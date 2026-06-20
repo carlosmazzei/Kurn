@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXFileReference section */
@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AA00000000000000000000E1 /* Exceptions for "MeetSync" folder */ = {
+		AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -21,14 +21,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		AA00000000000000000000C1 /* MeetSync */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				AA00000000000000000000E1 /* Exceptions for "MeetSync" folder */,
-			);
-			path = MeetSync;
-			sourceTree = "<group>";
-		};
+		AA00000000000000000000C1 /* MeetSync */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSync; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,7 +35,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AA0000000000000000000001 /* Main */ = {
+		AA0000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000C1 /* MeetSync */,
@@ -88,8 +81,8 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 1600;
+				LastSwiftUpdateCheck = 2650;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					AA00000000000000000000B1 = {
 						CreatedOnToolsVersion = 16.0;
@@ -105,7 +98,7 @@
 				Base,
 				"pt-BR",
 			);
-			mainGroup = AA0000000000000000000001 /* Main */;
+			mainGroup = AA0000000000000000000001;
 			productRefGroup = AA0000000000000000000002 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -262,6 +255,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WE49K38CEY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MeetSync/Info.plist;
@@ -271,7 +265,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.meetsync.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ainoteflow.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -286,6 +280,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WE49K38CEY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MeetSync/Info.plist;
@@ -295,7 +290,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.meetsync.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ainoteflow.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
