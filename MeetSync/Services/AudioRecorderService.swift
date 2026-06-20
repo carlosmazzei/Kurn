@@ -166,7 +166,7 @@ final class AudioRecorderService: NSObject {
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
-                options: [.defaultToSpeaker, .allowBluetooth]
+                options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try session.setActive(true)
         } catch {
@@ -241,28 +241,30 @@ final class AudioRecorderService: NSObject {
               let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
 
-        Task { @MainActor in
-            switch type {
-            case .began:
+        switch type {
+        case .began:
+            Task { @MainActor in
                 self.wasRecordingBeforeInterruption = (self.state == .recording)
                 if self.state == .recording { self.pause() }
-            case .ended:
-                let options: AVAudioSession.InterruptionOptions
-                if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt {
-                    options = AVAudioSession.InterruptionOptions(rawValue: optRaw)
-                } else {
-                    options = []
-                }
+            }
+        case .ended:
+            let shouldResume: Bool
+            if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt {
+                shouldResume = AVAudioSession.InterruptionOptions(rawValue: optRaw).contains(.shouldResume)
+            } else {
+                shouldResume = false
+            }
+            Task { @MainActor in
                 if self.wasRecordingBeforeInterruption,
-                   options.contains(.shouldResume),
+                   shouldResume,
                    self.state == .paused {
                     try? AVAudioSession.sharedInstance().setActive(true)
                     self.resume()
                 }
                 self.wasRecordingBeforeInterruption = false
-            @unknown default:
-                break
             }
+        @unknown default:
+            break
         }
     }
 
