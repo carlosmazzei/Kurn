@@ -1,0 +1,108 @@
+/* MeetSync — Português (Brasil) */
+
+/* Erros */
+"error.no_api_key" = "Nenhuma chave de API configurada para %@. Adicione uma nos Ajustes.";
+"error.network" = "Erro de rede: %@";
+"error.api" = "Erro da API %1$d: %2$@";
+"error.transcription" = "Falha na transcrição: %@";
+"error.audio" = "Erro de áudio: %@";
+"error.decoding" = "Não foi possível ler a resposta: %@";
+"error.permission" = "Permissão negada: %@";
+"error.recorder_start" = "Não foi possível iniciar a gravação.";
+"error.recognizer_unavailable" = "O reconhecimento de fala não está disponível para este idioma.";
+"error.recognizer_offline" = "O reconhecimento de fala no dispositivo não está pronto. Tente novamente em instantes.";
+"error.export_session" = "Não foi possível preparar o áudio para envio.";
+"error.export_failed" = "Falha ao exportar o áudio.";
+"error.anthropic_no_transcribe" = "A Anthropic não oferece transcrição. Use o modo no dispositivo ou o Whisper da OpenAI.";
+"error.no_transcript" = "Ainda não há transcrição para resumir.";
+"error.speech_permission" = "É necessária a permissão de reconhecimento de fala para a transcrição no dispositivo.";
+
+/* Modos de transcrição */
+"mode.on_device" = "No dispositivo";
+"mode.whisper" = "API Whisper";
+
+/* Idiomas */
+"lang.auto" = "Detectar automaticamente";
+"lang.pt" = "Português";
+"lang.en" = "Inglês";
+"lang.es" = "Espanhol";
+"lang.fr" = "Francês";
+"lang.de" = "Alemão";
+"lang.ja" = "Japonês";
+"lang.zh" = "Chinês";
+
+/* Gravador */
+"recorder.route_changed" = "Gravação pausada: o dispositivo de áudio mudou (ex.: fones desconectados).";
+"recorder.title" = "Gravar";
+"recorder.permission.title" = "Acesso ao Microfone Necessário";
+"recorder.permission.message" = "O MeetSync precisa do microfone para gravar reuniões. Ative o acesso nos Ajustes.";
+
+/* Reuniões */
+"meeting.default_title" = "Reunião – %@";
+"meeting.has_summary" = "Tem resumo";
+"meetings.title" = "Reuniões";
+"meetings.new" = "Nova Reunião";
+"meetings.empty.title" = "Nenhuma Reunião";
+"meetings.empty.subtitle" = "Toque em + para criar sua primeira reunião e começar a gravar.";
+"meetings.delete.confirm" = "Excluir esta reunião e suas gravações?";
+
+/* Comum */
+"common.delete" = "Excluir";
+"common.cancel" = "Cancelar";
+"common.save" = "Salvar";
+"common.ok" = "OK";
+"common.error" = "Erro";
+"common.edit" = "Editar";
+"common.done" = "Concluir";
+
+/* Status */
+"status.in_progress" = "Transcrevendo";
+"status.done" = "Transcrita";
+"status.failed" = "Falhou";
+
+/* Formulário de reunião */
+"form.title_section" = "Título";
+"form.title_placeholder" = "Título da reunião";
+"form.notes_section" = "Notas";
+"form.notes_placeholder" = "Adicionar notas…";
+"form.language_section" = "Idioma da Transcrição";
+"form.language" = "Idioma";
+"form.new_title" = "Nova Reunião";
+"form.edit_title" = "Editar Reunião";
+
+/* Detalhe */
+"detail.total_duration" = "Duração total: %@";
+"detail.recordings" = "Gravações";
+"detail.record_new" = "Gravar Novo Trecho";
+"detail.transcribe" = "Transcrever";
+"detail.transcribe.choose" = "Escolha como transcrever";
+"detail.transcript" = "Transcrição";
+"detail.speakers" = "Participantes";
+"detail.speakers.note" = "Os participantes são detectados automaticamente e podem precisar de correção. Toque em um nome para renomear.";
+"detail.summary" = "Resumo";
+"detail.summarizing" = "Gerando resumo…";
+"detail.summary.needs_transcript" = "Transcreva ao menos uma gravação para gerar um resumo.";
+"detail.summary.regenerate" = "Gerar novamente";
+"detail.summary.generate" = "Gerar Resumo";
+"detail.share" = "Compartilhar";
+
+/* Resumo */
+"summary.key_decisions" = "Decisões Principais";
+"summary.action_items" = "Itens de Ação";
+"summary.footer" = "Gerado por %1$@ · %2$@";
+
+/* Ajustes */
+"settings.title" = "Ajustes";
+"settings.provider" = "Provedor de IA";
+"settings.openai_key" = "Chave de API da OpenAI";
+"settings.openai_footer" = "Usada para transcrição Whisper e resumos GPT-4o.";
+"settings.anthropic_key" = "Chave de API da Anthropic";
+"settings.anthropic_footer" = "Usada para resumos com o Claude.";
+"settings.defaults" = "Padrões";
+"settings.default_mode" = "Transcrição Padrão";
+"settings.default_language" = "Idioma Padrão";
+"settings.storage" = "Armazenamento";
+"settings.audio_usage" = "Arquivos de Áudio";
+"settings.delete_all" = "Apagar Todos os Dados";
+"settings.delete_all.confirm" = "Apagar todas as reuniões e gravações?";
+"settings.delete_all.message" = "Isso remove permanentemente todas as reuniões, transcrições e arquivos de áudio. Não é possível desfazer.";
