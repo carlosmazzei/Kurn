@@ -53,14 +53,28 @@ extension SummaryJSON {
             }
             text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        guard let data = text.data(using: .utf8) else {
-            throw AppError.decodingError("summary text was not valid UTF-8")
+        // First attempt: decode the (de-fenced) text directly.
+        if let data = text.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(SummaryJSON.self, from: data) {
+            return decoded
         }
-        do {
-            return try JSONDecoder().decode(SummaryJSON.self, from: data)
-        } catch {
-            throw AppError.decodingError(error.localizedDescription)
+
+        // Fallback: extract the outermost { ... } object in case the model wrote
+        // any prose around the JSON (more common with the Anthropic path).
+        if let start = text.firstIndex(of: "{"),
+           let end = text.lastIndex(of: "}"),
+           start < end {
+            let candidate = String(text[start...end])
+            if let data = candidate.data(using: .utf8) {
+                do {
+                    return try JSONDecoder().decode(SummaryJSON.self, from: data)
+                } catch {
+                    throw AppError.decodingError(error.localizedDescription)
+                }
+            }
         }
+
+        throw AppError.decodingError("response did not contain valid JSON")
     }
 }
 

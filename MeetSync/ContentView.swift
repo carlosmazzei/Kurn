@@ -6,6 +6,7 @@
 //  pushes detail/recorder screens; Settings is presented as a sheet.
 //
 
+import SwiftData
 import SwiftUI
 
 struct ContentView: View {

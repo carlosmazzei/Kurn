@@ -5,6 +5,7 @@
 //  Hex <-> Color conversion for per-speaker color tags stored as strings.
 //
 
+import Foundation
 import SwiftUI
 
 extension Color {
