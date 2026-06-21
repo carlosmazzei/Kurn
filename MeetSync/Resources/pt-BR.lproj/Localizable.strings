@@ -101,6 +101,8 @@
 "detail.summary" = "Resumo";
 "detail.summarizing" = "Gerando resumo…";
 "detail.summary.needs_transcript" = "Transcreva ao menos uma gravação para gerar um resumo.";
+"detail.summary.model_nudge" = "Usará %1$@ · modelo %2$@";
+"detail.summary.model_missing" = "Nenhum modelo de resumo selecionado";
 "detail.summary.regenerate" = "Gerar novamente";
 "detail.summary.generate" = "Gerar Resumo";
 "detail.share" = "Compartilhar";
@@ -118,20 +120,38 @@
 "quality.standard" = "Padrão";
 "quality.low" = "Baixa";
 "error.provider_no_transcribe" = "Este provedor não oferece transcrição. Use on-device ou OpenAI Whisper.";
+"error.no_model_selected" = "Selecione um modelo antes de gerar um resumo.";
 
 /* Resumo */
 "summary.key_decisions" = "Decisões Principais";
 "summary.action_items" = "Itens de Ação";
 "summary.footer" = "Gerado por %1$@ · %2$@";
+"summary.footer_with_model" = "Gerado por %1$@ · %2$@ · %3$@";
 
 /* Ajustes */
 "settings.title" = "Ajustes";
 "settings.provider" = "Provedor";
 "settings.providers" = "Provedores de IA";
+"settings.no_configured_providers" = "Configure uma chave de API antes de selecionar um provedor de resumo.";
+"settings.add_provider" = "Adicionar Provedor";
+"settings.provider_name" = "Nome do Provedor";
+"settings.provider_type" = "Tipo de Provedor";
+"settings.base_url" = "URL Base";
+"settings.base_url_footer" = "Use a URL base da API do provedor, por exemplo https://api.openai.com/v1.";
+"settings.credentials" = "Credenciais";
+"settings.delete_provider" = "Apagar Provedor";
+"settings.delete_provider.confirm" = "Apagar este provedor?";
 "settings.transcription" = "Transcrição";
+"settings.whisper_openai_key_footer" = "A transcrição via Whisper API usa a chave de API da OpenAI configurada em Provedores de IA, independentemente do provedor de resumo selecionado.";
+"settings.whisper_openai_key_missing_footer" = "Configure a chave de API da OpenAI em Provedores de IA para habilitar a transcrição via Whisper API.";
 "settings.summary" = "Resumo";
 "settings.recording" = "Gravação";
 "settings.model" = "Modelo";
+"settings.no_models" = "Nenhum modelo";
+"settings.loading_models" = "Carregando modelos";
+"settings.refresh_models" = "Atualizar Modelos";
+"settings.models_need_key" = "Configure a chave de API deste provedor para carregar os modelos.";
+"settings.no_models_loaded" = "Nenhum modelo utilizável foi retornado por este provedor.";
 "settings.configured" = "Configurado";
 "settings.not_configured" = "Não configurado";
 "settings.api_key" = "Chave de API";

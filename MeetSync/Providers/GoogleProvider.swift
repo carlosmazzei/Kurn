@@ -10,13 +10,14 @@
 import Foundation
 
 struct GoogleProvider: LLMProvider {
-    let provider: AIProvider = .google
+    let provider: AIProvider
 
     private let apiKey: String
     private let session: URLSession
     private let model: String
 
-    init(apiKey: String, model: String = "gemini-1.5-pro", session: URLSession = .shared) {
+    init(provider: AIProvider = .google, apiKey: String, model: String = "gemini-1.5-pro", session: URLSession = .shared) {
+        self.provider = provider
         self.apiKey = apiKey
         self.model = model
         self.session = session
@@ -35,8 +36,11 @@ struct GoogleProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
 
+        let cleanModel = model.replacingOccurrences(of: "models/", with: "")
         var components = URLComponents(
-            string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
+            url: LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models/\(cleanModel):generateContent")
+                ?? URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(cleanModel):generateContent")!,
+            resolvingAgainstBaseURL: false
         )!
         components.queryItems = [URLQueryItem(name: "key", value: apiKey)]
         var request = URLRequest(url: components.url!)

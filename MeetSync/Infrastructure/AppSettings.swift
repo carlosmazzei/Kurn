@@ -15,6 +15,7 @@ import Observation
 final class AppSettings {
     private enum Keys {
         static let provider = "settings.aiProvider"
+        static let providers = "settings.aiProviders"
         static let defaultMode = "settings.defaultTranscriptionMode"
         static let defaultLanguage = "settings.defaultLanguage"
         static let micPickup = "settings.micPickup"
@@ -24,8 +25,16 @@ final class AppSettings {
 
     private let defaults = UserDefaults.standard
 
+    var providers: [AIProvider] {
+        didSet { persistProviders() }
+    }
+
+    var aiProviderID: String {
+        didSet { defaults.set(aiProviderID, forKey: Keys.provider) }
+    }
+
     var aiProvider: AIProvider {
-        didSet { defaults.set(aiProvider.rawValue, forKey: Keys.provider) }
+        providers.first(where: { $0.id == aiProviderID }) ?? providers.first ?? .openAI
     }
 
     var defaultMode: TranscriptionMode {
@@ -58,7 +67,7 @@ final class AppSettings {
     /// Selected summary model for a provider, falling back to its default.
     func summaryModel(for provider: AIProvider) -> String {
         let stored = summaryModels[provider.rawValue]
-        if let stored, provider.availableModels.contains(stored) { return stored }
+        if let stored, !stored.isEmpty { return stored }
         return provider.defaultModel
     }
 
@@ -66,10 +75,40 @@ final class AppSettings {
         summaryModels[provider.rawValue] = model
     }
 
+    func addProvider(_ provider: AIProvider) {
+        providers.append(provider)
+        aiProviderID = provider.id
+    }
+
+    func updateProvider(_ provider: AIProvider) {
+        guard let index = providers.firstIndex(where: { $0.id == provider.id }) else { return }
+        providers[index] = provider
+    }
+
+    func removeProvider(_ provider: AIProvider) {
+        guard !provider.isBuiltIn else { return }
+        providers.removeAll { $0.id == provider.id }
+        summaryModels[provider.id] = nil
+        KeychainManager.shared.delete(provider.keychainAccount)
+        if aiProviderID == provider.id {
+            aiProviderID = providers.first?.id ?? AIProvider.openAI.id
+        }
+    }
+
     init() {
-        aiProvider = AIProvider(
-            rawValue: defaults.string(forKey: Keys.provider) ?? ""
-        ) ?? .openAI
+        let loadedProviders: [AIProvider]
+        if let data = defaults.data(forKey: Keys.providers),
+           let decoded = try? JSONDecoder().decode([AIProvider].self, from: data),
+           !decoded.isEmpty {
+            loadedProviders = Self.mergedProviders(decoded)
+        } else {
+            loadedProviders = AIProvider.defaultProviders
+        }
+        providers = loadedProviders
+        let storedProviderID = defaults.string(forKey: Keys.provider) ?? AIProvider.openAI.id
+        aiProviderID = loadedProviders.contains(where: { $0.id == storedProviderID })
+            ? storedProviderID
+            : AIProvider.openAI.id
         defaultMode = TranscriptionMode(
             rawValue: defaults.string(forKey: Keys.defaultMode) ?? ""
         ) ?? .onDevice
@@ -88,5 +127,19 @@ final class AppSettings {
         } else {
             summaryModels = [:]
         }
+    }
+
+    private func persistProviders() {
+        if let data = try? JSONEncoder().encode(providers) {
+            defaults.set(data, forKey: Keys.providers)
+        }
+    }
+
+    private static func mergedProviders(_ stored: [AIProvider]) -> [AIProvider] {
+        var providers = AIProvider.defaultProviders
+        for provider in stored where !provider.isBuiltIn && !providers.contains(where: { $0.id == provider.id }) {
+            providers.append(provider)
+        }
+        return providers
     }
 }

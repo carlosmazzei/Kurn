@@ -35,6 +35,14 @@ protocol LLMProvider: Sendable {
 /// HTTP plumbing shared by the cloud providers: both OpenAI and Anthropic talk
 /// to JSON APIs that report failures as `{ "error": { "message" } }`.
 enum LLMHTTP {
+    static func endpoint(baseURLString: String, path: String) -> URL? {
+        guard var components = URLComponents(string: baseURLString) else { return nil }
+        let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let endpointPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = "/" + [basePath, endpointPath].filter { !$0.isEmpty }.joined(separator: "/")
+        return components.url
+    }
+
     /// Perform the request, mapping transport failures to `AppError.networkError`.
     static func send(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
         do {

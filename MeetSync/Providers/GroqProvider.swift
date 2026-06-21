@@ -10,13 +10,14 @@
 import Foundation
 
 struct GroqProvider: LLMProvider {
-    let provider: AIProvider = .groq
+    let provider: AIProvider
 
     private let apiKey: String
     private let session: URLSession
     private let model: String
 
-    init(apiKey: String, model: String = "llama-3.3-70b-versatile", session: URLSession = .shared) {
+    init(provider: AIProvider = .groq, apiKey: String, model: String = "llama-3.3-70b-versatile", session: URLSession = .shared) {
+        self.provider = provider
         self.apiKey = apiKey
         self.model = model
         self.session = session
@@ -35,7 +36,8 @@ struct GroqProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
 
-        let url = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "chat/completions")
+            ?? URL(string: "https://api.groq.com/openai/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

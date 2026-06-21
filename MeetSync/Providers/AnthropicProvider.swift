@@ -10,14 +10,15 @@
 import Foundation
 
 struct AnthropicProvider: LLMProvider {
-    let provider: AIProvider = .anthropic
+    let provider: AIProvider
 
     private let apiKey: String
     private let session: URLSession
     private let model: String
     private let apiVersion = "2023-06-01"
 
-    init(apiKey: String, model: String = "claude-3-5-sonnet-latest", session: URLSession = .shared) {
+    init(provider: AIProvider = .anthropic, apiKey: String, model: String = "claude-3-5-sonnet-latest", session: URLSession = .shared) {
+        self.provider = provider
         self.apiKey = apiKey
         self.model = model
         self.session = session
@@ -43,7 +44,8 @@ struct AnthropicProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
 
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "messages")
+            ?? URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")

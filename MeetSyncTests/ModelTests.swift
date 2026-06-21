@@ -125,6 +125,13 @@ struct ModelTests {
         #expect(summary.providerRaw == AIProvider.openAI.rawValue)
     }
 
+    @Test func modelPropertyRoundTripsThroughOptionalStorage() {
+        let summary = Summary(content: "body", provider: .openAI, model: "gpt-4o")
+        #expect(summary.model == "gpt-4o")
+        summary.model = nil
+        #expect(summary.model == nil)
+    }
+
     // MARK: - Transcript
 
     @Test func segmentsRoundTripThroughJSONStorage() {

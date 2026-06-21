@@ -187,6 +187,7 @@ final class TranscriptionViewModel {
                 existing.actionItems = result.actionItems
                 existing.keyDecisions = result.keyDecisions
                 existing.provider = provider
+                existing.model = model
                 existing.updatedAt = Date()
             } else {
                 let summary = Summary(
@@ -194,7 +195,8 @@ final class TranscriptionViewModel {
                     content: result.content,
                     actionItems: result.actionItems,
                     keyDecisions: result.keyDecisions,
-                    provider: provider
+                    provider: provider,
+                    model: model
                 )
                 modelContext.insert(summary)
                 meeting.summary = summary
