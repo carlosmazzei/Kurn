@@ -36,6 +36,9 @@ final class AudioRecorderService: NSObject {
     private var accumulated: TimeInterval = 0
     private var segmentStart: Date?
     @ObservationIgnored var onStateChanged: ((State, TimeInterval) -> Void)?
+    /// Fired on every metering tick (~50ms) while recording, for low-latency
+    /// mirroring (e.g. to the Watch app). Not used for UI state transitions.
+    @ObservationIgnored var onLevelChanged: ((Float) -> Void)?
 
     /// Whether the user was recording when an interruption began, so we can
     /// decide whether to auto-resume when it ends.
@@ -219,6 +222,7 @@ final class AudioRecorderService: NSObject {
         let floor: Float = -50
         let clamped = max(floor, power)
         level = (clamped - floor) / (-floor)
+        onLevelChanged?(level)
         if let start = segmentStart {
             elapsed = accumulated + Date().timeIntervalSince(start)
         }

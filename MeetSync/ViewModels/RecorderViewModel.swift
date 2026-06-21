@@ -31,7 +31,21 @@ final class RecorderViewModel {
         self.defaultMode = defaultMode
         self.recorder.onStateChanged = { [weak self] state, elapsed in
             self?.lockScreenController.update(state: state, elapsed: elapsed)
+            self?.pushWatchState(state: state, elapsed: elapsed)
         }
+        self.recorder.onLevelChanged = { level in
+            PhoneSessionController.shared.pushLevel(level)
+        }
+    }
+
+    private func pushWatchState(state: AudioRecorderService.State, elapsed: TimeInterval) {
+        PhoneSessionController.shared.pushState(
+            state: state,
+            meetingTitle: meeting.title,
+            accumulatedElapsed: elapsed,
+            referenceDate: Date(),
+            isAvailable: state != .idle
+        )
     }
 
     var state: AudioRecorderService.State { recorder.state }
@@ -55,6 +69,8 @@ final class RecorderViewModel {
             )
             RecordingCommandRouter.shared.register(
                 onTogglePause: { [weak self] in self?.togglePause() },
+                onPause: { [weak self] in self?.recorder.pause() },
+                onResume: { [weak self] in self?.recorder.resume() },
                 onStop: { [weak self] in self?.stopAndSave() }
             )
         } catch let appError as AppError {
@@ -77,6 +93,7 @@ final class RecorderViewModel {
         guard let result = recorder.stop() else {
             lockScreenController.end()
             RecordingCommandRouter.shared.unregister()
+            PhoneSessionController.shared.notifyEnded()
             didSaveRecording = true
             return
         }
@@ -85,6 +102,7 @@ final class RecorderViewModel {
             AudioFileStore.delete(fileName: result.fileName)
             lockScreenController.end()
             RecordingCommandRouter.shared.unregister()
+            PhoneSessionController.shared.notifyEnded()
             didSaveRecording = true
             return
         }
@@ -101,6 +119,7 @@ final class RecorderViewModel {
         try? modelContext.save()
         lockScreenController.end()
         RecordingCommandRouter.shared.unregister()
+        PhoneSessionController.shared.notifyEnded()
         didSaveRecording = true
     }
 
@@ -108,5 +127,6 @@ final class RecorderViewModel {
         recorder.cancel()
         lockScreenController.end()
         RecordingCommandRouter.shared.unregister()
+        PhoneSessionController.shared.notifyEnded()
     }
 }
