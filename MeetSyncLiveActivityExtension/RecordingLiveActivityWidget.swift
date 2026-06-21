@@ -60,7 +60,7 @@ struct RecordingLiveActivityWidget: Widget {
                     .padding(.bottom, 2)
                 }
             } compactLeading: {
-                Image(systemName: context.state.isPaused ? "pause.fill" : "waveform")
+                Image(systemName: context.state.isPaused ? "pause.fill" : "mic.fill")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(context.state.isPaused ? Color.meetSyncPaused : Color.meetSyncAccent)
             } compactTrailing: {
@@ -72,7 +72,7 @@ struct RecordingLiveActivityWidget: Widget {
                     .minimumScaleFactor(0.8)
                     .frame(width: 44)
             } minimal: {
-                Image(systemName: context.state.isPaused ? "pause.fill" : "waveform")
+                Image(systemName: context.state.isPaused ? "pause.fill" : "mic.fill")
                     .foregroundStyle(context.state.isPaused ? Color.meetSyncPaused : Color.meetSyncAccent)
             }
             .keylineTint(.meetSyncAccent)
@@ -91,7 +91,7 @@ private struct LockScreenRecordingView: View {
                         .fill(Color.meetSyncAccent.opacity(context.state.isPaused ? 0.16 : 0.22))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: context.state.isPaused ? "pause.fill" : "waveform")
+                    Image(systemName: context.state.isPaused ? "pause.fill" : "mic.fill")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(context.state.isPaused ? Color.meetSyncPaused : Color.meetSyncAccent)
                 }
@@ -219,10 +219,11 @@ private enum RecordingCommandStyle {
 }
 
 private extension Color {
-    static let meetSyncActivityBackground = Color(red: 0.055, green: 0.067, blue: 0.082)
-    static let meetSyncAccent = Color(red: 0.22, green: 0.89, blue: 0.70)
-    static let meetSyncPaused = Color(red: 1.0, green: 0.74, blue: 0.28)
-    static let meetSyncStop = Color(red: 1.0, green: 0.32, blue: 0.35)
+    static let meetSyncActivityBackground = Color(red: 0.039, green: 0.039, blue: 0.059)
+    // Recording accent matches the app design (#FF3B30).
+    static let meetSyncAccent = Color(red: 1.0, green: 0.231, blue: 0.188)
+    static let meetSyncPaused = Color(red: 1.0, green: 0.624, blue: 0.039) // #FF9F0A
+    static let meetSyncStop = Color(red: 1.0, green: 0.231, blue: 0.188)
 }
 
 private extension TimeInterval {

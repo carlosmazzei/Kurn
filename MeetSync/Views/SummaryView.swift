@@ -14,14 +14,16 @@ struct SummaryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             MarkdownText(summary.content)
+                .meetsyncCard()
 
             if !summary.keyDecisions.isEmpty {
                 bulletSection(
                     title: NSLocalizedString("summary.key_decisions", comment: "Key Decisions"),
                     items: summary.keyDecisions,
                     symbol: "checkmark.seal.fill",
-                    tint: .green
+                    tint: Theme.success
                 )
+                .meetsyncCard()
             }
 
             if !summary.actionItems.isEmpty {
@@ -29,8 +31,9 @@ struct SummaryView: View {
                     title: NSLocalizedString("summary.action_items", comment: "Action Items"),
                     items: summary.actionItems,
                     symbol: "square",
-                    tint: .blue
+                    tint: Theme.info
                 )
+                .meetsyncCard()
             }
 
             Text(
