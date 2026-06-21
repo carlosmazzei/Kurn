@@ -25,6 +25,7 @@ struct TranscriptionService {
     private let onDevice = OnDeviceTranscriber()
     private let diarizer = SpeakerDiarizer()
     private let chunker = AudioChunker()
+    private let preprocessor = AudioPreprocessor()
 
     /// Transcribe one recording file and return diarized segments.
     func transcribe(
@@ -33,10 +34,21 @@ struct TranscriptionService {
         language: MeetingLanguage,
         mode: TranscriptionMode
     ) async throws -> Output {
+        // Clean the audio (high-pass, presence EQ, AGC/limiter, mono 16 kHz)
+        // before transcription/diarization. If cleanup fails for any reason we
+        // fall back to the original so transcription never breaks.
+        let cleanedURL = (try? await preprocessor.process(url: fileURL)) ?? fileURL
+        defer {
+            if cleanedURL != fileURL {
+                let url = cleanedURL
+                Task { await preprocessor.cleanup(url) }
+            }
+        }
+
         // Transcription and diarization both read the same file but are
         // independent, so run them concurrently instead of back to back.
-        async let rawTranscript = transcribeRaw(fileURL: fileURL, language: language, mode: mode)
-        async let speakerTurns = diarizer.diarize(url: fileURL)
+        async let rawTranscript = transcribeRaw(fileURL: cleanedURL, language: language, mode: mode)
+        async let speakerTurns = diarizer.diarize(url: cleanedURL)
 
         let raw = try await rawTranscript
         let turns = await speakerTurns

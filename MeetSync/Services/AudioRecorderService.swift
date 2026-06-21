@@ -2,10 +2,17 @@
 //  AudioRecorderService.swift
 //  MeetSync
 //
-//  AVAudioRecorder wrapper providing the core recording loop: start / pause /
-//  resume / stop, real-time level metering, and resilient handling of audio
-//  session interruptions and route changes. Recording is fully offline — the
-//  .m4a is written directly to Documents and survives connectivity loss.
+//  AVAudioEngine-based recorder providing the core recording loop: start / pause
+//  / resume / stop, real-time level metering, and resilient handling of audio
+//  session interruptions and route changes.
+//
+//  Unlike a plain AVAudioRecorder, the engine's input node runs Apple's hardware
+//  Voice Processing (acoustic echo cancellation, background-noise suppression and
+//  automatic gain control) so the captured .m4a is already cleaned at the source.
+//  We also steer the built-in microphone toward a directional (cardioid) polar
+//  pattern when no external mic is attached, favouring the speaker in front.
+//  Recording stays fully offline — buffers are written straight to a Documents
+//  .m4a and survive connectivity loss.
 //
 
 import AVFoundation
@@ -29,7 +36,13 @@ final class AudioRecorderService: NSObject {
     /// Set when a route change (e.g. headphones unplugged) auto-paused us.
     private(set) var routeChangeMessage: String?
 
-    private var recorder: AVAudioRecorder?
+    private let engine = AVAudioEngine()
+    /// Thread-safe sink that owns the output file and the latest level. The input
+    /// tap runs on a render thread, so it talks to the sink rather than to this
+    /// main-actor object directly.
+    private let sink = RecordingSink()
+    private var tapInstalled = false
+
     private var meterTimer: Timer?
     private var currentFileName: String?
     /// Accumulated time across pause cycles plus the active span.
@@ -72,24 +85,8 @@ final class AudioRecorderService: NSObject {
         let fileName = AudioFileStore.fileName(meetingID: meetingID)
         let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
 
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44_100.0,
-            AVNumberOfChannelsKey: 2,
-            AVEncoderBitRateKey: 128_000,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
-        ]
-
         do {
-            let recorder = try AVAudioRecorder(url: url, settings: settings)
-            recorder.delegate = self
-            recorder.isMeteringEnabled = true
-            guard recorder.record() else {
-                throw AppError.audioError(
-                    NSLocalizedString("error.recorder_start", comment: "Recorder failed to start")
-                )
-            }
-            self.recorder = recorder
+            try beginEngine(writingTo: url)
             self.currentFileName = fileName
             self.accumulated = 0
             self.segmentStart = Date()
@@ -99,15 +96,19 @@ final class AudioRecorderService: NSObject {
             notifyStateChanged()
             startMetering()
         } catch let error as AppError {
+            teardownEngine()
+            deactivateSession()
             throw error
         } catch {
+            teardownEngine()
+            deactivateSession()
             throw AppError.audioError(error.localizedDescription)
         }
     }
 
     func pause() {
-        guard state == .recording, let recorder else { return }
-        recorder.pause()
+        guard state == .recording else { return }
+        sink.setPaused(true)
         accumulateElapsed()
         stopMetering()
         level = 0
@@ -116,8 +117,12 @@ final class AudioRecorderService: NSObject {
     }
 
     func resume() {
-        guard state == .paused, let recorder else { return }
-        guard recorder.record() else { return }
+        guard state == .paused else { return }
+        // An interruption may have stopped the engine while we were paused.
+        if !engine.isRunning {
+            do { try engine.start() } catch { return }
+        }
+        sink.setPaused(false)
         segmentStart = Date()
         routeChangeMessage = nil
         state = .recording
@@ -129,15 +134,14 @@ final class AudioRecorderService: NSObject {
     /// if nothing was recorded. The session is deactivated afterwards.
     @discardableResult
     func stop() -> (fileName: String, duration: TimeInterval)? {
-        guard state != .idle, let recorder, let fileName = currentFileName else {
+        guard state != .idle, let fileName = currentFileName else {
             return nil
         }
         accumulateElapsed()
-        recorder.stop()
         stopMetering()
+        teardownEngine()
 
         let duration = accumulated
-        self.recorder = nil
         self.currentFileName = nil
         self.state = .idle
         self.level = 0
@@ -152,11 +156,10 @@ final class AudioRecorderService: NSObject {
 
     /// Abort the current recording and delete its partial file.
     func cancel() {
-        guard let recorder, let fileName = currentFileName else { return }
-        recorder.stop()
+        guard let fileName = currentFileName else { return }
         stopMetering()
+        teardownEngine()
         AudioFileStore.delete(fileName: fileName)
-        self.recorder = nil
         self.currentFileName = nil
         self.state = .idle
         self.level = 0
@@ -167,20 +170,106 @@ final class AudioRecorderService: NSObject {
         deactivateSession()
     }
 
+    // MARK: - Engine
+
+    /// Configure Voice Processing, open the output file and start the engine,
+    /// installing a tap that writes captured buffers and tracks the input level.
+    private func beginEngine(writingTo url: URL) throws {
+        let input = engine.inputNode
+        // Enable hardware echo cancellation, noise suppression and AGC. Best
+        // effort: if the route can't support it we still record the raw input.
+        try? input.setVoiceProcessingEnabled(true)
+
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw AppError.audioError(
+                NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
+            )
+        }
+
+        // Derive AAC .m4a settings from the live input format so the encoder
+        // matches the buffers the tap delivers.
+        var settings = format.settings
+        settings[AVFormatIDKey] = Int(kAudioFormatMPEG4AAC)
+        settings[AVEncoderBitRateKey] = 64_000
+        settings[AVEncoderAudioQualityKey] = AVAudioQuality.high.rawValue
+
+        let file = try AVAudioFile(forWriting: url, settings: settings)
+        sink.open(file)
+
+        let bufferSink = sink
+        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
+            bufferSink.write(buffer)
+        }
+        tapInstalled = true
+
+        engine.prepare()
+        do {
+            try engine.start()
+        } catch {
+            throw AppError.audioError(
+                NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
+            )
+        }
+    }
+
+    private func teardownEngine() {
+        sink.setPaused(true)
+        if engine.isRunning { engine.stop() }
+        if tapInstalled {
+            engine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        // Flush and close the output file.
+        sink.close()
+        // Reset Voice Processing so the next session starts from a clean state.
+        try? engine.inputNode.setVoiceProcessingEnabled(false)
+    }
+
     // MARK: - Session
 
     private func configureSession() throws {
         let session = AVAudioSession.sharedInstance()
         do {
+            // `.voiceChat` is the recommended mode when the engine's Voice
+            // Processing unit is active.
             try session.setCategory(
                 .playAndRecord,
-                mode: .default,
+                mode: .voiceChat,
                 options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try session.setActive(true)
+            configureMicrophone(session)
         } catch {
             throw AppError.audioError(error.localizedDescription)
         }
+    }
+
+    /// Steer the built-in mic toward a directional pickup. Skipped entirely when
+    /// an external mic (Bluetooth / wired headset) is available, so we never
+    /// override the user's preferred input.
+    private func configureMicrophone(_ session: AVAudioSession) {
+        guard let inputs = session.availableInputs else { return }
+        let hasExternal = inputs.contains { $0.portType != .builtInMic }
+        guard !hasExternal,
+              let builtIn = inputs.first(where: { $0.portType == .builtInMic }) else { return }
+
+        try? session.setPreferredInput(builtIn)
+
+        guard let sources = builtIn.dataSources, !sources.isEmpty else { return }
+        // Prefer cardioid (most directional), then subcardioid.
+        let directional = sources.first { ds in
+            ds.supportedPolarPatterns?.contains(.cardioid) == true
+        } ?? sources.first { ds in
+            ds.supportedPolarPatterns?.contains(.subcardioid) == true
+        }
+        guard let source = directional else { return }
+        if source.supportedPolarPatterns?.contains(.cardioid) == true {
+            try? source.setPreferredPolarPattern(.cardioid)
+        } else {
+            try? source.setPreferredPolarPattern(.subcardioid)
+        }
+        try? builtIn.setPreferredDataSource(source)
     }
 
     private func deactivateSession() {
@@ -215,13 +304,9 @@ final class AudioRecorderService: NSObject {
     }
 
     private func tick() {
-        guard let recorder, state == .recording else { return }
-        recorder.updateMeters()
-        // Map dBFS (-160...0) to a perceptual 0...1 with a noise floor.
-        let power = recorder.averagePower(forChannel: 0)
-        let floor: Float = -50
-        let clamped = max(floor, power)
-        level = (clamped - floor) / (-floor)
+        guard state == .recording else { return }
+        // Level is computed off the render thread by the sink; just publish it.
+        level = sink.currentLevel
         onLevelChanged?(level)
         if let start = segmentStart {
             elapsed = accumulated + Date().timeIntervalSince(start)
@@ -302,13 +387,63 @@ final class AudioRecorderService: NSObject {
     }
 }
 
-extension AudioRecorderService: AVAudioRecorderDelegate {
-    nonisolated func audioRecorderEncodeErrorDidOccur(
-        _ recorder: AVAudioRecorder,
-        error: Error?
-    ) {
-        Task { @MainActor in
-            self.routeChangeMessage = error?.localizedDescription
+/// Thread-safe owner of the recording file and the latest input level. The audio
+/// tap runs on a real-time render thread; routing all file/level access through
+/// this lock-guarded box keeps it off the main actor and free of data races.
+private final class RecordingSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var file: AVAudioFile?
+    private var paused = true
+    private var level: Float = 0
+
+    func open(_ file: AVAudioFile) {
+        lock.lock(); defer { lock.unlock() }
+        self.file = file
+        paused = false
+        level = 0
+    }
+
+    func setPaused(_ value: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        paused = value
+        if value { level = 0 }
+    }
+
+    func close() {
+        lock.lock(); defer { lock.unlock() }
+        file = nil
+        paused = true
+        level = 0
+    }
+
+    var currentLevel: Float {
+        lock.lock(); defer { lock.unlock() }
+        return level
+    }
+
+    func write(_ buffer: AVAudioPCMBuffer) {
+        lock.lock(); defer { lock.unlock() }
+        guard !paused, let file else { return }
+        try? file.write(from: buffer)
+        level = Self.level(of: buffer)
+    }
+
+    /// Map a buffer's RMS energy to a perceptual 0...1 with a −50 dBFS floor,
+    /// matching the metering curve the UI was tuned against.
+    private static func level(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let channels = buffer.floatChannelData else { return 0 }
+        let frames = Int(buffer.frameLength)
+        guard frames > 0 else { return 0 }
+        var sum: Float = 0
+        let samples = channels[0]
+        for i in 0..<frames {
+            let sample = samples[i]
+            sum += sample * sample
         }
+        let rms = (sum / Float(frames)).squareRoot()
+        let db = 20 * log10(max(rms, 1e-7))
+        let floor: Float = -50
+        let clamped = max(floor, db)
+        return (clamped - floor) / (-floor)
     }
 }
