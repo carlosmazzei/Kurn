@@ -66,7 +66,8 @@ actor AudioPreprocessor {
         guard let outputFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
-            channels: 1
+            channels: 1,
+            interleaved: false
         ) else {
             throw AppError.audioError(
                 NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
@@ -77,8 +78,8 @@ actor AudioPreprocessor {
 
         try engine.start()
         // Audio units are initialized by `start()`, so set parameters afterwards.
-        configureDynamics(dynamics.audioUnit)
-        configureLimiter(limiter.audioUnit)
+        Self.configureDynamics(dynamics.audioUnit)
+        Self.configureLimiter(limiter.audioUnit)
         player.scheduleFile(inputFile, at: nil)
         player.play()
 
@@ -152,7 +153,7 @@ actor AudioPreprocessor {
 
     /// Compress loud peaks, lift the overall level (AGC-style makeup) and gate
     /// residual background below the expansion threshold.
-    private func configureDynamics(_ unit: AudioUnit) {
+    private static func configureDynamics(_ unit: AudioUnit) {
         setParam(unit, kDynamicsProcessorParam_Threshold, -22)
         setParam(unit, kDynamicsProcessorParam_HeadRoom, 5)
         setParam(unit, kDynamicsProcessorParam_ExpansionRatio, 4)
@@ -160,11 +161,11 @@ actor AudioPreprocessor {
         setParam(unit, kDynamicsProcessorParam_OverallGain, 6)
     }
 
-    private func configureLimiter(_ unit: AudioUnit) {
+    private static func configureLimiter(_ unit: AudioUnit) {
         setParam(unit, kLimiterParam_PreGain, 3)
     }
 
-    private func setParam(
+    private static func setParam(
         _ unit: AudioUnit,
         _ id: AudioUnitParameterID,
         _ value: AudioUnitParameterValue
