@@ -13,7 +13,7 @@ import Foundation
 /// Mirrors the command set the Watch app can send over WatchConnectivity.
 /// Duplicated (not shared) on the watchOS target since the two targets don't
 /// share source files.
-enum WatchCommand: String {
+enum WatchCommand: String, Sendable {
     case pause
     case resume
     case stop

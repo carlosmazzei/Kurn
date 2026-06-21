@@ -13,7 +13,7 @@ import WatchConnectivity
 
 /// Mirrors RecordingCommandRouter's command set on the iOS target.
 /// Duplicated rather than shared since the two targets don't share sources.
-enum WatchCommand: String {
+enum WatchCommand: String, Sendable {
     case pause
     case resume
     case stop

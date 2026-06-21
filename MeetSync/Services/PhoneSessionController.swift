@@ -11,6 +11,14 @@
 import Foundation
 import WatchConnectivity
 
+private struct WatchCommandReplyHandler: @unchecked Sendable {
+    let reply: ([String: Any]) -> Void
+
+    func call(_ response: [String: Any]) {
+        reply(response)
+    }
+}
+
 @MainActor
 final class PhoneSessionController: NSObject {
     static let shared = PhoneSessionController()
@@ -102,9 +110,12 @@ extension PhoneSessionController: WCSessionDelegate {
             replyHandler(["ok": false, "error": "unknown_command"])
             return
         }
-        Task { @MainActor in
-            let handled = RecordingCommandRouter.shared.handleWatchCommand(command)
-            replyHandler(handled ? ["ok": true] : ["ok": false, "error": "no_active_recording"])
+        let reply = WatchCommandReplyHandler(reply: replyHandler)
+        Task {
+            let handled = await MainActor.run {
+                RecordingCommandRouter.shared.handleWatchCommand(command)
+            }
+            reply.call(handled ? ["ok": true] : ["ok": false, "error": "no_active_recording"])
         }
     }
 }
