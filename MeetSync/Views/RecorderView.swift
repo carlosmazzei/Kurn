@@ -50,7 +50,6 @@ private struct RecorderContent: View {
     let onFinished: () -> Void
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
-    @State private var pulse = false
 
     var body: some View {
         ZStack {
@@ -81,7 +80,6 @@ private struct RecorderContent: View {
             .padding(.bottom, 40)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(.dark)
         .onChange(of: vm.level) { _, newValue in
             levels.removeFirst()
             levels.append(newValue)
@@ -142,10 +140,13 @@ private struct RecorderContent: View {
     @ViewBuilder
     private var statusBadge: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(vm.state == .paused ? Theme.warning : Theme.accent)
-                .frame(width: 10, height: 10)
-                .opacity(pulse && vm.state == .recording ? 0.25 : 1)
+            if vm.state == .recording {
+                PulsingDot(color: Theme.accent)
+            } else {
+                Circle()
+                    .fill(vm.state == .paused ? Theme.warning : Theme.accent)
+                    .frame(width: 10, height: 10)
+            }
             Text(vm.state == .paused
                  ? NSLocalizedString("recorder.paused", comment: "Paused")
                  : "REC")
@@ -238,11 +239,6 @@ private struct RecorderContent: View {
             .shadow(color: Theme.accent.opacity(vm.state == .idle ? 0 : 0.45), radius: 14, y: 4)
         }
         .opacity(vm.state == .idle ? 0.5 : 1)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-                pulse = true
-            }
-        }
     }
 
     private func pillLabel(
@@ -271,5 +267,24 @@ private struct RecorderContent: View {
         case .paused: return Theme.warning
         case .idle: return .white.opacity(0.3)
         }
+    }
+}
+
+/// A self-contained pulsing dot. Isolating the `repeatForever` animation here
+/// keeps it from interacting with the recorder's 20 Hz metering re-renders.
+private struct PulsingDot: View {
+    let color: Color
+    @State private var dim = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 10, height: 10)
+            .opacity(dim ? 0.25 : 1)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    dim = true
+                }
+            }
     }
 }
