@@ -56,6 +56,11 @@ struct MeetingsListView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                Text("MeetSync")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
                 searchField
                 filterChips
                 if filtered.isEmpty {
@@ -83,7 +88,9 @@ struct MeetingsListView: View {
             .padding(.bottom, 24)
         }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("MeetSync")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.background, for: .navigationBar)
         .navigationDestination(for: Meeting.self) { meeting in
             MeetingDetailView(meeting: meeting)
         }
