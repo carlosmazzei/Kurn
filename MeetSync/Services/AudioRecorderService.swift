@@ -39,12 +39,18 @@ final class AudioRecorderService: NSObject {
     /// Set when a route change (e.g. headphones unplugged) auto-paused us.
     private(set) var routeChangeMessage: String?
 
-    private let engine = AVAudioEngine()
+    // The engine, sink and tap flag are touched by the off-main setup/teardown
+    // path (see `setUpEngine`), so they are kept out of main-actor isolation and
+    // out of observation. Access is serialized by the `state`/`isStarting` guards.
+    @ObservationIgnored private nonisolated(unsafe) let engine = AVAudioEngine()
     /// Thread-safe sink that owns the output file and the latest level. The input
     /// tap runs on a render thread, so it talks to the sink rather than to this
     /// main-actor object directly.
-    private let sink = RecordingSink()
-    private var tapInstalled = false
+    @ObservationIgnored private nonisolated let sink = RecordingSink()
+    @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
+    /// True while `start` is asynchronously spinning up the engine, to block
+    /// re-entrant start attempts during that window.
+    @ObservationIgnored private var isStarting = false
 
     private var meterTimer: Timer?
     /// Counts metering ticks so we can log progress without flooding the console.
@@ -86,46 +92,55 @@ final class AudioRecorderService: NSObject {
 
     /// Begin recording into a new file for the given meeting. Throws `AppError`
     /// on permission or session/file failures.
-    func start(meetingID: UUID) throws {
+    func start(meetingID: UUID) async throws {
         AppLog.recorder.log("start: requested for meeting=\(meetingID, privacy: .public) currentState=\(String(describing: self.state), privacy: .public)")
-        guard state == .idle else {
-            AppLog.recorder.log("start: ignored, not idle")
+        guard state == .idle, !isStarting else {
+            AppLog.recorder.log("start: ignored (not idle or already starting)")
             return
         }
+        isStarting = true
+        defer { isStarting = false }
 
-        do {
-            try configureSession()
-        } catch {
-            AppLog.recorder.error("start: configureSession failed: \(error.localizedDescription, privacy: .public)")
-            throw error
-        }
-
+        let pickup = micPickup
         let fileName = AudioFileStore.fileName(meetingID: meetingID)
         let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
         AppLog.recorder.log("start: writing to \(fileName, privacy: .public)")
 
         do {
-            try beginEngine(writingTo: url)
-            self.currentFileName = fileName
-            self.accumulated = 0
-            self.segmentStart = Date()
-            self.elapsed = 0
-            self.routeChangeMessage = nil
-            self.state = .recording
-            notifyStateChanged()
-            startMetering()
-            AppLog.recorder.log("start: engine running, state=recording")
+            // Heavy AVAudioSession + AVAudioEngine setup runs OFF the main actor
+            // (see `setUpEngine`) so the UI — e.g. the recorder sheet animating
+            // in — stays responsive while the engine spins up.
+            try await setUpEngine(writingTo: url, pickup: pickup)
         } catch let error as AppError {
-            AppLog.recorder.error("start: beginEngine threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
+            AppLog.recorder.error("start: setup threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
             teardownEngine()
             deactivateSession()
             throw error
         } catch {
-            AppLog.recorder.error("start: beginEngine threw: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.error("start: setup threw: \(error.localizedDescription, privacy: .public)")
             teardownEngine()
             deactivateSession()
             throw AppError.audioError(error.localizedDescription)
         }
+
+        // Back on the main actor: publish state and start the metering timer.
+        self.currentFileName = fileName
+        self.accumulated = 0
+        self.segmentStart = Date()
+        self.elapsed = 0
+        self.routeChangeMessage = nil
+        self.state = .recording
+        notifyStateChanged()
+        startMetering()
+        AppLog.recorder.log("start: engine running, state=recording")
+    }
+
+    /// Configure the audio session and start the engine. `nonisolated` + `async`
+    /// so the (synchronously blocking) AVFoundation setup runs off the main
+    /// actor instead of stalling the UI.
+    private nonisolated func setUpEngine(writingTo url: URL, pickup: MicPickup) async throws {
+        try configureSession(pickup: pickup)
+        try beginEngine(writingTo: url)
     }
 
     func pause() {
@@ -203,8 +218,9 @@ final class AudioRecorderService: NSObject {
     // MARK: - Engine
 
     /// Open the output file and start the engine, installing a tap that writes
-    /// captured buffers and tracks the input level.
-    private func beginEngine(writingTo url: URL) throws {
+    /// captured buffers and tracks the input level. `nonisolated` so it can run
+    /// off the main actor from `setUpEngine`.
+    private nonisolated func beginEngine(writingTo url: URL) throws {
         let input = engine.inputNode
         // Keep the recorder on the standard input unit. VoiceProcessingIO can
         // block engine startup on some routes/devices, freezing this screen.
@@ -270,7 +286,7 @@ final class AudioRecorderService: NSObject {
         }
     }
 
-    private func teardownEngine() {
+    private nonisolated func teardownEngine() {
         sink.setPaused(true)
         if engine.isRunning { engine.stop() }
         if tapInstalled {
@@ -285,7 +301,7 @@ final class AudioRecorderService: NSObject {
 
     // MARK: - Session
 
-    private func configureSession() throws {
+    private nonisolated func configureSession(pickup: MicPickup) throws {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(
@@ -294,7 +310,7 @@ final class AudioRecorderService: NSObject {
                 options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try session.setActive(true)
-            configureMicrophone(session)
+            configureMicrophone(session, pickup: pickup)
             AppLog.recorder.log("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
         } catch {
             AppLog.recorder.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
@@ -308,7 +324,7 @@ final class AudioRecorderService: NSObject {
     /// subcardioid, then the hardware default. Skipped entirely when an external
     /// mic (Bluetooth / wired headset) is available, so we never override the
     /// user's preferred input.
-    private func configureMicrophone(_ session: AVAudioSession) {
+    private nonisolated func configureMicrophone(_ session: AVAudioSession, pickup: MicPickup) {
         guard let inputs = session.availableInputs else { return }
         let hasExternal = inputs.contains { $0.portType != .builtInMic }
         guard !hasExternal,
@@ -320,7 +336,7 @@ final class AudioRecorderService: NSObject {
 
         // Try patterns in priority order for the chosen pickup mode; apply the
         // first one the hardware actually supports.
-        let preferredPatterns: [AVAudioSession.PolarPattern] = micPickup == .wholeRoom
+        let preferredPatterns: [AVAudioSession.PolarPattern] = pickup == .wholeRoom
             ? [.omnidirectional, .subcardioid]
             : [.cardioid, .subcardioid]
 
@@ -330,13 +346,13 @@ final class AudioRecorderService: NSObject {
             }) else { continue }
             try? source.setPreferredPolarPattern(pattern)
             try? builtIn.setPreferredDataSource(source)
-            AppLog.recorder.log("configureMicrophone: pickup=\(self.micPickup.rawValue, privacy: .public) pattern=\(pattern.rawValue, privacy: .public) source=\(source.dataSourceName, privacy: .public)")
+            AppLog.recorder.log("configureMicrophone: pickup=\(pickup.rawValue, privacy: .public) pattern=\(pattern.rawValue, privacy: .public) source=\(source.dataSourceName, privacy: .public)")
             return
         }
-        AppLog.recorder.log("configureMicrophone: pickup=\(self.micPickup.rawValue, privacy: .public) hardware default pattern (no preferred pattern available)")
+        AppLog.recorder.log("configureMicrophone: pickup=\(pickup.rawValue, privacy: .public) hardware default pattern (no preferred pattern available)")
     }
 
-    private func deactivateSession() {
+    private nonisolated func deactivateSession() {
         try? AVAudioSession.sharedInstance().setActive(
             false,
             options: [.notifyOthersOnDeactivation]

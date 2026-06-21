@@ -70,7 +70,7 @@ final class RecorderViewModel {
             return
         }
         do {
-            try recorder.start(meetingID: meeting.id)
+            try await recorder.start(meetingID: meeting.id)
             lockScreenController.start(
                 title: meeting.title,
                 state: recorder.state,
