@@ -409,9 +409,7 @@ struct MeetingDetailView: View {
 
     private func deleteRecording(_ recording: Recording) {
         if player.loadedFileName == recording.fileName { player.stop() }
-        AudioFileStore.delete(fileName: recording.fileName)
-        modelContext.delete(recording)
-        try? modelContext.save()
+        MeetingsViewModel(modelContext: modelContext).deleteRecording(recording)
     }
 
     private func share() {

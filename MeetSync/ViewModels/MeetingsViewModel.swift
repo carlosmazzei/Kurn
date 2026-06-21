@@ -46,4 +46,13 @@ final class MeetingsViewModel {
         modelContext.delete(meeting)
         try? modelContext.save()
     }
+
+    /// Delete a single recording segment: remove its audio file from disk, then
+    /// the model. Keeping this here (rather than in the view) makes the
+    /// file-cleanup behavior unit-testable.
+    func deleteRecording(_ recording: Recording) {
+        AudioFileStore.delete(fileName: recording.fileName)
+        modelContext.delete(recording)
+        try? modelContext.save()
+    }
 }
