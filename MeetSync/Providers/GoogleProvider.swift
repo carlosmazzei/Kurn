@@ -49,8 +49,8 @@ struct GoogleProvider: LLMProvider {
             "contents": [["role": "user", "parts": [["text": combined]]]],
             "generationConfig": [
                 "responseMimeType": "application/json",
-                "maxOutputTokens": 2000,
-            ],
+                "maxOutputTokens": 2000
+            ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -76,12 +76,17 @@ struct GoogleProvider: LLMProvider {
 }
 
 private struct GeminiResponse: Decodable {
-    struct Candidate: Decodable {
-        struct Content: Decodable {
-            struct Part: Decodable { let text: String? }
-            let parts: [Part]
-        }
-        let content: Content
-    }
-    let candidates: [Candidate]?
+    let candidates: [GeminiCandidate]?
+}
+
+private struct GeminiCandidate: Decodable {
+    let content: GeminiContent
+}
+
+private struct GeminiContent: Decodable {
+    let parts: [GeminiPart]
+}
+
+private struct GeminiPart: Decodable {
+    let text: String?
 }

@@ -15,6 +15,10 @@ enum TestModelContainer {
     static func make() -> ModelContainer {
         let schema = Schema([Meeting.self, Recording.self, Speaker.self, Summary.self, Transcript.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        return try! ModelContainer(for: schema, configurations: [configuration])
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            fatalError("Failed to create in-memory ModelContainer: \(error)")
+        }
     }
 }

@@ -51,7 +51,7 @@ struct AudioPreprocessorTests {
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 64_000,
+            AVEncoderBitRateKey: 64_000
         ]
         let file = try AVAudioFile(forWriting: url, settings: settings)
         let format = file.processingFormat

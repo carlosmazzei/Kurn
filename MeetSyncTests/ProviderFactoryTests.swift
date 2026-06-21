@@ -17,8 +17,7 @@ struct ProviderFactoryTests {
         let original = KeychainManager.shared.get(key)
         KeychainManager.shared.delete(key)
         defer {
-            if let original { KeychainManager.shared.set(original, for: key) }
-            else { KeychainManager.shared.delete(key) }
+            if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
         }
         return try body()
     }
@@ -27,8 +26,7 @@ struct ProviderFactoryTests {
         let original = KeychainManager.shared.get(key)
         KeychainManager.shared.set(value, for: key)
         defer {
-            if let original { KeychainManager.shared.set(original, for: key) }
-            else { KeychainManager.shared.delete(key) }
+            if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
         }
         return try body()
     }

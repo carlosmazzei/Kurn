@@ -44,7 +44,7 @@ struct OpenAIProvider: LLMProvider {
 
         var fields: [(name: String, value: String)] = [
             ("model", whisperModel),
-            ("response_format", "verbose_json"),
+            ("response_format", "verbose_json")
         ]
         if let code = language.whisperCode {
             fields.append(("language", code))
@@ -53,10 +53,12 @@ struct OpenAIProvider: LLMProvider {
         request.httpBody = multipartBody(
             boundary: boundary,
             fields: fields,
-            fileField: "file",
-            fileName: fileName,
-            fileData: audioData,
-            mimeType: "audio/m4a"
+            file: MultipartFile(
+                field: "file",
+                name: fileName,
+                data: audioData,
+                mimeType: "audio/m4a"
+            )
         )
 
         let (data, response) = try await LLMHTTP.send(request, session: session)
@@ -99,8 +101,8 @@ struct OpenAIProvider: LLMProvider {
             "response_format": ["type": "json_object"],
             "messages": [
                 ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": userPrompt],
-            ],
+                ["role": "user", "content": userPrompt]
+            ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -130,10 +132,7 @@ struct OpenAIProvider: LLMProvider {
     private func multipartBody(
         boundary: String,
         fields: [(name: String, value: String)],
-        fileField: String,
-        fileName: String,
-        fileData: Data,
-        mimeType: String
+        file: MultipartFile
     ) -> Data {
         var body = Data()
         let lineBreak = "\r\n"
@@ -146,10 +145,10 @@ struct OpenAIProvider: LLMProvider {
 
         body.append("--\(boundary)\(lineBreak)")
         body.append(
-            "Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(fileName)\"\(lineBreak)"
+            "Content-Disposition: form-data; name=\"\(file.field)\"; filename=\"\(file.name)\"\(lineBreak)"
         )
-        body.append("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)")
-        body.append(fileData)
+        body.append("Content-Type: \(file.mimeType)\(lineBreak)\(lineBreak)")
+        body.append(file.data)
         body.append(lineBreak)
         body.append("--\(boundary)--\(lineBreak)")
         return body
@@ -157,6 +156,13 @@ struct OpenAIProvider: LLMProvider {
 }
 
 // MARK: - Response shapes
+
+private struct MultipartFile {
+    let field: String
+    let name: String
+    let data: Data
+    let mimeType: String
+}
 
 private struct WhisperVerboseResponse: Decodable {
     struct Segment: Decodable {

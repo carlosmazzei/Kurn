@@ -57,7 +57,11 @@ final class AudioPlayerService: NSObject {
     }
 
     func togglePlayPause() {
-        isPlaying ? pause() : play()
+        if isPlaying {
+            pause()
+        } else {
+            play()
+        }
     }
 
     /// Seek to an absolute time within the loaded file.

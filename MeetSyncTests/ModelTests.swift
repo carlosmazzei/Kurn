@@ -136,7 +136,7 @@ struct ModelTests {
     @Test func plainTextJoinsSpeakerAndTextPerSegment() {
         let segments = [
             TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 2, text: "hi"),
-            TranscriptSegment(speakerLabel: "Speaker 2", startTime: 2, endTime: 4, text: "hello"),
+            TranscriptSegment(speakerLabel: "Speaker 2", startTime: 2, endTime: 4, text: "hello")
         ]
         let transcript = Transcript(segments: segments)
         #expect(transcript.plainText == "Speaker 1: hi\nSpeaker 2: hello")

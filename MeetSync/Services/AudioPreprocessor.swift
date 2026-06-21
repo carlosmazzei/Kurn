@@ -99,7 +99,7 @@ actor AudioPreprocessor {
             AVSampleRateKey: 16_000.0,
             AVNumberOfChannelsKey: 1,
             AVEncoderBitRateKey: 32_000,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
         let outFile = try AVAudioFile(forWriting: outURL, settings: outSettings)
 

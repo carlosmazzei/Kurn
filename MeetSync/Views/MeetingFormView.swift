@@ -14,7 +14,7 @@ struct MeetingFormView: View {
     @Environment(AppSettings.self) private var settings
 
     /// When non-nil, the form edits an existing meeting; otherwise it creates.
-    var meeting: Meeting? = nil
+    var meeting: Meeting?
 
     @State private var title = ""
     @State private var notes = ""
