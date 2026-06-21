@@ -37,7 +37,12 @@
 
 /* Recorder */
 "recorder.route_changed" = "Recording paused: the audio device changed (e.g. headphones unplugged).";
-"recorder.title" = "Record";
+"recorder.title" = "New Recording";
+"recorder.add_title" = "Add title…";
+"recorder.pause" = "Pause";
+"recorder.resume" = "Resume";
+"recorder.stop" = "Stop";
+"recorder.paused" = "PAUSED";
 "recorder.permission.title" = "Microphone Access Needed";
 "recorder.permission.message" = "MeetSync needs microphone access to record meetings. Enable it in Settings.";
 

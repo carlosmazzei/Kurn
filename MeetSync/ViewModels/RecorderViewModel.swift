@@ -60,6 +60,12 @@ final class RecorderViewModel {
     var elapsed: TimeInterval { recorder.elapsed }
     var routeMessage: String? { recorder.routeChangeMessage }
 
+    /// Editable meeting title, surfaced as the recorder's "Add title…" field.
+    var meetingTitle: String {
+        get { meeting.title }
+        set { meeting.title = newValue }
+    }
+
     /// Request permission (if needed) and begin recording.
     func startRecording() async {
         AppLog.recorderUI.log("startRecording: begin, requesting permission")

@@ -37,7 +37,12 @@
 
 /* Gravador */
 "recorder.route_changed" = "Gravação pausada: o dispositivo de áudio mudou (ex.: fones desconectados).";
-"recorder.title" = "Gravar";
+"recorder.title" = "Nova Gravação";
+"recorder.add_title" = "Adicionar título…";
+"recorder.pause" = "Pausar";
+"recorder.resume" = "Retomar";
+"recorder.stop" = "Parar";
+"recorder.paused" = "PAUSADO";
 "recorder.permission.title" = "Acesso ao Microfone Necessário";
 "recorder.permission.message" = "O MeetSync precisa do microfone para gravar reuniões. Ative o acesso nos Ajustes.";
 
