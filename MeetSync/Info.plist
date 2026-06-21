@@ -17,6 +17,17 @@
 		<string>en</string>
 		<string>pt-BR</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ainoteflow.app.recording</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>meetsync</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
@@ -31,6 +42,8 @@
 	<string>MeetSync needs the microphone to record meetings.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>MeetSync uses speech recognition to transcribe your meetings on-device.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

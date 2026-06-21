@@ -14,7 +14,7 @@ struct OpenAIProvider: LLMProvider {
 
     private let apiKey: String
     private let session: URLSession
-    private let chatModel = "gpt-4o"
+    private let chatModel = "gpt-5.4"
     private let whisperModel = "whisper-1"
 
     init(apiKey: String, session: URLSession = .shared) {
@@ -94,7 +94,7 @@ struct OpenAIProvider: LLMProvider {
 
         let body: [String: Any] = [
             "model": chatModel,
-            "max_tokens": 2000,
+            "max_completion_tokens": 2000,
             "response_format": ["type": "json_object"],
             "messages": [
                 ["role": "system", "content": systemPrompt],

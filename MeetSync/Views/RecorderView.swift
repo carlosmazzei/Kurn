@@ -22,7 +22,7 @@ struct RecorderView: View {
     var body: some View {
         Group {
             if let vm {
-                RecorderContent(vm: vm, defaultMode: settings.defaultMode) {
+                RecorderContent(vm: vm) {
                     dismiss()
                 }
             } else {
@@ -31,7 +31,11 @@ struct RecorderView: View {
         }
         .onAppear {
             if vm == nil {
-                vm = RecorderViewModel(meeting: meeting, modelContext: modelContext)
+                vm = RecorderViewModel(
+                    meeting: meeting,
+                    modelContext: modelContext,
+                    defaultMode: settings.defaultMode
+                )
             }
         }
     }
@@ -39,7 +43,6 @@ struct RecorderView: View {
 
 private struct RecorderContent: View {
     @Bindable var vm: RecorderViewModel
-    let defaultMode: TranscriptionMode
     let onFinished: () -> Void
 
     @State private var levels: [Float] = Array(repeating: 0, count: 48)
@@ -150,7 +153,7 @@ private struct RecorderContent: View {
 
             // Stop & save.
             Button {
-                vm.stopAndSave(defaultMode: defaultMode)
+                vm.stopAndSave()
             } label: {
                 Image(systemName: "stop.fill")
                     .font(.title)

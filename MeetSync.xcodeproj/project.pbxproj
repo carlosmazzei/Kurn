@@ -6,8 +6,37 @@
 	objectVersion = 70;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AA1000000000000000000131 /* MeetSyncLiveActivityExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA1000000000000000000141 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000003 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA10000000000000000000B1;
+			remoteInfo = MeetSyncLiveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA1000000000000000000121 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA1000000000000000000131 /* MeetSyncLiveActivityExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		AA00000000000000000000A1 /* MeetSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeetSyncLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -18,14 +47,29 @@
 			);
 			target = AA00000000000000000000B1 /* MeetSync */;
 		};
+		AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA00000000000000000000C1 /* MeetSync */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSync; sourceTree = "<group>"; };
+		AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSyncLiveActivityExtension; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		AA00000000000000000000F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA10000000000000000000F1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -39,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000C1 /* MeetSync */,
+				AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */,
 				AA0000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -47,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000000A1 /* MeetSync.app */,
+				AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,10 +107,12 @@
 				AA0000000000000000000101 /* Sources */,
 				AA00000000000000000000F1 /* Frameworks */,
 				AA0000000000000000000111 /* Resources */,
+				AA1000000000000000000121 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA1000000000000000000151 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA00000000000000000000C1 /* MeetSync */,
@@ -73,6 +121,26 @@
 			productName = MeetSync;
 			productReference = AA00000000000000000000A1 /* MeetSync.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA10000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncLiveActivityExtension" */;
+			buildPhases = (
+				AA1000000000000000000101 /* Sources */,
+				AA10000000000000000000F1 /* Frameworks */,
+				AA1000000000000000000111 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */,
+			);
+			name = MeetSyncLiveActivityExtension;
+			productName = MeetSyncLiveActivityExtension;
+			productReference = AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -86,6 +154,9 @@
 				TargetAttributes = {
 					AA00000000000000000000B1 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					AA10000000000000000000B1 = {
+						CreatedOnToolsVersion = 26.5;
 					};
 				};
 			};
@@ -104,12 +175,20 @@
 			projectRoot = "";
 			targets = (
 				AA00000000000000000000B1 /* MeetSync */,
+				AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		AA0000000000000000000111 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA1000000000000000000111 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -126,7 +205,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA1000000000000000000101 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA1000000000000000000151 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */;
+			targetProxy = AA1000000000000000000141 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA0000000000000000000201 /* Debug */ = {
@@ -298,6 +392,56 @@
 			};
 			name = Release;
 		};
+		AA1000000000000000000211 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WE49K38CEY;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MeetSyncLiveActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ainoteflow.app.LiveActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA1000000000000000000212 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WE49K38CEY;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MeetSyncLiveActivityExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ainoteflow.app.LiveActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -315,6 +459,15 @@
 			buildConfigurations = (
 				AA0000000000000000000211 /* Debug */,
 				AA0000000000000000000212 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA10000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA1000000000000000000211 /* Debug */,
+				AA1000000000000000000212 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
