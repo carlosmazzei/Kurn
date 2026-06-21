@@ -6,13 +6,11 @@
 //  / resume / stop, real-time level metering, and resilient handling of audio
 //  session interruptions and route changes.
 //
-//  Unlike a plain AVAudioRecorder, the engine's input node runs Apple's hardware
-//  Voice Processing (acoustic echo cancellation, background-noise suppression and
-//  automatic gain control) so the captured .m4a is already cleaned at the source.
-//  We also steer the built-in microphone toward a directional (cardioid) polar
-//  pattern when no external mic is attached, favouring the speaker in front.
-//  Recording stays fully offline — buffers are written straight to a Documents
-//  .m4a and survive connectivity loss.
+//  Unlike a plain AVAudioRecorder, the engine writes input buffers directly to
+//  disk while publishing real-time levels to the UI. We also steer the built-in
+//  microphone toward a directional (cardioid) polar pattern when no external mic
+//  is attached, favouring the speaker in front. Recording stays fully offline —
+//  buffers are written straight to a Documents .m4a and survive connectivity loss.
 //
 
 import AVFoundation
@@ -172,13 +170,13 @@ final class AudioRecorderService: NSObject {
 
     // MARK: - Engine
 
-    /// Configure Voice Processing, open the output file and start the engine,
-    /// installing a tap that writes captured buffers and tracks the input level.
+    /// Open the output file and start the engine, installing a tap that writes
+    /// captured buffers and tracks the input level.
     private func beginEngine(writingTo url: URL) throws {
         let input = engine.inputNode
-        // Enable hardware echo cancellation, noise suppression and AGC. Best
-        // effort: if the route can't support it we still record the raw input.
-        try? input.setVoiceProcessingEnabled(true)
+        // Keep the recorder on the standard input unit. VoiceProcessingIO can
+        // block engine startup on some routes/devices, freezing this screen.
+        try? input.setVoiceProcessingEnabled(false)
 
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
@@ -231,11 +229,9 @@ final class AudioRecorderService: NSObject {
     private func configureSession() throws {
         let session = AVAudioSession.sharedInstance()
         do {
-            // `.voiceChat` is the recommended mode when the engine's Voice
-            // Processing unit is active.
             try session.setCategory(
                 .playAndRecord,
-                mode: .voiceChat,
+                mode: .default,
                 options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try session.setActive(true)

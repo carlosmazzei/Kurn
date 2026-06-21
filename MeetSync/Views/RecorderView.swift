@@ -134,17 +134,23 @@ private struct RecorderContent: View {
             }
             .disabled(vm.state == .idle)
 
-            // Record indicator (pulses while recording).
-            ZStack {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 84, height: 84)
-                    .scaleEffect(pulse && vm.state == .recording ? 1.08 : 1.0)
-                    .opacity(vm.state == .recording ? 1 : 0.5)
-                Image(systemName: "mic.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(.white)
+            // Record control (pulses while recording).
+            Button {
+                guard vm.state == .idle else { return }
+                Task { await vm.startRecording() }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 84, height: 84)
+                        .scaleEffect(pulse && vm.state == .recording ? 1.08 : 1.0)
+                        .opacity(vm.state == .recording ? 1 : 0.5)
+                    Image(systemName: "mic.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(.white)
+                }
             }
+            .buttonStyle(.plain)
             .onAppear {
                 withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
                     pulse = true
