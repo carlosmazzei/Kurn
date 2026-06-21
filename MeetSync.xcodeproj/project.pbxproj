@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AA1000000000000000000131 /* MeetSyncLiveActivityExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		AA2000000000000000000131 /* MeetSyncWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA20000000000000000000A1 /* MeetSyncWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA3000000000000000000131 /* MeetSyncWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA30000000000000000000A1 /* MeetSyncWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -19,11 +19,11 @@
 			remoteGlobalIDString = AA10000000000000000000B1;
 			remoteInfo = MeetSyncLiveActivityExtension;
 		};
-		AA2000000000000000000141 /* PBXContainerItemProxy */ = {
+		AA3000000000000000000141 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = AA0000000000000000000003 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = AA20000000000000000000B1;
+			remoteGlobalIDString = AA30000000000000000000B1;
 			remoteInfo = MeetSyncWatch;
 		};
 /* End PBXContainerItemProxy section */
@@ -40,13 +40,13 @@
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA2000000000000000000121 /* Embed Watch Content */ = {
+		AA3000000000000000000121 /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				AA2000000000000000000131 /* MeetSyncWatch.app in Embed Watch Content */,
+				AA3000000000000000000131 /* MeetSyncWatch.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -56,7 +56,7 @@
 /* Begin PBXFileReference section */
 		AA00000000000000000000A1 /* MeetSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeetSyncLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA20000000000000000000A1 /* MeetSyncWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetSyncWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA30000000000000000000A1 /* MeetSyncWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetSyncWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -74,19 +74,19 @@
 			);
 			target = AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */;
 		};
-		AA20000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		AA30000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = AA20000000000000000000B1 /* MeetSyncWatch */;
+			target = AA30000000000000000000B1 /* MeetSyncWatch */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA00000000000000000000C1 /* MeetSync */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSync; sourceTree = "<group>"; };
 		AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSyncLiveActivityExtension; sourceTree = "<group>"; };
-		AA20000000000000000000C1 /* MeetSyncWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA20000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSyncWatch; sourceTree = "<group>"; };
+		AA30000000000000000000C1 /* MeetSyncWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA30000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSyncWatch; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,7 +104,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA20000000000000000000F1 /* Frameworks */ = {
+		AA30000000000000000000F1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -119,7 +119,7 @@
 			children = (
 				AA00000000000000000000C1 /* MeetSync */,
 				AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */,
-				AA20000000000000000000C1 /* MeetSyncWatch */,
+				AA30000000000000000000C1 /* MeetSyncWatch */,
 				AA0000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -129,7 +129,7 @@
 			children = (
 				AA00000000000000000000A1 /* MeetSync.app */,
 				AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */,
-				AA20000000000000000000A1 /* MeetSyncWatch.app */,
+				AA30000000000000000000A1 /* MeetSyncWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -145,13 +145,13 @@
 				AA00000000000000000000F1 /* Frameworks */,
 				AA0000000000000000000111 /* Resources */,
 				AA1000000000000000000121 /* Embed App Extensions */,
-				AA2000000000000000000121 /* Embed Watch Content */,
+				AA3000000000000000000121 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				AA1000000000000000000151 /* PBXTargetDependency */,
-				AA2000000000000000000151 /* PBXTargetDependency */,
+				AA3000000000000000000151 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA00000000000000000000C1 /* MeetSync */,
@@ -181,24 +181,24 @@
 			productReference = AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		AA20000000000000000000B1 /* MeetSyncWatch */ = {
+		AA30000000000000000000B1 /* MeetSyncWatch */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AA20000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncWatch" */;
+			buildConfigurationList = AA30000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncWatch" */;
 			buildPhases = (
-				AA2000000000000000000101 /* Sources */,
-				AA20000000000000000000F1 /* Frameworks */,
-				AA2000000000000000000111 /* Resources */,
+				AA3000000000000000000101 /* Sources */,
+				AA30000000000000000000F1 /* Frameworks */,
+				AA3000000000000000000111 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				AA20000000000000000000C1 /* MeetSyncWatch */,
+				AA30000000000000000000C1 /* MeetSyncWatch */,
 			);
 			name = MeetSyncWatch;
 			productName = MeetSyncWatch;
-			productReference = AA20000000000000000000A1 /* MeetSyncWatch.app */;
+			productReference = AA30000000000000000000A1 /* MeetSyncWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -217,7 +217,7 @@
 					AA10000000000000000000B1 = {
 						CreatedOnToolsVersion = 26.5;
 					};
-					AA20000000000000000000B1 = {
+					AA30000000000000000000B1 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -238,7 +238,7 @@
 			targets = (
 				AA00000000000000000000B1 /* MeetSync */,
 				AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */,
-				AA20000000000000000000B1 /* MeetSyncWatch */,
+				AA30000000000000000000B1 /* MeetSyncWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -258,7 +258,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA2000000000000000000111 /* Resources */ = {
+		AA3000000000000000000111 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -282,7 +282,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA2000000000000000000101 /* Sources */ = {
+		AA3000000000000000000101 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -297,10 +297,10 @@
 			target = AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */;
 			targetProxy = AA1000000000000000000141 /* PBXContainerItemProxy */;
 		};
-		AA2000000000000000000151 /* PBXTargetDependency */ = {
+		AA3000000000000000000151 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = AA20000000000000000000B1 /* MeetSyncWatch */;
-			targetProxy = AA2000000000000000000141 /* PBXContainerItemProxy */;
+			target = AA30000000000000000000B1 /* MeetSyncWatch */;
+			targetProxy = AA3000000000000000000141 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -524,7 +524,7 @@
 			};
 			name = Release;
 		};
-		AA2000000000000000000211 /* Debug */ = {
+		AA3000000000000000000211 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -549,7 +549,7 @@
 			};
 			name = Debug;
 		};
-		AA2000000000000000000212 /* Release */ = {
+		AA3000000000000000000212 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -604,11 +604,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AA20000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncWatch" */ = {
+		AA30000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncWatch" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				AA2000000000000000000211 /* Debug */,
-				AA2000000000000000000212 /* Release */,
+				AA3000000000000000000211 /* Debug */,
+				AA3000000000000000000212 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
