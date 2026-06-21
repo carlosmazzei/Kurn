@@ -32,35 +32,40 @@ struct TranscriptView: View {
     @ViewBuilder
     private func segmentRow(_ segment: TranscriptSegment) -> some View {
         let speaker = speakers.first { $0.label == segment.speakerLabel }
+        let name = speaker?.displayName ?? segment.speakerLabel
         let color = Color(hex: speaker?.color ?? "#888888")
         let isActive = activeTime.map { $0 >= segment.startTime && $0 < segment.endTime } ?? false
 
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                Text(speaker?.displayName ?? segment.speakerLabel)
-                    .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle().fill(color.opacity(0.2)).frame(width: 26, height: 26)
+                    Text(String(name.prefix(1)).uppercased())
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(color)
+                }
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(color)
-                Spacer()
                 Text(segment.startTime.clockDisplay)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.textTertiary)
+                Spacer()
             }
             Text(segment.text)
-                .font(.body)
-                .foregroundStyle(.primary)
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.textPrimary.opacity(0.85))
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 34)
         }
         .padding(10)
         .background(
-            (isActive ? color.opacity(0.12) : Color(.secondarySystemBackground)),
-            in: RoundedRectangle(cornerRadius: 10)
+            isActive ? AnyShapeStyle(color.opacity(0.12)) : AnyShapeStyle(.clear),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isActive ? color : .clear, lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(isActive ? color.opacity(0.6) : .clear, lineWidth: 1.5)
         )
     }
 }

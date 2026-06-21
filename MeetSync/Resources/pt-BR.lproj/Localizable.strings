@@ -125,7 +125,17 @@
 
 /* Ajustes */
 "settings.title" = "Ajustes";
-"settings.provider" = "Provedor de IA";
+"settings.provider" = "Provedor";
+"settings.providers" = "Provedores de IA";
+"settings.transcription" = "Transcrição";
+"settings.summary" = "Resumo";
+"settings.recording" = "Gravação";
+"settings.model" = "Modelo";
+"settings.configured" = "Configurado";
+"settings.not_configured" = "Não configurado";
+"settings.api_key" = "Chave de API";
+"settings.key_footer" = "Sua chave da %@ fica guardada com segurança no Keychain do dispositivo e nunca sai dele.";
+"settings.remove_key" = "Remover Chave";
 "settings.openai_key" = "Chave de API da OpenAI";
 "settings.openai_footer" = "Usada para transcrição Whisper e resumos GPT-4o.";
 "settings.anthropic_key" = "Chave de API da Anthropic";

@@ -125,7 +125,17 @@
 
 /* Settings */
 "settings.title" = "Settings";
-"settings.provider" = "AI Provider";
+"settings.provider" = "Provider";
+"settings.providers" = "AI Providers";
+"settings.transcription" = "Transcription";
+"settings.summary" = "Summary";
+"settings.recording" = "Recording";
+"settings.model" = "Model";
+"settings.configured" = "Configured";
+"settings.not_configured" = "Not configured";
+"settings.api_key" = "API Key";
+"settings.key_footer" = "Your %@ key is stored securely in the device Keychain and never leaves your device.";
+"settings.remove_key" = "Remove Key";
 "settings.openai_key" = "OpenAI API Key";
 "settings.openai_footer" = "Used for Whisper transcription and GPT-4o summaries.";
 "settings.anthropic_key" = "Anthropic API Key";
