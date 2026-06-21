@@ -33,16 +33,13 @@ struct TranscriptionService {
         language: MeetingLanguage,
         mode: TranscriptionMode
     ) async throws -> Output {
-        let raw: RawTranscript
-        switch mode {
-        case .onDevice:
-            raw = try await onDevice.transcribe(url: fileURL, language: language)
-        case .whisperAPI:
-            raw = try await transcribeViaWhisper(fileURL: fileURL, language: language)
-        }
+        // Transcription and diarization both read the same file but are
+        // independent, so run them concurrently instead of back to back.
+        async let rawTranscript = transcribeRaw(fileURL: fileURL, language: language, mode: mode)
+        async let speakerTurns = diarizer.diarize(url: fileURL)
 
-        // Run diarization over the original file regardless of engine.
-        let turns = await diarizer.diarize(url: fileURL)
+        let raw = try await rawTranscript
+        let turns = await speakerTurns
         let segments = fuse(spans: raw.spans, turns: turns)
 
         var labels: [String] = []
@@ -55,6 +52,20 @@ struct TranscriptionService {
             language: raw.language,
             speakerLabels: labels
         )
+    }
+
+    /// Run the chosen transcription engine for the file.
+    private func transcribeRaw(
+        fileURL: URL,
+        language: MeetingLanguage,
+        mode: TranscriptionMode
+    ) async throws -> RawTranscript {
+        switch mode {
+        case .onDevice:
+            return try await onDevice.transcribe(url: fileURL, language: language)
+        case .whisperAPI:
+            return try await transcribeViaWhisper(fileURL: fileURL, language: language)
+        }
     }
 
     // MARK: - Whisper path (chunked upload)

@@ -30,6 +30,36 @@ protocol LLMProvider: Sendable {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult
 }
 
+// MARK: - Shared HTTP helpers
+
+/// HTTP plumbing shared by the cloud providers: both OpenAI and Anthropic talk
+/// to JSON APIs that report failures as `{ "error": { "message" } }`.
+enum LLMHTTP {
+    /// Perform the request, mapping transport failures to `AppError.networkError`.
+    static func send(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch let error as URLError {
+            throw AppError.networkError(error)
+        }
+    }
+
+    /// Throw `AppError.apiError` for any non-2xx response, extracting the
+    /// vendor's error message when present.
+    static func validate(response: URLResponse, data: Data) throws {
+        guard let http = response as? HTTPURLResponse else { return }
+        guard (200...299).contains(http.statusCode) else {
+            let message = decodeErrorMessage(data) ?? "request failed"
+            throw AppError.apiError(statusCode: http.statusCode, message: message)
+        }
+    }
+
+    private static func decodeErrorMessage(_ data: Data) -> String? {
+        struct Envelope: Decodable { struct E: Decodable { let message: String }; let error: E }
+        return try? JSONDecoder().decode(Envelope.self, from: data).error.message
+    }
+}
+
 // MARK: - Shared JSON shape
 
 /// The JSON contract both vendors are instructed to return for summaries.

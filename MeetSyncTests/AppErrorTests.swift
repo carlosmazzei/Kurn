@@ -35,6 +35,7 @@ struct AppErrorTests {
             .audioError("mic busy"),
             .decodingError("bad json"),
             .permissionDenied("speech"),
+            .persistenceFailed("disk full"),
         ]
         for error in cases {
             #expect(!(error.errorDescription ?? "").isEmpty)

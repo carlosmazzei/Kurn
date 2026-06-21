@@ -60,8 +60,8 @@ struct AnthropicProvider: LLMProvider {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await send(request)
-        try validate(response: response, data: data)
+        let (data, response) = try await LLMHTTP.send(request, session: session)
+        try LLMHTTP.validate(response: response, data: data)
 
         do {
             let decoded = try JSONDecoder().decode(MessagesResponse.self, from: data)
@@ -86,28 +86,6 @@ struct AnthropicProvider: LLMProvider {
         }
     }
 
-    // MARK: - HTTP helpers
-
-    private func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await session.data(for: request)
-        } catch let error as URLError {
-            throw AppError.networkError(error)
-        }
-    }
-
-    private func validate(response: URLResponse, data: Data) throws {
-        guard let http = response as? HTTPURLResponse else { return }
-        guard (200...299).contains(http.statusCode) else {
-            let message = decodeErrorMessage(data) ?? "request failed"
-            throw AppError.apiError(statusCode: http.statusCode, message: message)
-        }
-    }
-
-    private func decodeErrorMessage(_ data: Data) -> String? {
-        struct Envelope: Decodable { struct E: Decodable { let message: String }; let error: E }
-        return try? JSONDecoder().decode(Envelope.self, from: data).error.message
-    }
 }
 
 // MARK: - Response shapes

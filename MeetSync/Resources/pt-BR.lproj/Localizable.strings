@@ -8,6 +8,8 @@
 "error.audio" = "Erro de áudio: %@";
 "error.decoding" = "Não foi possível ler a resposta: %@";
 "error.permission" = "Permissão negada: %@";
+"error.persistence" = "Não foi possível salvar as alterações: %@";
+"error.recognizer_timeout" = "O reconhecimento de fala no dispositivo expirou.";
 "error.recorder_start" = "Não foi possível iniciar a gravação.";
 "error.recognizer_unavailable" = "O reconhecimento de fala não está disponível para este idioma.";
 "error.recognizer_offline" = "O reconhecimento de fala no dispositivo não está pronto. Tente novamente em instantes.";

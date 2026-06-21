@@ -116,7 +116,11 @@ final class RecorderViewModel {
             transcriptionMode: defaultMode
         )
         modelContext.insert(recording)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            self.error = .persistenceFailed(error.localizedDescription)
+        }
         lockScreenController.end()
         RecordingCommandRouter.shared.unregister()
         PhoneSessionController.shared.notifyEnded()

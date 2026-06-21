@@ -28,6 +28,17 @@ final class TranscriptionViewModel {
         self.modelContext = modelContext
     }
 
+    /// Persist pending model changes, surfacing failures instead of dropping
+    /// them silently — a failed save otherwise leaves the in-memory models and
+    /// the store diverged (e.g. status shown as `.done` but stored as `.inProgress`).
+    private func persist() {
+        do {
+            try modelContext.save()
+        } catch {
+            self.error = .persistenceFailed(error.localizedDescription)
+        }
+    }
+
     func isTranscribing(_ recording: Recording) -> Bool {
         transcribingIDs.contains(recording.id)
     }
@@ -64,7 +75,7 @@ final class TranscriptionViewModel {
         transcribingIDs.insert(recording.id)
         recording.transcriptionStatus = .inProgress
         recording.transcriptionMode = mode
-        try? modelContext.save()
+        persist()
 
         do {
             let output = try await transcriptionService.transcribe(
@@ -88,14 +99,14 @@ final class TranscriptionViewModel {
             recording.transcriptionStatus = .done
 
             ensureSpeakers(for: recording.meeting, labels: output.speakerLabels)
-            try? modelContext.save()
+            persist()
         } catch let appError as AppError {
             recording.transcriptionStatus = .failed
-            try? modelContext.save()
+            persist()
             error = appError
         } catch {
             recording.transcriptionStatus = .failed
-            try? modelContext.save()
+            persist()
             self.error = .transcriptionFailed(error.localizedDescription)
         }
 
@@ -162,7 +173,7 @@ final class TranscriptionViewModel {
                 modelContext.insert(summary)
                 meeting.summary = summary
             }
-            try? modelContext.save()
+            persist()
         } catch let appError as AppError {
             error = appError
         } catch {
