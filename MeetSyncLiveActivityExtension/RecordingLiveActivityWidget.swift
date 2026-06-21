@@ -61,12 +61,16 @@ struct RecordingLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 Image(systemName: context.state.isPaused ? "pause.fill" : "waveform")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(context.state.isPaused ? Color.meetSyncPaused : Color.meetSyncAccent)
             } compactTrailing: {
                 elapsedText(context)
                     .font(.system(.caption2, design: .rounded).monospacedDigit().weight(.semibold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.trailing)
+                    .minimumScaleFactor(0.8)
+                    .frame(width: 44)
             } minimal: {
                 Image(systemName: context.state.isPaused ? "pause.fill" : "waveform")
                     .foregroundStyle(context.state.isPaused ? Color.meetSyncPaused : Color.meetSyncAccent)
