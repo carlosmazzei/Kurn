@@ -40,12 +40,10 @@ struct RecordingLiveActivityWidget: Widget {
                         .foregroundStyle(.white)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 12) {
-                        ActivityWaveform(barCount: 10, height: 24, paused: context.state.isPaused)
-                        commandButtons(context, height: 34)
-                    }
-                    .padding(.horizontal, 2)
-                    .padding(.bottom, 2)
+                    commandButtons(context, height: 34)
+                        .padding(.horizontal, 2)
+                        .padding(.top, 6)
+                        .padding(.bottom, 2)
                 }
             } compactLeading: {
                 // Per the design: just the pulsing record dot.
@@ -141,32 +139,6 @@ private struct MeetSyncLogo: View {
                     Circle().fill(.white).frame(width: size * 0.22, height: size * 0.22)
                 }
             }
-    }
-}
-
-/// Static red waveform strip (Live Activities can't animate continuously).
-private struct ActivityWaveform: View {
-    var barCount: Int
-    var height: CGFloat
-    var paused: Bool
-
-    // Deterministic 0...1 heights that read as a voice waveform.
-    private static let pattern: [CGFloat] = [
-        0.9, 0.5, 0.95, 0.4, 0.8, 0.55, 1.0, 0.45, 0.85, 0.6,
-        0.7, 0.5, 0.9, 0.45, 0.8, 0.6, 0.95, 0.5, 0.75, 0.55,
-    ]
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<barCount, id: \.self) { i in
-                let h = Self.pattern[i % Self.pattern.count]
-                Capsule()
-                    .fill((paused ? Color.meetSyncPaused : Color.meetSyncAccent).opacity(0.6 + 0.4 * h))
-                    .frame(width: 3, height: max(4, height * h))
-            }
-        }
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
     }
 }
 
