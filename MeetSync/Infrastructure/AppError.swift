@@ -17,6 +17,7 @@ enum AppError: LocalizedError, Identifiable {
     case audioError(String)
     case decodingError(String)
     case permissionDenied(String)
+    case persistenceFailed(String)
 
     /// Stable identity so the value can drive `.alert(item:)`.
     var id: String { errorDescription ?? "AppError" }
@@ -56,6 +57,11 @@ enum AppError: LocalizedError, Identifiable {
         case .permissionDenied(let detail):
             return String(
                 format: NSLocalizedString("error.permission", comment: "Permission denied"),
+                detail
+            )
+        case .persistenceFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.persistence", comment: "Save failure"),
                 detail
             )
         }

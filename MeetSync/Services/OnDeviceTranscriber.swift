@@ -7,6 +7,7 @@
 //  word-level spans with timestamps that the diarizer/segmenter later groups.
 //
 
+import AVFoundation
 import Foundation
 import Speech
 
@@ -52,11 +53,18 @@ actor OnDeviceTranscriber {
             request.addsPunctuation = true
         }
 
+        // On-device recognition is roughly real-time or faster; allow a generous
+        // multiple of the clip length (with a floor) before treating a task that
+        // never reports a final result or error as stuck.
+        let durationSeconds = (try? await AVURLAsset(url: url).load(.duration))
+            .map(CMTimeGetSeconds) ?? 0
+        let timeout = max(60, durationSeconds * 4)
+
         let spans: [TranscribedSpan] = try await withCheckedThrowingContinuation { continuation in
             // Guard against the continuation being resumed more than once: the
             // Speech API can deliver a final result and an error in some cases.
             let box = ResumeBox()
-            _ = recognizer.recognitionTask(with: request) { result, error in
+            box.task = recognizer.recognitionTask(with: request) { result, error in
                 if let error {
                     if box.resumeIfNeeded() {
                         continuation.resume(
@@ -79,6 +87,21 @@ actor OnDeviceTranscriber {
                     continuation.resume(returning: mapped)
                 }
             }
+            // Safety net: if the task ends without ever delivering a final result
+            // or an error, resume so the caller doesn't hang forever.
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if box.resumeIfNeeded() {
+                    box.task?.cancel()
+                    continuation.resume(
+                        throwing: AppError.transcriptionFailed(
+                            NSLocalizedString(
+                                "error.recognizer_timeout",
+                                comment: "Recognition timed out"
+                            )
+                        )
+                    )
+                }
+            }
         }
 
         return RawTranscript(spans: spans, language: locale.identifier)
@@ -89,6 +112,9 @@ actor OnDeviceTranscriber {
 private final class ResumeBox: @unchecked Sendable {
     private let lock = NSLock()
     private var resumed = false
+    /// The recognition task, held so the timeout safety net can cancel it
+    /// without capturing a non-Sendable value into the dispatch closure.
+    var task: SFSpeechRecognitionTask?
     func resumeIfNeeded() -> Bool {
         lock.lock()
         defer { lock.unlock() }

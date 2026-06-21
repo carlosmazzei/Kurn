@@ -110,13 +110,18 @@ actor SpeakerDiarizer {
 
             carry.append(contentsOf: mono)
 
-            while carry.count >= samplesPerFrame {
-                let slice = Array(carry[0..<samplesPerFrame])
-                carry.removeFirst(samplesPerFrame)
+            // Walk the buffer with a read index and trim once per chunk, instead
+            // of calling removeFirst() per frame (which shifts the whole buffer
+            // every time, making this quadratic in the carry length).
+            var consumed = 0
+            while carry.count - consumed >= samplesPerFrame {
+                let slice = Array(carry[consumed..<consumed + samplesPerFrame])
+                consumed += samplesPerFrame
                 let time = Double(globalSampleIndex) / sampleRate
                 frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
                 globalSampleIndex += samplesPerFrame
             }
+            if consumed > 0 { carry.removeFirst(consumed) }
         }
 
         if carry.count > samplesPerFrame / 3 {
@@ -261,6 +266,9 @@ actor SpeakerDiarizer {
 
     private func assignSpeakers(to regions: [Region]) -> [SpeakerTurn] {
         var centroids: [[Float]] = []
+        // Unit-length copies of each centroid, kept in sync so the clustering
+        // loop doesn't re-normalize every centroid on every comparison.
+        var normalizedCentroids: [[Float]] = []
         var counts: [Int] = []
         var turns: [SpeakerTurn] = []
 
@@ -269,8 +277,8 @@ actor SpeakerDiarizer {
             var bestIndex = -1
             var bestSimilarity: Float = -1
 
-            for (i, centroid) in centroids.enumerated() {
-                let sim = cosineSimilarity(normalized, normalize(centroid))
+            for (i, centroid) in normalizedCentroids.enumerated() {
+                let sim = cosineSimilarity(normalized, centroid)
                 if sim > bestSimilarity {
                     bestSimilarity = sim
                     bestIndex = i
@@ -285,9 +293,11 @@ actor SpeakerDiarizer {
                 let n = Float(counts[speakerIndex])
                 centroids[speakerIndex] = zip(centroids[speakerIndex], region.feature)
                     .map { ($0 * n + $1) / (n + 1) }
+                normalizedCentroids[speakerIndex] = normalize(centroids[speakerIndex])
                 counts[speakerIndex] += 1
             } else if centroids.count < maxSpeakers {
                 centroids.append(region.feature)
+                normalizedCentroids.append(normalized)
                 counts.append(1)
                 speakerIndex = centroids.count - 1
             } else {

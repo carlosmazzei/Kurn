@@ -8,6 +8,8 @@
 "error.audio" = "Audio error: %@";
 "error.decoding" = "Could not read the response: %@";
 "error.permission" = "Permission denied: %@";
+"error.persistence" = "Could not save your changes: %@";
+"error.recognizer_timeout" = "On-device speech recognition timed out.";
 "error.recorder_start" = "The recorder could not start.";
 "error.recognizer_unavailable" = "Speech recognition is not available for this language.";
 "error.recognizer_offline" = "On-device speech recognition is not ready. Try again shortly.";
