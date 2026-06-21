@@ -80,7 +80,7 @@ actor AudioPreprocessor {
         // Audio units are initialized by `start()`, so set parameters afterwards.
         Self.configureDynamics(dynamics.audioUnit)
         Self.configureLimiter(limiter.audioUnit)
-        player.scheduleFile(inputFile, at: nil)
+        await player.scheduleFile(inputFile, at: nil)
         player.play()
 
         let outURL = FileManager.default.temporaryDirectory
