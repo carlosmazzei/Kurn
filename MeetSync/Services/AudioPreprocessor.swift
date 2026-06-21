@@ -85,13 +85,9 @@ actor AudioPreprocessor {
         // Audio units are initialized by `start()`, so set parameters afterwards.
         Self.configureDynamics(dynamics.audioUnit)
         Self.configureLimiter(limiter.audioUnit)
-        // IMPORTANT: schedule without awaiting. The `async` overload of
-        // `scheduleFile` only returns once the file has finished *playing*, but
-        // in offline manual-rendering mode the audio is only consumed by the
-        // `renderOffline` loop below — awaiting here deadlocks (the render loop
-        // is never reached, so playback never completes). The completion-handler
-        // overload schedules and returns immediately.
-        player.scheduleFile(inputFile, at: nil, completionHandler: nil)
+        // Schedule the file for offline rendering. See `scheduleForOfflineRender`
+        // for why we must NOT use the async overload here.
+        Self.scheduleForOfflineRender(inputFile, on: player)
         player.play()
 
         let outURL = FileManager.default.temporaryDirectory
@@ -160,6 +156,19 @@ actor AudioPreprocessor {
         let tmp = FileManager.default.temporaryDirectory.path
         guard url.path.hasPrefix(tmp) else { return }
         try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Schedule a file for offline rendering without awaiting.
+    ///
+    /// The `async` overload of `scheduleFile` only returns once the file has
+    /// finished *playing*, but in offline manual-rendering mode the audio is
+    /// consumed solely by the `renderOffline` loop — awaiting it deadlocks (the
+    /// loop is never reached, so playback never completes). We deliberately use
+    /// the completion-handler overload instead. Keeping this in a synchronous
+    /// helper also avoids the compiler's "consider using the asynchronous
+    /// alternative" warning that fires when it is called from an `async` context.
+    private static func scheduleForOfflineRender(_ file: AVAudioFile, on player: AVAudioPlayerNode) {
+        player.scheduleFile(file, at: nil, completionHandler: nil)
     }
 
     // MARK: - Unit configuration

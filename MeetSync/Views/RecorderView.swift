@@ -85,6 +85,8 @@ private struct RecorderContent: View {
             if saved { onFinished() }
         }
         .task {
+            // The recorder spins up its audio engine off the main actor, so this
+            // does not block the sheet's present animation.
             AppLog.recorderUI.log("RecorderContent.task: starting recording")
             await vm.startRecording()
         }
