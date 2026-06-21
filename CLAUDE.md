@@ -1,0 +1,137 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+Kurn is a local-first iOS + watchOS app (Swift 6, SwiftUI, SwiftData) for recording
+meetings, transcribing audio, diarizing speakers, and generating structured AI
+summaries. Everything is stored on device; network calls happen only when the user
+opts into OpenAI Whisper transcription or a cloud summary provider.
+
+There is no Swift Package or `Package.swift` — the project is an Xcode project
+(`Kurn.xcodeproj`) with three targets: `Kurn` (app), `KurnWatch` (watchOS companion),
+and `KurnLiveActivityExtension` (widget/Live Activity). Tests live in `KurnTests`
+(Swift Testing, not XCTest).
+
+## Commands
+
+Builds/tests require macOS with Xcode 16+. CI uses `iPhone 17` as the simulator
+destination (see `.github/workflows/swift.yml`); substitute an installed simulator
+name locally if needed.
+
+```bash
+# Build
+xcodebuild -project Kurn.xcodeproj -scheme Kurn \
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
+
+# Run all tests
+xcodebuild -project Kurn.xcodeproj -scheme Kurn \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
+
+# Run a single test (Swift Testing uses -only-testing:Target/Suite/test)
+xcodebuild -project Kurn.xcodeproj -scheme Kurn \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  test -only-testing:KurnTests/SummaryJSONParsingTests
+
+# Lint (must pass before build in CI)
+swiftlint lint --config .swiftlint.yml
+```
+
+If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+
+SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
+function body at 120, cyclomatic complexity at 15, type body at 400.
+
+## Architecture
+
+MVVM with `@Observable` `@MainActor` view models, value-type async services, and a
+single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
+
+- **Models/** — SwiftData `@Model` classes (`Meeting`, `Recording`, `Transcript`,
+  `Speaker`, `Summary`) plus shared value types in `Enums.swift`.
+- **Services/** — audio capture, transcription pipeline, diarization, summaries.
+  These are mostly `struct`/value types operating on plain values so they stay
+  decoupled from SwiftData and safe off the main actor.
+- **Providers/** — cloud LLM clients behind the `LLMProvider` protocol.
+- **ViewModels/** — `@MainActor @Observable` coordinators owning services and
+  persisting results.
+- **Views/** — SwiftUI screens.
+- **Infrastructure/** — settings, errors, logging, keychain, export, extensions.
+
+### Data model
+
+`Meeting` is the aggregate root. It cascades deletes to its `recordings`,
+`speakers`, and `summary`. Key persistence convention: **SwiftData can't store
+arbitrary `Codable` arrays**, so `Transcript.segments` (`[TranscriptSegment]`) and
+similar collections are encoded to/from JSON `Data` via computed properties
+(`Transcript.segmentsData`). Relationships are set by assigning the parent (e.g.
+`Recording(meeting:)`) — SwiftData maintains the inverse, so never append to the
+parent collection manually.
+
+### Transcription pipeline (`Services/TranscriptionService.swift`)
+
+The orchestration that requires reading several files together:
+
+1. **Preprocess** audio (`AudioPreprocessor`); on any failure it falls back to the
+   original file so transcription never breaks.
+2. **Transcribe + diarize concurrently** (`async let`) over the same cleaned file —
+   engine is on-device (`OnDeviceTranscriber`, Apple Speech) or Whisper
+   (`AudioChunker` splits long audio, uploads chunks, offsets timestamps back to
+   absolute meeting time).
+3. **Fuse** transcript spans with heuristic speaker turns into
+   `[TranscriptSegment]`, merging consecutive same-speaker spans (capped at 30s).
+
+Progress is reported via a `@Sendable` `PhaseHandler` (`TranscriptionPhase`); the
+receiver must hop to the main actor itself.
+
+### Providers (`Providers/`)
+
+`LLMProvider` (`Sendable`) abstracts the cloud vendors. `ProviderFactory` is the
+single place that resolves a provider from `AppSettings` + Keychain and throws
+`AppError.noAPIKey` when a key is missing. Vendor API shapes are modeled by
+`AIProviderKind` (`openAICompatible`, `anthropic`, `googleGemini`); Groq reuses the
+OpenAI-compatible client. **Cloud transcription always uses OpenAI Whisper**
+(`ProviderFactory.whisperProvider()`) regardless of the chosen summary provider.
+Summaries demand strict JSON (`SummaryPrompt.system`); `SummaryJSON.parse` tolerantly
+strips markdown fences and extracts the outermost `{...}` since models add prose.
+
+### Cross-device control (Watch + Live Activity)
+
+`RecordingCommandRouter` (main-actor singleton) is the single dispatcher: the live
+`RecorderViewModel` registers `onPause/onResume/onStop/onTogglePause` closures while
+recording. Both the Lock Screen Live Activity (via `kurn://recording/...` deep links)
+and the Apple Watch (via `PhoneSessionController` over WatchConnectivity) route
+through it. The recorder pushes state to the Watch with `updateApplicationContext`
+(survives disconnects) and throttles audio-level pushes (`sendMessage` off the main
+thread, 0.2s spacing).
+
+The watchOS target does **not** share source files with the app — types like
+`WatchCommand` are intentionally duplicated in `KurnWatch/`. Keep both copies in sync.
+
+### Settings & secrets
+
+`AppSettings` (`@MainActor @Observable`) holds non-secret preferences in
+`UserDefaults`, persisting on `didSet`. **API keys never go here** — they live in the
+Keychain via `KeychainManager`, keyed by `AIProvider.keychainAccount`. Built-in
+providers keep a `legacyKeychainAccount` for backward compatibility; custom providers
+use `provider_<id>_api_key`.
+
+## Conventions
+
+- **Errors:** surface recoverable failures as `AppError` (`Infrastructure/AppError.swift`),
+  a `LocalizedError` whose messages come from `NSLocalizedString`. New error cases
+  must add a matching localization key.
+- **Localization:** user-facing strings use `NSLocalizedString`; the app ships
+  English and Brazilian Portuguese (`Kurn/Resources/`). `displayName` on enums is the
+  localization seam.
+- **Logging:** use `AppLog.<category>` (`os.Logger`, subsystem `ai.kurn.app`). It's
+  on by default; disable at launch with `KURN_LOG=0`. Mark interpolated values
+  `privacy:` explicitly.
+- **Concurrency:** services are `Sendable` value types callable off the main actor;
+  view models and anything touching SwiftData/UI are `@MainActor`. Preserve these
+  boundaries when adding code.
+- **Tests:** Swift Testing (`@Test`, `#expect`). Use
+  `TestModelContainer.make()` for an in-memory `ModelContainer` when exercising real
+  SwiftData relationship behavior.
