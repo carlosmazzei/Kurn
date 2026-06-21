@@ -127,6 +127,33 @@
 "summary.action_items" = "Itens de Ação";
 "summary.footer" = "Gerado por %1$@ · %2$@";
 "summary.footer_with_model" = "Gerado por %1$@ · %2$@ · %3$@";
+"summary.template_label" = "Modelo: %@";
+"summary.section.overview" = "Visão Geral";
+"summary.section.key_decisions" = "Decisões Principais";
+"summary.section.action_items" = "Itens de Ação";
+
+/* Modelos de resumo */
+"detail.summary.choose_template" = "Escolha um Modelo";
+"settings.templates" = "Modelos de Resumo";
+"settings.templates_footer" = "Os modelos definem como a transcrição é resumida. Escolha um a cada vez que gerar um resumo.";
+"settings.add_template" = "Adicionar Modelo";
+"settings.template_name" = "Nome";
+"settings.template_instructions" = "Instruções";
+"settings.template_instructions_footer" = "Descreva o foco e o tom do resumo. O modelo sempre responde no idioma da transcrição.";
+"settings.template_sections" = "Seções";
+"settings.template_section" = "Título da seção";
+"settings.template_add_section" = "Adicionar Seção";
+"settings.template_sections_footer" = "Títulos de seção sugeridos para guiar a estrutura. O modelo pode adaptá-los.";
+"settings.template.builtin" = "Predefinido";
+"settings.template.custom" = "Personalizado";
+"settings.delete_template" = "Excluir Modelo";
+"settings.delete_template.confirm" = "Excluir este modelo?";
+"template.general.name" = "Reunião Geral";
+"template.general.desc" = "Visão geral, pontos principais, decisões e ações.";
+"template.standup.name" = "Daily / Standup";
+"template.standup.desc" = "O que foi feito, próximos passos e impedimentos.";
+"template.interview.name" = "Entrevista";
+"template.interview.desc" = "Perguntas, respostas, pontos fortes e avaliação.";
 
 /* Ajustes */
 "settings.title" = "Ajustes";

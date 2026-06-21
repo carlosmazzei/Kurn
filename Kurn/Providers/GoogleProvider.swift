@@ -66,11 +66,7 @@ struct GoogleProvider: LLMProvider {
             let text = decoded.candidates?.first?.content.parts.compactMap { $0.text }.joined() ?? ""
             guard !text.isEmpty else { throw AppError.decodingError("empty Gemini response") }
             let json = try SummaryJSON.parse(text)
-            return SummaryResult(
-                content: json.summary,
-                actionItems: json.actionItems,
-                keyDecisions: json.keyDecisions
-            )
+            return SummaryResult(sections: json.summarySections)
         } catch let error as AppError {
             throw error
         } catch {

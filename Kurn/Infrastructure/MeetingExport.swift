@@ -23,16 +23,18 @@ enum MeetingExport {
         }
 
         if let summary = meeting.summary {
-            out += "## Summary\n\n\(summary.content)\n\n"
-            if !summary.keyDecisions.isEmpty {
-                out += "### Key Decisions\n\n"
-                out += summary.keyDecisions.map { "- \($0)" }.joined(separator: "\n")
-                out += "\n\n"
-            }
-            if !summary.actionItems.isEmpty {
-                out += "### Action Items\n\n"
-                out += summary.actionItems.map { "- [ ] \($0)" }.joined(separator: "\n")
-                out += "\n\n"
+            out += "## Summary\n\n"
+            for section in summary.displaySections {
+                if !section.title.isEmpty {
+                    out += "### \(section.title)\n\n"
+                }
+                if !section.body.isEmpty {
+                    out += "\(section.body)\n\n"
+                }
+                if !section.items.isEmpty {
+                    out += section.items.map { "- \($0)" }.joined(separator: "\n")
+                    out += "\n\n"
+                }
             }
         }
 

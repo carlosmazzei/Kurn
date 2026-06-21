@@ -156,7 +156,12 @@ final class TranscriptionViewModel {
 
     // MARK: - Summary
 
-    func generateSummary(for meeting: Meeting, provider: AIProvider, model: String) async {
+    func generateSummary(
+        for meeting: Meeting,
+        provider: AIProvider,
+        model: String,
+        template: SummaryTemplate
+    ) async {
         guard !isSummarizing else { return }
 
         // Assemble transcript text on the main actor (reads SwiftData).
@@ -180,21 +185,24 @@ final class TranscriptionViewModel {
                 transcriptText: transcriptText,
                 meetingTitle: title,
                 provider: provider,
-                model: model
+                model: model,
+                template: template
             )
             if let existing = meeting.summary {
-                existing.content = result.content
-                existing.actionItems = result.actionItems
-                existing.keyDecisions = result.keyDecisions
+                existing.sections = result.sections
+                existing.templateName = template.displayName
+                // Clear legacy fields so display/export use the new sections only.
+                existing.content = ""
+                existing.actionItems = []
+                existing.keyDecisions = []
                 existing.provider = provider
                 existing.model = model
                 existing.updatedAt = Date()
             } else {
                 let summary = Summary(
                     meeting: meeting,
-                    content: result.content,
-                    actionItems: result.actionItems,
-                    keyDecisions: result.keyDecisions,
+                    sections: result.sections,
+                    templateName: template.displayName,
                     provider: provider,
                     model: model
                 )
