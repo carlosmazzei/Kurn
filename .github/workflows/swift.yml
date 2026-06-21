@@ -8,12 +8,12 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    runs-on: macos-26-arm64
 
     env:
       XCODE_PROJECT: MeetSync.xcodeproj
       XCODE_SCHEME: MeetSync
-      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 16
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
 
     steps:
       - name: Checkout
