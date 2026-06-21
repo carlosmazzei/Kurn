@@ -12,6 +12,11 @@ import Foundation
 
 struct TranscriptionService {
 
+    /// Callback invoked as the pipeline advances through its stages. May be
+    /// called from a background executor; the receiver is responsible for
+    /// hopping to the main actor before touching UI state.
+    typealias PhaseHandler = @Sendable (TranscriptionPhase) -> Void
+
     struct Output: Sendable {
         var segments: [TranscriptSegment]
         var language: String
@@ -28,16 +33,31 @@ struct TranscriptionService {
     private let preprocessor = AudioPreprocessor()
 
     /// Transcribe one recording file and return diarized segments.
+    /// - Parameter onPhase: optional progress callback reporting the active stage.
     func transcribe(
         fileURL: URL,
         fileName: String,
         language: MeetingLanguage,
-        mode: TranscriptionMode
+        mode: TranscriptionMode,
+        onPhase: PhaseHandler = { _ in }
     ) async throws -> Output {
+        let started = Date()
+        AppLog.transcription.log("transcribe: start file=\(fileName, privacy: .public) mode=\(mode.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
+
         // Clean the audio (high-pass, presence EQ, AGC/limiter, mono 16 kHz)
         // before transcription/diarization. If cleanup fails for any reason we
         // fall back to the original so transcription never breaks.
-        let cleanedURL = (try? await preprocessor.process(url: fileURL)) ?? fileURL
+        onPhase(.preprocessing)
+        AppLog.transcription.log("transcribe: preprocessing…")
+        let preStart = Date()
+        let cleanedURL: URL
+        do {
+            cleanedURL = try await preprocessor.process(url: fileURL)
+            AppLog.transcription.log("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s -> cleaned copy")
+        } catch {
+            cleanedURL = fileURL
+            AppLog.transcription.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
+        }
         defer {
             if cleanedURL != fileURL {
                 let url = cleanedURL
@@ -47,11 +67,17 @@ struct TranscriptionService {
 
         // Transcription and diarization both read the same file but are
         // independent, so run them concurrently instead of back to back.
+        onPhase(.transcribing)
+        AppLog.transcription.log("transcribe: transcribing + diarizing (concurrent)…")
+        let txStart = Date()
         async let rawTranscript = transcribeRaw(fileURL: cleanedURL, language: language, mode: mode)
         async let speakerTurns = diarizer.diarize(url: cleanedURL)
 
         let raw = try await rawTranscript
         let turns = await speakerTurns
+        AppLog.transcription.log("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
+
+        onPhase(.finalizing)
         let segments = fuse(spans: raw.spans, turns: turns)
 
         var labels: [String] = []
@@ -59,6 +85,7 @@ struct TranscriptionService {
             labels.append(segment.speakerLabel)
         }
 
+        AppLog.transcription.log("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public)")
         return Output(
             segments: segments,
             language: raw.language,
@@ -88,13 +115,15 @@ struct TranscriptionService {
     ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider()
         let chunks = try await chunker.chunk(url: fileURL)
+        AppLog.transcription.log("whisper: uploading \(chunks.count, privacy: .public) chunk(s)")
         defer { Task { await chunker.cleanup(chunks) } }
 
         var allSpans: [TranscribedSpan] = []
         var detectedLanguage = ""
 
-        for chunk in chunks {
+        for (index, chunk) in chunks.enumerated() {
             let data = try Data(contentsOf: chunk.url)
+            AppLog.transcription.log("whisper: chunk \(index + 1, privacy: .public)/\(chunks.count, privacy: .public) (\(data.count, privacy: .public) bytes)")
             let result = try await provider.transcribe(
                 audioData: data,
                 fileName: chunk.url.lastPathComponent,

@@ -64,6 +64,12 @@
 "status.done" = "Transcrita";
 "status.failed" = "Falhou";
 
+/* Fases da transcrição */
+"phase.preparing" = "Preparando…";
+"phase.preprocessing" = "Limpando áudio…";
+"phase.transcribing" = "Transcrevendo…";
+"phase.finalizing" = "Finalizando…";
+
 /* Formulário de reunião */
 "form.title_section" = "Título";
 "form.title_placeholder" = "Título da reunião";
@@ -105,6 +111,10 @@
 "settings.defaults" = "Padrões";
 "settings.default_mode" = "Transcrição Padrão";
 "settings.default_language" = "Idioma Padrão";
+"settings.mic_pickup" = "Microfone";
+"settings.mic_pickup_footer" = "Sala toda capta todos (omnidirecional); Foco em quem fala prioriza a pessoa à frente (direcional). Afeta apenas o microfone embutido.";
+"micpickup.whole_room" = "Sala toda";
+"micpickup.focus_speaker" = "Foco em quem fala";
 "settings.storage" = "Armazenamento";
 "settings.audio_usage" = "Arquivos de Áudio";
 "settings.delete_all" = "Apagar Todos os Dados";

@@ -151,7 +151,14 @@ struct MeetingDetailView: View {
             Spacer()
 
             if txVM?.isTranscribing(recording) == true {
-                ProgressView()
+                HStack(spacing: 6) {
+                    ProgressView()
+                    if let phase = txVM?.phase(for: recording) {
+                        Text(phase.displayName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } else if recording.transcriptionStatus == .done {
                 StatusBadge(status: .done)
             } else {

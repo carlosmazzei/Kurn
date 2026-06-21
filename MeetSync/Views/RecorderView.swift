@@ -7,6 +7,7 @@
 //  is written to Documents as it records.
 //
 
+import os
 import SwiftData
 import SwiftUI
 
@@ -31,10 +32,12 @@ struct RecorderView: View {
         }
         .onAppear {
             if vm == nil {
+                AppLog.recorderUI.log("RecorderView.onAppear: creating view model")
                 vm = RecorderViewModel(
                     meeting: meeting,
                     modelContext: modelContext,
-                    defaultMode: settings.defaultMode
+                    defaultMode: settings.defaultMode,
+                    micPickup: settings.micPickup
                 )
             }
         }
@@ -82,6 +85,7 @@ private struct RecorderContent: View {
             if saved { onFinished() }
         }
         .task {
+            AppLog.recorderUI.log("RecorderContent.task: starting recording")
             await vm.startRecording()
         }
         .alert(
@@ -125,6 +129,7 @@ private struct RecorderContent: View {
         HStack(spacing: 48) {
             // Pause / resume (hidden until recording starts).
             Button {
+                AppLog.recorderUI.log("UI: pause/resume button tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.togglePause()
             } label: {
                 Image(systemName: vm.state == .paused ? "play.fill" : "pause.fill")
@@ -136,6 +141,7 @@ private struct RecorderContent: View {
 
             // Record control (pulses while recording).
             Button {
+                AppLog.recorderUI.log("UI: record button tapped, state=\(String(describing: vm.state), privacy: .public)")
                 guard vm.state == .idle else { return }
                 Task { await vm.startRecording() }
             } label: {
@@ -159,6 +165,7 @@ private struct RecorderContent: View {
 
             // Stop & save.
             Button {
+                AppLog.recorderUI.log("UI: stop button tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.stopAndSave()
             } label: {
                 Image(systemName: "stop.fill")

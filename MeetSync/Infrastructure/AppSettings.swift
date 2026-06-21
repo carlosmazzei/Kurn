@@ -17,6 +17,7 @@ final class AppSettings {
         static let provider = "settings.aiProvider"
         static let defaultMode = "settings.defaultTranscriptionMode"
         static let defaultLanguage = "settings.defaultLanguage"
+        static let micPickup = "settings.micPickup"
     }
 
     private let defaults = UserDefaults.standard
@@ -33,6 +34,11 @@ final class AppSettings {
         didSet { defaults.set(defaultLanguage.rawValue, forKey: Keys.defaultLanguage) }
     }
 
+    /// Built-in microphone pickup preference. Defaults to whole-room capture.
+    var micPickup: MicPickup {
+        didSet { defaults.set(micPickup.rawValue, forKey: Keys.micPickup) }
+    }
+
     init() {
         aiProvider = AIProvider(
             rawValue: defaults.string(forKey: Keys.provider) ?? ""
@@ -43,5 +49,8 @@ final class AppSettings {
         defaultLanguage = MeetingLanguage(
             rawValue: defaults.string(forKey: Keys.defaultLanguage) ?? ""
         ) ?? .autoDetect
+        micPickup = MicPickup(
+            rawValue: defaults.string(forKey: Keys.micPickup) ?? ""
+        ) ?? .wholeRoom
     }
 }
