@@ -123,7 +123,7 @@ enum AIProvider: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Models the user can pick for summaries, newest/preferred first.
     var availableModels: [String] {
         switch self {
-        case .openAI: return ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini"]
+        case .openAI: return ["gpt-5.4", "gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini"]
         case .anthropic: return ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"]
         case .google: return ["gemini-1.5-pro", "gemini-1.5-flash"]
         case .groq: return ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
