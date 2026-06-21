@@ -262,7 +262,7 @@ struct MeetingDetailView: View {
             }
             HStack(spacing: 6) {
                 Image(systemName: "cpu").font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
-                Text("\(settings.aiProvider.displayName) · \(settings.summaryModel(for: settings.aiProvider))")
+                Text(summaryModelNudge)
                     .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
             }
             .padding(.horizontal, 14).padding(.vertical, 6)
@@ -271,6 +271,19 @@ struct MeetingDetailView: View {
             if canGenerate { generateButton(regenerate: false) }
         }
         .frame(maxWidth: .infinity).padding(.top, 40)
+    }
+
+    private var summaryModelNudge: String {
+        let provider = settings.aiProvider
+        let model = settings.summaryModel(for: provider)
+        guard !model.isEmpty else {
+            return NSLocalizedString("detail.summary.model_missing", comment: "No summary model selected")
+        }
+        return String(
+            format: NSLocalizedString("detail.summary.model_nudge", comment: "Summary model nudge"),
+            provider.displayName,
+            model
+        )
     }
 
     private func generateButton(regenerate: Bool) -> some View {

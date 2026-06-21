@@ -37,14 +37,21 @@ struct EnumsTests {
 
     // MARK: - AIProvider
 
-    @Test func aiProviderMapsToExpectedKeychainKey() {
-        #expect(AIProvider.openAI.keychainKey == .openAI)
-        #expect(AIProvider.anthropic.keychainKey == .anthropic)
+    @Test func aiProviderMapsToExpectedKeychainAccount() {
+        #expect(AIProvider.openAI.keychainAccount == KeychainKey.openAI.rawValue)
+        #expect(AIProvider.anthropic.keychainAccount == KeychainKey.anthropic.rawValue)
     }
 
     @Test func aiProviderDisplayNamesAreVendorNames() {
         #expect(AIProvider.openAI.displayName == "OpenAI")
         #expect(AIProvider.anthropic.displayName == "Anthropic")
+    }
+
+    @Test func defaultProvidersIncludeOpenAICompatibleAndVendorAPIs() {
+        #expect(AIProvider.openAI.kind == .openAICompatible)
+        #expect(AIProvider.groq.kind == .openAICompatible)
+        #expect(AIProvider.anthropic.kind == .anthropic)
+        #expect(AIProvider.google.kind == .googleGemini)
     }
 
     // MARK: - TranscriptionMode

@@ -3,7 +3,7 @@
 //  MeetSync
 //
 //  Renders an AI summary: markdown body, key decisions, action items, and a
-//  provenance footer (provider + timestamp).
+//  provenance footer (provider + model + timestamp).
 //
 
 import SwiftUI
@@ -38,8 +38,11 @@ struct SummaryView: View {
 
             Text(
                 String(
-                    format: NSLocalizedString("summary.footer", comment: "Provider footer"),
+                    format: summary.model == nil
+                        ? NSLocalizedString("summary.footer", comment: "Provider footer")
+                        : NSLocalizedString("summary.footer_with_model", comment: "Provider and model footer"),
                     summary.provider.displayName,
+                    summary.model ?? summary.updatedAt.meetingDisplay,
                     summary.updatedAt.meetingDisplay
                 )
             )

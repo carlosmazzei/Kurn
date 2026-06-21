@@ -93,53 +93,135 @@ enum TranscriptionMode: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
-/// Which LLM vendor generates summaries.
-enum AIProvider: String, Codable, Sendable, CaseIterable, Identifiable {
-    case openAI
+/// API shape a configured LLM provider speaks.
+enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
+    case openAICompatible
     case anthropic
-    case google
-    case groq
+    case googleGemini
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .openAI: return "OpenAI"
+        case .openAICompatible: return "OpenAI-compatible"
         case .anthropic: return "Anthropic"
-        case .google: return "Google AI"
-        case .groq: return "Groq"
+        case .googleGemini: return "Google Gemini"
         }
     }
 
-    var keychainKey: KeychainKey {
+    var defaultBaseURLString: String {
         switch self {
-        case .openAI: return .openAI
-        case .anthropic: return .anthropic
-        case .google: return .google
-        case .groq: return .groq
+        case .openAICompatible: return "https://api.openai.com/v1"
+        case .anthropic: return "https://api.anthropic.com/v1"
+        case .googleGemini: return "https://generativelanguage.googleapis.com/v1beta"
+        }
+    }
+}
+
+/// Configured LLM provider used for summaries. Built-ins are presets; users can
+/// add more providers by choosing an API shape and a base URL.
+struct AIProvider: Codable, Sendable, Identifiable, Hashable {
+    var id: String
+    var displayName: String
+    var kind: AIProviderKind
+    var baseURLString: String
+    var brandHex: String
+    var defaultModel: String
+    var isBuiltIn: Bool
+    var legacyKeychainAccount: String?
+
+    var rawValue: String { id }
+
+    var keychainAccount: String {
+        legacyKeychainAccount ?? "provider_\(id)_api_key"
+    }
+
+    static let openAI = AIProvider(
+        id: "openAI",
+        displayName: "OpenAI",
+        kind: .openAICompatible,
+        baseURLString: "https://api.openai.com/v1",
+        brandHex: "#10A37F",
+        defaultModel: "gpt-5.4",
+        isBuiltIn: true,
+        legacyKeychainAccount: KeychainKey.openAI.rawValue
+    )
+
+    static let anthropic = AIProvider(
+        id: "anthropic",
+        displayName: "Anthropic",
+        kind: .anthropic,
+        baseURLString: "https://api.anthropic.com/v1",
+        brandHex: "#D97757",
+        defaultModel: "claude-3-5-sonnet-latest",
+        isBuiltIn: true,
+        legacyKeychainAccount: KeychainKey.anthropic.rawValue
+    )
+
+    static let google = AIProvider(
+        id: "google",
+        displayName: "Google AI",
+        kind: .googleGemini,
+        baseURLString: "https://generativelanguage.googleapis.com/v1beta",
+        brandHex: "#4285F4",
+        defaultModel: "gemini-1.5-pro",
+        isBuiltIn: true,
+        legacyKeychainAccount: KeychainKey.google.rawValue
+    )
+
+    static let groq = AIProvider(
+        id: "groq",
+        displayName: "Groq",
+        kind: .openAICompatible,
+        baseURLString: "https://api.groq.com/openai/v1",
+        brandHex: "#F55036",
+        defaultModel: "llama-3.3-70b-versatile",
+        isBuiltIn: true,
+        legacyKeychainAccount: KeychainKey.groq.rawValue
+    )
+
+    static let defaultProviders: [AIProvider] = [.openAI, .anthropic, .google, .groq]
+
+    init(
+        id: String,
+        displayName: String,
+        kind: AIProviderKind,
+        baseURLString: String,
+        brandHex: String = "#64748B",
+        defaultModel: String = "",
+        isBuiltIn: Bool = false,
+        legacyKeychainAccount: String? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.kind = kind
+        self.baseURLString = baseURLString
+        self.brandHex = brandHex
+        self.defaultModel = defaultModel
+        self.isBuiltIn = isBuiltIn
+        self.legacyKeychainAccount = legacyKeychainAccount
+    }
+
+    init?(rawValue: String) {
+        if let provider = Self.defaultProviders.first(where: { $0.id == rawValue }) {
+            self = provider
+        } else {
+            self = AIProvider(
+                id: rawValue,
+                displayName: rawValue,
+                kind: .openAICompatible,
+                baseURLString: AIProviderKind.openAICompatible.defaultBaseURLString
+            )
         }
     }
 
-    /// Models the user can pick for summaries, newest/preferred first.
-    var availableModels: [String] {
-        switch self {
-        case .openAI: return ["gpt-5.4", "gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini"]
-        case .anthropic: return ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"]
-        case .google: return ["gemini-1.5-pro", "gemini-1.5-flash"]
-        case .groq: return ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
-        }
-    }
-
-    var defaultModel: String { availableModels.first ?? "" }
-
-    /// Brand accent used for the provider's icon well in Settings.
-    var brandHex: String {
-        switch self {
-        case .openAI: return "#10A37F"
-        case .anthropic: return "#D97757"
-        case .google: return "#4285F4"
-        case .groq: return "#F55036"
-        }
+    static func custom(displayName: String, kind: AIProviderKind, baseURLString: String) -> AIProvider {
+        AIProvider(
+            id: "custom-\(UUID().uuidString)",
+            displayName: displayName,
+            kind: kind,
+            baseURLString: baseURLString
+        )
     }
 }
 

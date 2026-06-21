@@ -29,8 +29,13 @@ final class KeychainManager: @unchecked Sendable {
 
     /// Store (or overwrite) a value. Passing an empty/nil string deletes it.
     func set(_ value: String?, for key: KeychainKey) {
+        set(value, for: key.rawValue)
+    }
+
+    /// Store (or overwrite) a value for a dynamic provider account.
+    func set(_ value: String?, for account: String) {
         guard let value, !value.isEmpty else {
-            delete(key)
+            delete(account)
             return
         }
         guard let data = value.data(using: .utf8) else { return }
@@ -38,7 +43,7 @@ final class KeychainManager: @unchecked Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key.rawValue
+            kSecAttrAccount as String: account
         ]
 
         let attributes: [String: Any] = [
@@ -56,10 +61,15 @@ final class KeychainManager: @unchecked Sendable {
 
     /// Read a value, or `nil` if absent.
     func get(_ key: KeychainKey) -> String? {
+        get(key.rawValue)
+    }
+
+    /// Read a dynamic provider value, or `nil` if absent.
+    func get(_ account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key.rawValue,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -76,15 +86,24 @@ final class KeychainManager: @unchecked Sendable {
 
     /// Convenience: true when a non-empty value is present.
     func hasValue(for key: KeychainKey) -> Bool {
-        guard let value = get(key) else { return false }
+        hasValue(for: key.rawValue)
+    }
+
+    /// Convenience: true when a non-empty value is present.
+    func hasValue(for account: String) -> Bool {
+        guard let value = get(account) else { return false }
         return !value.isEmpty
     }
 
     func delete(_ key: KeychainKey) {
+        delete(key.rawValue)
+    }
+
+    func delete(_ account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key.rawValue
+            kSecAttrAccount as String: account
         ]
         SecItemDelete(query as CFDictionary)
     }

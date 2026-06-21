@@ -10,14 +10,15 @@
 import Foundation
 
 struct OpenAIProvider: LLMProvider {
-    let provider: AIProvider = .openAI
+    let provider: AIProvider
 
     private let apiKey: String
     private let session: URLSession
     private let chatModel: String
     private let whisperModel = "whisper-1"
 
-    init(apiKey: String, model: String = "gpt-5.4", session: URLSession = .shared) {
+    init(provider: AIProvider = .openAI, apiKey: String, model: String = "gpt-5.4", session: URLSession = .shared) {
+        self.provider = provider
         self.apiKey = apiKey
         self.chatModel = model
         self.session = session
@@ -89,7 +90,8 @@ struct OpenAIProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
 
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "chat/completions")
+            ?? URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

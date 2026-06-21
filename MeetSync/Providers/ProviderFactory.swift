@@ -12,18 +12,19 @@ enum ProviderFactory {
     /// Build the summary provider chosen in Settings. Throws `.noAPIKey` when the
     /// selected provider has no stored key.
     static func summaryProvider(for provider: AIProvider, model: String) throws -> LLMProvider {
-        let key = KeychainManager.shared.get(provider.keychainKey) ?? ""
+        let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
         guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
-        let model = model.isEmpty ? provider.defaultModel : model
-        switch provider {
-        case .openAI:
-            return OpenAIProvider(apiKey: key, model: model)
+        let resolvedModel = model.isEmpty ? provider.defaultModel : model
+        guard !resolvedModel.isEmpty else {
+            throw AppError.apiError(statusCode: 0, message: NSLocalizedString("error.no_model_selected", comment: "No model selected"))
+        }
+        switch provider.kind {
+        case .openAICompatible:
+            return OpenAIProvider(provider: provider, apiKey: key, model: resolvedModel)
         case .anthropic:
-            return AnthropicProvider(apiKey: key, model: model)
-        case .google:
-            return GoogleProvider(apiKey: key, model: model)
-        case .groq:
-            return GroqProvider(apiKey: key, model: model)
+            return AnthropicProvider(provider: provider, apiKey: key, model: resolvedModel)
+        case .googleGemini:
+            return GoogleProvider(provider: provider, apiKey: key, model: resolvedModel)
         }
     }
 
