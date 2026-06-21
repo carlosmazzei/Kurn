@@ -19,7 +19,8 @@ struct SummaryService {
     func generate(
         transcriptText: String,
         meetingTitle: String,
-        provider: AIProvider
+        provider: AIProvider,
+        model: String
     ) async throws -> SummaryResult {
         let trimmed = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -28,7 +29,7 @@ struct SummaryService {
             )
         }
 
-        let llm = try ProviderFactory.summaryProvider(for: provider)
+        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
         let userPrompt = """
         Meeting title: \(meetingTitle)
 

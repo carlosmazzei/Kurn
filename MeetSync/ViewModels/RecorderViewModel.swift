@@ -30,12 +30,14 @@ final class RecorderViewModel {
         meeting: Meeting,
         modelContext: ModelContext,
         defaultMode: TranscriptionMode,
-        micPickup: MicPickup = .wholeRoom
+        micPickup: MicPickup = .wholeRoom,
+        audioQuality: AudioQuality = .high
     ) {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
         self.recorder.micPickup = micPickup
+        self.recorder.audioBitRate = audioQuality.bitRate
         self.recorder.onStateChanged = { [weak self] state, elapsed in
             self?.lockScreenController.update(state: state, elapsed: elapsed)
             self?.pushWatchState(state: state, elapsed: elapsed)
@@ -59,6 +61,12 @@ final class RecorderViewModel {
     var level: Float { recorder.level }
     var elapsed: TimeInterval { recorder.elapsed }
     var routeMessage: String? { recorder.routeChangeMessage }
+
+    /// Editable meeting title, surfaced as the recorder's "Add title…" field.
+    var meetingTitle: String {
+        get { meeting.title }
+        set { meeting.title = newValue }
+    }
 
     /// Request permission (if needed) and begin recording.
     func startRecording() async {

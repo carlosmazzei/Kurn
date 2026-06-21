@@ -14,6 +14,8 @@ import Security
 enum KeychainKey: String, CaseIterable {
     case openAI = "openai_api_key"
     case anthropic = "anthropic_api_key"
+    case google = "google_api_key"
+    case groq = "groq_api_key"
 }
 
 /// Serializes all keychain access. The Security APIs are thread-safe, but a

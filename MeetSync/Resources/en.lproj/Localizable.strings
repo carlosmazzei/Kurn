@@ -37,7 +37,12 @@
 
 /* Recorder */
 "recorder.route_changed" = "Recording paused: the audio device changed (e.g. headphones unplugged).";
-"recorder.title" = "Record";
+"recorder.title" = "New Recording";
+"recorder.add_title" = "Add title…";
+"recorder.pause" = "Pause";
+"recorder.resume" = "Resume";
+"recorder.stop" = "Stop";
+"recorder.paused" = "PAUSED";
 "recorder.permission.title" = "Microphone Access Needed";
 "recorder.permission.message" = "MeetSync needs microphone access to record meetings. Enable it in Settings.";
 
@@ -46,6 +51,10 @@
 "meeting.has_summary" = "Has summary";
 "meetings.title" = "Meetings";
 "meetings.new" = "New Meeting";
+"meetings.search" = "Search recordings…";
+"filter.all" = "All";
+"filter.today" = "Today";
+"filter.this_week" = "This week";
 "meetings.empty.title" = "No Meetings Yet";
 "meetings.empty.subtitle" = "Tap + to create your first meeting and start recording.";
 "meetings.delete.confirm" = "Delete this meeting and its recordings?";
@@ -63,6 +72,7 @@
 "status.in_progress" = "Transcribing";
 "status.done" = "Transcribed";
 "status.failed" = "Failed";
+"status.todo" = "Transcribe";
 
 /* Transcription phases */
 "phase.preparing" = "Preparing…";
@@ -94,6 +104,20 @@
 "detail.summary.regenerate" = "Regenerate";
 "detail.summary.generate" = "Generate Summary";
 "detail.share" = "Share";
+"detail.segment_count" = "%d segments";
+"detail.recording_n" = "Recording %d";
+"detail.add_segment" = "Add segment";
+"detail.transcript.empty.title" = "No transcript yet";
+"detail.transcript.empty.subtitle" = "Transcribe a recording to see the conversation here.";
+"detail.summary.empty.title" = "No summary yet";
+"tab.meetings" = "Meetings";
+"tab.recordings" = "Recordings";
+"tab.transcript" = "Transcript";
+"tab.summary" = "Summary";
+"quality.high" = "High";
+"quality.standard" = "Standard";
+"quality.low" = "Low";
+"error.provider_no_transcribe" = "This provider does not support transcription. Use on-device or OpenAI Whisper.";
 
 /* Summary */
 "summary.key_decisions" = "Key Decisions";
@@ -102,7 +126,17 @@
 
 /* Settings */
 "settings.title" = "Settings";
-"settings.provider" = "AI Provider";
+"settings.provider" = "Provider";
+"settings.providers" = "AI Providers";
+"settings.transcription" = "Transcription";
+"settings.summary" = "Summary";
+"settings.recording" = "Recording";
+"settings.model" = "Model";
+"settings.configured" = "Configured";
+"settings.not_configured" = "Not configured";
+"settings.api_key" = "API Key";
+"settings.key_footer" = "Your %@ key is stored securely in the device Keychain and never leaves your device.";
+"settings.remove_key" = "Remove Key";
 "settings.openai_key" = "OpenAI API Key";
 "settings.openai_footer" = "Used for Whisper transcription and GPT-4o summaries.";
 "settings.anthropic_key" = "Anthropic API Key";
@@ -115,6 +149,7 @@
 "micpickup.whole_room" = "Whole room";
 "micpickup.focus_speaker" = "Focus on speaker";
 "settings.storage" = "Storage";
+"settings.audio_quality" = "Audio quality";
 "settings.audio_usage" = "Audio Files";
 "settings.delete_all" = "Delete All Data";
 "settings.delete_all.confirm" = "Delete all meetings and recordings?";

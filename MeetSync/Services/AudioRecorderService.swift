@@ -32,6 +32,8 @@ final class AudioRecorderService: NSObject {
     /// Preferred built-in mic pickup pattern. Set before `start`. Defaults to
     /// whole-room (omnidirectional) capture.
     var micPickup: MicPickup = .wholeRoom
+    /// AAC encoder bit rate (bits/sec) for the output file. Set before `start`.
+    var audioBitRate: Int = 64_000
     /// Normalized 0...1 microphone level driven from the metering timer.
     private(set) var level: Float = 0
     /// Elapsed recording time (excludes paused spans).
@@ -102,6 +104,7 @@ final class AudioRecorderService: NSObject {
         defer { isStarting = false }
 
         let pickup = micPickup
+        let bitRate = audioBitRate
         let fileName = AudioFileStore.fileName(meetingID: meetingID)
         let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
         AppLog.recorder.log("start: writing to \(fileName, privacy: .public)")
@@ -110,7 +113,7 @@ final class AudioRecorderService: NSObject {
             // Heavy AVAudioSession + AVAudioEngine setup runs OFF the main actor
             // (see `setUpEngine`) so the UI — e.g. the recorder sheet animating
             // in — stays responsive while the engine spins up.
-            try await setUpEngine(writingTo: url, pickup: pickup)
+            try await setUpEngine(writingTo: url, pickup: pickup, bitRate: bitRate)
         } catch let error as AppError {
             AppLog.recorder.error("start: setup threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
             teardownEngine()
@@ -138,9 +141,9 @@ final class AudioRecorderService: NSObject {
     /// Configure the audio session and start the engine. `nonisolated` + `async`
     /// so the (synchronously blocking) AVFoundation setup runs off the main
     /// actor instead of stalling the UI.
-    private nonisolated func setUpEngine(writingTo url: URL, pickup: MicPickup) async throws {
+    private nonisolated func setUpEngine(writingTo url: URL, pickup: MicPickup, bitRate: Int) async throws {
         try configureSession(pickup: pickup)
-        try beginEngine(writingTo: url)
+        try beginEngine(writingTo: url, bitRate: bitRate)
     }
 
     func pause() {
@@ -220,7 +223,7 @@ final class AudioRecorderService: NSObject {
     /// Open the output file and start the engine, installing a tap that writes
     /// captured buffers and tracks the input level. `nonisolated` so it can run
     /// off the main actor from `setUpEngine`.
-    private nonisolated func beginEngine(writingTo url: URL) throws {
+    private nonisolated func beginEngine(writingTo url: URL, bitRate: Int) throws {
         let input = engine.inputNode
         // Keep the recorder on the standard input unit. VoiceProcessingIO can
         // block engine startup on some routes/devices, freezing this screen.
@@ -239,7 +242,7 @@ final class AudioRecorderService: NSObject {
         // matches the buffers the tap delivers.
         var settings = format.settings
         settings[AVFormatIDKey] = Int(kAudioFormatMPEG4AAC)
-        settings[AVEncoderBitRateKey] = 64_000
+        settings[AVEncoderBitRateKey] = bitRate
         settings[AVEncoderAudioQualityKey] = AVAudioQuality.high.rawValue
 
         let file: AVAudioFile

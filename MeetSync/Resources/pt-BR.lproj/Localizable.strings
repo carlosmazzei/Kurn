@@ -37,7 +37,12 @@
 
 /* Gravador */
 "recorder.route_changed" = "Gravação pausada: o dispositivo de áudio mudou (ex.: fones desconectados).";
-"recorder.title" = "Gravar";
+"recorder.title" = "Nova Gravação";
+"recorder.add_title" = "Adicionar título…";
+"recorder.pause" = "Pausar";
+"recorder.resume" = "Retomar";
+"recorder.stop" = "Parar";
+"recorder.paused" = "PAUSADO";
 "recorder.permission.title" = "Acesso ao Microfone Necessário";
 "recorder.permission.message" = "O MeetSync precisa do microfone para gravar reuniões. Ative o acesso nos Ajustes.";
 
@@ -46,6 +51,10 @@
 "meeting.has_summary" = "Tem resumo";
 "meetings.title" = "Reuniões";
 "meetings.new" = "Nova Reunião";
+"meetings.search" = "Buscar gravações…";
+"filter.all" = "Todas";
+"filter.today" = "Hoje";
+"filter.this_week" = "Esta semana";
 "meetings.empty.title" = "Nenhuma Reunião";
 "meetings.empty.subtitle" = "Toque em + para criar sua primeira reunião e começar a gravar.";
 "meetings.delete.confirm" = "Excluir esta reunião e suas gravações?";
@@ -63,6 +72,7 @@
 "status.in_progress" = "Transcrevendo";
 "status.done" = "Transcrita";
 "status.failed" = "Falhou";
+"status.todo" = "Transcrever";
 
 /* Fases da transcrição */
 "phase.preparing" = "Preparando…";
@@ -94,6 +104,20 @@
 "detail.summary.regenerate" = "Gerar novamente";
 "detail.summary.generate" = "Gerar Resumo";
 "detail.share" = "Compartilhar";
+"detail.segment_count" = "%d segmentos";
+"detail.recording_n" = "Gravação %d";
+"detail.add_segment" = "Adicionar segmento";
+"detail.transcript.empty.title" = "Sem transcrição ainda";
+"detail.transcript.empty.subtitle" = "Transcreva uma gravação para ver a conversa aqui.";
+"detail.summary.empty.title" = "Nenhum resumo ainda";
+"tab.meetings" = "Reuniões";
+"tab.recordings" = "Gravações";
+"tab.transcript" = "Transcript";
+"tab.summary" = "Resumo";
+"quality.high" = "Alta";
+"quality.standard" = "Padrão";
+"quality.low" = "Baixa";
+"error.provider_no_transcribe" = "Este provedor não oferece transcrição. Use on-device ou OpenAI Whisper.";
 
 /* Resumo */
 "summary.key_decisions" = "Decisões Principais";
@@ -102,7 +126,17 @@
 
 /* Ajustes */
 "settings.title" = "Ajustes";
-"settings.provider" = "Provedor de IA";
+"settings.provider" = "Provedor";
+"settings.providers" = "Provedores de IA";
+"settings.transcription" = "Transcrição";
+"settings.summary" = "Resumo";
+"settings.recording" = "Gravação";
+"settings.model" = "Modelo";
+"settings.configured" = "Configurado";
+"settings.not_configured" = "Não configurado";
+"settings.api_key" = "Chave de API";
+"settings.key_footer" = "Sua chave da %@ fica guardada com segurança no Keychain do dispositivo e nunca sai dele.";
+"settings.remove_key" = "Remover Chave";
 "settings.openai_key" = "Chave de API da OpenAI";
 "settings.openai_footer" = "Usada para transcrição Whisper e resumos GPT-4o.";
 "settings.anthropic_key" = "Chave de API da Anthropic";
@@ -115,6 +149,7 @@
 "micpickup.whole_room" = "Sala toda";
 "micpickup.focus_speaker" = "Foco em quem fala";
 "settings.storage" = "Armazenamento";
+"settings.audio_quality" = "Qualidade de áudio";
 "settings.audio_usage" = "Arquivos de Áudio";
 "settings.delete_all" = "Apagar Todos os Dados";
 "settings.delete_all.confirm" = "Apagar todas as reuniões e gravações?";

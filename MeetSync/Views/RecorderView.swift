@@ -37,7 +37,8 @@ struct RecorderView: View {
                     meeting: meeting,
                     modelContext: modelContext,
                     defaultMode: settings.defaultMode,
-                    micPickup: settings.micPickup
+                    micPickup: settings.micPickup,
+                    audioQuality: settings.audioQuality
                 )
             }
         }
@@ -48,35 +49,37 @@ private struct RecorderContent: View {
     @Bindable var vm: RecorderViewModel
     let onFinished: () -> Void
 
-    @State private var levels: [Float] = Array(repeating: 0, count: 48)
-    @State private var pulse = false
+    @State private var levels: [Float] = Array(repeating: 0, count: 40)
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        ZStack {
+            // Immersive black backdrop with a soft red glow, per the design mock.
+            Color.black.ignoresSafeArea()
+            RadialGradient(
+                colors: [Theme.accent.opacity(0.12), .clear],
+                center: .center, startRadius: 0, endRadius: 260
+            )
+            .ignoresSafeArea()
+            .opacity(vm.state == .recording ? 1 : 0.4)
 
-            Text(vm.elapsed.clockDisplay)
-                .font(.system(size: 56, weight: .light, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-
-            waveform
-
-            if let message = vm.routeMessage {
-                Label(message, systemImage: "exclamationmark.triangle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+            VStack(spacing: 0) {
+                topBar
+                Spacer()
+                statusBadge
+                timer
+                    .padding(.top, 22)
+                waveform
+                    .padding(.top, 26)
+                titleField
+                    .padding(.top, 28)
+                routeMessage
+                Spacer()
+                controls
             }
-
-            Spacer()
-
-            controls
-                .padding(.bottom, 40)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
         }
-        .navigationTitle(NSLocalizedString("recorder.title", comment: "Record"))
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: vm.level) { _, newValue in
             levels.removeFirst()
             levels.append(newValue)
@@ -115,75 +118,173 @@ private struct RecorderContent: View {
 
     // MARK: - Subviews
 
+    private var topBar: some View {
+        HStack {
+            Button(NSLocalizedString("common.cancel", comment: "Cancel")) {
+                vm.cancel()
+                onFinished()
+            }
+            .foregroundStyle(.white.opacity(0.6))
+            Spacer()
+            Text(NSLocalizedString("recorder.title", comment: "Record"))
+                .font(.headline)
+                .foregroundStyle(.white)
+            Spacer()
+            // Balance the Cancel button so the title stays centered.
+            Text(NSLocalizedString("common.cancel", comment: "Cancel"))
+                .opacity(0)
+        }
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var statusBadge: some View {
+        HStack(spacing: 8) {
+            if vm.state == .recording {
+                PulsingDot(color: Theme.accent)
+            } else {
+                Circle()
+                    .fill(vm.state == .paused ? Theme.warning : Theme.accent)
+                    .frame(width: 10, height: 10)
+            }
+            Text(vm.state == .paused
+                 ? NSLocalizedString("recorder.paused", comment: "Paused")
+                 : "REC")
+                .font(.system(size: 13, weight: .bold))
+                .tracking(2.5)
+                .foregroundStyle(vm.state == .paused ? Theme.warning : Theme.accent)
+        }
+    }
+
+    private var timer: some View {
+        Text(vm.elapsed.clockDisplay)
+            .font(.system(size: 64, weight: .ultraLight, design: .default))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .contentTransition(.numericText())
+    }
+
+    private var titleField: some View {
+        VStack(spacing: 8) {
+            TextField(
+                NSLocalizedString("recorder.add_title", comment: "Add title…"),
+                text: $vm.meetingTitle
+            )
+            .multilineTextAlignment(.center)
+            .font(.system(size: 17))
+            .foregroundStyle(.white)
+            .tint(Theme.accent)
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var routeMessage: some View {
+        if let message = vm.routeMessage {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote)
+                .foregroundStyle(Theme.warning)
+                .multilineTextAlignment(.center)
+                .padding(.top, 16)
+        }
+    }
+
     private var waveform: some View {
-        HStack(alignment: .center, spacing: 3) {
+        HStack(alignment: .center, spacing: 3.5) {
             ForEach(levels.indices, id: \.self) { i in
                 Capsule()
-                    .fill(barColor)
-                    .frame(width: 4, height: max(3, CGFloat(levels[i]) * 120))
+                    .fill(barColor.opacity(i.isMultiple(of: 3) ? 0.7 : 1))
+                    .frame(width: 3, height: max(4, CGFloat(levels[i]) * 56))
             }
         }
-        .frame(height: 120)
-        .animation(.linear(duration: 0.05), value: levels)
+        .frame(height: 56)
+        .animation(.linear(duration: 0.06), value: levels)
     }
 
     private var controls: some View {
-        HStack(spacing: 48) {
-            // Pause / resume (hidden until recording starts).
+        HStack(spacing: 14) {
+            // Pause / resume.
             Button {
-                AppLog.recorderUI.log("UI: pause/resume button tapped, state=\(String(describing: vm.state), privacy: .public)")
+                AppLog.recorderUI.log("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.togglePause()
             } label: {
-                Image(systemName: vm.state == .paused ? "play.fill" : "pause.fill")
-                    .font(.title)
-                    .frame(width: 64, height: 64)
-                    .background(Color(.secondarySystemBackground), in: Circle())
+                pillLabel(
+                    systemImage: vm.state == .paused ? "play.fill" : "pause.fill",
+                    title: vm.state == .paused
+                        ? NSLocalizedString("recorder.resume", comment: "Resume")
+                        : NSLocalizedString("recorder.pause", comment: "Pause"),
+                    foreground: .white,
+                    background: AnyShapeStyle(.white.opacity(0.1)),
+                    bordered: true
+                )
             }
             .disabled(vm.state == .idle)
-
-            // Record control (pulses while recording).
-            Button {
-                AppLog.recorderUI.log("UI: record button tapped, state=\(String(describing: vm.state), privacy: .public)")
-                guard vm.state == .idle else { return }
-                Task { await vm.startRecording() }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 84, height: 84)
-                        .scaleEffect(pulse && vm.state == .recording ? 1.08 : 1.0)
-                        .opacity(vm.state == .recording ? 1 : 0.5)
-                    Image(systemName: "mic.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(.white)
-                }
-            }
-            .buttonStyle(.plain)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            }
 
             // Stop & save.
             Button {
-                AppLog.recorderUI.log("UI: stop button tapped, state=\(String(describing: vm.state), privacy: .public)")
+                AppLog.recorderUI.log("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.stopAndSave()
             } label: {
-                Image(systemName: "stop.fill")
-                    .font(.title)
-                    .frame(width: 64, height: 64)
-                    .background(Color(.secondarySystemBackground), in: Circle())
+                pillLabel(
+                    systemImage: "stop.fill",
+                    title: NSLocalizedString("recorder.stop", comment: "Stop"),
+                    foreground: .white,
+                    background: AnyShapeStyle(Theme.accent),
+                    bordered: false
+                )
             }
             .disabled(vm.state == .idle)
+            .shadow(color: Theme.accent.opacity(vm.state == .idle ? 0 : 0.45), radius: 14, y: 4)
         }
+        .opacity(vm.state == .idle ? 0.5 : 1)
+    }
+
+    private func pillLabel(
+        systemImage: String,
+        title: String,
+        foreground: Color,
+        background: AnyShapeStyle,
+        bordered: Bool
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+            Text(title).font(.system(size: 16, weight: .semibold))
+        }
+        .foregroundStyle(foreground)
+        .frame(maxWidth: .infinity)
+        .frame(height: 58)
+        .background(background, in: Capsule())
+        .overlay(
+            Capsule().stroke(.white.opacity(bordered ? 0.1 : 0), lineWidth: 0.5)
+        )
     }
 
     private var barColor: Color {
         switch vm.state {
-        case .recording: return .red
-        case .paused: return .orange
-        case .idle: return .secondary
+        case .recording: return Theme.accent
+        case .paused: return Theme.warning
+        case .idle: return .white.opacity(0.3)
         }
+    }
+}
+
+/// A self-contained pulsing dot. Isolating the `repeatForever` animation here
+/// keeps it from interacting with the recorder's 20 Hz metering re-renders.
+private struct PulsingDot: View {
+    let color: Color
+    @State private var dim = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 10, height: 10)
+            .opacity(dim ? 0.25 : 1)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    dim = true
+                }
+            }
     }
 }
