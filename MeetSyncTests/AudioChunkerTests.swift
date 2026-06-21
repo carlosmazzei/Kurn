@@ -34,7 +34,7 @@ struct AudioChunkerTests {
         let chunker = AudioChunker()
         await chunker.cleanup([
             AudioChunker.Chunk(url: tmpURL, offset: 0),
-            AudioChunker.Chunk(url: documentsURL, offset: 10),
+            AudioChunker.Chunk(url: documentsURL, offset: 10)
         ])
 
         #expect(!FileManager.default.fileExists(atPath: tmpURL.path))

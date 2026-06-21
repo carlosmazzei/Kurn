@@ -11,7 +11,7 @@ struct SummaryServiceTests {
     @Test func assembleTranscriptTextFormatsTimestampSpeakerAndText() {
         let segments = [
             TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Hello"),
-            TranscriptSegment(speakerLabel: "Speaker 2", startTime: 65, endTime: 70, text: "Hi there"),
+            TranscriptSegment(speakerLabel: "Speaker 2", startTime: 65, endTime: 70, text: "Hi there")
         ]
         let text = SummaryService.assembleTranscriptText(from: [segments])
         #expect(text == "[0:00] Speaker 1: Hello\n[1:05] Speaker 2: Hi there")

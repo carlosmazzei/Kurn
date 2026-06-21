@@ -24,6 +24,6 @@ struct ContentView: View {
     ContentView()
         .environment(AppSettings())
         .modelContainer(for: [
-            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
+            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self
         ], inMemory: true)
 }

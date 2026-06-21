@@ -47,8 +47,8 @@ struct GroqProvider: LLMProvider {
             "response_format": ["type": "json_object"],
             "messages": [
                 ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": userPrompt],
-            ],
+                ["role": "user", "content": userPrompt]
+            ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

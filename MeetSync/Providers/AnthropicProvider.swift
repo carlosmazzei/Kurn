@@ -55,8 +55,8 @@ struct AnthropicProvider: LLMProvider {
             "max_tokens": 2000,
             "system": systemPrompt,
             "messages": [
-                ["role": "user", "content": userPrompt],
-            ],
+                ["role": "user", "content": userPrompt]
+            ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

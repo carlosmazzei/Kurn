@@ -1,43 +1,122 @@
 # MeetSync
 
-MeetSync is a native iOS app for recording, transcribing, and summarizing
-meetings. It is built with Swift 6, SwiftUI, SwiftData, and Apple's modern
-concurrency APIs.
+[![iOS CI](https://github.com/carlosmazzei/MeetSync/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/MeetSync/actions/workflows/swift.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-iOS%2017%2B%20%7C%20watchOS%2010%2B-blue.svg)
+![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
+![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF.svg)
+![Architecture](https://img.shields.io/badge/architecture-local--first-2F855A.svg)
+![Privacy](https://img.shields.io/badge/privacy-no%20tracking-2F855A.svg)
 
-The app is local-first: recordings and meeting data stay on the device, on-device
-transcription is supported through Apple's Speech framework, and optional cloud
-features use API keys that the user provides in Settings.
+MeetSync is a local-first iOS and watchOS app for recording meetings,
+transcribing audio, identifying speakers, and generating structured AI
+summaries. It is built with Swift 6, SwiftUI, SwiftData, AVFoundation, Apple's
+Speech framework, ActivityKit, and WatchConnectivity.
+
+Recordings and meeting data are stored on device by default. Network requests
+only happen when the user chooses OpenAI Whisper transcription or generates a
+summary with a configured AI provider.
+
+## Current App
+
+- Native iPhone and iPad app targeting iOS 17.0 or newer.
+- Companion Apple Watch app targeting watchOS 10.0 or newer.
+- Lock Screen and Dynamic Island Live Activity for active recordings.
+- Local SwiftData store for meetings, recordings, speakers, transcripts, and
+  summaries.
+- Local `.m4a` audio files saved in the app's Documents directory.
+- English and Brazilian Portuguese localizations.
+- App Privacy Manifest with no tracking and no collected data types.
 
 ## Features
 
-- Record meetings to local `.m4a` files.
-- Pause, resume, cancel, and stop recordings.
-- Show active recordings as a custom Live Activity on the iPhone Lock Screen and
-  Dynamic Island, with pause/resume and stop actions.
-- Keep recordings grouped under named meeting sessions.
-- Handle audio interruptions and route changes, including Bluetooth HFP input.
-- Transcribe recordings on-device with Apple's Speech framework.
-- Optionally transcribe with OpenAI Whisper using chunked uploads for longer
+- Create and edit meeting sessions with title, notes, and preferred language.
+- Record meetings in one or more audio segments.
+- Pause, resume, cancel, and stop recordings from the app.
+- Control active recordings from the Lock Screen, Dynamic Island, or Apple
+  Watch.
+- Mirror recording state and input level to the Watch app.
+- Search meetings and filter them by all, today, or this week.
+- Play saved recordings and seek from transcript timestamps.
+- Delete meetings and individual recording segments.
+- Track local audio storage usage and reset all app data from Settings.
+
+## Recording And Transcription
+
+- Records AAC `.m4a` audio through an `AVAudioEngine` input tap.
+- Supports whole-room and focused-speaker microphone pickup preferences.
+- Supports high, standard, and low audio quality presets.
+- Handles audio interruptions and route changes, including automatic pause on
+  relevant route changes.
+- Cleans audio before transcription with preprocessing, while falling back to
+  the original file if preprocessing fails.
+- Transcribes on device with Apple's Speech framework.
+- Optionally transcribes with OpenAI Whisper using chunked uploads for longer
   recordings.
-- Apply lightweight on-device speaker diarization using silence and audio
-  feature clustering.
-- Rename auto-detected speakers.
-- Generate structured AI summaries with OpenAI or Anthropic.
-- Extract key decisions and action items from transcripts.
-- Store meeting metadata locally with SwiftData.
-- Store API keys in the Keychain.
-- Export a meeting as structured Markdown.
-- Localized in English and Brazilian Portuguese.
-- Includes a privacy manifest and does not include analytics or tracking SDKs.
+- Runs lightweight heuristic speaker diarization and fuses speaker turns with
+  transcript spans.
+- Lets users rename detected speakers.
+
+Supported transcription languages are auto-detect, Portuguese, English,
+Spanish, French, German, Japanese, and Chinese.
+
+## AI Summaries
+
+MeetSync can generate a structured meeting summary from existing transcripts.
+Summaries include a markdown body, key decisions, and action items.
+
+Supported summary providers:
+
+- OpenAI
+- Anthropic
+- Google AI
+- Groq
+
+Each provider has selectable models in Settings. Cloud transcription always uses
+OpenAI Whisper, regardless of the selected summary provider.
+
+## Configuration
+
+MeetSync works without cloud credentials when using on-device transcription.
+Cloud features require user-provided API keys.
+
+- OpenAI key: required for Whisper transcription and OpenAI summaries.
+- Anthropic key: required for Anthropic summaries.
+- Google AI key: required for Gemini summaries.
+- Groq key: required for Groq summaries.
+- API keys are stored in the Keychain.
+- Non-secret preferences are stored in `UserDefaults`.
+
+Default preferences are managed in:
+
+`MeetSync/Infrastructure/AppSettings.swift`
+
+Provider setup is handled through:
+
+`MeetSync/Providers/ProviderFactory.swift`
+
+## Privacy
+
+MeetSync is designed to avoid a backend service controlled by the app.
+
+- Audio files are saved locally in the app's Documents directory.
+- Meeting metadata, transcripts, summaries, speakers, and recordings are stored
+  locally with SwiftData.
+- API keys are stored in the Keychain.
+- Network requests are only made when the user selects a cloud transcription or
+  summary feature.
+- No analytics or tracking SDKs are included.
+- The privacy manifest declares no tracking and no collected data types.
 
 ## Requirements
 
 - macOS with Xcode installed.
 - Xcode 16 or newer. The project has been opened with Xcode 26.5.
-- iOS 17.0 or newer.
+- iOS 17.0 or newer for the main app.
+- watchOS 10.0 or newer for the Watch app.
 - An iOS simulator or a physical iPhone/iPad.
-- Optional: an OpenAI API key for Whisper transcription and OpenAI summaries.
-- Optional: an Anthropic API key for Claude summaries.
+- Optional: a paired Apple Watch or watchOS simulator for Watch remote control.
+- Optional: API keys for OpenAI, Anthropic, Google AI, or Groq.
 
 ## Getting Started
 
@@ -47,18 +126,15 @@ features use API keys that the user provides in Settings.
 4. Press `Cmd + R` to build and run.
 5. Grant microphone permission when prompted.
 6. Grant speech recognition permission if you use on-device transcription.
-7. Open Settings in the app to choose the default transcription mode, language,
-   AI provider, and API keys.
-
-The app icon is currently a placeholder. Replace
-`MeetSync/Assets.xcassets/AppIcon.appiconset` before distribution.
+7. Open Settings in the app to configure transcription mode, language, audio
+   quality, microphone pickup, summary provider, model, and API keys.
 
 ## Running In The Simulator
 
 In Xcode:
 
 1. Use the device picker in the toolbar.
-2. Select an iPhone simulator, such as `iPhone 16 Pro`.
+2. Select an iPhone simulator, such as `iPhone 17`.
 3. Run the app with `Cmd + R`.
 
 If no simulators are available, install an iOS runtime from:
@@ -77,62 +153,74 @@ Then build with:
 xcodebuild \
   -project MeetSync.xcodeproj \
   -scheme MeetSync \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
   build
 ```
+
+Use another simulator name if `iPhone 17` is not installed locally.
 
 ## Running Tests
 
 Unit tests live in the `MeetSyncTests` target and use Swift Testing. They cover
-pure logic such as JSON parsing, Markdown export, SwiftData model helpers, and
-view model behavior against an in-memory `ModelContainer`. The Keychain-backed
-provider tests touch the real Simulator keychain and restore whatever was
-already stored when they finish.
+logic such as JSON parsing, Markdown export, SwiftData model helpers, audio
+chunking and preprocessing, provider setup, formatting helpers, and view model
+behavior against an in-memory `ModelContainer`.
 
-Run them from Xcode with `Cmd + U`, or from the terminal:
+Run tests from Xcode with `Cmd + U`, or from the terminal:
 
 ```bash
 xcodebuild \
   -project MeetSync.xcodeproj \
   -scheme MeetSync \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
   test
 ```
 
-## Configuration
+CI is configured in `.github/workflows/swift.yml` and runs clean test on macOS
+with the `MeetSync` scheme.
 
-MeetSync can work without cloud credentials when using on-device transcription.
-Cloud transcription and AI summaries require user-provided API keys.
+## Linting
 
-- OpenAI key: used for Whisper transcription and OpenAI summaries.
-- Anthropic key: used for Claude summaries.
-- API keys are stored in the Keychain.
-- Non-secret preferences are stored in `UserDefaults`.
+MeetSync uses SwiftLint for Swift style and static checks.
 
-Default app preferences are managed in:
+Install locally with Homebrew:
 
-`MeetSync/Infrastructure/AppSettings.swift`
+```bash
+brew install swiftlint
+```
 
-Provider setup is handled through:
+Run it from the repository root:
 
-`MeetSync/Providers/ProviderFactory.swift`
+```bash
+swiftlint lint --config .swiftlint.yml
+```
 
-## Privacy
+If SwiftLint cannot load SourceKit, make sure the active developer directory
+points to Xcode:
 
-MeetSync is designed to avoid a backend service.
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
 
-- Audio files are saved locally in the app's documents directory.
-- Meeting metadata, transcripts, summaries, speakers, and recordings are stored
-  locally with SwiftData.
-- API keys are stored in the Keychain.
-- Network requests are only made when the user selects a cloud transcription or
-  summary feature.
-- No analytics or tracking SDKs are included.
+The GitHub Actions workflow installs SwiftLint and runs linting before the
+build/test step.
+
+## Export
+
+Meetings can be shared as structured Markdown. The export includes:
+
+- Meeting title, date, notes, and total duration.
+- Summary content, key decisions, and action items when available.
+- Speaker-attributed transcript lines with timestamps.
+
+Export generation is implemented in:
+
+`MeetSync/Infrastructure/MeetingExport.swift`
 
 ## Architecture
 
 The app follows an MVVM-style structure with `@Observable`, `@MainActor` view
-models, and async service APIs.
+models, async service APIs, and a SwiftData model container.
 
 ```text
 MeetSync/
@@ -142,21 +230,30 @@ MeetSync/
 ├── Views/                       # SwiftUI screens and reusable views
 ├── ViewModels/                  # Main-actor observable coordinators
 ├── Services/                    # Audio, transcription, diarization, summaries
-├── Providers/                   # OpenAI and Anthropic URLSession clients
+├── Providers/                   # OpenAI, Anthropic, Google AI, and Groq clients
 ├── Infrastructure/              # Keychain, errors, settings, export, extensions
 ├── Resources/                   # Localizations and privacy manifest
 └── Assets.xcassets/             # App icon and accent color
+
+MeetSyncWatch/
+├── MeetSyncWatchApp.swift       # Watch app entry point
+├── WatchRecorderView.swift      # Watch remote control UI
+└── WatchConnectivityManager.swift
+
+MeetSyncLiveActivityExtension/
+├── RecordingActivityAttributes.swift
+└── RecordingLiveActivityWidget.swift
 ```
 
 ## Important Implementation Notes
 
 - Cloud transcription always uses OpenAI Whisper.
-- Summaries can use OpenAI or Anthropic.
+- Summary generation can use OpenAI, Anthropic, Google AI, or Groq.
 - Speaker diarization is heuristic and approximate by design.
 - On-device transcription availability depends on Apple's Speech framework,
   simulator/device support, and the selected language.
 - Background audio recording is enabled through `UIBackgroundModes`.
-- The app uses a checked-in `Info.plist` instead of generated build settings.
+- The main app and extensions use checked-in `Info.plist` files.
 
 ## Development Notes
 
@@ -166,13 +263,19 @@ Useful files:
 - `MeetSync/Services/TranscriptionService.swift`
 - `MeetSync/Services/SummaryService.swift`
 - `MeetSync/Services/SpeakerDiarizer.swift`
+- `MeetSync/Services/PhoneSessionController.swift`
 - `MeetSync/Views/SettingsView.swift`
 - `MeetSync/Infrastructure/MeetingExport.swift`
 
 Before shipping:
 
-- Replace the placeholder app icon.
 - Confirm the bundle identifier and signing team.
 - Test recording on a physical device.
-- Test microphone, speech recognition, and network permission flows.
+- Test Watch remote control with a paired Apple Watch or watchOS simulator.
+- Test microphone, speech recognition, Live Activity, and network permission
+  flows.
 - Validate export output with real meeting data.
+
+## License
+
+MeetSync is released under the [MIT License](LICENSE).

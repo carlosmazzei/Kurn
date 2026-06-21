@@ -33,7 +33,7 @@ extension Color {
         "#1098AD", // cyan
         "#E03131", // red
         "#F08C00", // amber
-        "#5C940D", // lime
+        "#5C940D" // lime
     ]
 
     /// Returns a palette hex for the Nth speaker, cycling if needed.

@@ -54,7 +54,7 @@ final class PhoneSessionController: NSObject {
             "meetingTitle": meetingTitle,
             "referenceDate": referenceDate,
             "accumulatedElapsed": accumulatedElapsed,
-            "isAvailable": isAvailable,
+            "isAvailable": isAvailable
         ]
         try? session.updateApplicationContext(context)
     }

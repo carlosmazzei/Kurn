@@ -22,7 +22,7 @@ struct EnumsTests {
         (MeetingLanguage.french, "fr-FR", "fr"),
         (MeetingLanguage.german, "de-DE", "de"),
         (MeetingLanguage.japanese, "ja-JP", "ja"),
-        (MeetingLanguage.chinese, "zh-CN", "zh"),
+        (MeetingLanguage.chinese, "zh-CN", "zh")
     ])
     func localeAndWhisperCodeMatchExpected(language: MeetingLanguage, locale: String, whisperCode: String) {
         #expect(language.localeIdentifier == locale)

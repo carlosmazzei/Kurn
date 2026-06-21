@@ -1,0 +1,74 @@
+included:
+  - MeetSync
+  - MeetSyncTests
+  - MeetSyncWatch
+  - MeetSyncLiveActivityExtension
+
+excluded:
+  - .build
+  - .git
+  - build_dd
+  - Carthage
+  - DerivedData
+  - Pods
+
+line_length:
+  warning: 160
+  error: 240
+  ignores_comments: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+  ignores_urls: true
+
+file_length:
+  warning: 600
+  error: 900
+
+type_body_length:
+  warning: 400
+  error: 600
+
+function_body_length:
+  warning: 120
+  error: 180
+
+function_parameter_count:
+  warning: 5
+  error: 8
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level:
+    warning: 2
+    error: 3
+  function_level:
+    warning: 3
+    error: 5
+
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - a
+    - b
+    - c
+    - g
+    - id
+    - i
+    - n
+    - r
+    - s
+    - t
+    - v
+    - vm
+    - x
+    - y
+
+type_name:
+  min_length:
+    warning: 2
+  excluded:
+    - E

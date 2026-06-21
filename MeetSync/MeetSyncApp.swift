@@ -21,7 +21,7 @@ struct MeetSyncApp: App {
             Recording.self,
             Transcript.self,
             Speaker.self,
-            Summary.self,
+            Summary.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
