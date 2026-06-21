@@ -110,6 +110,7 @@
 "detail.transcript.empty.title" = "No transcript yet";
 "detail.transcript.empty.subtitle" = "Transcribe a recording to see the conversation here.";
 "detail.summary.empty.title" = "No summary yet";
+"tab.meetings" = "Meetings";
 "tab.recordings" = "Recordings";
 "tab.transcript" = "Transcript";
 "tab.summary" = "Summary";

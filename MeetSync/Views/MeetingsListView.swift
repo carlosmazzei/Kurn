@@ -37,9 +37,10 @@ struct MeetingsListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
 
-    @State private var showingNewMeeting = false
     @State private var showingSettings = false
     @State private var pendingDelete: Meeting?
+    /// Set when the center record button creates a meeting to record into.
+    @State private var recordMeeting: Meeting?
     @State private var searchText = ""
     @State private var filter: MeetingDateFilter = .all
 
@@ -54,6 +55,7 @@ struct MeetingsListView: View {
     }
 
     var body: some View {
+        ZStack(alignment: .bottom) {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("MeetSync")
@@ -85,27 +87,18 @@ struct MeetingsListView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 4)
-            .padding(.bottom, 24)
+            .padding(.bottom, 110)
         }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Theme.background, for: .navigationBar)
+
+            bottomBar
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: Meeting.self) { meeting in
             MeetingDetailView(meeting: meeting)
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showingSettings = true } label: { Image(systemName: "gearshape") }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingNewMeeting = true } label: {
-                    Label(NSLocalizedString("meetings.new", comment: "New Meeting"), systemImage: "plus")
-                }
-            }
-        }
-        .sheet(isPresented: $showingNewMeeting) {
-            NavigationStack { MeetingFormView() }
+        .sheet(item: $recordMeeting) { meeting in
+            NavigationStack { RecorderView(meeting: meeting) }
         }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
@@ -131,6 +124,52 @@ struct MeetingsListView: View {
     }
 
     // MARK: - Subviews
+
+    // MARK: - Bottom bar
+
+    private var bottomBar: some View {
+        HStack(alignment: .center) {
+            bottomTab(icon: "square.grid.2x2.fill",
+                      label: NSLocalizedString("tab.meetings", comment: "Meetings"),
+                      active: true) {}
+            Spacer()
+            bottomTab(icon: "gearshape.fill",
+                      label: NSLocalizedString("settings.title", comment: "Settings"),
+                      active: false) { showingSettings = true }
+        }
+        .padding(.horizontal, 56)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .background(alignment: .top) { Divider().overlay(Theme.separator) }
+        .background(.bar)
+        .overlay(alignment: .top) { recordButton.offset(y: -26) }
+    }
+
+    private func bottomTab(icon: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 18))
+                Text(label).font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(active ? Theme.textPrimary : Theme.textTertiary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var recordButton: some View {
+        Button {
+            let meeting = MeetingsViewModel(modelContext: modelContext).createMeeting(title: "")
+            recordMeeting = meeting
+        } label: {
+            ZStack {
+                Circle().fill(Theme.accent).frame(width: 56, height: 56)
+                Circle().fill(.white).frame(width: 22, height: 22)
+            }
+            .shadow(color: Theme.accent.opacity(0.55), radius: 16, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(NSLocalizedString("meetings.new", comment: "New Meeting")))
+    }
 
     private var searchField: some View {
         HStack(spacing: 8) {
