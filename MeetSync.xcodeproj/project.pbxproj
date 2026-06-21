@@ -18,6 +18,13 @@
 			remoteGlobalIDString = AA10000000000000000000B1;
 			remoteInfo = MeetSyncLiveActivityExtension;
 		};
+		AA2000000000000000000141 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000003 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA00000000000000000000B1;
+			remoteInfo = MeetSync;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -37,6 +44,7 @@
 /* Begin PBXFileReference section */
 		AA00000000000000000000A1 /* MeetSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeetSyncLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA20000000000000000000A1 /* MeetSyncTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeetSyncTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,6 +67,7 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA00000000000000000000C1 /* MeetSync */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSync; sourceTree = "<group>"; };
 		AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MeetSyncLiveActivityExtension; sourceTree = "<group>"; };
+		AA20000000000000000000C1 /* MeetSyncTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MeetSyncTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +85,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA20000000000000000000F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -84,6 +100,7 @@
 			children = (
 				AA00000000000000000000C1 /* MeetSync */,
 				AA10000000000000000000C1 /* MeetSyncLiveActivityExtension */,
+				AA20000000000000000000C1 /* MeetSyncTests */,
 				AA0000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -93,6 +110,7 @@
 			children = (
 				AA00000000000000000000A1 /* MeetSync.app */,
 				AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */,
+				AA20000000000000000000A1 /* MeetSyncTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -142,6 +160,27 @@
 			productReference = AA10000000000000000000A1 /* MeetSyncLiveActivityExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		AA20000000000000000000B1 /* MeetSyncTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA20000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncTests" */;
+			buildPhases = (
+				AA2000000000000000000101 /* Sources */,
+				AA20000000000000000000F1 /* Frameworks */,
+				AA2000000000000000000111 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA2000000000000000000151 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA20000000000000000000C1 /* MeetSyncTests */,
+			);
+			name = MeetSyncTests;
+			productName = MeetSyncTests;
+			productReference = AA20000000000000000000A1 /* MeetSyncTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -157,6 +196,10 @@
 					};
 					AA10000000000000000000B1 = {
 						CreatedOnToolsVersion = 26.5;
+					};
+					AA20000000000000000000B1 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = AA00000000000000000000B1;
 					};
 				};
 			};
@@ -176,6 +219,7 @@
 			targets = (
 				AA00000000000000000000B1 /* MeetSync */,
 				AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */,
+				AA20000000000000000000B1 /* MeetSyncTests */,
 			);
 		};
 /* End PBXProject section */
@@ -189,6 +233,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA1000000000000000000111 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA2000000000000000000111 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -212,6 +263,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA2000000000000000000101 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -219,6 +277,11 @@
 			isa = PBXTargetDependency;
 			target = AA10000000000000000000B1 /* MeetSyncLiveActivityExtension */;
 			targetProxy = AA1000000000000000000141 /* PBXContainerItemProxy */;
+		};
+		AA2000000000000000000151 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA00000000000000000000B1 /* MeetSync */;
+			targetProxy = AA2000000000000000000141 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -442,6 +505,46 @@
 			};
 			name = Release;
 		};
+		AA2000000000000000000211 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WE49K38CEY;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ainoteflow.app.MeetSyncTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeetSync.app/MeetSync";
+			};
+			name = Debug;
+		};
+		AA2000000000000000000212 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WE49K38CEY;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ainoteflow.app.MeetSyncTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeetSync.app/MeetSync";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -468,6 +571,15 @@
 			buildConfigurations = (
 				AA1000000000000000000211 /* Debug */,
 				AA1000000000000000000212 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA20000000000000000000D2 /* Build configuration list for PBXNativeTarget "MeetSyncTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA2000000000000000000211 /* Debug */,
+				AA2000000000000000000212 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
