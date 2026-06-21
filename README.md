@@ -81,6 +81,24 @@ xcodebuild \
   build
 ```
 
+## Running Tests
+
+Unit tests live in the `MeetSyncTests` target and use Swift Testing. They cover
+pure logic such as JSON parsing, Markdown export, SwiftData model helpers, and
+view model behavior against an in-memory `ModelContainer`. The Keychain-backed
+provider tests touch the real Simulator keychain and restore whatever was
+already stored when they finish.
+
+Run them from Xcode with `Cmd + U`, or from the terminal:
+
+```bash
+xcodebuild \
+  -project MeetSync.xcodeproj \
+  -scheme MeetSync \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  test
+```
+
 ## Configuration
 
 MeetSync can work without cloud credentials when using on-device transcription.
