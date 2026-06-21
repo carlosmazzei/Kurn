@@ -113,10 +113,9 @@ struct SettingsView: View {
             }
         }
         .onAppear { refreshStorage() }
-        .confirmationDialog(
+        .alert(
             NSLocalizedString("settings.delete_all.confirm", comment: "Confirm delete all"),
-            isPresented: $showingDeleteConfirm,
-            titleVisibility: .visible
+            isPresented: $showingDeleteConfirm
         ) {
             Button(NSLocalizedString("settings.delete_all", comment: "Delete All Data"), role: .destructive) {
                 deleteAllData()

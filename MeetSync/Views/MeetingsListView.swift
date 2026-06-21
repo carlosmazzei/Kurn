@@ -105,7 +105,7 @@ struct MeetingsListView: View {
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }
-        .confirmationDialog(
+        .alert(
             NSLocalizedString("meetings.delete.confirm", comment: "Delete confirmation"),
             isPresented: Binding(
                 get: { pendingDelete != nil },
