@@ -51,6 +51,10 @@
 "meeting.has_summary" = "Has summary";
 "meetings.title" = "Meetings";
 "meetings.new" = "New Meeting";
+"meetings.search" = "Search recordings…";
+"filter.all" = "All";
+"filter.today" = "Today";
+"filter.this_week" = "This week";
 "meetings.empty.title" = "No Meetings Yet";
 "meetings.empty.subtitle" = "Tap + to create your first meeting and start recording.";
 "meetings.delete.confirm" = "Delete this meeting and its recordings?";
@@ -68,6 +72,7 @@
 "status.in_progress" = "Transcribing";
 "status.done" = "Transcribed";
 "status.failed" = "Failed";
+"status.todo" = "Transcribe";
 
 /* Transcription phases */
 "phase.preparing" = "Preparing…";
