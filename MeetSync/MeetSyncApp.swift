@@ -31,6 +31,10 @@ struct MeetSyncApp: App {
         }
     }()
 
+    init() {
+        PhoneSessionController.shared.activate()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
