@@ -36,21 +36,21 @@ struct ProviderFactoryTests {
     @Test func summaryProviderThrowsNoAPIKeyWhenKeychainIsEmpty() {
         withClearedKey(.openAI) {
             #expect(throws: AppError.self) {
-                _ = try ProviderFactory.summaryProvider(for: .openAI)
+                _ = try ProviderFactory.summaryProvider(for: .openAI, model: "gpt-4o")
             }
         }
     }
 
     @Test func summaryProviderBuildsOpenAIProviderWhenKeyPresent() throws {
         try withKey(.openAI, value: "test-key") {
-            let provider = try ProviderFactory.summaryProvider(for: .openAI)
+            let provider = try ProviderFactory.summaryProvider(for: .openAI, model: "gpt-4o")
             #expect(provider.provider == .openAI)
         }
     }
 
     @Test func summaryProviderBuildsAnthropicProviderWhenKeyPresent() throws {
         try withKey(.anthropic, value: "test-key") {
-            let provider = try ProviderFactory.summaryProvider(for: .anthropic)
+            let provider = try ProviderFactory.summaryProvider(for: .anthropic, model: "claude-3-5-sonnet-latest")
             #expect(provider.provider == .anthropic)
         }
     }

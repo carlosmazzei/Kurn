@@ -104,6 +104,19 @@
 "detail.summary.regenerate" = "Gerar novamente";
 "detail.summary.generate" = "Gerar Resumo";
 "detail.share" = "Compartilhar";
+"detail.segment_count" = "%d segmentos";
+"detail.recording_n" = "Gravação %d";
+"detail.add_segment" = "Adicionar segmento";
+"detail.transcript.empty.title" = "Sem transcrição ainda";
+"detail.transcript.empty.subtitle" = "Transcreva uma gravação para ver a conversa aqui.";
+"detail.summary.empty.title" = "Nenhum resumo ainda";
+"tab.recordings" = "Gravações";
+"tab.transcript" = "Transcript";
+"tab.summary" = "Resumo";
+"quality.high" = "Alta";
+"quality.standard" = "Padrão";
+"quality.low" = "Baixa";
+"error.provider_no_transcribe" = "Este provedor não oferece transcrição. Use on-device ou OpenAI Whisper.";
 
 /* Resumo */
 "summary.key_decisions" = "Decisões Principais";

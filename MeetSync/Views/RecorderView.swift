@@ -37,7 +37,8 @@ struct RecorderView: View {
                     meeting: meeting,
                     modelContext: modelContext,
                     defaultMode: settings.defaultMode,
-                    micPickup: settings.micPickup
+                    micPickup: settings.micPickup,
+                    audioQuality: settings.audioQuality
                 )
             }
         }

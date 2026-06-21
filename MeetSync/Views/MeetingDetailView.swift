@@ -2,9 +2,10 @@
 //  MeetingDetailView.swift
 //  MeetSync
 //
-//  The hub for a single meeting: recordings (play + transcribe), the diarized
-//  transcript, editable speakers, and the AI summary. Sharing exports a
-//  structured Markdown file.
+//  The hub for a single meeting, organized into three tabs (Recordings,
+//  Transcript, Summary) per the iOS design. Recordings can be played and
+//  transcribed; the transcript is speaker-filterable; the summary is generated
+//  by the configured AI provider. Sharing exports a structured Markdown file.
 //
 
 import SwiftData
@@ -16,43 +17,49 @@ struct MeetingDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppSettings.self) private var settings
 
+    enum Tab: Hashable { case recordings, transcript, summary }
+
     @State private var player = AudioPlayerService()
     @State private var txVM: TranscriptionViewModel?
+    @State private var tab: Tab = .recordings
 
     @State private var showingRecorder = false
     @State private var showingEdit = false
     @State private var shareItem: ShareItem?
 
     var body: some View {
-        List {
-            headerSection
-            recordingsSection
-            transcriptSection
-            speakersSection
-            summarySection
+        VStack(spacing: 0) {
+            header
+            Divider().overlay(Theme.separator)
+            ScrollView {
+                Group {
+                    switch tab {
+                    case .recordings: recordingsTab
+                    case .transcript: transcriptTab
+                    case .summary: summaryTab
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
+            }
+            tabBar
         }
-        .navigationTitle(meeting.title)
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
         .onAppear {
-            if txVM == nil {
-                txVM = TranscriptionViewModel(modelContext: modelContext)
-            }
+            if txVM == nil { txVM = TranscriptionViewModel(modelContext: modelContext) }
         }
         .onDisappear { player.stop() }
         .sheet(isPresented: $showingRecorder) {
-            NavigationStack {
-                RecorderView(meeting: meeting)
-            }
+            NavigationStack { RecorderView(meeting: meeting) }
         }
         .sheet(isPresented: $showingEdit) {
-            NavigationStack {
-                MeetingFormView(meeting: meeting)
-            }
+            NavigationStack { MeetingFormView(meeting: meeting) }
         }
-        .sheet(item: $shareItem) { item in
-            ActivityView(items: [item.url])
-        }
+        .sheet(item: $shareItem) { item in ActivityView(items: [item.url]) }
         .alert(
             NSLocalizedString("common.error", comment: "Error"),
             isPresented: Binding(
@@ -67,180 +74,274 @@ struct MeetingDetailView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Header
 
-    private var headerSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 4) {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(meeting.title)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+            HStack(spacing: 8) {
                 Text(meeting.createdAt.meetingDisplay)
-                    .foregroundStyle(.secondary)
+                metaDot
+                Text(String(format: NSLocalizedString("detail.segment_count", comment: ""), meeting.recordings.count))
                 if meeting.totalDuration > 0 {
-                    Text(
-                        String(
-                            format: NSLocalizedString("detail.total_duration", comment: ""),
-                            meeting.totalDuration.clockDisplay
-                        )
-                    )
-                    .font(.subheadline)
-                }
-                if !meeting.notes.isEmpty {
-                    Text(meeting.notes)
-                        .font(.body)
-                        .padding(.top, 4)
+                    metaDot
+                    Text(meeting.totalDuration.clockDisplay)
                 }
             }
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.textSecondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
     }
 
-    private var recordingsSection: some View {
-        Section(NSLocalizedString("detail.recordings", comment: "Recordings")) {
-            ForEach(sortedRecordings) { recording in
-                recordingRow(recording)
-            }
-            .onDelete(perform: deleteRecordings)
-
-            Button {
-                showingRecorder = true
-            } label: {
-                Label(
-                    NSLocalizedString("detail.record_new", comment: "Record New Segment"),
-                    systemImage: "mic.badge.plus"
-                )
-            }
-        }
+    private var metaDot: some View {
+        Circle().fill(Theme.textTertiary).frame(width: 3, height: 3)
     }
+
+    // MARK: - Recordings tab
 
     @ViewBuilder
-    private func recordingRow(_ recording: Recording) -> some View {
+    private var recordingsTab: some View {
+        VStack(spacing: 8) {
+            sectionLabel(NSLocalizedString("detail.recordings", comment: "Recordings"))
+            ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in
+                segmentRow(recording, index: index)
+            }
+            addSegmentButton
+        }
+    }
+
+    private func segmentRow(_ recording: Recording, index: Int) -> some View {
         let isLoaded = player.loadedFileName == recording.fileName
-        HStack(spacing: 12) {
-            Button {
-                togglePlay(recording)
-            } label: {
-                Image(systemName: (isLoaded && player.isPlaying) ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.title)
-                    .foregroundStyle(.tint)
+        return HStack(spacing: 12) {
+            Button { togglePlay(recording) } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.fill)
+                        .frame(width: 34, height: 34)
+                    Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textPrimary)
+                }
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(recording.recordedAt.meetingDisplay)
-                    .font(.subheadline)
-                Text(recording.duration.clockDisplay)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textTertiary)
             }
-
-            Spacer()
+            Spacer(minLength: 8)
 
             if txVM?.isTranscribing(recording) == true {
                 HStack(spacing: 6) {
                     ProgressView()
                     if let phase = txVM?.phase(for: recording) {
-                        Text(phase.displayName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(phase.displayName).font(.caption).foregroundStyle(Theme.textSecondary)
                     }
                 }
             } else if recording.transcriptionStatus == .done {
                 StatusBadge(status: .done)
             } else {
-                Button(NSLocalizedString("detail.transcribe", comment: "Transcribe")) {
+                Button {
                     startTranscription(recording, mode: settings.defaultMode)
+                } label: {
+                    StatusBadge(status: .none)
                 }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
+            }
+        }
+        .meetsyncCard(padding: 14, cornerRadius: 16)
+        .contextMenu {
+            Button(role: .destructive) { deleteRecording(recording) } label: {
+                Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
             }
         }
     }
 
-    @ViewBuilder
-    private var transcriptSection: some View {
-        let transcribed = sortedRecordings.filter { $0.transcript != nil }
-        if !transcribed.isEmpty {
-            Section(NSLocalizedString("detail.transcript", comment: "Transcript")) {
-                ForEach(transcribed) { recording in
-                    TranscriptView(
-                        segments: recording.transcript?.segments ?? [],
-                        speakers: meeting.speakers,
-                        activeTime: player.loadedFileName == recording.fileName
-                            ? player.currentTime : nil,
-                        onSeek: { time in seek(recording, to: time) }
-                    )
+    private var addSegmentButton: some View {
+        Button { showingRecorder = true } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(Theme.accent.opacity(0.12)).frame(width: 34, height: 34)
+                    Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
                 }
+                Text(NSLocalizedString("detail.add_segment", comment: "Add segment"))
+                    .font(.system(size: 15)).foregroundStyle(Theme.textSecondary)
+                Spacer()
             }
-        }
-    }
-
-    @ViewBuilder
-    private var speakersSection: some View {
-        if !meeting.speakers.isEmpty {
-            Section {
-                ForEach(meeting.speakers.sorted { $0.label < $1.label }) { speaker in
-                    SpeakerRow(speaker: speaker) { try? modelContext.save() }
-                }
-            } header: {
-                Text(NSLocalizedString("detail.speakers", comment: "Speakers"))
-            } footer: {
-                Text(NSLocalizedString("detail.speakers.note", comment: "Auto-detected note"))
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var summarySection: some View {
-        Section(NSLocalizedString("detail.summary", comment: "Summary")) {
-            if let summary = meeting.summary {
-                SummaryView(summary: summary)
-                summaryButton(regenerate: true)
-            } else if txVM?.isSummarizing == true {
-                HStack {
-                    ProgressView()
-                    Text(NSLocalizedString("detail.summarizing", comment: "Generating..."))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                if meeting.hasAnyTranscript {
-                    summaryButton(regenerate: false)
-                } else {
-                    Text(NSLocalizedString("detail.summary.needs_transcript", comment: ""))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private func summaryButton(regenerate: Bool) -> some View {
-        Button {
-            generateSummary()
-        } label: {
-            Label(
-                regenerate
-                    ? NSLocalizedString("detail.summary.regenerate", comment: "Regenerate")
-                    : NSLocalizedString("detail.summary.generate", comment: "Generate Summary"),
-                systemImage: "sparkles"
+            .padding(14)
+            .frame(maxWidth: .infinity)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                    .foregroundStyle(Theme.textTertiary.opacity(0.4))
             )
         }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Transcript tab
+
+    @ViewBuilder
+    private var transcriptTab: some View {
+        let transcribed = sortedRecordings.filter { $0.transcript != nil }
+        if transcribed.isEmpty {
+            placeholder(
+                icon: "text.alignleft",
+                title: NSLocalizedString("detail.transcript.empty.title", comment: ""),
+                subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
+            )
+        } else {
+            TranscriptTab(
+                meeting: meeting,
+                recordings: transcribed,
+                player: player,
+                onSeek: { rec, time in seek(rec, to: time) },
+                onRenameCommit: { try? modelContext.save() }
+            )
+        }
+    }
+
+    // MARK: - Summary tab
+
+    @ViewBuilder
+    private var summaryTab: some View {
+        if let summary = meeting.summary {
+            VStack(alignment: .leading, spacing: 16) {
+                SummaryView(summary: summary)
+                generateButton(regenerate: true)
+            }
+        } else if txVM?.isSummarizing == true {
+            VStack(spacing: 14) {
+                ProgressView()
+                Text(NSLocalizedString("detail.summarizing", comment: "Generating..."))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity).padding(.top, 80)
+        } else if meeting.hasAnyTranscript {
+            summaryEmptyState(canGenerate: true)
+        } else {
+            summaryEmptyState(canGenerate: false)
+        }
+    }
+
+    private func summaryEmptyState(canGenerate: Bool) -> some View {
+        VStack(spacing: 20) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Theme.fill)
+                    .frame(width: 72, height: 72)
+                Image(systemName: "sparkles").font(.system(size: 30)).foregroundStyle(Theme.textTertiary)
+            }
+            VStack(spacing: 8) {
+                Text(NSLocalizedString("detail.summary.empty.title", comment: ""))
+                    .font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.textPrimary)
+                Text(NSLocalizedString("detail.summary.needs_transcript", comment: ""))
+                    .font(.system(size: 14)).foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            HStack(spacing: 6) {
+                Image(systemName: "cpu").font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
+                Text("\(settings.aiProvider.displayName) · \(settings.summaryModel(for: settings.aiProvider))")
+                    .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(Theme.fill, in: Capsule())
+
+            if canGenerate { generateButton(regenerate: false) }
+        }
+        .frame(maxWidth: .infinity).padding(.top, 40)
+    }
+
+    private func generateButton(regenerate: Bool) -> some View {
+        Button { generateSummary() } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                Text(regenerate
+                     ? NSLocalizedString("detail.summary.regenerate", comment: "Regenerate")
+                     : NSLocalizedString("detail.summary.generate", comment: "Generate Summary"))
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity).frame(height: 54)
+            .background(Theme.accent, in: Capsule())
+            .shadow(color: Theme.accent.opacity(0.4), radius: 18, y: 4)
+        }
+        .buttonStyle(.plain)
         .disabled(txVM?.isSummarizing == true)
+    }
+
+    // MARK: - Tab bar
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            tabButton(.recordings, icon: "mic", label: NSLocalizedString("tab.recordings", comment: ""))
+            tabButton(.transcript, icon: "text.alignleft", label: NSLocalizedString("tab.transcript", comment: ""))
+            tabButton(.summary, icon: "sparkles", label: NSLocalizedString("tab.summary", comment: ""))
+        }
+        .padding(.top, 6)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider().overlay(Theme.separator) }
+    }
+
+    private func tabButton(_ value: Tab, icon: String, label: String) -> some View {
+        let active = tab == value
+        return Button { tab = value } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 18))
+                Text(label).font(.system(size: 11, weight: active ? .semibold : .regular))
+            }
+            .foregroundStyle(active ? Theme.accent : Theme.textTertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .overlay(alignment: .top) {
+                if active {
+                    Capsule().fill(Theme.accent).frame(width: 20, height: 2.5)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Shared bits
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.8)
+            .foregroundStyle(Theme.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 2)
+    }
+
+    private func placeholder(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon).font(.largeTitle).foregroundStyle(Theme.textTertiary)
+            Text(title).font(.headline).foregroundStyle(Theme.textPrimary)
+            Text(subtitle).font(.subheadline).foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity).padding(.top, 60)
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
-                Button {
-                    showingEdit = true
-                } label: {
+                Button { showingEdit = true } label: {
                     Label(NSLocalizedString("common.edit", comment: "Edit"), systemImage: "pencil")
                 }
-                Button {
-                    share()
-                } label: {
-                    Label(
-                        NSLocalizedString("detail.share", comment: "Share"),
-                        systemImage: "square.and.arrow.up"
-                    )
+                Button { share() } label: {
+                    Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -285,25 +386,20 @@ struct MeetingDetailView: View {
 
     private func startTranscription(_ recording: Recording, mode: TranscriptionMode) {
         guard let txVM else { return }
-        Task {
-            await txVM.transcribe(recording, language: meeting.language, mode: mode)
-        }
+        Task { await txVM.transcribe(recording, language: meeting.language, mode: mode) }
     }
 
     private func generateSummary() {
         guard let txVM else { return }
-        Task {
-            await txVM.generateSummary(for: meeting, provider: settings.aiProvider)
-        }
+        let provider = settings.aiProvider
+        let model = settings.summaryModel(for: provider)
+        Task { await txVM.generateSummary(for: meeting, provider: provider, model: model) }
     }
 
-    private func deleteRecordings(at offsets: IndexSet) {
-        let targets = offsets.map { sortedRecordings[$0] }
-        for recording in targets {
-            if player.loadedFileName == recording.fileName { player.stop() }
-            AudioFileStore.delete(fileName: recording.fileName)
-            modelContext.delete(recording)
-        }
+    private func deleteRecording(_ recording: Recording) {
+        if player.loadedFileName == recording.fileName { player.stop() }
+        AudioFileStore.delete(fileName: recording.fileName)
+        modelContext.delete(recording)
         try? modelContext.save()
     }
 
@@ -317,6 +413,65 @@ struct MeetingDetailView: View {
     }
 }
 
+/// Transcript tab content: speaker filter chips + speaker-attributed bubbles +
+/// inline speaker renaming.
+private struct TranscriptTab: View {
+    let meeting: Meeting
+    let recordings: [Recording]
+    let player: AudioPlayerService
+    let onSeek: (Recording, TimeInterval) -> Void
+    let onRenameCommit: () -> Void
+
+    @State private var selectedSpeaker: String?
+
+    private var sortedSpeakers: [Speaker] { meeting.speakers.sorted { $0.label < $1.label } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if !sortedSpeakers.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        FilterChip(title: NSLocalizedString("filter.all", comment: "All"),
+                                   isSelected: selectedSpeaker == nil) { selectedSpeaker = nil }
+                        ForEach(sortedSpeakers) { speaker in
+                            FilterChip(
+                                title: speaker.displayName,
+                                isSelected: selectedSpeaker == speaker.label,
+                                tint: Color(hex: speaker.color)
+                            ) {
+                                selectedSpeaker = (selectedSpeaker == speaker.label) ? nil : speaker.label
+                            }
+                        }
+                    }
+                }
+            }
+
+            ForEach(recordings) { recording in
+                let segments = (recording.transcript?.segments ?? [])
+                    .filter { selectedSpeaker == nil || $0.speakerLabel == selectedSpeaker }
+                TranscriptView(
+                    segments: segments,
+                    speakers: meeting.speakers,
+                    activeTime: player.loadedFileName == recording.fileName ? player.currentTime : nil,
+                    onSeek: { time in onSeek(recording, time) }
+                )
+            }
+
+            if !sortedSpeakers.isEmpty {
+                Divider().overlay(Theme.separator).padding(.vertical, 4)
+                Text(NSLocalizedString("detail.speakers", comment: "Speakers").uppercased())
+                    .font(.system(size: 11, weight: .semibold)).tracking(0.8)
+                    .foregroundStyle(Theme.textTertiary)
+                ForEach(sortedSpeakers) { speaker in
+                    SpeakerRow(speaker: speaker, onCommit: onRenameCommit)
+                }
+                Text(NSLocalizedString("detail.speakers.note", comment: "Auto-detected note"))
+                    .font(.footnote).foregroundStyle(Theme.textTertiary)
+            }
+        }
+    }
+}
+
 /// Inline-editable speaker name with its color swatch.
 private struct SpeakerRow: View {
     @Bindable var speaker: Speaker
@@ -324,14 +479,10 @@ private struct SpeakerRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle()
-                .fill(Color(hex: speaker.color))
-                .frame(width: 14, height: 14)
-            TextField(speaker.label, text: $speaker.name)
-                .onSubmit(onCommit)
-            Text(speaker.label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Circle().fill(Color(hex: speaker.color)).frame(width: 14, height: 14)
+            TextField(speaker.label, text: $speaker.name).onSubmit(onCommit)
+            Text(speaker.label).font(.caption2).foregroundStyle(Theme.textTertiary)
         }
+        .meetsyncCard(padding: 12, cornerRadius: 12)
     }
 }

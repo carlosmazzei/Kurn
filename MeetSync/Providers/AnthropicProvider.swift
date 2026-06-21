@@ -14,12 +14,12 @@ struct AnthropicProvider: LLMProvider {
 
     private let apiKey: String
     private let session: URLSession
-    /// Summary model. Configurable here if you want to move to a newer Opus.
-    private let model = "claude-opus-4-6"
+    private let model: String
     private let apiVersion = "2023-06-01"
 
-    init(apiKey: String, session: URLSession = .shared) {
+    init(apiKey: String, model: String = "claude-3-5-sonnet-latest", session: URLSession = .shared) {
         self.apiKey = apiKey
+        self.model = model
         self.session = session
     }
 

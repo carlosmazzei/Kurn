@@ -104,6 +104,19 @@
 "detail.summary.regenerate" = "Regenerate";
 "detail.summary.generate" = "Generate Summary";
 "detail.share" = "Share";
+"detail.segment_count" = "%d segments";
+"detail.recording_n" = "Recording %d";
+"detail.add_segment" = "Add segment";
+"detail.transcript.empty.title" = "No transcript yet";
+"detail.transcript.empty.subtitle" = "Transcribe a recording to see the conversation here.";
+"detail.summary.empty.title" = "No summary yet";
+"tab.recordings" = "Recordings";
+"tab.transcript" = "Transcript";
+"tab.summary" = "Summary";
+"quality.high" = "High";
+"quality.standard" = "Standard";
+"quality.low" = "Low";
+"error.provider_no_transcribe" = "This provider does not support transcription. Use on-device or OpenAI Whisper.";
 
 /* Summary */
 "summary.key_decisions" = "Key Decisions";

@@ -156,7 +156,7 @@ final class TranscriptionViewModel {
 
     // MARK: - Summary
 
-    func generateSummary(for meeting: Meeting, provider: AIProvider) async {
+    func generateSummary(for meeting: Meeting, provider: AIProvider, model: String) async {
         guard !isSummarizing else { return }
 
         // Assemble transcript text on the main actor (reads SwiftData).
@@ -179,7 +179,8 @@ final class TranscriptionViewModel {
             let result = try await summaryService.generate(
                 transcriptText: transcriptText,
                 meetingTitle: title,
-                provider: provider
+                provider: provider,
+                model: model
             )
             if let existing = meeting.summary {
                 existing.content = result.content
