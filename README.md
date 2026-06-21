@@ -1,6 +1,6 @@
-# MeetSync
+# Kurn
 
-[![iOS CI](https://github.com/carlosmazzei/MeetSync/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/MeetSync/actions/workflows/swift.yml)
+[![iOS CI](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-iOS%2017%2B%20%7C%20watchOS%2010%2B-blue.svg)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
@@ -8,7 +8,7 @@
 ![Architecture](https://img.shields.io/badge/architecture-local--first-2F855A.svg)
 ![Privacy](https://img.shields.io/badge/privacy-no%20tracking-2F855A.svg)
 
-MeetSync is a local-first iOS and watchOS app for recording meetings,
+Kurn is a local-first iOS and watchOS app for recording meetings,
 transcribing audio, identifying speakers, and generating structured AI
 summaries. It is built with Swift 6, SwiftUI, SwiftData, AVFoundation, Apple's
 Speech framework, ActivityKit, and WatchConnectivity.
@@ -62,7 +62,7 @@ Spanish, French, German, Japanese, and Chinese.
 
 ## AI Summaries
 
-MeetSync can generate a structured meeting summary from existing transcripts.
+Kurn can generate a structured meeting summary from existing transcripts.
 Summaries include a markdown body, key decisions, and action items.
 
 Supported summary providers:
@@ -77,7 +77,7 @@ OpenAI Whisper, regardless of the selected summary provider.
 
 ## Configuration
 
-MeetSync works without cloud credentials when using on-device transcription.
+Kurn works without cloud credentials when using on-device transcription.
 Cloud features require user-provided API keys.
 
 - OpenAI key: required for Whisper transcription and OpenAI summaries.
@@ -89,15 +89,15 @@ Cloud features require user-provided API keys.
 
 Default preferences are managed in:
 
-`MeetSync/Infrastructure/AppSettings.swift`
+`Kurn/Infrastructure/AppSettings.swift`
 
 Provider setup is handled through:
 
-`MeetSync/Providers/ProviderFactory.swift`
+`Kurn/Providers/ProviderFactory.swift`
 
 ## Privacy
 
-MeetSync is designed to avoid a backend service controlled by the app.
+Kurn is designed to avoid a backend service controlled by the app.
 
 - Audio files are saved locally in the app's Documents directory.
 - Meeting metadata, transcripts, summaries, speakers, and recordings are stored
@@ -120,8 +120,8 @@ MeetSync is designed to avoid a backend service controlled by the app.
 
 ## Getting Started
 
-1. Open `MeetSync.xcodeproj` in Xcode.
-2. Select the `MeetSync` scheme.
+1. Open `Kurn.xcodeproj` in Xcode.
+2. Select the `Kurn` scheme.
 3. Choose an iOS simulator or a connected device.
 4. Press `Cmd + R` to build and run.
 5. Grant microphone permission when prompted.
@@ -151,8 +151,8 @@ Then build with:
 
 ```bash
 xcodebuild \
-  -project MeetSync.xcodeproj \
-  -scheme MeetSync \
+  -project Kurn.xcodeproj \
+  -scheme Kurn \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
   build
 ```
@@ -161,7 +161,7 @@ Use another simulator name if `iPhone 17` is not installed locally.
 
 ## Running Tests
 
-Unit tests live in the `MeetSyncTests` target and use Swift Testing. They cover
+Unit tests live in the `KurnTests` target and use Swift Testing. They cover
 logic such as JSON parsing, Markdown export, SwiftData model helpers, audio
 chunking and preprocessing, provider setup, formatting helpers, and view model
 behavior against an in-memory `ModelContainer`.
@@ -170,18 +170,18 @@ Run tests from Xcode with `Cmd + U`, or from the terminal:
 
 ```bash
 xcodebuild \
-  -project MeetSync.xcodeproj \
-  -scheme MeetSync \
+  -project Kurn.xcodeproj \
+  -scheme Kurn \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
   test
 ```
 
 CI is configured in `.github/workflows/swift.yml` and runs clean test on macOS
-with the `MeetSync` scheme.
+with the `Kurn` scheme.
 
 ## Linting
 
-MeetSync uses SwiftLint for Swift style and static checks.
+Kurn uses SwiftLint for Swift style and static checks.
 
 Install locally with Homebrew:
 
@@ -215,7 +215,7 @@ Meetings can be shared as structured Markdown. The export includes:
 
 Export generation is implemented in:
 
-`MeetSync/Infrastructure/MeetingExport.swift`
+`Kurn/Infrastructure/MeetingExport.swift`
 
 ## Architecture
 
@@ -223,8 +223,8 @@ The app follows an MVVM-style structure with `@Observable`, `@MainActor` view
 models, async service APIs, and a SwiftData model container.
 
 ```text
-MeetSync/
-├── MeetSyncApp.swift            # App entry point and SwiftData container
+Kurn/
+├── KurnApp.swift                 # App entry point and SwiftData container
 ├── ContentView.swift            # Root NavigationStack
 ├── Models/                      # SwiftData @Model types and enums
 ├── Views/                       # SwiftUI screens and reusable views
@@ -235,12 +235,12 @@ MeetSync/
 ├── Resources/                   # Localizations and privacy manifest
 └── Assets.xcassets/             # App icon and accent color
 
-MeetSyncWatch/
-├── MeetSyncWatchApp.swift       # Watch app entry point
+KurnWatch/
+├── KurnWatchApp.swift            # Watch app entry point
 ├── WatchRecorderView.swift      # Watch remote control UI
 └── WatchConnectivityManager.swift
 
-MeetSyncLiveActivityExtension/
+KurnLiveActivityExtension/
 ├── RecordingActivityAttributes.swift
 └── RecordingLiveActivityWidget.swift
 ```
@@ -259,13 +259,13 @@ MeetSyncLiveActivityExtension/
 
 Useful files:
 
-- `MeetSync/Services/AudioRecorderService.swift`
-- `MeetSync/Services/TranscriptionService.swift`
-- `MeetSync/Services/SummaryService.swift`
-- `MeetSync/Services/SpeakerDiarizer.swift`
-- `MeetSync/Services/PhoneSessionController.swift`
-- `MeetSync/Views/SettingsView.swift`
-- `MeetSync/Infrastructure/MeetingExport.swift`
+- `Kurn/Services/AudioRecorderService.swift`
+- `Kurn/Services/TranscriptionService.swift`
+- `Kurn/Services/SummaryService.swift`
+- `Kurn/Services/SpeakerDiarizer.swift`
+- `Kurn/Services/PhoneSessionController.swift`
+- `Kurn/Views/SettingsView.swift`
+- `Kurn/Infrastructure/MeetingExport.swift`
 
 Before shipping:
 
@@ -278,4 +278,4 @@ Before shipping:
 
 ## License
 
-MeetSync is released under the [MIT License](LICENSE).
+Kurn is released under the [MIT License](LICENSE).

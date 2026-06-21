@@ -1,8 +1,8 @@
 included:
-  - MeetSync
-  - MeetSyncTests
-  - MeetSyncWatch
-  - MeetSyncLiveActivityExtension
+  - Kurn
+  - KurnTests
+  - KurnWatch
+  - KurnLiveActivityExtension
 
 excluded:
   - .build

@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-26-arm64
 
     env:
-      XCODE_PROJECT: MeetSync.xcodeproj
-      XCODE_SCHEME: MeetSync
+      XCODE_PROJECT: Kurn.xcodeproj
+      XCODE_SCHEME: Kurn
       IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
 
     steps:
