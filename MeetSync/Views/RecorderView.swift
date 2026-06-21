@@ -85,6 +85,11 @@ private struct RecorderContent: View {
             if saved { onFinished() }
         }
         .task {
+            // Let the sheet finish its present animation before kicking off the
+            // recorder. `start()` does synchronous AVAudioSession/AVAudioEngine
+            // setup that briefly blocks the main thread (noticeably slower in
+            // debug builds); deferring it keeps the modal appearing instantly.
+            try? await Task.sleep(for: .milliseconds(350))
             AppLog.recorderUI.log("RecorderContent.task: starting recording")
             await vm.startRecording()
         }
