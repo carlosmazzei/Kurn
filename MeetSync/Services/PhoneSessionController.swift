@@ -46,7 +46,9 @@ final class PhoneSessionController: NSObject {
         referenceDate: Date,
         isAvailable: Bool
     ) {
-        guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
         let context: [String: Any] = [
             "state": stateString(state),
             "meetingTitle": meetingTitle,
@@ -54,7 +56,7 @@ final class PhoneSessionController: NSObject {
             "accumulatedElapsed": accumulatedElapsed,
             "isAvailable": isAvailable,
         ]
-        try? WCSession.default.updateApplicationContext(context)
+        try? session.updateApplicationContext(context)
     }
 
     func notifyEnded() {
