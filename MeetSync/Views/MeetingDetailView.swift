@@ -21,7 +21,6 @@ struct MeetingDetailView: View {
 
     @State private var showingRecorder = false
     @State private var showingEdit = false
-    @State private var transcribeTarget: Recording?
     @State private var shareItem: ShareItem?
 
     var body: some View {
@@ -53,22 +52,6 @@ struct MeetingDetailView: View {
         }
         .sheet(item: $shareItem) { item in
             ActivityView(items: [item.url])
-        }
-        .confirmationDialog(
-            NSLocalizedString("detail.transcribe.choose", comment: "Choose transcription mode"),
-            isPresented: Binding(
-                get: { transcribeTarget != nil },
-                set: { if !$0 { transcribeTarget = nil } }
-            ),
-            presenting: transcribeTarget
-        ) { recording in
-            Button(TranscriptionMode.onDevice.displayName) {
-                startTranscription(recording, mode: .onDevice)
-            }
-            Button(TranscriptionMode.whisperAPI.displayName) {
-                startTranscription(recording, mode: .whisperAPI)
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
         }
         .alert(
             NSLocalizedString("common.error", comment: "Error"),
@@ -163,7 +146,7 @@ struct MeetingDetailView: View {
                 StatusBadge(status: .done)
             } else {
                 Button(NSLocalizedString("detail.transcribe", comment: "Transcribe")) {
-                    transcribeTarget = recording
+                    startTranscription(recording, mode: settings.defaultMode)
                 }
                 .font(.caption.weight(.semibold))
                 .buttonStyle(.bordered)
@@ -301,7 +284,6 @@ struct MeetingDetailView: View {
     }
 
     private func startTranscription(_ recording: Recording, mode: TranscriptionMode) {
-        transcribeTarget = nil
         guard let txVM else { return }
         Task {
             await txVM.transcribe(recording, language: meeting.language, mode: mode)
