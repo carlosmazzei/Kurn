@@ -11,6 +11,8 @@
 "error.persistence" = "Could not save your changes: %@";
 "error.recognizer_timeout" = "On-device speech recognition timed out.";
 "error.recorder_start" = "The recorder could not start.";
+"error.recorder_engine" = "The audio engine could not start.";
+"error.audio_cleanup" = "Could not clean up the audio for transcription.";
 "error.recognizer_unavailable" = "Speech recognition is not available for this language.";
 "error.recognizer_offline" = "On-device speech recognition is not ready. Try again shortly.";
 "error.export_session" = "Could not prepare the audio for upload.";

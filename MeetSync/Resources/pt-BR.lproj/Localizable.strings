@@ -11,6 +11,8 @@
 "error.persistence" = "Não foi possível salvar as alterações: %@";
 "error.recognizer_timeout" = "O reconhecimento de fala no dispositivo expirou.";
 "error.recorder_start" = "Não foi possível iniciar a gravação.";
+"error.recorder_engine" = "Não foi possível iniciar o mecanismo de áudio.";
+"error.audio_cleanup" = "Não foi possível limpar o áudio para transcrição.";
 "error.recognizer_unavailable" = "O reconhecimento de fala não está disponível para este idioma.";
 "error.recognizer_offline" = "O reconhecimento de fala no dispositivo não está pronto. Tente novamente em instantes.";
 "error.export_session" = "Não foi possível preparar o áudio para envio.";
