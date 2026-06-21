@@ -149,6 +149,7 @@
 "micpickup.whole_room" = "Whole room";
 "micpickup.focus_speaker" = "Focus on speaker";
 "settings.storage" = "Storage";
+"settings.audio_quality" = "Audio quality";
 "settings.audio_usage" = "Audio Files";
 "settings.delete_all" = "Delete All Data";
 "settings.delete_all.confirm" = "Delete all meetings and recordings?";
