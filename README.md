@@ -12,6 +12,8 @@ features use API keys that the user provides in Settings.
 
 - Record meetings to local `.m4a` files.
 - Pause, resume, cancel, and stop recordings.
+- Show active recordings as a custom Live Activity on the iPhone Lock Screen and
+  Dynamic Island, with pause/resume and stop actions.
 - Keep recordings grouped under named meeting sessions.
 - Handle audio interruptions and route changes, including Bluetooth HFP input.
 - Transcribe recordings on-device with Apple's Speech framework.

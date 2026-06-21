@@ -14,6 +14,9 @@ struct ContentView: View {
         NavigationStack {
             MeetingsListView()
         }
+        .onOpenURL { url in
+            RecordingCommandRouter.shared.handle(url)
+        }
     }
 }
 

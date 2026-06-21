@@ -35,6 +35,7 @@ final class AudioRecorderService: NSObject {
     /// Accumulated time across pause cycles plus the active span.
     private var accumulated: TimeInterval = 0
     private var segmentStart: Date?
+    @ObservationIgnored var onStateChanged: ((State, TimeInterval) -> Void)?
 
     /// Whether the user was recording when an interruption began, so we can
     /// decide whether to auto-resume when it ends.
@@ -92,6 +93,7 @@ final class AudioRecorderService: NSObject {
             self.elapsed = 0
             self.routeChangeMessage = nil
             self.state = .recording
+            notifyStateChanged()
             startMetering()
         } catch let error as AppError {
             throw error
@@ -107,6 +109,7 @@ final class AudioRecorderService: NSObject {
         stopMetering()
         level = 0
         state = .paused
+        notifyStateChanged()
     }
 
     func resume() {
@@ -115,6 +118,7 @@ final class AudioRecorderService: NSObject {
         segmentStart = Date()
         routeChangeMessage = nil
         state = .recording
+        notifyStateChanged()
         startMetering()
     }
 
@@ -137,6 +141,7 @@ final class AudioRecorderService: NSObject {
         self.elapsed = 0
         self.accumulated = 0
         self.segmentStart = nil
+        notifyStateChanged()
 
         deactivateSession()
         return (fileName, duration)
@@ -155,6 +160,7 @@ final class AudioRecorderService: NSObject {
         self.elapsed = 0
         self.accumulated = 0
         self.segmentStart = nil
+        notifyStateChanged()
         deactivateSession()
     }
 
@@ -216,6 +222,10 @@ final class AudioRecorderService: NSObject {
         if let start = segmentStart {
             elapsed = accumulated + Date().timeIntervalSince(start)
         }
+    }
+
+    private func notifyStateChanged() {
+        onStateChanged?(state, elapsed)
     }
 
     // MARK: - Notifications

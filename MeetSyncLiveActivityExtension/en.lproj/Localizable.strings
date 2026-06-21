@@ -1,0 +1,5 @@
+"live_activity.recording" = "Recording";
+"live_activity.paused" = "Paused";
+"live_activity.pause" = "Pause";
+"live_activity.resume" = "Resume";
+"live_activity.stop" = "Stop";

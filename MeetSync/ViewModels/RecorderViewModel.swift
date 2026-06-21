@@ -22,10 +22,16 @@ final class RecorderViewModel {
 
     private let meeting: Meeting
     private let modelContext: ModelContext
+    private let defaultMode: TranscriptionMode
+    private let lockScreenController = LockScreenRecordingController()
 
-    init(meeting: Meeting, modelContext: ModelContext) {
+    init(meeting: Meeting, modelContext: ModelContext, defaultMode: TranscriptionMode) {
         self.meeting = meeting
         self.modelContext = modelContext
+        self.defaultMode = defaultMode
+        self.recorder.onStateChanged = { [weak self] state, elapsed in
+            self?.lockScreenController.update(state: state, elapsed: elapsed)
+        }
     }
 
     var state: AudioRecorderService.State { recorder.state }
@@ -42,6 +48,15 @@ final class RecorderViewModel {
         }
         do {
             try recorder.start(meetingID: meeting.id)
+            lockScreenController.start(
+                title: meeting.title,
+                state: recorder.state,
+                elapsed: recorder.elapsed
+            )
+            RecordingCommandRouter.shared.register(
+                onTogglePause: { [weak self] in self?.togglePause() },
+                onStop: { [weak self] in self?.stopAndSave() }
+            )
         } catch let appError as AppError {
             error = appError
         } catch {
@@ -58,14 +73,18 @@ final class RecorderViewModel {
     }
 
     /// Stop, save the segment to SwiftData, and flag completion.
-    func stopAndSave(defaultMode: TranscriptionMode) {
+    func stopAndSave() {
         guard let result = recorder.stop() else {
+            lockScreenController.end()
+            RecordingCommandRouter.shared.unregister()
             didSaveRecording = true
             return
         }
         // Ignore zero-length recordings.
         guard result.duration >= 0.5 else {
             AudioFileStore.delete(fileName: result.fileName)
+            lockScreenController.end()
+            RecordingCommandRouter.shared.unregister()
             didSaveRecording = true
             return
         }
@@ -80,10 +99,14 @@ final class RecorderViewModel {
         )
         modelContext.insert(recording)
         try? modelContext.save()
+        lockScreenController.end()
+        RecordingCommandRouter.shared.unregister()
         didSaveRecording = true
     }
 
     func cancel() {
         recorder.cancel()
+        lockScreenController.end()
+        RecordingCommandRouter.shared.unregister()
     }
 }
