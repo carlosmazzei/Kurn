@@ -374,7 +374,11 @@ final class AudioRecorderService: NSObject {
         tickCount = 0
         meterTimer?.invalidate()
         let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            // The timer fires on the main run loop, so we are already on the main
+            // actor's executor. Call `tick()` directly via `assumeIsolated`
+            // instead of spawning a Task every 50 ms — that 20 Hz task churn
+            // caused periodic scheduling hitches in the UI.
+            MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         meterTimer = timer
@@ -391,7 +395,13 @@ final class AudioRecorderService: NSObject {
         level = sink.currentLevel
         onLevelChanged?(level)
         if let start = segmentStart {
-            elapsed = accumulated + Date().timeIntervalSince(start)
+            let newElapsed = accumulated + Date().timeIntervalSince(start)
+            // The on-screen counter only shows whole seconds, so publish `elapsed`
+            // (an observed property) just once per second instead of 20×/second —
+            // this avoids invalidating the recorder view on every metering tick.
+            if Int(newElapsed) != Int(elapsed) {
+                elapsed = newElapsed
+            }
         }
         // Log roughly once per second so we can confirm the timer keeps firing.
         tickCount += 1

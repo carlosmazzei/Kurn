@@ -78,7 +78,18 @@ final class PhoneSessionController: NSObject {
         if let last = lastLevelPushDate, now.timeIntervalSince(last) < levelPushInterval { return }
         lastLevelPushDate = now
 
-        session.sendMessage(["level": level], replyHandler: nil, errorHandler: nil)
+        // Send off the main thread: this runs from the recorder's 20 Hz metering
+        // tick, and WatchConnectivity IPC on the main thread caused periodic UI
+        // hitches. Capturing only `level` (Sendable) keeps it data-race free.
+        Self.sendLevelOffMain(level)
+    }
+
+    private nonisolated static func sendLevelOffMain(_ level: Float) {
+        DispatchQueue.global(qos: .utility).async {
+            let session = WCSession.default
+            guard session.activationState == .activated, session.isReachable else { return }
+            session.sendMessage(["level": level], replyHandler: nil, errorHandler: nil)
+        }
     }
 
     private func stateString(_ state: AudioRecorderService.State) -> String {
