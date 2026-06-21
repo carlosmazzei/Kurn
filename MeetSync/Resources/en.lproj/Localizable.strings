@@ -64,6 +64,12 @@
 "status.done" = "Transcribed";
 "status.failed" = "Failed";
 
+/* Transcription phases */
+"phase.preparing" = "Preparing…";
+"phase.preprocessing" = "Cleaning audio…";
+"phase.transcribing" = "Transcribing…";
+"phase.finalizing" = "Finalizing…";
+
 /* Meeting form */
 "form.title_section" = "Title";
 "form.title_placeholder" = "Meeting title";
@@ -105,6 +111,10 @@
 "settings.defaults" = "Defaults";
 "settings.default_mode" = "Default Transcription";
 "settings.default_language" = "Default Language";
+"settings.mic_pickup" = "Microphone";
+"settings.mic_pickup_footer" = "Whole room captures everyone (omnidirectional); Focus on speaker favours the person in front (directional). Only affects the built-in mic.";
+"micpickup.whole_room" = "Whole room";
+"micpickup.focus_speaker" = "Focus on speaker";
 "settings.storage" = "Storage";
 "settings.audio_usage" = "Audio Files";
 "settings.delete_all" = "Delete All Data";

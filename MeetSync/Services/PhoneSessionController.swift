@@ -11,6 +11,14 @@
 import Foundation
 import WatchConnectivity
 
+private struct WatchCommandReplyHandler: @unchecked Sendable {
+    let reply: ([String: Any]) -> Void
+
+    func call(_ response: [String: Any]) {
+        reply(response)
+    }
+}
+
 @MainActor
 final class PhoneSessionController: NSObject {
     static let shared = PhoneSessionController()
@@ -38,7 +46,9 @@ final class PhoneSessionController: NSObject {
         referenceDate: Date,
         isAvailable: Bool
     ) {
-        guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
         let context: [String: Any] = [
             "state": stateString(state),
             "meetingTitle": meetingTitle,
@@ -46,7 +56,7 @@ final class PhoneSessionController: NSObject {
             "accumulatedElapsed": accumulatedElapsed,
             "isAvailable": isAvailable,
         ]
-        try? WCSession.default.updateApplicationContext(context)
+        try? session.updateApplicationContext(context)
     }
 
     func notifyEnded() {
@@ -102,9 +112,12 @@ extension PhoneSessionController: WCSessionDelegate {
             replyHandler(["ok": false, "error": "unknown_command"])
             return
         }
-        Task { @MainActor in
-            let handled = RecordingCommandRouter.shared.handleWatchCommand(command)
-            replyHandler(handled ? ["ok": true] : ["ok": false, "error": "no_active_recording"])
+        let reply = WatchCommandReplyHandler(reply: replyHandler)
+        Task {
+            let handled = await MainActor.run {
+                RecordingCommandRouter.shared.handleWatchCommand(command)
+            }
+            reply.call(handled ? ["ok": true] : ["ok": false, "error": "no_active_recording"])
         }
     }
 }

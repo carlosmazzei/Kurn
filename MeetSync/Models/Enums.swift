@@ -15,6 +15,43 @@ enum TranscriptionStatus: String, Codable, Sendable {
     case failed
 }
 
+/// Fine-grained stage within an in-progress transcription, surfaced to the UI so
+/// the user can see what the app is currently doing (e.g. cleaning audio vs.
+/// transcribing). Reported by `TranscriptionService` as it advances.
+enum TranscriptionPhase: String, Sendable {
+    case preparing
+    case preprocessing
+    case transcribing
+    case finalizing
+
+    /// Short, user-facing description of the current stage.
+    var displayName: String {
+        switch self {
+        case .preparing: return NSLocalizedString("phase.preparing", comment: "Preparing")
+        case .preprocessing: return NSLocalizedString("phase.preprocessing", comment: "Cleaning audio")
+        case .transcribing: return NSLocalizedString("phase.transcribing", comment: "Transcribing")
+        case .finalizing: return NSLocalizedString("phase.finalizing", comment: "Finalizing")
+        }
+    }
+}
+
+/// Microphone pickup pattern preference for the built-in mic.
+enum MicPickup: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Omnidirectional: capture the whole room / all participants.
+    case wholeRoom
+    /// Cardioid (directional): favour the person in front of the device.
+    case focusSpeaker
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .wholeRoom: return NSLocalizedString("micpickup.whole_room", comment: "Whole room")
+        case .focusSpeaker: return NSLocalizedString("micpickup.focus_speaker", comment: "Focus on speaker")
+        }
+    }
+}
+
 /// Where a transcript is produced.
 enum TranscriptionMode: String, Codable, Sendable, CaseIterable, Identifiable {
     case onDevice

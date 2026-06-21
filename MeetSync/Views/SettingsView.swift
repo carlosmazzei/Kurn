@@ -86,6 +86,21 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                Picker(
+                    NSLocalizedString("settings.mic_pickup", comment: "Microphone pickup"),
+                    selection: $settings.micPickup
+                ) {
+                    ForEach(MicPickup.allCases) { pickup in
+                        Text(pickup.displayName).tag(pickup)
+                    }
+                }
+            } header: {
+                Text(NSLocalizedString("settings.mic_pickup", comment: "Microphone pickup"))
+            } footer: {
+                Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
+            }
+
             Section(NSLocalizedString("settings.storage", comment: "Storage")) {
                 LabeledContent(
                     NSLocalizedString("settings.audio_usage", comment: "Audio usage"),

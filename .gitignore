@@ -1,16 +1,48 @@
-# Xcode / macOS
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode - user-specific
 xcuserdata/
 *.xcuserstate
 *.xcscmblueprint
+*.xccheckout
+
+# Xcode - build output / derived data
 build/
+build_dd/
 DerivedData/
 *.moved-aside
 *.hmap
 *.ipa
 *.dSYM.zip
 *.dSYM
+*.app
+*.appx
+timeline.xctimeline
+playground.xcworkspace
 
-# Swift Package Manager (unused, but ignore if added later)
+# Xcode - injected/secret config (keep templates, ignore real values)
+*.xcconfig.local
+GoogleService-Info.plist
+secrets.xcconfig
+
+# Swift Package Manager
 .build/
 .swiftpm/
+Package.resolved
+
+# CocoaPods / Carthage (unused now, ignored if added later)
+Pods/
+Carthage/Build/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Misc
+*.log
+*.tmp

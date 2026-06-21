@@ -1,7 +1,4 @@
-# This workflow will build a Swift project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
-
-name: Swift
+name: iOS CI
 
 on:
   push:
@@ -10,13 +7,38 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  build-and-test:
+    runs-on: macos-26-arm64
 
-    runs-on: macos-latest
+    env:
+      XCODE_PROJECT: MeetSync.xcodeproj
+      XCODE_SCHEME: MeetSync
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: swift build -v
-    - name: Run tests
-      run: swift test -v
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Prepare simulator runtimes
+        run: |
+          sudo xcodebuild -runFirstLaunch
+
+          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
+            xcodebuild -downloadPlatform iOS
+          fi
+
+          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
+            xcodebuild -downloadPlatform watchOS
+          fi
+
+      - name: Build and test
+        run: |
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            clean test

@@ -17,16 +17,21 @@
 import AudioToolbox
 import AVFoundation
 import Foundation
+import os
 
 actor AudioPreprocessor {
 
     /// Render the cleaned, mono 16 kHz copy to the temporary directory and return
     /// its URL. The caller owns the file and should `cleanup` it when done.
     func process(url: URL) async throws -> URL {
+        let started = Date()
+        AppLog.transcription.log("preprocess: open \(url.lastPathComponent, privacy: .public)")
         let inputFile = try AVAudioFile(forReading: url)
         let inputFormat = inputFile.processingFormat
         let totalInputFrames = inputFile.length
+        AppLog.transcription.log("preprocess: input sampleRate=\(inputFormat.sampleRate, privacy: .public) channels=\(inputFormat.channelCount, privacy: .public) frames=\(totalInputFrames, privacy: .public)")
         guard totalInputFrames > 0, inputFormat.sampleRate > 0 else {
+            AppLog.transcription.error("preprocess: invalid input (no frames or zero sample rate)")
             throw AppError.audioError(
                 NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
             )
@@ -66,7 +71,8 @@ actor AudioPreprocessor {
         guard let outputFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
-            channels: 1
+            channels: 1,
+            interleaved: false
         ) else {
             throw AppError.audioError(
                 NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
@@ -77,9 +83,15 @@ actor AudioPreprocessor {
 
         try engine.start()
         // Audio units are initialized by `start()`, so set parameters afterwards.
-        configureDynamics(dynamics.audioUnit)
-        configureLimiter(limiter.audioUnit)
-        player.scheduleFile(inputFile, at: nil)
+        Self.configureDynamics(dynamics.audioUnit)
+        Self.configureLimiter(limiter.audioUnit)
+        // IMPORTANT: schedule without awaiting. The `async` overload of
+        // `scheduleFile` only returns once the file has finished *playing*, but
+        // in offline manual-rendering mode the audio is only consumed by the
+        // `renderOffline` loop below — awaiting here deadlocks (the render loop
+        // is never reached, so playback never completes). The completion-handler
+        // overload schedules and returns immediately.
+        player.scheduleFile(inputFile, at: nil, completionHandler: nil)
         player.play()
 
         let outURL = FileManager.default.temporaryDirectory
@@ -108,7 +120,10 @@ actor AudioPreprocessor {
         // Cap on output frames given the resample ratio (safety against runaway).
         let ratio = outputFormat.sampleRate / inputFormat.sampleRate
         let expectedOutFrames = AVAudioFramePosition(Double(totalInputFrames) * ratio)
+        AppLog.transcription.log("preprocess: rendering ~\(expectedOutFrames, privacy: .public) frames @16kHz")
 
+        let renderStart = Date()
+        var lastLoggedProgress = 0.0
         renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
             let remaining = expectedOutFrames - engine.manualRenderingSampleTime
             let framesToRender = AVAudioFrameCount(min(Int64(maxFrames), remaining))
@@ -118,16 +133,25 @@ actor AudioPreprocessor {
                 try outFile.write(from: renderBuffer)
             case .insufficientDataFromInputNode:
                 // Source exhausted — we're done.
+                AppLog.transcription.log("preprocess: input exhausted at \(engine.manualRenderingSampleTime, privacy: .public) frames")
                 break renderLoop
             case .cannotDoInCurrentContext, .error:
+                AppLog.transcription.error("preprocess: render stopped early (status=\(status.rawValue, privacy: .public)) at \(engine.manualRenderingSampleTime, privacy: .public) frames")
                 break renderLoop
             @unknown default:
                 break renderLoop
+            }
+            // Log progress at ~25% increments so a slow/stuck render is visible.
+            let progress = Double(engine.manualRenderingSampleTime) / Double(max(1, expectedOutFrames))
+            if progress - lastLoggedProgress >= 0.25 {
+                lastLoggedProgress = progress
+                AppLog.transcription.log("preprocess: render progress \(Int(progress * 100), privacy: .public)%")
             }
         }
 
         player.stop()
         engine.stop()
+        AppLog.transcription.log("preprocess: done in \(Date().timeIntervalSince(renderStart), privacy: .public)s (total \(Date().timeIntervalSince(started), privacy: .public)s) -> \(outURL.lastPathComponent, privacy: .public)")
         return outURL
     }
 
@@ -150,21 +174,24 @@ actor AudioPreprocessor {
         )
     }
 
-    /// Compress loud peaks, lift the overall level (AGC-style makeup) and gate
-    /// residual background below the expansion threshold.
-    private func configureDynamics(_ unit: AudioUnit) {
+    /// Compress loud peaks, lift the overall level (AGC-style makeup) and apply a
+    /// gentle downward expander. Tuned for whole-room capture: the expander is
+    /// kept soft (low ratio, low threshold) so distant/quiet participants are
+    /// preserved rather than gated out as background. The makeup gain is raised
+    /// to help those far voices reach the transcription engines.
+    private static func configureDynamics(_ unit: AudioUnit) {
         setParam(unit, kDynamicsProcessorParam_Threshold, -22)
         setParam(unit, kDynamicsProcessorParam_HeadRoom, 5)
-        setParam(unit, kDynamicsProcessorParam_ExpansionRatio, 4)
-        setParam(unit, kDynamicsProcessorParam_ExpansionThreshold, -45)
-        setParam(unit, kDynamicsProcessorParam_OverallGain, 6)
+        setParam(unit, kDynamicsProcessorParam_ExpansionRatio, 2)
+        setParam(unit, kDynamicsProcessorParam_ExpansionThreshold, -60)
+        setParam(unit, kDynamicsProcessorParam_OverallGain, 8)
     }
 
-    private func configureLimiter(_ unit: AudioUnit) {
+    private static func configureLimiter(_ unit: AudioUnit) {
         setParam(unit, kLimiterParam_PreGain, 3)
     }
 
-    private func setParam(
+    private static func setParam(
         _ unit: AudioUnit,
         _ id: AudioUnitParameterID,
         _ value: AudioUnitParameterValue
