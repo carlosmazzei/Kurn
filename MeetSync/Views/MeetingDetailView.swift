@@ -31,18 +31,7 @@ struct MeetingDetailView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(Theme.separator)
-            ScrollView {
-                Group {
-                    switch tab {
-                    case .recordings: recordingsTab
-                    case .transcript: transcriptTab
-                    case .summary: summaryTab
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 24)
-            }
+            tabContent
             tabBar
         }
         .background(Theme.background.ignoresSafeArea())
@@ -103,17 +92,44 @@ struct MeetingDetailView: View {
         Circle().fill(Theme.textTertiary).frame(width: 3, height: 3)
     }
 
-    // MARK: - Recordings tab
+    // MARK: - Tab content
 
     @ViewBuilder
-    private var recordingsTab: some View {
-        VStack(spacing: 8) {
+    private var tabContent: some View {
+        switch tab {
+        case .recordings:
+            recordingsList
+        case .transcript:
+            ScrollView {
+                transcriptTab.padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
+            }
+        case .summary:
+            ScrollView {
+                summaryTab.padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
+            }
+        }
+    }
+
+    // MARK: - Recordings tab (List, so swipe-to-delete works)
+
+    private var recordingsList: some View {
+        List {
             sectionLabel(NSLocalizedString("detail.recordings", comment: "Recordings"))
+                .clearListRow(insets: EdgeInsets(top: 16, leading: 20, bottom: 4, trailing: 20))
             ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in
                 segmentRow(recording, index: index)
+                    .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { deleteRecording(recording) } label: {
+                            Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
+                        }
+                    }
             }
             addSegmentButton
+                .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     private func segmentRow(_ recording: Recording, index: Int) -> some View {
@@ -160,11 +176,6 @@ struct MeetingDetailView: View {
             }
         }
         .meetsyncCard(padding: 14, cornerRadius: 16)
-        .contextMenu {
-            Button(role: .destructive) { deleteRecording(recording) } label: {
-                Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
-            }
-        }
     }
 
     private var addSegmentButton: some View {

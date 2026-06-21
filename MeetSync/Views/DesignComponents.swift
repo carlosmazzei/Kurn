@@ -86,4 +86,13 @@ extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
+
+    /// Strip the default `List` row chrome (separator + background) so cards sit
+    /// directly on the themed background while keeping swipe actions available.
+    func clearListRow(insets: EdgeInsets? = nil) -> some View {
+        self
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(insets ?? EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+    }
 }

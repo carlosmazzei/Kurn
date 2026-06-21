@@ -39,6 +39,8 @@ struct MeetingsListView: View {
 
     @State private var showingSettings = false
     @State private var pendingDelete: Meeting?
+    /// Pushed meeting detail (item-based so cards have no disclosure chevron).
+    @State private var selectedMeeting: Meeting?
     /// Set when the center record button creates a meeting to record into.
     @State private var recordMeeting: Meeting?
     @State private var searchText = ""
@@ -56,45 +58,45 @@ struct MeetingsListView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-        ScrollView {
+        List {
             VStack(alignment: .leading, spacing: 16) {
                 Text("MeetSync")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 4)
                 searchField
                 filterChips
-                if filtered.isEmpty {
-                    emptyState
-                } else {
-                    LazyVStack(spacing: 10) {
-                        ForEach(filtered) { meeting in
-                            NavigationLink(value: meeting) {
-                                MeetingCard(meeting: meeting, preview: preview(for: meeting))
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    pendingDelete = meeting
-                                } label: {
-                                    Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
-                                }
-                            }
+            }
+            .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
+
+            if filtered.isEmpty {
+                emptyState.clearListRow()
+            } else {
+                ForEach(filtered) { meeting in
+                    Button { selectedMeeting = meeting } label: {
+                        MeetingCard(meeting: meeting, preview: preview(for: meeting))
+                    }
+                    .buttonStyle(.plain)
+                    .clearListRow(insets: EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { pendingDelete = meeting } label: {
+                            Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                         }
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 4)
-            .padding(.bottom, 110)
+
+            // Spacer so the last card clears the floating bottom bar.
+            Color.clear.frame(height: 84).clearListRow()
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
 
             bottomBar
         }
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(for: Meeting.self) { meeting in
+        .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
         }
         .sheet(item: $recordMeeting) { meeting in
