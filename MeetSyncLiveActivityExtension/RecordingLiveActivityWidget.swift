@@ -93,8 +93,6 @@ private struct LockScreenRecordingView: View {
                 }
             }
 
-            ActivityWaveform(barCount: 16, height: 32, paused: context.state.isPaused)
-
             commandButtons(context, height: 44)
         }
         .padding(.vertical, 14)
