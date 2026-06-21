@@ -6,13 +6,16 @@
 //  the UI clearly labels speakers as auto-detected and lets users rename them.
 //
 //  Approach:
-//   1. Read the audio in chunks and compute per-100ms-frame RMS energy + zero
-//      crossing rate (a crude voice-timbre proxy).
+//   1. Read the audio in chunks and compute per-100ms-frame RMS energy (for
+//      voice-activity detection) plus pitch (F0), zero-crossing rate, and
+//      spectral tilt (crude voice-timbre proxies).
 //   2. Split into speech regions separated by silence gaps (< -40 dBFS for
 //      >= 0.5s).
 //   3. Assign each region to a speaker by cosine-similarity clustering of its
-//      mean feature vector (threshold 0.85), creating a new speaker when no
-//      existing centroid is close enough.
+//      mean timbre feature vector (threshold 0.80), creating a new speaker
+//      when no existing centroid is close enough. RMS/volume is deliberately
+//      excluded from this vector — it reflects mic distance and speaking
+//      loudness, not who is speaking.
 //
 
 import AVFoundation
@@ -25,20 +28,31 @@ actor SpeakerDiarizer {
         let rms: Float
         let dbfs: Float
         let zcr: Float
+        let pitch: Float       // Hz, 0 when unvoiced/no clear periodicity
+        let highBand: Float    // 0...1, energy fraction above the first-difference cutoff
     }
 
     private struct Region {
         let start: TimeInterval
         let end: TimeInterval
-        let feature: [Float]   // [meanRMS, meanZCR]
+        let feature: [Float]   // [normalizedPitch, meanZCR, meanHighBand]
     }
 
     private let frameDuration: TimeInterval = 0.1     // 100 ms frames
     private let silenceFloorDBFS: Float = -40         // below this is "silence"
     private let minSilenceFrames = 5                  // 0.5 s gap splits regions
     private let minRegionFrames = 2                   // ignore < 200 ms blips
-    private let similarityThreshold: Float = 0.85
-    private let maxSpeakers = 6
+    private let similarityThreshold: Float = 0.80
+    private let maxSpeakers = 8
+
+    // Pitch estimation (autocorrelation) is run on a decimated copy of each
+    // frame so its cost stays linear in audio duration instead of exploding
+    // with native sample rate.
+    private let pitchAnalysisRate: Double = 4000
+    private let minPitchHz: Float = 80
+    private let maxPitchHz: Float = 400
+    private let voicingThreshold: Float = 0.3
+    private let pitchNormalizer: Float = 300          // brings Hz into ~[0,1.3] to match other dims
 
     /// Produce ordered speaker turns for the file. On any failure returns a
     /// single turn covering the whole clip so callers always get usable output.
@@ -100,20 +114,20 @@ actor SpeakerDiarizer {
                 let slice = Array(carry[0..<samplesPerFrame])
                 carry.removeFirst(samplesPerFrame)
                 let time = Double(globalSampleIndex) / sampleRate
-                frames.append(makeFrame(slice, time: time))
+                frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
                 globalSampleIndex += samplesPerFrame
             }
         }
 
         if carry.count > samplesPerFrame / 3 {
             let time = Double(globalSampleIndex) / sampleRate
-            frames.append(makeFrame(carry, time: time))
+            frames.append(makeFrame(carry, time: time, sampleRate: sampleRate))
         }
 
         return frames
     }
 
-    private func makeFrame(_ samples: [Float], time: TimeInterval) -> Frame {
+    private func makeFrame(_ samples: [Float], time: TimeInterval, sampleRate: Double) -> Frame {
         var sumSquares: Float = 0
         var crossings = 0
         var previous: Float = 0
@@ -125,7 +139,71 @@ actor SpeakerDiarizer {
         let rms = sqrt(sumSquares / Float(max(1, samples.count)))
         let dbfs = rms > 0 ? 20 * log10(rms) : -160
         let zcr = Float(crossings) / Float(max(1, samples.count))
-        return Frame(time: time, rms: rms, dbfs: dbfs, zcr: zcr)
+        let pitch = estimatePitch(samples, nativeSampleRate: sampleRate)
+        let highBand = highBandRatio(samples)
+        return Frame(time: time, rms: rms, dbfs: dbfs, zcr: zcr, pitch: pitch, highBand: highBand)
+    }
+
+    /// Crude F0 estimate via normalized autocorrelation on a decimated copy of
+    /// the frame. Decimation keeps the lag search small (and thus the cost
+    /// roughly linear in audio duration) since human F0 is well under the
+    /// decimated Nyquist rate. Returns 0 when no clear periodicity is found
+    /// (silence, noise, or unvoiced speech).
+    private func estimatePitch(_ samples: [Float], nativeSampleRate: Double) -> Float {
+        let stride = max(1, Int(nativeSampleRate / pitchAnalysisRate))
+        var decimated: [Float] = []
+        decimated.reserveCapacity(samples.count / stride + 1)
+        var i = 0
+        while i < samples.count {
+            decimated.append(samples[i])
+            i += stride
+        }
+
+        let rate = nativeSampleRate / Double(stride)
+        let minLag = Int(rate / Double(maxPitchHz))
+        let maxLag = Int(rate / Double(minPitchHz))
+        guard minLag > 0, maxLag > minLag, decimated.count > maxLag + 1 else { return 0 }
+
+        var energy: Float = 0
+        for s in decimated { energy += s * s }
+        guard energy > 1e-6 else { return 0 }
+
+        var bestLag = -1
+        var bestCorrelation: Float = 0
+        for lag in minLag...maxLag {
+            var correlation: Float = 0
+            for idx in 0..<(decimated.count - lag) {
+                correlation += decimated[idx] * decimated[idx + lag]
+            }
+            let normalized = correlation / energy
+            if normalized > bestCorrelation {
+                bestCorrelation = normalized
+                bestLag = lag
+            }
+        }
+
+        guard bestLag > 0, bestCorrelation > voicingThreshold else { return 0 }
+        return Float(rate / Double(bestLag))
+    }
+
+    /// Fraction of frame energy above a first-difference high-pass filter — a
+    /// cheap proxy for spectral tilt/brightness, which differs between voices
+    /// independently of pitch.
+    private func highBandRatio(_ samples: [Float]) -> Float {
+        guard samples.count > 1 else { return 0 }
+        var totalEnergy: Float = 0
+        var highEnergy: Float = 0
+        var previous = samples[0]
+        totalEnergy += previous * previous
+        for i in 1..<samples.count {
+            let s = samples[i]
+            totalEnergy += s * s
+            let diff = s - previous
+            highEnergy += diff * diff
+            previous = s
+        }
+        guard totalEnergy > 0 else { return 0 }
+        return min(1, highEnergy / totalEnergy)
     }
 
     // MARK: - Segmentation
@@ -162,12 +240,19 @@ actor SpeakerDiarizer {
             .map { range in
                 let slice = frames[range.start...range.end]
                 let count = Float(slice.count)
-                let meanRMS = slice.reduce(Float(0)) { $0 + $1.rms } / count
                 let meanZCR = slice.reduce(Float(0)) { $0 + $1.zcr } / count
+                let meanHighBand = slice.reduce(Float(0)) { $0 + $1.highBand } / count
+
+                let voicedPitches = slice.compactMap { $0.pitch > 0 ? $0.pitch : nil }
+                let meanPitch = voicedPitches.isEmpty
+                    ? 0
+                    : voicedPitches.reduce(0, +) / Float(voicedPitches.count)
+                let normalizedPitch = min(1.5, meanPitch / pitchNormalizer)
+
                 return Region(
                     start: frames[range.start].time,
                     end: frames[range.end].time + frameDuration,
-                    feature: [meanRMS, meanZCR]
+                    feature: [normalizedPitch, meanZCR, meanHighBand]
                 )
             }
     }
