@@ -17,7 +17,7 @@ struct OpenAIProvider: LLMProvider {
     private let chatModel: String
     private let whisperModel = "whisper-1"
 
-    init(apiKey: String, model: String = "gpt-4o", session: URLSession = .shared) {
+    init(apiKey: String, model: String = "gpt-5.4", session: URLSession = .shared) {
         self.apiKey = apiKey
         self.chatModel = model
         self.session = session
