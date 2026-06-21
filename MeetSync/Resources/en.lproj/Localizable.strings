@@ -85,7 +85,6 @@
 "detail.recordings" = "Recordings";
 "detail.record_new" = "Record New Segment";
 "detail.transcribe" = "Transcribe";
-"detail.transcribe.choose" = "Choose how to transcribe";
 "detail.transcript" = "Transcript";
 "detail.speakers" = "Speakers";
 "detail.speakers.note" = "Speakers are auto-detected and may need correction. Tap a name to rename.";

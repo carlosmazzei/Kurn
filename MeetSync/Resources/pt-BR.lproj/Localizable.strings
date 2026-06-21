@@ -85,7 +85,6 @@
 "detail.recordings" = "Gravações";
 "detail.record_new" = "Gravar Novo Trecho";
 "detail.transcribe" = "Transcrever";
-"detail.transcribe.choose" = "Escolha como transcrever";
 "detail.transcript" = "Transcrição";
 "detail.speakers" = "Participantes";
 "detail.speakers.note" = "Os participantes são detectados automaticamente e podem precisar de correção. Toque em um nome para renomear.";
