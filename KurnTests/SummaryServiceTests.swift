@@ -32,7 +32,13 @@ struct SummaryServiceTests {
     @Test func generateThrowsWhenTranscriptIsBlank() async {
         let service = SummaryService()
         await #expect(throws: AppError.self) {
-            try await service.generate(transcriptText: "   \n  ", meetingTitle: "Standup", provider: .openAI, model: "gpt-4o")
+            try await service.generate(
+                transcriptText: "   \n  ",
+                meetingTitle: "Standup",
+                provider: .openAI,
+                model: "gpt-4o",
+                template: .general
+            )
         }
     }
 }
