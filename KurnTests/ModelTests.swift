@@ -104,29 +104,26 @@ struct ModelTests {
 
     // MARK: - Summary
 
-    @Test func actionItemsAndKeyDecisionsRoundTripThroughJSONStorage() {
+    @Test func sectionsRoundTripThroughJSONStorage() {
         let summary = Summary(
-            content: "body",
-            actionItems: ["a", "b"],
-            keyDecisions: ["c"],
+            sections: [SummarySection(title: "Overview", body: "body")],
             provider: .openAI
         )
-        #expect(summary.actionItems == ["a", "b"])
-        #expect(summary.keyDecisions == ["c"])
+        #expect(summary.sections == [SummarySection(title: "Overview", body: "body")])
 
-        summary.actionItems = ["d"]
-        #expect(summary.actionItems == ["d"])
+        summary.sections = [SummarySection(title: "Updated", items: ["d"])]
+        #expect(summary.sections == [SummarySection(title: "Updated", items: ["d"])])
     }
 
     @Test func providerPropertyRoundTripsThroughRawValue() {
-        let summary = Summary(content: "body", provider: .anthropic)
+        let summary = Summary(provider: .anthropic)
         #expect(summary.provider == .anthropic)
         summary.provider = .openAI
         #expect(summary.providerRaw == AIProvider.openAI.rawValue)
     }
 
     @Test func modelPropertyRoundTripsThroughOptionalStorage() {
-        let summary = Summary(content: "body", provider: .openAI, model: "gpt-4o")
+        let summary = Summary(provider: .openAI, model: "gpt-4o")
         #expect(summary.model == "gpt-4o")
         summary.model = nil
         #expect(summary.model == nil)

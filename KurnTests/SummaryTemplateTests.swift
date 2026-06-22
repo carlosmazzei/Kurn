@@ -3,7 +3,7 @@
 //  KurnTests
 //
 //  Covers the template-driven summary prompt and the Summary model's section
-//  storage + legacy fallback.
+//  storage.
 //
 
 import Testing
@@ -66,21 +66,7 @@ struct SummaryTemplateTests {
         )
         #expect(summary.sections.count == 1)
         #expect(summary.sections.first?.title == "T")
-        #expect(summary.displaySections == summary.sections)
-    }
-
-    @Test func displaySectionsFallsBackToLegacyFields() {
-        let summary = Summary(
-            content: "Body text",
-            actionItems: ["Do it"],
-            keyDecisions: ["Decided"],
-            provider: .openAI
-        )
-        let display = summary.displaySections
-        // Overview (content) + Key Decisions + Action Items.
-        #expect(display.count == 3)
-        #expect(display[0].body == "Body text")
-        #expect(display[1].items == ["Decided"])
-        #expect(display[2].items == ["Do it"])
+        #expect(summary.sections.first?.body == "b")
+        #expect(summary.sections.first?.items == ["i"])
     }
 }

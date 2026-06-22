@@ -99,8 +99,8 @@ from the chosen `SummaryTemplate` (persona/focus + suggested sections), and the 
 returns a flexible `{ "sections": [...] }` shape. `SummaryJSON.parse` tolerantly strips
 markdown fences and extracts the outermost `{...}` since models add prose. Templates
 (built-in presets + user-defined) live in `AppSettings.summaryTemplates`; the user
-picks one per summarization via `SummaryTemplatePicker`. `Summary.displaySections`
-reconstructs sections from legacy fields for summaries created before templates.
+picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` holds the
+template-driven body that the views and export render.
 
 ### Cross-device control (Watch + Live Activity)
 

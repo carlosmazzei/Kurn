@@ -24,7 +24,7 @@ enum MeetingExport {
 
         if let summary = meeting.summary {
             out += "## Summary\n\n"
-            for section in summary.displaySections {
+            for section in summary.sections {
                 if !section.title.isEmpty {
                     out += "### \(section.title)\n\n"
                 }
