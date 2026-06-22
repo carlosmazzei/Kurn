@@ -65,6 +65,10 @@ final class AudioRecorderService: NSObject {
     /// Fired on every metering tick (~50ms) while recording, for low-latency
     /// mirroring (e.g. to the Watch app). Not used for UI state transitions.
     @ObservationIgnored var onLevelChanged: ((Float) -> Void)?
+    /// Fired with every raw captured buffer (e.g. for live transcription
+    /// preview). Called on the audio render thread, like the tap itself —
+    /// `nonisolated(unsafe)` so setting it doesn't require the main actor.
+    @ObservationIgnored nonisolated(unsafe) var onAudioBuffer: ((AVAudioPCMBuffer) -> Void)?
 
     /// Whether the user was recording when an interruption began, so we can
     /// decide whether to auto-resume when it ends.
@@ -252,7 +256,7 @@ final class AudioRecorderService: NSObject {
             AppLog.recorder.error("beginEngine: AVAudioFile open failed: \(error.localizedDescription, privacy: .public)")
             throw error
         }
-        sink.open(file)
+        sink.open(file, onBuffer: onAudioBuffer)
 
         // Install the tap from a `nonisolated` context so its block does NOT
         // inherit this type's `@MainActor` isolation. The tap runs on
@@ -495,10 +499,12 @@ private final class RecordingSink: @unchecked Sendable {
     private var file: AVAudioFile?
     private var paused = true
     private var level: Float = 0
+    private var onBuffer: ((AVAudioPCMBuffer) -> Void)?
 
-    func open(_ file: AVAudioFile) {
+    func open(_ file: AVAudioFile, onBuffer: ((AVAudioPCMBuffer) -> Void)?) {
         lock.lock(); defer { lock.unlock() }
         self.file = file
+        self.onBuffer = onBuffer
         paused = false
         level = 0
     }
@@ -512,6 +518,7 @@ private final class RecordingSink: @unchecked Sendable {
     func close() {
         lock.lock(); defer { lock.unlock() }
         file = nil
+        onBuffer = nil
         paused = true
         level = 0
     }
@@ -522,10 +529,13 @@ private final class RecordingSink: @unchecked Sendable {
     }
 
     func write(_ buffer: AVAudioPCMBuffer) {
-        lock.lock(); defer { lock.unlock() }
-        guard !paused, let file else { return }
+        lock.lock()
+        guard !paused, let file else { lock.unlock(); return }
         try? file.write(from: buffer)
         level = Self.level(of: buffer)
+        let callback = onBuffer
+        lock.unlock()
+        callback?(buffer)
     }
 
     /// Map a buffer's RMS energy to a perceptual 0...1 with a −50 dBFS floor,

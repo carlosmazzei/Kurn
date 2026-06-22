@@ -29,3 +29,10 @@ struct SpeakerTurn: Sendable, Hashable {
     var start: TimeInterval
     var end: TimeInterval
 }
+
+/// A speaker diarization engine. Implementations must never throw — on any
+/// failure they should fall back to a single turn covering the whole clip, so
+/// `TranscriptionService` always gets usable output.
+protocol Diarizing: Sendable {
+    func diarize(url: URL) async -> [SpeakerTurn]
+}

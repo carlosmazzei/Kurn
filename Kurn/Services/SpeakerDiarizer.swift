@@ -21,7 +21,7 @@
 import AVFoundation
 import Foundation
 
-actor SpeakerDiarizer {
+actor SpeakerDiarizer: Diarizing {
 
     private struct Frame {
         let time: TimeInterval

@@ -62,6 +62,14 @@ struct EnumsTests {
         }
     }
 
+    // MARK: - DiarizationEngine
+
+    @Test func diarizationEngineIdMatchesRawValue() {
+        for engine in DiarizationEngine.allCases {
+            #expect(engine.id == engine.rawValue)
+        }
+    }
+
     // MARK: - TranscriptSegment
 
     @Test func transcriptSegmentDurationIsClampedToZero() {

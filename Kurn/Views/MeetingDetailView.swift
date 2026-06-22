@@ -214,21 +214,35 @@ struct MeetingDetailView: View {
     @ViewBuilder
     private var transcriptTab: some View {
         let transcribed = sortedRecordings.filter { $0.transcript != nil }
-        if transcribed.isEmpty {
-            placeholder(
-                icon: "text.alignleft",
-                title: NSLocalizedString("detail.transcript.empty.title", comment: ""),
-                subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
-            )
-        } else {
-            TranscriptTab(
-                meeting: meeting,
-                recordings: transcribed,
-                player: player,
-                onSeek: { rec, time in seek(rec, to: time) },
-                onRenameCommit: { try? modelContext.save() }
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            if let warning = txVM?.diarizationWarning {
+                diarizationWarningBanner(warning)
+            }
+            if transcribed.isEmpty {
+                placeholder(
+                    icon: "text.alignleft",
+                    title: NSLocalizedString("detail.transcript.empty.title", comment: ""),
+                    subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
+                )
+            } else {
+                TranscriptTab(
+                    meeting: meeting,
+                    recordings: transcribed,
+                    player: player,
+                    onSeek: { rec, time in seek(rec, to: time) },
+                    onRenameCommit: { try? modelContext.save() }
+                )
+            }
         }
+    }
+
+    private func diarizationWarningBanner(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.footnote)
+            .foregroundStyle(Theme.warning)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - Summary tab
@@ -419,7 +433,14 @@ struct MeetingDetailView: View {
 
     private func startTranscription(_ recording: Recording, mode: TranscriptionMode) {
         guard let txVM else { return }
-        Task { await txVM.transcribe(recording, language: meeting.language, mode: mode) }
+        Task {
+            await txVM.transcribe(
+                recording,
+                language: meeting.language,
+                mode: mode,
+                diarizationEngine: settings.diarizationEngine
+            )
+        }
     }
 
     private func generateSummary() {

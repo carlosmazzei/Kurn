@@ -21,6 +21,9 @@ final class TranscriptionViewModel {
     private(set) var phases: [UUID: TranscriptionPhase] = [:]
     private(set) var isSummarizing = false
     var error: AppError?
+    /// Non-fatal diarization failure (e.g. a FluidAudio model download error).
+    /// Transcription still succeeds; this is a banner, not an `AppError`.
+    private(set) var diarizationWarning: String?
 
     private let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
@@ -61,7 +64,8 @@ final class TranscriptionViewModel {
     func transcribe(
         _ recording: Recording,
         language: MeetingLanguage,
-        mode: TranscriptionMode
+        mode: TranscriptionMode,
+        diarizationEngine: DiarizationEngine = .heuristic
     ) async {
         guard !transcribingIDs.contains(recording.id) else { return }
 
@@ -92,6 +96,7 @@ final class TranscriptionViewModel {
         // Capture primitives before suspending.
         let fileURL = recording.fileURL
         let fileName = recording.fileName
+        diarizationWarning = nil
 
         do {
             let output = try await transcriptionService.transcribe(
@@ -99,9 +104,13 @@ final class TranscriptionViewModel {
                 fileName: fileName,
                 language: language,
                 mode: mode,
+                diarizationEngine: diarizationEngine,
                 onPhase: { [weak self] phase in
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.phases[recordingID] = phase }
+                },
+                onDiarizationWarning: { [weak self] message in
+                    Task { @MainActor in self?.diarizationWarning = message }
                 }
             )
 

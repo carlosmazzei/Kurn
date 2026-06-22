@@ -20,10 +20,16 @@
 "error.anthropic_no_transcribe" = "Anthropic does not provide transcription. Use on-device or OpenAI Whisper.";
 "error.no_transcript" = "There is no transcript to summarize yet.";
 "error.speech_permission" = "Speech recognition permission is required for on-device transcription.";
+"error.model_download_required" = "A one-time model download is required for %@.";
+"error.model_download_failed" = "Model download failed: %@";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
 "mode.whisper" = "Whisper API";
+
+/* Diarization engines */
+"diarization.heuristic" = "Heuristic";
+"diarization.fluid_audio" = "FluidAudio";
 
 /* Languages */
 "lang.auto" = "Auto-detect";
@@ -45,6 +51,7 @@
 "recorder.paused" = "PAUSED";
 "recorder.permission.title" = "Microphone Access Needed";
 "recorder.permission.message" = "Kurn needs microphone access to record meetings. Enable it in Settings.";
+"recorder.live_listening" = "Listening…";
 
 /* Meetings */
 "meeting.default_title" = "Meeting – %@";
@@ -198,3 +205,8 @@
 "settings.delete_all" = "Delete All Data";
 "settings.delete_all.confirm" = "Delete all meetings and recordings?";
 "settings.delete_all.message" = "This permanently removes every meeting, transcript, and audio file. This cannot be undone.";
+"settings.diarization_engine" = "Diarization Engine";
+"settings.live_transcription" = "Live Transcription Preview";
+"settings.model_download.title" = "One-Time Model Download";
+"settings.model_download.message" = "This feature downloads an on-device model from FluidAudio the first time you use it. The model is cached afterward and no further downloads are needed.";
+"settings.model_download.allow" = "Allow and Download";

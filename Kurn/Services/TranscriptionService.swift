@@ -16,6 +16,9 @@ struct TranscriptionService {
     /// called from a background executor; the receiver is responsible for
     /// hopping to the main actor before touching UI state.
     typealias PhaseHandler = @Sendable (TranscriptionPhase) -> Void
+    /// Reports a non-fatal diarization failure (e.g. a FluidAudio model
+    /// download error). Transcription still succeeds with a fallback turn.
+    typealias DiarizationWarningHandler = @Sendable (String) -> Void
 
     struct Output: Sendable {
         var segments: [TranscriptSegment]
@@ -28,7 +31,8 @@ struct TranscriptionService {
     private let maxSegmentDuration: TimeInterval = 30
 
     private let onDevice = OnDeviceTranscriber()
-    private let diarizer = SpeakerDiarizer()
+    private let heuristicDiarizer = SpeakerDiarizer()
+    private let fluidAudioDiarizer = FluidAudioDiarizer()
     private let chunker = AudioChunker()
     private let preprocessor = AudioPreprocessor()
 
@@ -39,7 +43,9 @@ struct TranscriptionService {
         fileName: String,
         language: MeetingLanguage,
         mode: TranscriptionMode,
-        onPhase: PhaseHandler = { _ in }
+        diarizationEngine: DiarizationEngine = .heuristic,
+        onPhase: PhaseHandler = { _ in },
+        onDiarizationWarning: DiarizationWarningHandler? = nil
     ) async throws -> Output {
         let started = Date()
         AppLog.transcription.log("transcribe: start file=\(fileName, privacy: .public) mode=\(mode.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
@@ -71,7 +77,11 @@ struct TranscriptionService {
         AppLog.transcription.log("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
         async let rawTranscript = transcribeRaw(fileURL: cleanedURL, language: language, mode: mode)
-        async let speakerTurns = diarizer.diarize(url: cleanedURL)
+        async let speakerTurns = diarize(
+            url: cleanedURL,
+            engine: diarizationEngine,
+            onWarning: onDiarizationWarning
+        )
 
         let raw = try await rawTranscript
         let turns = await speakerTurns
@@ -104,6 +114,22 @@ struct TranscriptionService {
             return try await onDevice.transcribe(url: fileURL, language: language)
         case .whisperAPI:
             return try await transcribeViaWhisper(fileURL: fileURL, language: language)
+        }
+    }
+
+    /// Dispatch to the chosen diarization engine. Both engines satisfy
+    /// `Diarizing` and never throw, so this always returns usable turns.
+    private func diarize(
+        url: URL,
+        engine: DiarizationEngine,
+        onWarning: DiarizationWarningHandler?
+    ) async -> [SpeakerTurn] {
+        switch engine {
+        case .heuristic:
+            return await heuristicDiarizer.diarize(url: url)
+        case .fluidAudio:
+            await fluidAudioDiarizer.setOnDownloadFailure(onWarning)
+            return await fluidAudioDiarizer.diarize(url: url)
         }
     }
 

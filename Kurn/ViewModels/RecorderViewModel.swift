@@ -15,6 +15,7 @@ import SwiftData
 @Observable
 final class RecorderViewModel {
     let recorder = AudioRecorderService()
+    let liveTranscription = LiveTranscriptionService()
 
     var error: AppError?
     var permissionDenied = false
@@ -24,6 +25,7 @@ final class RecorderViewModel {
     private let meeting: Meeting
     private let modelContext: ModelContext
     private let defaultMode: TranscriptionMode
+    private let liveTranscriptionEnabled: Bool
     private let lockScreenController = LockScreenRecordingController()
 
     init(
@@ -31,11 +33,13 @@ final class RecorderViewModel {
         modelContext: ModelContext,
         defaultMode: TranscriptionMode,
         micPickup: MicPickup = .wholeRoom,
-        audioQuality: AudioQuality = .high
+        audioQuality: AudioQuality = .high,
+        liveTranscriptionEnabled: Bool = false
     ) {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
+        self.liveTranscriptionEnabled = liveTranscriptionEnabled
         self.recorder.micPickup = micPickup
         self.recorder.audioBitRate = audioQuality.bitRate
         self.recorder.onStateChanged = { [weak self] state, elapsed in
@@ -45,7 +49,20 @@ final class RecorderViewModel {
         self.recorder.onLevelChanged = { level in
             PhoneSessionController.shared.pushLevel(level)
         }
+        if liveTranscriptionEnabled {
+            // Capture the service directly (not via `self`) so this closure,
+            // invoked on the tap's real-time render thread, isn't inferred as
+            // main-actor isolated — `append` is `nonisolated` precisely so it
+            // can be called from there.
+            let live = liveTranscription
+            self.recorder.onAudioBuffer = { buffer in
+                live.append(buffer)
+            }
+        }
     }
+
+    var livePartialText: String { liveTranscription.partialText }
+    var isLiveTranscriptionActive: Bool { liveTranscription.isActive }
 
     private func pushWatchState(state: AudioRecorderService.State, elapsed: TimeInterval) {
         PhoneSessionController.shared.pushState(
@@ -79,6 +96,9 @@ final class RecorderViewModel {
         }
         do {
             try await recorder.start(meetingID: meeting.id)
+            if liveTranscriptionEnabled {
+                await liveTranscription.start()
+            }
             lockScreenController.start(
                 title: meeting.title,
                 state: recorder.state,
@@ -112,6 +132,7 @@ final class RecorderViewModel {
     /// Stop, save the segment to SwiftData, and flag completion.
     func stopAndSave() {
         AppLog.recorderUI.log("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
+        if liveTranscriptionEnabled { Task { await liveTranscription.stop() } }
         guard let result = recorder.stop() else {
             lockScreenController.end()
             RecordingCommandRouter.shared.unregister()
@@ -150,6 +171,7 @@ final class RecorderViewModel {
     }
 
     func cancel() {
+        if liveTranscriptionEnabled { Task { await liveTranscription.stop() } }
         recorder.cancel()
         lockScreenController.end()
         RecordingCommandRouter.shared.unregister()

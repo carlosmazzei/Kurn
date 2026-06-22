@@ -38,7 +38,8 @@ struct RecorderView: View {
                     modelContext: modelContext,
                     defaultMode: settings.defaultMode,
                     micPickup: settings.micPickup,
-                    audioQuality: settings.audioQuality
+                    audioQuality: settings.audioQuality,
+                    liveTranscriptionEnabled: settings.liveTranscriptionEnabled
                 )
             }
         }
@@ -72,6 +73,7 @@ private struct RecorderContent: View {
                     .padding(.top, 26)
                 titleField
                     .padding(.top, 28)
+                liveTranscriptArea
                 routeMessage
                 Spacer()
                 controls
@@ -177,6 +179,23 @@ private struct RecorderContent: View {
             Rectangle()
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var liveTranscriptArea: some View {
+        if vm.isLiveTranscriptionActive {
+            ScrollView {
+                Text(vm.livePartialText.isEmpty
+                     ? NSLocalizedString("recorder.live_listening", comment: "Listening…")
+                     : vm.livePartialText)
+                    .font(.system(size: 15))
+                    .foregroundStyle(vm.livePartialText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(maxHeight: 90)
+            .padding(.top, 16)
         }
     }
 
