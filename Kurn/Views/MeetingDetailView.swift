@@ -215,8 +215,10 @@ struct MeetingDetailView: View {
     private var transcriptTab: some View {
         let transcribed = sortedRecordings.filter { $0.transcript != nil }
         VStack(alignment: .leading, spacing: 12) {
-            if let warning = txVM?.diarizationWarning {
-                diarizationWarningBanner(warning)
+            ForEach(sortedRecordings, id: \.id) { recording in
+                if let warning = txVM?.diarizationWarnings[recording.id] {
+                    diarizationWarningBanner(warning)
+                }
             }
             if transcribed.isEmpty {
                 placeholder(

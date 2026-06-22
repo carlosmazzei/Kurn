@@ -9,9 +9,11 @@
 //
 
 import AVFoundation
-import FluidAudio
 import Foundation
 import Observation
+
+#if canImport(FluidAudio)
+import FluidAudio
 
 @MainActor
 @Observable
@@ -21,6 +23,10 @@ final class LiveTranscriptionService {
     private(set) var isUnavailable = false
 
     private var engine: (any StreamingAsrManager)?
+    /// Guards against unbounded `Task` growth: `append` drops a buffer instead
+    /// of scheduling another `process` call while one is already in flight, so
+    /// a slow/stalled engine can't pile up queued copies and Tasks.
+    private let inFlight = InFlightGate()
 
     func start() async {
         guard engine == nil else { return }
@@ -28,31 +34,44 @@ final class LiveTranscriptionService {
         do {
             try await candidate.loadModels()
         } catch {
+            AppLog.transcription.error("LiveTranscriptionService: model load failed: \(error.localizedDescription, privacy: .public)")
             isUnavailable = true
             return
         }
-        await candidate.setPartialTranscriptCallback { [weak self] text in
-            Task { @MainActor in self?.partialText = text }
-        }
+        // Assign state before wiring the callback so any callback invocation,
+        // however unlikely, never observes `isActive == false` with text ready.
         engine = candidate
         isActive = true
         isUnavailable = false
         partialText = ""
+        await candidate.setPartialTranscriptCallback { [weak self] text in
+            Task { @MainActor in self?.partialText = text }
+        }
     }
 
     /// Called from the audio render thread via `AudioRecorderService.onAudioBuffer`.
     /// Copies the buffer synchronously before dispatching, since the engine may
-    /// recycle the original before an async task can read it.
+    /// recycle the original before an async task can read it. Drops the buffer
+    /// if a previous one is still being processed instead of queuing more work.
     nonisolated func append(_ buffer: AVAudioPCMBuffer) {
-        guard let copy = Self.copy(buffer) else { return }
+        guard inFlight.tryAcquire() else { return }
+        guard let copy = Self.copy(buffer) else {
+            inFlight.release()
+            return
+        }
         Task { @MainActor [weak self] in
             await self?.process(copy)
+            self?.inFlight.release()
         }
     }
 
     func stop() async {
         guard let engine else { return }
-        _ = try? await engine.finish()
+        do {
+            _ = try await engine.finish()
+        } catch {
+            AppLog.transcription.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
+        }
         await engine.cleanup()
         self.engine = nil
         isActive = false
@@ -66,6 +85,7 @@ final class LiveTranscriptionService {
             try await engine.processBufferedAudio()
         } catch {
             // Best-effort preview; drop the buffer and keep listening.
+            AppLog.transcription.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -85,3 +105,47 @@ final class LiveTranscriptionService {
         return copy
     }
 }
+
+/// Lock-protected single-slot in-flight flag, safe to call from the audio
+/// render thread (`append`) and from the `@MainActor` completion (`process`).
+private final class InFlightGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isBusy = false
+
+    func tryAcquire() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !isBusy else { return false }
+        isBusy = true
+        return true
+    }
+
+    func release() {
+        lock.lock(); defer { lock.unlock() }
+        isBusy = false
+    }
+}
+
+#else
+
+/// Built without the FluidAudio package linked: the preview stays unavailable
+/// until the package is added, but the recorder UI keeps working.
+@MainActor
+@Observable
+final class LiveTranscriptionService {
+    private(set) var partialText = ""
+    private(set) var isActive = false
+    private(set) var isUnavailable = false
+
+    func start() async {
+        isUnavailable = true
+    }
+
+    nonisolated func append(_ buffer: AVAudioPCMBuffer) {}
+
+    func stop() async {
+        isActive = false
+        partialText = ""
+    }
+}
+
+#endif

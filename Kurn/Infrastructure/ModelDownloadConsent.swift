@@ -8,8 +8,11 @@
 //  diarization models, and vice versa.
 //
 
-import FluidAudio
 import Foundation
+
+#if canImport(FluidAudio)
+import FluidAudio
+#endif
 
 enum ModelSet {
     case liveTranscriptionASR
@@ -18,13 +21,23 @@ enum ModelSet {
 
 struct ModelDownloadConsent {
     static func download(_ set: ModelSet) async throws {
-        switch set {
-        case .liveTranscriptionASR:
-            let engine = StreamingModelVariant.parakeetEou160ms.createManager()
-            try await engine.loadModels()
-        case .diarization:
-            let manager = OfflineDiarizerManager()
-            try await manager.prepareModels()
+        #if canImport(FluidAudio)
+        do {
+            switch set {
+            case .liveTranscriptionASR:
+                let engine = StreamingModelVariant.parakeetEou160ms.createManager()
+                try await engine.loadModels()
+            case .diarization:
+                let manager = OfflineDiarizerManager()
+                try await manager.prepareModels()
+            }
+        } catch {
+            throw AppError.modelDownloadFailed(error.localizedDescription)
         }
+        #else
+        throw AppError.modelDownloadRequired(
+            NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
+        )
+        #endif
     }
 }

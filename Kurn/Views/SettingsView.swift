@@ -25,6 +25,13 @@ struct SettingsView: View {
     @State private var showingASRConsent = false
     @State private var showingDiarizationConsent = false
     @State private var pendingDiarizationEngine: DiarizationEngine?
+    /// True while a consented FluidAudio model download is in flight, so the
+    /// toggle/picker can't be re-triggered mid-download.
+    @State private var isPreparingFluidAudioModels = false
+    /// Surfaced only if a consented download actually fails — the consent
+    /// flags themselves are set after success, so a failure leaves the
+    /// feature off and the consent alert available to retry.
+    @State private var modelDownloadError: AppError?
 
     var body: some View {
         @Bindable var settings = settings
@@ -168,20 +175,53 @@ struct SettingsView: View {
             showingASRConsent: $showingASRConsent,
             showingDiarizationConsent: $showingDiarizationConsent,
             onConfirmASR: {
-                settings.fluidAudioASRModelsConsented = true
-                settings.liveTranscriptionEnabled = true
-                Task { try? await ModelDownloadConsent.download(.liveTranscriptionASR) }
+                isPreparingFluidAudioModels = true
+                Task {
+                    do {
+                        try await ModelDownloadConsent.download(.liveTranscriptionASR)
+                        settings.fluidAudioASRModelsConsented = true
+                        settings.liveTranscriptionEnabled = true
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    isPreparingFluidAudioModels = false
+                }
             },
             onConfirmDiarization: {
-                settings.fluidAudioDiarizationModelsConsented = true
-                if let engine = pendingDiarizationEngine { settings.diarizationEngine = engine }
+                guard let engine = pendingDiarizationEngine else { return }
                 pendingDiarizationEngine = nil
-                Task { try? await ModelDownloadConsent.download(.diarization) }
+                isPreparingFluidAudioModels = true
+                Task {
+                    do {
+                        try await ModelDownloadConsent.download(.diarization)
+                        settings.fluidAudioDiarizationModelsConsented = true
+                        settings.diarizationEngine = engine
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    isPreparingFluidAudioModels = false
+                }
             },
             onCancelDiarization: {
                 pendingDiarizationEngine = nil
             }
         ))
+        .alert(
+            NSLocalizedString("common.error", comment: "Error"),
+            isPresented: Binding(
+                get: { modelDownloadError != nil },
+                set: { if !$0 { modelDownloadError = nil } }
+            ),
+            presenting: modelDownloadError
+        ) { _ in
+            Button(NSLocalizedString("common.ok", comment: "OK"), role: .cancel) {}
+        } message: { error in
+            Text(error.errorDescription ?? "")
+        }
     }
 
     @ViewBuilder
@@ -230,6 +270,7 @@ struct SettingsView: View {
             ) {
                 ForEach(DiarizationEngine.allCases) { Text($0.displayName).tag($0) }
             }
+            .disabled(isPreparingFluidAudioModels)
         } header: {
             Text(NSLocalizedString("settings.transcription", comment: "Transcription"))
         } footer: {
@@ -276,6 +317,7 @@ struct SettingsView: View {
                     }
                 )
             )
+            .disabled(isPreparingFluidAudioModels)
         } header: {
             Text(NSLocalizedString("settings.recording", comment: "Recording"))
         } footer: {

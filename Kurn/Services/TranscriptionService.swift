@@ -119,6 +119,12 @@ struct TranscriptionService {
 
     /// Dispatch to the chosen diarization engine. Both engines satisfy
     /// `Diarizing` and never throw, so this always returns usable turns.
+    ///
+    /// `fluidAudioDiarizer` is a single shared actor reused across concurrent
+    /// transcriptions (different recordings can transcribe at once), so the
+    /// warning handler is passed as a call argument rather than set on shared
+    /// actor state beforehand — that would let one call's handler leak into
+    /// another's result at the actor's next suspension point.
     private func diarize(
         url: URL,
         engine: DiarizationEngine,
@@ -128,8 +134,7 @@ struct TranscriptionService {
         case .heuristic:
             return await heuristicDiarizer.diarize(url: url)
         case .fluidAudio:
-            await fluidAudioDiarizer.setOnDownloadFailure(onWarning)
-            return await fluidAudioDiarizer.diarize(url: url)
+            return await fluidAudioDiarizer.diarize(url: url, onDownloadFailure: onWarning)
         }
     }
 

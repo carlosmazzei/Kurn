@@ -22,6 +22,7 @@
 "error.speech_permission" = "Speech recognition permission is required for on-device transcription.";
 "error.model_download_required" = "A one-time model download is required for %@.";
 "error.model_download_failed" = "Model download failed: %@";
+"error.model_download_timeout" = "The on-device model timed out. Check your connection and try again.";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
@@ -210,3 +211,4 @@
 "settings.model_download.title" = "One-Time Model Download";
 "settings.model_download.message" = "This feature downloads an on-device model from FluidAudio the first time you use it. The model is cached afterward and no further downloads are needed.";
 "settings.model_download.allow" = "Allow and Download";
+"settings.fluid_audio.package_missing" = "Add the FluidAudio Swift package to the Kurn target before using this feature.";
