@@ -25,6 +25,7 @@ struct MeetingDetailView: View {
 
     @State private var showingRecorder = false
     @State private var showingEdit = false
+    @State private var showingTemplatePicker = false
     @State private var shareItem: ShareItem?
 
     var body: some View {
@@ -49,6 +50,14 @@ struct MeetingDetailView: View {
             NavigationStack { MeetingFormView(meeting: meeting) }
         }
         .sheet(item: $shareItem) { item in ActivityView(items: [item.url]) }
+        .sheet(isPresented: $showingTemplatePicker) {
+            SummaryTemplatePicker(
+                templates: settings.summaryTemplates,
+                selectedID: settings.lastSummaryTemplateID
+            ) { template in
+                runSummary(with: template)
+            }
+        }
         .alert(
             NSLocalizedString("common.error", comment: "Error"),
             isPresented: Binding(
@@ -414,10 +423,22 @@ struct MeetingDetailView: View {
     }
 
     private func generateSummary() {
+        showingTemplatePicker = true
+    }
+
+    private func runSummary(with template: SummaryTemplate) {
         guard let txVM else { return }
+        settings.lastSummaryTemplateID = template.id
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
-        Task { await txVM.generateSummary(for: meeting, provider: provider, model: model) }
+        Task {
+            await txVM.generateSummary(
+                for: meeting,
+                provider: provider,
+                model: model,
+                template: template
+            )
+        }
     }
 
     private func deleteRecording(_ recording: Recording) {

@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var storageText = "—"
     @State private var showingDeleteConfirm = false
     @State private var showingAddProvider = false
+    @State private var showingAddTemplate = false
     /// Bumped after editing a key so the provider rows re-read keychain status.
     @State private var keyRevision = 0
 
@@ -105,6 +106,30 @@ struct SettingsView: View {
                 }
             }
 
+            // MARK: Summary templates
+            Section {
+                ForEach(settings.summaryTemplates) { template in
+                    NavigationLink {
+                        TemplateEditor(
+                            template: template,
+                            onSave: { settings.updateTemplate($0) },
+                            onDelete: { settings.removeTemplate(template) }
+                        )
+                    } label: {
+                        TemplateRow(template: template)
+                    }
+                }
+                Button {
+                    showingAddTemplate = true
+                } label: {
+                    Label(NSLocalizedString("settings.add_template", comment: "Add Template"), systemImage: "plus")
+                }
+            } header: {
+                Text(NSLocalizedString("settings.templates", comment: "Summary Templates"))
+            } footer: {
+                Text(NSLocalizedString("settings.templates_footer", comment: "Templates footer"))
+            }
+
             // MARK: Recording
             Section {
                 Picker(
@@ -150,6 +175,14 @@ struct SettingsView: View {
                     }
                     keyRevision += 1
                     showingAddProvider = false
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddTemplate) {
+            NavigationStack {
+                AddTemplateView { template in
+                    settings.addTemplate(template)
+                    showingAddTemplate = false
                 }
             }
         }

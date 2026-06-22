@@ -76,11 +76,7 @@ struct AnthropicProvider: LLMProvider {
                 throw AppError.decodingError("empty Anthropic response")
             }
             let json = try SummaryJSON.parse(text)
-            return SummaryResult(
-                content: json.summary,
-                actionItems: json.actionItems,
-                keyDecisions: json.keyDecisions
-            )
+            return SummaryResult(sections: json.summarySections)
         } catch let error as AppError {
             throw error
         } catch {

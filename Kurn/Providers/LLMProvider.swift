@@ -10,11 +10,10 @@
 
 import Foundation
 
-/// Structured summary returned by a chat/messages completion.
+/// Structured summary returned by a chat/messages completion. The shape is
+/// template-driven, so it is just an ordered list of titled sections.
 struct SummaryResult: Sendable {
-    var content: String
-    var actionItems: [String]
-    var keyDecisions: [String]
+    var sections: [SummarySection]
 }
 
 protocol LLMProvider: Sendable {
@@ -70,11 +69,29 @@ enum LLMHTTP {
 
 // MARK: - Shared JSON shape
 
-/// The JSON contract both vendors are instructed to return for summaries.
+/// The JSON contract all vendors are instructed to return for summaries: an
+/// ordered list of titled sections, each with optional prose and/or bullets.
 struct SummaryJSON: Decodable {
-    let summary: String
-    let actionItems: [String]
-    let keyDecisions: [String]
+    struct Section: Decodable {
+        let title: String
+        let body: String?
+        let items: [String]?
+    }
+    let sections: [Section]
+
+    /// Map the wire shape into the shared `SummarySection` value type, dropping
+    /// sections that carry neither a title nor any content.
+    var summarySections: [SummarySection] {
+        sections.compactMap { section in
+            let title = section.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = (section.body ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let items = (section.items ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard !title.isEmpty || !body.isEmpty || !items.isEmpty else { return nil }
+            return SummarySection(title: title, body: body, items: items)
+        }
+    }
 }
 
 extension SummaryJSON {
@@ -119,17 +136,46 @@ extension SummaryJSON {
 // MARK: - Shared prompt
 
 enum SummaryPrompt {
-    /// System prompt shared by both vendors; requests strict JSON in the
-    /// transcript's own language.
-    static let system = """
-    You are an expert meeting assistant. Given a meeting transcript with speaker \
-    labels, produce a structured summary in the SAME LANGUAGE as the transcript.
-    Output valid JSON with this shape:
-    {
-      "summary": "# Meeting Summary\\n...(markdown, 3-5 paragraphs)...",
-      "actionItems": ["...", "..."],
-      "keyDecisions": ["...", "..."]
+    /// Build the system prompt for a template. Combines a fixed base + the
+    /// template's persona/focus + its suggested sections + the JSON contract.
+    /// The summary is requested in the transcript's own language.
+    static func system(for template: SummaryTemplate) -> String {
+        var prompt = """
+        You are an expert meeting assistant. Given a meeting transcript with \
+        speaker labels, produce a structured summary in the SAME LANGUAGE as the \
+        transcript.
+
+        \(template.instructions)
+        """
+
+        let sections = template.sections
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !sections.isEmpty {
+            let list = sections.map { "- \($0)" }.joined(separator: "\n")
+            prompt += """
+
+
+            Organize the summary into sections along these lines (adapt, merge, \
+            rename, or add sections as the content requires):
+            \(list)
+            """
+        }
+
+        prompt += """
+
+
+        Output valid JSON with this shape:
+        {
+          "sections": [
+            { "title": "Section heading", "body": "markdown paragraph(s)", "items": ["bullet", "bullet"] }
+          ]
+        }
+        Each section needs a "title". Use "body" for prose and "items" for bullet \
+        lists; either may be omitted when not needed. Translate the section titles \
+        into the transcript's language.
+        Output ONLY the JSON, no markdown fences.
+        """
+        return prompt
     }
-    Output ONLY the JSON, no markdown fences.
-    """
 }

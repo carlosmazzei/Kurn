@@ -63,11 +63,7 @@ struct GroqProvider: LLMProvider {
                 throw AppError.decodingError("empty Groq response")
             }
             let json = try SummaryJSON.parse(content)
-            return SummaryResult(
-                content: json.summary,
-                actionItems: json.actionItems,
-                keyDecisions: json.keyDecisions
-            )
+            return SummaryResult(sections: json.summarySections)
         } catch let error as AppError {
             throw error
         } catch {

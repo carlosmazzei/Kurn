@@ -16,11 +16,13 @@ struct SummaryService {
     ///     meeting.
     ///   - meetingTitle: included for light context in the prompt.
     ///   - provider: which vendor to use (resolved to a key via ProviderFactory).
+    ///   - template: shapes the persona/focus and the summary's sections.
     func generate(
         transcriptText: String,
         meetingTitle: String,
         provider: AIProvider,
-        model: String
+        model: String,
+        template: SummaryTemplate
     ) async throws -> SummaryResult {
         let trimmed = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -38,7 +40,7 @@ struct SummaryService {
         """
 
         return try await llm.summarize(
-            systemPrompt: SummaryPrompt.system,
+            systemPrompt: SummaryPrompt.system(for: template),
             userPrompt: userPrompt
         )
     }

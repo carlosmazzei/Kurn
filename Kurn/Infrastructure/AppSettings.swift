@@ -21,6 +21,8 @@ final class AppSettings {
         static let micPickup = "settings.micPickup"
         static let audioQuality = "settings.audioQuality"
         static let summaryModels = "settings.summaryModels"
+        static let summaryTemplates = "settings.summaryTemplates"
+        static let lastSummaryTemplate = "settings.lastSummaryTemplate"
     }
 
     private let defaults = UserDefaults.standard
@@ -75,6 +77,39 @@ final class AppSettings {
         summaryModels[provider.rawValue] = model
     }
 
+    /// Summary templates (built-in presets + user-defined). Built-ins are seeded
+    /// from `SummaryTemplate.defaultTemplates` and merged on launch.
+    var summaryTemplates: [SummaryTemplate] {
+        didSet { persistTemplates() }
+    }
+
+    /// Id of the template chosen for the most recent summary, used to preselect
+    /// the picker. Falls back to the first available template.
+    var lastSummaryTemplateID: String {
+        didSet { defaults.set(lastSummaryTemplateID, forKey: Keys.lastSummaryTemplate) }
+    }
+
+    func template(for id: String) -> SummaryTemplate? {
+        summaryTemplates.first(where: { $0.id == id })
+    }
+
+    func addTemplate(_ template: SummaryTemplate) {
+        summaryTemplates.append(template)
+    }
+
+    func updateTemplate(_ template: SummaryTemplate) {
+        guard let index = summaryTemplates.firstIndex(where: { $0.id == template.id }) else { return }
+        summaryTemplates[index] = template
+    }
+
+    func removeTemplate(_ template: SummaryTemplate) {
+        guard !template.isBuiltIn else { return }
+        summaryTemplates.removeAll { $0.id == template.id }
+        if lastSummaryTemplateID == template.id {
+            lastSummaryTemplateID = summaryTemplates.first?.id ?? SummaryTemplate.general.id
+        }
+    }
+
     func addProvider(_ provider: AIProvider) {
         providers.append(provider)
         aiProviderID = provider.id
@@ -127,12 +162,43 @@ final class AppSettings {
         } else {
             summaryModels = [:]
         }
+        let loadedTemplates: [SummaryTemplate]
+        if let data = defaults.data(forKey: Keys.summaryTemplates),
+           let decoded = try? JSONDecoder().decode([SummaryTemplate].self, from: data),
+           !decoded.isEmpty {
+            loadedTemplates = Self.mergedTemplates(decoded)
+        } else {
+            loadedTemplates = SummaryTemplate.defaultTemplates
+        }
+        summaryTemplates = loadedTemplates
+        let storedTemplateID = defaults.string(forKey: Keys.lastSummaryTemplate)
+            ?? SummaryTemplate.general.id
+        lastSummaryTemplateID = loadedTemplates.contains(where: { $0.id == storedTemplateID })
+            ? storedTemplateID
+            : (loadedTemplates.first?.id ?? SummaryTemplate.general.id)
     }
 
     private func persistProviders() {
         if let data = try? JSONEncoder().encode(providers) {
             defaults.set(data, forKey: Keys.providers)
         }
+    }
+
+    private func persistTemplates() {
+        if let data = try? JSONEncoder().encode(summaryTemplates) {
+            defaults.set(data, forKey: Keys.summaryTemplates)
+        }
+    }
+
+    /// Keep stored templates (user edits to built-ins persist) and append any
+    /// built-in preset that isn't present yet, so new presets appear on upgrade.
+    private static func mergedTemplates(_ stored: [SummaryTemplate]) -> [SummaryTemplate] {
+        var templates = stored
+        for builtIn in SummaryTemplate.defaultTemplates
+        where !templates.contains(where: { $0.id == builtIn.id }) {
+            templates.append(builtIn)
+        }
+        return templates
     }
 
     private static func mergedProviders(_ stored: [AIProvider]) -> [AIProvider] {

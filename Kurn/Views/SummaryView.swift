@@ -13,27 +13,20 @@ struct SummaryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            MarkdownText(summary.content)
-                .kurnCard()
-
-            if !summary.keyDecisions.isEmpty {
-                bulletSection(
-                    title: NSLocalizedString("summary.key_decisions", comment: "Key Decisions"),
-                    items: summary.keyDecisions,
-                    symbol: "checkmark.seal.fill",
-                    tint: Theme.success
-                )
-                .kurnCard()
+            ForEach(Array(summary.displaySections.enumerated()), id: \.offset) { _, section in
+                sectionCard(section)
+                    .kurnCard()
             }
 
-            if !summary.actionItems.isEmpty {
-                bulletSection(
-                    title: NSLocalizedString("summary.action_items", comment: "Action Items"),
-                    items: summary.actionItems,
-                    symbol: "square",
-                    tint: Theme.info
+            if let templateName = summary.templateName, !templateName.isEmpty {
+                Text(
+                    String(
+                        format: NSLocalizedString("summary.template_label", comment: "Template label"),
+                        templateName
+                    )
                 )
-                .kurnCard()
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
 
             Text(
@@ -51,24 +44,27 @@ struct SummaryView: View {
         }
     }
 
-    private func bulletSection(
-        title: String,
-        items: [String],
-        symbol: String,
-        tint: Color
-    ) -> some View {
+    @ViewBuilder
+    private func sectionCard(_ section: SummarySection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+            if !section.title.isEmpty {
+                Text(section.title).font(.headline)
+            }
+            if !section.body.isEmpty {
+                MarkdownText(section.body)
+            }
+            ForEach(Array(section.items.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: symbol)
-                        .foregroundStyle(tint)
-                        .font(.body)
+                    Image(systemName: "circle.fill")
+                        .foregroundStyle(Theme.accent)
+                        .font(.system(size: 6))
+                        .padding(.top, 7)
                     Text(item)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

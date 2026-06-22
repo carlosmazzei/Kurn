@@ -2,9 +2,10 @@
 //  SummaryJSONParsingTests.swift
 //  KurnTests
 //
-//  SummaryJSON.parse is the tolerant decoder both LLM providers route their raw
+//  SummaryJSON.parse is the tolerant decoder all LLM providers route their raw
 //  text response through; it has to cope with code fences and stray prose since
-//  models do not always follow the "JSON only" instruction.
+//  models do not always follow the "JSON only" instruction. The contract is a
+//  template-driven list of titled sections.
 //
 
 import Testing
@@ -14,44 +15,63 @@ struct SummaryJSONParsingTests {
 
     @Test func parsesPlainJSON() throws {
         let raw = """
-        {"summary": "Recap", "actionItems": ["follow up"], "keyDecisions": ["ship it"]}
+        {"sections": [
+          {"title": "Overview", "body": "Recap"},
+          {"title": "Action Items", "items": ["follow up"]}
+        ]}
         """
         let json = try SummaryJSON.parse(raw)
-        #expect(json.summary == "Recap")
-        #expect(json.actionItems == ["follow up"])
-        #expect(json.keyDecisions == ["ship it"])
+        let sections = json.summarySections
+        #expect(sections.count == 2)
+        #expect(sections[0].title == "Overview")
+        #expect(sections[0].body == "Recap")
+        #expect(sections[1].items == ["follow up"])
     }
 
     @Test func stripsMarkdownCodeFenceWithLanguageTag() throws {
         let raw = """
         ```json
-        {"summary": "Recap", "actionItems": [], "keyDecisions": []}
+        {"sections": [{"title": "Overview", "body": "Recap"}]}
         ```
         """
         let json = try SummaryJSON.parse(raw)
-        #expect(json.summary == "Recap")
+        #expect(json.summarySections.first?.body == "Recap")
     }
 
     @Test func stripsPlainMarkdownCodeFence() throws {
         let raw = """
         ```
-        {"summary": "Recap", "actionItems": [], "keyDecisions": []}
+        {"sections": [{"title": "Overview", "body": "Recap"}]}
         ```
         """
         let json = try SummaryJSON.parse(raw)
-        #expect(json.summary == "Recap")
+        #expect(json.summarySections.first?.title == "Overview")
     }
 
     @Test func extractsJSONObjectSurroundedByProse() throws {
         let raw = """
         Here is the summary you asked for:
-        {"summary": "Recap", "actionItems": ["a"], "keyDecisions": ["b"]}
+        {"sections": [{"title": "Recap", "body": "All good", "items": ["a"]}]}
         Let me know if you need anything else.
         """
         let json = try SummaryJSON.parse(raw)
-        #expect(json.summary == "Recap")
-        #expect(json.actionItems == ["a"])
-        #expect(json.keyDecisions == ["b"])
+        let section = try #require(json.summarySections.first)
+        #expect(section.title == "Recap")
+        #expect(section.body == "All good")
+        #expect(section.items == ["a"])
+    }
+
+    @Test func summarySectionsDropsEmptyEntries() throws {
+        let raw = """
+        {"sections": [
+          {"title": "", "body": "", "items": []},
+          {"title": "Kept", "body": "x"}
+        ]}
+        """
+        let json = try SummaryJSON.parse(raw)
+        let sections = json.summarySections
+        #expect(sections.count == 1)
+        #expect(sections.first?.title == "Kept")
     }
 
     @Test func throwsDecodingErrorWhenNoJSONObjectPresent() {
@@ -62,7 +82,7 @@ struct SummaryJSONParsingTests {
 
     @Test func throwsDecodingErrorOnMalformedJSONObject() {
         #expect(throws: AppError.self) {
-            try SummaryJSON.parse("{\"summary\": \"Recap\", this is not valid}")
+            try SummaryJSON.parse("{\"sections\": [ this is not valid }")
         }
     }
 }

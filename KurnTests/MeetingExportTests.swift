@@ -29,10 +29,37 @@ struct MeetingExportTests {
         #expect(!markdown.contains("## Notes"))
     }
 
-    @Test func markdownIncludesSummaryDecisionsAndActionItems() {
+    @Test func markdownRendersTemplateSections() {
         let context = makeContext()
         let meeting = Meeting(title: "Sprint Planning")
         context.insert(meeting)
+        let summary = Summary(
+            meeting: meeting,
+            sections: [
+                SummarySection(title: "Recap", body: "We aligned on scope."),
+                SummarySection(title: "Decisions", items: ["Ship next week"]),
+                SummarySection(title: "Actions", items: ["Write tests"])
+            ],
+            provider: .openAI
+        )
+        context.insert(summary)
+        meeting.summary = summary
+
+        let markdown = MeetingExport.markdown(for: meeting)
+        #expect(markdown.contains("## Summary"))
+        #expect(markdown.contains("### Recap"))
+        #expect(markdown.contains("We aligned on scope."))
+        #expect(markdown.contains("### Decisions"))
+        #expect(markdown.contains("- Ship next week"))
+        #expect(markdown.contains("### Actions"))
+        #expect(markdown.contains("- Write tests"))
+    }
+
+    @Test func markdownRendersLegacySummaryViaFallback() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+        // A summary created before templates: only legacy fields are populated.
         let summary = Summary(
             meeting: meeting,
             content: "We aligned on scope.",
@@ -46,10 +73,8 @@ struct MeetingExportTests {
         let markdown = MeetingExport.markdown(for: meeting)
         #expect(markdown.contains("## Summary"))
         #expect(markdown.contains("We aligned on scope."))
-        #expect(markdown.contains("### Key Decisions"))
         #expect(markdown.contains("- Ship next week"))
-        #expect(markdown.contains("### Action Items"))
-        #expect(markdown.contains("- [ ] Write tests"))
+        #expect(markdown.contains("- Write tests"))
     }
 
     @Test func markdownUsesSpeakerDisplayNameInTranscript() {

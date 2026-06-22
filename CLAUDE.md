@@ -94,8 +94,13 @@ single place that resolves a provider from `AppSettings` + Keychain and throws
 `AIProviderKind` (`openAICompatible`, `anthropic`, `googleGemini`); Groq reuses the
 OpenAI-compatible client. **Cloud transcription always uses OpenAI Whisper**
 (`ProviderFactory.whisperProvider()`) regardless of the chosen summary provider.
-Summaries demand strict JSON (`SummaryPrompt.system`); `SummaryJSON.parse` tolerantly
-strips markdown fences and extracts the outermost `{...}` since models add prose.
+Summaries are template-driven: `SummaryPrompt.system(for:)` builds the system prompt
+from the chosen `SummaryTemplate` (persona/focus + suggested sections), and the model
+returns a flexible `{ "sections": [...] }` shape. `SummaryJSON.parse` tolerantly strips
+markdown fences and extracts the outermost `{...}` since models add prose. Templates
+(built-in presets + user-defined) live in `AppSettings.summaryTemplates`; the user
+picks one per summarization via `SummaryTemplatePicker`. `Summary.displaySections`
+reconstructs sections from legacy fields for summaries created before templates.
 
 ### Cross-device control (Watch + Live Activity)
 
