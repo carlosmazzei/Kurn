@@ -55,28 +55,6 @@ struct MeetingExportTests {
         #expect(markdown.contains("- Write tests"))
     }
 
-    @Test func markdownRendersLegacySummaryViaFallback() {
-        let context = makeContext()
-        let meeting = Meeting(title: "Sprint Planning")
-        context.insert(meeting)
-        // A summary created before templates: only legacy fields are populated.
-        let summary = Summary(
-            meeting: meeting,
-            content: "We aligned on scope.",
-            actionItems: ["Write tests"],
-            keyDecisions: ["Ship next week"],
-            provider: .openAI
-        )
-        context.insert(summary)
-        meeting.summary = summary
-
-        let markdown = MeetingExport.markdown(for: meeting)
-        #expect(markdown.contains("## Summary"))
-        #expect(markdown.contains("We aligned on scope."))
-        #expect(markdown.contains("- Ship next week"))
-        #expect(markdown.contains("- Write tests"))
-    }
-
     @Test func markdownUsesSpeakerDisplayNameInTranscript() {
         let context = makeContext()
         let meeting = Meeting(title: "Sprint Planning")

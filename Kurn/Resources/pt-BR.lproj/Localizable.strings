@@ -128,9 +128,6 @@
 "summary.footer" = "Gerado por %1$@ · %2$@";
 "summary.footer_with_model" = "Gerado por %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Modelo: %@";
-"summary.section.overview" = "Visão Geral";
-"summary.section.key_decisions" = "Decisões Principais";
-"summary.section.action_items" = "Itens de Ação";
 
 /* Modelos de resumo */
 "detail.summary.choose_template" = "Escolha um Modelo";

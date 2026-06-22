@@ -191,10 +191,6 @@ final class TranscriptionViewModel {
             if let existing = meeting.summary {
                 existing.sections = result.sections
                 existing.templateName = template.displayName
-                // Clear legacy fields so display/export use the new sections only.
-                existing.content = ""
-                existing.actionItems = []
-                existing.keyDecisions = []
                 existing.provider = provider
                 existing.model = model
                 existing.updatedAt = Date()

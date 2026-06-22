@@ -2,8 +2,8 @@
 //  SummaryView.swift
 //  Kurn
 //
-//  Renders an AI summary: markdown body, key decisions, action items, and a
-//  provenance footer (provider + model + timestamp).
+//  Renders an AI summary: template-driven sections and a provenance footer
+//  (provider + model + timestamp).
 //
 
 import SwiftUI
@@ -13,7 +13,7 @@ struct SummaryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ForEach(Array(summary.displaySections.enumerated()), id: \.offset) { _, section in
+            ForEach(Array(summary.sections.enumerated()), id: \.offset) { _, section in
                 sectionCard(section)
                     .kurnCard()
             }
