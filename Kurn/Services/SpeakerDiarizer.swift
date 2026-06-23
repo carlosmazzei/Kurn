@@ -11,9 +11,12 @@
 //      spectral tilt (crude voice-timbre proxies).
 //   2. Split into speech regions separated by silence gaps (< -40 dBFS for
 //      >= 0.5s).
-//   3. Assign each region to a speaker by cosine-similarity clustering of its
-//      mean timbre feature vector (threshold 0.80), creating a new speaker
-//      when no existing centroid is close enough. RMS/volume is deliberately
+//   3. Assign each region to a speaker by weighted-Euclidean clustering of
+//      its mean timbre feature vector, creating a new speaker when no
+//      existing centroid is close enough. Cosine similarity isn't usable
+//      here: the feature dimensions are all non-negative and pitch dominates
+//      the magnitude, so two very different voices end up with cosine ~0.99
+//      and collapse into a single speaker. RMS/volume is deliberately
 //      excluded from this vector — it reflects mic distance and speaking
 //      loudness, not who is speaking.
 //
@@ -42,7 +45,14 @@ actor SpeakerDiarizer: Diarizing {
     private let silenceFloorDBFS: Float = -40         // below this is "silence"
     private let minSilenceFrames = 5                  // 0.5 s gap splits regions
     private let minRegionFrames = 2                   // ignore < 200 ms blips
-    private let similarityThreshold: Float = 0.80
+    /// Weighted-Euclidean distance below which a region joins an existing
+    /// centroid. Tuned empirically: same-speaker regions cluster well under
+    /// 0.15, different-pitched speakers land around 0.30+.
+    private let distanceThreshold: Float = 0.22
+    /// Per-dimension weights for the distance metric. Pitch is the strongest
+    /// discriminator and gets the most weight; ZCR varies on a small absolute
+    /// scale (~0.02–0.15) so it's amplified; high-band sits in between.
+    private let featureWeights: [Float] = [1.0, 3.0, 1.5]
     private let maxSpeakers = 8
 
     // Pitch estimation (autocorrelation) is run on a decimated copy of each
@@ -67,7 +77,10 @@ actor SpeakerDiarizer: Diarizing {
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: end)]
         }
 
-        return assignSpeakers(to: regions)
+        let turns = assignSpeakers(to: regions)
+        let uniqueSpeakers = Set(turns.map { $0.speakerLabel }).count
+        AppLog.transcription.log("SpeakerDiarizer: regions=\(regions.count, privacy: .public) turns=\(turns.count, privacy: .public) speakers=\(uniqueSpeakers, privacy: .public)")
+        return turns
     }
 
     // MARK: - Feature extraction
@@ -266,38 +279,31 @@ actor SpeakerDiarizer: Diarizing {
 
     private func assignSpeakers(to regions: [Region]) -> [SpeakerTurn] {
         var centroids: [[Float]] = []
-        // Unit-length copies of each centroid, kept in sync so the clustering
-        // loop doesn't re-normalize every centroid on every comparison.
-        var normalizedCentroids: [[Float]] = []
         var counts: [Int] = []
         var turns: [SpeakerTurn] = []
 
         for region in regions {
-            let normalized = normalize(region.feature)
             var bestIndex = -1
-            var bestSimilarity: Float = -1
+            var bestDistance: Float = .greatestFiniteMagnitude
 
-            for (i, centroid) in normalizedCentroids.enumerated() {
-                let sim = cosineSimilarity(normalized, centroid)
-                if sim > bestSimilarity {
-                    bestSimilarity = sim
+            for (i, centroid) in centroids.enumerated() {
+                let dist = weightedDistance(region.feature, centroid)
+                if dist < bestDistance {
+                    bestDistance = dist
                     bestIndex = i
                 }
             }
 
             let speakerIndex: Int
-            if bestIndex >= 0,
-               bestSimilarity >= similarityThreshold {
+            if bestIndex >= 0, bestDistance <= distanceThreshold {
                 speakerIndex = bestIndex
                 // Running average update of the centroid.
                 let n = Float(counts[speakerIndex])
                 centroids[speakerIndex] = zip(centroids[speakerIndex], region.feature)
                     .map { ($0 * n + $1) / (n + 1) }
-                normalizedCentroids[speakerIndex] = normalize(centroids[speakerIndex])
                 counts[speakerIndex] += 1
             } else if centroids.count < maxSpeakers {
                 centroids.append(region.feature)
-                normalizedCentroids.append(normalized)
                 counts.append(1)
                 speakerIndex = centroids.count - 1
             } else {
@@ -338,15 +344,16 @@ actor SpeakerDiarizer: Diarizing {
         return merged
     }
 
-    private func normalize(_ v: [Float]) -> [Float] {
-        let magnitude = sqrt(v.reduce(Float(0)) { $0 + $1 * $1 })
-        guard magnitude > 0 else { return v }
-        return v.map { $0 / magnitude }
-    }
-
-    private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
-        guard a.count == b.count else { return 0 }
-        let dot = zip(a, b).reduce(Float(0)) { $0 + $1.0 * $1.1 }
-        return dot // both inputs already normalized
+    /// Weighted Euclidean distance: emphasises pitch (the strongest natural
+    /// discriminator between voices) and amplifies the small-scale ZCR
+    /// dimension so it isn't drowned out by larger features.
+    private func weightedDistance(_ a: [Float], _ b: [Float]) -> Float {
+        guard a.count == b.count, a.count <= featureWeights.count else { return .greatestFiniteMagnitude }
+        var sumSquares: Float = 0
+        for i in 0..<a.count {
+            let delta = (a[i] - b[i]) * featureWeights[i]
+            sumSquares += delta * delta
+        }
+        return sqrt(sumSquares)
     }
 }

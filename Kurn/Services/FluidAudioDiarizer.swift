@@ -73,6 +73,8 @@ actor FluidAudioDiarizer: Diarizing {
     /// the already-`Sendable` `[SpeakerTurn]` needs to cross the boundary.
     private func processAndMapTurns(url: URL) async throws -> [SpeakerTurn] {
         let result = try await manager.process(url)
+        let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
+        AppLog.transcription.log("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
         return Self.turns(from: result.segments)
     }
 
