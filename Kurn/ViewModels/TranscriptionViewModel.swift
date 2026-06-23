@@ -72,7 +72,7 @@ final class TranscriptionViewModel {
         guard !transcribingIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id
-        AppLog.transcription.log("VM: transcribe requested id=\(recordingID, privacy: .public) mode=\(mode.rawValue, privacy: .public)")
+        AppLog.transcription.notice("VM: transcribe requested id=\(recordingID, privacy: .public) mode=\(mode.rawValue, privacy: .public)")
 
         transcribingIDs.insert(recordingID)
         phases[recordingID] = .preparing
@@ -139,7 +139,7 @@ final class TranscriptionViewModel {
 
             ensureSpeakers(for: recording.meeting, labels: output.speakerLabels)
             persist()
-            AppLog.transcription.log("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
+            AppLog.transcription.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
         } catch let appError as AppError {
             recording.transcriptionStatus = .failed
             persist()
@@ -198,7 +198,7 @@ final class TranscriptionViewModel {
         }
 
         isSummarizing = true
-        AppLog.transcription.log("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
+        AppLog.transcription.notice("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
         do {
             let result = try await summaryService.generate(
                 transcriptText: transcriptText,
@@ -225,7 +225,7 @@ final class TranscriptionViewModel {
                 meeting.summary = summary
             }
             persist()
-            AppLog.transcription.log("VM: summary done")
+            AppLog.transcription.notice("VM: summary done")
         } catch let appError as AppError {
             error = appError
             AppLog.transcription.error("VM: summary failed (AppError): \(appError.errorDescription ?? "nil", privacy: .public)")

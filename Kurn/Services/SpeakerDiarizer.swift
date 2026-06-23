@@ -79,7 +79,7 @@ actor SpeakerDiarizer: Diarizing {
 
         let turns = assignSpeakers(to: regions)
         let uniqueSpeakers = Set(turns.map { $0.speakerLabel }).count
-        AppLog.transcription.log("SpeakerDiarizer: regions=\(regions.count, privacy: .public) turns=\(turns.count, privacy: .public) speakers=\(uniqueSpeakers, privacy: .public)")
+        AppLog.transcription.info("SpeakerDiarizer: regions=\(regions.count, privacy: .public) turns=\(turns.count, privacy: .public) speakers=\(uniqueSpeakers, privacy: .public)")
         return turns
     }
 

@@ -110,6 +110,9 @@ struct SettingsView: View {
             // MARK: Recording
             recordingSection(settings: settings)
 
+            // MARK: Diagnostics
+            diagnosticsSection(settings: settings)
+
             // MARK: Storage
             Section(NSLocalizedString("settings.storage", comment: "Storage")) {
                 LabeledContent(
@@ -322,6 +325,25 @@ struct SettingsView: View {
             Text(NSLocalizedString("settings.recording", comment: "Recording"))
         } footer: {
             Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
+        }
+    }
+
+    @ViewBuilder
+    private func diagnosticsSection(settings: AppSettings) -> some View {
+        Section {
+            Picker(
+                NSLocalizedString("settings.log_level", comment: "Logging level"),
+                selection: Binding(
+                    get: { settings.logLevel },
+                    set: { settings.logLevel = $0 }
+                )
+            ) {
+                ForEach(LogLevel.allCases) { Text($0.displayName).tag($0) }
+            }
+        } header: {
+            Text(NSLocalizedString("settings.diagnostics", comment: "Diagnostics"))
+        } footer: {
+            Text(NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels"))
         }
     }
 

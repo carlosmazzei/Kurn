@@ -28,10 +28,10 @@ actor AudioChunker {
     func chunk(url: URL) async throws -> [Chunk] {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         if Int64(size) <= Self.sizeThresholdBytes {
-            AppLog.transcription.log("chunk: \(size, privacy: .public) bytes <= threshold, single chunk")
+            AppLog.transcription.debug("chunk: \(size, privacy: .public) bytes <= threshold, single chunk")
             return [Chunk(url: url, offset: 0)]
         }
-        AppLog.transcription.log("chunk: \(size, privacy: .public) bytes > threshold, splitting…")
+        AppLog.transcription.debug("chunk: \(size, privacy: .public) bytes > threshold, splitting…")
 
         let asset = AVURLAsset(url: url)
         let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))

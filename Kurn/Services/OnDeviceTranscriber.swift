@@ -36,7 +36,7 @@ actor OnDeviceTranscriber {
             locale = Locale.current
         }
 
-        AppLog.transcription.log("onDevice: locale=\(locale.identifier, privacy: .public)")
+        AppLog.transcription.debug("onDevice: locale=\(locale.identifier, privacy: .public)")
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
             AppLog.transcription.error("onDevice: recognizer unavailable for locale")
             throw AppError.transcriptionFailed(
@@ -63,7 +63,7 @@ actor OnDeviceTranscriber {
         let durationSeconds = (try? await AVURLAsset(url: url).load(.duration))
             .map(CMTimeGetSeconds) ?? 0
         let timeout = max(60, durationSeconds * 4)
-        AppLog.transcription.log("onDevice: recognizing (clip=\(durationSeconds, privacy: .public)s, timeout=\(timeout, privacy: .public)s)")
+        AppLog.transcription.debug("onDevice: recognizing (clip=\(durationSeconds, privacy: .public)s, timeout=\(timeout, privacy: .public)s)")
 
         let spans: [TranscribedSpan] = try await withCheckedThrowingContinuation { continuation in
             // Guard against the continuation being resumed more than once: the

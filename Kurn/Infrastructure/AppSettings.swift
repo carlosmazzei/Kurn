@@ -27,6 +27,7 @@ final class AppSettings {
         static let diarizationEngine = "settings.diarizationEngine"
         static let fluidAudioASRModelsConsented = "settings.fluidAudioASRModelsConsented"
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
+        static let logLevel = "settings.logLevel"
     }
 
     private let defaults = UserDefaults.standard
@@ -83,6 +84,16 @@ final class AppSettings {
     /// models (independent of the ASR model consent above).
     var fluidAudioDiarizationModelsConsented: Bool {
         didSet { defaults.set(fluidAudioDiarizationModelsConsented, forKey: Keys.fluidAudioDiarizationModelsConsented) }
+    }
+
+    /// Minimum severity emitted by `AppLog`. Persisted here and pushed to
+    /// `AppLog.minimumLevel` so the choice survives relaunches. `.off` disables
+    /// all app logging.
+    var logLevel: LogLevel {
+        didSet {
+            defaults.set(logLevel.rawValue, forKey: Keys.logLevel)
+            AppLog.minimumLevel = logLevel
+        }
     }
 
     /// Per-provider chosen summary model (rawValue → model id).
@@ -190,6 +201,12 @@ final class AppSettings {
         ) ?? .heuristic
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
+        // Fall back to the environment-derived default (set on `AppLog` at
+        // launch) when the user hasn't chosen a level yet.
+        let resolvedLogLevel = (defaults.string(forKey: Keys.logLevel))
+            .flatMap(LogLevel.init(rawValue:)) ?? AppLog.minimumLevel
+        logLevel = resolvedLogLevel
+        AppLog.minimumLevel = resolvedLogLevel
         if let data = defaults.data(forKey: Keys.summaryModels),
            let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
             summaryModels = decoded

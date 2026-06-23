@@ -35,7 +35,7 @@ final class LiveTranscriptionService {
         isUnavailable = false
         partialText = ""
         defer { isLoading = false }
-        AppLog.transcription.log("LiveTranscriptionService: loading Parakeet EOU 160ms…")
+        AppLog.transcription.info("LiveTranscriptionService: loading Parakeet EOU 160ms…")
         let candidate = StreamingModelVariant.parakeetEou160ms.createManager()
         do {
             try await candidate.loadModels()
@@ -44,7 +44,7 @@ final class LiveTranscriptionService {
             isUnavailable = true
             return
         }
-        AppLog.transcription.log("LiveTranscriptionService: model loaded, activating live preview")
+        AppLog.transcription.notice("LiveTranscriptionService: model loaded, activating live preview")
         // Wire the callback BEFORE flipping `isActive`, so the very first
         // chunk processed after activation can update the UI. (Previously the
         // callback was set after, racing with `processBufferedAudio` callers

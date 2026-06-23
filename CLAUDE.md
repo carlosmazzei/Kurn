@@ -131,9 +131,14 @@ use `provider_<id>_api_key`.
 - **Localization:** user-facing strings use `NSLocalizedString`; the app ships
   English and Brazilian Portuguese (`Kurn/Resources/`). `displayName` on enums is the
   localization seam.
-- **Logging:** use `AppLog.<category>` (`os.Logger`, subsystem `ai.kurn.app`). It's
-  on by default; disable at launch with `KURN_LOG=0`. Mark interpolated values
-  `privacy:` explicitly.
+- **Logging:** use `AppLog.<category>` (subsystem `ai.kurn.app`), which wraps
+  `os.Logger` in a `CategoryLogger` that gates every message by `AppLog.minimumLevel`.
+  Pick the severity per call site — `.debug` for high-frequency/per-iteration traces,
+  `.info` for details (counts, formats, timings), `.notice` for lifecycle milestones,
+  `.error`/`.fault` for failures. The user controls the threshold in Settings
+  (persisted via `AppSettings.logLevel`); `.off` silences everything. The launch
+  default is `.notice`, overridable with `KURN_LOG_LEVEL=debug|info|notice|error|off`
+  or `KURN_LOG=0`. Mark interpolated values `privacy:` explicitly.
 - **Concurrency:** services are `Sendable` value types callable off the main actor;
   view models and anything touching SwiftData/UI are `@MainActor`. Preserve these
   boundaries when adding code.
