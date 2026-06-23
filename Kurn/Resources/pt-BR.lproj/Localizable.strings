@@ -88,6 +88,7 @@
 "phase.preparing" = "Preparando…";
 "phase.preprocessing" = "Limpando áudio…";
 "phase.transcribing" = "Transcrevendo…";
+"phase.transcribing_progress" = "Transcrevendo… %d%%";
 "phase.finalizing" = "Finalizando…";
 
 /* Formulário de reunião */

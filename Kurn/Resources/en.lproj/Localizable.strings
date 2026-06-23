@@ -88,6 +88,7 @@
 "phase.preparing" = "Preparing…";
 "phase.preprocessing" = "Cleaning audio…";
 "phase.transcribing" = "Transcribing…";
+"phase.transcribing_progress" = "Transcribing… %d%%";
 "phase.finalizing" = "Finalizing…";
 
 /* Meeting form */

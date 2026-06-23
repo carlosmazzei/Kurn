@@ -100,6 +100,14 @@ final class TranscriptionViewModel {
         let fileName = recording.fileName
         diarizationWarnings[recordingID] = nil
 
+        // Long transcriptions (especially the chunked Whisper path) would
+        // otherwise be aborted when the app is backgrounded and the system
+        // suspends it. Hold a background-task assertion for the duration so the
+        // work gets a finite grace window instead of being killed immediately.
+        let background = BackgroundActivity()
+        background.begin(name: "ai.kurn.transcription")
+        defer { background.end() }
+
         do {
             let output = try await transcriptionService.transcribe(
                 fileURL: fileURL,

@@ -44,7 +44,7 @@ struct TranscriptionService {
         language: MeetingLanguage,
         mode: TranscriptionMode,
         diarizationEngine: DiarizationEngine = .heuristic,
-        onPhase: PhaseHandler = { _ in },
+        onPhase: @escaping PhaseHandler = { _ in },
         onDiarizationWarning: DiarizationWarningHandler? = nil
     ) async throws -> Output {
         let started = Date()
@@ -73,10 +73,15 @@ struct TranscriptionService {
 
         // Transcription and diarization both read the same file but are
         // independent, so run them concurrently instead of back to back.
-        onPhase(.transcribing)
+        onPhase(.transcribing(progress: nil))
         AppLog.transcription.log("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
-        async let rawTranscript = transcribeRaw(fileURL: cleanedURL, language: language, mode: mode)
+        async let rawTranscript = transcribeRaw(
+            fileURL: cleanedURL,
+            language: language,
+            mode: mode,
+            onPhase: onPhase
+        )
         async let speakerTurns = diarize(
             url: cleanedURL,
             engine: diarizationEngine,
@@ -107,13 +112,14 @@ struct TranscriptionService {
     private func transcribeRaw(
         fileURL: URL,
         language: MeetingLanguage,
-        mode: TranscriptionMode
+        mode: TranscriptionMode,
+        onPhase: @escaping PhaseHandler
     ) async throws -> RawTranscript {
         switch mode {
         case .onDevice:
             return try await onDevice.transcribe(url: fileURL, language: language)
         case .whisperAPI:
-            return try await transcribeViaWhisper(fileURL: fileURL, language: language)
+            return try await transcribeViaWhisper(fileURL: fileURL, language: language, onPhase: onPhase)
         }
     }
 
@@ -142,19 +148,27 @@ struct TranscriptionService {
 
     private func transcribeViaWhisper(
         fileURL: URL,
-        language: MeetingLanguage
+        language: MeetingLanguage,
+        onPhase: @escaping PhaseHandler
     ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider()
         let chunks = try await chunker.chunk(url: fileURL)
-        AppLog.transcription.log("whisper: uploading \(chunks.count, privacy: .public) chunk(s)")
+        let total = chunks.count
+        AppLog.transcription.log("whisper: uploading \(total, privacy: .public) chunk(s)")
         defer { Task { await chunker.cleanup(chunks) } }
 
         var allSpans: [TranscribedSpan] = []
         var detectedLanguage = ""
 
         for (index, chunk) in chunks.enumerated() {
+            // Report progress before each upload so the UI advances as chunks
+            // complete. Only meaningful when split into several chunks; a single
+            // chunk stays indeterminate (nil) until it finishes.
+            if total > 1 {
+                onPhase(.transcribing(progress: Double(index) / Double(total)))
+            }
             let data = try Data(contentsOf: chunk.url)
-            AppLog.transcription.log("whisper: chunk \(index + 1, privacy: .public)/\(chunks.count, privacy: .public) (\(data.count, privacy: .public) bytes)")
+            AppLog.transcription.log("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
             let result = try await provider.transcribe(
                 audioData: data,
                 fileName: chunk.url.lastPathComponent,

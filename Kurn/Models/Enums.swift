@@ -18,10 +18,13 @@ enum TranscriptionStatus: String, Codable, Sendable {
 /// Fine-grained stage within an in-progress transcription, surfaced to the UI so
 /// the user can see what the app is currently doing (e.g. cleaning audio vs.
 /// transcribing). Reported by `TranscriptionService` as it advances.
-enum TranscriptionPhase: String, Sendable {
+enum TranscriptionPhase: Sendable, Equatable {
     case preparing
     case preprocessing
-    case transcribing
+    /// Active transcription. `progress` is a fraction in `0...1` when the engine
+    /// can report it (e.g. the chunked Whisper path), or `nil` when the stage is
+    /// indeterminate (e.g. a single on-device pass).
+    case transcribing(progress: Double?)
     case finalizing
 
     /// Short, user-facing description of the current stage.
@@ -29,7 +32,15 @@ enum TranscriptionPhase: String, Sendable {
         switch self {
         case .preparing: return NSLocalizedString("phase.preparing", comment: "Preparing")
         case .preprocessing: return NSLocalizedString("phase.preprocessing", comment: "Cleaning audio")
-        case .transcribing: return NSLocalizedString("phase.transcribing", comment: "Transcribing")
+        case .transcribing(let progress):
+            guard let progress else {
+                return NSLocalizedString("phase.transcribing", comment: "Transcribing")
+            }
+            let percent = Int((progress * 100).rounded())
+            return String(
+                format: NSLocalizedString("phase.transcribing_progress", comment: "Transcribing with percent"),
+                percent
+            )
         case .finalizing: return NSLocalizedString("phase.finalizing", comment: "Finalizing")
         }
     }
