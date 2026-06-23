@@ -169,6 +169,9 @@ struct MeetingDetailView: View {
             if txVM?.isTranscribing(recording) == true {
                 HStack(spacing: 6) {
                     ProgressView()
+                    // The percentage (when known) is carried in `displayName`;
+                    // `.circular` ProgressView ignores a determinate value on iOS,
+                    // so the text is what conveys progress here.
                     if let phase = txVM?.phase(for: recording) {
                         Text(phase.displayName).font(.caption).foregroundStyle(Theme.textSecondary)
                     }
