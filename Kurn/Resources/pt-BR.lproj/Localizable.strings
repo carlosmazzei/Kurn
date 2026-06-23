@@ -222,4 +222,5 @@
 "settings.model_download.title" = "Download Único de Modelo";
 "settings.model_download.message" = "Este recurso baixa um modelo local do FluidAudio na primeira vez que você o usar. O modelo fica em cache depois e novos downloads não são necessários.";
 "settings.model_download.allow" = "Permitir e Baixar";
+"settings.model_download.downloading" = "Baixando modelo…";
 "settings.fluid_audio.package_missing" = "Adicione o pacote Swift FluidAudio ao target Kurn antes de usar este recurso.";
