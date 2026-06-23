@@ -18,6 +18,8 @@ enum AppError: LocalizedError, Identifiable {
     case decodingError(String)
     case permissionDenied(String)
     case persistenceFailed(String)
+    case modelDownloadRequired(String)
+    case modelDownloadFailed(String)
 
     /// Stable identity so the value can drive `.alert(item:)`.
     var id: String { errorDescription ?? "AppError" }
@@ -62,6 +64,16 @@ enum AppError: LocalizedError, Identifiable {
         case .persistenceFailed(let detail):
             return String(
                 format: NSLocalizedString("error.persistence", comment: "Save failure"),
+                detail
+            )
+        case .modelDownloadRequired(let detail):
+            return String(
+                format: NSLocalizedString("error.model_download_required", comment: "Model download required"),
+                detail
+            )
+        case .modelDownloadFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.model_download_failed", comment: "Model download failed"),
                 detail
             )
         }

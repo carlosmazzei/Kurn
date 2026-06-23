@@ -23,6 +23,10 @@ final class AppSettings {
         static let summaryModels = "settings.summaryModels"
         static let summaryTemplates = "settings.summaryTemplates"
         static let lastSummaryTemplate = "settings.lastSummaryTemplate"
+        static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
+        static let diarizationEngine = "settings.diarizationEngine"
+        static let fluidAudioASRModelsConsented = "settings.fluidAudioASRModelsConsented"
+        static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
     }
 
     private let defaults = UserDefaults.standard
@@ -55,6 +59,30 @@ final class AppSettings {
     /// Recording audio quality (encoder bit rate). Defaults to high.
     var audioQuality: AudioQuality {
         didSet { defaults.set(audioQuality.rawValue, forKey: Keys.audioQuality) }
+    }
+
+    /// Opt-in live transcription preview during recording (FluidAudio streaming
+    /// ASR). Off by default; never replaces the post-recording transcript.
+    var liveTranscriptionEnabled: Bool {
+        didSet { defaults.set(liveTranscriptionEnabled, forKey: Keys.liveTranscriptionEnabled) }
+    }
+
+    /// Speaker diarization engine used by the transcription pipeline. Defaults
+    /// to the always-available heuristic engine.
+    var diarizationEngine: DiarizationEngine {
+        didSet { defaults.set(diarizationEngine.rawValue, forKey: Keys.diarizationEngine) }
+    }
+
+    /// Whether the user has consented to downloading FluidAudio's streaming ASR
+    /// models (independent of the diarization model consent below).
+    var fluidAudioASRModelsConsented: Bool {
+        didSet { defaults.set(fluidAudioASRModelsConsented, forKey: Keys.fluidAudioASRModelsConsented) }
+    }
+
+    /// Whether the user has consented to downloading FluidAudio's diarization
+    /// models (independent of the ASR model consent above).
+    var fluidAudioDiarizationModelsConsented: Bool {
+        didSet { defaults.set(fluidAudioDiarizationModelsConsented, forKey: Keys.fluidAudioDiarizationModelsConsented) }
     }
 
     /// Per-provider chosen summary model (rawValue → model id).
@@ -156,6 +184,12 @@ final class AppSettings {
         audioQuality = AudioQuality(
             rawValue: defaults.string(forKey: Keys.audioQuality) ?? ""
         ) ?? .high
+        liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
+        diarizationEngine = DiarizationEngine(
+            rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
+        ) ?? .heuristic
+        fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
+        fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
         if let data = defaults.data(forKey: Keys.summaryModels),
            let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
             summaryModels = decoded

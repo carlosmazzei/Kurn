@@ -22,6 +22,17 @@ struct SettingsView: View {
     /// Bumped after editing a key so the provider rows re-read keychain status.
     @State private var keyRevision = 0
 
+    @State private var showingASRConsent = false
+    @State private var showingDiarizationConsent = false
+    @State private var pendingDiarizationEngine: DiarizationEngine?
+    /// True while a consented FluidAudio model download is in flight, so the
+    /// toggle/picker can't be re-triggered mid-download.
+    @State private var isPreparingFluidAudioModels = false
+    /// Surfaced only if a consented download actually fails — the consent
+    /// flags themselves are set after success, so a failure leaves the
+    /// feature off and the consent alert available to retry.
+    @State private var modelDownloadError: AppError?
+
     var body: some View {
         @Bindable var settings = settings
 
@@ -54,41 +65,7 @@ struct SettingsView: View {
             }
 
             // MARK: Transcription
-            Section {
-                Picker(
-                    NSLocalizedString("settings.default_mode", comment: "Default mode"),
-                    selection: Binding(
-                        get: { settings.defaultMode },
-                        set: { mode in
-                            if mode != .whisperAPI || hasOpenAIAPIKey {
-                                settings.defaultMode = mode
-                            }
-                        }
-                    )
-                ) {
-                    ForEach(TranscriptionMode.allCases) { mode in
-                        Text(mode.displayName)
-                            .tag(mode)
-                            .disabled(mode == .whisperAPI && !hasOpenAIAPIKey)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Picker(
-                    NSLocalizedString("settings.default_language", comment: "Default language"),
-                    selection: $settings.defaultLanguage
-                ) {
-                    ForEach(MeetingLanguage.allCases) { Text($0.displayName).tag($0) }
-                }
-            } header: {
-                Text(NSLocalizedString("settings.transcription", comment: "Transcription"))
-            } footer: {
-                Text(NSLocalizedString(
-                    hasOpenAIAPIKey
-                        ? "settings.whisper_openai_key_footer"
-                        : "settings.whisper_openai_key_missing_footer",
-                    comment: "Whisper OpenAI key dependency"
-                ))
-            }
+            transcriptionSection(settings: settings)
 
             // MARK: Summary
             Section(NSLocalizedString("settings.summary", comment: "Summary")) {
@@ -131,24 +108,7 @@ struct SettingsView: View {
             }
 
             // MARK: Recording
-            Section {
-                Picker(
-                    NSLocalizedString("settings.mic_pickup", comment: "Microphone"),
-                    selection: $settings.micPickup
-                ) {
-                    ForEach(MicPickup.allCases) { Text($0.displayName).tag($0) }
-                }
-                Picker(
-                    NSLocalizedString("settings.audio_quality", comment: "Audio quality"),
-                    selection: $settings.audioQuality
-                ) {
-                    ForEach(AudioQuality.allCases) { Text($0.displayName).tag($0) }
-                }
-            } header: {
-                Text(NSLocalizedString("settings.recording", comment: "Recording"))
-            } footer: {
-                Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
-            }
+            recordingSection(settings: settings)
 
             // MARK: Storage
             Section(NSLocalizedString("settings.storage", comment: "Storage")) {
@@ -211,6 +171,158 @@ struct SettingsView: View {
         } message: {
             Text(NSLocalizedString("settings.delete_all.message", comment: ""))
         }
+        .modifier(ModelDownloadAlerts(
+            showingASRConsent: $showingASRConsent,
+            showingDiarizationConsent: $showingDiarizationConsent,
+            onConfirmASR: {
+                isPreparingFluidAudioModels = true
+                Task {
+                    do {
+                        try await ModelDownloadConsent.download(.liveTranscriptionASR)
+                        settings.fluidAudioASRModelsConsented = true
+                        settings.liveTranscriptionEnabled = true
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    isPreparingFluidAudioModels = false
+                }
+            },
+            onConfirmDiarization: {
+                guard let engine = pendingDiarizationEngine else { return }
+                pendingDiarizationEngine = nil
+                isPreparingFluidAudioModels = true
+                Task {
+                    do {
+                        try await ModelDownloadConsent.download(.diarization)
+                        settings.fluidAudioDiarizationModelsConsented = true
+                        settings.diarizationEngine = engine
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    isPreparingFluidAudioModels = false
+                }
+            },
+            onCancelDiarization: {
+                pendingDiarizationEngine = nil
+            }
+        ))
+        .alert(
+            NSLocalizedString("common.error", comment: "Error"),
+            isPresented: Binding(
+                get: { modelDownloadError != nil },
+                set: { if !$0 { modelDownloadError = nil } }
+            ),
+            presenting: modelDownloadError
+        ) { _ in
+            Button(NSLocalizedString("common.ok", comment: "OK"), role: .cancel) {}
+        } message: { error in
+            Text(error.errorDescription ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private func transcriptionSection(settings: AppSettings) -> some View {
+        Section {
+            Picker(
+                NSLocalizedString("settings.default_mode", comment: "Default mode"),
+                selection: Binding(
+                    get: { settings.defaultMode },
+                    set: { mode in
+                        if mode != .whisperAPI || hasOpenAIAPIKey {
+                            settings.defaultMode = mode
+                        }
+                    }
+                )
+            ) {
+                ForEach(TranscriptionMode.allCases) { mode in
+                    Text(mode.displayName)
+                        .tag(mode)
+                        .disabled(mode == .whisperAPI && !hasOpenAIAPIKey)
+                }
+            }
+            .pickerStyle(.segmented)
+            Picker(
+                NSLocalizedString("settings.default_language", comment: "Default language"),
+                selection: Binding(
+                    get: { settings.defaultLanguage },
+                    set: { settings.defaultLanguage = $0 }
+                )
+            ) {
+                ForEach(MeetingLanguage.allCases) { Text($0.displayName).tag($0) }
+            }
+            Picker(
+                NSLocalizedString("settings.diarization_engine", comment: "Diarization engine"),
+                selection: Binding(
+                    get: { settings.diarizationEngine },
+                    set: { engine in
+                        if engine == .fluidAudio && !settings.fluidAudioDiarizationModelsConsented {
+                            pendingDiarizationEngine = engine
+                            showingDiarizationConsent = true
+                        } else {
+                            settings.diarizationEngine = engine
+                        }
+                    }
+                )
+            ) {
+                ForEach(DiarizationEngine.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(isPreparingFluidAudioModels)
+        } header: {
+            Text(NSLocalizedString("settings.transcription", comment: "Transcription"))
+        } footer: {
+            Text(NSLocalizedString(
+                hasOpenAIAPIKey
+                    ? "settings.whisper_openai_key_footer"
+                    : "settings.whisper_openai_key_missing_footer",
+                comment: "Whisper OpenAI key dependency"
+            ))
+        }
+    }
+
+    @ViewBuilder
+    private func recordingSection(settings: AppSettings) -> some View {
+        Section {
+            Picker(
+                NSLocalizedString("settings.mic_pickup", comment: "Microphone"),
+                selection: Binding(
+                    get: { settings.micPickup },
+                    set: { settings.micPickup = $0 }
+                )
+            ) {
+                ForEach(MicPickup.allCases) { Text($0.displayName).tag($0) }
+            }
+            Picker(
+                NSLocalizedString("settings.audio_quality", comment: "Audio quality"),
+                selection: Binding(
+                    get: { settings.audioQuality },
+                    set: { settings.audioQuality = $0 }
+                )
+            ) {
+                ForEach(AudioQuality.allCases) { Text($0.displayName).tag($0) }
+            }
+            Toggle(
+                NSLocalizedString("settings.live_transcription", comment: "Live transcription"),
+                isOn: Binding(
+                    get: { settings.liveTranscriptionEnabled },
+                    set: { enabled in
+                        if enabled && !settings.fluidAudioASRModelsConsented {
+                            showingASRConsent = true
+                        } else {
+                            settings.liveTranscriptionEnabled = enabled
+                        }
+                    }
+                )
+            )
+            .disabled(isPreparingFluidAudioModels)
+        } header: {
+            Text(NSLocalizedString("settings.recording", comment: "Recording"))
+        } footer: {
+            Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
+        }
     }
 
     private func refreshStorage() {
@@ -248,6 +360,37 @@ struct SettingsView: View {
         if !hasOpenAIAPIKey && settings.defaultMode == .whisperAPI {
             settings.defaultMode = .onDevice
         }
+    }
+}
+
+/// Consent alerts shown before the first FluidAudio model download for a given feature.
+private struct ModelDownloadAlerts: ViewModifier {
+    @Binding var showingASRConsent: Bool
+    @Binding var showingDiarizationConsent: Bool
+    let onConfirmASR: () -> Void
+    let onConfirmDiarization: () -> Void
+    let onCancelDiarization: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+                isPresented: $showingASRConsent
+            ) {
+                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmASR)
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message", comment: ""))
+            }
+            .alert(
+                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+                isPresented: $showingDiarizationConsent
+            ) {
+                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmDiarization)
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelDiarization)
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message", comment: ""))
+            }
     }
 }
 

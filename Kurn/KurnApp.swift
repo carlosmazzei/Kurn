@@ -33,6 +33,9 @@ struct KurnApp: App {
 
     init() {
         PhoneSessionController.shared.activate()
+        // Clean up after a process that died mid-recording (orphaned Live
+        // Activity + an unsaved audio file with no matching `Recording` row).
+        RecordingRecovery.recoverOrphans(modelContainer: modelContainer)
     }
 
     var body: some Scene {

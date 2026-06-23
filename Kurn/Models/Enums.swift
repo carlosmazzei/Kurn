@@ -93,6 +93,23 @@ enum TranscriptionMode: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// Speaker diarization engine used when transcribing a recording.
+enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Pitch/ZCR/spectral-tilt clustering, always available, no downloads.
+    case heuristic
+    /// FluidAudio's on-device diarization models (downloaded on first use).
+    case fluidAudio
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .heuristic: return NSLocalizedString("diarization.heuristic", comment: "Heuristic")
+        case .fluidAudio: return NSLocalizedString("diarization.fluid_audio", comment: "FluidAudio")
+        }
+    }
+}
+
 /// API shape a configured LLM provider speaks.
 enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
     case openAICompatible

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2AA9E32D2FEA18F40067BF88 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 2AA9E32C2FEA18F40067BF88 /* FluidAudio */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA3000000000000000000131 /* KurnWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA30000000000000000000A1 /* KurnWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -103,6 +104,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2AA9E32D2FEA18F40067BF88 /* FluidAudio in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +132,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2AA9E32B2FEA18F40067BF88 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		AA0000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
@@ -137,6 +146,7 @@
 				AA10000000000000000000C1 /* KurnLiveActivityExtension */,
 				AA30000000000000000000C1 /* KurnWatch */,
 				AA20000000000000000000C1 /* KurnTests */,
+				2AA9E32B2FEA18F40067BF88 /* Frameworks */,
 				AA0000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -275,6 +285,9 @@
 				"pt-BR",
 			);
 			mainGroup = AA0000000000000000000001;
+			packageReferences = (
+				2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+			);
 			productRefGroup = AA0000000000000000000002 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -503,6 +516,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Kurn/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -527,6 +541,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Kurn/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -724,6 +739,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				kind = versionRange;
+				maximumVersion = 0.15.4;
+				minimumVersion = 0.12.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2AA9E32C2FEA18F40067BF88 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AA0000000000000000000003 /* Project object */;
 }

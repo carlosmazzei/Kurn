@@ -38,12 +38,12 @@ struct SummaryTemplateTests {
         #expect(!prompt.contains("Organize the summary into sections"))
     }
 
-    @Test func defaultTemplatesIncludeGeneralStandupInterview() {
+    @Test func defaultTemplatesIncludeGeneralStandupInterview() throws {
         let ids = SummaryTemplate.defaultTemplates.map(\.id)
         #expect(ids.contains("general"))
         #expect(ids.contains("standup"))
         #expect(ids.contains("interview"))
-        #expect(SummaryTemplate.defaultTemplates.allSatisfy(\.isBuiltIn))
+        try #expect(SummaryTemplate.defaultTemplates.allSatisfy(\.isBuiltIn))
     }
 
     @Test func customTemplateIsNotBuiltInAndUsesGivenName() {

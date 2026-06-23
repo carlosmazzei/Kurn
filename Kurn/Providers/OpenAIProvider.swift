@@ -37,6 +37,11 @@ struct OpenAIProvider: LLMProvider {
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // URLSession.shared's default (60s) is tuned for small JSON calls, not a
+        // multi-MB audio upload plus Whisper's server-side processing time —
+        // AudioChunker caps chunks at 10 minutes of audio, and transcribing that
+        // alone can take longer than 60s under load. 300s leaves comfortable headroom.
+        request.timeoutInterval = 300
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(
             "multipart/form-data; boundary=\(boundary)",
