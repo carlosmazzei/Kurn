@@ -121,7 +121,9 @@ The watchOS target does **not** share source files with the app — types like
 `UserDefaults`, persisting on `didSet`. **API keys never go here** — they live in the
 Keychain via `KeychainManager`, keyed by `AIProvider.keychainAccount`. Built-in
 providers keep a `legacyKeychainAccount` for backward compatibility; custom providers
-use `provider_<id>_api_key`.
+use `provider_<id>_api_key`. A few preferences also mirror to non-persistent global
+state in their `didSet` — e.g. `logLevel` pushes to `AppLog.minimumLevel` so the
+logging gate reflects the user's choice immediately (also synced once on init).
 
 ## Conventions
 
