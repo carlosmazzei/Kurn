@@ -21,9 +21,18 @@ enum RecordingRecovery {
     /// `RecordingActivityAttributes` activity still running is by definition
     /// orphaned.
     static func recoverOrphans(modelContainer: ModelContainer) {
-        Task {
-            for activity in Activity<RecordingActivityAttributes>.activities {
-                await activity.end(nil, dismissalPolicy: .immediate)
+        // Snapshot the activities synchronously, here at launch, BEFORE any
+        // recording UI exists. Anything running now is by definition orphaned.
+        // Ending happens asynchronously, so reading `.activities` inside the
+        // Task instead could race a brand-new Live Activity started moments
+        // after launch and tear it right back down. Only the launch-time
+        // snapshot is touched.
+        let orphaned = Activity<RecordingActivityAttributes>.activities
+        if !orphaned.isEmpty {
+            Task {
+                for activity in orphaned {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
             }
         }
         recoverOrphanedAudioFiles(modelContainer: modelContainer)
