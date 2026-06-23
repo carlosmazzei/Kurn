@@ -20,6 +20,7 @@ import FluidAudio
 final class LiveTranscriptionService {
     private(set) var partialText = ""
     private(set) var isActive = false
+    private(set) var isLoading = false
     private(set) var isUnavailable = false
 
     private var engine: (any StreamingAsrManager)?
@@ -29,7 +30,12 @@ final class LiveTranscriptionService {
     private let inFlight = InFlightGate()
 
     func start() async {
-        guard engine == nil else { return }
+        guard engine == nil, !isLoading else { return }
+        isLoading = true
+        isUnavailable = false
+        partialText = ""
+        defer { isLoading = false }
+        AppLog.transcription.log("LiveTranscriptionService: loading Parakeet EOU 160ms…")
         let candidate = StreamingModelVariant.parakeetEou160ms.createManager()
         do {
             try await candidate.loadModels()
@@ -38,15 +44,16 @@ final class LiveTranscriptionService {
             isUnavailable = true
             return
         }
-        // Assign state before wiring the callback so any callback invocation,
-        // however unlikely, never observes `isActive == false` with text ready.
-        engine = candidate
-        isActive = true
-        isUnavailable = false
-        partialText = ""
+        AppLog.transcription.log("LiveTranscriptionService: model loaded, activating live preview")
+        // Wire the callback BEFORE flipping `isActive`, so the very first
+        // chunk processed after activation can update the UI. (Previously the
+        // callback was set after, racing with `processBufferedAudio` callers
+        // and occasionally dropping the first partial emission.)
         await candidate.setPartialTranscriptCallback { [weak self] text in
             Task { @MainActor in self?.partialText = text }
         }
+        engine = candidate
+        isActive = true
     }
 
     /// Called from the audio render thread via `AudioRecorderService.onAudioBuffer`.
@@ -70,7 +77,12 @@ final class LiveTranscriptionService {
     }
 
     func stop() async {
-        guard let engine else { return }
+        guard let engine else {
+            isActive = false
+            isLoading = false
+            partialText = ""
+            return
+        }
         do {
             _ = try await engine.finish()
         } catch {
@@ -79,6 +91,7 @@ final class LiveTranscriptionService {
         await engine.cleanup()
         self.engine = nil
         isActive = false
+        isLoading = false
         partialText = ""
     }
 
@@ -147,6 +160,7 @@ private final class InFlightGate: @unchecked Sendable {
 final class LiveTranscriptionService {
     private(set) var partialText = ""
     private(set) var isActive = false
+    private(set) var isLoading = false
     private(set) var isUnavailable = false
 
     func start() async {
@@ -157,6 +171,7 @@ final class LiveTranscriptionService {
 
     func stop() async {
         isActive = false
+        isLoading = false
         partialText = ""
     }
 }

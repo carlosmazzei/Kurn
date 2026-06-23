@@ -53,6 +53,8 @@
 "recorder.permission.title" = "Acesso ao Microfone Necessário";
 "recorder.permission.message" = "O Kurn precisa do microfone para gravar reuniões. Ative o acesso nos Ajustes.";
 "recorder.live_listening" = "Ouvindo…";
+"recorder.live_loading" = "Preparando transcrição em tempo real…";
+"recorder.live_unavailable" = "Transcrição em tempo real indisponível.";
 
 /* Reuniões */
 "meeting.default_title" = "Reunião – %@";

@@ -184,19 +184,35 @@ private struct RecorderContent: View {
 
     @ViewBuilder
     private var liveTranscriptArea: some View {
-        if vm.isLiveTranscriptionActive {
+        if vm.isLiveTranscriptionRequested {
             ScrollView {
-                Text(vm.livePartialText.isEmpty
-                     ? NSLocalizedString("recorder.live_listening", comment: "Listening…")
-                     : vm.livePartialText)
+                Text(liveTranscriptText)
                     .font(.system(size: 15))
-                    .foregroundStyle(vm.livePartialText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.85))
+                    .foregroundStyle(liveTranscriptColor)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
             }
             .frame(maxHeight: 90)
             .padding(.top, 16)
         }
+    }
+
+    private var liveTranscriptText: String {
+        if vm.isLiveTranscriptionUnavailable {
+            return NSLocalizedString("recorder.live_unavailable", comment: "Live transcription unavailable")
+        }
+        if vm.isLiveTranscriptionLoading {
+            return NSLocalizedString("recorder.live_loading", comment: "Preparing live transcription")
+        }
+        if !vm.livePartialText.isEmpty {
+            return vm.livePartialText
+        }
+        return NSLocalizedString("recorder.live_listening", comment: "Listening…")
+    }
+
+    private var liveTranscriptColor: Color {
+        if vm.isLiveTranscriptionUnavailable { return Theme.warning }
+        return vm.livePartialText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.85)
     }
 
     @ViewBuilder

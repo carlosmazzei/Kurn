@@ -63,6 +63,12 @@ final class RecorderViewModel {
 
     var livePartialText: String { liveTranscription.partialText }
     var isLiveTranscriptionActive: Bool { liveTranscription.isActive }
+    var isLiveTranscriptionLoading: Bool { liveTranscription.isLoading }
+    var isLiveTranscriptionUnavailable: Bool { liveTranscription.isUnavailable }
+    /// True whenever the recorder was launched with the live preview enabled —
+    /// drives whether the UI reserves space for the preview area (loading,
+    /// listening, or unavailable messages) even before models finish loading.
+    var isLiveTranscriptionRequested: Bool { liveTranscriptionEnabled }
 
     private func pushWatchState(state: AudioRecorderService.State, elapsed: TimeInterval) {
         PhoneSessionController.shared.pushState(
@@ -94,11 +100,15 @@ final class RecorderViewModel {
             permissionDenied = true
             return
         }
+        // Load the streaming ASR model in parallel with the audio engine
+        // spin-up so the first usable buffer arrives at an already-loaded
+        // engine instead of being dropped while we wait on model I/O.
+        let liveStartTask: Task<Void, Never>? = liveTranscriptionEnabled
+            ? Task { @MainActor [weak self] in await self?.liveTranscription.start() }
+            : nil
         do {
             try await recorder.start(meetingID: meeting.id)
-            if liveTranscriptionEnabled {
-                await liveTranscription.start()
-            }
+            await liveStartTask?.value
             lockScreenController.start(
                 title: meeting.title,
                 state: recorder.state,
@@ -113,9 +123,13 @@ final class RecorderViewModel {
             AppLog.recorderUI.log("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
         } catch let appError as AppError {
             AppLog.recorderUI.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
+            await liveStartTask?.value
+            if liveTranscriptionEnabled { await liveTranscription.stop() }
             error = appError
         } catch {
             AppLog.recorderUI.error("startRecording: error: \(error.localizedDescription, privacy: .public)")
+            await liveStartTask?.value
+            if liveTranscriptionEnabled { await liveTranscription.stop() }
             self.error = .audioError(error.localizedDescription)
         }
     }
