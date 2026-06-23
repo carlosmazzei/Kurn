@@ -108,7 +108,12 @@ final class RecorderViewModel {
             : nil
         do {
             try await recorder.start(meetingID: meeting.id)
-            await liveStartTask?.value
+            // Bring up the Live Activity / Dynamic Island the instant the
+            // recorder is running, BEFORE awaiting the optional live-transcription
+            // model warmup. `loadModels()` can take several seconds on first run
+            // (or stall/fail), and the Lock Screen widget must never be held
+            // hostage to it — otherwise it appears late or, if the load hangs,
+            // never at all.
             lockScreenController.start(
                 title: meeting.title,
                 state: recorder.state,
@@ -120,6 +125,7 @@ final class RecorderViewModel {
                 onResume: { [weak self] in self?.recorder.resume() },
                 onStop: { [weak self] in self?.stopAndSave() }
             )
+            await liveStartTask?.value
             AppLog.recorderUI.log("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
         } catch let appError as AppError {
             AppLog.recorderUI.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
