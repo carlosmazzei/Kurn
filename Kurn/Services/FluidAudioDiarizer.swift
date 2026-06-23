@@ -21,10 +21,26 @@ actor FluidAudioDiarizer: Diarizing {
     // isolation boundary. `manager` is a `let` never exposed outside this actor,
     // so there's no real aliasing risk — `nonisolated(unsafe)` matches the same
     // pattern already used for `LockScreenRecordingController.activity`.
-    private nonisolated(unsafe) let manager = OfflineDiarizerManager()
+    private nonisolated(unsafe) let manager = OfflineDiarizerManager(config: Self.tunedConfig)
     private var modelsReady = false
     private let prepareTimeout: TimeInterval = 60
     private let processTimeout: TimeInterval = 120
+
+    /// Override of `OfflineDiarizerConfig.default` that swaps the VBx warm-start
+    /// priors. The community defaults (Fa=0.07, Fb=0.8) consistently collapse
+    /// multi-speaker AHC results into a single cluster on our recordings (the
+    /// VBx mixture weights go to ~1e-20 for everything but one), even when
+    /// segmentation and AHC both clearly find multiple speakers. The values
+    /// here are the BUT-VBx literature defaults (DIHARD/AMI): Fa=0.4 gives the
+    /// acoustic likelihood more weight, and Fb=11 makes the Dirichlet prior
+    /// far less concentrated so VBx preserves the cluster count it was given
+    /// instead of collapsing to one.
+    private static let tunedConfig: OfflineDiarizerConfig = {
+        var config = OfflineDiarizerConfig.default
+        config.clustering.warmStartFa = 0.4
+        config.clustering.warmStartFb = 11
+        return config
+    }()
 
     func diarize(url: URL) async -> [SpeakerTurn] {
         await diarize(url: url, onDownloadFailure: nil)
@@ -73,6 +89,8 @@ actor FluidAudioDiarizer: Diarizing {
     /// the already-`Sendable` `[SpeakerTurn]` needs to cross the boundary.
     private func processAndMapTurns(url: URL) async throws -> [SpeakerTurn] {
         let result = try await manager.process(url)
+        let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
+        AppLog.transcription.log("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
         return Self.turns(from: result.segments)
     }
 
