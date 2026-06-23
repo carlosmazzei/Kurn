@@ -16,7 +16,12 @@ import Foundation
 import FluidAudio
 
 actor FluidAudioDiarizer: Diarizing {
-    private let manager = OfflineDiarizerManager()
+    // `OfflineDiarizerManager` isn't `Sendable`, and calling its `async` methods
+    // from inside this actor makes the compiler treat each call as crossing an
+    // isolation boundary. `manager` is a `let` never exposed outside this actor,
+    // so there's no real aliasing risk — `nonisolated(unsafe)` matches the same
+    // pattern already used for `LockScreenRecordingController.activity`.
+    private nonisolated(unsafe) let manager = OfflineDiarizerManager()
     private var modelsReady = false
     private let prepareTimeout: TimeInterval = 60
     private let processTimeout: TimeInterval = 120
@@ -33,7 +38,7 @@ actor FluidAudioDiarizer: Diarizing {
         if !modelsReady {
             do {
                 try await Self.withTimeout(seconds: prepareTimeout) {
-                    try await self.manager.prepareModels()
+                    try await self.prepareModels()
                 }
                 modelsReady = true
             } catch {
@@ -43,10 +48,9 @@ actor FluidAudioDiarizer: Diarizing {
             }
         }
         do {
-            let result = try await Self.withTimeout(seconds: processTimeout) {
-                try await self.manager.process(url)
+            return try await Self.withTimeout(seconds: processTimeout) {
+                try await self.processAndMapTurns(url: url)
             }
-            return Self.turns(from: result.segments)
         } catch {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
@@ -54,6 +58,22 @@ actor FluidAudioDiarizer: Diarizing {
             AppLog.transcription.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
             return [Self.fallbackTurn(for: url)]
         }
+    }
+
+    /// Isolated so the non-`Sendable` `manager` never has to cross out of this
+    /// actor — `withTimeout`'s race runs this as a child task, but the task
+    /// only ever touches `self` (an actor, hence `Sendable`), never `manager`
+    /// directly.
+    private func prepareModels() async throws {
+        try await manager.prepareModels()
+    }
+
+    /// Same isolation reasoning as `prepareModels()`, and also keeps
+    /// FluidAudio's own result type from having to satisfy `Sendable` — only
+    /// the already-`Sendable` `[SpeakerTurn]` needs to cross the boundary.
+    private func processAndMapTurns(url: URL) async throws -> [SpeakerTurn] {
+        let result = try await manager.process(url)
+        return Self.turns(from: result.segments)
     }
 
     /// Map FluidAudio's `speakerId` strings to the same "Speaker N" (1-indexed,

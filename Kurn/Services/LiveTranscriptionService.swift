@@ -59,8 +59,12 @@ final class LiveTranscriptionService {
             inFlight.release()
             return
         }
+        // AVAudioPCMBuffer isn't Sendable; box it so the compiler doesn't have
+        // to prove this freshly-allocated, never-aliased copy is safe to hand
+        // off to the Task below.
+        let box = UncheckedBufferBox(buffer: copy)
         Task { @MainActor [weak self] in
-            await self?.process(copy)
+            await self?.process(box.buffer)
             self?.inFlight.release()
         }
     }
@@ -78,7 +82,7 @@ final class LiveTranscriptionService {
         partialText = ""
     }
 
-    private func process(_ buffer: AVAudioPCMBuffer) async {
+    private func process(_ buffer: sending AVAudioPCMBuffer) async {
         guard let engine, isActive else { return }
         do {
             try await engine.appendAudio(buffer)
@@ -89,7 +93,9 @@ final class LiveTranscriptionService {
         }
     }
 
-    private static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+    /// Pure transform with no actor state — `nonisolated` so `append` (called
+    /// from the audio render thread) can use it without hopping to the main actor.
+    private nonisolated static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
         guard let copy = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameCapacity) else {
             return nil
         }
@@ -104,6 +110,13 @@ final class LiveTranscriptionService {
         }
         return copy
     }
+}
+
+/// Carries a freshly-copied, never-aliased `AVAudioPCMBuffer` across the
+/// `append` → `Task` handoff without requiring `AVAudioPCMBuffer` itself to
+/// be `Sendable`.
+private struct UncheckedBufferBox: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
 }
 
 /// Lock-protected single-slot in-flight flag, safe to call from the audio
