@@ -90,7 +90,7 @@ actor FluidAudioDiarizer: Diarizing {
     private func processAndMapTurns(url: URL) async throws -> [SpeakerTurn] {
         let result = try await manager.process(url)
         let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
-        AppLog.transcription.log("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
+        AppLog.transcription.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
         return Self.turns(from: result.segments)
     }
 

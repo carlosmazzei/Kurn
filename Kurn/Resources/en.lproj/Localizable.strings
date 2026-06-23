@@ -203,6 +203,14 @@
 "settings.mic_pickup_footer" = "Whole room captures everyone (omnidirectional); Focus on speaker favours the person in front (directional). Only affects the built-in mic.";
 "micpickup.whole_room" = "Whole room";
 "micpickup.focus_speaker" = "Focus on speaker";
+"settings.diagnostics" = "Diagnostics";
+"settings.log_level" = "Logging";
+"settings.log_level_footer" = "Controls how much detail the app writes to the system log (Console.app, subsystem ai.kurn.app). Off disables logging entirely; Verbose includes high-frequency traces useful when reporting a bug.";
+"log_level.off" = "Off";
+"log_level.error" = "Errors only";
+"log_level.notice" = "Standard";
+"log_level.info" = "Detailed";
+"log_level.debug" = "Verbose";
 "settings.storage" = "Storage";
 "settings.audio_quality" = "Audio quality";
 "settings.audio_usage" = "Audio Files";

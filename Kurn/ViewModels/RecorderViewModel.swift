@@ -93,7 +93,7 @@ final class RecorderViewModel {
 
     /// Request permission (if needed) and begin recording.
     func startRecording() async {
-        AppLog.recorderUI.log("startRecording: begin, requesting permission")
+        AppLog.recorderUI.notice("startRecording: begin, requesting permission")
         let granted = await recorder.requestMicrophonePermission()
         guard granted else {
             AppLog.recorderUI.error("startRecording: permission denied")
@@ -126,7 +126,7 @@ final class RecorderViewModel {
                 onStop: { [weak self] in self?.stopAndSave() }
             )
             await liveStartTask?.value
-            AppLog.recorderUI.log("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
+            AppLog.recorderUI.info("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
         } catch let appError as AppError {
             AppLog.recorderUI.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
             await liveStartTask?.value
@@ -141,7 +141,7 @@ final class RecorderViewModel {
     }
 
     func togglePause() {
-        AppLog.recorderUI.log("togglePause: state=\(String(describing: self.recorder.state), privacy: .public)")
+        AppLog.recorderUI.info("togglePause: state=\(String(describing: self.recorder.state), privacy: .public)")
         switch recorder.state {
         case .recording: recorder.pause()
         case .paused: recorder.resume()
@@ -151,7 +151,7 @@ final class RecorderViewModel {
 
     /// Stop, save the segment to SwiftData, and flag completion.
     func stopAndSave() {
-        AppLog.recorderUI.log("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
+        AppLog.recorderUI.notice("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
         if liveTranscriptionEnabled { Task { await liveTranscription.stop() } }
         guard let result = recorder.stop() else {
             lockScreenController.end()

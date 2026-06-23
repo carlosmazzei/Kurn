@@ -31,10 +31,10 @@ final class BackgroundActivity {
         taskID = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             // The system is about to reclaim the time; release it cleanly so it
             // doesn't kill the app for overrunning.
-            AppLog.transcription.log("background activity expired: \(name, privacy: .public)")
+            AppLog.transcription.notice("background activity expired: \(name, privacy: .public)")
             self?.end()
         }
-        AppLog.transcription.log("background activity begin: \(name, privacy: .public)")
+        AppLog.transcription.debug("background activity begin: \(name, privacy: .public)")
         #endif
     }
 

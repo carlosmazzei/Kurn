@@ -32,7 +32,7 @@ struct RecorderView: View {
         }
         .onAppear {
             if vm == nil {
-                AppLog.recorderUI.log("RecorderView.onAppear: creating view model")
+                AppLog.recorderUI.debug("RecorderView.onAppear: creating view model")
                 vm = RecorderViewModel(
                     meeting: meeting,
                     modelContext: modelContext,
@@ -92,7 +92,7 @@ private struct RecorderContent: View {
         .task {
             // The recorder spins up its audio engine off the main actor, so this
             // does not block the sheet's present animation.
-            AppLog.recorderUI.log("RecorderContent.task: starting recording")
+            AppLog.recorderUI.notice("RecorderContent.task: starting recording")
             await vm.startRecording()
         }
         .alert(
@@ -242,7 +242,7 @@ private struct RecorderContent: View {
         HStack(spacing: 14) {
             // Pause / resume.
             Button {
-                AppLog.recorderUI.log("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
+                AppLog.recorderUI.info("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.togglePause()
             } label: {
                 pillLabel(
@@ -259,7 +259,7 @@ private struct RecorderContent: View {
 
             // Stop & save.
             Button {
-                AppLog.recorderUI.log("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
+                AppLog.recorderUI.info("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.stopAndSave()
             } label: {
                 pillLabel(

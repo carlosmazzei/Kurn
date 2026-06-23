@@ -87,7 +87,7 @@ enum RecordingRecovery {
         }
         let recording = Recording(meeting: meeting, fileName: fileName, duration: duration)
         context.insert(recording)
-        AppLog.recorder.log(
+        AppLog.recorder.notice(
             "recovery: reattached orphaned recording \(fileName, privacy: .public) duration=\(duration, privacy: .public)s"
         )
         return true
