@@ -25,9 +25,10 @@ struct SettingsView: View {
     @State private var showingASRConsent = false
     @State private var showingDiarizationConsent = false
     @State private var pendingDiarizationEngine: DiarizationEngine?
-    /// True while a consented FluidAudio model download is in flight, so the
-    /// toggle/picker can't be re-triggered mid-download.
-    @State private var isPreparingFluidAudioModels = false
+    /// Which FluidAudio model set is currently downloading (`nil` when idle), so
+    /// the toggle/picker can't be re-triggered mid-download and the matching
+    /// section can surface a progress indicator.
+    @State private var downloadingModel: ModelSet?
     /// Surfaced only if a consented download actually fails — the consent
     /// flags themselves are set after success, so a failure leaves the
     /// feature off and the consent alert available to retry.
@@ -178,8 +179,13 @@ struct SettingsView: View {
             showingASRConsent: $showingASRConsent,
             showingDiarizationConsent: $showingDiarizationConsent,
             onConfirmASR: {
-                isPreparingFluidAudioModels = true
+                downloadingModel = .liveTranscriptionASR
                 Task {
+                    // Keep a finite background window so the download isn't
+                    // aborted the moment Settings leaves the foreground.
+                    let background = BackgroundActivity()
+                    background.begin(name: "ai.kurn.modelDownload")
+                    defer { background.end() }
                     do {
                         try await ModelDownloadConsent.download(.liveTranscriptionASR)
                         settings.fluidAudioASRModelsConsented = true
@@ -189,14 +195,19 @@ struct SettingsView: View {
                     } catch {
                         modelDownloadError = .modelDownloadFailed(error.localizedDescription)
                     }
-                    isPreparingFluidAudioModels = false
+                    downloadingModel = nil
                 }
             },
             onConfirmDiarization: {
                 guard let engine = pendingDiarizationEngine else { return }
                 pendingDiarizationEngine = nil
-                isPreparingFluidAudioModels = true
+                downloadingModel = .diarization
                 Task {
+                    // Keep a finite background window so the download isn't
+                    // aborted the moment Settings leaves the foreground.
+                    let background = BackgroundActivity()
+                    background.begin(name: "ai.kurn.modelDownload")
+                    defer { background.end() }
                     do {
                         try await ModelDownloadConsent.download(.diarization)
                         settings.fluidAudioDiarizationModelsConsented = true
@@ -206,7 +217,7 @@ struct SettingsView: View {
                     } catch {
                         modelDownloadError = .modelDownloadFailed(error.localizedDescription)
                     }
-                    isPreparingFluidAudioModels = false
+                    downloadingModel = nil
                 }
             },
             onCancelDiarization: {
@@ -273,7 +284,10 @@ struct SettingsView: View {
             ) {
                 ForEach(DiarizationEngine.allCases) { Text($0.displayName).tag($0) }
             }
-            .disabled(isPreparingFluidAudioModels)
+            .disabled(downloadingModel != nil)
+            if downloadingModel == .diarization {
+                modelDownloadProgressRow
+            }
         } header: {
             Text(NSLocalizedString("settings.transcription", comment: "Transcription"))
         } footer: {
@@ -320,7 +334,10 @@ struct SettingsView: View {
                     }
                 )
             )
-            .disabled(isPreparingFluidAudioModels)
+            .disabled(downloadingModel != nil)
+            if downloadingModel == .liveTranscriptionASR {
+                modelDownloadProgressRow
+            }
         } header: {
             Text(NSLocalizedString("settings.recording", comment: "Recording"))
         } footer: {
@@ -344,6 +361,17 @@ struct SettingsView: View {
             Text(NSLocalizedString("settings.diagnostics", comment: "Diagnostics"))
         } footer: {
             Text(NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels"))
+        }
+    }
+
+    /// Indeterminate download indicator shown while a FluidAudio model set is
+    /// being fetched. FluidAudio's high-level download API doesn't expose byte
+    /// progress, so this is intentionally indeterminate.
+    private var modelDownloadProgressRow: some View {
+        HStack {
+            ProgressView()
+            Text(NSLocalizedString("settings.model_download.downloading", comment: "Downloading model"))
+                .foregroundStyle(Theme.textSecondary)
         }
     }
 
