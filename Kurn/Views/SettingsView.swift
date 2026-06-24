@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var keyRevision = 0
 
     @State private var showingASRConsent = false
+    @State private var showingBatchASRConsent = false
     @State private var showingDiarizationConsent = false
     @State private var pendingDiarizationEngine: DiarizationEngine?
     /// Which FluidAudio model set is currently downloading (`nil` when idle), so
@@ -177,6 +178,7 @@ struct SettingsView: View {
         }
         .modifier(ModelDownloadAlerts(
             showingASRConsent: $showingASRConsent,
+            showingBatchASRConsent: $showingBatchASRConsent,
             showingDiarizationConsent: $showingDiarizationConsent,
             onConfirmASR: {
                 downloadingModel = .liveTranscriptionASR
@@ -190,6 +192,25 @@ struct SettingsView: View {
                         try await ModelDownloadConsent.download(.liveTranscriptionASR)
                         settings.fluidAudioASRModelsConsented = true
                         settings.liveTranscriptionEnabled = true
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    downloadingModel = nil
+                }
+            },
+            onConfirmBatchASR: {
+                downloadingModel = .onDeviceASR
+                Task {
+                    // Keep a finite background window so the download isn't
+                    // aborted the moment Settings leaves the foreground.
+                    let background = BackgroundActivity()
+                    background.begin(name: "ai.kurn.modelDownload")
+                    defer { background.end() }
+                    do {
+                        try await ModelDownloadConsent.download(.onDeviceASR)
+                        settings.fluidAudioBatchASRModelsConsented = true
                     } catch let appError as AppError {
                         modelDownloadError = appError
                     } catch {
@@ -267,6 +288,23 @@ struct SettingsView: View {
                 )
             ) {
                 ForEach(MeetingLanguage.allCases) { Text($0.displayName).tag($0) }
+            }
+            Toggle(
+                NSLocalizedString("settings.on_device_auto_language", comment: "On-device automatic language detection"),
+                isOn: Binding(
+                    get: { settings.fluidAudioBatchASRModelsConsented },
+                    set: { enabled in
+                        if enabled && !settings.fluidAudioBatchASRModelsConsented {
+                            showingBatchASRConsent = true
+                        } else {
+                            settings.fluidAudioBatchASRModelsConsented = enabled
+                        }
+                    }
+                )
+            )
+            .disabled(downloadingModel != nil)
+            if downloadingModel == .onDeviceASR {
+                modelDownloadProgressRow
             }
             Picker(
                 NSLocalizedString("settings.diarization_engine", comment: "Diarization engine"),
@@ -416,8 +454,10 @@ struct SettingsView: View {
 /// Consent alerts shown before the first FluidAudio model download for a given feature.
 private struct ModelDownloadAlerts: ViewModifier {
     @Binding var showingASRConsent: Bool
+    @Binding var showingBatchASRConsent: Bool
     @Binding var showingDiarizationConsent: Bool
     let onConfirmASR: () -> Void
+    let onConfirmBatchASR: () -> Void
     let onConfirmDiarization: () -> Void
     let onCancelDiarization: () -> Void
 
@@ -428,6 +468,15 @@ private struct ModelDownloadAlerts: ViewModifier {
                 isPresented: $showingASRConsent
             ) {
                 Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmASR)
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message", comment: ""))
+            }
+            .alert(
+                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+                isPresented: $showingBatchASRConsent
+            ) {
+                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmBatchASR)
                 Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
             } message: {
                 Text(NSLocalizedString("settings.model_download.message", comment: ""))

@@ -31,6 +31,7 @@ struct TranscriptionService {
     private let maxSegmentDuration: TimeInterval = 30
 
     private let onDevice = OnDeviceTranscriber()
+    private let fluidAudioTranscriber = FluidAudioTranscriber()
     private let heuristicDiarizer = SpeakerDiarizer()
     private let fluidAudioDiarizer = FluidAudioDiarizer()
     private let chunker = AudioChunker()
@@ -44,6 +45,7 @@ struct TranscriptionService {
         language: MeetingLanguage,
         mode: TranscriptionMode,
         diarizationEngine: DiarizationEngine = .heuristic,
+        onDeviceMultilingualEnabled: Bool = false,
         onPhase: @escaping PhaseHandler = { _ in },
         onDiarizationWarning: DiarizationWarningHandler? = nil
     ) async throws -> Output {
@@ -80,6 +82,7 @@ struct TranscriptionService {
             fileURL: cleanedURL,
             language: language,
             mode: mode,
+            onDeviceMultilingualEnabled: onDeviceMultilingualEnabled,
             onPhase: onPhase
         )
         async let speakerTurns = diarize(
@@ -113,10 +116,21 @@ struct TranscriptionService {
         fileURL: URL,
         language: MeetingLanguage,
         mode: TranscriptionMode,
+        onDeviceMultilingualEnabled: Bool,
         onPhase: @escaping PhaseHandler
     ) async throws -> RawTranscript {
         switch mode {
         case .onDevice:
+            // Apple's recognizer needs a fixed locale and can't detect the
+            // spoken language. When the meeting language is "Auto" and the user
+            // has enabled the multilingual on-device model, route to FluidAudio
+            // (Parakeet TDT v3) so the language is detected from the audio.
+            // Pinned languages keep using Apple Speech (no download, and it
+            // covers locales the multilingual model doesn't, e.g. ja/zh).
+            if language == .autoDetect && onDeviceMultilingualEnabled {
+                AppLog.transcription.info("transcribe: on-device auto-detect via FluidAudio multilingual ASR")
+                return try await fluidAudioTranscriber.transcribe(url: fileURL, language: language)
+            }
             return try await onDevice.transcribe(url: fileURL, language: language)
         case .whisperAPI:
             return try await transcribeViaWhisper(fileURL: fileURL, language: language, onPhase: onPhase)

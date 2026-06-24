@@ -67,7 +67,8 @@ final class TranscriptionViewModel {
         _ recording: Recording,
         language: MeetingLanguage,
         mode: TranscriptionMode,
-        diarizationEngine: DiarizationEngine = .heuristic
+        diarizationEngine: DiarizationEngine = .heuristic,
+        onDeviceMultilingualEnabled: Bool = false
     ) async {
         guard !transcribingIDs.contains(recording.id) else { return }
 
@@ -80,7 +81,11 @@ final class TranscriptionViewModel {
         recording.transcriptionMode = mode
         persist()
 
-        if mode == .onDevice {
+        // The FluidAudio multilingual route doesn't use Apple Speech, so don't
+        // gate it on (or block it by a denial of) the Speech authorization.
+        let usesAppleSpeech = mode == .onDevice
+            && !(language == .autoDetect && onDeviceMultilingualEnabled)
+        if usesAppleSpeech {
             let authorized = await ensureAuthorization(for: mode)
             guard authorized else {
                 AppLog.transcription.error("VM: speech permission denied")
@@ -115,6 +120,7 @@ final class TranscriptionViewModel {
                 language: language,
                 mode: mode,
                 diarizationEngine: diarizationEngine,
+                onDeviceMultilingualEnabled: onDeviceMultilingualEnabled,
                 onPhase: { [weak self] phase in
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.phases[recordingID] = phase }

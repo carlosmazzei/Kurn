@@ -16,6 +16,7 @@ import FluidAudio
 
 enum ModelSet {
     case liveTranscriptionASR
+    case onDeviceASR
     case diarization
 }
 
@@ -25,8 +26,17 @@ struct ModelDownloadConsent {
         do {
             switch set {
             case .liveTranscriptionASR:
-                let engine = StreamingModelVariant.parakeetEou160ms.createManager()
-                try await engine.loadModels()
+                // The live preview picks a streaming model per meeting language at
+                // record time (English-only EOU vs. multilingual), so warm both
+                // now — the recording path must never block on a missing model.
+                for variant in [StreamingModelVariant.parakeetEou160ms, .nemotronMultilingual160ms] {
+                    let engine = variant.createManager()
+                    try await engine.loadModels()
+                }
+            case .onDeviceASR:
+                // Multilingual on-device batch ASR (Parakeet TDT v3) used for the
+                // post-recording transcript when the meeting language is "Auto".
+                _ = try await AsrModels.downloadAndLoad(version: .v3)
             case .diarization:
                 let manager = OfflineDiarizerManager()
                 try await manager.prepareModels()

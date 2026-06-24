@@ -26,6 +26,7 @@ final class AppSettings {
         static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
         static let diarizationEngine = "settings.diarizationEngine"
         static let fluidAudioASRModelsConsented = "settings.fluidAudioASRModelsConsented"
+        static let fluidAudioBatchASRModelsConsented = "settings.fluidAudioBatchASRModelsConsented"
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
         static let logLevel = "settings.logLevel"
     }
@@ -78,6 +79,14 @@ final class AppSettings {
     /// models (independent of the diarization model consent below).
     var fluidAudioASRModelsConsented: Bool {
         didSet { defaults.set(fluidAudioASRModelsConsented, forKey: Keys.fluidAudioASRModelsConsented) }
+    }
+
+    /// Whether the user has consented to downloading FluidAudio's multilingual
+    /// on-device batch ASR model (Parakeet TDT v3). When enabled, "Auto" meetings
+    /// transcribed on-device detect the language from the audio instead of
+    /// falling back to Apple Speech with the device locale.
+    var fluidAudioBatchASRModelsConsented: Bool {
+        didSet { defaults.set(fluidAudioBatchASRModelsConsented, forKey: Keys.fluidAudioBatchASRModelsConsented) }
     }
 
     /// Whether the user has consented to downloading FluidAudio's diarization
@@ -200,6 +209,7 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
+        fluidAudioBatchASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
         // Fall back to the environment-derived default (set on `AppLog` at
         // launch) when the user hasn't chosen a level yet.

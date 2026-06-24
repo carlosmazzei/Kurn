@@ -103,8 +103,9 @@ final class RecorderViewModel {
         // Load the streaming ASR model in parallel with the audio engine
         // spin-up so the first usable buffer arrives at an already-loaded
         // engine instead of being dropped while we wait on model I/O.
+        let liveLanguage = meeting.language
         let liveStartTask: Task<Void, Never>? = liveTranscriptionEnabled
-            ? Task { @MainActor [weak self] in await self?.liveTranscription.start() }
+            ? Task { @MainActor [weak self] in await self?.liveTranscription.start(language: liveLanguage) }
             : nil
         do {
             try await recorder.start(meetingID: meeting.id)

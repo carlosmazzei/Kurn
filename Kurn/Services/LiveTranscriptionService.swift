@@ -3,9 +3,12 @@
 //  Kurn
 //
 //  Opt-in live transcription preview shown while recording. Wraps FluidAudio's
-//  streaming ASR (Parakeet EOU). This is preview-only: nothing here is ever
-//  persisted — the authoritative transcript still comes from
-//  TranscriptionService after the recording finishes.
+//  streaming ASR. The model is picked from the meeting language: English uses the
+//  lightweight English-only Parakeet EOU; every other language (and auto-detect)
+//  uses the multilingual streaming model so e.g. Portuguese is transcribed
+//  correctly. This is preview-only: nothing here is ever persisted — the
+//  authoritative transcript still comes from TranscriptionService after the
+//  recording finishes.
 //
 
 import AVFoundation
@@ -29,14 +32,15 @@ final class LiveTranscriptionService {
     /// a slow/stalled engine can't pile up queued copies and Tasks.
     private let inFlight = InFlightGate()
 
-    func start() async {
+    func start(language: MeetingLanguage) async {
         guard engine == nil, !isLoading else { return }
         isLoading = true
         isUnavailable = false
         partialText = ""
         defer { isLoading = false }
-        AppLog.transcription.info("LiveTranscriptionService: loading Parakeet EOU 160ms…")
-        let candidate = StreamingModelVariant.parakeetEou160ms.createManager()
+        let variant = language.streamingVariant
+        AppLog.transcription.info("LiveTranscriptionService: loading streaming model \(String(describing: variant), privacy: .public) for language=\(language.rawValue, privacy: .public)…")
+        let candidate = variant.createManager()
         do {
             try await candidate.loadModels()
         } catch {
@@ -151,6 +155,27 @@ private final class InFlightGate: @unchecked Sendable {
     }
 }
 
+private extension MeetingLanguage {
+    /// Streaming model best suited to this language. English uses the lighter
+    /// English-only Parakeet EOU; everything else — including auto-detect, so a
+    /// Portuguese speaker who leaves the meeting on "Auto" still gets sensible
+    /// output — uses the multilingual streaming model.
+    ///
+    /// NOTE: confirm the multilingual case name against the linked FluidAudio
+    /// version (the multilingual streaming model arrived in 0.15.0 as the
+    /// Nemotron streaming variant). This is the single FluidAudio symbol to
+    /// adjust if the enum spelling differs; bump the package if the case is
+    /// only available in a newer release.
+    var streamingVariant: StreamingModelVariant {
+        switch self {
+        case .english:
+            return .parakeetEou160ms
+        default:
+            return .nemotronMultilingual160ms
+        }
+    }
+}
+
 #else
 
 /// Built without the FluidAudio package linked: the preview stays unavailable
@@ -163,7 +188,7 @@ final class LiveTranscriptionService {
     private(set) var isLoading = false
     private(set) var isUnavailable = false
 
-    func start() async {
+    func start(language: MeetingLanguage) async {
         isUnavailable = true
     }
 
