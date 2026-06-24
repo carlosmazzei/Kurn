@@ -225,3 +225,12 @@
 "settings.model_download.allow" = "Permitir e Baixar";
 "settings.model_download.downloading" = "Baixando modelo…";
 "settings.fluid_audio.package_missing" = "Adicione o pacote Swift FluidAudio ao target Kurn antes de usar este recurso.";
+"settings.models" = "Modelos no Dispositivo";
+"settings.models_footer" = "Os modelos são baixados sob demanda e ficam em cache no dispositivo. Exclua um para liberar espaço; ele será baixado novamente na próxima vez que você ativar o recurso.";
+"settings.models.none" = "Nenhum modelo baixado";
+"settings.models.live" = "Transcrição ao Vivo";
+"settings.models.on_device_language" = "Detecção de Idioma no Dispositivo";
+"settings.models.diarization" = "Diarização de Locutores";
+"settings.models.delete" = "Excluir Modelo";
+"settings.models.delete_confirm" = "Excluir este modelo?";
+"settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";

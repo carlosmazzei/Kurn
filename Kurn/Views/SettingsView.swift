@@ -17,6 +17,11 @@ struct SettingsView: View {
 
     @State private var storageText = "—"
     @State private var showingDeleteConfirm = false
+    /// Bytes used on disk per downloaded FluidAudio model group, refreshed when
+    /// the screen appears and after any download/deletion.
+    @State private var modelSizes: [ModelStore.ModelGroup: Int64] = [:]
+    /// Model group awaiting a delete confirmation, if any.
+    @State private var pendingModelDeletion: ModelStore.ModelGroup?
     @State private var showingAddProvider = false
     @State private var showingAddTemplate = false
     /// Bumped after editing a key so the provider rows re-read keychain status.
@@ -123,6 +128,9 @@ struct SettingsView: View {
                 )
             }
 
+            // MARK: Downloaded models
+            modelsSection
+
             Section {
                 Button(role: .destructive) { showingDeleteConfirm = true } label: {
                     Text(NSLocalizedString("settings.delete_all", comment: "Delete All Data"))
@@ -158,8 +166,24 @@ struct SettingsView: View {
         }
         .onAppear {
             refreshStorage()
+            refreshModelSizes()
             ensureSelectedProviderIsConfigured()
             ensureWhisperSelectionIsAllowed()
+        }
+        .alert(
+            NSLocalizedString("settings.models.delete_confirm", comment: "Confirm delete model"),
+            isPresented: Binding(
+                get: { pendingModelDeletion != nil },
+                set: { if !$0 { pendingModelDeletion = nil } }
+            ),
+            presenting: pendingModelDeletion
+        ) { group in
+            Button(NSLocalizedString("settings.models.delete", comment: "Delete model"), role: .destructive) {
+                deleteModel(group)
+            }
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
+        } message: { _ in
+            Text(NSLocalizedString("settings.models.delete_message", comment: "Re-download later"))
         }
         .onChange(of: keyRevision) { _, _ in
             ensureSelectedProviderIsConfigured()
@@ -198,6 +222,7 @@ struct SettingsView: View {
                         modelDownloadError = .modelDownloadFailed(error.localizedDescription)
                     }
                     downloadingModel = nil
+                    refreshModelSizes()
                 }
             },
             onConfirmBatchASR: {
@@ -217,6 +242,7 @@ struct SettingsView: View {
                         modelDownloadError = .modelDownloadFailed(error.localizedDescription)
                     }
                     downloadingModel = nil
+                    refreshModelSizes()
                 }
             },
             onConfirmDiarization: {
@@ -239,6 +265,7 @@ struct SettingsView: View {
                         modelDownloadError = .modelDownloadFailed(error.localizedDescription)
                     }
                     downloadingModel = nil
+                    refreshModelSizes()
                 }
             },
             onCancelDiarization: {
@@ -422,6 +449,73 @@ struct SettingsView: View {
         try? modelContext.save()
         AudioFileStore.deleteAllAudio()
         refreshStorage()
+    }
+
+    /// Downloaded on-device models the user can inspect and remove. Only groups
+    /// actually present on disk are listed; deleting one frees its space and
+    /// turns the matching feature off so it can be re-downloaded on demand.
+    @ViewBuilder
+    private var modelsSection: some View {
+        let installed = ModelStore.ModelGroup.allCases.filter { (modelSizes[$0] ?? 0) > 0 }
+        Section {
+            if installed.isEmpty {
+                Text(NSLocalizedString("settings.models.none", comment: "No models downloaded"))
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                ForEach(installed) { group in
+                    HStack {
+                        Text(group.displayName)
+                        Spacer()
+                        Text(AudioFileStore.formattedSize(modelSizes[group] ?? 0))
+                            .foregroundStyle(Theme.textSecondary)
+                        Button {
+                            pendingModelDeletion = group
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .tint(.red)
+                        .disabled(downloadingModel != nil)
+                    }
+                }
+            }
+        } header: {
+            Text(NSLocalizedString("settings.models", comment: "On-device models"))
+        } footer: {
+            Text(NSLocalizedString("settings.models_footer", comment: "Models footer"))
+        }
+    }
+
+    /// Recompute each model group's on-disk size off the main thread.
+    private func refreshModelSizes() {
+        Task { @MainActor in
+            let sizes = await Task.detached {
+                var result: [ModelStore.ModelGroup: Int64] = [:]
+                for group in ModelStore.ModelGroup.allCases {
+                    result[group] = ModelStore.sizeOnDisk(group)
+                }
+                return result
+            }.value
+            modelSizes = sizes
+        }
+    }
+
+    /// Delete a model group from disk and turn off the feature that uses it so the
+    /// UI reflects the removal and it can be re-downloaded later.
+    private func deleteModel(_ group: ModelStore.ModelGroup) {
+        ModelStore.delete(group)
+        switch group {
+        case .liveTranscription:
+            settings.liveTranscriptionEnabled = false
+            settings.fluidAudioASRModelsConsented = false
+        case .onDeviceLanguage:
+            settings.fluidAudioBatchASRModelsConsented = false
+        case .diarization:
+            settings.fluidAudioDiarizationModelsConsented = false
+            settings.diarizationEngine = .heuristic
+        }
+        pendingModelDeletion = nil
+        refreshModelSizes()
     }
 
     private var configuredProviders: [AIProvider] {
