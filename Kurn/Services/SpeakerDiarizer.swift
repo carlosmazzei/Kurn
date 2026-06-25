@@ -41,10 +41,13 @@ actor SpeakerDiarizer: Diarizing {
         let feature: [Float]   // [normalizedPitch, meanZCR, meanHighBand]
     }
 
-    private let frameDuration: TimeInterval = 0.1     // 100 ms frames
-    private let silenceFloorDBFS: Float = -40         // below this is "silence"
-    private let minSilenceFrames = 5                  // 0.5 s gap splits regions
-    private let minRegionFrames = 2                   // ignore < 200 ms blips
+    // Segmentation tunables come from `EnergyVAD` so the app has one VAD
+    // algorithm and one set of thresholds (the diarizer just feeds it richer
+    // per-frame features afterwards).
+    private let frameDuration = EnergyVAD.frameDuration       // 100 ms frames
+    private let silenceFloorDBFS = EnergyVAD.silenceFloorDBFS // below this is "silence"
+    private let minSilenceFrames = EnergyVAD.minSilenceFrames // 0.5 s gap splits regions
+    private let minRegionFrames = EnergyVAD.minRegionFrames   // ignore < 200 ms blips
     /// Weighted-Euclidean distance below which a region joins an existing
     /// centroid. Tuned empirically: same-speaker regions cluster well under
     /// 0.15, different-pitched speakers land around 0.30+.
@@ -227,34 +230,16 @@ actor SpeakerDiarizer: Diarizing {
     // MARK: - Segmentation
 
     private func speechRegions(from frames: [Frame]) -> [Region] {
-        var ranges: [(start: Int, end: Int)] = []
-        var inSpeech = false
-        var regionStart = 0
-        var silentRun = 0
-
-        for (i, frame) in frames.enumerated() {
-            let isSpeech = frame.dbfs > silenceFloorDBFS
-            if isSpeech {
-                if !inSpeech {
-                    inSpeech = true
-                    regionStart = i
-                }
-                silentRun = 0
-            } else if inSpeech {
-                silentRun += 1
-                if silentRun >= minSilenceFrames {
-                    ranges.append((regionStart, i - silentRun))
-                    inSpeech = false
-                    silentRun = 0
-                }
-            }
-        }
-        if inSpeech {
-            ranges.append((regionStart, frames.count - 1))
-        }
+        // Reuse the shared VAD state machine for silence-gap segmentation, then
+        // layer this engine's timbre features over each detected range.
+        let ranges = EnergyVAD.speechFrameRanges(
+            dbfs: frames.map { $0.dbfs },
+            silenceFloor: silenceFloorDBFS,
+            minSilenceFrames: minSilenceFrames,
+            minRegionFrames: minRegionFrames
+        )
 
         return ranges
-            .filter { $0.end - $0.start + 1 >= minRegionFrames }
             .map { range in
                 let slice = frames[range.start...range.end]
                 let count = Float(slice.count)

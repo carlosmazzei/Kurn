@@ -14,7 +14,7 @@ import Foundation
 import FluidAudio
 #endif
 
-enum ModelSet {
+enum ModelSet: Sendable, Equatable {
     case liveTranscriptionASR
     case onDeviceASR
     case diarization

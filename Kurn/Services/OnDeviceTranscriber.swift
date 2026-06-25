@@ -12,7 +12,7 @@ import Foundation
 import os
 import Speech
 
-actor OnDeviceTranscriber {
+actor OnDeviceTranscriber: Transcribing {
 
     /// Ask the user for speech-recognition authorization.
     func requestAuthorization() async -> Bool {
@@ -28,7 +28,12 @@ actor OnDeviceTranscriber {
     ///   - url: local .m4a file.
     ///   - language: desired `MeetingLanguage`; auto-detect falls back to the
     ///     device locale.
-    func transcribe(url: URL, language: MeetingLanguage) async throws -> RawTranscript {
+    func transcribe(
+        url: URL,
+        language: MeetingLanguage,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> RawTranscript {
+        // Apple Speech runs a single pass and can't report incremental progress.
         let locale: Locale
         if let id = language.localeIdentifier {
             locale = Locale(identifier: id)
