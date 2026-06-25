@@ -39,6 +39,7 @@
 "preprocessing.standard" = "Limpeza padrão";
 "preprocessing.none" = "Nenhuma";
 "vad.energy" = "Limiar de energia";
+"vad.fluid_audio" = "FluidAudio (Silero)";
 "langdetect.by_transcriber" = "Pelo transcritor";
 "langdetect.fluid_lid" = "Detecção FluidAudio";
 
@@ -246,6 +247,7 @@
 "settings.models.live" = "Transcrição ao Vivo";
 "settings.models.on_device_language" = "Detecção de Idioma no Dispositivo";
 "settings.models.diarization" = "Diarização de Locutores";
+"settings.models.vad" = "Detecção de Atividade de Voz";
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";

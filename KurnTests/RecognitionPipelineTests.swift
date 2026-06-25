@@ -59,6 +59,8 @@ struct RecognitionPipelineTests {
         #expect(LanguageDetectionEngine.fluidAudioLID.requiredModelSet == .onDeviceASR)
         #expect(DiarizationEngine.heuristic.requiredModelSet == nil)
         #expect(DiarizationEngine.fluidAudio.requiredModelSet == .diarization)
+        #expect(VADEngine.energyThreshold.requiredModelSet == nil)
+        #expect(VADEngine.fluidAudio.requiredModelSet == .vad)
     }
 
     // MARK: - Language code mapping
@@ -113,5 +115,55 @@ struct RecognitionPipelineTests {
         #expect(config.languageDetection == .byTranscriber)
         #expect(config.diarization == .heuristic)
         #expect(config.transcription == .appleSpeech)
+    }
+
+    // MARK: - VAD audio compaction (timeline remap + region normalization)
+
+    private func isClose(_ lhs: TimeInterval?, _ rhs: TimeInterval, tolerance: TimeInterval = 1e-6) -> Bool {
+        guard let lhs else { return false }
+        return abs(lhs - rhs) < tolerance
+    }
+
+    /// Two regions with a 0.5 s seam gap: 0–3 s ← original 5 s; 3.5–5.5 s ← original 20 s.
+    private var sampleMap: [TimelineSegment] {
+        [
+            TimelineSegment(compactedStart: 0, originalStart: 5, duration: 3),
+            TimelineSegment(compactedStart: 3.5, originalStart: 20, duration: 2)
+        ]
+    }
+
+    @Test func remapWithinRegionsIsLinear() {
+        #expect(isClose(VADAudioCompactor.remap(0, map: sampleMap), 5))      // start of first region
+        #expect(isClose(VADAudioCompactor.remap(1.5, map: sampleMap), 6.5))  // mid first region
+        #expect(isClose(VADAudioCompactor.remap(3.0, map: sampleMap), 8))    // end of first region
+        #expect(isClose(VADAudioCompactor.remap(4.0, map: sampleMap), 20.5)) // inside second region
+    }
+
+    @Test func remapSnapsSeamGapAndTailToBoundaries() {
+        // A time in the inter-region gap snaps to the previous region's end (8).
+        #expect(isClose(VADAudioCompactor.remap(3.2, map: sampleMap), 8))
+        // Past the last region snaps to its end (20 + 2).
+        #expect(isClose(VADAudioCompactor.remap(10, map: sampleMap), 22))
+    }
+
+    @Test func remapWithEmptyMapIsIdentity() {
+        #expect(isClose(VADAudioCompactor.remap(4.2, map: []), 4.2))
+    }
+
+    @Test func normalizeMergesOverlappingPaddedRegions() {
+        let regions = [SpeechRegion(start: 1, end: 2), SpeechRegion(start: 2.1, end: 3)]
+        let merged = VADAudioCompactor.normalize(regions: regions, pad: 0.25, totalDuration: 10)
+        #expect(merged.count == 1)
+        #expect(isClose(merged.first?.start, 0.75))
+        #expect(isClose(merged.first?.end, 3.25))
+    }
+
+    @Test func normalizeClampsPaddingToClipBounds() {
+        let merged = VADAudioCompactor.normalize(
+            regions: [SpeechRegion(start: 0, end: 1)], pad: 0.25, totalDuration: 10
+        )
+        #expect(merged.count == 1)
+        #expect(isClose(merged.first?.start, 0))   // clamped at 0, not -0.25
+        #expect(isClose(merged.first?.end, 1.25))
     }
 }

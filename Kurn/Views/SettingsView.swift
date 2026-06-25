@@ -36,6 +36,8 @@ struct SettingsView: View {
     /// can require that model).
     @State private var pendingTranscriptionEngine: TranscriptionEngine?
     @State private var pendingLanguageDetectionEngine: LanguageDetectionEngine?
+    @State private var showingVADConsent = false
+    @State private var pendingVADEngine: VADEngine?
     /// Which FluidAudio model set is currently downloading (`nil` when idle), so
     /// the toggle/picker can't be re-triggered mid-download and the matching
     /// section can surface a progress indicator.
@@ -288,6 +290,33 @@ struct SettingsView: View {
             },
             onCancelDiarization: {
                 pendingDiarizationEngine = nil
+            },
+            showingVADConsent: $showingVADConsent,
+            onConfirmVAD: {
+                guard let engine = pendingVADEngine else { return }
+                pendingVADEngine = nil
+                downloadingModel = .vad
+                Task {
+                    // Keep a finite background window so the download isn't
+                    // aborted the moment Settings leaves the foreground.
+                    let background = BackgroundActivity()
+                    background.begin(name: "ai.kurn.modelDownload")
+                    defer { background.end() }
+                    do {
+                        try await ModelDownloadConsent.download(.vad)
+                        settings.fluidAudioVADModelsConsented = true
+                        settings.vadEngine = engine
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    downloadingModel = nil
+                    refreshModelSizes()
+                }
+            },
+            onCancelVAD: {
+                pendingVADEngine = nil
             }
         ))
         .alert(
@@ -349,11 +378,12 @@ struct SettingsView: View {
                 NSLocalizedString("pipeline.vad", comment: "Voice activity detection"),
                 selection: Binding(
                     get: { settings.vadEngine },
-                    set: { settings.vadEngine = $0 }
+                    set: { selectVADEngine($0, settings: settings) }
                 )
             ) {
                 ForEach(VADEngine.allCases) { Text($0.displayName).tag($0) }
             }
+            .disabled(downloadingModel != nil)
 
             // Language detection.
             Picker(
@@ -386,7 +416,7 @@ struct SettingsView: View {
             }
             .disabled(downloadingModel != nil)
 
-            if downloadingModel == .onDeviceASR || downloadingModel == .diarization {
+            if downloadingModel == .onDeviceASR || downloadingModel == .diarization || downloadingModel == .vad {
                 modelDownloadProgressRow
             }
         } header: {
@@ -422,6 +452,17 @@ struct SettingsView: View {
             showingBatchASRConsent = true
         } else {
             settings.languageDetectionEngine = engine
+        }
+    }
+
+    /// Apply a VAD choice, intercepting the FluidAudio engine to trigger the
+    /// one-time Silero VAD model download.
+    private func selectVADEngine(_ engine: VADEngine, settings: AppSettings) {
+        if engine.requiredModelSet == .vad && !settings.fluidAudioVADModelsConsented {
+            pendingVADEngine = engine
+            showingVADConsent = true
+        } else {
+            settings.vadEngine = engine
         }
     }
 
@@ -581,6 +622,9 @@ struct SettingsView: View {
         case .diarization:
             settings.fluidAudioDiarizationModelsConsented = false
             settings.diarizationEngine = .heuristic
+        case .vad:
+            settings.fluidAudioVADModelsConsented = false
+            settings.vadEngine = .energyThreshold
         }
         pendingModelDeletion = nil
         refreshModelSizes()
@@ -623,6 +667,9 @@ private struct ModelDownloadAlerts: ViewModifier {
     let onCancelBatchASR: () -> Void
     let onConfirmDiarization: () -> Void
     let onCancelDiarization: () -> Void
+    @Binding var showingVADConsent: Bool
+    let onConfirmVAD: () -> Void
+    let onCancelVAD: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -650,6 +697,15 @@ private struct ModelDownloadAlerts: ViewModifier {
             ) {
                 Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmDiarization)
                 Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelDiarization)
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message", comment: ""))
+            }
+            .alert(
+                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+                isPresented: $showingVADConsent
+            ) {
+                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmVAD)
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelVAD)
             } message: {
                 Text(NSLocalizedString("settings.model_download.message", comment: ""))
             }

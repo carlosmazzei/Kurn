@@ -22,6 +22,7 @@ enum ModelStore {
         case liveTranscription
         case onDeviceLanguage
         case diarization
+        case vad
 
         var id: String { rawValue }
 
@@ -42,6 +43,8 @@ enum ModelStore {
                 return ["parakeet-tdt-0.6b-v3"]
             case .diarization:
                 return ["speaker-diarization"]
+            case .vad:
+                return ["silero-vad"]
             }
         }
 
@@ -53,6 +56,8 @@ enum ModelStore {
                 return NSLocalizedString("settings.models.on_device_language", comment: "On-device language model")
             case .diarization:
                 return NSLocalizedString("settings.models.diarization", comment: "Diarization models")
+            case .vad:
+                return NSLocalizedString("settings.models.vad", comment: "Voice activity detection model")
             }
         }
     }

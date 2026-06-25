@@ -67,14 +67,29 @@ actor SpeakerDiarizer: Diarizing {
     private let voicingThreshold: Float = 0.3
     private let pitchNormalizer: Float = 300          // brings Hz into ~[0,1.3] to match other dims
 
-    /// Produce ordered speaker turns for the file. On any failure returns a
-    /// single turn covering the whole clip so callers always get usable output.
+    /// Produce ordered speaker turns for the file, segmenting speech with the
+    /// built-in energy VAD. On any failure returns a single turn covering the
+    /// whole clip so callers always get usable output.
     func diarize(url: URL) async -> [SpeakerTurn] {
         guard let frames = try? readFrames(url: url), !frames.isEmpty else {
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 0)]
         }
+        return finalize(regions: speechRegions(from: frames), frames: frames)
+    }
 
-        let regions = speechRegions(from: frames)
+    /// Same as `diarize(url:)` but uses speech regions produced by an external
+    /// VAD engine (e.g. FluidAudio Silero) instead of the built-in energy VAD,
+    /// then layers this engine's timbre features over those regions.
+    func diarize(url: URL, speechRegions externalRegions: [SpeechRegion]) async -> [SpeakerTurn] {
+        guard let frames = try? readFrames(url: url), !frames.isEmpty else {
+            return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 0)]
+        }
+        return finalize(regions: featureRegions(from: frames, speechRegions: externalRegions), frames: frames)
+    }
+
+    /// Cluster the feature regions into speaker turns, falling back to a single
+    /// whole-clip turn when there are none.
+    private func finalize(regions: [Region], frames: [Frame]) -> [SpeakerTurn] {
         guard !regions.isEmpty else {
             let end = frames.last.map { $0.time + frameDuration } ?? 0
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: end)]
@@ -238,26 +253,38 @@ actor SpeakerDiarizer: Diarizing {
             minSilenceFrames: minSilenceFrames,
             minRegionFrames: minRegionFrames
         )
+        return ranges.map { featureRegion(from: frames, startFrame: $0.start, endFrame: $0.end) }
+    }
 
-        return ranges
-            .map { range in
-                let slice = frames[range.start...range.end]
-                let count = Float(slice.count)
-                let meanZCR = slice.reduce(Float(0)) { $0 + $1.zcr } / count
-                let meanHighBand = slice.reduce(Float(0)) { $0 + $1.highBand } / count
+    /// Build feature regions from speech intervals (seconds) produced by an
+    /// external VAD, mapping each interval to the corresponding 100 ms frames.
+    private func featureRegions(from frames: [Frame], speechRegions: [SpeechRegion]) -> [Region] {
+        speechRegions.compactMap { region in
+            let startFrame = max(0, Int(region.start / frameDuration))
+            let endFrame = min(frames.count - 1, Int(region.end / frameDuration))
+            guard endFrame >= startFrame else { return nil }
+            return featureRegion(from: frames, startFrame: startFrame, endFrame: endFrame)
+        }
+    }
 
-                let voicedPitches = slice.compactMap { $0.pitch > 0 ? $0.pitch : nil }
-                let meanPitch = voicedPitches.isEmpty
-                    ? 0
-                    : voicedPitches.reduce(0, +) / Float(voicedPitches.count)
-                let normalizedPitch = min(1.5, meanPitch / pitchNormalizer)
+    /// Mean timbre feature vector over a `[startFrame, endFrame]` frame range.
+    private func featureRegion(from frames: [Frame], startFrame: Int, endFrame: Int) -> Region {
+        let slice = frames[startFrame...endFrame]
+        let count = Float(slice.count)
+        let meanZCR = slice.reduce(Float(0)) { $0 + $1.zcr } / count
+        let meanHighBand = slice.reduce(Float(0)) { $0 + $1.highBand } / count
 
-                return Region(
-                    start: frames[range.start].time,
-                    end: frames[range.end].time + frameDuration,
-                    feature: [normalizedPitch, meanZCR, meanHighBand]
-                )
-            }
+        let voicedPitches = slice.compactMap { $0.pitch > 0 ? $0.pitch : nil }
+        let meanPitch = voicedPitches.isEmpty
+            ? 0
+            : voicedPitches.reduce(0, +) / Float(voicedPitches.count)
+        let normalizedPitch = min(1.5, meanPitch / pitchNormalizer)
+
+        return Region(
+            start: frames[startFrame].time,
+            end: frames[endFrame].time + frameDuration,
+            feature: [normalizedPitch, meanZCR, meanHighBand]
+        )
     }
 
     // MARK: - Clustering

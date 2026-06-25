@@ -18,6 +18,7 @@ enum ModelSet: Sendable, Equatable {
     case liveTranscriptionASR
     case onDeviceASR
     case diarization
+    case vad
 }
 
 struct ModelDownloadConsent {
@@ -40,6 +41,10 @@ struct ModelDownloadConsent {
             case .diarization:
                 let manager = OfflineDiarizerManager()
                 try await manager.prepareModels()
+            case .vad:
+                // Silero VAD CoreML model; `VadManager`'s initializer downloads
+                // and loads it on first use.
+                _ = try await VadManager()
             }
         } catch {
             throw AppError.modelDownloadFailed(error.localizedDescription)

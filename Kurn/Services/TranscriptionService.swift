@@ -36,6 +36,8 @@ struct TranscriptionService {
     // per call. The non-Sendable audio resources stay isolated inside each actor.
     private let standardPreprocessor = AudioPreprocessor()
     private let passthroughPreprocessor = PassthroughPreprocessor()
+    private let energyVAD = EnergyVAD()
+    private let fluidAudioVAD = FluidAudioVAD()
     private let noOpLanguageDetector = NoOpLanguageDetector()
     private let fluidAudioLanguageDetector = FluidAudioLanguageDetector()
     private let appleTranscriber = OnDeviceTranscriber()
@@ -43,6 +45,7 @@ struct TranscriptionService {
     private let whisperTranscriber = WhisperTranscriber()
     private let heuristicDiarizer = SpeakerDiarizer()
     private let fluidAudioDiarizer = FluidAudioDiarizer()
+    private let vadCompactor = VADAudioCompactor()
 
     /// Transcribe one recording file and return diarized segments, driving each
     /// pipeline stage through the engine selected in `config`.
@@ -89,20 +92,28 @@ struct TranscriptionService {
             AppLog.transcription.atInfo.info("transcribe: language refined \(language.rawValue, privacy: .public) -> \(resolvedLanguage.rawValue, privacy: .public)")
         }
 
-        // 3. Transcription and diarization both read the same file but are
+        // 3. Detect speech regions with the selected VAD engine. They drive both
+        // the heuristic diarizer's segmentation and the silence-gating of the
+        // audio fed to transcription.
+        let regions = await resolveVAD(config.vad).detectSpeech(cleanedURL)
+        AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
+
+        // 4. Transcription and diarization both read the same file but are
         // independent, so run them concurrently instead of back to back.
         onPhase(.transcribing(progress: nil))
         AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
-        let transcriber = resolveTranscriber(config.transcription)
-        async let rawTranscript = transcriber.transcribe(
-            url: cleanedURL,
+        async let rawTranscript = transcribeGated(
+            cleanedURL: cleanedURL,
+            regions: regions,
+            engine: config.transcription,
             language: resolvedLanguage,
-            onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+            onPhase: onPhase
         )
         async let speakerTurns = diarize(
             url: cleanedURL,
             engine: config.diarization,
+            regions: regions,
             onWarning: onDiarizationWarning
         )
 
@@ -110,7 +121,7 @@ struct TranscriptionService {
         let turns = await speakerTurns
         AppLog.transcription.atInfo.info("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
 
-        // 4. Fuse text spans with speaker turns into attributed segments.
+        // 5. Fuse text spans with speaker turns into attributed segments.
         onPhase(.finalizing)
         let segments = fuse(spans: raw.spans, turns: turns)
 
@@ -154,8 +165,55 @@ struct TranscriptionService {
         }
     }
 
+    /// Map a `VADEngine` to its engine.
+    private func resolveVAD(_ engine: VADEngine) -> any VoiceActivityDetecting {
+        switch engine {
+        case .energyThreshold: return energyVAD
+        case .fluidAudio: return fluidAudioVAD
+        }
+    }
+
+    // MARK: - VAD-gated transcription
+
+    /// Transcribe using the chosen engine, first removing silence via the VAD
+    /// speech regions (so engines don't hallucinate over silence). Span
+    /// timestamps are remapped from the compacted timeline back to the original
+    /// so they line up with diarization. Falls back to the original audio when
+    /// compaction isn't worthwhile.
+    private func transcribeGated(
+        cleanedURL: URL,
+        regions: [SpeechRegion],
+        engine: TranscriptionEngine,
+        language: MeetingLanguage,
+        onPhase: @escaping PhaseHandler
+    ) async throws -> RawTranscript {
+        let transcriber = resolveTranscriber(engine)
+        let compaction = (try? await vadCompactor.compact(url: cleanedURL, regions: regions)) ?? nil
+        let target = compaction?.url ?? cleanedURL
+        defer {
+            if let url = compaction?.url { vadCompactor.cleanup(url) }
+        }
+
+        let raw = try await transcriber.transcribe(
+            url: target,
+            language: language,
+            onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+        )
+        guard let map = compaction?.map else { return raw }
+
+        // Remap compacted-timeline spans back to the original timeline.
+        let spans = raw.spans.map { span -> TranscribedSpan in
+            let start = VADAudioCompactor.remap(span.start, map: map)
+            let end = VADAudioCompactor.remap(span.end, map: map)
+            return TranscribedSpan(text: span.text, start: start, end: max(start, end), confidence: span.confidence)
+        }
+        return RawTranscript(spans: spans, language: raw.language)
+    }
+
     /// Dispatch to the chosen diarization engine. Both engines satisfy
-    /// `Diarizing` and never throw, so this always returns usable turns.
+    /// `Diarizing` and never throw, so this always returns usable turns. The
+    /// heuristic engine reuses the pipeline's VAD regions; FluidAudio diarization
+    /// is end-to-end and ignores them.
     ///
     /// `fluidAudioDiarizer` is a single shared actor reused across concurrent
     /// transcriptions (different recordings can transcribe at once), so the
@@ -165,11 +223,12 @@ struct TranscriptionService {
     private func diarize(
         url: URL,
         engine: DiarizationEngine,
+        regions: [SpeechRegion],
         onWarning: DiarizationWarningHandler?
     ) async -> [SpeakerTurn] {
         switch engine {
         case .heuristic:
-            return await heuristicDiarizer.diarize(url: url)
+            return await heuristicDiarizer.diarize(url: url, speechRegions: regions)
         case .fluidAudio:
             return await fluidAudioDiarizer.diarize(url: url, onDownloadFailure: onWarning)
         }

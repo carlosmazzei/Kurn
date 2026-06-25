@@ -193,12 +193,22 @@ enum PreprocessingEngine: String, Codable, Sendable, CaseIterable, Identifiable 
 enum VADEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Energy-threshold (dBFS) detection over 100 ms frames. Always available.
     case energyThreshold
+    /// FluidAudio's Silero VAD CoreML model. Requires a model download.
+    case fluidAudio
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .energyThreshold: return NSLocalizedString("vad.energy", comment: "Energy threshold")
+        case .fluidAudio: return NSLocalizedString("vad.fluid_audio", comment: "FluidAudio (Silero)")
+        }
+    }
+
+    var requiredModelSet: ModelSet? {
+        switch self {
+        case .energyThreshold: return nil
+        case .fluidAudio: return .vad
         }
     }
 }

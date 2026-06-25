@@ -32,6 +32,7 @@ final class AppSettings {
         static let fluidAudioASRModelsConsented = "settings.fluidAudioASRModelsConsented"
         static let fluidAudioBatchASRModelsConsented = "settings.fluidAudioBatchASRModelsConsented"
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
+        static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let logLevel = "settings.logLevel"
     }
 
@@ -130,6 +131,12 @@ final class AppSettings {
     /// models (independent of the ASR model consent above).
     var fluidAudioDiarizationModelsConsented: Bool {
         didSet { defaults.set(fluidAudioDiarizationModelsConsented, forKey: Keys.fluidAudioDiarizationModelsConsented) }
+    }
+
+    /// Whether the user has consented to downloading FluidAudio's Silero VAD
+    /// model (used by the FluidAudio voice-activity-detection engine).
+    var fluidAudioVADModelsConsented: Bool {
+        didSet { defaults.set(fluidAudioVADModelsConsented, forKey: Keys.fluidAudioVADModelsConsented) }
     }
 
     /// Minimum severity emitted by `AppLog`. Persisted here and pushed to
@@ -248,6 +255,7 @@ final class AppSettings {
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         fluidAudioBatchASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
+        fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
         // Transcription engine: prefer the stored value; otherwise migrate the
         // legacy `defaultMode` + on-device-multilingual pairing into the new
         // single explicit choice.
