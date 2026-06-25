@@ -443,7 +443,8 @@ struct MeetingDetailView: View {
                 recording,
                 language: meeting.language,
                 mode: mode,
-                diarizationEngine: settings.diarizationEngine
+                diarizationEngine: settings.diarizationEngine,
+                onDeviceMultilingualEnabled: settings.fluidAudioBatchASRModelsConsented
             )
         }
     }

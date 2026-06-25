@@ -103,48 +103,42 @@ enum AppLog {
     static let transcription = CategoryLogger(transcriptionLogger)
 }
 
-/// Thin wrapper over `os.Logger` that gates each message by `AppLog.minimumLevel`
-/// before forwarding it. The methods accept `OSLogMessage`, so call sites keep
-/// using string interpolation with `privacy:` annotations exactly as before.
+/// Thin wrapper over `os.Logger` that gates each message by `AppLog.minimumLevel`.
+///
+/// `os.Logger`'s privacy-redaction machinery requires the `OSLogMessage`
+/// argument to be a string-interpolation literal written directly at the
+/// call to `Logger.debug`/`info`/`notice`/`error`/`fault`/`log` — it can't be
+/// captured into a parameter and forwarded from a wrapper function (that
+/// fails to compile: "argument must be a string interpolation"). So instead
+/// of wrapping those methods, each property below resolves to either the
+/// real `Logger` or a silently-`OSLog.disabled`-backed one depending on
+/// `AppLog.minimumLevel`, and call sites invoke the real method on it, e.g.
+/// `AppLog.transcription.atDebug.debug("text \(value, privacy: .public)")`.
+/// That keeps the literal at the real call site, so `privacy:` annotations
+/// keep working, while still gating by the user's configured level.
 struct CategoryLogger: Sendable {
     private let logger: Logger
+    private static let disabled = Logger(OSLog.disabled)
 
     init(_ logger: Logger) {
         self.logger = logger
     }
 
     /// High-frequency / per-iteration traces. Hidden unless the level is `.debug`.
-    func debug(_ message: OSLogMessage) {
-        guard AppLog.allows(.debug) else { return }
-        logger.debug(message)
-    }
+    var atDebug: Logger { AppLog.allows(.debug) ? logger : Self.disabled }
 
     /// Informational details (formats, counts, timings).
-    func info(_ message: OSLogMessage) {
-        guard AppLog.allows(.info) else { return }
-        logger.info(message)
-    }
+    var atInfo: Logger { AppLog.allows(.info) ? logger : Self.disabled }
 
-    /// Key lifecycle milestones. This is the default level for `log`.
-    func notice(_ message: OSLogMessage) {
-        guard AppLog.allows(.notice) else { return }
-        logger.notice(message)
-    }
+    /// Key lifecycle milestones. This is the default level for `atLog`.
+    var atNotice: Logger { AppLog.allows(.notice) ? logger : Self.disabled }
 
-    /// Alias for `notice`, matching `os.Logger`'s default `log` level.
-    func log(_ message: OSLogMessage) {
-        notice(message)
-    }
+    /// Alias for `atNotice`, matching `os.Logger`'s default `log` level.
+    var atLog: Logger { atNotice }
 
     /// Recoverable failures.
-    func error(_ message: OSLogMessage) {
-        guard AppLog.allows(.error) else { return }
-        logger.error(message)
-    }
+    var atError: Logger { AppLog.allows(.error) ? logger : Self.disabled }
 
     /// Programmer errors / unexpected invariants. Emitted whenever logging is on.
-    func fault(_ message: OSLogMessage) {
-        guard AppLog.allows(.error) else { return }
-        logger.fault(message)
-    }
+    var atFault: Logger { AppLog.allows(.error) ? logger : Self.disabled }
 }

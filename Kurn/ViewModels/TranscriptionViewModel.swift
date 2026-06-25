@@ -67,12 +67,13 @@ final class TranscriptionViewModel {
         _ recording: Recording,
         language: MeetingLanguage,
         mode: TranscriptionMode,
-        diarizationEngine: DiarizationEngine = .heuristic
+        diarizationEngine: DiarizationEngine = .heuristic,
+        onDeviceMultilingualEnabled: Bool = false
     ) async {
         guard !transcribingIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id
-        AppLog.transcription.notice("VM: transcribe requested id=\(recordingID, privacy: .public) mode=\(mode.rawValue, privacy: .public)")
+        AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) mode=\(mode.rawValue, privacy: .public)")
 
         transcribingIDs.insert(recordingID)
         phases[recordingID] = .preparing
@@ -80,10 +81,14 @@ final class TranscriptionViewModel {
         recording.transcriptionMode = mode
         persist()
 
-        if mode == .onDevice {
+        // The FluidAudio multilingual route doesn't use Apple Speech, so don't
+        // gate it on (or block it by a denial of) the Speech authorization.
+        let usesAppleSpeech = mode == .onDevice
+            && !(language == .autoDetect && onDeviceMultilingualEnabled)
+        if usesAppleSpeech {
             let authorized = await ensureAuthorization(for: mode)
             guard authorized else {
-                AppLog.transcription.error("VM: speech permission denied")
+                AppLog.transcription.atError.error("VM: speech permission denied")
                 recording.transcriptionStatus = .failed
                 persist()
                 transcribingIDs.remove(recordingID)
@@ -115,6 +120,7 @@ final class TranscriptionViewModel {
                 language: language,
                 mode: mode,
                 diarizationEngine: diarizationEngine,
+                onDeviceMultilingualEnabled: onDeviceMultilingualEnabled,
                 onPhase: { [weak self] phase in
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.phases[recordingID] = phase }
@@ -139,17 +145,17 @@ final class TranscriptionViewModel {
 
             ensureSpeakers(for: recording.meeting, labels: output.speakerLabels)
             persist()
-            AppLog.transcription.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
+            AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
         } catch let appError as AppError {
             recording.transcriptionStatus = .failed
             persist()
             error = appError
-            AppLog.transcription.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
+            AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
         } catch {
             recording.transcriptionStatus = .failed
             persist()
             self.error = .transcriptionFailed(error.localizedDescription)
-            AppLog.transcription.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
 
         transcribingIDs.remove(recordingID)
@@ -198,7 +204,7 @@ final class TranscriptionViewModel {
         }
 
         isSummarizing = true
-        AppLog.transcription.notice("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
+        AppLog.transcription.atNotice.notice("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
         do {
             let result = try await summaryService.generate(
                 transcriptText: transcriptText,
@@ -225,13 +231,13 @@ final class TranscriptionViewModel {
                 meeting.summary = summary
             }
             persist()
-            AppLog.transcription.notice("VM: summary done")
+            AppLog.transcription.atNotice.notice("VM: summary done")
         } catch let appError as AppError {
             error = appError
-            AppLog.transcription.error("VM: summary failed (AppError): \(appError.errorDescription ?? "nil", privacy: .public)")
+            AppLog.transcription.atError.error("VM: summary failed (AppError): \(appError.errorDescription ?? "nil", privacy: .public)")
         } catch {
             self.error = .apiError(statusCode: 0, message: error.localizedDescription)
-            AppLog.transcription.error("VM: summary failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("VM: summary failed: \(error.localizedDescription, privacy: .public)")
         }
         isSummarizing = false
     }

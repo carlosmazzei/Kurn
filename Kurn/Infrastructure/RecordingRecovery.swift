@@ -63,7 +63,7 @@ enum RecordingRecovery {
         do {
             try context.save()
         } catch {
-            AppLog.recorder.error("recovery: failed to save recovered recordings: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("recovery: failed to save recovered recordings: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -87,7 +87,7 @@ enum RecordingRecovery {
         }
         let recording = Recording(meeting: meeting, fileName: fileName, duration: duration)
         context.insert(recording)
-        AppLog.recorder.notice(
+        AppLog.recorder.atNotice.notice(
             "recovery: reattached orphaned recording \(fileName, privacy: .public) duration=\(duration, privacy: .public)s"
         )
         return true

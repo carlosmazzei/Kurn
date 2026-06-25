@@ -25,13 +25,13 @@ actor AudioPreprocessor {
     /// its URL. The caller owns the file and should `cleanup` it when done.
     func process(url: URL) async throws -> URL {
         let started = Date()
-        AppLog.transcription.debug("preprocess: open \(url.lastPathComponent, privacy: .public)")
+        AppLog.transcription.atDebug.debug("preprocess: open \(url.lastPathComponent, privacy: .public)")
         let inputFile = try AVAudioFile(forReading: url)
         let inputFormat = inputFile.processingFormat
         let totalInputFrames = inputFile.length
-        AppLog.transcription.debug("preprocess: input sampleRate=\(inputFormat.sampleRate, privacy: .public) channels=\(inputFormat.channelCount, privacy: .public) frames=\(totalInputFrames, privacy: .public)")
+        AppLog.transcription.atDebug.debug("preprocess: input sampleRate=\(inputFormat.sampleRate, privacy: .public) channels=\(inputFormat.channelCount, privacy: .public) frames=\(totalInputFrames, privacy: .public)")
         guard totalInputFrames > 0, inputFormat.sampleRate > 0 else {
-            AppLog.transcription.error("preprocess: invalid input (no frames or zero sample rate)")
+            AppLog.transcription.atError.error("preprocess: invalid input (no frames or zero sample rate)")
             throw AppError.audioError(
                 NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
             )
@@ -116,7 +116,7 @@ actor AudioPreprocessor {
         // Cap on output frames given the resample ratio (safety against runaway).
         let ratio = outputFormat.sampleRate / inputFormat.sampleRate
         let expectedOutFrames = AVAudioFramePosition(Double(totalInputFrames) * ratio)
-        AppLog.transcription.debug("preprocess: rendering ~\(expectedOutFrames, privacy: .public) frames @16kHz")
+        AppLog.transcription.atDebug.debug("preprocess: rendering ~\(expectedOutFrames, privacy: .public) frames @16kHz")
 
         let renderStart = Date()
         var lastLoggedProgress = 0.0
@@ -129,10 +129,10 @@ actor AudioPreprocessor {
                 try outFile.write(from: renderBuffer)
             case .insufficientDataFromInputNode:
                 // Source exhausted — we're done.
-                AppLog.transcription.debug("preprocess: input exhausted at \(engine.manualRenderingSampleTime, privacy: .public) frames")
+                AppLog.transcription.atDebug.debug("preprocess: input exhausted at \(engine.manualRenderingSampleTime, privacy: .public) frames")
                 break renderLoop
             case .cannotDoInCurrentContext, .error:
-                AppLog.transcription.error("preprocess: render stopped early (status=\(status.rawValue, privacy: .public)) at \(engine.manualRenderingSampleTime, privacy: .public) frames")
+                AppLog.transcription.atError.error("preprocess: render stopped early (status=\(status.rawValue, privacy: .public)) at \(engine.manualRenderingSampleTime, privacy: .public) frames")
                 break renderLoop
             @unknown default:
                 break renderLoop
@@ -141,13 +141,13 @@ actor AudioPreprocessor {
             let progress = Double(engine.manualRenderingSampleTime) / Double(max(1, expectedOutFrames))
             if progress - lastLoggedProgress >= 0.25 {
                 lastLoggedProgress = progress
-                AppLog.transcription.debug("preprocess: render progress \(Int(progress * 100), privacy: .public)%")
+                AppLog.transcription.atDebug.debug("preprocess: render progress \(Int(progress * 100), privacy: .public)%")
             }
         }
 
         player.stop()
         engine.stop()
-        AppLog.transcription.info("preprocess: done in \(Date().timeIntervalSince(renderStart), privacy: .public)s (total \(Date().timeIntervalSince(started), privacy: .public)s) -> \(outURL.lastPathComponent, privacy: .public)")
+        AppLog.transcription.atInfo.info("preprocess: done in \(Date().timeIntervalSince(renderStart), privacy: .public)s (total \(Date().timeIntervalSince(started), privacy: .public)s) -> \(outURL.lastPathComponent, privacy: .public)")
         return outURL
     }
 

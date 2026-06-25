@@ -21,7 +21,7 @@ actor FluidAudioDiarizer: Diarizing {
     // isolation boundary. `manager` is a `let` never exposed outside this actor,
     // so there's no real aliasing risk — `nonisolated(unsafe)` matches the same
     // pattern already used for `LockScreenRecordingController.activity`.
-    private nonisolated(unsafe) let manager = OfflineDiarizerManager(config: Self.tunedConfig)
+    private nonisolated(unsafe) let manager = OfflineDiarizerManager(config: FluidAudioDiarizer.tunedConfig)
     private var modelsReady = false
     private let prepareTimeout: TimeInterval = 60
     private let processTimeout: TimeInterval = 120
@@ -58,7 +58,7 @@ actor FluidAudioDiarizer: Diarizing {
                 }
                 modelsReady = true
             } catch {
-                AppLog.transcription.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
                 onDownloadFailure?(error.localizedDescription)
                 return [Self.fallbackTurn(for: url)]
             }
@@ -71,7 +71,7 @@ actor FluidAudioDiarizer: Diarizing {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
             // which would mislead the user into re-consenting for no reason.
-            AppLog.transcription.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
             return [Self.fallbackTurn(for: url)]
         }
     }
@@ -90,7 +90,7 @@ actor FluidAudioDiarizer: Diarizing {
     private func processAndMapTurns(url: URL) async throws -> [SpeakerTurn] {
         let result = try await manager.process(url)
         let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
-        AppLog.transcription.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
+        AppLog.transcription.atInfo.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
         return Self.turns(from: result.segments)
     }
 
@@ -159,7 +159,7 @@ actor FluidAudioDiarizer: Diarizing {
 
     func diarize(url: URL, onDownloadFailure: (@Sendable (String) -> Void)?) async -> [SpeakerTurn] {
         let message = NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
-        AppLog.transcription.error("FluidAudioDiarizer: \(message, privacy: .public)")
+        AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)
         return [Self.fallbackTurn(for: url)]
     }

@@ -3,9 +3,12 @@
 //  Kurn
 //
 //  Opt-in live transcription preview shown while recording. Wraps FluidAudio's
-//  streaming ASR (Parakeet EOU). This is preview-only: nothing here is ever
-//  persisted — the authoritative transcript still comes from
-//  TranscriptionService after the recording finishes.
+//  streaming ASR. The model is picked from the meeting language: English uses the
+//  lightweight English-only Parakeet EOU; every other language (and auto-detect)
+//  uses the multilingual streaming model so e.g. Portuguese is transcribed
+//  correctly. This is preview-only: nothing here is ever persisted — the
+//  authoritative transcript still comes from TranscriptionService after the
+//  recording finishes.
 //
 
 import AVFoundation
@@ -29,22 +32,24 @@ final class LiveTranscriptionService {
     /// a slow/stalled engine can't pile up queued copies and Tasks.
     private let inFlight = InFlightGate()
 
-    func start() async {
+    func start(language: MeetingLanguage) async {
         guard engine == nil, !isLoading else { return }
         isLoading = true
         isUnavailable = false
         partialText = ""
         defer { isLoading = false }
-        AppLog.transcription.info("LiveTranscriptionService: loading Parakeet EOU 160ms…")
-        let candidate = StreamingModelVariant.parakeetEou160ms.createManager()
+        let candidate: any StreamingAsrManager = language.usesEnglishOnlyStreamingModel
+            ? StreamingModelVariant.parakeetEou160ms.createManager()
+            : FluidAudioMultilingualStreamingManager()
+        AppLog.transcription.atInfo.info("LiveTranscriptionService: loading streaming model for language=\(language.rawValue, privacy: .public)…")
         do {
             try await candidate.loadModels()
         } catch {
-            AppLog.transcription.error("LiveTranscriptionService: model load failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: model load failed: \(error.localizedDescription, privacy: .public)")
             isUnavailable = true
             return
         }
-        AppLog.transcription.notice("LiveTranscriptionService: model loaded, activating live preview")
+        AppLog.transcription.atNotice.notice("LiveTranscriptionService: model loaded, activating live preview")
         // Wire the callback BEFORE flipping `isActive`, so the very first
         // chunk processed after activation can update the UI. (Previously the
         // callback was set after, racing with `processBufferedAudio` callers
@@ -86,7 +91,7 @@ final class LiveTranscriptionService {
         do {
             _ = try await engine.finish()
         } catch {
-            AppLog.transcription.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
         }
         await engine.cleanup()
         self.engine = nil
@@ -102,7 +107,7 @@ final class LiveTranscriptionService {
             try await engine.processBufferedAudio()
         } catch {
             // Best-effort preview; drop the buffer and keep listening.
-            AppLog.transcription.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -151,6 +156,16 @@ private final class InFlightGate: @unchecked Sendable {
     }
 }
 
+private extension MeetingLanguage {
+    /// English uses the lighter English-only Parakeet EOU streaming model;
+    /// everything else — including auto-detect, so a Portuguese speaker who
+    /// leaves the meeting on "Auto" still gets sensible output — uses the
+    /// multilingual streaming model via `FluidAudioMultilingualStreamingManager`.
+    var usesEnglishOnlyStreamingModel: Bool {
+        self == .english
+    }
+}
+
 #else
 
 /// Built without the FluidAudio package linked: the preview stays unavailable
@@ -163,7 +178,7 @@ final class LiveTranscriptionService {
     private(set) var isLoading = false
     private(set) var isUnavailable = false
 
-    func start() async {
+    func start(language: MeetingLanguage) async {
         isUnavailable = true
     }
 
