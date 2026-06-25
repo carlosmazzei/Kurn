@@ -25,19 +25,23 @@ enum ModelStore {
 
         var id: String { rawValue }
 
-        /// Folder names under `modelsDirectory`.
+        /// Folder names under `modelsDirectory`. These are FluidAudio's internal
+        /// `Repo.folderName` cache-folder aliases, not the HuggingFace repo
+        /// names — e.g. `Repo.parakeetEou160.folderName` is
+        /// `"parakeet-eou-streaming/160ms"`, so the group folder here is the
+        /// shared parent `"parakeet-eou-streaming"`.
         var folderNames: [String] {
             switch self {
             case .liveTranscription:
                 // English-only EOU + multilingual Nemotron streaming.
                 return [
-                    "parakeet-realtime-eou-120m-coreml",
-                    "Nemotron-3.5-ASR-Streaming-Multilingual-0.6b-CoreML"
+                    "parakeet-eou-streaming",
+                    "nemotron-multilingual"
                 ]
             case .onDeviceLanguage:
-                return ["parakeet-tdt-0.6b-v3-coreml"]
+                return ["parakeet-tdt-0.6b-v3"]
             case .diarization:
-                return ["speaker-diarization-coreml"]
+                return ["speaker-diarization"]
             }
         }
 
