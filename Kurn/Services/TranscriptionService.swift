@@ -50,21 +50,21 @@ struct TranscriptionService {
         onDiarizationWarning: DiarizationWarningHandler? = nil
     ) async throws -> Output {
         let started = Date()
-        AppLog.transcription.notice("transcribe: start file=\(fileName, privacy: .public) mode=\(mode.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
+        AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) mode=\(mode.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
 
         // Clean the audio (high-pass, presence EQ, AGC/limiter, mono 16 kHz)
         // before transcription/diarization. If cleanup fails for any reason we
         // fall back to the original so transcription never breaks.
         onPhase(.preprocessing)
-        AppLog.transcription.debug("transcribe: preprocessing…")
+        AppLog.transcription.atDebug.debug("transcribe: preprocessing…")
         let preStart = Date()
         let cleanedURL: URL
         do {
             cleanedURL = try await preprocessor.process(url: fileURL)
-            AppLog.transcription.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s -> cleaned copy")
+            AppLog.transcription.atDebug.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s -> cleaned copy")
         } catch {
             cleanedURL = fileURL
-            AppLog.transcription.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
         }
         defer {
             if cleanedURL != fileURL {
@@ -76,7 +76,7 @@ struct TranscriptionService {
         // Transcription and diarization both read the same file but are
         // independent, so run them concurrently instead of back to back.
         onPhase(.transcribing(progress: nil))
-        AppLog.transcription.debug("transcribe: transcribing + diarizing (concurrent)…")
+        AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
         async let rawTranscript = transcribeRaw(
             fileURL: cleanedURL,
@@ -93,7 +93,7 @@ struct TranscriptionService {
 
         let raw = try await rawTranscript
         let turns = await speakerTurns
-        AppLog.transcription.info("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
+        AppLog.transcription.atInfo.info("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
 
         onPhase(.finalizing)
         let segments = fuse(spans: raw.spans, turns: turns)
@@ -103,7 +103,7 @@ struct TranscriptionService {
             labels.append(segment.speakerLabel)
         }
 
-        AppLog.transcription.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public)")
+        AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public)")
         return Output(
             segments: segments,
             language: raw.language,
@@ -128,7 +128,7 @@ struct TranscriptionService {
             // Pinned languages keep using Apple Speech (no download, and it
             // covers locales the multilingual model doesn't, e.g. ja/zh).
             if language == .autoDetect && onDeviceMultilingualEnabled {
-                AppLog.transcription.info("transcribe: on-device auto-detect via FluidAudio multilingual ASR")
+                AppLog.transcription.atInfo.info("transcribe: on-device auto-detect via FluidAudio multilingual ASR")
                 return try await fluidAudioTranscriber.transcribe(url: fileURL, language: language)
             }
             return try await onDevice.transcribe(url: fileURL, language: language)
@@ -168,7 +168,7 @@ struct TranscriptionService {
         let provider = try ProviderFactory.whisperProvider()
         let chunks = try await chunker.chunk(url: fileURL)
         let total = chunks.count
-        AppLog.transcription.info("whisper: uploading \(total, privacy: .public) chunk(s)")
+        AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s)")
         defer { Task { await chunker.cleanup(chunks) } }
 
         var allSpans: [TranscribedSpan] = []
@@ -182,7 +182,7 @@ struct TranscriptionService {
                 onPhase(.transcribing(progress: Double(index) / Double(total)))
             }
             let data = try Data(contentsOf: chunk.url)
-            AppLog.transcription.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
+            AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
             let result = try await provider.transcribe(
                 audioData: data,
                 fileName: chunk.url.lastPathComponent,

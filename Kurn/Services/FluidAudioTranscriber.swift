@@ -9,11 +9,6 @@
 //  transcribes in English. Used for the post-recording transcript when the
 //  meeting language is "Auto"; pinned languages stay on `OnDeviceTranscriber`.
 //
-//  NOTE: the FluidAudio batch-ASR symbols below (`AsrModels.downloadAndLoad`,
-//  `AsrManager(config:)`, `configure(models:)`, `transcribe(_:source:)`, the
-//  `.v3` model version, `.default` config, and the `.system` audio source)
-//  follow the documented API and must be confirmed against the linked package
-//  version when building on macOS; bump the FluidAudio dependency if needed.
 //
 
 import AVFoundation
@@ -34,13 +29,14 @@ actor FluidAudioTranscriber {
     func transcribe(url: URL, language: MeetingLanguage) async throws -> RawTranscript {
         let manager = try await loadedManager()
 
-        AppLog.transcription.debug("fluidAudio: transcribing (auto language detection)")
+        AppLog.transcription.atDebug.debug("fluidAudio: transcribing (auto language detection)")
         let text: String
         do {
-            let result = try await manager.transcribe(url, source: .system)
+            var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+            let result = try await manager.transcribe(url, decoderState: &decoderState)
             text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
-            AppLog.transcription.error("fluidAudio: transcription failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("fluidAudio: transcription failed: \(error.localizedDescription, privacy: .public)")
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
 
@@ -65,13 +61,12 @@ actor FluidAudioTranscriber {
         if let manager { return manager }
         do {
             let models = try await AsrModels.downloadAndLoad(version: .v3)
-            let created = AsrManager(config: .default)
-            try await created.configure(models: models)
+            let created = AsrManager(config: .default, models: models)
             manager = created
-            AppLog.transcription.notice("fluidAudio: multilingual ASR models loaded")
+            AppLog.transcription.atNotice.notice("fluidAudio: multilingual ASR models loaded")
             return created
         } catch {
-            AppLog.transcription.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
     }

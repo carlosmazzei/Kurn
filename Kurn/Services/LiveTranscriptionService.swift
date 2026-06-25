@@ -38,17 +38,18 @@ final class LiveTranscriptionService {
         isUnavailable = false
         partialText = ""
         defer { isLoading = false }
-        let variant = language.streamingVariant
-        AppLog.transcription.info("LiveTranscriptionService: loading streaming model \(String(describing: variant), privacy: .public) for language=\(language.rawValue, privacy: .public)…")
-        let candidate = variant.createManager()
+        let candidate: any StreamingAsrManager = language.usesEnglishOnlyStreamingModel
+            ? StreamingModelVariant.parakeetEou160ms.createManager()
+            : FluidAudioMultilingualStreamingManager()
+        AppLog.transcription.atInfo.info("LiveTranscriptionService: loading streaming model for language=\(language.rawValue, privacy: .public)…")
         do {
             try await candidate.loadModels()
         } catch {
-            AppLog.transcription.error("LiveTranscriptionService: model load failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: model load failed: \(error.localizedDescription, privacy: .public)")
             isUnavailable = true
             return
         }
-        AppLog.transcription.notice("LiveTranscriptionService: model loaded, activating live preview")
+        AppLog.transcription.atNotice.notice("LiveTranscriptionService: model loaded, activating live preview")
         // Wire the callback BEFORE flipping `isActive`, so the very first
         // chunk processed after activation can update the UI. (Previously the
         // callback was set after, racing with `processBufferedAudio` callers
@@ -90,7 +91,7 @@ final class LiveTranscriptionService {
         do {
             _ = try await engine.finish()
         } catch {
-            AppLog.transcription.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
         }
         await engine.cleanup()
         self.engine = nil
@@ -106,7 +107,7 @@ final class LiveTranscriptionService {
             try await engine.processBufferedAudio()
         } catch {
             // Best-effort preview; drop the buffer and keep listening.
-            AppLog.transcription.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -156,23 +157,12 @@ private final class InFlightGate: @unchecked Sendable {
 }
 
 private extension MeetingLanguage {
-    /// Streaming model best suited to this language. English uses the lighter
-    /// English-only Parakeet EOU; everything else — including auto-detect, so a
-    /// Portuguese speaker who leaves the meeting on "Auto" still gets sensible
-    /// output — uses the multilingual streaming model.
-    ///
-    /// NOTE: confirm the multilingual case name against the linked FluidAudio
-    /// version (the multilingual streaming model arrived in 0.15.0 as the
-    /// Nemotron streaming variant). This is the single FluidAudio symbol to
-    /// adjust if the enum spelling differs; bump the package if the case is
-    /// only available in a newer release.
-    var streamingVariant: StreamingModelVariant {
-        switch self {
-        case .english:
-            return .parakeetEou160ms
-        default:
-            return .nemotronMultilingual160ms
-        }
+    /// English uses the lighter English-only Parakeet EOU streaming model;
+    /// everything else — including auto-detect, so a Portuguese speaker who
+    /// leaves the meeting on "Auto" still gets sensible output — uses the
+    /// multilingual streaming model via `FluidAudioMultilingualStreamingManager`.
+    var usesEnglishOnlyStreamingModel: Bool {
+        self == .english
     }
 }
 

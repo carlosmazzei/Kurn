@@ -93,10 +93,10 @@ final class RecorderViewModel {
 
     /// Request permission (if needed) and begin recording.
     func startRecording() async {
-        AppLog.recorderUI.notice("startRecording: begin, requesting permission")
+        AppLog.recorderUI.atNotice.notice("startRecording: begin, requesting permission")
         let granted = await recorder.requestMicrophonePermission()
         guard granted else {
-            AppLog.recorderUI.error("startRecording: permission denied")
+            AppLog.recorderUI.atError.error("startRecording: permission denied")
             permissionDenied = true
             return
         }
@@ -127,14 +127,14 @@ final class RecorderViewModel {
                 onStop: { [weak self] in self?.stopAndSave() }
             )
             await liveStartTask?.value
-            AppLog.recorderUI.info("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
+            AppLog.recorderUI.atInfo.info("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
         } catch let appError as AppError {
-            AppLog.recorderUI.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
+            AppLog.recorderUI.atError.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
             await liveStartTask?.value
             if liveTranscriptionEnabled { await liveTranscription.stop() }
             error = appError
         } catch {
-            AppLog.recorderUI.error("startRecording: error: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorderUI.atError.error("startRecording: error: \(error.localizedDescription, privacy: .public)")
             await liveStartTask?.value
             if liveTranscriptionEnabled { await liveTranscription.stop() }
             self.error = .audioError(error.localizedDescription)
@@ -142,7 +142,7 @@ final class RecorderViewModel {
     }
 
     func togglePause() {
-        AppLog.recorderUI.info("togglePause: state=\(String(describing: self.recorder.state), privacy: .public)")
+        AppLog.recorderUI.atInfo.info("togglePause: state=\(String(describing: self.recorder.state), privacy: .public)")
         switch recorder.state {
         case .recording: recorder.pause()
         case .paused: recorder.resume()
@@ -152,7 +152,7 @@ final class RecorderViewModel {
 
     /// Stop, save the segment to SwiftData, and flag completion.
     func stopAndSave() {
-        AppLog.recorderUI.notice("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
+        AppLog.recorderUI.atNotice.notice("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
         if liveTranscriptionEnabled { Task { await liveTranscription.stop() } }
         guard let result = recorder.stop() else {
             lockScreenController.end()
