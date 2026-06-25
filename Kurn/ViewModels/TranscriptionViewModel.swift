@@ -57,36 +57,34 @@ final class TranscriptionViewModel {
 
     // MARK: - Transcription
 
-    /// Request the on-device speech permission when needed for the chosen mode.
-    func ensureAuthorization(for mode: TranscriptionMode) async -> Bool {
-        guard mode == .onDevice else { return true }
-        return await OnDeviceTranscriber().requestAuthorization()
+    /// Request the on-device Speech permission. Only the Apple Speech engine
+    /// needs it; the FluidAudio and Whisper engines don't use `SFSpeechRecognizer`.
+    func ensureSpeechAuthorization() async -> Bool {
+        await OnDeviceTranscriber().requestAuthorization()
     }
 
     func transcribe(
         _ recording: Recording,
         language: MeetingLanguage,
-        mode: TranscriptionMode,
-        diarizationEngine: DiarizationEngine = .heuristic,
-        onDeviceMultilingualEnabled: Bool = false
+        config: PipelineConfiguration
     ) async {
         guard !transcribingIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id
-        AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) mode=\(mode.rawValue, privacy: .public)")
+        AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public)")
 
         transcribingIDs.insert(recordingID)
         phases[recordingID] = .preparing
         recording.transcriptionStatus = .inProgress
-        recording.transcriptionMode = mode
+        recording.transcriptionMode = config.transcription.storageMode
         persist()
 
-        // The FluidAudio multilingual route doesn't use Apple Speech, so don't
-        // gate it on (or block it by a denial of) the Speech authorization.
-        let usesAppleSpeech = mode == .onDevice
-            && !(language == .autoDetect && onDeviceMultilingualEnabled)
+        // Only the Apple Speech engine uses `SFSpeechRecognizer`; the FluidAudio
+        // and Whisper engines don't, so don't gate them on (or block them by a
+        // denial of) the Speech authorization.
+        let usesAppleSpeech = config.transcription == .appleSpeech
         if usesAppleSpeech {
-            let authorized = await ensureAuthorization(for: mode)
+            let authorized = await ensureSpeechAuthorization()
             guard authorized else {
                 AppLog.transcription.atError.error("VM: speech permission denied")
                 recording.transcriptionStatus = .failed
@@ -118,9 +116,7 @@ final class TranscriptionViewModel {
                 fileURL: fileURL,
                 fileName: fileName,
                 language: language,
-                mode: mode,
-                diarizationEngine: diarizationEngine,
-                onDeviceMultilingualEnabled: onDeviceMultilingualEnabled,
+                config: config,
                 onPhase: { [weak self] phase in
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.phases[recordingID] = phase }

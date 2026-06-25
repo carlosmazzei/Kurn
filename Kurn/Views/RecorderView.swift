@@ -36,7 +36,7 @@ struct RecorderView: View {
                 vm = RecorderViewModel(
                     meeting: meeting,
                     modelContext: modelContext,
-                    defaultMode: settings.defaultMode,
+                    defaultMode: settings.transcriptionEngine.storageMode,
                     micPickup: settings.micPickup,
                     audioQuality: settings.audioQuality,
                     liveTranscriptionEnabled: settings.liveTranscriptionEnabled

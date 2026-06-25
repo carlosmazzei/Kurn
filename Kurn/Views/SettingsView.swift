@@ -31,6 +31,13 @@ struct SettingsView: View {
     @State private var showingBatchASRConsent = false
     @State private var showingDiarizationConsent = false
     @State private var pendingDiarizationEngine: DiarizationEngine?
+    /// Engine choices awaiting a successful on-device-ASR model download before
+    /// they're applied (both the transcription and language-detection pickers
+    /// can require that model).
+    @State private var pendingTranscriptionEngine: TranscriptionEngine?
+    @State private var pendingLanguageDetectionEngine: LanguageDetectionEngine?
+    @State private var showingVADConsent = false
+    @State private var pendingVADEngine: VADEngine?
     /// Which FluidAudio model set is currently downloading (`nil` when idle), so
     /// the toggle/picker can't be re-triggered mid-download and the matching
     /// section can surface a progress indicator.
@@ -236,14 +243,27 @@ struct SettingsView: View {
                     do {
                         try await ModelDownloadConsent.download(.onDeviceASR)
                         settings.fluidAudioBatchASRModelsConsented = true
+                        // Apply whichever picker requested the download.
+                        if let engine = pendingTranscriptionEngine {
+                            settings.transcriptionEngine = engine
+                        }
+                        if let engine = pendingLanguageDetectionEngine {
+                            settings.languageDetectionEngine = engine
+                        }
                     } catch let appError as AppError {
                         modelDownloadError = appError
                     } catch {
                         modelDownloadError = .modelDownloadFailed(error.localizedDescription)
                     }
+                    pendingTranscriptionEngine = nil
+                    pendingLanguageDetectionEngine = nil
                     downloadingModel = nil
                     refreshModelSizes()
                 }
+            },
+            onCancelBatchASR: {
+                pendingTranscriptionEngine = nil
+                pendingLanguageDetectionEngine = nil
             },
             onConfirmDiarization: {
                 guard let engine = pendingDiarizationEngine else { return }
@@ -270,6 +290,33 @@ struct SettingsView: View {
             },
             onCancelDiarization: {
                 pendingDiarizationEngine = nil
+            },
+            showingVADConsent: $showingVADConsent,
+            onConfirmVAD: {
+                guard let engine = pendingVADEngine else { return }
+                pendingVADEngine = nil
+                downloadingModel = .vad
+                Task {
+                    // Keep a finite background window so the download isn't
+                    // aborted the moment Settings leaves the foreground.
+                    let background = BackgroundActivity()
+                    background.begin(name: "ai.kurn.modelDownload")
+                    defer { background.end() }
+                    do {
+                        try await ModelDownloadConsent.download(.vad)
+                        settings.fluidAudioVADModelsConsented = true
+                        settings.vadEngine = engine
+                    } catch let appError as AppError {
+                        modelDownloadError = appError
+                    } catch {
+                        modelDownloadError = .modelDownloadFailed(error.localizedDescription)
+                    }
+                    downloadingModel = nil
+                    refreshModelSizes()
+                }
+            },
+            onCancelVAD: {
+                pendingVADEngine = nil
             }
         ))
         .alert(
@@ -289,24 +336,22 @@ struct SettingsView: View {
     @ViewBuilder
     private func transcriptionSection(settings: AppSettings) -> some View {
         Section {
+            // Transcription engine (the stage that turns audio into text).
             Picker(
-                NSLocalizedString("settings.default_mode", comment: "Default mode"),
+                NSLocalizedString("pipeline.transcription_engine", comment: "Transcription engine"),
                 selection: Binding(
-                    get: { settings.defaultMode },
-                    set: { mode in
-                        if mode != .whisperAPI || hasOpenAIAPIKey {
-                            settings.defaultMode = mode
-                        }
-                    }
+                    get: { settings.transcriptionEngine },
+                    set: { selectTranscriptionEngine($0, settings: settings) }
                 )
             ) {
-                ForEach(TranscriptionMode.allCases) { mode in
-                    Text(mode.displayName)
-                        .tag(mode)
-                        .disabled(mode == .whisperAPI && !hasOpenAIAPIKey)
+                ForEach(TranscriptionEngine.allCases) { engine in
+                    Text(engine.displayName)
+                        .tag(engine)
+                        .disabled(engine == .whisperAPI && !hasOpenAIAPIKey)
                 }
             }
-            .pickerStyle(.segmented)
+            .disabled(downloadingModel != nil)
+
             Picker(
                 NSLocalizedString("settings.default_language", comment: "Default language"),
                 selection: Binding(
@@ -316,23 +361,43 @@ struct SettingsView: View {
             ) {
                 ForEach(MeetingLanguage.allCases) { Text($0.displayName).tag($0) }
             }
-            Toggle(
-                NSLocalizedString("settings.on_device_auto_language", comment: "On-device automatic language detection"),
-                isOn: Binding(
-                    get: { settings.fluidAudioBatchASRModelsConsented },
-                    set: { enabled in
-                        if enabled && !settings.fluidAudioBatchASRModelsConsented {
-                            showingBatchASRConsent = true
-                        } else {
-                            settings.fluidAudioBatchASRModelsConsented = enabled
-                        }
-                    }
+
+            // Audio cleanup/normalization.
+            Picker(
+                NSLocalizedString("pipeline.preprocessing", comment: "Audio cleanup"),
+                selection: Binding(
+                    get: { settings.preprocessingEngine },
+                    set: { settings.preprocessingEngine = $0 }
                 )
-            )
-            .disabled(downloadingModel != nil)
-            if downloadingModel == .onDeviceASR {
-                modelDownloadProgressRow
+            ) {
+                ForEach(PreprocessingEngine.allCases) { Text($0.displayName).tag($0) }
             }
+
+            // Voice-activity detection.
+            Picker(
+                NSLocalizedString("pipeline.vad", comment: "Voice activity detection"),
+                selection: Binding(
+                    get: { settings.vadEngine },
+                    set: { selectVADEngine($0, settings: settings) }
+                )
+            ) {
+                ForEach(VADEngine.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(downloadingModel != nil)
+
+            // Language detection.
+            Picker(
+                NSLocalizedString("pipeline.language_detection", comment: "Language detection"),
+                selection: Binding(
+                    get: { settings.languageDetectionEngine },
+                    set: { selectLanguageDetectionEngine($0, settings: settings) }
+                )
+            ) {
+                ForEach(LanguageDetectionEngine.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(downloadingModel != nil)
+
+            // Speaker diarization.
             Picker(
                 NSLocalizedString("settings.diarization_engine", comment: "Diarization engine"),
                 selection: Binding(
@@ -350,11 +415,12 @@ struct SettingsView: View {
                 ForEach(DiarizationEngine.allCases) { Text($0.displayName).tag($0) }
             }
             .disabled(downloadingModel != nil)
-            if downloadingModel == .diarization {
+
+            if downloadingModel == .onDeviceASR || downloadingModel == .diarization || downloadingModel == .vad {
                 modelDownloadProgressRow
             }
         } header: {
-            Text(NSLocalizedString("settings.transcription", comment: "Transcription"))
+            Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
         } footer: {
             Text(NSLocalizedString(
                 hasOpenAIAPIKey
@@ -362,6 +428,41 @@ struct SettingsView: View {
                     : "settings.whisper_openai_key_missing_footer",
                 comment: "Whisper OpenAI key dependency"
             ))
+        }
+    }
+
+    /// Apply a transcription-engine choice, intercepting the FluidAudio engine
+    /// to trigger a one-time model download (and deferring the change until it
+    /// succeeds). Whisper without an OpenAI key is ignored (the row is disabled).
+    private func selectTranscriptionEngine(_ engine: TranscriptionEngine, settings: AppSettings) {
+        if engine == .whisperAPI && !hasOpenAIAPIKey { return }
+        if engine.requiredModelSet == .onDeviceASR && !settings.fluidAudioBatchASRModelsConsented {
+            pendingTranscriptionEngine = engine
+            showingBatchASRConsent = true
+        } else {
+            settings.transcriptionEngine = engine
+        }
+    }
+
+    /// Apply a language-detection choice, intercepting the FluidAudio detector
+    /// to trigger the same one-time on-device-ASR model download.
+    private func selectLanguageDetectionEngine(_ engine: LanguageDetectionEngine, settings: AppSettings) {
+        if engine.requiredModelSet == .onDeviceASR && !settings.fluidAudioBatchASRModelsConsented {
+            pendingLanguageDetectionEngine = engine
+            showingBatchASRConsent = true
+        } else {
+            settings.languageDetectionEngine = engine
+        }
+    }
+
+    /// Apply a VAD choice, intercepting the FluidAudio engine to trigger the
+    /// one-time Silero VAD model download.
+    private func selectVADEngine(_ engine: VADEngine, settings: AppSettings) {
+        if engine.requiredModelSet == .vad && !settings.fluidAudioVADModelsConsented {
+            pendingVADEngine = engine
+            showingVADConsent = true
+        } else {
+            settings.vadEngine = engine
         }
     }
 
@@ -510,9 +611,20 @@ struct SettingsView: View {
             settings.fluidAudioASRModelsConsented = false
         case .onDeviceLanguage:
             settings.fluidAudioBatchASRModelsConsented = false
+            // Turn off the engines that depend on the multilingual on-device
+            // model so the UI doesn't point at a now-missing model.
+            if settings.transcriptionEngine == .fluidAudioParakeet {
+                settings.transcriptionEngine = .appleSpeech
+            }
+            if settings.languageDetectionEngine == .fluidAudioLID {
+                settings.languageDetectionEngine = .byTranscriber
+            }
         case .diarization:
             settings.fluidAudioDiarizationModelsConsented = false
             settings.diarizationEngine = .heuristic
+        case .vad:
+            settings.fluidAudioVADModelsConsented = false
+            settings.vadEngine = .energyThreshold
         }
         pendingModelDeletion = nil
         refreshModelSizes()
@@ -539,8 +651,8 @@ struct SettingsView: View {
     }
 
     private func ensureWhisperSelectionIsAllowed() {
-        if !hasOpenAIAPIKey && settings.defaultMode == .whisperAPI {
-            settings.defaultMode = .onDevice
+        if !hasOpenAIAPIKey && settings.transcriptionEngine == .whisperAPI {
+            settings.transcriptionEngine = .appleSpeech
         }
     }
 }
@@ -552,8 +664,12 @@ private struct ModelDownloadAlerts: ViewModifier {
     @Binding var showingDiarizationConsent: Bool
     let onConfirmASR: () -> Void
     let onConfirmBatchASR: () -> Void
+    let onCancelBatchASR: () -> Void
     let onConfirmDiarization: () -> Void
     let onCancelDiarization: () -> Void
+    @Binding var showingVADConsent: Bool
+    let onConfirmVAD: () -> Void
+    let onCancelVAD: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -571,7 +687,7 @@ private struct ModelDownloadAlerts: ViewModifier {
                 isPresented: $showingBatchASRConsent
             ) {
                 Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmBatchASR)
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelBatchASR)
             } message: {
                 Text(NSLocalizedString("settings.model_download.message", comment: ""))
             }
@@ -581,6 +697,15 @@ private struct ModelDownloadAlerts: ViewModifier {
             ) {
                 Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmDiarization)
                 Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelDiarization)
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message", comment: ""))
+            }
+            .alert(
+                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+                isPresented: $showingVADConsent
+            ) {
+                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmVAD)
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelVAD)
             } message: {
                 Text(NSLocalizedString("settings.model_download.message", comment: ""))
             }
@@ -631,262 +756,5 @@ private struct ProviderIcon: View {
     }
 }
 
-/// Editor for a provider's non-secret config plus API key.
-private struct ProviderEditor: View {
-    let provider: AIProvider
-    let onSave: (AIProvider) -> Void
-    let onDelete: () -> Void
-    let onChange: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var kind = AIProviderKind.openAICompatible
-    @State private var baseURLString = ""
-    @State private var key = ""
-    @State private var showingDeleteConfirm = false
-
-    private var canEditDetails: Bool { !provider.isBuiltIn }
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                TextField(NSLocalizedString("settings.provider_name", comment: "Provider name"), text: $name)
-                    .disabled(!canEditDetails)
-                Picker(NSLocalizedString("settings.provider_type", comment: "Provider type"), selection: $kind) {
-                    ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
-                }
-                .disabled(!canEditDetails)
-                TextField(NSLocalizedString("settings.base_url", comment: "Base URL"), text: $baseURLString)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-                    .disabled(!canEditDetails)
-            } footer: {
-                Text(NSLocalizedString("settings.base_url_footer", comment: "Base URL footer"))
-            }
-
-            Section {
-                SecureField(
-                    NSLocalizedString("settings.api_key", comment: "API Key"),
-                    text: $key
-                )
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            } header: {
-                Text(NSLocalizedString("settings.credentials", comment: "Credentials"))
-            } footer: {
-                Text(String(
-                    format: NSLocalizedString("settings.key_footer", comment: "Stored securely"),
-                    provider.displayName
-                ))
-            }
-
-            if !key.isEmpty {
-                Section {
-                    Button(role: .destructive) {
-                        key = ""
-                        KeychainManager.shared.delete(provider.keychainAccount)
-                        onChange()
-                    } label: {
-                        Text(NSLocalizedString("settings.remove_key", comment: "Remove key"))
-                    }
-                }
-            }
-
-            if !provider.isBuiltIn {
-                Section {
-                    Button(role: .destructive) {
-                        showingDeleteConfirm = true
-                    } label: {
-                        Text(NSLocalizedString("settings.delete_provider", comment: "Delete Provider"))
-                    }
-                }
-            }
-        }
-        .navigationTitle(provider.displayName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if canEditDetails {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.save", comment: "Save")) {
-                        var updated = provider
-                        updated.displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        updated.kind = kind
-                        updated.baseURLString = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onSave(updated)
-                        dismiss()
-                    }
-                    .disabled(!canSave)
-                }
-            }
-        }
-        .onAppear {
-            name = provider.displayName
-            kind = provider.kind
-            baseURLString = provider.baseURLString
-            key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        }
-        .onChange(of: key) { _, newValue in
-            KeychainManager.shared.set(newValue, for: provider.keychainAccount)
-            onChange()
-        }
-        .alert(
-            NSLocalizedString("settings.delete_provider.confirm", comment: "Delete provider?"),
-            isPresented: $showingDeleteConfirm
-        ) {
-            Button(NSLocalizedString("settings.delete_provider", comment: "Delete Provider"), role: .destructive) {
-                onDelete()
-                dismiss()
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        }
-    }
-}
-
-private struct AddProviderView: View {
-    let onAdd: (AIProvider, String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var kind = AIProviderKind.openAICompatible
-    @State private var baseURLString = AIProviderKind.openAICompatible.defaultBaseURLString
-    @State private var key = ""
-
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                TextField(NSLocalizedString("settings.provider_name", comment: "Provider name"), text: $name)
-                Picker(NSLocalizedString("settings.provider_type", comment: "Provider type"), selection: $kind) {
-                    ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
-                }
-                TextField(NSLocalizedString("settings.base_url", comment: "Base URL"), text: $baseURLString)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-            } footer: {
-                Text(NSLocalizedString("settings.base_url_footer", comment: "Base URL footer"))
-            }
-
-            Section(NSLocalizedString("settings.credentials", comment: "Credentials")) {
-                SecureField(NSLocalizedString("settings.api_key", comment: "API Key"), text: $key)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-        }
-        .navigationTitle(NSLocalizedString("settings.add_provider", comment: "Add Provider"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button(NSLocalizedString("common.save", comment: "Save")) {
-                    let provider = AIProvider.custom(
-                        displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                        kind: kind,
-                        baseURLString: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-                    )
-                    onAdd(provider, key)
-                }
-                .disabled(!canSave)
-            }
-        }
-        .onChange(of: kind) { _, newValue in
-            baseURLString = newValue.defaultBaseURLString
-        }
-    }
-}
-
-private struct SummaryModelPicker: View {
-    let settings: AppSettings
-    let provider: AIProvider
-    let revision: Int
-
-    @State private var models: [String] = []
-    @State private var isLoading = false
-    @State private var errorText: String?
-
-    private var selectedModel: String {
-        settings.summaryModel(for: provider)
-    }
-
-    private var pickerModels: [String] {
-        let selected = selectedModel
-        guard !selected.isEmpty else { return models }
-        return models.contains(selected) ? models : [selected] + models
-    }
-
-    var body: some View {
-        Picker(
-            NSLocalizedString("settings.model", comment: "Model"),
-            selection: Binding(
-                get: { settings.summaryModel(for: provider) },
-                set: { settings.setSummaryModel($0, for: provider) }
-            )
-        ) {
-            if pickerModels.isEmpty {
-                Text(NSLocalizedString("settings.no_models", comment: "No models")).tag("")
-            } else {
-                ForEach(pickerModels, id: \.self) { Text($0).tag($0) }
-            }
-        }
-        .disabled(pickerModels.isEmpty)
-        .task(id: "\(provider.id)-\(revision)") {
-            await loadModels()
-        }
-
-        if isLoading {
-            HStack {
-                ProgressView()
-                Text(NSLocalizedString("settings.loading_models", comment: "Loading models"))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        } else if let errorText {
-            Text(errorText)
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.textSecondary)
-        }
-
-        Button {
-            Task { await loadModels() }
-        } label: {
-            Label(NSLocalizedString("settings.refresh_models", comment: "Refresh models"), systemImage: "arrow.clockwise")
-        }
-        .disabled(isLoading || !KeychainManager.shared.hasValue(for: provider.keychainAccount))
-    }
-
-    @MainActor
-    private func loadModels() async {
-        guard KeychainManager.shared.hasValue(for: provider.keychainAccount) else {
-            models = []
-            errorText = NSLocalizedString("settings.models_need_key", comment: "Configure key to load models")
-            return
-        }
-
-        isLoading = true
-        errorText = nil
-        do {
-            let loaded = try await ProviderModelsService().models(for: provider)
-            models = loaded
-            if settings.summaryModel(for: provider).isEmpty, let first = loaded.first {
-                settings.setSummaryModel(first, for: provider)
-            }
-            if loaded.isEmpty {
-                errorText = NSLocalizedString("settings.no_models_loaded", comment: "No models loaded")
-            }
-        } catch {
-            models = []
-            errorText = error.localizedDescription
-        }
-        isLoading = false
-    }
-}
+// ProviderEditor, AddProviderView, and SummaryModelPicker live in
+// SettingsProviderViews.swift to keep this file under the length limit.

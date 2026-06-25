@@ -30,38 +30,48 @@ struct TranscriptionService {
     /// Cap on a single fused segment's spoken duration before it's split.
     private let maxSegmentDuration: TimeInterval = 30
 
-    private let onDevice = OnDeviceTranscriber()
+    // Stage engines are created once and reused across concurrent
+    // transcriptions; the per-stage selectors below map a configuration choice
+    // to one of these existing instances rather than spinning up a new actor
+    // per call. The non-Sendable audio resources stay isolated inside each actor.
+    private let standardPreprocessor = AudioPreprocessor()
+    private let passthroughPreprocessor = PassthroughPreprocessor()
+    private let energyVAD = EnergyVAD()
+    private let fluidAudioVAD = FluidAudioVAD()
+    private let noOpLanguageDetector = NoOpLanguageDetector()
+    private let fluidAudioLanguageDetector = FluidAudioLanguageDetector()
+    private let appleTranscriber = OnDeviceTranscriber()
     private let fluidAudioTranscriber = FluidAudioTranscriber()
+    private let whisperTranscriber = WhisperTranscriber()
     private let heuristicDiarizer = SpeakerDiarizer()
     private let fluidAudioDiarizer = FluidAudioDiarizer()
-    private let chunker = AudioChunker()
-    private let preprocessor = AudioPreprocessor()
+    private let vadCompactor = VADAudioCompactor()
 
-    /// Transcribe one recording file and return diarized segments.
+    /// Transcribe one recording file and return diarized segments, driving each
+    /// pipeline stage through the engine selected in `config`.
     /// - Parameter onPhase: optional progress callback reporting the active stage.
     func transcribe(
         fileURL: URL,
         fileName: String,
         language: MeetingLanguage,
-        mode: TranscriptionMode,
-        diarizationEngine: DiarizationEngine = .heuristic,
-        onDeviceMultilingualEnabled: Bool = false,
+        config: PipelineConfiguration,
         onPhase: @escaping PhaseHandler = { _ in },
         onDiarizationWarning: DiarizationWarningHandler? = nil
     ) async throws -> Output {
         let started = Date()
-        AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) mode=\(mode.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
+        AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
 
-        // Clean the audio (high-pass, presence EQ, AGC/limiter, mono 16 kHz)
-        // before transcription/diarization. If cleanup fails for any reason we
-        // fall back to the original so transcription never breaks.
+        // 1. Clean the audio (selected preprocessing engine) before
+        // transcription/diarization. If cleanup fails for any reason we fall
+        // back to the original so transcription never breaks.
         onPhase(.preprocessing)
-        AppLog.transcription.atDebug.debug("transcribe: preprocessing…")
+        let preprocessor = resolvePreprocessor(config.preprocessing)
+        AppLog.transcription.atDebug.debug("transcribe: preprocessing (\(config.preprocessing.rawValue, privacy: .public))…")
         let preStart = Date()
         let cleanedURL: URL
         do {
             cleanedURL = try await preprocessor.process(url: fileURL)
-            AppLog.transcription.atDebug.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s -> cleaned copy")
+            AppLog.transcription.atDebug.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s")
         } catch {
             cleanedURL = fileURL
             AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
@@ -73,21 +83,37 @@ struct TranscriptionService {
             }
         }
 
-        // Transcription and diarization both read the same file but are
+        // 2. Detect the language (selected engine) to refine the hint. The
+        // default no-op detector returns the hint unchanged, deferring to the
+        // transcription engine's own detection.
+        let detector = resolveLanguageDetector(config.languageDetection)
+        let resolvedLanguage = await detector.detect(url: cleanedURL, hint: language)
+        if resolvedLanguage != language {
+            AppLog.transcription.atInfo.info("transcribe: language refined \(language.rawValue, privacy: .public) -> \(resolvedLanguage.rawValue, privacy: .public)")
+        }
+
+        // 3. Detect speech regions with the selected VAD engine. They drive both
+        // the heuristic diarizer's segmentation and the silence-gating of the
+        // audio fed to transcription.
+        let regions = await resolveVAD(config.vad).detectSpeech(cleanedURL)
+        AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
+
+        // 4. Transcription and diarization both read the same file but are
         // independent, so run them concurrently instead of back to back.
         onPhase(.transcribing(progress: nil))
         AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
-        async let rawTranscript = transcribeRaw(
-            fileURL: cleanedURL,
-            language: language,
-            mode: mode,
-            onDeviceMultilingualEnabled: onDeviceMultilingualEnabled,
+        async let rawTranscript = transcribeGated(
+            cleanedURL: cleanedURL,
+            regions: regions,
+            engine: config.transcription,
+            language: resolvedLanguage,
             onPhase: onPhase
         )
         async let speakerTurns = diarize(
             url: cleanedURL,
-            engine: diarizationEngine,
+            engine: config.diarization,
+            regions: regions,
             onWarning: onDiarizationWarning
         )
 
@@ -95,6 +121,7 @@ struct TranscriptionService {
         let turns = await speakerTurns
         AppLog.transcription.atInfo.info("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
 
+        // 5. Fuse text spans with speaker turns into attributed segments.
         onPhase(.finalizing)
         let segments = fuse(spans: raw.spans, turns: turns)
 
@@ -106,39 +133,87 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public)")
         return Output(
             segments: segments,
-            language: raw.language,
+            language: raw.language.isEmpty ? (resolvedLanguage.localeIdentifier ?? raw.language) : raw.language,
             speakerLabels: labels
         )
     }
 
-    /// Run the chosen transcription engine for the file.
-    private func transcribeRaw(
-        fileURL: URL,
-        language: MeetingLanguage,
-        mode: TranscriptionMode,
-        onDeviceMultilingualEnabled: Bool,
-        onPhase: @escaping PhaseHandler
-    ) async throws -> RawTranscript {
-        switch mode {
-        case .onDevice:
-            // Apple's recognizer needs a fixed locale and can't detect the
-            // spoken language. When the meeting language is "Auto" and the user
-            // has enabled the multilingual on-device model, route to FluidAudio
-            // (Parakeet TDT v3) so the language is detected from the audio.
-            // Pinned languages keep using Apple Speech (no download, and it
-            // covers locales the multilingual model doesn't, e.g. ja/zh).
-            if language == .autoDetect && onDeviceMultilingualEnabled {
-                AppLog.transcription.atInfo.info("transcribe: on-device auto-detect via FluidAudio multilingual ASR")
-                return try await fluidAudioTranscriber.transcribe(url: fileURL, language: language)
-            }
-            return try await onDevice.transcribe(url: fileURL, language: language)
-        case .whisperAPI:
-            return try await transcribeViaWhisper(fileURL: fileURL, language: language, onPhase: onPhase)
+    // MARK: - Per-stage engine selectors
+
+    /// Map a `PreprocessingEngine` to its (already instantiated) engine.
+    private func resolvePreprocessor(_ engine: PreprocessingEngine) -> any AudioPreprocessing {
+        switch engine {
+        case .standardDSP: return standardPreprocessor
+        case .none: return passthroughPreprocessor
         }
     }
 
+    /// Map a `LanguageDetectionEngine` to its engine.
+    private func resolveLanguageDetector(_ engine: LanguageDetectionEngine) -> any LanguageDetecting {
+        switch engine {
+        case .byTranscriber: return noOpLanguageDetector
+        case .fluidAudioLID: return fluidAudioLanguageDetector
+        }
+    }
+
+    /// Map a `TranscriptionEngine` to its engine.
+    private func resolveTranscriber(_ engine: TranscriptionEngine) -> any Transcribing {
+        switch engine {
+        case .appleSpeech: return appleTranscriber
+        case .fluidAudioParakeet: return fluidAudioTranscriber
+        case .whisperAPI: return whisperTranscriber
+        }
+    }
+
+    /// Map a `VADEngine` to its engine.
+    private func resolveVAD(_ engine: VADEngine) -> any VoiceActivityDetecting {
+        switch engine {
+        case .energyThreshold: return energyVAD
+        case .fluidAudio: return fluidAudioVAD
+        }
+    }
+
+    // MARK: - VAD-gated transcription
+
+    /// Transcribe using the chosen engine, first removing silence via the VAD
+    /// speech regions (so engines don't hallucinate over silence). Span
+    /// timestamps are remapped from the compacted timeline back to the original
+    /// so they line up with diarization. Falls back to the original audio when
+    /// compaction isn't worthwhile.
+    private func transcribeGated(
+        cleanedURL: URL,
+        regions: [SpeechRegion],
+        engine: TranscriptionEngine,
+        language: MeetingLanguage,
+        onPhase: @escaping PhaseHandler
+    ) async throws -> RawTranscript {
+        let transcriber = resolveTranscriber(engine)
+        let compaction = (try? await vadCompactor.compact(url: cleanedURL, regions: regions)) ?? nil
+        let target = compaction?.url ?? cleanedURL
+        defer {
+            if let url = compaction?.url { vadCompactor.cleanup(url) }
+        }
+
+        let raw = try await transcriber.transcribe(
+            url: target,
+            language: language,
+            onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+        )
+        guard let map = compaction?.map else { return raw }
+
+        // Remap compacted-timeline spans back to the original timeline.
+        let spans = raw.spans.map { span -> TranscribedSpan in
+            let start = VADAudioCompactor.remap(span.start, map: map)
+            let end = VADAudioCompactor.remap(span.end, map: map)
+            return TranscribedSpan(text: span.text, start: start, end: max(start, end), confidence: span.confidence)
+        }
+        return RawTranscript(spans: spans, language: raw.language)
+    }
+
     /// Dispatch to the chosen diarization engine. Both engines satisfy
-    /// `Diarizing` and never throw, so this always returns usable turns.
+    /// `Diarizing` and never throw, so this always returns usable turns. The
+    /// heuristic engine reuses the pipeline's VAD regions; FluidAudio diarization
+    /// is end-to-end and ignores them.
     ///
     /// `fluidAudioDiarizer` is a single shared actor reused across concurrent
     /// transcriptions (different recordings can transcribe at once), so the
@@ -148,61 +223,15 @@ struct TranscriptionService {
     private func diarize(
         url: URL,
         engine: DiarizationEngine,
+        regions: [SpeechRegion],
         onWarning: DiarizationWarningHandler?
     ) async -> [SpeakerTurn] {
         switch engine {
         case .heuristic:
-            return await heuristicDiarizer.diarize(url: url)
+            return await heuristicDiarizer.diarize(url: url, speechRegions: regions)
         case .fluidAudio:
             return await fluidAudioDiarizer.diarize(url: url, onDownloadFailure: onWarning)
         }
-    }
-
-    // MARK: - Whisper path (chunked upload)
-
-    private func transcribeViaWhisper(
-        fileURL: URL,
-        language: MeetingLanguage,
-        onPhase: @escaping PhaseHandler
-    ) async throws -> RawTranscript {
-        let provider = try ProviderFactory.whisperProvider()
-        let chunks = try await chunker.chunk(url: fileURL)
-        let total = chunks.count
-        AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s)")
-        defer { Task { await chunker.cleanup(chunks) } }
-
-        var allSpans: [TranscribedSpan] = []
-        var detectedLanguage = ""
-
-        for (index, chunk) in chunks.enumerated() {
-            // Report progress before each upload so the UI advances as chunks
-            // complete. Only meaningful when split into several chunks; a single
-            // chunk stays indeterminate (nil) until it finishes.
-            if total > 1 {
-                onPhase(.transcribing(progress: Double(index) / Double(total)))
-            }
-            let data = try Data(contentsOf: chunk.url)
-            AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
-            let result = try await provider.transcribe(
-                audioData: data,
-                fileName: chunk.url.lastPathComponent,
-                language: language
-            )
-            if detectedLanguage.isEmpty { detectedLanguage = result.language }
-            // Offset chunk-local timestamps back to absolute meeting time.
-            for span in result.spans {
-                allSpans.append(
-                    TranscribedSpan(
-                        text: span.text,
-                        start: span.start + chunk.offset,
-                        end: span.end + chunk.offset,
-                        confidence: span.confidence
-                    )
-                )
-            }
-        }
-
-        return RawTranscript(spans: allSpans, language: detectedLanguage)
     }
 
     // MARK: - Fusion

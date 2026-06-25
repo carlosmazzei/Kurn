@@ -25,9 +25,14 @@ final class AppSettings {
         static let lastSummaryTemplate = "settings.lastSummaryTemplate"
         static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
         static let diarizationEngine = "settings.diarizationEngine"
+        static let transcriptionEngine = "settings.transcriptionEngine"
+        static let preprocessingEngine = "settings.preprocessingEngine"
+        static let vadEngine = "settings.vadEngine"
+        static let languageDetectionEngine = "settings.languageDetectionEngine"
         static let fluidAudioASRModelsConsented = "settings.fluidAudioASRModelsConsented"
         static let fluidAudioBatchASRModelsConsented = "settings.fluidAudioBatchASRModelsConsented"
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
+        static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let logLevel = "settings.logLevel"
     }
 
@@ -75,6 +80,39 @@ final class AppSettings {
         didSet { defaults.set(diarizationEngine.rawValue, forKey: Keys.diarizationEngine) }
     }
 
+    /// Engine that turns audio into text. Replaces the legacy `defaultMode` +
+    /// on-device-multilingual pairing; `init` migrates the old keys into this.
+    var transcriptionEngine: TranscriptionEngine {
+        didSet { defaults.set(transcriptionEngine.rawValue, forKey: Keys.transcriptionEngine) }
+    }
+
+    /// Offline audio-cleanup engine applied before transcription/diarization.
+    var preprocessingEngine: PreprocessingEngine {
+        didSet { defaults.set(preprocessingEngine.rawValue, forKey: Keys.preprocessingEngine) }
+    }
+
+    /// Voice-activity-detection engine used for speech-region segmentation.
+    var vadEngine: VADEngine {
+        didSet { defaults.set(vadEngine.rawValue, forKey: Keys.vadEngine) }
+    }
+
+    /// Language-detection engine run before transcription to refine the language.
+    var languageDetectionEngine: LanguageDetectionEngine {
+        didSet { defaults.set(languageDetectionEngine.rawValue, forKey: Keys.languageDetectionEngine) }
+    }
+
+    /// The full per-stage pipeline configuration assembled from the individual
+    /// engine preferences, passed to `TranscriptionService`.
+    var pipelineConfiguration: PipelineConfiguration {
+        PipelineConfiguration(
+            preprocessing: preprocessingEngine,
+            vad: vadEngine,
+            languageDetection: languageDetectionEngine,
+            diarization: diarizationEngine,
+            transcription: transcriptionEngine
+        )
+    }
+
     /// Whether the user has consented to downloading FluidAudio's streaming ASR
     /// models (independent of the diarization model consent below).
     var fluidAudioASRModelsConsented: Bool {
@@ -93,6 +131,12 @@ final class AppSettings {
     /// models (independent of the ASR model consent above).
     var fluidAudioDiarizationModelsConsented: Bool {
         didSet { defaults.set(fluidAudioDiarizationModelsConsented, forKey: Keys.fluidAudioDiarizationModelsConsented) }
+    }
+
+    /// Whether the user has consented to downloading FluidAudio's Silero VAD
+    /// model (used by the FluidAudio voice-activity-detection engine).
+    var fluidAudioVADModelsConsented: Bool {
+        didSet { defaults.set(fluidAudioVADModelsConsented, forKey: Keys.fluidAudioVADModelsConsented) }
     }
 
     /// Minimum severity emitted by `AppLog`. Persisted here and pushed to
@@ -211,6 +255,27 @@ final class AppSettings {
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         fluidAudioBatchASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
+        fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
+        // Transcription engine: prefer the stored value; otherwise migrate the
+        // legacy `defaultMode` + on-device-multilingual pairing into the new
+        // single explicit choice.
+        let storedTranscriptionEngine = (defaults.string(forKey: Keys.transcriptionEngine))
+            .flatMap(TranscriptionEngine.init(rawValue:))
+        transcriptionEngine = storedTranscriptionEngine
+            ?? Self.migratedTranscriptionEngine(
+                mode: defaultMode,
+                language: defaultLanguage,
+                multilingualConsented: fluidAudioBatchASRModelsConsented
+            )
+        preprocessingEngine = PreprocessingEngine(
+            rawValue: defaults.string(forKey: Keys.preprocessingEngine) ?? ""
+        ) ?? .standardDSP
+        vadEngine = VADEngine(
+            rawValue: defaults.string(forKey: Keys.vadEngine) ?? ""
+        ) ?? .energyThreshold
+        languageDetectionEngine = LanguageDetectionEngine(
+            rawValue: defaults.string(forKey: Keys.languageDetectionEngine) ?? ""
+        ) ?? .byTranscriber
         // Fall back to the environment-derived default (set on `AppLog` at
         // launch) when the user hasn't chosen a level yet.
         let resolvedLogLevel = (defaults.string(forKey: Keys.logLevel))
@@ -260,6 +325,23 @@ final class AppSettings {
             templates.append(builtIn)
         }
         return templates
+    }
+
+    /// Derive the initial `TranscriptionEngine` from the legacy `defaultMode` +
+    /// on-device-multilingual consent so upgrading users keep their behavior.
+    static func migratedTranscriptionEngine(
+        mode: TranscriptionMode,
+        language: MeetingLanguage,
+        multilingualConsented: Bool
+    ) -> TranscriptionEngine {
+        switch mode {
+        case .whisperAPI:
+            return .whisperAPI
+        case .onDevice:
+            // The old "Auto + multilingual model consented" path routed to
+            // FluidAudio Parakeet; everything else used Apple Speech.
+            return (language == .autoDetect && multilingualConsented) ? .fluidAudioParakeet : .appleSpeech
+        }
     }
 
     private static func mergedProviders(_ stored: [AIProvider]) -> [AIProvider] {

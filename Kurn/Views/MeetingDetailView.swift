@@ -180,7 +180,7 @@ struct MeetingDetailView: View {
                 StatusBadge(status: .done)
             } else {
                 Button {
-                    startTranscription(recording, mode: settings.defaultMode)
+                    startTranscription(recording)
                 } label: {
                     StatusBadge(status: .none)
                 }
@@ -436,15 +436,13 @@ struct MeetingDetailView: View {
         }
     }
 
-    private func startTranscription(_ recording: Recording, mode: TranscriptionMode) {
+    private func startTranscription(_ recording: Recording) {
         guard let txVM else { return }
         Task {
             await txVM.transcribe(
                 recording,
                 language: meeting.language,
-                mode: mode,
-                diarizationEngine: settings.diarizationEngine,
-                onDeviceMultilingualEnabled: settings.fluidAudioBatchASRModelsConsented
+                config: settings.pipelineConfiguration
             )
         }
     }

@@ -32,6 +32,17 @@
 "diarization.heuristic" = "Heuristic";
 "diarization.fluid_audio" = "FluidAudio";
 
+/* Recognition pipeline engines */
+"transcription.apple_speech" = "Apple Speech";
+"transcription.fluid_parakeet" = "FluidAudio (multilingual)";
+"transcription.whisper" = "Whisper API";
+"preprocessing.standard" = "Standard cleanup";
+"preprocessing.none" = "None";
+"vad.energy" = "Energy threshold";
+"vad.fluid_audio" = "FluidAudio (Silero)";
+"langdetect.by_transcriber" = "By transcriber";
+"langdetect.fluid_lid" = "FluidAudio detection";
+
 /* Languages */
 "lang.auto" = "Auto-detect";
 "lang.pt" = "Portuguese";
@@ -177,6 +188,11 @@
 "settings.delete_provider" = "Delete Provider";
 "settings.delete_provider.confirm" = "Delete this provider?";
 "settings.transcription" = "Transcription";
+"settings.recognition_pipeline" = "Recognition Pipeline";
+"pipeline.transcription_engine" = "Transcription Engine";
+"pipeline.preprocessing" = "Audio Cleanup";
+"pipeline.vad" = "Voice Activity Detection";
+"pipeline.language_detection" = "Language Detection";
 "settings.whisper_openai_key_footer" = "Whisper API transcription uses the OpenAI API key configured in AI Providers, regardless of the selected summary provider.";
 "settings.whisper_openai_key_missing_footer" = "Configure the OpenAI API key in AI Providers to enable Whisper API transcription.";
 "settings.summary" = "Summary";
@@ -231,6 +247,7 @@
 "settings.models.live" = "Live Transcription";
 "settings.models.on_device_language" = "On-Device Language Detection";
 "settings.models.diarization" = "Speaker Diarization";
+"settings.models.vad" = "Voice Activity Detection";
 "settings.models.delete" = "Delete Model";
 "settings.models.delete_confirm" = "Delete this model?";
 "settings.models.delete_message" = "It will be removed from this device. You can download it again later by re-enabling the feature.";

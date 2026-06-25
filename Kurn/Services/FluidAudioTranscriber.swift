@@ -17,7 +17,7 @@ import Foundation
 #if canImport(FluidAudio)
 import FluidAudio
 
-actor FluidAudioTranscriber {
+actor FluidAudioTranscriber: Transcribing {
 
     /// Lazily loaded and reused across recordings — model load is expensive.
     private var manager: AsrManager?
@@ -26,7 +26,11 @@ actor FluidAudioTranscriber {
     /// detection. `language` is accepted for parity with `OnDeviceTranscriber`;
     /// the multilingual model detects the language from the audio, so no locale
     /// is forced.
-    func transcribe(url: URL, language: MeetingLanguage) async throws -> RawTranscript {
+    func transcribe(
+        url: URL,
+        language: MeetingLanguage,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> RawTranscript {
         let manager = try await loadedManager()
 
         AppLog.transcription.atDebug.debug("fluidAudio: transcribing (auto language detection)")
@@ -76,8 +80,12 @@ actor FluidAudioTranscriber {
 
 /// Built without the FluidAudio package linked: the multilingual on-device engine
 /// is unavailable, so callers fall back to `OnDeviceTranscriber` (Apple Speech).
-actor FluidAudioTranscriber {
-    func transcribe(url: URL, language: MeetingLanguage) async throws -> RawTranscript {
+actor FluidAudioTranscriber: Transcribing {
+    func transcribe(
+        url: URL,
+        language: MeetingLanguage,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> RawTranscript {
         throw AppError.transcriptionFailed(
             NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
         )

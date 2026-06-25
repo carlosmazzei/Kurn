@@ -19,7 +19,7 @@ import AVFoundation
 import Foundation
 import os
 
-actor AudioPreprocessor {
+actor AudioPreprocessor: AudioPreprocessing {
 
     /// Render the cleaned, mono 16 kHz copy to the temporary directory and return
     /// its URL. The caller owns the file and should `cleanup` it when done.

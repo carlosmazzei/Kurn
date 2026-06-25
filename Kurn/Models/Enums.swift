@@ -119,6 +119,123 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         case .fluidAudio: return NSLocalizedString("diarization.fluid_audio", comment: "FluidAudio")
         }
     }
+
+    /// FluidAudio model family that must be downloaded before this engine runs,
+    /// or `nil` when it needs no download.
+    var requiredModelSet: ModelSet? {
+        switch self {
+        case .heuristic: return nil
+        case .fluidAudio: return .diarization
+        }
+    }
+}
+
+/// Transcription engine used to turn audio into text. Replaces the older
+/// `TranscriptionMode` + "multilingual on-device" boolean pair with a single
+/// explicit choice. `TranscriptionMode` is still persisted on `Recording` for
+/// back-compat; map via `storageMode`.
+enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Apple `SFSpeechRecognizer`, on-device, fixed locale (no language detection).
+    case appleSpeech
+    /// FluidAudio multilingual on-device batch ASR (Parakeet TDT v3), detects
+    /// the spoken language from the audio. Requires a model download.
+    case fluidAudioParakeet
+    /// OpenAI Whisper cloud API (chunked upload). Requires an OpenAI API key.
+    case whisperAPI
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .appleSpeech: return NSLocalizedString("transcription.apple_speech", comment: "Apple Speech")
+        case .fluidAudioParakeet: return NSLocalizedString("transcription.fluid_parakeet", comment: "FluidAudio multilingual")
+        case .whisperAPI: return NSLocalizedString("transcription.whisper", comment: "Whisper API")
+        }
+    }
+
+    /// FluidAudio model family that must be downloaded before this engine runs,
+    /// or `nil` when it needs no download.
+    var requiredModelSet: ModelSet? {
+        switch self {
+        case .appleSpeech, .whisperAPI: return nil
+        case .fluidAudioParakeet: return .onDeviceASR
+        }
+    }
+
+    /// The legacy `TranscriptionMode` to persist on `Recording` so the stored
+    /// field stays valid without a SwiftData migration.
+    var storageMode: TranscriptionMode {
+        switch self {
+        case .appleSpeech, .fluidAudioParakeet: return .onDevice
+        case .whisperAPI: return .whisperAPI
+        }
+    }
+}
+
+/// Offline DSP cleanup engine applied before transcription/diarization.
+enum PreprocessingEngine: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Speech-tuned filter chain (high-pass, presence EQ, AGC/limiter, mono 16 kHz).
+    case standardDSP
+    /// No cleanup — feed the original recording straight to the engines.
+    case none
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .standardDSP: return NSLocalizedString("preprocessing.standard", comment: "Standard cleanup")
+        case .none: return NSLocalizedString("preprocessing.none", comment: "No cleanup")
+        }
+    }
+}
+
+/// Voice-activity detection engine used to find speech regions.
+enum VADEngine: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Energy-threshold (dBFS) detection over 100 ms frames. Always available.
+    case energyThreshold
+    /// FluidAudio's Silero VAD CoreML model. Requires a model download.
+    case fluidAudio
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .energyThreshold: return NSLocalizedString("vad.energy", comment: "Energy threshold")
+        case .fluidAudio: return NSLocalizedString("vad.fluid_audio", comment: "FluidAudio (Silero)")
+        }
+    }
+
+    var requiredModelSet: ModelSet? {
+        switch self {
+        case .energyThreshold: return nil
+        case .fluidAudio: return .vad
+        }
+    }
+}
+
+/// Language-detection engine run before transcription to refine the language.
+enum LanguageDetectionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Defer to the transcription engine's own detection (current behavior).
+    case byTranscriber
+    /// FluidAudio Parakeet detects the language, then pins the locale so even
+    /// `appleSpeech` benefits from auto-detection. Requires a model download.
+    case fluidAudioLID
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .byTranscriber: return NSLocalizedString("langdetect.by_transcriber", comment: "By transcriber")
+        case .fluidAudioLID: return NSLocalizedString("langdetect.fluid_lid", comment: "FluidAudio detection")
+        }
+    }
+
+    var requiredModelSet: ModelSet? {
+        switch self {
+        case .byTranscriber: return nil
+        case .fluidAudioLID: return .onDeviceASR
+        }
+    }
 }
 
 /// API shape a configured LLM provider speaks.
@@ -299,6 +416,21 @@ enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     var whisperCode: String? {
         guard let id = localeIdentifier else { return nil }
         return String(id.prefix(2))
+    }
+
+    /// Map a two-letter language code (e.g. from a language detector) to a
+    /// supported `MeetingLanguage`, or `.autoDetect` when it isn't one we pin.
+    init(detectedCode code: String) {
+        switch code.lowercased().prefix(2) {
+        case "pt": self = .portuguese
+        case "en": self = .english
+        case "es": self = .spanish
+        case "fr": self = .french
+        case "de": self = .german
+        case "ja": self = .japanese
+        case "zh": self = .chinese
+        default: self = .autoDetect
+        }
     }
 
     var displayName: String {
