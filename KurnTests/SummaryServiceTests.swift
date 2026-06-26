@@ -29,6 +29,23 @@ struct SummaryServiceTests {
         #expect(SummaryService.assembleTranscriptText(from: [[]]).isEmpty)
     }
 
+    @Test func assembleTranscriptTextUsesHourClockForLongMeetings() {
+        let segments = [
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 3725, endTime: 3730, text: "still going")
+        ]
+        let text = SummaryService.assembleTranscriptText(from: [segments])
+        #expect(text == "[1:02:05] Speaker 1: still going")
+    }
+
+    @Test func assembleTranscriptTextKeepsEmptyTextSegments() {
+        let segments = [
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 1, text: ""),
+            TranscriptSegment(speakerLabel: "Speaker 2", startTime: 1, endTime: 2, text: "hi")
+        ]
+        let text = SummaryService.assembleTranscriptText(from: [segments])
+        #expect(text == "[0:00] Speaker 1: \n[0:01] Speaker 2: hi")
+    }
+
     @Test func generateThrowsWhenTranscriptIsBlank() async {
         let service = SummaryService()
         await #expect(throws: AppError.self) {

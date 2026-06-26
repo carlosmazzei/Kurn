@@ -40,4 +40,19 @@ struct AudioChunkerTests {
         #expect(!FileManager.default.fileExists(atPath: tmpURL.path))
         #expect(FileManager.default.fileExists(atPath: documentsURL.path))
     }
+
+    @Test func realAudioUnderThresholdIsReturnedAsSingleChunk() async throws {
+        let url = try AudioFixtures.m4aTone(seconds: 0.5)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let chunks = try await AudioChunker().chunk(url: url)
+        #expect(chunks.count == 1)
+        #expect(chunks[0].url == url)
+        #expect(chunks[0].offset == 0)
+    }
+
+    @Test func cleanupWithEmptyListDoesNothing() async {
+        // Should be a safe no-op (e.g. when transcription bailed before chunking).
+        await AudioChunker().cleanup([])
+    }
 }
