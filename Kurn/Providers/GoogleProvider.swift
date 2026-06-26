@@ -58,8 +58,7 @@ struct GoogleProvider: LLMProvider {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await LLMHTTP.send(request, session: session)
-        try LLMHTTP.validate(response: response, data: data)
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         do {
             let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
