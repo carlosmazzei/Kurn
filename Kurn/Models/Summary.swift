@@ -34,7 +34,7 @@ final class Summary {
     ) {
         self.id = id
         self.meeting = meeting
-        self.sectionsData = (try? JSONEncoder().encode(sections)) ?? Data()
+        self.sectionsData = JSONStorage.encode(sections)
         self.templateName = templateName
         self.providerRaw = provider.rawValue
         self.modelRaw = model
@@ -43,8 +43,8 @@ final class Summary {
     }
 
     var sections: [SummarySection] {
-        get { (try? JSONDecoder().decode([SummarySection].self, from: sectionsData)) ?? [] }
-        set { sectionsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        get { JSONStorage.decode([SummarySection].self, from: sectionsData) }
+        set { sectionsData = JSONStorage.encode(newValue) }
     }
 
     var provider: AIProvider {

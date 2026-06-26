@@ -34,7 +34,7 @@ struct GroqProvider: LLMProvider {
     }
 
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
-        guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "chat/completions")
             ?? URL(string: "https://api.groq.com/openai/v1/chat/completions")!
@@ -56,25 +56,10 @@ struct GroqProvider: LLMProvider {
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
-        do {
-            let decoded = try JSONDecoder().decode(GroqChatResponse.self, from: data)
-            guard let content = decoded.choices.first?.message.content else {
-                throw AppError.decodingError("empty Groq response")
-            }
-            let json = try SummaryJSON.parse(content)
-            return SummaryResult(sections: json.summarySections)
-        } catch let error as AppError {
-            throw error
-        } catch {
-            throw AppError.decodingError(error.localizedDescription)
-        }
+        return try LLMHTTP.summaryResult(
+            from: data,
+            as: ChatResponse.self,
+            emptyMessage: "empty Groq response"
+        ) { $0.choices.first?.message.content }
     }
-}
-
-private struct GroqChatResponse: Decodable {
-    struct Choice: Decodable {
-        struct Message: Decodable { let content: String }
-        let message: Message
-    }
-    let choices: [Choice]
 }

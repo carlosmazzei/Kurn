@@ -319,18 +319,7 @@ struct SettingsView: View {
                 pendingVADEngine = nil
             }
         ))
-        .alert(
-            NSLocalizedString("common.error", comment: "Error"),
-            isPresented: Binding(
-                get: { modelDownloadError != nil },
-                set: { if !$0 { modelDownloadError = nil } }
-            ),
-            presenting: modelDownloadError
-        ) { _ in
-            Button(NSLocalizedString("common.ok", comment: "OK"), role: .cancel) {}
-        } message: { error in
-            Text(error.errorDescription ?? "")
-        }
+        .errorAlert($modelDownloadError)
     }
 
     @ViewBuilder
@@ -657,104 +646,6 @@ struct SettingsView: View {
     }
 }
 
-/// Consent alerts shown before the first FluidAudio model download for a given feature.
-private struct ModelDownloadAlerts: ViewModifier {
-    @Binding var showingASRConsent: Bool
-    @Binding var showingBatchASRConsent: Bool
-    @Binding var showingDiarizationConsent: Bool
-    let onConfirmASR: () -> Void
-    let onConfirmBatchASR: () -> Void
-    let onCancelBatchASR: () -> Void
-    let onConfirmDiarization: () -> Void
-    let onCancelDiarization: () -> Void
-    @Binding var showingVADConsent: Bool
-    let onConfirmVAD: () -> Void
-    let onCancelVAD: () -> Void
-
-    func body(content: Content) -> some View {
-        content
-            .alert(
-                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-                isPresented: $showingASRConsent
-            ) {
-                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmASR)
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-            } message: {
-                Text(NSLocalizedString("settings.model_download.message", comment: ""))
-            }
-            .alert(
-                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-                isPresented: $showingBatchASRConsent
-            ) {
-                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmBatchASR)
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelBatchASR)
-            } message: {
-                Text(NSLocalizedString("settings.model_download.message", comment: ""))
-            }
-            .alert(
-                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-                isPresented: $showingDiarizationConsent
-            ) {
-                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmDiarization)
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelDiarization)
-            } message: {
-                Text(NSLocalizedString("settings.model_download.message", comment: ""))
-            }
-            .alert(
-                NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-                isPresented: $showingVADConsent
-            ) {
-                Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirmVAD)
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancelVAD)
-            } message: {
-                Text(NSLocalizedString("settings.model_download.message", comment: ""))
-            }
-    }
-}
-
-/// A provider row showing its brand icon, name, and key configuration status.
-private struct ProviderRow: View {
-    let provider: AIProvider
-    let revision: Int
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ProviderIcon(provider: provider)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(provider.displayName).font(.system(size: 15, weight: .semibold))
-                Text(provider.kind.displayName)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textSecondary)
-                let configured = KeychainManager.shared.hasValue(for: provider.keychainAccount)
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(configured ? Theme.success : Theme.textTertiary)
-                        .frame(width: 6, height: 6)
-                    Text(configured
-                         ? NSLocalizedString("settings.configured", comment: "Configured")
-                         : NSLocalizedString("settings.not_configured", comment: "Not configured"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                .id(revision)
-            }
-        }
-    }
-}
-
-private struct ProviderIcon: View {
-    let provider: AIProvider
-    var body: some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(Color(hex: provider.brandHex))
-            .frame(width: 32, height: 32)
-            .overlay(
-                Text(String(provider.displayName.prefix(1)))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-            )
-    }
-}
-
-// ProviderEditor, AddProviderView, and SummaryModelPicker live in
-// SettingsProviderViews.swift to keep this file under the length limit.
+// ModelDownloadAlerts, ProviderRow, ProviderIcon, ProviderEditor, AddProviderView,
+// and SummaryModelPicker live in SettingsProviderViews.swift to keep this file
+// under SwiftLint's length limit.

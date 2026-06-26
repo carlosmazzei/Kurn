@@ -6,25 +6,33 @@
 import Foundation
 
 extension Date {
-    /// Medium date + short time, localized. e.g. "Jun 16, 2025 at 9:30 AM".
-    var meetingDisplay: String {
+    // `DateFormatter` is expensive to create, so cache one per format. They are
+    // configured once and never mutated afterwards, which makes reads thread-safe.
+    private static let meetingFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        return formatter.string(from: self)
-    }
+        return formatter
+    }()
 
-    /// Compact date used in default meeting titles. e.g. "2025-06-16".
-    var isoDay: String {
+    private static let isoDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: self)
-    }
+        return formatter
+    }()
 
-    /// Timestamp suitable for unique file names. e.g. "20250616-093012".
-    var fileTimestamp: String {
+    private static let fileTimestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return formatter.string(from: self)
-    }
+        return formatter
+    }()
+
+    /// Medium date + short time, localized. e.g. "Jun 16, 2025 at 9:30 AM".
+    var meetingDisplay: String { Self.meetingFormatter.string(from: self) }
+
+    /// Compact date used in default meeting titles. e.g. "2025-06-16".
+    var isoDay: String { Self.isoDayFormatter.string(from: self) }
+
+    /// Timestamp suitable for unique file names. e.g. "20250616-093012".
+    var fileTimestamp: String { Self.fileTimestampFormatter.string(from: self) }
 }

@@ -58,18 +58,7 @@ struct MeetingDetailView: View {
                 runSummary(with: template)
             }
         }
-        .alert(
-            NSLocalizedString("common.error", comment: "Error"),
-            isPresented: Binding(
-                get: { txVM?.error != nil },
-                set: { if !$0 { txVM?.error = nil } }
-            ),
-            presenting: txVM?.error
-        ) { _ in
-            Button(NSLocalizedString("common.ok", comment: "OK"), role: .cancel) {}
-        } message: { error in
-            Text(error.errorDescription ?? "")
-        }
+        .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
     }
 
     // MARK: - Header

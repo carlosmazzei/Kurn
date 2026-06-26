@@ -34,7 +34,7 @@ struct GoogleProvider: LLMProvider {
     }
 
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
-        guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         let cleanModel = model.replacingOccurrences(of: "models/", with: "")
         var components = URLComponents(
@@ -60,17 +60,11 @@ struct GoogleProvider: LLMProvider {
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
-        do {
-            let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
-            let text = decoded.candidates?.first?.content.parts.compactMap { $0.text }.joined() ?? ""
-            guard !text.isEmpty else { throw AppError.decodingError("empty Gemini response") }
-            let json = try SummaryJSON.parse(text)
-            return SummaryResult(sections: json.summarySections)
-        } catch let error as AppError {
-            throw error
-        } catch {
-            throw AppError.decodingError(error.localizedDescription)
-        }
+        return try LLMHTTP.summaryResult(
+            from: data,
+            as: GeminiResponse.self,
+            emptyMessage: "empty Gemini response"
+        ) { $0.candidates?.first?.content.parts.compactMap { $0.text }.joined() }
     }
 }
 
