@@ -60,6 +60,36 @@ enum LLMHTTP {
         return components.url
     }
 
+    /// Fail fast with `AppError.noAPIKey` when a provider has no configured key.
+    static func requireAPIKey(_ key: String, provider: AIProvider) throws {
+        guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+    }
+
+    /// Decode a summary response, extract its text content, and parse the shared
+    /// JSON contract into a `SummaryResult`. Centralizes the decode→parse→error
+    /// flow every provider's `summarize` shares. The first catch deliberately
+    /// re-throws `AppError`s (e.g. the empty-content and `SummaryJSON.parse`
+    /// failures) so they aren't re-wrapped by the generic `decodingError` catch.
+    static func summaryResult<T: Decodable>(
+        from data: Data,
+        as type: T.Type,
+        emptyMessage: String,
+        extractContent: (T) -> String?
+    ) throws -> SummaryResult {
+        do {
+            let decoded = try JSONDecoder().decode(type, from: data)
+            guard let content = extractContent(decoded), !content.isEmpty else {
+                throw AppError.decodingError(emptyMessage)
+            }
+            let json = try SummaryJSON.parse(content)
+            return SummaryResult(sections: json.summarySections)
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.decodingError(error.localizedDescription)
+        }
+    }
+
     /// Send the request and validate its response, retrying transient transport
     /// and server failures with exponential backoff (honoring `Retry-After`).
     /// This is the entry point providers should use; `send`/`validate` remain
@@ -167,6 +197,17 @@ enum LLMHTTP {
         struct Envelope: Decodable { struct E: Decodable { let message: String }; let error: E }
         return try? JSONDecoder().decode(Envelope.self, from: data).error.message
     }
+}
+
+// MARK: - Shared response shape (OpenAI-compatible)
+
+/// Chat Completions response shared by OpenAI and the OpenAI-compatible Groq API.
+struct ChatResponse: Decodable {
+    struct Choice: Decodable {
+        struct Message: Decodable { let content: String }
+        let message: Message
+    }
+    let choices: [Choice]
 }
 
 // MARK: - Shared JSON shape

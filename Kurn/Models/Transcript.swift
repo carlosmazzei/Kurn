@@ -28,18 +28,14 @@ final class Transcript {
     ) {
         self.id = id
         self.recording = recording
-        self.segmentsData = (try? JSONEncoder().encode(segments)) ?? Data()
+        self.segmentsData = JSONStorage.encode(segments)
         self.language = language
         self.createdAt = createdAt
     }
 
     var segments: [TranscriptSegment] {
-        get {
-            (try? JSONDecoder().decode([TranscriptSegment].self, from: segmentsData)) ?? []
-        }
-        set {
-            segmentsData = (try? JSONEncoder().encode(newValue)) ?? Data()
-        }
+        get { JSONStorage.decode([TranscriptSegment].self, from: segmentsData) }
+        set { segmentsData = JSONStorage.encode(newValue) }
     }
 
     /// Flattened plain text, one line per segment, for sharing/export.

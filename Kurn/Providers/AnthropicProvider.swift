@@ -42,7 +42,7 @@ struct AnthropicProvider: LLMProvider {
     // MARK: - Summary (Messages API)
 
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
-        guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "messages")
             ?? URL(string: "https://api.anthropic.com/v1/messages")!
@@ -64,22 +64,16 @@ struct AnthropicProvider: LLMProvider {
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
-        do {
-            let decoded = try JSONDecoder().decode(MessagesResponse.self, from: data)
-            // Concatenate all text blocks (there is normally one for JSON output).
-            let text = decoded.content
+        // Concatenate all text blocks (there is normally one for JSON output).
+        return try LLMHTTP.summaryResult(
+            from: data,
+            as: MessagesResponse.self,
+            emptyMessage: "empty Anthropic response"
+        ) { decoded in
+            decoded.content
                 .filter { $0.type == "text" }
                 .compactMap { $0.text }
                 .joined()
-            guard !text.isEmpty else {
-                throw AppError.decodingError("empty Anthropic response")
-            }
-            let json = try SummaryJSON.parse(text)
-            return SummaryResult(sections: json.summarySections)
-        } catch let error as AppError {
-            throw error
-        } catch {
-            throw AppError.decodingError(error.localizedDescription)
         }
     }
 

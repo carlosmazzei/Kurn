@@ -103,18 +103,7 @@ private struct RecorderContent: View {
         } message: {
             Text(NSLocalizedString("recorder.permission.message", comment: ""))
         }
-        .alert(
-            NSLocalizedString("common.error", comment: "Error"),
-            isPresented: Binding(
-                get: { vm.error != nil },
-                set: { if !$0 { vm.error = nil } }
-            ),
-            presenting: vm.error
-        ) { _ in
-            Button(NSLocalizedString("common.ok", comment: "OK"), role: .cancel) {}
-        } message: { error in
-            Text(error.errorDescription ?? "")
-        }
+        .errorAlert($vm.error)
         .interactiveDismissDisabled(vm.state != .idle)
     }
 

@@ -268,3 +268,94 @@ struct SummaryModelPicker: View {
         isLoading = false
     }
 }
+
+// MARK: - Model download consent alerts
+
+/// Consent alerts shown before the first FluidAudio model download for a given feature.
+struct ModelDownloadAlerts: ViewModifier {
+    @Binding var showingASRConsent: Bool
+    @Binding var showingBatchASRConsent: Bool
+    @Binding var showingDiarizationConsent: Bool
+    let onConfirmASR: () -> Void
+    let onConfirmBatchASR: () -> Void
+    let onCancelBatchASR: () -> Void
+    let onConfirmDiarization: () -> Void
+    let onCancelDiarization: () -> Void
+    @Binding var showingVADConsent: Bool
+    let onConfirmVAD: () -> Void
+    let onCancelVAD: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .modelDownloadAlert(isPresented: $showingASRConsent, onConfirm: onConfirmASR, onCancel: {})
+            .modelDownloadAlert(isPresented: $showingBatchASRConsent, onConfirm: onConfirmBatchASR, onCancel: onCancelBatchASR)
+            .modelDownloadAlert(isPresented: $showingDiarizationConsent, onConfirm: onConfirmDiarization, onCancel: onCancelDiarization)
+            .modelDownloadAlert(isPresented: $showingVADConsent, onConfirm: onConfirmVAD, onCancel: onCancelVAD)
+    }
+}
+
+private extension View {
+    /// One consent alert for a one-time model download. Title, message, and
+    /// buttons are identical across features; only the binding and actions vary.
+    func modelDownloadAlert(
+        isPresented: Binding<Bool>,
+        onConfirm: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) -> some View {
+        alert(
+            NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+            isPresented: isPresented
+        ) {
+            Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirm)
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancel)
+        } message: {
+            Text(NSLocalizedString("settings.model_download.message", comment: ""))
+        }
+    }
+}
+
+// MARK: - Provider row
+
+/// A provider row showing its brand icon, name, and key configuration status.
+struct ProviderRow: View {
+    let provider: AIProvider
+    let revision: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ProviderIcon(provider: provider)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.displayName).font(.system(size: 15, weight: .semibold))
+                Text(provider.kind.displayName)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textSecondary)
+                let configured = KeychainManager.shared.hasValue(for: provider.keychainAccount)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(configured ? Theme.success : Theme.textTertiary)
+                        .frame(width: 6, height: 6)
+                    Text(configured
+                         ? NSLocalizedString("settings.configured", comment: "Configured")
+                         : NSLocalizedString("settings.not_configured", comment: "Not configured"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .id(revision)
+            }
+        }
+    }
+}
+
+private struct ProviderIcon: View {
+    let provider: AIProvider
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Color(hex: provider.brandHex))
+            .frame(width: 32, height: 32)
+            .overlay(
+                Text(String(provider.displayName.prefix(1)))
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+            )
+    }
+}

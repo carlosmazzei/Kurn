@@ -17,64 +17,59 @@ struct ProviderModelsService: Sendable {
 
     func models(for provider: AIProvider) async throws -> [String] {
         let apiKey = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        guard !apiKey.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         switch provider.kind {
         case .openAICompatible:
-            return try await openAICompatibleModels(provider: provider, apiKey: apiKey)
+            return try await fetchModels(provider: provider, as: OpenAIModelListResponse.self) { request in
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            } extract: { decoded in
+                decoded.data.filter { $0.active != false }.map(\.id)
+            }
         case .anthropic:
-            return try await anthropicModels(provider: provider, apiKey: apiKey)
+            return try await fetchModels(provider: provider, as: AnthropicModelListResponse.self) { request in
+                request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+                request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
+            } extract: { decoded in
+                decoded.data.map(\.id)
+            }
         case .googleGemini:
-            return try await googleModels(provider: provider, apiKey: apiKey)
+            return try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
+                // Gemini authenticates via a `key` query param rather than a header.
+                if let url = request.url,
+                   var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                    components.queryItems = [URLQueryItem(name: "key", value: apiKey)]
+                    request.url = components.url
+                }
+            } extract: { decoded in
+                decoded.models
+                    .filter { $0.supportedGenerationMethods.contains("generateContent") }
+                    .map { $0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: "") }
+            }
         }
     }
 
-    private func openAICompatibleModels(provider: AIProvider, apiKey: String) async throws -> [String] {
+    /// Shared GET-and-decode flow for a provider's `/models` listing: build the
+    /// endpoint, apply provider-specific auth via `configure`, send, decode, and
+    /// reduce to a unique sorted list via `extract`.
+    private func fetchModels<T: Decodable>(
+        provider: AIProvider,
+        as type: T.Type,
+        configure: (inout URLRequest) -> Void,
+        extract: (T) -> [String]
+    ) async throws -> [String] {
         guard let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models") else {
-            throw AppError.apiError(statusCode: 0, message: "Invalid provider URL")
+            throw Self.invalidURL
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        configure(&request)
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
-
-        let decoded = try JSONDecoder().decode(OpenAIModelListResponse.self, from: data)
-        return uniqueSorted(decoded.data.filter { $0.active != false }.map(\.id))
+        return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
     }
 
-    private func anthropicModels(provider: AIProvider, apiKey: String) async throws -> [String] {
-        guard let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models") else {
-            throw AppError.apiError(statusCode: 0, message: "Invalid provider URL")
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
-
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
-
-        let decoded = try JSONDecoder().decode(AnthropicModelListResponse.self, from: data)
-        return uniqueSorted(decoded.data.map(\.id))
-    }
-
-    private func googleModels(provider: AIProvider, apiKey: String) async throws -> [String] {
-        guard let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models"),
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            throw AppError.apiError(statusCode: 0, message: "Invalid provider URL")
-        }
-        components.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-        var request = URLRequest(url: components.url!)
-        request.httpMethod = "GET"
-
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
-
-        let decoded = try JSONDecoder().decode(GoogleModelListResponse.self, from: data)
-        let models = decoded.models
-            .filter { $0.supportedGenerationMethods.contains("generateContent") }
-            .map { $0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: "") }
-        return uniqueSorted(models)
-    }
+    private static let invalidURL = AppError.apiError(statusCode: 0, message: "Invalid provider URL")
 
     private func uniqueSorted(_ values: [String]) -> [String] {
         Array(Set(values.filter { !$0.isEmpty })).sorted()
