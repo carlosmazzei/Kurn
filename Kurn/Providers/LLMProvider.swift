@@ -34,12 +34,68 @@ protocol LLMProvider: Sendable {
 /// HTTP plumbing shared by the cloud providers: both OpenAI and Anthropic talk
 /// to JSON APIs that report failures as `{ "error": { "message" } }`.
 enum LLMHTTP {
+    /// Total attempts (initial try + retries) for a transient failure.
+    static let maxAttempts = 3
+    /// Base unit for exponential backoff. Kept small so the UI isn't blocked
+    /// long; the user is waiting on a transcription/summary.
+    static let baseDelay: TimeInterval = 0.5
+    /// Upper bound on any single backoff wait, including a server `Retry-After`.
+    static let maxDelay: TimeInterval = 8
+
+    /// Transport-level `URLError` codes worth retrying — momentary connectivity
+    /// blips and timeouts rather than permanent misconfiguration.
+    static let retriableURLErrorCodes: Set<URLError.Code> = [
+        .timedOut, .networkConnectionLost, .cannotConnectToHost,
+        .notConnectedToInternet, .dnsLookupFailed
+    ]
+    /// HTTP status codes worth retrying: request timeout, rate limiting, and
+    /// transient server-side failures. Auth/validation errors (4xx) fail fast.
+    static let retriableStatusCodes: Set<Int> = [408, 429, 500, 502, 503, 504]
+
     static func endpoint(baseURLString: String, path: String) -> URL? {
         guard var components = URLComponents(string: baseURLString) else { return nil }
         let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let endpointPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         components.path = "/" + [basePath, endpointPath].filter { !$0.isEmpty }.joined(separator: "/")
         return components.url
+    }
+
+    /// Send the request and validate its response, retrying transient transport
+    /// and server failures with exponential backoff (honoring `Retry-After`).
+    /// This is the entry point providers should use; `send`/`validate` remain
+    /// available for callers that need the two steps separately.
+    static func sendValidated(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+        var attempt = 0
+        while true {
+            // Transport step. Only `AppError.networkError` is retriable here;
+            // anything else (e.g. cancellation) propagates immediately.
+            let result: (data: Data, response: URLResponse)
+            do {
+                result = try await send(request, session: session)
+            } catch let AppError.networkError(urlError) {
+                guard let delay = retryableDelay(
+                    attempt: attempt, status: nil, urlError: urlError, retryAfter: nil
+                ) else { throw AppError.networkError(urlError) }
+                try await backoff(delay, attempt: attempt, reason: "network \(urlError.code.rawValue)")
+                attempt += 1
+                continue
+            }
+
+            // Validation step. A retriable status code (429/5xx/…) backs off and
+            // retries; any other API error fails fast.
+            do {
+                try validate(response: result.response, data: result.data)
+                return result
+            } catch let AppError.apiError(status, message) {
+                let retryAfter = retryAfterSeconds(from: result.response)
+                guard let delay = retryableDelay(
+                    attempt: attempt, status: status, urlError: nil, retryAfter: retryAfter
+                ) else { throw AppError.apiError(statusCode: status, message: message) }
+                try await backoff(delay, attempt: attempt, reason: "HTTP \(status)")
+                attempt += 1
+                continue
+            }
+        }
     }
 
     /// Perform the request, mapping transport failures to `AppError.networkError`.
@@ -59,6 +115,52 @@ enum LLMHTTP {
             let message = decodeErrorMessage(data) ?? "request failed"
             throw AppError.apiError(statusCode: http.statusCode, message: message)
         }
+    }
+
+    /// Decide whether the attempt that just failed should be retried, and after
+    /// how long. `attempt` is zero-based (0 = first try). Returns `nil` when the
+    /// failure is non-transient or the attempt budget is exhausted.
+    static func retryableDelay(
+        attempt: Int,
+        status: Int?,
+        urlError: URLError?,
+        retryAfter: TimeInterval?
+    ) -> TimeInterval? {
+        guard attempt < maxAttempts - 1 else { return nil }
+
+        let isTransient: Bool
+        if let status {
+            isTransient = retriableStatusCodes.contains(status)
+        } else if let urlError {
+            isTransient = retriableURLErrorCodes.contains(urlError.code)
+        } else {
+            isTransient = false
+        }
+        guard isTransient else { return nil }
+
+        // A server-provided Retry-After wins over our own backoff.
+        if let retryAfter, retryAfter > 0 {
+            return min(retryAfter, maxDelay)
+        }
+        let exponential = baseDelay * pow(2, Double(attempt))
+        let jitter = Double.random(in: 0...baseDelay)
+        return min(exponential + jitter, maxDelay)
+    }
+
+    private static func backoff(_ delay: TimeInterval, attempt: Int, reason: String) async throws {
+        let seconds = String(format: "%.2f", delay)
+        let nextAttempt = attempt + 2
+        AppLog.transcription.atInfo.info("http: retrying after \(seconds, privacy: .public)s (attempt \(nextAttempt, privacy: .public)/\(maxAttempts, privacy: .public), \(reason, privacy: .public))")
+        try await Task.sleep(for: .seconds(delay))
+    }
+
+    /// Parse a `Retry-After` header expressed in delta-seconds. The HTTP-date
+    /// form is permitted by the spec but unused by these vendors, so it's ignored.
+    private static func retryAfterSeconds(from response: URLResponse) -> TimeInterval? {
+        guard let http = response as? HTTPURLResponse,
+              let raw = http.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = TimeInterval(raw.trimmingCharacters(in: .whitespaces)) else { return nil }
+        return seconds
     }
 
     private static func decodeErrorMessage(_ data: Data) -> String? {

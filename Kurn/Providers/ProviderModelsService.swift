@@ -37,8 +37,7 @@ struct ProviderModelsService: Sendable {
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await LLMHTTP.send(request, session: session)
-        try LLMHTTP.validate(response: response, data: data)
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         let decoded = try JSONDecoder().decode(OpenAIModelListResponse.self, from: data)
         return uniqueSorted(decoded.data.filter { $0.active != false }.map(\.id))
@@ -53,8 +52,7 @@ struct ProviderModelsService: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
 
-        let (data, response) = try await LLMHTTP.send(request, session: session)
-        try LLMHTTP.validate(response: response, data: data)
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         let decoded = try JSONDecoder().decode(AnthropicModelListResponse.self, from: data)
         return uniqueSorted(decoded.data.map(\.id))
@@ -69,8 +67,7 @@ struct ProviderModelsService: Sendable {
         var request = URLRequest(url: components.url!)
         request.httpMethod = "GET"
 
-        let (data, response) = try await LLMHTTP.send(request, session: session)
-        try LLMHTTP.validate(response: response, data: data)
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         let decoded = try JSONDecoder().decode(GoogleModelListResponse.self, from: data)
         let models = decoded.models
