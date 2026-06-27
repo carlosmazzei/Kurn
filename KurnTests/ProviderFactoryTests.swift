@@ -53,6 +53,22 @@ struct ProviderFactoryTests {
         }
     }
 
+    @Test func summaryProviderBuildsGoogleProviderWhenKeyPresent() throws {
+        try withKey(.google, value: "test-key") {
+            let provider = try ProviderFactory.summaryProvider(for: .google, model: "gemini-1.5-pro")
+            #expect(provider.provider == .google)
+        }
+    }
+
+    @Test func summaryProviderResolvesDefaultModelWhenModelEmpty() throws {
+        // An empty model resolves to the provider's defaultModel, so building
+        // still succeeds (the built-in providers all have a non-empty default).
+        try withKey(.openAI, value: "test-key") {
+            let provider = try ProviderFactory.summaryProvider(for: .openAI, model: "")
+            #expect(provider.provider == .openAI)
+        }
+    }
+
     @Test func whisperProviderThrowsNoAPIKeyWhenOpenAIKeyIsEmpty() {
         withClearedKey(.openAI) {
             #expect(throws: AppError.self) {

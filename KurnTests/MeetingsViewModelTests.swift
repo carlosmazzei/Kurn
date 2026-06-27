@@ -95,4 +95,33 @@ struct MeetingsViewModelTests {
 
         #expect(!FileManager.default.fileExists(atPath: file.url.path))
     }
+
+    @Test func deleteMeetingRemovesEveryRecordingAudioFile() throws {
+        let (viewModel, context) = makeViewModel()
+        let meeting = viewModel.createMeeting(title: "Standup")
+        let first = try makeAudioFile()
+        let second = try makeAudioFile()
+        defer {
+            try? FileManager.default.removeItem(at: first.url)
+            try? FileManager.default.removeItem(at: second.url)
+        }
+
+        context.insert(Recording(meeting: meeting, fileName: first.name, duration: 5))
+        context.insert(Recording(meeting: meeting, fileName: second.name, duration: 6))
+        try context.save()
+
+        viewModel.delete(meeting)
+
+        #expect(!FileManager.default.fileExists(atPath: first.url.path))
+        #expect(!FileManager.default.fileExists(atPath: second.url.path))
+        let remaining = try context.fetch(FetchDescriptor<Recording>())
+        #expect(remaining.isEmpty)
+    }
+
+    @Test func createMeetingTreatsNewlineAndTabOnlyTitleAsBlank() {
+        let (viewModel, _) = makeViewModel()
+        let meeting = viewModel.createMeeting(title: "\n\t  ")
+        #expect(!meeting.title.isEmpty)
+        #expect(!meeting.title.contains("\n"))
+    }
 }

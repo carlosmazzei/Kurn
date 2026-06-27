@@ -3,7 +3,6 @@
 //  KurnTests
 //
 
-import AVFoundation
 import Foundation
 import SwiftData
 import Testing
@@ -71,26 +70,6 @@ struct RecordingRecoveryTests {
     /// under `named`, mirroring how `AudioRecorderService` writes recordings.
     private static func makeToneFile(named fileName: String, seconds: Double) throws -> URL {
         let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
-        let sampleRate = 44_100.0
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: sampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 64_000
-        ]
-        let file = try AVAudioFile(forWriting: url, settings: settings)
-        let format = file.processingFormat
-        let frameCount = AVAudioFrameCount(sampleRate * seconds)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount),
-              let data = buffer.floatChannelData else {
-            throw AppError.audioError("Could not build tone buffer")
-        }
-        buffer.frameLength = frameCount
-        let omega = 2.0 * Double.pi * 440.0
-        for i in 0..<Int(frameCount) {
-            data[0][i] = Float(sin(omega * Double(i) / sampleRate)) * 0.5
-        }
-        try file.write(from: buffer)
-        return url
+        return try AudioFixtures.m4aTone(seconds: seconds, at: url)
     }
 }
