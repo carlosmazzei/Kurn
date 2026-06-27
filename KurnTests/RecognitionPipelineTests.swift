@@ -8,6 +8,7 @@
 //  the default `PipelineConfiguration`.
 //
 
+import Foundation
 import Testing
 @testable import Kurn
 

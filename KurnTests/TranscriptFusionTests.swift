@@ -69,12 +69,14 @@ struct TranscriptFusionTests {
 
     @Test func runExceedingMaxDurationSplits() {
         let turns = [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 100)]
-        // Three contiguous 20s spans; with a 30s cap the third span starts a new
-        // segment (span.end 60 - currentStart 0 > 30).
+        // Three contiguous 15s spans of the same speaker. The cap keeps a segment
+        // from exceeding 30s of spoken time (span.end - currentStart): "a" and "b"
+        // merge (end 30 - start 0 == 30, not over), then "c" starts a new segment
+        // (end 45 - start 0 > 30).
         let spans = [
-            TranscribedSpan(text: "a", start: 0, end: 20, confidence: nil),
-            TranscribedSpan(text: "b", start: 20, end: 40, confidence: nil),
-            TranscribedSpan(text: "c", start: 40, end: 60, confidence: nil)
+            TranscribedSpan(text: "a", start: 0, end: 15, confidence: nil),
+            TranscribedSpan(text: "b", start: 15, end: 30, confidence: nil),
+            TranscribedSpan(text: "c", start: 30, end: 45, confidence: nil)
         ]
         let segments = TranscriptFusion.segments(spans: spans, turns: turns, maxSegmentDuration: 30)
         #expect(segments.count == 2)

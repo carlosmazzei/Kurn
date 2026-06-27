@@ -24,7 +24,7 @@ actor EnergyVAD: VoiceActivityDetecting {
     /// region covering the whole clip so callers always get usable output.
     func detectSpeech(url: URL) async -> [SpeechRegion] {
         guard let dbfs = try? Self.frameDBFS(url: url), !dbfs.isEmpty else {
-            let duration = (try? AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
+            let duration = (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
             return [SpeechRegion(start: 0, end: max(0, duration))]
         }
         let ranges = Self.speechFrameRanges(dbfs: dbfs)

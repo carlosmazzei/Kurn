@@ -44,6 +44,26 @@ If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
 SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
 function body at 120, cyclomatic complexity at 15, type body at 400.
 
+### Verifying without a local macOS/Xcode toolchain
+
+Builds and tests require macOS + Xcode, so they can't run in Linux/CI agents or
+any environment without the Apple toolchain. When you cannot build or test
+locally, **do not claim a change compiles or passes — verify it through the
+GitHub Actions `iOS CI` workflow** (`.github/workflows/swift.yml`), which builds,
+lints, and runs the full test suite on a macOS runner:
+
+- Push the change to its branch and open (or update) a PR targeting `main` — the
+  `pull_request` trigger runs the workflow. Pushing to a feature branch alone
+  does **not** trigger CI; only `push` to `main` and PRs to `main` do.
+- Read the run's outcome with the GitHub Actions tooling/API: fetch the
+  `build-and-test` job logs and grep for `error:` (compile failures),
+  `recorded an issue` / `** TEST FAILED **` (test failures), and the final
+  result line. Treat a green run as the source of truth that it compiles and
+  passes.
+- Iterate against CI: each fix can surface the next latent error (the Swift
+  build stops at the first error), so expect several rounds. State plainly that
+  results are pending/observed from CI rather than asserting local success.
+
 ## Architecture
 
 MVVM with `@Observable` `@MainActor` view models, value-type async services, and a

@@ -95,7 +95,7 @@ struct TranscriptionService {
         // 3. Detect speech regions with the selected VAD engine. They drive both
         // the heuristic diarizer's segmentation and the silence-gating of the
         // audio fed to transcription.
-        let regions = await resolveVAD(config.vad).detectSpeech(cleanedURL)
+        let regions = await resolveVAD(config.vad).detectSpeech(url: cleanedURL)
         AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
 
         // 4. Transcription and diarization both read the same file but are
