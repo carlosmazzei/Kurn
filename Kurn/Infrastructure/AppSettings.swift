@@ -236,12 +236,14 @@ final class AppSettings {
         aiProviderID = loadedProviders.contains(where: { $0.id == storedProviderID })
             ? storedProviderID
             : AIProvider.openAI.id
-        defaultMode = TranscriptionMode(
+        let resolvedDefaultMode = TranscriptionMode(
             rawValue: defaults.string(forKey: Keys.defaultMode) ?? ""
         ) ?? .onDevice
-        defaultLanguage = MeetingLanguage(
+        defaultMode = resolvedDefaultMode
+        let resolvedDefaultLanguage = MeetingLanguage(
             rawValue: defaults.string(forKey: Keys.defaultLanguage) ?? ""
         ) ?? .autoDetect
+        defaultLanguage = resolvedDefaultLanguage
         micPickup = MicPickup(
             rawValue: defaults.string(forKey: Keys.micPickup) ?? ""
         ) ?? .wholeRoom
@@ -253,7 +255,8 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
-        fluidAudioBatchASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
+        let batchASRConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
+        fluidAudioBatchASRModelsConsented = batchASRConsented
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
         fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
         // Transcription engine: prefer the stored value; otherwise migrate the
@@ -263,9 +266,9 @@ final class AppSettings {
             .flatMap(TranscriptionEngine.init(rawValue:))
         let resolvedTranscriptionEngine = storedTranscriptionEngine
             ?? Self.migratedTranscriptionEngine(
-                mode: defaultMode,
-                language: defaultLanguage,
-                multilingualConsented: fluidAudioBatchASRModelsConsented
+                mode: resolvedDefaultMode,
+                language: resolvedDefaultLanguage,
+                multilingualConsented: batchASRConsented
             )
         transcriptionEngine = resolvedTranscriptionEngine
         preprocessingEngine = PreprocessingEngine(
