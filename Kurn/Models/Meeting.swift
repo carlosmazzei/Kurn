@@ -55,6 +55,19 @@ final class Meeting {
         recordings.reduce(0) { $0 + $1.duration }
     }
 
+    /// Seconds from the start of the meeting to the start of `recording`, i.e.
+    /// the sum of every chronologically earlier recording's duration. Used to
+    /// shift each segment's recording-relative timestamps into absolute meeting
+    /// time when displaying or exporting a multi-segment transcript. Based on all
+    /// recordings (not only transcribed ones) so an untranscribed gap doesn't
+    /// misalign later segments.
+    func startOffset(of recording: Recording) -> TimeInterval {
+        recordings
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .prefix { $0.id != recording.id }
+            .reduce(0) { $0 + $1.duration }
+    }
+
     /// Aggregate transcription status shown as a badge in the list.
     var aggregateStatus: TranscriptionStatus {
         guard !recordings.isEmpty else { return .none }

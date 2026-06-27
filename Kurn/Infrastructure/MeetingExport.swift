@@ -52,9 +52,11 @@ enum MeetingExport {
                 if transcribed.count > 1 {
                     out += "### Segment \(index + 1)\n\n"
                 }
+                let offset = meeting.startOffset(of: recording)
                 for segment in recording.transcript?.segments ?? [] {
                     let name = nameByLabel[segment.speakerLabel] ?? segment.speakerLabel
-                    out += "**[\(segment.startTime.clockDisplay)] \(name):** \(segment.text)\n\n"
+                    let stamp = (segment.startTime + offset).clockDisplay
+                    out += "**[\(stamp)] \(name):** \(segment.text)\n\n"
                 }
             }
         }

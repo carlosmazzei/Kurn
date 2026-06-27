@@ -131,6 +131,12 @@
 "detail.segment_count" = "%d segmentos";
 "detail.recording_n" = "Gravação %d";
 "detail.add_segment" = "Adicionar segmento";
+"detail.retranscribe" = "Refazer transcrição";
+"detail.retranscribe.confirm.title" = "Refazer a transcrição desta gravação?";
+"detail.retranscribe.confirm.message" = "Isto substitui a transcrição atual por uma nova, a partir do áudio original. Não dá para desfazer.";
+"detail.retranscribe_all" = "Refazer todas as transcrições";
+"detail.retranscribe_all.confirm.title" = "Refazer a transcrição de todas as gravações?";
+"detail.retranscribe_all.confirm.message" = "Isto substitui todas as transcrições atuais por novas, a partir do áudio original, em ordem. Não dá para desfazer.";
 "detail.transcript.empty.title" = "Sem transcrição ainda";
 "detail.transcript.empty.subtitle" = "Transcreva uma gravação para ver a conversa aqui.";
 "detail.summary.empty.title" = "Nenhum resumo ainda";

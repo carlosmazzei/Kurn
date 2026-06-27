@@ -46,14 +46,17 @@ struct SummaryService {
     }
 
     /// Assemble a single prompt-ready transcript string from per-recording
-    /// segment lists. `[mm:ss] Speaker: text` lines, blank line between segments.
+    /// segment lists. `[mm:ss] Speaker: text` lines, one per segment. Each group
+    /// carries the recording's `offset` (seconds from the meeting start), so the
+    /// timestamps read as one continuous, chronologically ordered timeline across
+    /// multiple recordings rather than restarting at 0:00 per segment.
     static func assembleTranscriptText(
-        from segmentGroups: [[TranscriptSegment]]
+        from groups: [(offset: TimeInterval, segments: [TranscriptSegment])]
     ) -> String {
         var lines: [String] = []
-        for segments in segmentGroups {
-            for segment in segments {
-                let stamp = segment.startTime.clockDisplay
+        for group in groups {
+            for segment in group.segments {
+                let stamp = (segment.startTime + group.offset).clockDisplay
                 lines.append("[\(stamp)] \(segment.speakerLabel): \(segment.text)")
             }
         }
