@@ -58,12 +58,17 @@ enum AudioFixtures {
         amplitude: Float = 0.5,
         at url: URL? = nil
     ) throws -> URL {
+        // Write 32-bit float PCM so the on-disk format matches AVAudioFile's
+        // float `processingFormat` exactly — no int16 conversion on write. A
+        // converted int16 WAV round-trips inconsistently on some simulator
+        // runtimes (ExtAudioFileOpenURL fails on reopen), which made the
+        // diarizer fall back to its single-speaker path in CI.
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
             AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
-            AVLinearPCMBitDepthKey: 16,
-            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
             AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false
         ]
