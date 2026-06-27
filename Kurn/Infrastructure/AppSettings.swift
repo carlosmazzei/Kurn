@@ -261,12 +261,13 @@ final class AppSettings {
         // single explicit choice.
         let storedTranscriptionEngine = (defaults.string(forKey: Keys.transcriptionEngine))
             .flatMap(TranscriptionEngine.init(rawValue:))
-        transcriptionEngine = storedTranscriptionEngine
+        let resolvedTranscriptionEngine = storedTranscriptionEngine
             ?? Self.migratedTranscriptionEngine(
                 mode: defaultMode,
                 language: defaultLanguage,
                 multilingualConsented: fluidAudioBatchASRModelsConsented
             )
+        transcriptionEngine = resolvedTranscriptionEngine
         preprocessingEngine = PreprocessingEngine(
             rawValue: defaults.string(forKey: Keys.preprocessingEngine) ?? ""
         ) ?? .standardDSP
