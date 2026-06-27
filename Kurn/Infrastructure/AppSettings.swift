@@ -333,7 +333,7 @@ final class AppSettings {
 
     /// Derive the initial `TranscriptionEngine` from the legacy `defaultMode` +
     /// on-device-multilingual consent so upgrading users keep their behavior.
-    static func migratedTranscriptionEngine(
+    nonisolated static func migratedTranscriptionEngine(
         mode: TranscriptionMode,
         language: MeetingLanguage,
         multilingualConsented: Bool
