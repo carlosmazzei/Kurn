@@ -9,19 +9,27 @@
 //  max-speaker cap) rather than exact turn boundaries.
 //
 
+import AVFoundation
 import Foundation
 import Testing
 @testable import Kurn
 
 struct SpeakerDiarizerTests {
 
-    /// Tests that depend on AVAudioFile actually *reading back* a synthetic WAV
-    /// fixture. On the GitHub Actions simulator runtime AVAudioFile can't read
-    /// these WAVs (ExtAudioFileOpenURL fails / yields 0 frames), so the diarizer
-    /// silently falls back to its single-speaker path and these assertions can't
-    /// hold. They pass on a local macOS/Xcode toolchain, so skip only on CI.
+    /// True when the current runtime can't read back the synthetic WAV fixtures
+    /// these tests depend on. On the GitHub Actions simulator runtime AVAudioFile
+    /// fails to read these WAVs (ExtAudioFileOpenURL fails / yields 0 frames), so
+    /// the diarizer silently falls back to its single-speaker path and the
+    /// read-dependent assertions can't hold. Probed once at runtime (not via a CI
+    /// env var, which doesn't propagate into the simulator process) so the tests
+    /// still run wherever AVAudioFile actually works (e.g. a real device).
     /// TODO: revisit once the simulator WAV I/O issue is understood.
-    static let skipOnCI = ProcessInfo.processInfo.environment["CI"] != nil
+    static let wavFixturesUnreadable: Bool = {
+        guard let url = try? AudioFixtures.wav(segments: [(440, 0.2)]) else { return true }
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let file = try? AVAudioFile(forReading: url) else { return true }
+        return file.length == 0
+    }()
 
     @Test func unreadableFileFallsBackToSingleSpeaker() async {
         let url = URL(fileURLWithPath: "/does/not/exist/\(UUID().uuidString).wav")
@@ -30,7 +38,7 @@ struct SpeakerDiarizerTests {
         #expect(turns.first?.speakerLabel == "Speaker 1")
     }
 
-    @Test(.disabled(if: skipOnCI, "AVAudioFile can't read WAV fixtures on the CI simulator"))
+    @Test(.disabled(if: wavFixturesUnreadable, "AVAudioFile can't read WAV fixtures on the CI simulator"))
     func silentFileProducesSingleWholeClipTurn() async throws {
         let url = try AudioFixtures.wav(segments: [(0, 2.0)])
         defer { try? FileManager.default.removeItem(at: url) }
@@ -41,7 +49,7 @@ struct SpeakerDiarizerTests {
         #expect((turns.first?.end ?? 0) > 0)
     }
 
-    @Test(.disabled(if: skipOnCI, "AVAudioFile can't read WAV fixtures on the CI simulator"))
+    @Test(.disabled(if: wavFixturesUnreadable, "AVAudioFile can't read WAV fixtures on the CI simulator"))
     func twoDistinctPitchesYieldTwoSpeakers() async throws {
         let url = try AudioFixtures.twoSpeakerWAV()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -50,7 +58,7 @@ struct SpeakerDiarizerTests {
         #expect(Set(turns.map(\.speakerLabel)).count >= 2)
     }
 
-    @Test(.disabled(if: skipOnCI, "AVAudioFile can't read WAV fixtures on the CI simulator"))
+    @Test(.disabled(if: wavFixturesUnreadable, "AVAudioFile can't read WAV fixtures on the CI simulator"))
     func sameVoiceRepeatedStaysOneSpeaker() async throws {
         let url = try AudioFixtures.sameSpeakerWAV()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -61,7 +69,7 @@ struct SpeakerDiarizerTests {
         #expect(Set(turns.map(\.speakerLabel)).count == 1)
     }
 
-    @Test(.disabled(if: skipOnCI, "AVAudioFile can't read WAV fixtures on the CI simulator"))
+    @Test(.disabled(if: wavFixturesUnreadable, "AVAudioFile can't read WAV fixtures on the CI simulator"))
     func externalSpeechRegionsAreHonored() async throws {
         // One continuous tone; supply two external regions. The diarizer should
         // produce turns confined to those regions' span (same pitch ⇒ one label).
@@ -76,7 +84,7 @@ struct SpeakerDiarizerTests {
         #expect((turns.last?.end ?? .greatestFiniteMagnitude) <= 3.0 + 0.2)
     }
 
-    @Test(.disabled(if: skipOnCI, "AVAudioFile can't read WAV fixtures on the CI simulator"))
+    @Test(.disabled(if: wavFixturesUnreadable, "AVAudioFile can't read WAV fixtures on the CI simulator"))
     func manyToneRegionsClusterWithoutExceedingCap() async throws {
         // A dozen tone regions across the human pitch range. Nearby pitches fall
         // within the clustering threshold and merge, so this never explodes into
