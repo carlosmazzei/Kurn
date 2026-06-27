@@ -54,21 +54,20 @@ enum AudioFixtures {
     @discardableResult
     static func wav(
         segments: [(hz: Double, seconds: Double)],
-        sampleRate: Double = 16_000,
+        sampleRate: Double = 44_100,
         amplitude: Float = 0.5,
         at url: URL? = nil
     ) throws -> URL {
-        // Write 32-bit float PCM so the on-disk format matches AVAudioFile's
-        // float `processingFormat` exactly — no int16 conversion on write. A
-        // converted int16 WAV round-trips inconsistently on some simulator
-        // runtimes (ExtAudioFileOpenURL fails on reopen), which made the
-        // diarizer fall back to its single-speaker path in CI.
+        // Standard 16-bit little-endian PCM at 44.1 kHz — the same rate the
+        // working AAC fixtures use. (A 16 kHz WAV failed to reopen on the CI
+        // simulator runtime: ExtAudioFileOpenURL returned kAudioFileUnspecified-
+        // Error, silently degrading the diarizer to its single-speaker path.)
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatLinearPCM),
             AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
-            AVLinearPCMBitDepthKey: 32,
-            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false,
             AVLinearPCMIsNonInterleaved: false
         ]
@@ -100,6 +99,29 @@ enum AudioFixtures {
         settings: [String: Any],
         to url: URL
     ) throws -> URL {
+        // Write in a nested scope so the AVAudioFile writer is deallocated — and
+        // the file flushed and closed — before anything tries to read it back.
+        try writeSamples(
+            segments: segments,
+            sampleRate: sampleRate,
+            amplitude: amplitude,
+            settings: settings,
+            to: url
+        )
+        // Fail loudly if the file can't be reopened, instead of letting callers
+        // silently fall back on an unreadable fixture (which masked real
+        // diarizer behavior in CI).
+        _ = try AVAudioFile(forReading: url)
+        return url
+    }
+
+    private static func writeSamples(
+        segments: [(hz: Double, seconds: Double)],
+        sampleRate: Double,
+        amplitude: Float,
+        settings: [String: Any],
+        to url: URL
+    ) throws {
         let file = try AVAudioFile(forWriting: url, settings: settings)
         let format = file.processingFormat
         for segment in segments {
@@ -120,6 +142,5 @@ enum AudioFixtures {
             }
             try file.write(from: buffer)
         }
-        return url
     }
 }
