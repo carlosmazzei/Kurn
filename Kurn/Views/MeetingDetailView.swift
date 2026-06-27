@@ -27,6 +27,11 @@ struct MeetingDetailView: View {
     @State private var showingEdit = false
     @State private var showingTemplatePicker = false
     @State private var shareItem: ShareItem?
+    /// Set when the user taps redo on a transcribed recording; drives the
+    /// per-segment re-transcription confirmation dialog.
+    @State private var pendingRetranscribe: Recording?
+    /// Set when the user picks "Re-transcribe all" from the menu.
+    @State private var pendingRetranscribeAll = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +64,34 @@ struct MeetingDetailView: View {
             }
         }
         .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
+        .confirmationDialog(
+            NSLocalizedString("detail.retranscribe.confirm.title", comment: "Re-transcribe confirmation"),
+            isPresented: Binding(
+                get: { pendingRetranscribe != nil },
+                set: { if !$0 { pendingRetranscribe = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingRetranscribe
+        ) { recording in
+            Button(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"), role: .destructive) {
+                retranscribe(recording)
+            }
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
+        } message: { _ in
+            Text(NSLocalizedString("detail.retranscribe.confirm.message", comment: "Re-transcribe message"))
+        }
+        .confirmationDialog(
+            NSLocalizedString("detail.retranscribe_all.confirm.title", comment: "Re-transcribe all confirmation"),
+            isPresented: $pendingRetranscribeAll,
+            titleVisibility: .visible
+        ) {
+            Button(NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"), role: .destructive) {
+                retranscribeAll()
+            }
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(NSLocalizedString("detail.retranscribe_all.confirm.message", comment: "Re-transcribe all message"))
+        }
     }
 
     // MARK: - Header
@@ -166,7 +199,20 @@ struct MeetingDetailView: View {
                     }
                 }
             } else if recording.transcriptionStatus == .done {
-                StatusBadge(status: .done)
+                HStack(spacing: 8) {
+                    StatusBadge(status: .done)
+                    Button {
+                        pendingRetranscribe = recording
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.textSecondary)
+                            .frame(width: 30, height: 30)
+                            .background(Theme.fill, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+                }
             } else {
                 Button {
                     startTranscription(recording)
@@ -384,6 +430,11 @@ struct MeetingDetailView: View {
                 Button { share() } label: {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
+                if meeting.hasAnyTranscript {
+                    Button { pendingRetranscribeAll = true } label: {
+                        Label(NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"), systemImage: "arrow.clockwise")
+                    }
+                }
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
@@ -430,6 +481,22 @@ struct MeetingDetailView: View {
         Task {
             await txVM.transcribe(
                 recording,
+                language: meeting.language,
+                config: settings.pipelineConfiguration
+            )
+        }
+    }
+
+    private func retranscribe(_ recording: Recording) {
+        // `transcribe` replaces any existing transcript for this recording.
+        startTranscription(recording)
+    }
+
+    private func retranscribeAll() {
+        guard let txVM else { return }
+        Task {
+            await txVM.retranscribeAll(
+                meeting,
                 language: meeting.language,
                 config: settings.pipelineConfiguration
             )
@@ -510,6 +577,7 @@ private struct TranscriptTab: View {
                     segments: segments,
                     speakers: meeting.speakers,
                     activeTime: player.loadedFileName == recording.fileName ? player.currentTime : nil,
+                    offset: meeting.startOffset(of: recording),
                     onSeek: { time in onSeek(recording, time) }
                 )
             }

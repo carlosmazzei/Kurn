@@ -158,6 +158,22 @@ final class TranscriptionViewModel {
         phases[recordingID] = nil
     }
 
+    /// Re-transcribe every recording of a meeting, in chronological order. Each
+    /// segment runs through `transcribe`, which replaces its existing transcript,
+    /// so the whole meeting is reprocessed (e.g. after the pipeline settings
+    /// changed). Sequential by design: it respects the per-recording
+    /// `transcribingIDs` guard and avoids saturating the network on the chunked
+    /// Whisper path.
+    func retranscribeAll(
+        _ meeting: Meeting,
+        language: MeetingLanguage,
+        config: PipelineConfiguration
+    ) async {
+        for recording in meeting.recordings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
+            await transcribe(recording, language: language, config: config)
+        }
+    }
+
     /// Create `Speaker` rows for any labels not already present on the meeting.
     private func ensureSpeakers(for meeting: Meeting?, labels: [String]) {
         guard let meeting else { return }
@@ -185,10 +201,15 @@ final class TranscriptionViewModel {
     ) async {
         guard !isSummarizing else { return }
 
-        // Assemble transcript text on the main actor (reads SwiftData).
-        let groups: [[TranscriptSegment]] = meeting.recordings
+        // Assemble transcript text on the main actor (reads SwiftData). Each
+        // group carries the recording's absolute start offset so the timestamps
+        // stay chronological across multiple segments.
+        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = meeting.recordings
             .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { $0.transcript?.segments }
+            .compactMap { recording in
+                guard let segments = recording.transcript?.segments else { return nil }
+                return (offset: meeting.startOffset(of: recording), segments: segments)
+            }
         let transcriptText = SummaryService.assembleTranscriptText(from: groups)
         let title = meeting.title
 

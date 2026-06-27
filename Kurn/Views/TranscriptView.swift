@@ -14,6 +14,11 @@ struct TranscriptView: View {
     let speakers: [Speaker]
     /// Current playback time within the owning recording (or nil if not playing).
     let activeTime: TimeInterval?
+    /// Seconds from the meeting start to this recording, added only to the
+    /// displayed timestamp so a multi-segment transcript reads as one continuous
+    /// timeline. Seeking and active-segment highlighting still use the raw,
+    /// recording-relative times, since playback is per recording.
+    var offset: TimeInterval = 0
     let onSeek: (TimeInterval) -> Void
 
     var body: some View {
@@ -47,7 +52,7 @@ struct TranscriptView: View {
                 Text(name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(color)
-                Text(segment.startTime.clockDisplay)
+                Text((segment.startTime + offset).clockDisplay)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.textTertiary)
                 Spacer()
