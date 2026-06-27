@@ -176,6 +176,6 @@ private extension Data {
     /// Append a fixed-width integer in little-endian byte order.
     mutating func appendLE<T: FixedWidthInteger>(_ value: T) {
         var littleEndian = value.littleEndian
-        withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
+        Swift.withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
     }
 }
