@@ -30,13 +30,12 @@ actor WhisperTranscriber: Transcribing {
         var allSpans: [TranscribedSpan] = []
         var detectedLanguage = ""
 
+        // Show 0% immediately so the user sees a determinate bar from the start
+        // even for single-chunk uploads (which were previously indeterminate until
+        // they finished).
+        onProgress(0)
+
         for (index, chunk) in chunks.enumerated() {
-            // Report progress before each upload so the UI advances as chunks
-            // complete. Only meaningful when split into several chunks; a single
-            // chunk stays indeterminate until it finishes.
-            if total > 1 {
-                onProgress(Double(index) / Double(total))
-            }
             let data = try Data(contentsOf: chunk.url)
             AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
             let result = try await provider.transcribe(
@@ -56,6 +55,9 @@ actor WhisperTranscriber: Transcribing {
                     )
                 )
             }
+            // Advance after each upload completes so the bar reaches 100% when
+            // the last chunk lands (rather than stalling at (total-1)/total).
+            onProgress(Double(index + 1) / Double(total))
         }
 
         return RawTranscript(spans: allSpans, language: detectedLanguage)

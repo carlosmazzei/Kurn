@@ -33,7 +33,6 @@ actor OnDeviceTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        // Apple Speech runs a single pass and can't report incremental progress.
         let locale: Locale
         if let id = language.localeIdentifier {
             locale = Locale(identifier: id)
@@ -55,8 +54,13 @@ actor OnDeviceTranscriber: Transcribing {
             )
         }
 
+        // Partial results let us turn the otherwise-opaque single-pass recognition
+        // into a determinate progress bar: each callback carries the timestamp of
+        // the latest recognized word, which divided by the clip duration is a
+        // believable fraction of work done. The final result still drives the
+        // returned spans, so enabling partials doesn't affect correctness.
         let request = SFSpeechURLRecognitionRequest(url: url)
-        request.shouldReportPartialResults = false
+        request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
         if #available(iOS 16.0, *) {
             request.addsPunctuation = true
@@ -69,6 +73,9 @@ actor OnDeviceTranscriber: Transcribing {
             .map(CMTimeGetSeconds) ?? 0
         let timeout = max(60, durationSeconds * 4)
         AppLog.transcription.atDebug.debug("onDevice: recognizing (clip=\(durationSeconds, privacy: .public)s, timeout=\(timeout, privacy: .public)s)")
+
+        // Show some movement immediately rather than starting at the empty bar.
+        onProgress(0)
 
         let spans: [TranscribedSpan] = try await withCheckedThrowingContinuation { continuation in
             // Guard against the continuation being resumed more than once: the
@@ -83,7 +90,18 @@ actor OnDeviceTranscriber: Transcribing {
                     }
                     return
                 }
-                guard let result, result.isFinal else { return }
+                guard let result else { return }
+                if !result.isFinal {
+                    // Cap the partial-results fraction below 1 so the bar only
+                    // reaches 100% when the final result arrives.
+                    if durationSeconds > 0,
+                       let last = result.bestTranscription.segments.last {
+                        let lastEnd = last.timestamp + last.duration
+                        let fraction = min(0.99, max(0, lastEnd / durationSeconds))
+                        box.reportProgressIfBumped(fraction, sink: onProgress)
+                    }
+                    return
+                }
                 let segments = result.bestTranscription.segments
                 let mapped = segments.map { seg in
                     TranscribedSpan(
@@ -94,6 +112,7 @@ actor OnDeviceTranscriber: Transcribing {
                     )
                 }
                 if box.resumeIfNeeded() {
+                    onProgress(1)
                     continuation.resume(returning: mapped)
                 }
             }
@@ -122,6 +141,10 @@ actor OnDeviceTranscriber: Transcribing {
 private final class ResumeBox: @unchecked Sendable {
     private let lock = NSLock()
     private var resumed = false
+    /// Last whole-percent fraction we forwarded to `onProgress`, used to throttle
+    /// the high-frequency partial-result callbacks down to at most one update per
+    /// percent so the UI doesn't churn for the main actor.
+    private var lastReportedPercent: Int = -1
     /// The recognition task, held so the timeout safety net can cancel it
     /// without capturing a non-Sendable value into the dispatch closure.
     var task: SFSpeechRecognitionTask?
@@ -131,5 +154,15 @@ private final class ResumeBox: @unchecked Sendable {
         if resumed { return false }
         resumed = true
         return true
+    }
+
+    /// Forward `fraction` only when it has advanced by at least one whole percent.
+    func reportProgressIfBumped(_ fraction: Double, sink: @Sendable (Double) -> Void) {
+        let percent = Int((fraction * 100).rounded(.down))
+        lock.lock()
+        let shouldEmit = percent > lastReportedPercent
+        if shouldEmit { lastReportedPercent = percent }
+        lock.unlock()
+        if shouldEmit { sink(fraction) }
     }
 }
