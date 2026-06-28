@@ -98,6 +98,8 @@
 /* Transcription phases */
 "phase.preparing" = "Preparing…";
 "phase.preprocessing" = "Cleaning audio…";
+"phase.detecting_language" = "Detecting language…";
+"phase.detecting_speech" = "Detecting speech…";
 "phase.transcribing" = "Transcribing…";
 "phase.transcribing_progress" = "Transcribing… %d%%";
 "phase.finalizing" = "Finalizing…";
@@ -240,6 +242,8 @@
 "settings.delete_all.confirm" = "Delete all meetings and recordings?";
 "settings.delete_all.message" = "This permanently removes every meeting, transcript, and audio file. This cannot be undone.";
 "settings.diarization_engine" = "Diarization Engine";
+"settings.diarization_min_speakers" = "Minimum Speakers";
+"settings.diarization_min_speakers_auto" = "Auto";
 "settings.on_device_auto_language" = "Detect Language On-Device (Auto)";
 "settings.live_transcription" = "Live Transcription Preview";
 "settings.model_download.title" = "One-Time Model Download";
@@ -254,6 +258,7 @@
 "settings.models.on_device_language" = "On-Device Language Detection";
 "settings.models.diarization" = "Speaker Diarization";
 "settings.models.vad" = "Voice Activity Detection";
+"settings.models.other" = "Other FluidAudio Models";
 "settings.models.delete" = "Delete Model";
 "settings.models.delete_confirm" = "Delete this model?";
 "settings.models.delete_message" = "It will be removed from this device. You can download it again later by re-enabling the feature.";

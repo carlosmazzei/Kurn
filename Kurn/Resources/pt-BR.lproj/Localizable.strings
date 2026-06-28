@@ -98,6 +98,8 @@
 /* Fases da transcrição */
 "phase.preparing" = "Preparando…";
 "phase.preprocessing" = "Limpando áudio…";
+"phase.detecting_language" = "Detectando idioma…";
+"phase.detecting_speech" = "Detectando fala…";
 "phase.transcribing" = "Transcrevendo…";
 "phase.transcribing_progress" = "Transcrevendo… %d%%";
 "phase.finalizing" = "Finalizando…";
@@ -240,6 +242,8 @@
 "settings.delete_all.confirm" = "Apagar todas as reuniões e gravações?";
 "settings.delete_all.message" = "Isso remove permanentemente todas as reuniões, transcrições e arquivos de áudio. Não é possível desfazer.";
 "settings.diarization_engine" = "Motor de Diarização";
+"settings.diarization_min_speakers" = "Mínimo de Interlocutores";
+"settings.diarization_min_speakers_auto" = "Automático";
 "settings.on_device_auto_language" = "Detectar Idioma no Dispositivo (Auto)";
 "settings.live_transcription" = "Prévia de Transcrição em Tempo Real";
 "settings.model_download.title" = "Download Único de Modelo";
@@ -254,6 +258,7 @@
 "settings.models.on_device_language" = "Detecção de Idioma no Dispositivo";
 "settings.models.diarization" = "Diarização de Locutores";
 "settings.models.vad" = "Detecção de Atividade de Voz";
+"settings.models.other" = "Outros Modelos FluidAudio";
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";

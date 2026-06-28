@@ -85,7 +85,12 @@ struct TranscriptionService {
 
         // 2. Detect the language (selected engine) to refine the hint. The
         // default no-op detector returns the hint unchanged, deferring to the
-        // transcription engine's own detection.
+        // transcription engine's own detection — so only surface the phase when a
+        // real detector runs, otherwise the bar would flash a stage that does no
+        // work.
+        if config.languageDetection != .byTranscriber {
+            onPhase(.detectingLanguage)
+        }
         let detector = resolveLanguageDetector(config.languageDetection)
         let resolvedLanguage = await detector.detect(url: cleanedURL, hint: language)
         if resolvedLanguage != language {
@@ -95,31 +100,71 @@ struct TranscriptionService {
         // 3. Detect speech regions with the selected VAD engine. They drive both
         // the heuristic diarizer's segmentation and the silence-gating of the
         // audio fed to transcription.
+        onPhase(.detectingSpeech)
         let regions = await resolveVAD(config.vad).detectSpeech(url: cleanedURL)
         AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
 
-        // 4. Transcription and diarization both read the same file but are
-        // independent, so run them concurrently instead of back to back.
+        // 4. Transcription and diarization are independent. Cloud transcription
+        // (Whisper) keeps almost nothing on-device, so overlap it with local
+        // diarization for speed. On-device engines load a large model whose
+        // inference activations, run alongside the diarizer's over a long
+        // recording, push the process past its memory limit and get the app
+        // jetsammed — so run those two stages sequentially.
+        //
+        // Both stages read the DSP-cleaned copy. Feeding the diarizer the
+        // original (un-cleaned) recording instead was tried to give the FluidAudio
+        // speaker embedder more spectral detail, but it made no difference to the
+        // collapse on heavily-processed far-field audio and broke the heuristic
+        // engine's frame reader — so the cleaned copy (16 kHz mono, known-readable)
+        // is used here. The heuristic engine's pitch/ZCR/timbre features survive
+        // the cleanup (they're gain-invariant), and the cleaned copy is what its
+        // VAD regions are computed against anyway.
         onPhase(.transcribing(progress: nil))
-        AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
-        async let rawTranscript = transcribeGated(
-            cleanedURL: cleanedURL,
-            regions: regions,
-            engine: config.transcription,
-            language: resolvedLanguage,
-            onPhase: onPhase
-        )
-        async let speakerTurns = diarize(
-            url: cleanedURL,
-            engine: config.diarization,
-            regions: regions,
-            onWarning: onDiarizationWarning
-        )
-
-        let raw = try await rawTranscript
-        let turns = await speakerTurns
-        AppLog.transcription.atInfo.info("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
+        let raw: RawTranscript
+        let turns: [SpeakerTurn]
+        if config.transcription == .whisperAPI {
+            AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
+            async let rawTranscript = transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                language: resolvedLanguage,
+                onPhase: onPhase
+            )
+            async let speakerTurns = diarize(
+                url: cleanedURL,
+                engine: config.diarization,
+                regions: regions,
+                minSpeakers: config.fluidAudioMinSpeakers,
+                onWarning: onDiarizationWarning
+            )
+            raw = try await rawTranscript
+            turns = await speakerTurns
+        } else {
+            AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
+            raw = try await transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                language: resolvedLanguage,
+                onPhase: onPhase
+            )
+            turns = await diarize(
+                url: cleanedURL,
+                engine: config.diarization,
+                regions: regions,
+                minSpeakers: config.fluidAudioMinSpeakers,
+                onWarning: onDiarizationWarning
+            )
+        }
+        // Distinct speakers in the raw diarizer turns, BEFORE fusion. Comparing
+        // this against the post-fusion `speakers=` count below isolates whether a
+        // collapse happens in the diarizer or in fusion: if `turnSpeakers` is
+        // already 1 the diarizer found one voice; if it's >1 but `speakers=` is 1
+        // the fusion step is dropping them.
+        let turnSpeakers = Set(turns.map { $0.speakerLabel })
+        AppLog.transcription.atNotice.notice("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public) turnSpeakers=\(turnSpeakers.count, privacy: .public) [\(turnSpeakers.sorted().joined(separator: ", "), privacy: .public)]")
 
         // 5. Fuse text spans with speaker turns into attributed segments.
         onPhase(.finalizing)
@@ -134,7 +179,7 @@ struct TranscriptionService {
             labels.append(segment.speakerLabel)
         }
 
-        AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public)")
+        AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public) [\(labels.joined(separator: ", "), privacy: .public)]")
         return Output(
             segments: segments,
             language: raw.language.isEmpty ? (resolvedLanguage.localeIdentifier ?? raw.language) : raw.language,
@@ -228,13 +273,16 @@ struct TranscriptionService {
         url: URL,
         engine: DiarizationEngine,
         regions: [SpeechRegion],
+        minSpeakers: Int,
         onWarning: DiarizationWarningHandler?
     ) async -> [SpeakerTurn] {
         switch engine {
         case .heuristic:
             return await heuristicDiarizer.diarize(url: url, speechRegions: regions)
         case .fluidAudio:
-            return await fluidAudioDiarizer.diarize(url: url, onDownloadFailure: onWarning)
+            return await fluidAudioDiarizer.diarize(
+                url: url, minSpeakers: minSpeakers, onDownloadFailure: onWarning
+            )
         }
     }
 }

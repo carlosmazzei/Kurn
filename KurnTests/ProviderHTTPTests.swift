@@ -61,7 +61,7 @@ struct ProviderHTTPTests {
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString.contains("audio/transcriptions") == true)
         #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
-        let bodyString = String(decoding: MockURLProtocol.body(of: request), as: UTF8.self)
+        let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
         #expect(bodyString.contains("whisper-1"))
         #expect(bodyString.contains("verbose_json"))
         #expect(bodyString.contains("en")) // language hint field

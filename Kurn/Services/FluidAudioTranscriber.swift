@@ -19,9 +19,6 @@ import FluidAudio
 
 actor FluidAudioTranscriber: Transcribing {
 
-    /// Lazily loaded and reused across recordings — model load is expensive.
-    private var manager: AsrManager?
-
     /// Transcribe an audio file fully on-device with automatic language
     /// detection. `language` is accepted for parity with `OnDeviceTranscriber`;
     /// the multilingual model detects the language from the audio, so no locale
@@ -31,7 +28,37 @@ actor FluidAudioTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        let manager = try await loadedManager()
+        // The model is shared process-wide (see `FluidAudioModelStore`) so it
+        // loads once and is reused across recordings, meeting views, and the
+        // language-detection pass — not reloaded per instance.
+        let manager = try await FluidAudioModelStore.shared.manager()
+
+        // The clip duration bounds the single span (below) and gates progress
+        // reporting: FluidAudio only emits progress for clips longer than its
+        // internal chunking threshold (`maxModelSamples`, 15 s at 16 kHz).
+        let duration = (try? await AVURLAsset(url: url).load(.duration))
+            .map(CMTimeGetSeconds) ?? 0
+
+        // Forward FluidAudio's progress stream (0...1) to the caller so the UI
+        // bar advances during the on-device pass. Open the stream *before*
+        // transcribing so no early ticks are missed, and only when the clip is
+        // long enough that the engine will actually run — and finish — a progress
+        // session; otherwise we'd leave a dangling session on the shared manager.
+        var progressTask: Task<Void, Never>?
+        if duration > 15.5 {
+            let stream = await manager.transcriptionProgressStream
+            progressTask = Task {
+                do {
+                    for try await fraction in stream {
+                        onProgress(min(1, max(0, fraction)))
+                    }
+                } catch {
+                    // A failed session is surfaced by `transcribe` below; the
+                    // stream error here just ends progress reporting.
+                }
+            }
+        }
+        defer { progressTask?.cancel() }
 
         AppLog.transcription.atDebug.debug("fluidAudio: transcribing (auto language detection)")
         let text: String
@@ -55,24 +82,8 @@ actor FluidAudioTranscriber: Transcribing {
         // macOS, split into timed spans for finer speaker attribution. The full
         // text as one span keeps this compiling and correct for single-speaker
         // recordings; multi-speaker clips get coarser attribution until then.
-        let duration = (try? await AVURLAsset(url: url).load(.duration))
-            .map(CMTimeGetSeconds) ?? 0
         let span = TranscribedSpan(text: text, start: 0, end: duration, confidence: nil)
         return RawTranscript(spans: [span], language: "")
-    }
-
-    private func loadedManager() async throws -> AsrManager {
-        if let manager { return manager }
-        do {
-            let models = try await AsrModels.downloadAndLoad(version: .v3)
-            let created = AsrManager(config: .default, models: models)
-            manager = created
-            AppLog.transcription.atNotice.notice("fluidAudio: multilingual ASR models loaded")
-            return created
-        } catch {
-            AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
-            throw AppError.modelDownloadFailed(error.localizedDescription)
-        }
     }
 }
 

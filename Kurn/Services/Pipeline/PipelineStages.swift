@@ -68,18 +68,8 @@ struct PipelineConfiguration: Sendable, Equatable {
     var languageDetection: LanguageDetectionEngine = .byTranscriber
     var diarization: DiarizationEngine = .heuristic
     var transcription: TranscriptionEngine = .appleSpeech
-
-    init(
-        preprocessing: PreprocessingEngine = .standardDSP,
-        vad: VADEngine = .energyThreshold,
-        languageDetection: LanguageDetectionEngine = .byTranscriber,
-        diarization: DiarizationEngine = .heuristic,
-        transcription: TranscriptionEngine = .appleSpeech
-    ) {
-        self.preprocessing = preprocessing
-        self.vad = vad
-        self.languageDetection = languageDetection
-        self.diarization = diarization
-        self.transcription = transcription
-    }
+    /// Floor on the FluidAudio diarizer's speaker count (`0` = auto-detect). Only
+    /// the `.fluidAudio` engine reads it, to break its VBx single-speaker collapse
+    /// by re-clustering with KMeans to at least this many speakers.
+    var fluidAudioMinSpeakers: Int = 0
 }

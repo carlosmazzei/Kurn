@@ -126,20 +126,27 @@ final class TranscriptionViewModel {
                 }
             )
 
-            // Replace any existing transcript.
+            // Replace any existing transcript. Detach the old one first: a
+            // `delete` isn't applied to the relationship until the next save, so
+            // without this `recording.transcript` still points at the old
+            // transcript when the new one's inverse is established — which traps
+            // with "relationship already has a value but it's not the target".
             if let existing = recording.transcript {
+                recording.transcript = nil
                 modelContext.delete(existing)
             }
+            // Assigning `recording` in the initializer establishes the
+            // relationship (SwiftData maintains the inverse `recording.transcript`),
+            // so no manual back-assignment is needed.
             let transcript = Transcript(
                 recording: recording,
                 segments: output.segments,
                 language: output.language
             )
             modelContext.insert(transcript)
-            recording.transcript = transcript
             recording.transcriptionStatus = .done
 
-            ensureSpeakers(for: recording.meeting, labels: output.speakerLabels)
+            syncSpeakers(for: recording.meeting)
             persist()
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
         } catch let appError as AppError {
@@ -174,11 +181,43 @@ final class TranscriptionViewModel {
         }
     }
 
-    /// Create `Speaker` rows for any labels not already present on the meeting.
-    private func ensureSpeakers(for meeting: Meeting?, labels: [String]) {
+    /// Reconcile the meeting's `Speaker` rows with the labels actually present
+    /// across all its recordings' current transcripts. Adds rows for new labels
+    /// and removes any whose label no longer appears in *any* transcript — so a
+    /// re-transcription that detects a different (e.g. smaller) set of speakers
+    /// doesn't leave stale chips/rows behind in the UI. Labels that survive keep
+    /// their existing row, preserving the user's renamed `name` and color.
+    ///
+    /// Speakers are meeting-scoped but transcripts are per-recording, so the
+    /// "still used" set is the union over every recording: re-transcribing one
+    /// recording must not drop speakers another recording still references.
+    private func syncSpeakers(for meeting: Meeting?) {
         guard let meeting else { return }
-        var index = meeting.speakers.count
-        for label in labels where !meeting.speakers.contains(where: { $0.label == label }) {
+
+        // Labels still referenced by any recording's current transcript, in
+        // first-appearance order for stable color assignment.
+        var usedLabels: [String] = []
+        for recording in meeting.recordings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
+            guard let segments = recording.transcript?.segments else { continue }
+            for segment in segments where !usedLabels.contains(segment.speakerLabel) {
+                usedLabels.append(segment.speakerLabel)
+            }
+        }
+
+        // Drop speakers no longer referenced by any transcript.
+        let existingLabels = Set(meeting.speakers.map(\.label))
+        let deletedLabels = existingLabels.subtracting(usedLabels)
+        for speaker in meeting.speakers where !usedLabels.contains(speaker.label) {
+            modelContext.delete(speaker)
+        }
+
+        // Add rows for newly-appearing labels. `surviving` excludes the rows just
+        // marked for deletion (the delete isn't applied until save) so the color
+        // index reflects the speakers that will actually remain.
+        let survivingLabels = existingLabels.subtracting(deletedLabels)
+        var index = survivingLabels.count
+        var addedLabels: [String] = []
+        for label in usedLabels where !meeting.speakers.contains(where: { $0.label == label }) {
             // Setting `meeting` establishes the relationship; SwiftData maintains
             // the inverse `meeting.speakers`.
             let speaker = Speaker(
@@ -187,8 +226,16 @@ final class TranscriptionViewModel {
                 color: Color.speakerHex(for: index)
             )
             modelContext.insert(speaker)
+            addedLabels.append(label)
             index += 1
         }
+
+        // Final state the UI (filter chips + speaker list) will render, plus the
+        // delta, so a "UI shows 1 speaker" report can be traced to the exact stage:
+        // if `final` here is >1 the data layer is correct and any UI mismatch is a
+        // view-refresh problem; if it's 1, the collapse happened upstream (see the
+        // diarizer's `turnSpeakers`/`speakers` log lines).
+        AppLog.transcription.atNotice.notice("VM: syncSpeakers final=\(usedLabels.count, privacy: .public) [\(usedLabels.joined(separator: ", "), privacy: .public)] added=\(addedLabels.count, privacy: .public) removed=\(deletedLabels.count, privacy: .public)")
     }
 
     // MARK: - Summary

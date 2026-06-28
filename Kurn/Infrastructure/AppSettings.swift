@@ -25,6 +25,7 @@ final class AppSettings {
         static let lastSummaryTemplate = "settings.lastSummaryTemplate"
         static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
         static let diarizationEngine = "settings.diarizationEngine"
+        static let fluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
         static let transcriptionEngine = "settings.transcriptionEngine"
         static let preprocessingEngine = "settings.preprocessingEngine"
         static let vadEngine = "settings.vadEngine"
@@ -80,6 +81,16 @@ final class AppSettings {
         didSet { defaults.set(diarizationEngine.rawValue, forKey: Keys.diarizationEngine) }
     }
 
+    /// Minimum number of speakers to force on the FluidAudio (neural) diarizer.
+    /// `0` means auto-detect (no constraint). On far-field/single-mic audio the
+    /// neural pipeline's VBx step collapses every cluster into one speaker; a
+    /// non-zero floor here makes FluidAudio re-cluster with KMeans to at least
+    /// this many speakers instead of reporting a single one. Ignored by the
+    /// heuristic engine, which auto-detects from pitch/timbre.
+    var fluidAudioMinSpeakers: Int {
+        didSet { defaults.set(fluidAudioMinSpeakers, forKey: Keys.fluidAudioMinSpeakers) }
+    }
+
     /// Engine that turns audio into text. Replaces the legacy `defaultMode` +
     /// on-device-multilingual pairing; `init` migrates the old keys into this.
     var transcriptionEngine: TranscriptionEngine {
@@ -109,8 +120,20 @@ final class AppSettings {
             vad: vadEngine,
             languageDetection: languageDetectionEngine,
             diarization: diarizationEngine,
-            transcription: transcriptionEngine
+            transcription: transcriptionEngine,
+            fluidAudioMinSpeakers: fluidAudioMinSpeakers
         )
+    }
+
+    /// Whether the selected pipeline relies on the FluidAudio on-device ASR model
+    /// (as the Parakeet transcriber or the auto-language detector) *and* the user
+    /// has consented to downloading it. Gates foreground pre-warming so the model
+    /// is only loaded for users who will actually use it, and never downloaded
+    /// without consent. See `FluidAudioModelStore.prewarm()`.
+    var usesFluidAudioModel: Bool {
+        let needsOnDeviceASR = transcriptionEngine.requiredModelSet == .onDeviceASR
+            || languageDetectionEngine.requiredModelSet == .onDeviceASR
+        return needsOnDeviceASR && fluidAudioBatchASRModelsConsented
     }
 
     /// Whether the user has consented to downloading FluidAudio's streaming ASR
@@ -254,6 +277,7 @@ final class AppSettings {
         diarizationEngine = DiarizationEngine(
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic
+        fluidAudioMinSpeakers = defaults.integer(forKey: Keys.fluidAudioMinSpeakers)
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         let batchASRConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioBatchASRModelsConsented = batchASRConsented
