@@ -113,8 +113,10 @@ final class ResourcePressureMonitor {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.didReceiveMemoryWarning = true
-            AppLog.transcription.atError.error("resource: received memory warning")
+            Task { @MainActor in
+                self?.didReceiveMemoryWarning = true
+                AppLog.transcription.atError.error("resource: received memory warning")
+            }
         }
     }
 
