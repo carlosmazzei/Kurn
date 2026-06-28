@@ -113,6 +113,17 @@ final class AppSettings {
         )
     }
 
+    /// Whether the selected pipeline relies on the FluidAudio on-device ASR model
+    /// (as the Parakeet transcriber or the auto-language detector) *and* the user
+    /// has consented to downloading it. Gates foreground pre-warming so the model
+    /// is only loaded for users who will actually use it, and never downloaded
+    /// without consent. See `FluidAudioModelStore.prewarm()`.
+    var usesFluidAudioModel: Bool {
+        let needsOnDeviceASR = transcriptionEngine.requiredModelSet == .onDeviceASR
+            || languageDetectionEngine.requiredModelSet == .onDeviceASR
+        return needsOnDeviceASR && fluidAudioBatchASRModelsConsented
+    }
+
     /// Whether the user has consented to downloading FluidAudio's streaming ASR
     /// models (independent of the diarization model consent below).
     var fluidAudioASRModelsConsented: Bool {

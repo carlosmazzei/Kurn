@@ -14,6 +14,8 @@ struct KurnApp: App {
     /// Shared, observable preferences (provider, default mode/language).
     @State private var settings = AppSettings()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     /// One container for the whole app, persisted on disk.
     let modelContainer: ModelContainer = {
         let schema = Schema([
@@ -42,7 +44,26 @@ struct KurnApp: App {
         WindowGroup {
             ContentView()
                 .environment(settings)
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    // Pre-warm the FluidAudio ASR model while the app is in the
+                    // foreground. The one-time CoreML/ANE compilation costs tens
+                    // of seconds and fails outright if first attempted from the
+                    // background ("could not communicate with a helper
+                    // application"), so doing it here — gated to users who've
+                    // selected and consented to the on-device engine — keeps
+                    // later transcriptions fast and reliable.
+                    guard phase == .active, settings.usesFluidAudioModel else { return }
+                    prewarmFluidAudioModel()
+                }
         }
         .modelContainer(modelContainer)
+    }
+
+    private func prewarmFluidAudioModel() {
+        #if canImport(FluidAudio)
+        Task.detached(priority: .utility) {
+            await FluidAudioModelStore.shared.prewarm()
+        }
+        #endif
     }
 }

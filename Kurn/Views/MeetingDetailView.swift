@@ -391,7 +391,14 @@ struct MeetingDetailView: View {
         }
     }
 
-    // MARK: - Helpers
+}
+
+// MARK: - Actions & helpers
+//
+// Kept in a same-file extension so it stays out of the view's `type_body_length`
+// budget while retaining access to the view's private state.
+
+extension MeetingDetailView {
 
     private var sortedRecordings: [Recording] {
         meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }

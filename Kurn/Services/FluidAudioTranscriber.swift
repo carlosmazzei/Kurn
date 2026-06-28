@@ -19,9 +19,6 @@ import FluidAudio
 
 actor FluidAudioTranscriber: Transcribing {
 
-    /// Lazily loaded and reused across recordings — model load is expensive.
-    private var manager: AsrManager?
-
     /// Transcribe an audio file fully on-device with automatic language
     /// detection. `language` is accepted for parity with `OnDeviceTranscriber`;
     /// the multilingual model detects the language from the audio, so no locale
@@ -31,7 +28,10 @@ actor FluidAudioTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        let manager = try await loadedManager()
+        // The model is shared process-wide (see `FluidAudioModelStore`) so it
+        // loads once and is reused across recordings, meeting views, and the
+        // language-detection pass — not reloaded per instance.
+        let manager = try await FluidAudioModelStore.shared.manager()
 
         AppLog.transcription.atDebug.debug("fluidAudio: transcribing (auto language detection)")
         let text: String
@@ -59,20 +59,6 @@ actor FluidAudioTranscriber: Transcribing {
             .map(CMTimeGetSeconds) ?? 0
         let span = TranscribedSpan(text: text, start: 0, end: duration, confidence: nil)
         return RawTranscript(spans: [span], language: "")
-    }
-
-    private func loadedManager() async throws -> AsrManager {
-        if let manager { return manager }
-        do {
-            let models = try await AsrModels.downloadAndLoad(version: .v3)
-            let created = AsrManager(config: .default, models: models)
-            manager = created
-            AppLog.transcription.atNotice.notice("fluidAudio: multilingual ASR models loaded")
-            return created
-        } catch {
-            AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
-            throw AppError.modelDownloadFailed(error.localizedDescription)
-        }
     }
 }
 
