@@ -32,48 +32,78 @@ struct CompactionResult: Sendable {
 }
 
 /// Loads audio as mono Float samples at a target sample rate. Shared by the
-/// compactor and `FluidAudioVAD`.
+/// compactor, `FluidAudioVAD`, and `SpeakerDiarizer`.
 enum VADAudioLoader {
+    /// Decode `url` to mono Float samples at `sampleRate` using an offline
+    /// `AVAudioEngine` render (the same mechanism `AudioPreprocessor` uses).
+    ///
+    /// This deliberately does NOT use `AVAudioFile.read(into:)` or
+    /// `AVAudioConverter`: on device, both of those decode paths fail on the
+    /// app's compressed AAC `.m4a` files with a generic `erro 0`
+    /// (`Foundation._GenericObjCError`), which silently broke both VAD and
+    /// diarization (collapsing to a single speaker / whole-clip region). The
+    /// engine's player-node render path decodes the very same files reliably —
+    /// `AudioPreprocessor` reads them this way every run without error.
     static func monoSamples(url: URL, sampleRate: Double) throws -> [Float] {
-        let file = try AVAudioFile(forReading: url)
-        let inFormat = file.processingFormat
-        guard inFormat.sampleRate > 0 else { return [] }
-        guard
-            let outFormat = AVAudioFormat(
-                commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false
-            ),
-            let converter = AVAudioConverter(from: inFormat, to: outFormat),
-            let inBuf = AVAudioPCMBuffer(pcmFormat: inFormat, frameCapacity: 16_384)
-        else {
+        let inputFile = try AVAudioFile(forReading: url)
+        let inputFormat = inputFile.processingFormat
+        let totalInputFrames = inputFile.length
+        guard totalInputFrames > 0, inputFormat.sampleRate > 0 else { return [] }
+
+        guard let outputFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false
+        ) else {
             throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
         }
 
-        var output: [Float] = []
-        while true {
-            try file.read(into: inBuf)
-            let isEOF = inBuf.frameLength == 0
-            let ratio = sampleRate / inFormat.sampleRate
-            let capacity = AVAudioFrameCount(Double(max(1, inBuf.frameLength)) * ratio) + 1_024
-            guard let outBuf = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: capacity) else { break }
+        let engine = AVAudioEngine()
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+        // The mixer/output path resamples and downmixes to the manual-rendering
+        // format (mono @ `sampleRate`), so connect with the source's own format.
+        engine.connect(player, to: engine.mainMixerNode, format: inputFormat)
 
-            // The converter's input block is `@Sendable`, but it runs
-            // synchronously inside `convert` on this thread, so this one-shot
-            // "feed the buffer once" flag is not actually shared across threads.
-            nonisolated(unsafe) var provided = false
-            var convError: NSError?
-            let status = converter.convert(to: outBuf, error: &convError) { _, inputStatus in
-                if isEOF { inputStatus.pointee = .endOfStream; return nil }
-                if provided { inputStatus.pointee = .noDataNow; return nil }
-                provided = true
-                inputStatus.pointee = .haveData
-                return inBuf
-            }
-            if let convError { throw AppError.audioError(convError.localizedDescription) }
-            if let channel = outBuf.floatChannelData, outBuf.frameLength > 0 {
-                output.append(contentsOf: UnsafeBufferPointer(start: channel[0], count: Int(outBuf.frameLength)))
-            }
-            if isEOF || status == .endOfStream { break }
+        let maxFrames: AVAudioFrameCount = 4096
+        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
+        try engine.start()
+        // Completion-handler overload (not the `async` one): in offline rendering
+        // the file is consumed by the render loop below, so awaiting playback
+        // completion would deadlock. Matches `AudioPreprocessor`.
+        player.scheduleFile(inputFile, at: nil, completionHandler: nil)
+        player.play()
+
+        guard let renderBuffer = AVAudioPCMBuffer(
+            pcmFormat: engine.manualRenderingFormat, frameCapacity: maxFrames
+        ) else {
+            engine.stop()
+            throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
         }
+
+        let ratio = sampleRate / inputFormat.sampleRate
+        let expectedOutFrames = AVAudioFramePosition(Double(totalInputFrames) * ratio)
+        var output: [Float] = []
+        output.reserveCapacity(Int(max(0, expectedOutFrames)))
+
+        renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
+            let remaining = expectedOutFrames - engine.manualRenderingSampleTime
+            let framesToRender = AVAudioFrameCount(min(Int64(maxFrames), remaining))
+            let status = try engine.renderOffline(framesToRender, to: renderBuffer)
+            switch status {
+            case .success:
+                if let channel = renderBuffer.floatChannelData, renderBuffer.frameLength > 0 {
+                    output.append(
+                        contentsOf: UnsafeBufferPointer(start: channel[0], count: Int(renderBuffer.frameLength))
+                    )
+                }
+            case .insufficientDataFromInputNode, .cannotDoInCurrentContext, .error:
+                break renderLoop
+            @unknown default:
+                break renderLoop
+            }
+        }
+
+        player.stop()
+        engine.stop()
         return output
     }
 }

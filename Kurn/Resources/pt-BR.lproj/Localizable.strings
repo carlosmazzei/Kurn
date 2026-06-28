@@ -242,6 +242,8 @@
 "settings.delete_all.confirm" = "Apagar todas as reuniões e gravações?";
 "settings.delete_all.message" = "Isso remove permanentemente todas as reuniões, transcrições e arquivos de áudio. Não é possível desfazer.";
 "settings.diarization_engine" = "Motor de Diarização";
+"settings.diarization_min_speakers" = "Mínimo de Interlocutores";
+"settings.diarization_min_speakers_auto" = "Automático";
 "settings.on_device_auto_language" = "Detectar Idioma no Dispositivo (Auto)";
 "settings.live_transcription" = "Prévia de Transcrição em Tempo Real";
 "settings.model_download.title" = "Download Único de Modelo";

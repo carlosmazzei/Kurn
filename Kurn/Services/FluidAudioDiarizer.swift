@@ -21,8 +21,12 @@ actor FluidAudioDiarizer: Diarizing {
     // isolation boundary. `manager` is a `let` never exposed outside this actor,
     // so there's no real aliasing risk — `nonisolated(unsafe)` matches the same
     // pattern already used for `LockScreenRecordingController.activity`.
-    private nonisolated(unsafe) let manager = OfflineDiarizerManager(config: FluidAudioDiarizer.tunedConfig)
+    private nonisolated(unsafe) var manager = OfflineDiarizerManager(config: FluidAudioDiarizer.tunedConfig(minSpeakers: 0))
     private var modelsReady = false
+    /// Speaker floor the current `manager` was built with. The manager bakes its
+    /// config at init (it has no per-call config), so a change here forces a
+    /// rebuild + re-prepare.
+    private var currentMinSpeakers = 0
     private let prepareTimeout: TimeInterval = 60
     private let processTimeout: TimeInterval = 120
 
@@ -31,26 +35,71 @@ actor FluidAudioDiarizer: Diarizing {
     /// multi-speaker AHC results into a single cluster on our recordings (the
     /// VBx mixture weights go to ~1e-20 for everything but one), even when
     /// segmentation and AHC both clearly find multiple speakers. The values
-    /// here are the BUT-VBx literature defaults (DIHARD/AMI): Fa=0.4 gives the
-    /// acoustic likelihood more weight, and Fb=11 makes the Dirichlet prior
+    /// here lift `Fa` above the BUT-VBx literature defaults (DIHARD/AMI): Fa=0.6
+    /// gives the acoustic likelihood even more weight (so subtle x-vector
+    /// differences aren't flattened away), and Fb=11 makes the Dirichlet prior
     /// far less concentrated so VBx preserves the cluster count it was given
     /// instead of collapsing to one.
-    private static let tunedConfig: OfflineDiarizerConfig = {
+    ///
+    /// NOTE on what is *not* tunable here: FluidAudio's offline VBx is a
+    /// variational-Bayes Dirichlet GMM, not the Brno HMM-VBx — there is no
+    /// `loop_p`/self-loop/transition term to lower. The init smoothing that
+    /// could keep the other components alive is hardcoded (`initSmoothing: 7.0`
+    /// in `VBxClustering`), not in the public config. And the AHC init is not
+    /// the bottleneck: it already yields ~59 clusters; VBx collapses *those* to
+    /// one. So `Fa` is the only auto-side lever, and clustering-side tuning can
+    /// only help when the *embeddings* are discriminative. On heavily-processed
+    /// far-field audio they collapse into one blob and no Fa/Fb/threshold value
+    /// recovers the speakers (feeding the original un-cleaned recording was tried
+    /// and made no difference). When that happens, either set `minSpeakers`
+    /// (forces a KMeans re-cluster, escaping the collapse) or use the heuristic
+    /// `SpeakerDiarizer` (pitch/timbre based), which the user can select.
+    ///
+    /// - Parameter minSpeakers: when > 1, sets `clustering.minSpeakers`, which
+    ///   makes the pipeline re-cluster with KMeans to at least that many speakers
+    ///   whenever VBx collapses below it (which it does on far-field audio). When
+    ///   0/1 the diarizer auto-detects with no floor.
+    private static func tunedConfig(minSpeakers: Int) -> OfflineDiarizerConfig {
         var config = OfflineDiarizerConfig.default
-        config.clustering.warmStartFa = 0.4
+        config.clustering.warmStartFa = 0.6
         config.clustering.warmStartFb = 11
+        if minSpeakers > 1 {
+            config.clustering.minSpeakers = minSpeakers
+        }
         return config
-    }()
+    }
+
+    /// Rebuild `manager` if the requested speaker floor differs from the one it
+    /// was constructed with. Resets `modelsReady` so models re-prepare against
+    /// the new config (cheap: weights are cached on disk, only recompiled).
+    private func ensureManager(minSpeakers: Int) {
+        guard minSpeakers != currentMinSpeakers else { return }
+        manager = OfflineDiarizerManager(config: Self.tunedConfig(minSpeakers: minSpeakers))
+        currentMinSpeakers = minSpeakers
+        modelsReady = false
+    }
 
     func diarize(url: URL) async -> [SpeakerTurn] {
-        await diarize(url: url, onDownloadFailure: nil)
+        await diarize(url: url, minSpeakers: 0, onDownloadFailure: nil)
+    }
+
+    func diarize(url: URL, onDownloadFailure: (@Sendable (String) -> Void)?) async -> [SpeakerTurn] {
+        await diarize(url: url, minSpeakers: 0, onDownloadFailure: onDownloadFailure)
     }
 
     /// - Parameter onDownloadFailure: reported only for a model preparation
     ///   failure (the one case where re-consenting/redownloading could help).
     ///   Passed per call, not stored on the actor, so concurrent transcriptions
     ///   of different recordings can't have their warning handlers cross over.
-    func diarize(url: URL, onDownloadFailure: (@Sendable (String) -> Void)?) async -> [SpeakerTurn] {
+    func diarize(
+        url: URL,
+        minSpeakers: Int,
+        onDownloadFailure: (@Sendable (String) -> Void)?
+    ) async -> [SpeakerTurn] {
+        ensureManager(minSpeakers: minSpeakers)
+        if minSpeakers > 1 {
+            AppLog.transcription.atNotice.notice("FluidAudioDiarizer: minSpeakers=\(minSpeakers, privacy: .public) (forced KMeans re-cluster on VBx collapse)")
+        }
         if !modelsReady {
             do {
                 try await Self.withTimeout(seconds: prepareTimeout) {
@@ -154,10 +203,18 @@ actor FluidAudioDiarizer: Diarizing {
 /// speaker turn so `TranscriptionService` keeps working until the package is added.
 actor FluidAudioDiarizer: Diarizing {
     func diarize(url: URL) async -> [SpeakerTurn] {
-        await diarize(url: url, onDownloadFailure: nil)
+        await diarize(url: url, minSpeakers: 0, onDownloadFailure: nil)
     }
 
     func diarize(url: URL, onDownloadFailure: (@Sendable (String) -> Void)?) async -> [SpeakerTurn] {
+        await diarize(url: url, minSpeakers: 0, onDownloadFailure: onDownloadFailure)
+    }
+
+    func diarize(
+        url: URL,
+        minSpeakers: Int,
+        onDownloadFailure: (@Sendable (String) -> Void)?
+    ) async -> [SpeakerTurn] {
         let message = NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
         AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)

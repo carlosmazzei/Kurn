@@ -50,8 +50,12 @@ actor SpeakerDiarizer: Diarizing {
     private let minRegionFrames = EnergyVAD.minRegionFrames   // ignore < 200 ms blips
     /// Weighted-Euclidean distance below which a region joins an existing
     /// centroid. Tuned empirically: same-speaker regions cluster well under
-    /// 0.15, different-pitched speakers land around 0.30+.
-    private let distanceThreshold: Float = 0.22
+    /// 0.15, different-pitched speakers land around 0.30+. Lowered to 0.16
+    /// (just above the same-speaker band) for more sensitivity on far-field
+    /// audio, where different voices' timbre features partly converge and a
+    /// looser threshold under-splits — this is the engine that auto-detects
+    /// without a forced speaker count (FluidAudio's VBx collapses to 1 here).
+    private let distanceThreshold: Float = 0.16
     /// Per-dimension weights for the distance metric. Pitch is the strongest
     /// discriminator and gets the most weight; ZCR varies on a small absolute
     /// scale (~0.02–0.15) so it's amplified; high-band sits in between.
@@ -71,7 +75,7 @@ actor SpeakerDiarizer: Diarizing {
     /// built-in energy VAD. On any failure returns a single turn covering the
     /// whole clip so callers always get usable output.
     func diarize(url: URL) async -> [SpeakerTurn] {
-        guard let frames = try? readFrames(url: url), !frames.isEmpty else {
+        guard let frames = loadFrames(url: url), !frames.isEmpty else {
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 0)]
         }
         return finalize(regions: speechRegions(from: frames), frames: frames)
@@ -81,10 +85,24 @@ actor SpeakerDiarizer: Diarizing {
     /// VAD engine (e.g. FluidAudio Silero) instead of the built-in energy VAD,
     /// then layers this engine's timbre features over those regions.
     func diarize(url: URL, speechRegions externalRegions: [SpeechRegion]) async -> [SpeakerTurn] {
-        guard let frames = try? readFrames(url: url), !frames.isEmpty else {
+        guard let frames = loadFrames(url: url), !frames.isEmpty else {
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 0)]
         }
-        return finalize(regions: featureRegions(from: frames, speechRegions: externalRegions), frames: frames)
+        // This engine assigns one speaker per region and clusters *across*
+        // regions — it never splits within a region — so it can only find as many
+        // speakers as the segmentation hands it. An upstream VAD that fails and
+        // returns a single whole-clip region (see `FluidAudioVAD`'s fallback)
+        // would therefore cap the result at one speaker. When the external VAD is
+        // that degenerate, fall back to the built-in energy VAD's silence-gap
+        // segmentation so diarization stays useful regardless of the VAD engine.
+        let regions: [Region]
+        if externalRegions.count <= 1 {
+            regions = speechRegions(from: frames)
+            AppLog.transcription.atInfo.info("SpeakerDiarizer: external VAD gave \(externalRegions.count, privacy: .public) region(s); self-segmented into \(regions.count, privacy: .public)")
+        } else {
+            regions = featureRegions(from: frames, speechRegions: externalRegions)
+        }
+        return finalize(regions: regions, frames: frames)
     }
 
     /// Cluster the feature regions into speaker turns, falling back to a single
@@ -92,6 +110,7 @@ actor SpeakerDiarizer: Diarizing {
     private func finalize(regions: [Region], frames: [Frame]) -> [SpeakerTurn] {
         guard !regions.isEmpty else {
             let end = frames.last.map { $0.time + frameDuration } ?? 0
+            AppLog.transcription.atInfo.info("SpeakerDiarizer: no speech regions — single whole-clip turn")
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: end)]
         }
 
@@ -103,61 +122,51 @@ actor SpeakerDiarizer: Diarizing {
 
     // MARK: - Feature extraction
 
-    private func readFrames(url: URL) throws -> [Frame] {
-        let file = try AVAudioFile(forReading: url)
-        let format = file.processingFormat
-        let sampleRate = format.sampleRate
-        guard sampleRate > 0 else { return [] }
-
-        let channelCount = Int(format.channelCount)
-        let samplesPerFrame = max(1, Int(sampleRate * frameDuration))
-        let chunkCapacity = AVAudioFrameCount(samplesPerFrame * 50) // ~5 s per read
-
-        guard let buffer = AVAudioPCMBuffer(
-            pcmFormat: format,
-            frameCapacity: chunkCapacity
-        ) else { return [] }
-
-        var frames: [Frame] = []
-        var carry: [Float] = []
-        var globalSampleIndex = 0
-
-        while true {
-            buffer.frameLength = 0
-            try file.read(into: buffer)
-            let read = Int(buffer.frameLength)
-            if read == 0 { break }
-            guard let channelData = buffer.floatChannelData else { break }
-
-            var mono = [Float](repeating: 0, count: read)
-            for ch in 0..<channelCount {
-                let ptr = channelData[ch]
-                for i in 0..<read { mono[i] += ptr[i] }
-            }
-            if channelCount > 1 {
-                let inv = 1.0 / Float(channelCount)
-                for i in 0..<read { mono[i] *= inv }
-            }
-
-            carry.append(contentsOf: mono)
-
-            // Walk the buffer with a read index and trim once per chunk, instead
-            // of calling removeFirst() per frame (which shifts the whole buffer
-            // every time, making this quadratic in the carry length).
-            var consumed = 0
-            while carry.count - consumed >= samplesPerFrame {
-                let slice = Array(carry[consumed..<consumed + samplesPerFrame])
-                consumed += samplesPerFrame
-                let time = Double(globalSampleIndex) / sampleRate
-                frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
-                globalSampleIndex += samplesPerFrame
-            }
-            if consumed > 0 { carry.removeFirst(consumed) }
+    /// Read frames, logging the concrete decode error instead of swallowing it
+    /// (a bare `try?` previously hid an AAC decode failure that collapsed
+    /// diarization to one speaker). Returns nil on failure so callers fall back.
+    private func loadFrames(url: URL) -> [Frame]? {
+        do {
+            return try readFrames(url: url)
+        } catch {
+            AppLog.transcription.atError.error("SpeakerDiarizer: readFrames failed for \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public) — single-speaker fallback")
+            return nil
         }
+    }
 
-        if carry.count > samplesPerFrame / 3 {
-            let time = Double(globalSampleIndex) / sampleRate
-            frames.append(makeFrame(carry, time: time, sampleRate: sampleRate))
+    /// Sample rate the audio is decoded to for analysis. 16 kHz is ample for
+    /// speech F0 (≤ 400 Hz) and the timbre proxies, and decoding to a fixed rate
+    /// keeps pitch/feature behaviour identical regardless of the source format.
+    private let analysisSampleRate: Double = 16_000
+
+    private func readFrames(url: URL) throws -> [Frame] {
+        // Decode through `VADAudioLoader.monoSamples` (offline AVAudioEngine
+        // render) instead of reading raw PCM buffers directly: both
+        // `AVAudioFile.read(into:)` and `AVAudioConverter` fail on device for the
+        // app's compressed AAC `.m4a` files (recordings and cleaned copy alike)
+        // with a generic `erro 0`, which silently collapsed diarization to a
+        // single speaker. See `VADAudioLoader.monoSamples`.
+        let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: analysisSampleRate)
+        guard !samples.isEmpty else { return [] }
+
+        let sampleRate = analysisSampleRate
+        let samplesPerFrame = max(1, Int(sampleRate * frameDuration))
+        var frames: [Frame] = []
+        frames.reserveCapacity(samples.count / samplesPerFrame + 1)
+
+        var index = 0
+        while index + samplesPerFrame <= samples.count {
+            let slice = Array(samples[index..<index + samplesPerFrame])
+            let time = Double(index) / sampleRate
+            frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
+            index += samplesPerFrame
+        }
+        // Keep a trailing partial frame only if it carries enough samples to be
+        // meaningful (matches the previous reader's >1/3-frame threshold).
+        if samples.count - index > samplesPerFrame / 3 {
+            let slice = Array(samples[index..<samples.count])
+            let time = Double(index) / sampleRate
+            frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
         }
 
         return frames

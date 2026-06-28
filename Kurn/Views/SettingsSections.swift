@@ -98,6 +98,32 @@ extension SettingsView {
             }
             .disabled(downloadingModel != nil)
 
+            // Minimum-speakers floor for the neural (FluidAudio) engine. On
+            // far-field/single-mic audio its VBx step collapses everything into
+            // one speaker; a non-zero floor forces a KMeans re-cluster to at
+            // least this many. Hidden for the heuristic engine, which auto-detects.
+            if settings.diarizationEngine == .fluidAudio {
+                Stepper(
+                    value: Binding(
+                        get: { settings.fluidAudioMinSpeakers },
+                        set: { settings.fluidAudioMinSpeakers = $0 }
+                    ),
+                    in: 0...10
+                ) {
+                    HStack {
+                        Text(NSLocalizedString("settings.diarization_min_speakers", comment: "Minimum speakers"))
+                        Spacer()
+                        Text(
+                            settings.fluidAudioMinSpeakers == 0
+                                ? NSLocalizedString("settings.diarization_min_speakers_auto", comment: "Auto")
+                                : "\(settings.fluidAudioMinSpeakers)"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(downloadingModel != nil)
+            }
+
             if downloadingModel == .onDeviceASR || downloadingModel == .diarization || downloadingModel == .vad {
                 modelDownloadProgressRow
             }
