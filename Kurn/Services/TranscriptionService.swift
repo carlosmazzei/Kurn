@@ -85,7 +85,12 @@ struct TranscriptionService {
 
         // 2. Detect the language (selected engine) to refine the hint. The
         // default no-op detector returns the hint unchanged, deferring to the
-        // transcription engine's own detection.
+        // transcription engine's own detection — so only surface the phase when a
+        // real detector runs, otherwise the bar would flash a stage that does no
+        // work.
+        if config.languageDetection != .byTranscriber {
+            onPhase(.detectingLanguage)
+        }
         let detector = resolveLanguageDetector(config.languageDetection)
         let resolvedLanguage = await detector.detect(url: cleanedURL, hint: language)
         if resolvedLanguage != language {
@@ -95,6 +100,7 @@ struct TranscriptionService {
         // 3. Detect speech regions with the selected VAD engine. They drive both
         // the heuristic diarizer's segmentation and the silence-gating of the
         // audio fed to transcription.
+        onPhase(.detectingSpeech)
         let regions = await resolveVAD(config.vad).detectSpeech(url: cleanedURL)
         AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
 

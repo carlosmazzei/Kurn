@@ -33,6 +33,33 @@ actor FluidAudioTranscriber: Transcribing {
         // language-detection pass — not reloaded per instance.
         let manager = try await FluidAudioModelStore.shared.manager()
 
+        // The clip duration bounds the single span (below) and gates progress
+        // reporting: FluidAudio only emits progress for clips longer than its
+        // internal chunking threshold (`maxModelSamples`, 15 s at 16 kHz).
+        let duration = (try? await AVURLAsset(url: url).load(.duration))
+            .map(CMTimeGetSeconds) ?? 0
+
+        // Forward FluidAudio's progress stream (0...1) to the caller so the UI
+        // bar advances during the on-device pass. Open the stream *before*
+        // transcribing so no early ticks are missed, and only when the clip is
+        // long enough that the engine will actually run — and finish — a progress
+        // session; otherwise we'd leave a dangling session on the shared manager.
+        var progressTask: Task<Void, Never>?
+        if duration > 15.5 {
+            let stream = await manager.transcriptionProgressStream
+            progressTask = Task {
+                do {
+                    for try await fraction in stream {
+                        onProgress(min(1, max(0, fraction)))
+                    }
+                } catch {
+                    // A failed session is surfaced by `transcribe` below; the
+                    // stream error here just ends progress reporting.
+                }
+            }
+        }
+        defer { progressTask?.cancel() }
+
         AppLog.transcription.atDebug.debug("fluidAudio: transcribing (auto language detection)")
         let text: String
         do {
@@ -55,8 +82,6 @@ actor FluidAudioTranscriber: Transcribing {
         // macOS, split into timed spans for finer speaker attribution. The full
         // text as one span keeps this compiling and correct for single-speaker
         // recordings; multi-speaker clips get coarser attribution until then.
-        let duration = (try? await AVURLAsset(url: url).load(.duration))
-            .map(CMTimeGetSeconds) ?? 0
         let span = TranscribedSpan(text: text, start: 0, end: duration, confidence: nil)
         return RawTranscript(spans: [span], language: "")
     }

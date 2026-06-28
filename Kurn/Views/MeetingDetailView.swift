@@ -240,21 +240,17 @@ struct MeetingDetailView: View {
     }
 
     /// Thin bar shown beneath the row while a transcription is running.
-    /// Determinate when the active phase reports a `0...1` fraction; falls back
-    /// to the indeterminate animation for stages that can't be measured
-    /// (preparing, preprocessing, finalizing, or engines with no progress API).
+    /// Always determinate: every stage maps to a forward-only band of
+    /// `fractionComplete`, with the engine's real sub-progress filling the
+    /// transcribing band. An indeterminate linear bar renders as a dead, empty
+    /// line on iOS, so the user saw no movement during cleaning / detection.
     @ViewBuilder
     private func transcriptionProgressBar(phase: TranscriptionPhase?) -> some View {
-        if case .transcribing(let progress) = phase, let progress {
-            ProgressView(value: max(0, min(1, progress)))
-                .progressViewStyle(.linear)
-                .tint(Theme.accent)
-                .animation(.easeInOut(duration: 0.25), value: progress)
-        } else {
-            ProgressView()
-                .progressViewStyle(.linear)
-                .tint(Theme.accent)
-        }
+        let fraction = (phase ?? .preparing).fractionComplete
+        ProgressView(value: fraction)
+            .progressViewStyle(.linear)
+            .tint(Theme.accent)
+            .animation(.easeInOut(duration: 0.25), value: fraction)
     }
 
     private var addSegmentButton: some View {

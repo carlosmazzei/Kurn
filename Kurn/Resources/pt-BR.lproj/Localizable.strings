@@ -98,6 +98,8 @@
 /* Fases da transcrição */
 "phase.preparing" = "Preparando…";
 "phase.preprocessing" = "Limpando áudio…";
+"phase.detecting_language" = "Detectando idioma…";
+"phase.detecting_speech" = "Detectando fala…";
 "phase.transcribing" = "Transcrevendo…";
 "phase.transcribing_progress" = "Transcrevendo… %d%%";
 "phase.finalizing" = "Finalizando…";

@@ -21,6 +21,11 @@ enum TranscriptionStatus: String, Codable, Sendable {
 enum TranscriptionPhase: Sendable, Equatable {
     case preparing
     case preprocessing
+    /// Detecting the spoken language (only the FluidAudio LID engine reports this;
+    /// engines that detect the language themselves skip it).
+    case detectingLanguage
+    /// Running voice-activity detection to find speech regions.
+    case detectingSpeech
     /// Active transcription. `progress` is a fraction in `0...1` when the engine
     /// can report it (e.g. the chunked Whisper path), or `nil` when the stage is
     /// indeterminate (e.g. a single on-device pass).
@@ -32,6 +37,8 @@ enum TranscriptionPhase: Sendable, Equatable {
         switch self {
         case .preparing: return NSLocalizedString("phase.preparing", comment: "Preparing")
         case .preprocessing: return NSLocalizedString("phase.preprocessing", comment: "Cleaning audio")
+        case .detectingLanguage: return NSLocalizedString("phase.detecting_language", comment: "Detecting language")
+        case .detectingSpeech: return NSLocalizedString("phase.detecting_speech", comment: "Detecting speech")
         case .transcribing(let progress):
             guard let progress else {
                 return NSLocalizedString("phase.transcribing", comment: "Transcribing")
@@ -42,6 +49,22 @@ enum TranscriptionPhase: Sendable, Equatable {
                 percent
             )
         case .finalizing: return NSLocalizedString("phase.finalizing", comment: "Finalizing")
+        }
+    }
+
+    /// Overall completion in `0...1` for a single, always-determinate progress
+    /// bar. Each stage occupies a fixed band so the bar only ever moves forward —
+    /// the indeterminate linear bar rendered as a dead, empty line, leaving the
+    /// user with no feedback during the stages between cleaning and transcribing.
+    /// Within transcribing, the engine's real sub-progress fills that band.
+    var fractionComplete: Double {
+        switch self {
+        case .preparing: return 0.02
+        case .preprocessing: return 0.08
+        case .detectingLanguage: return 0.16
+        case .detectingSpeech: return 0.24
+        case .transcribing(let progress): return 0.30 + 0.62 * min(1, max(0, progress ?? 0))
+        case .finalizing: return 0.96
         }
     }
 }
