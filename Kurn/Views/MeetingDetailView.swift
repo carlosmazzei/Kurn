@@ -165,64 +165,90 @@ struct MeetingDetailView: View {
 
     private func segmentRow(_ recording: Recording, index: Int) -> some View {
         let isLoaded = player.loadedFileName == recording.fileName
-        return HStack(spacing: 12) {
-            Button { togglePlay(recording) } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Theme.fill)
-                        .frame(width: 34, height: 34)
-                    Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.textPrimary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textTertiary)
-            }
-            Spacer(minLength: 8)
-
-            if txVM?.isTranscribing(recording) == true {
-                HStack(spacing: 6) {
-                    ProgressView()
-                    // The percentage (when known) is carried in `displayName`;
-                    // `.circular` ProgressView ignores a determinate value on iOS,
-                    // so the text is what conveys progress here.
-                    if let phase = txVM?.phase(for: recording) {
-                        Text(phase.displayName).font(.caption).foregroundStyle(Theme.textSecondary)
+        let isTranscribing = txVM?.isTranscribing(recording) == true
+        let phase = txVM?.phase(for: recording)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Button { togglePlay(recording) } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Theme.fill)
+                            .frame(width: 34, height: 34)
+                        Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.textPrimary)
                     }
-                }
-            } else if recording.transcriptionStatus == .done {
-                HStack(spacing: 8) {
-                    StatusBadge(status: .done)
-                    Button {
-                        pendingRetranscribe = recording
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.textSecondary)
-                            .frame(width: 30, height: 30)
-                            .background(Theme.fill, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
-                }
-            } else {
-                Button {
-                    startTranscription(recording)
-                } label: {
-                    StatusBadge(status: .none)
                 }
                 .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                Spacer(minLength: 8)
+
+                if isTranscribing {
+                    // The phase label carries any known percentage via its
+                    // `displayName`; the bar below mirrors it visually.
+                    if let phase {
+                        Text(phase.displayName)
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                } else if recording.transcriptionStatus == .done {
+                    HStack(spacing: 8) {
+                        StatusBadge(status: .done)
+                        Button {
+                            pendingRetranscribe = recording
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.fill, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+                    }
+                } else {
+                    Button {
+                        startTranscription(recording)
+                    } label: {
+                        StatusBadge(status: .none)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if isTranscribing {
+                transcriptionProgressBar(phase: phase)
             }
         }
         .kurnCard(padding: 14, cornerRadius: 16)
+    }
+
+    /// Thin bar shown beneath the row while a transcription is running.
+    /// Determinate when the active phase reports a `0...1` fraction; falls back
+    /// to the indeterminate animation for stages that can't be measured
+    /// (preparing, preprocessing, finalizing, or engines with no progress API).
+    @ViewBuilder
+    private func transcriptionProgressBar(phase: TranscriptionPhase?) -> some View {
+        if case .transcribing(let progress) = phase, let progress {
+            ProgressView(value: max(0, min(1, progress)))
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+                .animation(.easeInOut(duration: 0.25), value: progress)
+        } else {
+            ProgressView()
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+        }
     }
 
     private var addSegmentButton: some View {
