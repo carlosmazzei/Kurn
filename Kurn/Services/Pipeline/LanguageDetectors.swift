@@ -26,12 +26,25 @@ actor FluidAudioLanguageDetector: LanguageDetecting {
 
     private let transcriber = FluidAudioTranscriber()
 
+    /// Seconds of audio fed to detection. The language is obvious from a short
+    /// sample, so transcribing only a prefix avoids a second full-length ASR pass
+    /// (and its memory) just to classify the language.
+    private static let prefixSeconds: TimeInterval = 60
+
     func detect(url: URL, hint: MeetingLanguage) async -> MeetingLanguage {
         // A pinned language needs no detection.
         guard hint == .autoDetect else { return hint }
 
+        // Detect on a short prefix; fall back to the whole file if trimming fails
+        // or the clip is already shorter than the prefix.
+        let prefixURL = (try? VADAudioCompactor.prefixClip(url: url, seconds: Self.prefixSeconds)) ?? nil
+        let target = prefixURL ?? url
+        defer {
+            if let prefixURL { try? FileManager.default.removeItem(at: prefixURL) }
+        }
+
         do {
-            let raw = try await transcriber.transcribe(url: url, language: .autoDetect)
+            let raw = try await transcriber.transcribe(url: target, language: .autoDetect)
             let text = raw.spans.map { $0.text }.joined(separator: " ")
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return hint }
 

@@ -99,26 +99,48 @@ struct TranscriptionService {
         AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
 
         // 4. Transcription and diarization both read the same file but are
-        // independent, so run them concurrently instead of back to back.
+        // independent. Cloud transcription (Whisper) keeps almost nothing
+        // on-device, so overlap it with local diarization for speed. On-device
+        // engines load a large model whose inference activations, run alongside
+        // the diarizer's over a long recording, push the process past its memory
+        // limit and get the app jetsammed — so run those two stages sequentially.
         onPhase(.transcribing(progress: nil))
-        AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
         let txStart = Date()
-        async let rawTranscript = transcribeGated(
-            cleanedURL: cleanedURL,
-            regions: regions,
-            engine: config.transcription,
-            language: resolvedLanguage,
-            onPhase: onPhase
-        )
-        async let speakerTurns = diarize(
-            url: cleanedURL,
-            engine: config.diarization,
-            regions: regions,
-            onWarning: onDiarizationWarning
-        )
-
-        let raw = try await rawTranscript
-        let turns = await speakerTurns
+        let raw: RawTranscript
+        let turns: [SpeakerTurn]
+        if config.transcription == .whisperAPI {
+            AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
+            async let rawTranscript = transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                language: resolvedLanguage,
+                onPhase: onPhase
+            )
+            async let speakerTurns = diarize(
+                url: cleanedURL,
+                engine: config.diarization,
+                regions: regions,
+                onWarning: onDiarizationWarning
+            )
+            raw = try await rawTranscript
+            turns = await speakerTurns
+        } else {
+            AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
+            raw = try await transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                language: resolvedLanguage,
+                onPhase: onPhase
+            )
+            turns = await diarize(
+                url: cleanedURL,
+                engine: config.diarization,
+                regions: regions,
+                onWarning: onDiarizationWarning
+            )
+        }
         AppLog.transcription.atInfo.info("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public)")
 
         // 5. Fuse text spans with speaker turns into attributed segments.

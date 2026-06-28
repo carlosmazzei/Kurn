@@ -85,6 +85,12 @@ struct VADAudioCompactor {
     /// Build the compacted file + timeline map, or `nil` when compaction isn't
     /// worthwhile (no regions, regions ~cover the clip, or trim saves < `minSavings`),
     /// in which case the caller transcribes the original with an identity mapping.
+    ///
+    /// Streams the source file one region at a time — seek, convert to 16 kHz
+    /// mono, write straight to the output — so peak memory stays at a single
+    /// read buffer instead of loading the whole clip (and its trimmed copy) into
+    /// `[Float]` arrays. That double-buffering pushed long recordings past the
+    /// process memory limit on device.
     func compact(
         url: URL,
         regions: [SpeechRegion],
@@ -92,39 +98,78 @@ struct VADAudioCompactor {
         gap: TimeInterval = 0.1,
         minSavings: TimeInterval = 1.0
     ) async throws -> CompactionResult? {
-        let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: sampleRate)
-        guard !samples.isEmpty else { return nil }
-        let totalDuration = Double(samples.count) / sampleRate
+        let file = try AVAudioFile(forReading: url)
+        let inFormat = file.processingFormat
+        guard inFormat.sampleRate > 0, file.length > 0 else { return nil }
+        let totalDuration = Double(file.length) / inFormat.sampleRate
 
         let merged = Self.normalize(regions: regions, pad: pad, totalDuration: totalDuration)
         guard !merged.isEmpty else { return nil }
         let kept = merged.reduce(0) { $0 + ($1.end - $1.start) }
         guard totalDuration - kept >= minSavings else { return nil }
 
-        var compacted: [Float] = []
-        compacted.reserveCapacity(Int(kept * sampleRate) + merged.count * Int(gap * sampleRate))
+        let outURL = Self.tempURL()
+        let outFile = try AVAudioFile(forWriting: outURL, settings: Self.aacSettings(sampleRate: sampleRate))
+        let outFormat = outFile.processingFormat
+
         var map: [TimelineSegment] = []
         var compactedTime: TimeInterval = 0
         let gapSamples = max(0, Int(gap * sampleRate))
 
-        for (index, region) in merged.enumerated() {
-            let startIdx = max(0, Int(region.start * sampleRate))
-            let endIdx = min(samples.count, Int(region.end * sampleRate))
-            guard endIdx > startIdx else { continue }
-            if index > 0 {
-                compacted.append(contentsOf: repeatElement(0, count: gapSamples))
-                compactedTime += gap
+        do {
+            for region in merged {
+                // Skip degenerate regions before writing a seam gap, so we never
+                // emit an orphan gap with no speech after it.
+                guard Int(region.end * sampleRate) - Int(region.start * sampleRate) > 0 else { continue }
+                if !map.isEmpty {
+                    try Self.writeSilence(frames: gapSamples, to: outFile, format: outFormat)
+                    compactedTime += gap
+                }
+                let written = try Self.streamRegion(
+                    file: file, startSec: region.start, endSec: region.end, to: outFile
+                )
+                guard written > 0 else { continue }
+                let duration = Double(written) / sampleRate
+                map.append(TimelineSegment(compactedStart: compactedTime, originalStart: region.start, duration: duration))
+                compactedTime += duration
             }
-            let duration = Double(endIdx - startIdx) / sampleRate
-            map.append(TimelineSegment(compactedStart: compactedTime, originalStart: region.start, duration: duration))
-            compacted.append(contentsOf: samples[startIdx..<endIdx])
-            compactedTime += duration
+        } catch {
+            cleanup(outURL)
+            throw error
         }
-        guard !map.isEmpty else { return nil }
+        guard !map.isEmpty else {
+            cleanup(outURL)
+            return nil
+        }
 
-        let outURL = try Self.write(samples: compacted, sampleRate: sampleRate)
         AppLog.transcription.atInfo.info("vadCompact: \(String(format: "%.1f", totalDuration), privacy: .public)s -> \(String(format: "%.1f", kept), privacy: .public)s speech (\(map.count, privacy: .public) regions)")
         return CompactionResult(url: outURL, map: map)
+    }
+
+    /// Write the first `seconds` of `url` to a temp 16 kHz-mono file, or `nil`
+    /// when the clip is already shorter (the caller uses the original). Lets
+    /// language detection run a short ASR pass instead of transcribing the whole
+    /// recording just to classify its language.
+    static func prefixClip(url: URL, seconds: TimeInterval, sampleRate: Double = 16_000) throws -> URL? {
+        let file = try AVAudioFile(forReading: url)
+        let inFormat = file.processingFormat
+        guard inFormat.sampleRate > 0, file.length > 0 else { return nil }
+        let totalDuration = Double(file.length) / inFormat.sampleRate
+        guard totalDuration > seconds else { return nil }
+
+        let outURL = tempURL()
+        let outFile = try AVAudioFile(forWriting: outURL, settings: aacSettings(sampleRate: sampleRate))
+        do {
+            let written = try streamRegion(file: file, startSec: 0, endSec: seconds, to: outFile)
+            guard written > 0 else {
+                try? FileManager.default.removeItem(at: outURL)
+                return nil
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: outURL)
+            throw error
+        }
+        return outURL
     }
 
     /// Remove a compacted temp file. Only touches files in the temp directory.
@@ -173,35 +218,94 @@ struct VADAudioCompactor {
         return merged
     }
 
-    private static func write(samples: [Float], sampleRate: Double) throws -> URL {
-        let outURL = FileManager.default.temporaryDirectory
+    private static func tempURL() -> URL {
+        FileManager.default.temporaryDirectory
             .appendingPathComponent("kurn_vad_\(UUID().uuidString).m4a")
-        try? FileManager.default.removeItem(at: outURL)
+    }
 
-        let settings: [String: Any] = [
+    private static func aacSettings(sampleRate: Double) -> [String: Any] {
+        [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
             AVEncoderBitRateKey: 32_000,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
-        let outFile = try AVAudioFile(forWriting: outURL, settings: settings)
-        let format = outFile.processingFormat
+    }
 
+    /// Stream `[startSec, endSec)` of `file` to `outFile`, converting to mono at
+    /// `targetSampleRate`, and return the number of frames written. Reads in
+    /// small chunks and writes straight through, so no whole-region buffer is
+    /// ever materialized.
+    private static func streamRegion(
+        file: AVAudioFile,
+        startSec: TimeInterval,
+        endSec: TimeInterval,
+        to outFile: AVAudioFile
+    ) throws -> Int {
+        let inFormat = file.processingFormat
+        let inSR = inFormat.sampleRate
+        let outFormat = outFile.processingFormat
+        let targetSampleRate = outFormat.sampleRate
+        let startFrame = AVAudioFramePosition(max(0, startSec * inSR))
+        let endFrame = AVAudioFramePosition(min(Double(file.length), endSec * inSR))
+        guard endFrame > startFrame else { return 0 }
+        file.framePosition = startFrame
+        guard
+            let converter = AVAudioConverter(from: inFormat, to: outFormat),
+            let inBuf = AVAudioPCMBuffer(pcmFormat: inFormat, frameCapacity: 16_384)
+        else {
+            throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
+        }
+
+        var remaining = endFrame - startFrame
+        var produced = 0
+        while remaining > 0 {
+            let toRead = AVAudioFrameCount(min(Int64(16_384), remaining))
+            try file.read(into: inBuf, frameCount: toRead)
+            let got = inBuf.frameLength
+            if got == 0 { break }
+            remaining -= AVAudioFramePosition(got)
+
+            let ratio = targetSampleRate / inSR
+            let capacity = AVAudioFrameCount(Double(got) * ratio) + 1_024
+            guard let outBuf = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: capacity) else { break }
+
+            // The converter's input block is `@Sendable` but runs synchronously
+            // inside `convert` on this thread, so this one-shot "feed once" flag
+            // is not actually shared across threads.
+            nonisolated(unsafe) var provided = false
+            var convError: NSError?
+            _ = converter.convert(to: outBuf, error: &convError) { _, inputStatus in
+                if provided { inputStatus.pointee = .noDataNow; return nil }
+                provided = true
+                inputStatus.pointee = .haveData
+                return inBuf
+            }
+            if let convError { throw AppError.audioError(convError.localizedDescription) }
+            if outBuf.frameLength > 0 {
+                try outFile.write(from: outBuf)
+                produced += Int(outBuf.frameLength)
+            }
+        }
+        return produced
+    }
+
+    /// Append `frames` of silence to `outFile`, chunked so no large zero buffer
+    /// is allocated.
+    private static func writeSilence(frames: Int, to outFile: AVAudioFile, format: AVAudioFormat) throws {
+        guard frames > 0 else { return }
+        var remaining = frames
         let chunk = 16_384
-        var offset = 0
-        while offset < samples.count {
-            let count = min(chunk, samples.count - offset)
+        while remaining > 0 {
+            let count = min(chunk, remaining)
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)) else { break }
             buffer.frameLength = AVAudioFrameCount(count)
             if let channel = buffer.floatChannelData {
-                samples.withUnsafeBufferPointer { src in
-                    channel[0].update(from: src.baseAddress! + offset, count: count)
-                }
+                channel[0].update(repeating: 0, count: count)
             }
             try outFile.write(from: buffer)
-            offset += count
+            remaining -= count
         }
-        return outURL
     }
 }
