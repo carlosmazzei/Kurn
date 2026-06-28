@@ -132,6 +132,7 @@
 "detail.share" = "Compartilhar";
 "detail.segment_count" = "%d segmentos";
 "detail.recording_n" = "Gravação %d";
+"detail.playback_position" = "Posição da reprodução";
 "detail.add_segment" = "Adicionar segmento";
 "detail.retranscribe" = "Refazer transcrição";
 "detail.retranscribe.confirm.title" = "Refazer a transcrição desta gravação?";
