@@ -98,6 +98,18 @@ extension SettingsView {
             }
             .disabled(downloadingModel != nil)
 
+            // Toggle the dedicated diarization preprocessor (lighter cleanup
+            // on the original recording, fed to both engines). When off, both
+            // engines reuse the ASR-tuned `.m4a`; useful for A/B comparison.
+            Toggle(
+                NSLocalizedString("settings.diarization_preprocessing", comment: "Diarization audio cleanup"),
+                isOn: Binding(
+                    get: { settings.diarizationPreprocessingEnabled },
+                    set: { settings.diarizationPreprocessingEnabled = $0 }
+                )
+            )
+            .disabled(downloadingModel != nil)
+
             // Minimum-speakers floor for the neural (FluidAudio) engine. On
             // far-field/single-mic audio its VBx step collapses everything into
             // one speaker; a non-zero floor forces a KMeans re-cluster to at

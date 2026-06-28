@@ -45,6 +45,7 @@ struct TranscriptionService {
     private let whisperTranscriber = WhisperTranscriber()
     private let heuristicDiarizer = SpeakerDiarizer()
     private let fluidAudioDiarizer = FluidAudioDiarizer()
+    private let diarizationPreprocessor = DiarizationPreprocessor()
     private let vadCompactor = VADAudioCompactor()
 
     /// Transcribe one recording file and return diarized segments, driving each
@@ -122,14 +123,16 @@ struct TranscriptionService {
         // recording, push the process past its memory limit and get the app
         // jetsammed — so run those two stages sequentially.
         //
-        // Both stages read the DSP-cleaned copy. Feeding the diarizer the
-        // original (un-cleaned) recording instead was tried to give the FluidAudio
-        // speaker embedder more spectral detail, but it made no difference to the
-        // collapse on heavily-processed far-field audio and broke the heuristic
-        // engine's frame reader — so the cleaned copy (16 kHz mono, known-readable)
-        // is used here. The heuristic engine's pitch/ZCR/timbre features survive
-        // the cleanup (they're gain-invariant), and the cleaned copy is what its
-        // VAD regions are computed against anyway.
+        // Transcription always reads the ASR-tuned cleaned copy (16 kHz mono,
+        // known-readable AAC). Diarization gets its own input: when
+        // `diarizationPreprocessingEnabled` is on (default), a dedicated
+        // `DiarizationPreprocessor` builds a WAV from the *original* recording
+        // with minimal DSP (HP + spectral noise reduction + global peak
+        // normalization), preserving the natural timbre and relative loudness
+        // that speaker embeddings rely on but which the ASR chain's AGC +
+        // compression + AAC re-encode flatten. When off, both diarizers fall
+        // back to the same `cleanedURL` used by transcription so the user can
+        // A/B the two paths from Settings.
         onPhase(.transcribing(progress: nil))
         let txStart = Date()
         let raw: RawTranscript
@@ -144,8 +147,10 @@ struct TranscriptionService {
                 onPhase: onPhase
             )
             async let speakerTurns = diarize(
-                url: cleanedURL,
+                originalURL: fileURL,
+                cleanedURL: cleanedURL,
                 engine: config.diarization,
+                diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 regions: regions,
                 minSpeakers: config.fluidAudioMinSpeakers,
                 onWarning: onDiarizationWarning
@@ -162,8 +167,10 @@ struct TranscriptionService {
                 onPhase: onPhase
             )
             turns = try await diarize(
-                url: cleanedURL,
+                originalURL: fileURL,
+                cleanedURL: cleanedURL,
                 engine: config.diarization,
+                diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 regions: regions,
                 minSpeakers: config.fluidAudioMinSpeakers,
                 onWarning: onDiarizationWarning
@@ -285,22 +292,54 @@ struct TranscriptionService {
     /// warning handler is passed as a call argument rather than set on shared
     /// actor state beforehand — that would let one call's handler leak into
     /// another's result at the actor's next suspension point.
+    ///
+    /// When `diarizationPreprocessingEnabled` is on, the original recording is
+    /// passed through `DiarizationPreprocessor` to produce a minimally-cleaned
+    /// WAV that both engines consume; otherwise both fall back to the ASR-tuned
+    /// `cleanedURL`. The VAD `regions` are unchanged either way — they're
+    /// timestamps on the absolute timeline, which the preprocessor preserves.
     private func diarize(
-        url: URL,
+        originalURL: URL,
+        cleanedURL: URL,
         engine: DiarizationEngine,
+        diarizationPreprocessingEnabled: Bool,
         regions: [SpeechRegion],
         minSpeakers: Int,
         onWarning: DiarizationWarningHandler?
     ) async throws -> [SpeakerTurn] {
         try await ResourceGuard.requireTranscriptionHeadroom()
+        let diarURL: URL
+        let cleanupURL: URL?
+        if diarizationPreprocessingEnabled {
+            do {
+                diarURL = try await diarizationPreprocessor.process(url: originalURL)
+                cleanupURL = diarURL
+                AppLog.transcription.atInfo.info("diarize: using preprocessed input \(diarURL.lastPathComponent, privacy: .public)")
+            } catch {
+                if let appError = ResourceGuard.appErrorIfResourceFailure(error) { throw appError }
+                AppLog.transcription.atError.error("diarize: preprocess failed, falling back to ASR-cleaned: \(error.localizedDescription, privacy: .public)")
+                diarURL = cleanedURL
+                cleanupURL = nil
+            }
+        } else {
+            diarURL = cleanedURL
+            cleanupURL = nil
+            AppLog.transcription.atDebug.debug("diarize: preprocessor disabled, using ASR-cleaned input")
+        }
+        defer {
+            if let url = cleanupURL {
+                Task { [diarizationPreprocessor] in await diarizationPreprocessor.cleanup(url) }
+            }
+        }
+        try await ResourceGuard.requireTranscriptionHeadroom()
         switch engine {
         case .heuristic:
-            let turns = await heuristicDiarizer.diarize(url: url, speechRegions: regions)
+            let turns = await heuristicDiarizer.diarize(url: diarURL, speechRegions: regions)
             try await ResourceGuard.requireTranscriptionHeadroom()
             return turns
         case .fluidAudio:
             let turns = await fluidAudioDiarizer.diarize(
-                url: url, minSpeakers: minSpeakers, onDownloadFailure: onWarning
+                url: diarURL, minSpeakers: minSpeakers, onDownloadFailure: onWarning
             )
             try await ResourceGuard.requireTranscriptionHeadroom()
             return turns

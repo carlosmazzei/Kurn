@@ -26,6 +26,7 @@ final class AppSettings {
         static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
         static let diarizationEngine = "settings.diarizationEngine"
         static let fluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
+        static let diarizationPreprocessingEnabled = "settings.diarizationPreprocessingEnabled"
         static let transcriptionEngine = "settings.transcriptionEngine"
         static let preprocessingEngine = "settings.preprocessingEngine"
         static let vadEngine = "settings.vadEngine"
@@ -91,6 +92,15 @@ final class AppSettings {
         didSet { defaults.set(fluidAudioMinSpeakers, forKey: Keys.fluidAudioMinSpeakers) }
     }
 
+    /// When on, the diarization stage runs a dedicated lighter cleanup
+    /// (`DiarizationPreprocessor`) on the original recording and feeds the
+    /// resulting WAV to both diarizer engines. When off, both diarizers reuse
+    /// the ASR-tuned `.m4a` produced by `AudioPreprocessor`. Defaults on; the
+    /// user can flip it to A/B the two paths on the same recording.
+    var diarizationPreprocessingEnabled: Bool {
+        didSet { defaults.set(diarizationPreprocessingEnabled, forKey: Keys.diarizationPreprocessingEnabled) }
+    }
+
     /// Engine that turns audio into text. Replaces the legacy `defaultMode` +
     /// on-device-multilingual pairing; `init` migrates the old keys into this.
     var transcriptionEngine: TranscriptionEngine {
@@ -121,7 +131,8 @@ final class AppSettings {
             languageDetection: languageDetectionEngine,
             diarization: diarizationEngine,
             transcription: transcriptionEngine,
-            fluidAudioMinSpeakers: fluidAudioMinSpeakers
+            fluidAudioMinSpeakers: fluidAudioMinSpeakers,
+            diarizationPreprocessingEnabled: diarizationPreprocessingEnabled
         )
     }
 
@@ -278,6 +289,9 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic
         fluidAudioMinSpeakers = defaults.integer(forKey: Keys.fluidAudioMinSpeakers)
+        // `object(forKey:)` so an absent key defaults to `true` rather than
+        // `false` (which is what `defaults.bool(forKey:)` would return).
+        diarizationPreprocessingEnabled = defaults.object(forKey: Keys.diarizationPreprocessingEnabled) as? Bool ?? true
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         let batchASRConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioBatchASRModelsConsented = batchASRConsented

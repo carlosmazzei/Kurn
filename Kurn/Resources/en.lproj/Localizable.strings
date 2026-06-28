@@ -249,6 +249,7 @@
 "settings.diarization_engine" = "Diarization Engine";
 "settings.diarization_min_speakers" = "Minimum Speakers";
 "settings.diarization_min_speakers_auto" = "Auto";
+"settings.diarization_preprocessing" = "Diarization Audio Cleanup";
 "settings.on_device_auto_language" = "Detect Language On-Device (Auto)";
 "settings.live_transcription" = "Live Transcription Preview";
 "settings.model_download.title" = "One-Time Model Download";
