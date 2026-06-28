@@ -35,10 +35,12 @@ actor FluidAudioModelStore {
     /// The shared manager, loaded on first call. Concurrent callers coalesce onto
     /// the same in-flight load. Failures aren't cached — the next call retries.
     func manager() async throws -> AsrManager {
+        try await ResourceGuard.requireModelDownloadHeadroom()
         if let manager { return manager }
         if let loadTask { return try await loadTask.value }
 
         let task = Task<AsrManager, Error> {
+            try await ResourceGuard.requireModelDownloadHeadroom()
             let models = try await AsrModels.downloadAndLoad(version: .v3)
             return AsrManager(config: .default, models: models)
         }
@@ -52,6 +54,9 @@ actor FluidAudioModelStore {
         } catch {
             loadTask = nil
             AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
+            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                throw appError
+            }
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
     }

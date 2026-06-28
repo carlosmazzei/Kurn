@@ -28,6 +28,7 @@ actor FluidAudioTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
+        try await ResourceGuard.requireTranscriptionHeadroom()
         // The model is shared process-wide (see `FluidAudioModelStore`) so it
         // loads once and is reused across recordings, meeting views, and the
         // language-detection pass — not reloaded per instance.
@@ -64,10 +65,17 @@ actor FluidAudioTranscriber: Transcribing {
         let text: String
         do {
             var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+            try await ResourceGuard.requireTranscriptionHeadroom()
             let result = try await manager.transcribe(url, decoderState: &decoderState)
+            try await ResourceGuard.requireTranscriptionHeadroom()
             text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch let appError as AppError {
+            throw appError
         } catch {
             AppLog.transcription.atError.error("fluidAudio: transcription failed: \(error.localizedDescription, privacy: .public)")
+            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                throw appError
+            }
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
 

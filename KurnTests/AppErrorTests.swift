@@ -37,10 +37,16 @@ struct AppErrorTests {
             .permissionDenied("speech"),
             .persistenceFailed("disk full"),
             .modelDownloadRequired("diarization"),
-            .modelDownloadFailed("network unavailable")
+            .modelDownloadFailed("network unavailable"),
+            .resourceUnavailable("low memory")
         ]
         for error in cases {
             #expect(!(error.errorDescription ?? "").isEmpty)
         }
+    }
+
+    @Test func resourceUnavailableMessageIncludesDetail() {
+        let error = AppError.resourceUnavailable("free storage")
+        #expect(error.errorDescription?.contains("free storage") == true)
     }
 }

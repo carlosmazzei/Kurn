@@ -95,14 +95,15 @@ private struct RecorderContent: View {
             AppLog.recorderUI.atNotice.notice("RecorderContent.task: starting recording")
             await vm.startRecording()
         }
-        .alert(
-            NSLocalizedString("recorder.permission.title", comment: "Mic permission"),
-            isPresented: $vm.permissionDenied
-        ) {
-            Button(NSLocalizedString("common.ok", comment: "OK"), role: .cancel) { onFinished() }
-        } message: {
-            Text(NSLocalizedString("recorder.permission.message", comment: ""))
-        }
+        .kurnDialog(
+            isPresented: $vm.permissionDenied,
+            iconSystemName: "mic.slash.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("recorder.permission.title", comment: "Mic permission"),
+            message: NSLocalizedString("recorder.permission.message", comment: ""),
+            primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
+            primaryAction: onFinished
+        )
         .errorAlert($vm.error)
         .interactiveDismissDisabled(vm.state != .idle)
     }

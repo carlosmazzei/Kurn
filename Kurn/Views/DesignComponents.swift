@@ -94,7 +94,7 @@ struct KurnDialogModifier: ViewModifier {
     let primaryTitle: String
     let primaryRole: KurnDialogActionRole
     let primaryAction: () -> Void
-    let secondaryTitle: String
+    let secondaryTitle: String?
     let secondaryAction: () -> Void
 
     func body(content: Content) -> some View {
@@ -132,21 +132,25 @@ struct KurnDialogModifier: ViewModifier {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(message)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if !message.isEmpty {
+                        Text(message)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 
             HStack(spacing: 10) {
-                dialogButton(
-                    title: secondaryTitle,
-                    role: .normal,
-                    isPrimary: false
-                ) {
-                    secondaryAction()
-                    isPresented = false
+                if let secondaryTitle {
+                    dialogButton(
+                        title: secondaryTitle,
+                        role: .normal,
+                        isPrimary: false
+                    ) {
+                        secondaryAction()
+                        isPresented = false
+                    }
                 }
 
                 dialogButton(
@@ -222,7 +226,7 @@ extension View {
         primaryTitle: String,
         primaryRole: KurnDialogActionRole = .normal,
         primaryAction: @escaping () -> Void,
-        secondaryTitle: String,
+        secondaryTitle: String? = nil,
         secondaryAction: @escaping () -> Void = {}
     ) -> some View {
         modifier(

@@ -112,16 +112,20 @@ struct ProviderEditor: View {
             KeychainManager.shared.set(newValue, for: provider.keychainAccount)
             onChange()
         }
-        .alert(
-            NSLocalizedString("settings.delete_provider.confirm", comment: "Delete provider?"),
-            isPresented: $showingDeleteConfirm
-        ) {
-            Button(NSLocalizedString("settings.delete_provider", comment: "Delete Provider"), role: .destructive) {
+        .kurnDialog(
+            isPresented: $showingDeleteConfirm,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.delete_provider.confirm", comment: "Delete provider?"),
+            message: provider.displayName,
+            primaryTitle: NSLocalizedString("settings.delete_provider", comment: "Delete Provider"),
+            primaryRole: .destructive,
+            primaryAction: {
                 onDelete()
                 dismiss()
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        }
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }
 
