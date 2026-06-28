@@ -60,6 +60,7 @@ struct TranscriptionService {
     ) async throws -> Output {
         let started = Date()
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
+        try await ResourceGuard.requireTranscriptionHeadroom()
 
         // 1. Clean the audio (selected preprocessing engine) before
         // transcription/diarization. If cleanup fails for any reason we fall
@@ -72,7 +73,14 @@ struct TranscriptionService {
         do {
             cleanedURL = try await preprocessor.process(url: fileURL)
             AppLog.transcription.atDebug.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s")
+        } catch let appError as AppError {
+            if case .resourceUnavailable = appError { throw appError }
+            cleanedURL = fileURL
+            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(appError.localizedDescription, privacy: .public)")
         } catch {
+            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                throw appError
+            }
             cleanedURL = fileURL
             AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
         }
@@ -82,6 +90,7 @@ struct TranscriptionService {
                 Task { await preprocessor.cleanup(url) }
             }
         }
+        try await ResourceGuard.requireTranscriptionHeadroom()
 
         // 2. Detect the language (selected engine) to refine the hint. The
         // default no-op detector returns the hint unchanged, deferring to the
@@ -96,6 +105,7 @@ struct TranscriptionService {
         if resolvedLanguage != language {
             AppLog.transcription.atInfo.info("transcribe: language refined \(language.rawValue, privacy: .public) -> \(resolvedLanguage.rawValue, privacy: .public)")
         }
+        try await ResourceGuard.requireTranscriptionHeadroom()
 
         // 3. Detect speech regions with the selected VAD engine. They drive both
         // the heuristic diarizer's segmentation and the silence-gating of the
@@ -103,6 +113,7 @@ struct TranscriptionService {
         onPhase(.detectingSpeech)
         let regions = await resolveVAD(config.vad).detectSpeech(url: cleanedURL)
         AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
+        try await ResourceGuard.requireTranscriptionHeadroom()
 
         // 4. Transcription and diarization are independent. Cloud transcription
         // (Whisper) keeps almost nothing on-device, so overlap it with local
@@ -140,7 +151,7 @@ struct TranscriptionService {
                 onWarning: onDiarizationWarning
             )
             raw = try await rawTranscript
-            turns = await speakerTurns
+            turns = try await speakerTurns
         } else {
             AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
             raw = try await transcribeGated(
@@ -150,7 +161,7 @@ struct TranscriptionService {
                 language: resolvedLanguage,
                 onPhase: onPhase
             )
-            turns = await diarize(
+            turns = try await diarize(
                 url: cleanedURL,
                 engine: config.diarization,
                 regions: regions,
@@ -158,6 +169,7 @@ struct TranscriptionService {
                 onWarning: onDiarizationWarning
             )
         }
+        try await ResourceGuard.requireTranscriptionHeadroom()
         // Distinct speakers in the raw diarizer turns, BEFORE fusion. Comparing
         // this against the post-fusion `speakers=` count below isolates whether a
         // collapse happens in the diarizer or in fusion: if `turnSpeakers` is
@@ -168,6 +180,7 @@ struct TranscriptionService {
 
         // 5. Fuse text spans with speaker turns into attributed segments.
         onPhase(.finalizing)
+        try await ResourceGuard.requireTranscriptionHeadroom()
         let segments = TranscriptFusion.segments(
             spans: raw.spans,
             turns: turns,
@@ -236,8 +249,10 @@ struct TranscriptionService {
         language: MeetingLanguage,
         onPhase: @escaping PhaseHandler
     ) async throws -> RawTranscript {
+        try await ResourceGuard.requireTranscriptionHeadroom()
         let transcriber = resolveTranscriber(engine)
         let compaction = (try? await vadCompactor.compact(url: cleanedURL, regions: regions)) ?? nil
+        try await ResourceGuard.requireTranscriptionHeadroom()
         let target = compaction?.url ?? cleanedURL
         defer {
             if let url = compaction?.url { vadCompactor.cleanup(url) }
@@ -248,6 +263,7 @@ struct TranscriptionService {
             language: language,
             onProgress: { progress in onPhase(.transcribing(progress: progress)) }
         )
+        try await ResourceGuard.requireTranscriptionHeadroom()
         guard let map = compaction?.map else { return raw }
 
         // Remap compacted-timeline spans back to the original timeline.
@@ -275,14 +291,19 @@ struct TranscriptionService {
         regions: [SpeechRegion],
         minSpeakers: Int,
         onWarning: DiarizationWarningHandler?
-    ) async -> [SpeakerTurn] {
+    ) async throws -> [SpeakerTurn] {
+        try await ResourceGuard.requireTranscriptionHeadroom()
         switch engine {
         case .heuristic:
-            return await heuristicDiarizer.diarize(url: url, speechRegions: regions)
+            let turns = await heuristicDiarizer.diarize(url: url, speechRegions: regions)
+            try await ResourceGuard.requireTranscriptionHeadroom()
+            return turns
         case .fluidAudio:
-            return await fluidAudioDiarizer.diarize(
+            let turns = await fluidAudioDiarizer.diarize(
                 url: url, minSpeakers: minSpeakers, onDownloadFailure: onWarning
             )
+            try await ResourceGuard.requireTranscriptionHeadroom()
+            return turns
         }
     }
 }

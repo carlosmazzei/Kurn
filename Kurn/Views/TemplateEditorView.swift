@@ -91,16 +91,20 @@ struct TemplateEditor: View {
             instructions = template.instructions
             sections = template.sections
         }
-        .alert(
-            NSLocalizedString("settings.delete_template.confirm", comment: "Delete template?"),
-            isPresented: $showingDeleteConfirm
-        ) {
-            Button(NSLocalizedString("settings.delete_template", comment: "Delete Template"), role: .destructive) {
+        .kurnDialog(
+            isPresented: $showingDeleteConfirm,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.delete_template.confirm", comment: "Delete template?"),
+            message: template.displayName,
+            primaryTitle: NSLocalizedString("settings.delete_template", comment: "Delete Template"),
+            primaryRole: .destructive,
+            primaryAction: {
                 onDelete()
                 dismiss()
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        }
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }
 

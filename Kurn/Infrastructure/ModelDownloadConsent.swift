@@ -23,6 +23,7 @@ enum ModelSet: Sendable, Equatable {
 
 struct ModelDownloadConsent {
     static func download(_ set: ModelSet) async throws {
+        try await ResourceGuard.requireModelDownloadHeadroom()
         #if canImport(FluidAudio)
         do {
             switch set {
@@ -46,7 +47,13 @@ struct ModelDownloadConsent {
                 // and loads it on first use.
                 _ = try await VadManager()
             }
+            try await ResourceGuard.requireModelDownloadHeadroom()
+        } catch let appError as AppError {
+            throw appError
         } catch {
+            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                throw appError
+            }
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
         #else

@@ -2,13 +2,13 @@
 //  AppError.swift
 //  Kurn
 //
-//  Central error type surfaced to the UI via alerts or non-blocking banners.
+//  Central error type surfaced to the UI via app dialogs or non-blocking banners.
 //
 
 import Foundation
 
 /// All recoverable failures the app can produce. Conforms to `LocalizedError`
-/// so SwiftUI `.alert` modifiers can render a human-readable message directly.
+/// so UI presentation code can render a human-readable message directly.
 enum AppError: LocalizedError, Identifiable {
     case noAPIKey(provider: String)
     case networkError(URLError)
@@ -20,8 +20,9 @@ enum AppError: LocalizedError, Identifiable {
     case persistenceFailed(String)
     case modelDownloadRequired(String)
     case modelDownloadFailed(String)
+    case resourceUnavailable(String)
 
-    /// Stable identity so the value can drive `.alert(item:)`.
+    /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
 
     var errorDescription: String? {
@@ -74,6 +75,11 @@ enum AppError: LocalizedError, Identifiable {
         case .modelDownloadFailed(let detail):
             return String(
                 format: NSLocalizedString("error.model_download_failed", comment: "Model download failed"),
+                detail
+            )
+        case .resourceUnavailable(let detail):
+            return String(
+                format: NSLocalizedString("error.resource_unavailable", comment: "Resource unavailable"),
                 detail
             )
         }

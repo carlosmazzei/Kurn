@@ -180,36 +180,39 @@ struct SettingsView: View {
             ensureSelectedProviderIsConfigured()
             ensureWhisperSelectionIsAllowed()
         }
-        .alert(
-            NSLocalizedString("settings.models.delete_confirm", comment: "Confirm delete model"),
+        .kurnDialog(
             isPresented: Binding(
                 get: { pendingModelDeletion != nil },
                 set: { if !$0 { pendingModelDeletion = nil } }
             ),
-            presenting: pendingModelDeletion
-        ) { model in
-            Button(NSLocalizedString("settings.models.delete", comment: "Delete model"), role: .destructive) {
-                deleteModel(model)
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        } message: { _ in
-            Text(NSLocalizedString("settings.models.delete_message", comment: "Re-download later"))
-        }
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.models.delete_confirm", comment: "Confirm delete model"),
+            message: NSLocalizedString("settings.models.delete_message", comment: "Re-download later"),
+            primaryTitle: NSLocalizedString("settings.models.delete", comment: "Delete model"),
+            primaryRole: .destructive,
+            primaryAction: {
+                if let model = pendingModelDeletion {
+                    deleteModel(model)
+                }
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
         .onChange(of: keyRevision) { _, _ in
             ensureSelectedProviderIsConfigured()
             ensureWhisperSelectionIsAllowed()
         }
-        .alert(
-            NSLocalizedString("settings.delete_all.confirm", comment: "Confirm delete all"),
-            isPresented: $showingDeleteConfirm
-        ) {
-            Button(NSLocalizedString("settings.delete_all", comment: "Delete All Data"), role: .destructive) {
-                deleteAllData()
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        } message: {
-            Text(NSLocalizedString("settings.delete_all.message", comment: ""))
-        }
+        .kurnDialog(
+            isPresented: $showingDeleteConfirm,
+            iconSystemName: "exclamationmark.triangle.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.delete_all.confirm", comment: "Confirm delete all"),
+            message: NSLocalizedString("settings.delete_all.message", comment: ""),
+            primaryTitle: NSLocalizedString("settings.delete_all", comment: "Delete All Data"),
+            primaryRole: .destructive,
+            primaryAction: deleteAllData,
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
         .modifier(ModelDownloadAlerts(
             showingASRConsent: $showingASRConsent,
             showingBatchASRConsent: $showingBatchASRConsent,

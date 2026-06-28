@@ -64,34 +64,34 @@ struct MeetingDetailView: View {
             }
         }
         .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
-        .confirmationDialog(
-            NSLocalizedString("detail.retranscribe.confirm.title", comment: "Re-transcribe confirmation"),
+        .kurnDialog(
             isPresented: Binding(
                 get: { pendingRetranscribe != nil },
                 set: { if !$0 { pendingRetranscribe = nil } }
             ),
-            titleVisibility: .visible,
-            presenting: pendingRetranscribe
-        ) { recording in
-            Button(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"), role: .destructive) {
+            iconSystemName: "arrow.clockwise.circle.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("detail.retranscribe.confirm.title", comment: "Re-transcribe confirmation"),
+            message: NSLocalizedString("detail.retranscribe.confirm.message", comment: "Re-transcribe message"),
+            primaryTitle: NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"),
+            primaryRole: .destructive,
+            primaryAction: {
+                guard let recording = pendingRetranscribe else { return }
                 retranscribe(recording)
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        } message: { _ in
-            Text(NSLocalizedString("detail.retranscribe.confirm.message", comment: "Re-transcribe message"))
-        }
-        .confirmationDialog(
-            NSLocalizedString("detail.retranscribe_all.confirm.title", comment: "Re-transcribe all confirmation"),
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
             isPresented: $pendingRetranscribeAll,
-            titleVisibility: .visible
-        ) {
-            Button(NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"), role: .destructive) {
-                retranscribeAll()
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        } message: {
-            Text(NSLocalizedString("detail.retranscribe_all.confirm.message", comment: "Re-transcribe all message"))
-        }
+            iconSystemName: "arrow.triangle.2.circlepath.circle.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("detail.retranscribe_all.confirm.title", comment: "Re-transcribe all confirmation"),
+            message: NSLocalizedString("detail.retranscribe_all.confirm.message", comment: "Re-transcribe all message"),
+            primaryTitle: NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"),
+            primaryRole: .destructive,
+            primaryAction: retranscribeAll,
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 
     // MARK: - Header
@@ -234,6 +234,13 @@ struct MeetingDetailView: View {
 
             if isTranscribing {
                 transcriptionProgressBar(phase: phase)
+            } else if isLoaded {
+                SegmentPlaybackScrubber(
+                    currentTime: player.currentTime,
+                    duration: player.duration > 0 ? player.duration : recording.duration,
+                    isPlaying: player.isPlaying,
+                    onSeek: { player.seek(to: $0) }
+                )
             }
         }
         .kurnCard(padding: 14, cornerRadius: 16)
@@ -251,6 +258,65 @@ struct MeetingDetailView: View {
             .progressViewStyle(.linear)
             .tint(Theme.accent)
             .animation(.easeInOut(duration: 0.25), value: fraction)
+    }
+
+    private struct SegmentPlaybackScrubber: View {
+        let currentTime: TimeInterval
+        let duration: TimeInterval
+        let isPlaying: Bool
+        let onSeek: (TimeInterval) -> Void
+
+        private var playableDuration: TimeInterval { max(duration, 0) }
+        private var sliderUpperBound: TimeInterval { max(playableDuration, 1) }
+        private var boundedCurrentTime: TimeInterval {
+            min(max(currentTime, 0), sliderUpperBound)
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                GeometryReader { proxy in
+                    let fraction = sliderUpperBound > 0 ? boundedCurrentTime / sliderUpperBound : 0
+                    let markerWidth: CGFloat = 54
+                    let markerX = min(
+                        max(markerWidth / 2, proxy.size.width * fraction),
+                        max(markerWidth / 2, proxy.size.width - markerWidth / 2)
+                    )
+
+                    Text(boundedCurrentTime.clockDisplay)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .frame(width: markerWidth, height: 22)
+                        .background(Theme.fill, in: Capsule())
+                        .position(x: markerX, y: 11)
+                }
+                .frame(height: 24)
+
+                Slider(
+                    value: Binding(
+                        get: { boundedCurrentTime },
+                        set: { onSeek($0) }
+                    ),
+                    in: 0...sliderUpperBound
+                )
+                .tint(Theme.accent)
+                .disabled(playableDuration <= 0)
+
+                HStack(spacing: 8) {
+                    Image(systemName: isPlaying ? "waveform" : "timer")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.textTertiary)
+                    Text("0:00")
+                    Spacer(minLength: 8)
+                    Text(playableDuration.clockDisplay)
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.textTertiary)
+            }
+            .padding(.leading, 46)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
+            .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
+        }
     }
 
     private var addSegmentButton: some View {

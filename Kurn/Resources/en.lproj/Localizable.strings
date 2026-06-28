@@ -23,6 +23,10 @@
 "error.model_download_required" = "A one-time model download is required for %@.";
 "error.model_download_failed" = "Model download failed: %@";
 "error.model_download_timeout" = "The on-device model timed out. Check your connection and try again.";
+"error.resource_unavailable" = "Cannot continue: %@";
+"error.resource_low_storage" = "free at least %@ of storage before continuing. Available now: %@.";
+"error.resource_disk_full" = "the device is out of available storage.";
+"error.resource_memory_pressure" = "the device reported low memory. Close other apps or free storage, then try again.";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
@@ -132,6 +136,7 @@
 "detail.share" = "Share";
 "detail.segment_count" = "%d segments";
 "detail.recording_n" = "Recording %d";
+"detail.playback_position" = "Playback position";
 "detail.add_segment" = "Add segment";
 "detail.retranscribe" = "Re-transcribe";
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";

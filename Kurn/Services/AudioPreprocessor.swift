@@ -24,6 +24,7 @@ actor AudioPreprocessor: AudioPreprocessing {
     /// Render the cleaned, mono 16 kHz copy to the temporary directory and return
     /// its URL. The caller owns the file and should `cleanup` it when done.
     func process(url: URL) async throws -> URL {
+        try await ResourceGuard.requireTranscriptionHeadroom()
         let started = Date()
         AppLog.transcription.atDebug.debug("preprocess: open \(url.lastPathComponent, privacy: .public)")
         let inputFile = try AVAudioFile(forReading: url)
@@ -120,13 +121,33 @@ actor AudioPreprocessor: AudioPreprocessing {
 
         let renderStart = Date()
         var lastLoggedProgress = 0.0
+        var resourceCheckCounter = 0
         renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
+            if resourceCheckCounter.isMultiple(of: 128) {
+                try await ResourceGuard.requireTranscriptionHeadroom()
+            }
+            resourceCheckCounter += 1
             let remaining = expectedOutFrames - engine.manualRenderingSampleTime
             let framesToRender = AVAudioFrameCount(min(Int64(maxFrames), remaining))
-            let status = try engine.renderOffline(framesToRender, to: renderBuffer)
+            let status: AVAudioEngineManualRenderingStatus
+            do {
+                status = try engine.renderOffline(framesToRender, to: renderBuffer)
+            } catch {
+                if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                    throw appError
+                }
+                throw error
+            }
             switch status {
             case .success:
-                try outFile.write(from: renderBuffer)
+                do {
+                    try outFile.write(from: renderBuffer)
+                } catch {
+                    if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                        throw appError
+                    }
+                    throw error
+                }
             case .insufficientDataFromInputNode:
                 // Source exhausted — we're done.
                 AppLog.transcription.atDebug.debug("preprocess: input exhausted at \(engine.manualRenderingSampleTime, privacy: .public) frames")
@@ -147,6 +168,7 @@ actor AudioPreprocessor: AudioPreprocessing {
 
         player.stop()
         engine.stop()
+        try await ResourceGuard.requireTranscriptionHeadroom()
         AppLog.transcription.atInfo.info("preprocess: done in \(Date().timeIntervalSince(renderStart), privacy: .public)s (total \(Date().timeIntervalSince(started), privacy: .public)s) -> \(outURL.lastPathComponent, privacy: .public)")
         return outURL
     }

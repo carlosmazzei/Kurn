@@ -112,16 +112,20 @@ struct ProviderEditor: View {
             KeychainManager.shared.set(newValue, for: provider.keychainAccount)
             onChange()
         }
-        .alert(
-            NSLocalizedString("settings.delete_provider.confirm", comment: "Delete provider?"),
-            isPresented: $showingDeleteConfirm
-        ) {
-            Button(NSLocalizedString("settings.delete_provider", comment: "Delete Provider"), role: .destructive) {
+        .kurnDialog(
+            isPresented: $showingDeleteConfirm,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.delete_provider.confirm", comment: "Delete provider?"),
+            message: provider.displayName,
+            primaryTitle: NSLocalizedString("settings.delete_provider", comment: "Delete Provider"),
+            primaryRole: .destructive,
+            primaryAction: {
                 onDelete()
                 dismiss()
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-        }
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }
 
@@ -269,9 +273,9 @@ struct SummaryModelPicker: View {
     }
 }
 
-// MARK: - Model download consent alerts
+// MARK: - Model download consent dialogs
 
-/// Consent alerts shown before the first FluidAudio model download for a given feature.
+/// Consent dialogs shown before the first FluidAudio model download for a given feature.
 struct ModelDownloadAlerts: ViewModifier {
     @Binding var showingASRConsent: Bool
     @Binding var showingBatchASRConsent: Bool
@@ -287,30 +291,30 @@ struct ModelDownloadAlerts: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .modelDownloadAlert(isPresented: $showingASRConsent, onConfirm: onConfirmASR, onCancel: {})
-            .modelDownloadAlert(isPresented: $showingBatchASRConsent, onConfirm: onConfirmBatchASR, onCancel: onCancelBatchASR)
-            .modelDownloadAlert(isPresented: $showingDiarizationConsent, onConfirm: onConfirmDiarization, onCancel: onCancelDiarization)
-            .modelDownloadAlert(isPresented: $showingVADConsent, onConfirm: onConfirmVAD, onCancel: onCancelVAD)
+            .modelDownloadDialog(isPresented: $showingASRConsent, onConfirm: onConfirmASR, onCancel: {})
+            .modelDownloadDialog(isPresented: $showingBatchASRConsent, onConfirm: onConfirmBatchASR, onCancel: onCancelBatchASR)
+            .modelDownloadDialog(isPresented: $showingDiarizationConsent, onConfirm: onConfirmDiarization, onCancel: onCancelDiarization)
+            .modelDownloadDialog(isPresented: $showingVADConsent, onConfirm: onConfirmVAD, onCancel: onCancelVAD)
     }
 }
 
 private extension View {
-    /// One consent alert for a one-time model download. Title, message, and
-    /// buttons are identical across features; only the binding and actions vary.
-    func modelDownloadAlert(
+    func modelDownloadDialog(
         isPresented: Binding<Bool>,
         onConfirm: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) -> some View {
-        alert(
-            NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-            isPresented: isPresented
-        ) {
-            Button(NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"), action: onConfirm)
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel, action: onCancel)
-        } message: {
-            Text(NSLocalizedString("settings.model_download.message", comment: ""))
-        }
+        kurnDialog(
+            isPresented: isPresented,
+            iconSystemName: "arrow.down.circle.fill",
+            iconTint: Theme.info,
+            title: NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
+            message: NSLocalizedString("settings.model_download.message", comment: ""),
+            primaryTitle: NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"),
+            primaryAction: onConfirm,
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
+            secondaryAction: onCancel
+        )
     }
 }
 

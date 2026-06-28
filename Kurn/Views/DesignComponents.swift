@@ -78,6 +78,127 @@ struct FilterChip: View {
     }
 }
 
+enum KurnDialogActionRole: Equatable {
+    case normal
+    case destructive
+}
+
+/// App-styled modal confirmation surface used where native alerts are too
+/// constrained for Kurn's settings flows.
+struct KurnDialogModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    let iconSystemName: String
+    let iconTint: Color
+    let title: String
+    let message: String
+    let primaryTitle: String
+    let primaryRole: KurnDialogActionRole
+    let primaryAction: () -> Void
+    let secondaryTitle: String?
+    let secondaryAction: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if isPresented {
+                    ZStack {
+                        Color.black.opacity(0.42)
+                            .ignoresSafeArea()
+
+                        dialog
+                            .padding(.horizontal, 24)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .zIndex(100)
+                }
+            }
+            .animation(.easeInOut(duration: 0.18), value: isPresented)
+    }
+
+    private var dialog: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(iconTint.opacity(0.14))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: iconSystemName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(iconTint)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !message.isEmpty {
+                        Text(message)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                if let secondaryTitle {
+                    dialogButton(
+                        title: secondaryTitle,
+                        role: .normal,
+                        isPrimary: false
+                    ) {
+                        secondaryAction()
+                        isPresented = false
+                    }
+                }
+
+                dialogButton(
+                    title: primaryTitle,
+                    role: primaryRole,
+                    isPrimary: true
+                ) {
+                    primaryAction()
+                    isPresented = false
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: 380, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Theme.separator, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.24), radius: 22, x: 0, y: 12)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func dialogButton(
+        title: String,
+        role: KurnDialogActionRole,
+        isPrimary: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let background = isPrimary
+            ? (role == .destructive ? Theme.accent : Theme.info)
+            : Theme.fill
+        let foreground = isPrimary ? Color.white : Theme.textPrimary
+
+        return Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .foregroundStyle(foreground)
+                .background(background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 extension View {
     /// The standard rounded card surface (#1C1C1E in dark) used across screens.
     func kurnCard(padding: CGFloat = 16, cornerRadius: CGFloat = 18) -> some View {
@@ -94,5 +215,33 @@ extension View {
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
             .listRowInsets(insets ?? EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+    }
+
+    func kurnDialog(
+        isPresented: Binding<Bool>,
+        iconSystemName: String,
+        iconTint: Color,
+        title: String,
+        message: String,
+        primaryTitle: String,
+        primaryRole: KurnDialogActionRole = .normal,
+        primaryAction: @escaping () -> Void,
+        secondaryTitle: String? = nil,
+        secondaryAction: @escaping () -> Void = {}
+    ) -> some View {
+        modifier(
+            KurnDialogModifier(
+                isPresented: isPresented,
+                iconSystemName: iconSystemName,
+                iconTint: iconTint,
+                title: title,
+                message: message,
+                primaryTitle: primaryTitle,
+                primaryRole: primaryRole,
+                primaryAction: primaryAction,
+                secondaryTitle: secondaryTitle,
+                secondaryAction: secondaryAction
+            )
+        )
     }
 }

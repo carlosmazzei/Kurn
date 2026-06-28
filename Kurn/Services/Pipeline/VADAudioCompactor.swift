@@ -128,6 +128,7 @@ struct VADAudioCompactor {
         gap: TimeInterval = 0.1,
         minSavings: TimeInterval = 1.0
     ) async throws -> CompactionResult? {
+        try await ResourceGuard.requireTranscriptionHeadroom()
         let file = try AVAudioFile(forReading: url)
         let inFormat = file.processingFormat
         guard inFormat.sampleRate > 0, file.length > 0 else { return nil }
@@ -148,16 +149,32 @@ struct VADAudioCompactor {
 
         do {
             for region in merged {
+                try await ResourceGuard.requireTranscriptionHeadroom()
                 // Skip degenerate regions before writing a seam gap, so we never
                 // emit an orphan gap with no speech after it.
                 guard Int(region.end * sampleRate) - Int(region.start * sampleRate) > 0 else { continue }
                 if !map.isEmpty {
-                    try Self.writeSilence(frames: gapSamples, to: outFile, format: outFormat)
+                    do {
+                        try Self.writeSilence(frames: gapSamples, to: outFile, format: outFormat)
+                    } catch {
+                        if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                            throw appError
+                        }
+                        throw error
+                    }
                     compactedTime += gap
                 }
-                let written = try Self.streamRegion(
-                    file: file, startSec: region.start, endSec: region.end, to: outFile
-                )
+                let written: Int
+                do {
+                    written = try Self.streamRegion(
+                        file: file, startSec: region.start, endSec: region.end, to: outFile
+                    )
+                } catch {
+                    if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                        throw appError
+                    }
+                    throw error
+                }
                 guard written > 0 else { continue }
                 let duration = Double(written) / sampleRate
                 map.append(TimelineSegment(compactedStart: compactedTime, originalStart: region.start, duration: duration))
@@ -171,6 +188,7 @@ struct VADAudioCompactor {
             cleanup(outURL)
             return nil
         }
+        try await ResourceGuard.requireTranscriptionHeadroom()
 
         AppLog.transcription.atInfo.info("vadCompact: \(String(format: "%.1f", totalDuration), privacy: .public)s -> \(String(format: "%.1f", kept), privacy: .public)s speech (\(map.count, privacy: .public) regions)")
         return CompactionResult(url: outURL, map: map)
@@ -181,6 +199,7 @@ struct VADAudioCompactor {
     /// language detection run a short ASR pass instead of transcribing the whole
     /// recording just to classify its language.
     static func prefixClip(url: URL, seconds: TimeInterval, sampleRate: Double = 16_000) throws -> URL? {
+        try ResourceGuard.requireFreeStorage(atLeast: ResourceGuard.minimumFreeStorageForTranscription)
         let file = try AVAudioFile(forReading: url)
         let inFormat = file.processingFormat
         guard inFormat.sampleRate > 0, file.length > 0 else { return nil }
@@ -197,8 +216,12 @@ struct VADAudioCompactor {
             }
         } catch {
             try? FileManager.default.removeItem(at: outURL)
+            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
+                throw appError
+            }
             throw error
         }
+        try ResourceGuard.requireFreeStorage(atLeast: ResourceGuard.minimumFreeStorageForTranscription)
         return outURL
     }
 

@@ -105,24 +105,27 @@ struct MeetingsListView: View {
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }
-        .alert(
-            NSLocalizedString("meetings.delete.confirm", comment: "Delete confirmation"),
+        .kurnDialog(
             isPresented: Binding(
                 get: { pendingDelete != nil },
                 set: { if !$0 { pendingDelete = nil } }
             ),
-            presenting: pendingDelete
-        ) { meeting in
-            Button(NSLocalizedString("common.delete", comment: "Delete"), role: .destructive) {
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("meetings.delete.confirm", comment: "Delete confirmation"),
+            message: pendingDelete?.title ?? "",
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: {
+                guard let meeting = pendingDelete else { return }
                 MeetingsViewModel(modelContext: modelContext).delete(meeting)
                 pendingDelete = nil
-            }
-            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
+            secondaryAction: {
                 pendingDelete = nil
             }
-        } message: { meeting in
-            Text(meeting.title)
-        }
+        )
     }
 
     // MARK: - Subviews

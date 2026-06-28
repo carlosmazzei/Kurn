@@ -23,6 +23,10 @@
 "error.model_download_required" = "É necessário um download único de modelo para %@.";
 "error.model_download_failed" = "Falha no download do modelo: %@";
 "error.model_download_timeout" = "O modelo local expirou. Verifique sua conexão e tente novamente.";
+"error.resource_unavailable" = "Não é possível continuar: %@";
+"error.resource_low_storage" = "libere ao menos %@ de armazenamento antes de continuar. Disponível agora: %@.";
+"error.resource_disk_full" = "o dispositivo está sem armazenamento disponível.";
+"error.resource_memory_pressure" = "o dispositivo informou pouca memória. Feche outros apps ou libere espaço e tente novamente.";
 
 /* Modos de transcrição */
 "mode.on_device" = "No dispositivo";
@@ -132,6 +136,7 @@
 "detail.share" = "Compartilhar";
 "detail.segment_count" = "%d segmentos";
 "detail.recording_n" = "Gravação %d";
+"detail.playback_position" = "Posição da reprodução";
 "detail.add_segment" = "Adicionar segmento";
 "detail.retranscribe" = "Refazer transcrição";
 "detail.retranscribe.confirm.title" = "Refazer a transcrição desta gravação?";
