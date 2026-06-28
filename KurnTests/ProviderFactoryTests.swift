@@ -11,8 +11,14 @@
 import Testing
 @testable import Kurn
 
+// Serialized because these tests mutate the real, process-wide Keychain
+// (`KeychainManager.shared`) — several share the `.openAI` key, so running them
+// in parallel races on set/delete (one test clears the key while another expects
+// it set). Matches the same precaution in `ProviderHTTPTests`.
+@Suite(.serialized)
 struct ProviderFactoryTests {
 
+    @discardableResult
     private func withClearedKey<R>(_ key: KeychainKey, _ body: () throws -> R) rethrows -> R {
         let original = KeychainManager.shared.get(key)
         KeychainManager.shared.delete(key)
@@ -22,6 +28,7 @@ struct ProviderFactoryTests {
         return try body()
     }
 
+    @discardableResult
     private func withKey<R>(_ key: KeychainKey, value: String, _ body: () throws -> R) rethrows -> R {
         let original = KeychainManager.shared.get(key)
         KeychainManager.shared.set(value, for: key)

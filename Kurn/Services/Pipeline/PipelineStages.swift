@@ -68,18 +68,4 @@ struct PipelineConfiguration: Sendable, Equatable {
     var languageDetection: LanguageDetectionEngine = .byTranscriber
     var diarization: DiarizationEngine = .heuristic
     var transcription: TranscriptionEngine = .appleSpeech
-
-    init(
-        preprocessing: PreprocessingEngine = .standardDSP,
-        vad: VADEngine = .energyThreshold,
-        languageDetection: LanguageDetectionEngine = .byTranscriber,
-        diarization: DiarizationEngine = .heuristic,
-        transcription: TranscriptionEngine = .appleSpeech
-    ) {
-        self.preprocessing = preprocessing
-        self.vad = vad
-        self.languageDetection = languageDetection
-        self.diarization = diarization
-        self.transcription = transcription
-    }
 }

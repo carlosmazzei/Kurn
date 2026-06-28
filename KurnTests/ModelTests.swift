@@ -79,6 +79,34 @@ struct ModelTests {
         #expect(meeting.hasAnyTranscript == true)
     }
 
+    // Re-transcription replaces a recording's transcript. The relationship must
+    // be detached before the old transcript is deleted, otherwise establishing
+    // the new transcript's inverse traps with "relationship already has a value
+    // but it's not the target". This mirrors the replace path in
+    // `TranscriptionViewModel.transcribe`.
+    @Test func replacingTranscriptDetachesTheOldOne() throws {
+        let context = makeContext()
+        let meeting = Meeting(title: "Standup")
+        context.insert(meeting)
+        let recording = Recording(meeting: meeting, fileName: "a.m4a", duration: 10)
+        context.insert(recording)
+
+        let first = Transcript(recording: recording, language: "en")
+        context.insert(first)
+        try context.save()
+
+        // Detach before delete, then attach the replacement via the initializer.
+        recording.transcript = nil
+        context.delete(first)
+        let second = Transcript(recording: recording, language: "pt-BR")
+        context.insert(second)
+        try context.save()
+
+        #expect(recording.transcript?.language == "pt-BR")
+        let remaining = try context.fetch(FetchDescriptor<Transcript>())
+        #expect(remaining.count == 1)
+    }
+
     @Test func languagePropertyRoundTripsThroughRawValue() {
         let meeting = Meeting(title: "Standup", language: .portuguese)
         #expect(meeting.language == .portuguese)

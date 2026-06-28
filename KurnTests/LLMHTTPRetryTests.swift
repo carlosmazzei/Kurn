@@ -63,14 +63,15 @@ struct LLMHTTPRetryTests {
 
     // MARK: - Backoff shape
 
-    @Test func backoffStaysWithinExpectedBounds() {
+    @Test func backoffStaysWithinExpectedBounds() throws {
         // Delay = base * 2^attempt + jitter(0...base), clamped to maxDelay.
         for attempt in 0..<(LLMHTTP.maxAttempts - 1) {
             let exponential = LLMHTTP.baseDelay * pow(2, Double(attempt))
-            let delay = LLMHTTP.retryableDelay(attempt: attempt, status: 500, urlError: nil, retryAfter: nil)
-            let value = try? #require(delay)
-            #expect((value ?? -1) >= exponential)
-            #expect((value ?? .infinity) <= min(exponential + LLMHTTP.baseDelay, LLMHTTP.maxDelay))
+            let delay = try #require(
+                LLMHTTP.retryableDelay(attempt: attempt, status: 500, urlError: nil, retryAfter: nil)
+            )
+            #expect(delay >= exponential)
+            #expect(delay <= min(exponential + LLMHTTP.baseDelay, LLMHTTP.maxDelay))
         }
     }
 

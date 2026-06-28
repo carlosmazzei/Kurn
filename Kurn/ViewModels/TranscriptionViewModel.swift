@@ -126,17 +126,24 @@ final class TranscriptionViewModel {
                 }
             )
 
-            // Replace any existing transcript.
+            // Replace any existing transcript. Detach the old one first: a
+            // `delete` isn't applied to the relationship until the next save, so
+            // without this `recording.transcript` still points at the old
+            // transcript when the new one's inverse is established — which traps
+            // with "relationship already has a value but it's not the target".
             if let existing = recording.transcript {
+                recording.transcript = nil
                 modelContext.delete(existing)
             }
+            // Assigning `recording` in the initializer establishes the
+            // relationship (SwiftData maintains the inverse `recording.transcript`),
+            // so no manual back-assignment is needed.
             let transcript = Transcript(
                 recording: recording,
                 segments: output.segments,
                 language: output.language
             )
             modelContext.insert(transcript)
-            recording.transcript = transcript
             recording.transcriptionStatus = .done
 
             ensureSpeakers(for: recording.meeting, labels: output.speakerLabels)

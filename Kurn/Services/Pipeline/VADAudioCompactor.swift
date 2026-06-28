@@ -10,7 +10,13 @@
 //  timeline so they still line up with diarization and playback.
 //
 
-import AVFoundation
+// AVAudioConverter's input block is `@Sendable` in the iOS 18 SDK, which makes
+// the synchronous-only `convert(to:error:withInputFrom:)` pattern below (feeding
+// a single non-Sendable `AVAudioPCMBuffer` once, guarded by a captured `var`)
+// trip Sendable/data-race warnings even though the block never escapes. The
+// block runs synchronously inside `convert`, so this is safe; `@preconcurrency`
+// downgrades the false-positive concurrency diagnostics from AVFAudio.
+@preconcurrency import AVFoundation
 import Foundation
 
 /// One contiguous speech run in the compacted file and where it came from.
@@ -50,7 +56,10 @@ enum VADAudioLoader {
             let capacity = AVAudioFrameCount(Double(max(1, inBuf.frameLength)) * ratio) + 1_024
             guard let outBuf = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: capacity) else { break }
 
-            var provided = false
+            // The converter's input block is `@Sendable`, but it runs
+            // synchronously inside `convert` on this thread, so this one-shot
+            // "feed the buffer once" flag is not actually shared across threads.
+            nonisolated(unsafe) var provided = false
             var convError: NSError?
             let status = converter.convert(to: outBuf, error: &convError) { _, inputStatus in
                 if isEOF { inputStatus.pointee = .endOfStream; return nil }
