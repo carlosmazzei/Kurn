@@ -258,6 +258,7 @@
 "settings.models.on_device_language" = "Detecção de Idioma no Dispositivo";
 "settings.models.diarization" = "Diarização de Locutores";
 "settings.models.vad" = "Detecção de Atividade de Voz";
+"settings.models.other" = "Outros Modelos FluidAudio";
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";

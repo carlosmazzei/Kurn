@@ -20,11 +20,11 @@ struct SettingsView: View {
 
     @State var storageText = "—"
     @State var showingDeleteConfirm = false
-    /// Bytes used on disk per downloaded FluidAudio model group, refreshed when
-    /// the screen appears and after any download/deletion.
-    @State var modelSizes: [ModelStore.ModelGroup: Int64] = [:]
-    /// Model group awaiting a delete confirmation, if any.
-    @State var pendingModelDeletion: ModelStore.ModelGroup?
+    /// Downloaded FluidAudio model entries, refreshed when the screen appears
+    /// and after any download/deletion.
+    @State var installedModels: [ModelStore.InstalledModel] = []
+    /// Model entry awaiting a delete confirmation, if any.
+    @State var pendingModelDeletion: ModelStore.InstalledModel?
     @State var showingAddProvider = false
     @State var showingAddTemplate = false
     /// Bumped after editing a key so the provider rows re-read keychain status.
@@ -187,9 +187,9 @@ struct SettingsView: View {
                 set: { if !$0 { pendingModelDeletion = nil } }
             ),
             presenting: pendingModelDeletion
-        ) { group in
+        ) { model in
             Button(NSLocalizedString("settings.models.delete", comment: "Delete model"), role: .destructive) {
-                deleteModel(group)
+                deleteModel(model)
             }
             Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
         } message: { _ in
@@ -223,7 +223,9 @@ struct SettingsView: View {
                     background.begin(name: "ai.kurn.modelDownload")
                     defer { background.end() }
                     do {
+                        let before = ModelStore.snapshot()
                         try await ModelDownloadConsent.download(.liveTranscriptionASR)
+                        ModelStore.recordDownload(for: .liveTranscription, before: before)
                         settings.fluidAudioASRModelsConsented = true
                         settings.liveTranscriptionEnabled = true
                     } catch let appError as AppError {
@@ -244,7 +246,9 @@ struct SettingsView: View {
                     background.begin(name: "ai.kurn.modelDownload")
                     defer { background.end() }
                     do {
+                        let before = ModelStore.snapshot()
                         try await ModelDownloadConsent.download(.onDeviceASR)
+                        ModelStore.recordDownload(for: .onDeviceLanguage, before: before)
                         settings.fluidAudioBatchASRModelsConsented = true
                         // Apply whichever picker requested the download.
                         if let engine = pendingTranscriptionEngine {
@@ -279,7 +283,9 @@ struct SettingsView: View {
                     background.begin(name: "ai.kurn.modelDownload")
                     defer { background.end() }
                     do {
+                        let before = ModelStore.snapshot()
                         try await ModelDownloadConsent.download(.diarization)
+                        ModelStore.recordDownload(for: .diarization, before: before)
                         settings.fluidAudioDiarizationModelsConsented = true
                         settings.diarizationEngine = engine
                     } catch let appError as AppError {
@@ -306,7 +312,9 @@ struct SettingsView: View {
                     background.begin(name: "ai.kurn.modelDownload")
                     defer { background.end() }
                     do {
+                        let before = ModelStore.snapshot()
                         try await ModelDownloadConsent.download(.vad)
+                        ModelStore.recordDownload(for: .vad, before: before)
                         settings.fluidAudioVADModelsConsented = true
                         settings.vadEngine = engine
                     } catch let appError as AppError {

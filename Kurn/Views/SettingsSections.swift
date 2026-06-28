@@ -261,24 +261,24 @@ extension SettingsView {
     }
 
     /// Downloaded on-device models the user can inspect and remove. Only groups
-    /// actually present on disk are listed; deleting one frees its space and
-    /// turns the matching feature off so it can be re-downloaded on demand.
+    /// actually present on disk are listed; deleting a known group frees its
+    /// space and turns the matching feature off so it can be re-downloaded on
+    /// demand. Unassociated FluidAudio folders are shown as a separate entry.
     @ViewBuilder
     var modelsSection: some View {
-        let installed = ModelStore.ModelGroup.allCases.filter { (modelSizes[$0] ?? 0) > 0 }
         Section {
-            if installed.isEmpty {
+            if installedModels.isEmpty {
                 Text(NSLocalizedString("settings.models.none", comment: "No models downloaded"))
                     .foregroundStyle(Theme.textSecondary)
             } else {
-                ForEach(installed) { group in
+                ForEach(installedModels) { model in
                     HStack {
-                        Text(group.displayName)
+                        Text(model.displayName)
                         Spacer()
-                        Text(AudioFileStore.formattedSize(modelSizes[group] ?? 0))
+                        Text(AudioFileStore.formattedSize(model.size))
                             .foregroundStyle(Theme.textSecondary)
                         Button {
-                            pendingModelDeletion = group
+                            pendingModelDeletion = model
                         } label: {
                             Image(systemName: "trash")
                         }
@@ -295,24 +295,24 @@ extension SettingsView {
         }
     }
 
-    /// Recompute each model group's on-disk size off the main thread.
+    /// Recompute installed model entries off the main thread.
     func refreshModelSizes() {
         Task { @MainActor in
-            let sizes = await Task.detached {
-                var result: [ModelStore.ModelGroup: Int64] = [:]
-                for group in ModelStore.ModelGroup.allCases {
-                    result[group] = ModelStore.sizeOnDisk(group)
-                }
-                return result
+            installedModels = await Task.detached {
+                ModelStore.installedModels()
             }.value
-            modelSizes = sizes
         }
     }
 
-    /// Delete a model group from disk and turn off the feature that uses it so the
-    /// UI reflects the removal and it can be re-downloaded later.
-    func deleteModel(_ group: ModelStore.ModelGroup) {
-        ModelStore.delete(group)
+    /// Delete a model entry from disk and turn off any feature that uses it so
+    /// the UI reflects the removal and it can be re-downloaded later.
+    func deleteModel(_ model: ModelStore.InstalledModel) {
+        ModelStore.delete(model)
+        guard let group = model.group else {
+            pendingModelDeletion = nil
+            refreshModelSizes()
+            return
+        }
         switch group {
         case .liveTranscription:
             settings.liveTranscriptionEnabled = false
