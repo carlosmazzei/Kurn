@@ -43,9 +43,18 @@ struct DiarizationPreprocessorTests {
     }
 
     @Test func processPeakNormalizesToTargetWithin1dB() async throws {
-        // Pre-normalized loud-ish source so the global gain doesn't have to
-        // clamp; the preprocessor's target is -3 dBFS within ±1 dB.
-        let inputURL = try AudioFixtures.m4aTone(seconds: 1.5, amplitude: 0.3)
+        // A pure continuous tone is indistinguishable from stationary noise, so
+        // spectral subtraction crushes it to the spectral floor and the gain
+        // clamps trying to recover. Use a signal with a genuine quiet region
+        // (the noise-floor estimate comes from there) and a louder tone that
+        // survives denoise, isolating the global -3 dBFS (±1 dB) gain stage.
+        let inputURL = try Self.makeNoisyToneWAV(
+            durationSilent: 1.5,
+            durationTone: 1.5,
+            toneHz: 440,
+            toneAmplitude: 0.3,
+            noiseAmplitude: 0.05
+        )
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         let outURL = try await DiarizationPreprocessor().process(url: inputURL)
