@@ -197,33 +197,39 @@ struct DiarizationPreprocessorTests {
         }
 
         try writeRegion(file: file, format: format, sampleRate: sampleRate,
-                        seconds: durationSilent, toneHz: 0,
-                        toneAmplitude: 0, noise: nextNoise)
+                        region: Region(seconds: durationSilent, toneHz: 0, toneAmplitude: 0),
+                        noise: nextNoise)
         try writeRegion(file: file, format: format, sampleRate: sampleRate,
-                        seconds: durationTone, toneHz: toneHz,
-                        toneAmplitude: toneAmplitude, noise: nextNoise)
+                        region: Region(seconds: durationTone, toneHz: toneHz, toneAmplitude: toneAmplitude),
+                        noise: nextNoise)
         return url
+    }
+
+    /// One contiguous fixture region: a sine tone (`toneHz <= 0` = none) at
+    /// `toneAmplitude`, lasting `seconds`.
+    private struct Region {
+        var seconds: Double
+        var toneHz: Double
+        var toneAmplitude: Float
     }
 
     private static func writeRegion(
         file: AVAudioFile,
         format: AVAudioFormat,
         sampleRate: Double,
-        seconds: Double,
-        toneHz: Double,
-        toneAmplitude: Float,
+        region: Region,
         noise: () -> Float
     ) throws {
-        let frames = AVAudioFrameCount(sampleRate * seconds)
+        let frames = AVAudioFrameCount(sampleRate * region.seconds)
         guard frames > 0,
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames),
               let data = buffer.floatChannelData else {
             throw AppError.audioError("Could not allocate fixture buffer")
         }
         buffer.frameLength = frames
-        let omega = 2.0 * Double.pi * toneHz
+        let omega = 2.0 * Double.pi * region.toneHz
         for i in 0..<Int(frames) {
-            let tone = toneHz > 0 ? Float(sin(omega * Double(i) / sampleRate)) * toneAmplitude : 0
+            let tone = region.toneHz > 0 ? Float(sin(omega * Double(i) / sampleRate)) * region.toneAmplitude : 0
             data[0][i] = tone + noise()
         }
         try file.write(from: buffer)
