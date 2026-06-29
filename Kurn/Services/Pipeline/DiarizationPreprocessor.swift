@@ -249,7 +249,7 @@ actor DiarizationPreprocessor {
                         dst.baseAddress!, 1,
                         src.baseAddress!, 1,
                         dst.baseAddress!, 1,
-                        vDSP_Length(accum.count)
+                        vDSP_Length(dst.count)
                     )
                 }
             }
@@ -356,8 +356,8 @@ private final class STFT {
     let frameSize: Int
     let halfFrame: Int
     let hopSize: Int
-    private let forwardDFT: vDSP.DFT<Float>
-    private let inverseDFT: vDSP.DFT<Float>
+    private let forwardDFT: vDSP.DiscreteFourierTransform<Float>
+    private let inverseDFT: vDSP.DiscreteFourierTransform<Float>
     private var window: [Float]
     private var realIn: [Float]
     private var imagIn: [Float]
@@ -371,12 +371,14 @@ private final class STFT {
         self.frameSize = frameSize
         self.halfFrame = frameSize / 2
         self.hopSize = hopSize
-        guard let forward = vDSP.DFT(
+        guard let forward = try? vDSP.DiscreteFourierTransform(
+            previous: nil,
             count: frameSize, direction: .forward, transformType: .complexComplex, ofType: Float.self
-        ), let inverse = vDSP.DFT(
+        ), let inverse = try? vDSP.DiscreteFourierTransform(
+            previous: nil,
             count: frameSize, direction: .inverse, transformType: .complexComplex, ofType: Float.self
         ) else {
-            preconditionFailure("vDSP.DFT setup failed for frameSize=\(frameSize)")
+            preconditionFailure("vDSP.DiscreteFourierTransform setup failed for frameSize=\(frameSize)")
         }
         self.forwardDFT = forward
         self.inverseDFT = inverse
@@ -434,17 +436,19 @@ private final class STFT {
         }
         // Hermitian-mirror to negative-frequency bins so the inverse DFT yields
         // a real-valued signal. X[N-k] = conj(X[k]) for k = 1..N/2-1.
-        for k in (halfFrame + 1)..<frameSize {
-            realOut[k] = realOut[frameSize - k]
-            imagOut[k] = -imagOut[frameSize - k]
+        for bin in (halfFrame + 1)..<frameSize {
+            realOut[bin] = realOut[frameSize - bin]
+            imagOut[bin] = -imagOut[frameSize - bin]
         }
         inverseDFT.transform(
             inputReal: realOut, inputImaginary: imagOut,
             outputReal: &timeReal, outputImaginary: &timeImag
         )
-        // vDSP.DFT inverse is scaled by `count`; divide to undo.
+        // vDSP DFT inverse is scaled by `count`; divide to undo.
         var scale = 1.0 / Float(frameSize)
-        vDSP_vsmul(&timeReal, 1, &scale, &timeReal, 1, vDSP_Length(frameSize))
+        timeReal.withUnsafeMutableBufferPointer { ptr in
+            vDSP_vsmul(ptr.baseAddress!, 1, &scale, ptr.baseAddress!, 1, vDSP_Length(frameSize))
+        }
         return timeReal
     }
 
