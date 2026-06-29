@@ -72,4 +72,12 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// the `.fluidAudio` engine reads it, to break its VBx single-speaker collapse
     /// by re-clustering with KMeans to at least this many speakers.
     var fluidAudioMinSpeakers: Int = 0
+    /// When true, the diarization stage runs a dedicated lighter cleanup on the
+    /// original recording (`DiarizationPreprocessor`) and feeds the resulting
+    /// WAV to both diarizer engines, instead of reusing the ASR-cleaned `.m4a`
+    /// produced by `AudioPreprocessor`. The ASR-cleaned chain is tuned for
+    /// transcription clarity (AGC + compression + AAC re-encode) which flattens
+    /// the relative loudness and natural timbre that speaker-embedding and
+    /// pitch/timbre features rely on.
+    var diarizationPreprocessingEnabled: Bool = true
 }

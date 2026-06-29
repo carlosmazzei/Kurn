@@ -249,6 +249,7 @@
 "settings.diarization_engine" = "Motor de Diarização";
 "settings.diarization_min_speakers" = "Mínimo de Interlocutores";
 "settings.diarization_min_speakers_auto" = "Automático";
+"settings.diarization_preprocessing" = "Limpeza de Áudio para Diarização";
 "settings.on_device_auto_language" = "Detectar Idioma no Dispositivo (Auto)";
 "settings.live_transcription" = "Prévia de Transcrição em Tempo Real";
 "settings.model_download.title" = "Download Único de Modelo";
