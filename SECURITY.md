@@ -64,8 +64,10 @@ In scope:
 - Code in this repository, including build configuration, CI workflows
   (`.github/workflows/`), and any helper scripts.
 - Handling of secrets (API keys in the Keychain), local data at rest
-  (SwiftData store and `.m4a` files in the app's Documents directory), and
-  network requests to user-configured LLM and transcription providers.
+  (SwiftData store and `.m4a` files in the protected
+  `Documents/Recordings/` subdirectory, encrypted via iOS Data Protection
+  and gated behind device authentication by default), and network requests
+  to user-configured LLM and transcription providers.
 
 Out of scope:
 

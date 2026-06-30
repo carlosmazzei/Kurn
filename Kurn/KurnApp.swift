@@ -13,6 +13,10 @@ import SwiftUI
 struct KurnApp: App {
     /// Shared, observable preferences (provider, default mode/language).
     @State private var settings = AppSettings()
+    /// Per-session Face ID / passcode gate guarding the recordings UI. Reset
+    /// on every background transition so a borrowed-unlocked device cannot
+    /// expose meeting audio just by reopening the app.
+    @State private var accessGate = RecordingAccessGate()
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -47,7 +51,14 @@ struct KurnApp: App {
         WindowGroup {
             ContentView()
                 .environment(settings)
+                .environment(accessGate)
                 .onChange(of: scenePhase, initial: true) { _, phase in
+                    // Lock the recordings gate whenever the app leaves the
+                    // foreground so the next time it comes back the user has
+                    // to authenticate again.
+                    if phase == .background {
+                        accessGate.lock()
+                    }
                     // Pre-warm the FluidAudio ASR model while the app is in the
                     // foreground. The one-time CoreML/ANE compilation costs tens
                     // of seconds and fails outright if first attempted from the

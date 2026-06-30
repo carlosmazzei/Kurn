@@ -27,6 +27,8 @@
 "error.resource_low_storage" = "libere ao menos %@ de armazenamento antes de continuar. Disponível agora: %@.";
 "error.resource_disk_full" = "o dispositivo está sem armazenamento disponível.";
 "error.resource_memory_pressure" = "o dispositivo informou pouca memória. Feche outros apps ou libere espaço e tente novamente.";
+"error.authentication_required" = "É necessário autenticar para acessar suas gravações.";
+"error.authentication_failed" = "Falha de autenticação: %@";
 
 /* Modos de transcrição */
 "mode.on_device" = "No dispositivo";
@@ -277,3 +279,11 @@
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";
+
+/* Segurança das gravações */
+"settings.require_auth_for_recordings" = "Exigir autenticação";
+"settings.require_auth_for_recordings_footer" = "Pede Face ID, Touch ID ou o código do aparelho uma vez por sessão antes de mostrar as reuniões e gravações. Os arquivos de áudio ficam sempre criptografados em disco usando o código do aparelho.";
+"recordings.locked_title" = "Gravações bloqueadas";
+"recordings.locked_subtitle" = "Autentique-se para ver suas reuniões e gravações.";
+"recordings.unlock_button" = "Desbloquear";
+"recordings.unlock_reason" = "Autentique-se para acessar as gravações das suas reuniões.";

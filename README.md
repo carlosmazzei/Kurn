@@ -24,7 +24,9 @@ summary with a configured AI provider.
 - Lock Screen and Dynamic Island Live Activity for active recordings.
 - Local SwiftData store for meetings, recordings, speakers, transcripts, and
   summaries.
-- Local `.m4a` audio files saved in the app's Documents directory.
+- Local `.m4a` audio files saved in a protected subdirectory of the app's
+  Documents directory, encrypted at rest with iOS Data Protection and gated
+  behind Face ID / Touch ID / passcode once per session by default.
 - English and Brazilian Portuguese localizations.
 - App Privacy Manifest with no tracking and no collected data types.
 
@@ -99,7 +101,13 @@ Provider setup is handled through:
 
 Kurn is designed to avoid a backend service controlled by the app.
 
-- Audio files are saved locally in the app's Documents directory.
+- Audio files are saved locally in a protected subdirectory of the app's
+  Documents directory (`Documents/Recordings/`) with iOS Data Protection
+  (`FileProtectionType.completeUnlessOpen`), so the bytes are encrypted at
+  rest using a key derived from the device passcode.
+- Access to the recordings UI is gated behind Face ID / Touch ID / passcode
+  once per foreground session by default; the gate can be turned off in
+  Settings and the on-disk encryption stays active either way.
 - Meeting metadata, transcripts, summaries, speakers, and recordings are stored
   locally with SwiftData.
 - API keys are stored in the Keychain.

@@ -21,6 +21,15 @@ enum RecordingRecovery {
     /// `RecordingActivityAttributes` activity still running is by definition
     /// orphaned.
     static func recoverOrphans(modelContainer: ModelContainer) {
+        // Migrate any legacy `.m4a` left in Documents into the protected
+        // recordings directory before scanning for orphans, so the scan and
+        // every subsequent file access happens against the post-migration
+        // layout.
+        RecordingProtection.migrateLegacyRecordings(
+            documentsURL: AudioFileStore.documentsURL,
+            recordingsURL: AudioFileStore.recordingsDirectoryURL
+        )
+
         // Snapshot the activities synchronously, here at launch, BEFORE any
         // recording UI exists. Anything running now is by definition orphaned.
         // Ending happens asynchronously, so reading `.activities` inside the
@@ -46,7 +55,7 @@ enum RecordingRecovery {
         let known = Set(knownFileNames)
 
         guard let items = try? FileManager.default.contentsOfDirectory(
-            at: AudioFileStore.documentsURL,
+            at: AudioFileStore.recordingsDirectoryURL,
             includingPropertiesForKeys: nil
         ) else { return }
 

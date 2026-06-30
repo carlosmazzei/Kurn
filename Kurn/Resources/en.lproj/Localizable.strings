@@ -27,6 +27,8 @@
 "error.resource_low_storage" = "free at least %@ of storage before continuing. Available now: %@.";
 "error.resource_disk_full" = "the device is out of available storage.";
 "error.resource_memory_pressure" = "the device reported low memory. Close other apps or free storage, then try again.";
+"error.authentication_required" = "Authentication is required to access your recordings.";
+"error.authentication_failed" = "Authentication failed: %@";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
@@ -277,3 +279,11 @@
 "settings.models.delete" = "Delete Model";
 "settings.models.delete_confirm" = "Delete this model?";
 "settings.models.delete_message" = "It will be removed from this device. You can download it again later by re-enabling the feature.";
+
+/* Recordings security */
+"settings.require_auth_for_recordings" = "Require Authentication";
+"settings.require_auth_for_recordings_footer" = "Ask for Face ID, Touch ID, or your device passcode once per session before showing meetings and recordings. Audio files are always encrypted on disk using the device passcode.";
+"recordings.locked_title" = "Recordings Locked";
+"recordings.locked_subtitle" = "Authenticate to view your meetings and recordings.";
+"recordings.unlock_button" = "Unlock";
+"recordings.unlock_reason" = "Authenticate to access your meeting recordings.";
