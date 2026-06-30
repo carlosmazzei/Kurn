@@ -86,6 +86,65 @@ enum MicPickup: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// How the meetings list is sorted. Date and title are stable database sorts;
+/// duration is computed from related recordings so it is applied in memory.
+enum MeetingsSortOrder: String, Codable, Sendable, CaseIterable, Identifiable {
+    case dateNewest
+    case dateOldest
+    case titleAZ
+    case durationLongest
+    case durationShortest
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .dateNewest: return NSLocalizedString("meetings.sort.date_newest", comment: "Newest first")
+        case .dateOldest: return NSLocalizedString("meetings.sort.date_oldest", comment: "Oldest first")
+        case .titleAZ: return NSLocalizedString("meetings.sort.title_az", comment: "Title A–Z")
+        case .durationLongest: return NSLocalizedString("meetings.sort.duration_longest", comment: "Longest first")
+        case .durationShortest: return NSLocalizedString("meetings.sort.duration_shortest", comment: "Shortest first")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .dateNewest, .dateOldest: return "calendar"
+        case .titleAZ: return "textformat"
+        case .durationLongest, .durationShortest: return "clock"
+        }
+    }
+
+    /// Apply the chosen ordering to a list of meetings. The default
+    /// `.dateNewest` is a no-op because `@Query` already sorts by `createdAt`
+    /// descending; the other cases re-sort in memory (necessary for the
+    /// computed `totalDuration`).
+    func apply(to meetings: [Meeting]) -> [Meeting] {
+        switch self {
+        case .dateNewest:
+            return meetings
+        case .dateOldest:
+            return meetings.sorted { $0.createdAt < $1.createdAt }
+        case .titleAZ:
+            return meetings.sorted {
+                let lhs = $0.title.localizedCaseInsensitiveCompare($1.title)
+                if lhs != .orderedSame { return lhs == .orderedAscending }
+                return $0.createdAt > $1.createdAt
+            }
+        case .durationLongest:
+            return meetings.sorted {
+                if $0.totalDuration != $1.totalDuration { return $0.totalDuration > $1.totalDuration }
+                return $0.createdAt > $1.createdAt
+            }
+        case .durationShortest:
+            return meetings.sorted {
+                if $0.totalDuration != $1.totalDuration { return $0.totalDuration < $1.totalDuration }
+                return $0.createdAt > $1.createdAt
+            }
+        }
+    }
+}
+
 /// Recording audio quality, mapped to the encoder bit rate.
 enum AudioQuality: String, Codable, Sendable, CaseIterable, Identifiable {
     case high
