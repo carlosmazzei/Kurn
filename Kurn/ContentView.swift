@@ -23,6 +23,7 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(AppSettings())
+        .environment(RecordingAccessGate())
         .modelContainer(for: [
             Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self
         ], inMemory: true)

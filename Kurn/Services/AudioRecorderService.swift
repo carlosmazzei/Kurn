@@ -110,7 +110,7 @@ final class AudioRecorderService: NSObject {
         let pickup = micPickup
         let bitRate = audioBitRate
         let fileName = AudioFileStore.fileName(meetingID: meetingID)
-        let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
+        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
         AppLog.recorder.atDebug.debug("start: writing to \(fileName, privacy: .public)")
 
         do {

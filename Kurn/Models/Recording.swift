@@ -53,7 +53,9 @@ final class Recording {
     }
 
     /// Absolute URL of the backing audio file in the current container.
+    /// Resolves through `AudioFileStore` so the protected subdirectory is
+    /// preferred and any pre-migration leftover in Documents is still found.
     var fileURL: URL {
-        AudioFileStore.documentsURL.appendingPathComponent(fileName)
+        AudioFileStore.resolveURL(fileName: fileName)
     }
 }

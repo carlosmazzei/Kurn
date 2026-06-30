@@ -90,6 +90,33 @@ similar collections are encoded to/from JSON `Data` via computed properties
 `Recording(meeting:)`) — SwiftData maintains the inverse, so never append to the
 parent collection manually.
 
+### Secure local storage for recordings
+
+Audio files live in `Documents/Recordings/` (not `Documents/` itself) with
+`FileProtectionType.completeUnlessOpen` set on the directory so new `.m4a`
+files inherit it. iOS wraps each file's AES key with a key derived from the
+device passcode, so the bytes are unrecoverable from a backup or extraction
+without the passcode. `.completeUnlessOpen` (rather than `.complete`) is
+chosen so an in-progress recording survives the screen locking mid-meeting.
+
+`RecordingProtection` (`Infrastructure/RecordingProtection.swift`) owns the
+directory setup, the per-file attribute application, and the one-shot
+migration of any legacy `.m4a` left in `Documents/` from older versions —
+called from `RecordingRecovery.recoverOrphans` at launch. Every read path
+resolves files through `AudioFileStore.resolveURL(fileName:)`, which prefers
+the protected directory and falls back to `Documents/` for any
+not-yet-migrated leftovers.
+
+A separate access layer, `RecordingAccessGate`
+(`Services/RecordingAccessGate.swift`), guards the recordings UI behind
+`LAContext.evaluatePolicy(.deviceOwnerAuthentication, ...)` (Face ID /
+Touch ID / passcode) once per foreground session. The gate is injected via
+the environment from `KurnApp` and re-locked on every
+`scenePhase == .background` transition. `MeetingsListView` swaps in a
+`LockedRecordingsView` overlay until the user authenticates. Disabling
+`AppSettings.requireAuthForRecordings` (Settings → Recording) turns off the
+prompt while leaving the on-disk encryption in place.
+
 ### Transcription pipeline (`Services/TranscriptionService.swift`)
 
 The orchestration that requires reading several files together:

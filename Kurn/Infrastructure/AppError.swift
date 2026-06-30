@@ -21,6 +21,8 @@ enum AppError: LocalizedError, Identifiable {
     case modelDownloadRequired(String)
     case modelDownloadFailed(String)
     case resourceUnavailable(String)
+    case authenticationRequired
+    case authenticationFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
@@ -80,6 +82,16 @@ enum AppError: LocalizedError, Identifiable {
         case .resourceUnavailable(let detail):
             return String(
                 format: NSLocalizedString("error.resource_unavailable", comment: "Resource unavailable"),
+                detail
+            )
+        case .authenticationRequired:
+            return NSLocalizedString(
+                "error.authentication_required",
+                comment: "Authentication required to access recordings"
+            )
+        case .authenticationFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.authentication_failed", comment: "Authentication failed"),
                 detail
             )
         }

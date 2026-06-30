@@ -224,10 +224,20 @@ extension SettingsView {
             if downloadingModel == .liveTranscriptionASR {
                 modelDownloadProgressRow
             }
+            Toggle(
+                NSLocalizedString("settings.require_auth_for_recordings", comment: "Require authentication for recordings"),
+                isOn: Binding(
+                    get: { settings.requireAuthForRecordings },
+                    set: { settings.requireAuthForRecordings = $0 }
+                )
+            )
         } header: {
             Text(NSLocalizedString("settings.recording", comment: "Recording"))
         } footer: {
-            Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
+                Text(NSLocalizedString("settings.require_auth_for_recordings_footer", comment: "Explains authentication and at-rest encryption"))
+            }
         }
     }
 

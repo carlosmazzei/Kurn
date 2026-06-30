@@ -35,6 +35,8 @@ private enum MeetingDateFilter: String, CaseIterable, Identifiable {
 
 struct MeetingsListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppSettings.self) private var settings
+    @Environment(RecordingAccessGate.self) private var accessGate
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
 
     @State private var showingSettings = false
@@ -45,6 +47,10 @@ struct MeetingsListView: View {
     @State private var recordMeeting: Meeting?
     @State private var searchText = ""
     @State private var filter: MeetingDateFilter = .all
+
+    private var isLocked: Bool {
+        settings.requireAuthForRecordings && !accessGate.isUnlocked
+    }
 
     private var filtered: [Meeting] {
         meetings.filter { meeting in
@@ -57,6 +63,17 @@ struct MeetingsListView: View {
     }
 
     var body: some View {
+        if isLocked {
+            LockedRecordingsView(gate: accessGate)
+                .background(Theme.background.ignoresSafeArea())
+                .toolbar(.hidden, for: .navigationBar)
+                .task { await accessGate.authenticate() }
+        } else {
+            unlockedBody
+        }
+    }
+
+    private var unlockedBody: some View {
         ZStack(alignment: .bottom) {
         List {
             VStack(alignment: .leading, spacing: 16) {
@@ -232,6 +249,48 @@ struct MeetingsListView: View {
             return segment
         }
         return meeting.notes
+    }
+}
+
+/// Full-screen overlay shown in place of the meetings list while the gate is
+/// locked. Triggers authentication automatically when it appears and offers a
+/// retry button when the user cancels the prompt or biometrics fail.
+private struct LockedRecordingsView: View {
+    let gate: RecordingAccessGate
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(Theme.textSecondary)
+            Text(NSLocalizedString("recordings.locked_title", comment: "Recordings Locked"))
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+            Text(NSLocalizedString("recordings.locked_subtitle", comment: "Authenticate to view"))
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+            if let message = gate.lastError?.errorDescription {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.warning)
+                    .multilineTextAlignment(.center)
+            }
+            Button {
+                Task { await gate.authenticate() }
+            } label: {
+                Text(NSLocalizedString("recordings.unlock_button", comment: "Unlock"))
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+        .padding(.horizontal, 36)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

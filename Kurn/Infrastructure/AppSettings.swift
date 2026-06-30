@@ -36,6 +36,7 @@ final class AppSettings {
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
         static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let logLevel = "settings.logLevel"
+        static let requireAuthForRecordings = "settings.requireAuthForRecordings"
     }
 
     private let defaults = UserDefaults.standard
@@ -74,6 +75,14 @@ final class AppSettings {
     /// ASR). Off by default; never replaces the post-recording transcript.
     var liveTranscriptionEnabled: Bool {
         didSet { defaults.set(liveTranscriptionEnabled, forKey: Keys.liveTranscriptionEnabled) }
+    }
+
+    /// When on, the recordings UI requires Face ID / Touch ID / passcode once
+    /// per foreground session before listing meetings or playing audio. Audio
+    /// files are always encrypted at rest by iOS Data Protection regardless
+    /// of this toggle. Defaults to on so the secure path is the default.
+    var requireAuthForRecordings: Bool {
+        didSet { defaults.set(requireAuthForRecordings, forKey: Keys.requireAuthForRecordings) }
     }
 
     /// Speaker diarization engine used by the transcription pipeline. Defaults
@@ -285,6 +294,9 @@ final class AppSettings {
             rawValue: defaults.string(forKey: Keys.audioQuality) ?? ""
         ) ?? .high
         liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
+        // `object(forKey:)` so an absent key defaults to `true` rather than
+        // `false` (which is what `defaults.bool(forKey:)` would return).
+        requireAuthForRecordings = defaults.object(forKey: Keys.requireAuthForRecordings) as? Bool ?? true
         diarizationEngine = DiarizationEngine(
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic

@@ -42,6 +42,7 @@ struct RecordingRecoveryTests {
 
         let recordings = try container.mainContext.fetch(FetchDescriptor<Recording>())
         #expect(recordings.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName).path))
         #expect(!FileManager.default.fileExists(atPath: AudioFileStore.documentsURL.appendingPathComponent(fileName).path))
     }
 
@@ -66,10 +67,11 @@ struct RecordingRecoveryTests {
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
-    /// Write a short 440 Hz tone directly into the real Documents directory
-    /// under `named`, mirroring how `AudioRecorderService` writes recordings.
+    /// Write a short 440 Hz tone directly into the protected recordings
+    /// directory under `named`, mirroring how `AudioRecorderService` writes
+    /// recordings in production.
     private static func makeToneFile(named fileName: String, seconds: Double) throws -> URL {
-        let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
+        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
         return try AudioFixtures.m4aTone(seconds: seconds, at: url)
     }
 }
