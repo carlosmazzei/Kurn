@@ -145,6 +145,44 @@ enum MeetingsSortOrder: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// Top-level library bucket selecting which meetings the list shows. Combines
+/// with date filters and search; cannot itself be saved per-meeting. `.all` is
+/// the inbox-style default and hides archived meetings; users see archived
+/// meetings only when explicitly selecting `.archive`.
+enum MeetingsLibraryBucket: String, Codable, Sendable, CaseIterable, Identifiable {
+    case all
+    case favorites
+    case archive
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .all: return NSLocalizedString("meetings.bucket.all", comment: "All meetings")
+        case .favorites: return NSLocalizedString("meetings.bucket.favorites", comment: "Favorites")
+        case .archive: return NSLocalizedString("meetings.bucket.archive", comment: "Archive")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: return "tray.full"
+        case .favorites: return "star.fill"
+        case .archive: return "archivebox"
+        }
+    }
+
+    /// Whether `meeting` belongs in this bucket given its current state. `.all`
+    /// hides archived meetings; the other buckets are explicit slices.
+    func contains(_ meeting: Meeting) -> Bool {
+        switch self {
+        case .all: return !meeting.isArchived
+        case .favorites: return meeting.isFavorite && !meeting.isArchived
+        case .archive: return meeting.isArchived
+        }
+    }
+}
+
 /// Recording audio quality, mapped to the encoder bit rate.
 enum AudioQuality: String, Codable, Sendable, CaseIterable, Identifiable {
     case high

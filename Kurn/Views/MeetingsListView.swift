@@ -3,9 +3,11 @@
 //  Kurn
 //
 //  Lists all meetings with a search field (full-text across titles, notes and
-//  transcripts), date filters, a configurable sort menu, status/summary chips,
-//  swipe-to-delete, a long-press context menu (rename / share / delete), and
-//  entry points for creating a meeting or opening settings.
+//  transcripts), library bucket (All / Favorites / Archive) + date filters, a
+//  configurable sort menu, status/summary chips, leading swipe for
+//  favorite/archive, trailing swipe for delete, a long-press context menu
+//  (favorite / archive / rename / share / delete), and entry points for
+//  creating a meeting or opening settings.
 //
 
 import SwiftData
@@ -52,6 +54,7 @@ struct MeetingsListView: View {
     @State private var shareItem: ShareItem?
     @State private var searchText = ""
     @State private var filter: MeetingDateFilter = .all
+    @State private var bucket: MeetingsLibraryBucket = .all
 
     private var isLocked: Bool {
         settings.requireAuthForRecordings && !accessGate.isUnlocked
@@ -59,10 +62,21 @@ struct MeetingsListView: View {
 
     private var filtered: [Meeting] {
         let searched = meetings.filter { meeting in
+            guard bucket.contains(meeting) else { return false }
             guard filter.matches(meeting.createdAt) else { return false }
             return meeting.matches(search: searchText)
         }
         return settings.meetingsSortOrder.apply(to: searched)
+    }
+
+    private func toggleFavorite(_ meeting: Meeting) {
+        meeting.isFavorite.toggle()
+        try? modelContext.save()
+    }
+
+    private func toggleArchive(_ meeting: Meeting) {
+        meeting.archivedAt = meeting.isArchived ? nil : Date()
+        try? modelContext.save()
     }
 
     var body: some View {
@@ -98,12 +112,53 @@ struct MeetingsListView: View {
                     }
                     .buttonStyle(.plain)
                     .clearListRow(insets: EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        Button { toggleFavorite(meeting) } label: {
+                            Label(
+                                meeting.isFavorite
+                                    ? NSLocalizedString("meetings.unfavorite", comment: "Unfavorite")
+                                    : NSLocalizedString("meetings.favorite", comment: "Favorite"),
+                                systemImage: meeting.isFavorite ? "star.slash" : "star"
+                            )
+                        }
+                        .tint(Theme.warning)
+                        Button { toggleArchive(meeting) } label: {
+                            Label(
+                                meeting.isArchived
+                                    ? NSLocalizedString("meetings.unarchive", comment: "Unarchive")
+                                    : NSLocalizedString("meetings.archive", comment: "Archive"),
+                                systemImage: meeting.isArchived ? "tray.and.arrow.up" : "archivebox"
+                            )
+                        }
+                        .tint(Theme.info)
+                    }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { pendingDelete = meeting } label: {
                             Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                         }
                     }
                     .contextMenu {
+                        Button {
+                            toggleFavorite(meeting)
+                        } label: {
+                            Label(
+                                meeting.isFavorite
+                                    ? NSLocalizedString("meetings.unfavorite", comment: "Unfavorite")
+                                    : NSLocalizedString("meetings.favorite", comment: "Favorite"),
+                                systemImage: meeting.isFavorite ? "star.slash" : "star"
+                            )
+                        }
+                        Button {
+                            toggleArchive(meeting)
+                        } label: {
+                            Label(
+                                meeting.isArchived
+                                    ? NSLocalizedString("meetings.unarchive", comment: "Unarchive")
+                                    : NSLocalizedString("meetings.archive", comment: "Archive"),
+                                systemImage: meeting.isArchived ? "tray.and.arrow.up" : "archivebox"
+                            )
+                        }
+                        Divider()
                         Button {
                             editingMeeting = meeting
                         } label: {
@@ -252,6 +307,7 @@ struct MeetingsListView: View {
 
     private var filterChips: some View {
         HStack(spacing: 8) {
+            bucketMenu
             ForEach(MeetingDateFilter.allCases) { option in
                 FilterChip(title: option.title, isSelected: filter == option) {
                     filter = option
@@ -260,6 +316,27 @@ struct MeetingsListView: View {
             Spacer()
             sortMenu
         }
+    }
+
+    private var bucketMenu: some View {
+        Menu {
+            Picker(
+                NSLocalizedString("meetings.bucket", comment: "Library bucket"),
+                selection: $bucket
+            ) {
+                ForEach(MeetingsLibraryBucket.allCases) { option in
+                    Label(option.displayName, systemImage: option.systemImage).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: bucket.systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(bucket == .all ? Theme.textSecondary : Theme.accent)
+                .frame(width: 32, height: 32)
+                .background(Theme.fill, in: Circle())
+        }
+        .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library bucket"))
+        .accessibilityValue(bucket.displayName)
     }
 
     private var sortMenu: some View {
@@ -367,6 +444,12 @@ private struct MeetingCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
+                if meeting.isFavorite {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(Theme.warning)
+                        .font(.system(size: 13))
+                        .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
+                }
                 Text(meeting.title)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
