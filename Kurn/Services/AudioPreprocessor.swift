@@ -2,7 +2,7 @@
 //  AudioPreprocessor.swift
 //  Kurn
 //
-//  Offline DSP cleanup applied to a recording before transcription/diarization.
+//  Offline DSP cleanup applied to a recording before transcription.
 //  Produces a temporary mono 16 kHz .m4a (the format Speech / Whisper prefer)
 //  with a speech-tuned filter chain:
 //

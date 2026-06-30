@@ -3,7 +3,7 @@
 //  Kurn
 //
 //  No-op preprocessing engine: feeds the original recording straight to the
-//  transcription/diarization engines with no DSP cleanup. Selected via
+//  transcription path with no DSP cleanup. Selected via
 //  `PreprocessingEngine.none` for users who prefer the raw audio (or want to
 //  skip the cleanup cost).
 //

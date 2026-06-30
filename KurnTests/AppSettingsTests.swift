@@ -21,7 +21,8 @@ struct AppSettingsTests {
         "settings.defaultLanguage", "settings.micPickup", "settings.audioQuality",
         "settings.summaryModels", "settings.summaryTemplates", "settings.lastSummaryTemplate",
         "settings.liveTranscriptionEnabled", "settings.diarizationEngine", "settings.transcriptionEngine",
-        "settings.preprocessingEngine", "settings.vadEngine", "settings.languageDetectionEngine",
+        "settings.diarizationPreprocessingEnabled", "settings.preprocessingEngine",
+        "settings.vadEngine", "settings.languageDetectionEngine",
         "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
         "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
         "settings.logLevel"
@@ -52,6 +53,7 @@ struct AppSettingsTests {
             settings.languageDetectionEngine = .fluidAudioLID
             settings.diarizationEngine = .fluidAudio
             settings.transcriptionEngine = .whisperAPI
+            settings.diarizationPreprocessingEnabled = false
 
             let config = settings.pipelineConfiguration
             #expect(config.preprocessing == .none)
@@ -59,6 +61,7 @@ struct AppSettingsTests {
             #expect(config.languageDetection == .fluidAudioLID)
             #expect(config.diarization == .fluidAudio)
             #expect(config.transcription == .whisperAPI)
+            #expect(config.diarizationPreprocessingEnabled == false)
         }
     }
 
