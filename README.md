@@ -276,6 +276,21 @@ Before shipping:
   flows.
 - Validate export output with real meeting data.
 
+## Acknowledgements
+
+On-device speech recognition, speaker diarization, and voice-activity detection
+are **Powered by [Fluid Inference](https://github.com/FluidInference/FluidAudio)**.
+Kurn depends on the [FluidAudio](https://github.com/FluidInference/FluidAudio)
+Swift package (Apache 2.0) and downloads several CoreML models on demand —
+NVIDIA Parakeet TDT for ASR, pyannote / WeSpeaker / NVIDIA Sortformer for
+diarization, and Silero VAD. Each carries its own license.
+
+The full attribution list and license details are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and the same notices are
+available in the app under **Settings → Acknowledgements**.
+
 ## License
 
-Kurn is released under the [MIT License](LICENSE).
+Kurn is released under the [MIT License](LICENSE). It includes and downloads
+third-party components under their own licenses; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

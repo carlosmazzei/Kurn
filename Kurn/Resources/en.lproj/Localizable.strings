@@ -260,6 +260,14 @@
 "settings.fluid_audio.package_missing" = "Add the FluidAudio Swift package to the Kurn target before using this feature.";
 "settings.models" = "On-Device Models";
 "settings.models_footer" = "Models are downloaded on demand and cached on device. Delete one to free space; it is downloaded again the next time you enable the feature.";
+
+/* About & acknowledgements */
+"settings.about" = "About";
+"settings.acknowledgements" = "Acknowledgements";
+"ack.intro" = "On-device speech recognition, speaker diarization, and voice-activity detection are powered by Fluid Inference. Kurn uses the FluidAudio package and downloads the machine-learning models below on demand. Each component is used under its own license.";
+"ack.packages" = "Swift Packages";
+"ack.models" = "Machine-Learning Models";
+"ack.footer" = "Models are downloaded on demand through FluidAudio and are not bundled in the app. Tap an item to open its project and full license. The NVIDIA Open Model License covering Sortformer has its own terms.";
 "settings.models.none" = "No models downloaded";
 "settings.models.live" = "Live Transcription";
 "settings.models.on_device_language" = "On-Device Language Detection";
