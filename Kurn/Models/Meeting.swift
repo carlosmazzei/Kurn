@@ -17,6 +17,15 @@ final class Meeting {
     var notes: String
     /// Stored raw value of `MeetingLanguage` for the transcription preference.
     var languageRaw: String
+    /// User-pinned meeting. Surfaced as a star on the card and as the
+    /// `Favorites` library bucket. Lightweight-additive: defaults to `false`
+    /// for meetings created before this field existed.
+    var isFavorite: Bool = false
+    /// When non-nil, the meeting is archived: hidden from the default list
+    /// but still in storage and accessible from the `Archive` library bucket.
+    /// Tracking the moment of archival lets future versions sort the Archive
+    /// view by "recently archived" without a second field.
+    var archivedAt: Date?
 
     // Deleting a meeting tears down everything that belongs to it.
     @Relationship(deleteRule: .cascade, inverse: \Recording.meeting)
@@ -33,17 +42,24 @@ final class Meeting {
         title: String,
         createdAt: Date = Date(),
         notes: String = "",
-        language: MeetingLanguage = .autoDetect
+        language: MeetingLanguage = .autoDetect,
+        isFavorite: Bool = false,
+        archivedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
         self.createdAt = createdAt
         self.notes = notes
         self.languageRaw = language.rawValue
+        self.isFavorite = isFavorite
+        self.archivedAt = archivedAt
         self.recordings = []
         self.speakers = []
         self.summary = nil
     }
+
+    /// Convenience: whether the meeting is currently archived.
+    var isArchived: Bool { archivedAt != nil }
 
     var language: MeetingLanguage {
         get { MeetingLanguage(rawValue: languageRaw) ?? .autoDetect }

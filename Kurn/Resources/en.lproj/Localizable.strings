@@ -92,6 +92,14 @@
 "meetings.sort.title_az" = "Title A–Z";
 "meetings.sort.duration_longest" = "Longest first";
 "meetings.sort.duration_shortest" = "Shortest first";
+"meetings.favorite" = "Favorite";
+"meetings.unfavorite" = "Unfavorite";
+"meetings.archive" = "Archive";
+"meetings.unarchive" = "Unarchive";
+"meetings.bucket" = "Library";
+"meetings.bucket.all" = "All";
+"meetings.bucket.favorites" = "Favorites";
+"meetings.bucket.archive" = "Archive";
 
 /* Common */
 "common.delete" = "Delete";

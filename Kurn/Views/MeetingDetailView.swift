@@ -382,12 +382,37 @@ struct MeetingDetailView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                meeting.isFavorite.toggle()
+                try? modelContext.save()
+            } label: {
+                Image(systemName: meeting.isFavorite ? "star.fill" : "star")
+                    .foregroundStyle(meeting.isFavorite ? Theme.warning : Theme.textSecondary)
+            }
+            .accessibilityLabel(
+                meeting.isFavorite
+                    ? NSLocalizedString("meetings.unfavorite", comment: "Unfavorite")
+                    : NSLocalizedString("meetings.favorite", comment: "Favorite")
+            )
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button { showingEdit = true } label: {
                     Label(NSLocalizedString("common.edit", comment: "Edit"), systemImage: "pencil")
                 }
                 Button { share() } label: {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
+                }
+                Button {
+                    meeting.archivedAt = meeting.isArchived ? nil : Date()
+                    try? modelContext.save()
+                } label: {
+                    Label(
+                        meeting.isArchived
+                            ? NSLocalizedString("meetings.unarchive", comment: "Unarchive")
+                            : NSLocalizedString("meetings.archive", comment: "Archive"),
+                        systemImage: meeting.isArchived ? "tray.and.arrow.up" : "archivebox"
+                    )
                 }
                 if meeting.hasAnyTranscript {
                     Button { pendingRetranscribeAll = true } label: {
