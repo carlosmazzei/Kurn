@@ -18,6 +18,12 @@ final class AudioPlayerService: NSObject {
     private(set) var duration: TimeInterval = 0
     /// File name currently loaded, so the UI can highlight the active recording.
     private(set) var loadedFileName: String?
+    /// Current playback speed multiplier (e.g. 0.5, 1.0, 1.5, 2.0). Persists
+    /// across loads/seeks so the user's choice sticks for the session.
+    private(set) var playbackRate: Float = 1.0
+
+    /// Speeds the user can cycle through, mirroring WhatsApp's voice-note control.
+    static let rateOptions: [Float] = [1.0, 1.5, 2.0, 0.5]
 
     private var player: AVAudioPlayer?
     private var timer: Timer?
@@ -33,6 +39,8 @@ final class AudioPlayerService: NSObject {
             try AVAudioSession.sharedInstance().setActive(true)
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = self
+            player.enableRate = true
+            player.rate = playbackRate
             player.prepareToPlay()
             self.player = player
             self.duration = player.duration
@@ -46,8 +54,23 @@ final class AudioPlayerService: NSObject {
     func play() {
         guard let player else { return }
         player.play()
+        player.rate = playbackRate
         isPlaying = true
         startTimer()
+    }
+
+    /// Set the playback speed, applying it live if a player is loaded.
+    func setRate(_ rate: Float) {
+        playbackRate = rate
+        player?.rate = rate
+    }
+
+    /// Advance to the next speed in `rateOptions`, wrapping around. Used by the
+    /// tappable speed pill in the player UI.
+    func cycleRate() {
+        let options = Self.rateOptions
+        let index = options.firstIndex(of: playbackRate) ?? 0
+        setRate(options[(index + 1) % options.count])
     }
 
     func pause() {

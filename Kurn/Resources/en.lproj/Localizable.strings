@@ -137,6 +137,7 @@
 "detail.segment_count" = "%d segments";
 "detail.recording_n" = "Recording %d";
 "detail.playback_position" = "Playback position";
+"detail.playback_speed" = "Playback speed";
 "detail.add_segment" = "Add segment";
 "detail.retranscribe" = "Re-transcribe";
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";

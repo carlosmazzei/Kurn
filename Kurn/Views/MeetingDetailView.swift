@@ -234,12 +234,18 @@ struct MeetingDetailView: View {
 
             if isTranscribing {
                 transcriptionProgressBar(phase: phase)
-            } else if isLoaded {
+            }
+            // Show the scrubber whenever this recording is the loaded one — even
+            // while transcription is still running, so playback started mid-
+            // transcription still surfaces the slider and speed control.
+            if isLoaded {
                 SegmentPlaybackScrubber(
                     currentTime: player.currentTime,
                     duration: player.duration > 0 ? player.duration : recording.duration,
                     isPlaying: player.isPlaying,
-                    onSeek: { player.seek(to: $0) }
+                    playbackRate: player.playbackRate,
+                    onSeek: { player.seek(to: $0) },
+                    onCycleRate: { player.cycleRate() }
                 )
             }
         }
@@ -258,65 +264,6 @@ struct MeetingDetailView: View {
             .progressViewStyle(.linear)
             .tint(Theme.accent)
             .animation(.easeInOut(duration: 0.25), value: fraction)
-    }
-
-    private struct SegmentPlaybackScrubber: View {
-        let currentTime: TimeInterval
-        let duration: TimeInterval
-        let isPlaying: Bool
-        let onSeek: (TimeInterval) -> Void
-
-        private var playableDuration: TimeInterval { max(duration, 0) }
-        private var sliderUpperBound: TimeInterval { max(playableDuration, 1) }
-        private var boundedCurrentTime: TimeInterval {
-            min(max(currentTime, 0), sliderUpperBound)
-        }
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                GeometryReader { proxy in
-                    let fraction = sliderUpperBound > 0 ? boundedCurrentTime / sliderUpperBound : 0
-                    let markerWidth: CGFloat = 54
-                    let markerX = min(
-                        max(markerWidth / 2, proxy.size.width * fraction),
-                        max(markerWidth / 2, proxy.size.width - markerWidth / 2)
-                    )
-
-                    Text(boundedCurrentTime.clockDisplay)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .frame(width: markerWidth, height: 22)
-                        .background(Theme.fill, in: Capsule())
-                        .position(x: markerX, y: 11)
-                }
-                .frame(height: 24)
-
-                Slider(
-                    value: Binding(
-                        get: { boundedCurrentTime },
-                        set: { onSeek($0) }
-                    ),
-                    in: 0...sliderUpperBound
-                )
-                .tint(Theme.accent)
-                .disabled(playableDuration <= 0)
-
-                HStack(spacing: 8) {
-                    Image(systemName: isPlaying ? "waveform" : "timer")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.textTertiary)
-                    Text("0:00")
-                    Spacer(minLength: 8)
-                    Text(playableDuration.clockDisplay)
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.textTertiary)
-            }
-            .padding(.leading, 46)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
-            .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
-        }
     }
 
     private var addSegmentButton: some View {
@@ -453,6 +400,83 @@ struct MeetingDetailView: View {
         }
     }
 
+}
+
+private struct SegmentPlaybackScrubber: View {
+    let currentTime: TimeInterval
+    let duration: TimeInterval
+    let isPlaying: Bool
+    let playbackRate: Float
+    let onSeek: (TimeInterval) -> Void
+    let onCycleRate: () -> Void
+
+    private var playableDuration: TimeInterval { max(duration, 0) }
+    private var sliderUpperBound: TimeInterval { max(playableDuration, 1) }
+    private var boundedCurrentTime: TimeInterval {
+        min(max(currentTime, 0), sliderUpperBound)
+    }
+
+    /// "1×", "1.5×", "0.5×" — `%g` drops trailing zeros and the decimal point.
+    private var rateLabel: String {
+        String(format: "%g×", playbackRate)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { proxy in
+                let fraction = sliderUpperBound > 0 ? boundedCurrentTime / sliderUpperBound : 0
+                let markerWidth: CGFloat = 54
+                let markerX = min(
+                    max(markerWidth / 2, proxy.size.width * fraction),
+                    max(markerWidth / 2, proxy.size.width - markerWidth / 2)
+                )
+
+                Text(boundedCurrentTime.clockDisplay)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .frame(width: markerWidth, height: 22)
+                    .background(Theme.fill, in: Capsule())
+                    .position(x: markerX, y: 11)
+            }
+            .frame(height: 24)
+
+            Slider(
+                value: Binding(
+                    get: { boundedCurrentTime },
+                    set: { onSeek($0) }
+                ),
+                in: 0...sliderUpperBound
+            )
+            .tint(Theme.accent)
+            .disabled(playableDuration <= 0)
+
+            HStack(spacing: 8) {
+                Image(systemName: isPlaying ? "waveform" : "timer")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.textTertiary)
+                Text("0:00")
+                Spacer(minLength: 8)
+                Button(action: onCycleRate) {
+                    Text(rateLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(minWidth: 34)
+                        .padding(.vertical, 3)
+                        .background(Theme.fill, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("detail.playback_speed", comment: "Playback speed"))
+                .accessibilityValue(rateLabel)
+                Text(playableDuration.clockDisplay)
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(Theme.textTertiary)
+        }
+        .padding(.leading, 46)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
+        .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
+    }
 }
 
 // MARK: - Actions & helpers
