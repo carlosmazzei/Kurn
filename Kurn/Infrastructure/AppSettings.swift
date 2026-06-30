@@ -94,9 +94,9 @@ final class AppSettings {
 
     /// When on, the diarization stage runs a dedicated lighter cleanup
     /// (`DiarizationPreprocessor`) on the original recording and feeds the
-    /// resulting WAV to both diarizer engines. When off, both diarizers reuse
-    /// the ASR-tuned `.m4a` produced by `AudioPreprocessor`. Defaults on; the
-    /// user can flip it to A/B the two paths on the same recording.
+    /// resulting WAV to both diarizer engines. When off, diarization uses the
+    /// original recording directly. It never reuses the ASR-tuned `.m4a`
+    /// produced by `AudioPreprocessor`.
     var diarizationPreprocessingEnabled: Bool {
         didSet { defaults.set(diarizationPreprocessingEnabled, forKey: Keys.diarizationPreprocessingEnabled) }
     }
@@ -107,7 +107,7 @@ final class AppSettings {
         didSet { defaults.set(transcriptionEngine.rawValue, forKey: Keys.transcriptionEngine) }
     }
 
-    /// Offline audio-cleanup engine applied before transcription/diarization.
+    /// Offline audio-cleanup engine applied before the transcription path.
     var preprocessingEngine: PreprocessingEngine {
         didSet { defaults.set(preprocessingEngine.rawValue, forKey: Keys.preprocessingEngine) }
     }

@@ -45,15 +45,15 @@ extension SettingsView {
             }
 
             // Audio cleanup/normalization.
-            Picker(
+            Toggle(
                 NSLocalizedString("pipeline.preprocessing", comment: "Audio cleanup"),
-                selection: Binding(
-                    get: { settings.preprocessingEngine },
-                    set: { settings.preprocessingEngine = $0 }
+                isOn: Binding(
+                    get: { settings.preprocessingEngine == .standardDSP },
+                    set: { enabled in
+                        settings.preprocessingEngine = enabled ? .standardDSP : .none
+                    }
                 )
-            ) {
-                ForEach(PreprocessingEngine.allCases) { Text($0.displayName).tag($0) }
-            }
+            )
 
             // Voice-activity detection.
             Picker(
@@ -98,9 +98,9 @@ extension SettingsView {
             }
             .disabled(downloadingModel != nil)
 
-            // Toggle the dedicated diarization preprocessor (lighter cleanup
-            // on the original recording, fed to both engines). When off, both
-            // engines reuse the ASR-tuned `.m4a`; useful for A/B comparison.
+            // Dedicated diarization cleanup. This controls only the
+            // diarization input; the ASR cleanup toggle above controls only the
+            // transcription path.
             Toggle(
                 NSLocalizedString("settings.diarization_preprocessing", comment: "Diarization audio cleanup"),
                 isOn: Binding(

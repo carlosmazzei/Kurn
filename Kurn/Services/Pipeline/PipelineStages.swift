@@ -15,7 +15,7 @@
 
 import Foundation
 
-/// Offline audio cleanup applied before transcription/diarization. The returned
+/// Offline audio cleanup applied before the transcription path. The returned
 /// URL may be the input unchanged (passthrough) or a temporary cleaned copy that
 /// the caller owns and should `cleanup` when done.
 protocol AudioPreprocessing: Sendable {
@@ -74,10 +74,8 @@ struct PipelineConfiguration: Sendable, Equatable {
     var fluidAudioMinSpeakers: Int = 0
     /// When true, the diarization stage runs a dedicated lighter cleanup on the
     /// original recording (`DiarizationPreprocessor`) and feeds the resulting
-    /// WAV to both diarizer engines, instead of reusing the ASR-cleaned `.m4a`
-    /// produced by `AudioPreprocessor`. The ASR-cleaned chain is tuned for
-    /// transcription clarity (AGC + compression + AAC re-encode) which flattens
-    /// the relative loudness and natural timbre that speaker-embedding and
-    /// pitch/timbre features rely on.
+    /// WAV to both diarizer engines. When false, diarization uses the original
+    /// recording directly; it never reuses the ASR-cleaned `.m4a` produced by
+    /// `AudioPreprocessor`.
     var diarizationPreprocessingEnabled: Bool = true
 }

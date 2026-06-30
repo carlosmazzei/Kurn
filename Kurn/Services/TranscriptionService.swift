@@ -63,9 +63,9 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
-        // 1. Clean the audio (selected preprocessing engine) before
-        // transcription/diarization. If cleanup fails for any reason we fall
-        // back to the original so transcription never breaks.
+        // 1. Clean the audio (selected preprocessing engine) for the
+        // transcription path. If cleanup fails for any reason we fall back to
+        // the original so transcription never breaks.
         onPhase(.preprocessing)
         let preprocessor = resolvePreprocessor(config.preprocessing)
         AppLog.transcription.atDebug.debug("transcribe: preprocessing (\(config.preprocessing.rawValue, privacy: .public))…")
@@ -123,16 +123,15 @@ struct TranscriptionService {
         // recording, push the process past its memory limit and get the app
         // jetsammed — so run those two stages sequentially.
         //
-        // Transcription always reads the ASR-tuned cleaned copy (16 kHz mono,
-        // known-readable AAC). Diarization gets its own input: when
-        // `diarizationPreprocessingEnabled` is on (default), a dedicated
-        // `DiarizationPreprocessor` builds a WAV from the *original* recording
-        // with minimal DSP (HP + spectral noise reduction + global peak
-        // normalization), preserving the natural timbre and relative loudness
-        // that speaker embeddings rely on but which the ASR chain's AGC +
-        // compression + AAC re-encode flatten. When off, both diarizers fall
-        // back to the same `cleanedURL` used by transcription so the user can
-        // A/B the two paths from Settings.
+        // Transcription always reads the ASR-tuned cleaned copy selected above
+        // (or the original when ASR cleanup is disabled). Diarization gets its
+        // own independent input: when `diarizationPreprocessingEnabled` is on
+        // (default), a dedicated `DiarizationPreprocessor` builds a WAV from
+        // the *original* recording with minimal DSP (HP + spectral noise
+        // reduction + global peak normalization), preserving the natural timbre
+        // and relative loudness that speaker embeddings rely on. When off,
+        // diarization uses the original recording directly; it never reuses the
+        // ASR chain's AGC + compression + AAC re-encode output.
         onPhase(.transcribing(progress: nil))
         let txStart = Date()
         let raw: RawTranscript
@@ -148,7 +147,6 @@ struct TranscriptionService {
             )
             async let speakerTurns = diarize(
                 originalURL: fileURL,
-                cleanedURL: cleanedURL,
                 engine: config.diarization,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 regions: regions,
@@ -168,7 +166,6 @@ struct TranscriptionService {
             )
             turns = try await diarize(
                 originalURL: fileURL,
-                cleanedURL: cleanedURL,
                 engine: config.diarization,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 regions: regions,
@@ -295,12 +292,11 @@ struct TranscriptionService {
     ///
     /// When `diarizationPreprocessingEnabled` is on, the original recording is
     /// passed through `DiarizationPreprocessor` to produce a minimally-cleaned
-    /// WAV that both engines consume; otherwise both fall back to the ASR-tuned
-    /// `cleanedURL`. The VAD `regions` are unchanged either way — they're
+    /// WAV that both engines consume; otherwise both consume the original
+    /// recording directly. The VAD `regions` are unchanged either way — they're
     /// timestamps on the absolute timeline, which the preprocessor preserves.
     private func diarize(
         originalURL: URL,
-        cleanedURL: URL,
         engine: DiarizationEngine,
         diarizationPreprocessingEnabled: Bool,
         regions: [SpeechRegion],
@@ -317,14 +313,14 @@ struct TranscriptionService {
                 AppLog.transcription.atInfo.info("diarize: using preprocessed input \(diarURL.lastPathComponent, privacy: .public)")
             } catch {
                 if let appError = ResourceGuard.appErrorIfResourceFailure(error) { throw appError }
-                AppLog.transcription.atError.error("diarize: preprocess failed, falling back to ASR-cleaned: \(error.localizedDescription, privacy: .public)")
-                diarURL = cleanedURL
+                AppLog.transcription.atError.error("diarize: preprocess failed, falling back to original: \(error.localizedDescription, privacy: .public)")
+                diarURL = originalURL
                 cleanupURL = nil
             }
         } else {
-            diarURL = cleanedURL
+            diarURL = originalURL
             cleanupURL = nil
-            AppLog.transcription.atDebug.debug("diarize: preprocessor disabled, using ASR-cleaned input")
+            AppLog.transcription.atDebug.debug("diarize: preprocessor disabled, using original input")
         }
         defer {
             if let url = cleanupURL {
