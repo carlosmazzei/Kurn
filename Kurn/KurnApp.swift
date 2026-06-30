@@ -20,18 +20,18 @@ struct KurnApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    /// One container for the whole app, persisted on disk.
+    /// One container for the whole app, persisted on disk. Built from the
+    /// current `KurnSchemaV2` via `KurnMigrationPlan`, which carries the
+    /// V1 → V2 lightweight stage so existing stores upgrade in place.
     let modelContainer: ModelContainer = {
-        let schema = Schema([
-            Meeting.self,
-            Recording.self,
-            Transcript.self,
-            Speaker.self,
-            Summary.self
-        ])
+        let schema = Schema(KurnSchemaV2.models)
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: KurnMigrationPlan.self,
+                configurations: [configuration]
+            )
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

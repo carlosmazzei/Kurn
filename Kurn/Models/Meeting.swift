@@ -26,6 +26,11 @@ final class Meeting {
     /// Tracking the moment of archival lets future versions sort the Archive
     /// view by "recently archived" without a second field.
     var archivedAt: Date?
+    /// Owning user folder, or `nil` when the meeting lives in the `Inbox`
+    /// virtual bucket. The inverse is defined on `Folder.meetings` with
+    /// `.nullify`, so deleting a folder detaches its meetings instead of
+    /// destroying them.
+    var folder: Folder?
 
     // Deleting a meeting tears down everything that belongs to it.
     @Relationship(deleteRule: .cascade, inverse: \Recording.meeting)
@@ -44,7 +49,8 @@ final class Meeting {
         notes: String = "",
         language: MeetingLanguage = .autoDetect,
         isFavorite: Bool = false,
-        archivedAt: Date? = nil
+        archivedAt: Date? = nil,
+        folder: Folder? = nil
     ) {
         self.id = id
         self.title = title
@@ -53,6 +59,7 @@ final class Meeting {
         self.languageRaw = language.rawValue
         self.isFavorite = isFavorite
         self.archivedAt = archivedAt
+        self.folder = folder
         self.recordings = []
         self.speakers = []
         self.summary = nil

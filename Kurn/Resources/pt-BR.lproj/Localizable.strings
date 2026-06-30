@@ -98,8 +98,21 @@
 "meetings.unarchive" = "Desarquivar";
 "meetings.bucket" = "Biblioteca";
 "meetings.bucket.all" = "Todas";
+"meetings.bucket.inbox" = "Caixa de Entrada";
 "meetings.bucket.favorites" = "Favoritas";
 "meetings.bucket.archive" = "Arquivo";
+"folder.section.library" = "Biblioteca";
+"folder.section.folders" = "Pastas";
+"folder.new" = "Nova Pasta";
+"folder.rename" = "Renomear";
+"folder.delete" = "Apagar";
+"folder.delete.confirm" = "Apagar esta pasta?";
+"folder.delete.message" = "As reuniões permanecem na Caixa de Entrada; apenas a pasta é removida.";
+"folder.move_to" = "Mover para Pasta";
+"folder.inbox" = "Caixa de Entrada (sem pasta)";
+"folder.name_placeholder" = "Nome da pasta";
+"folder.empty" = "Nenhuma pasta ainda. Toque em + para criar uma.";
+"folder.deleted" = "Pasta apagada";
 
 /* Comum */
 "common.delete" = "Excluir";

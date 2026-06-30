@@ -13,7 +13,10 @@ import SwiftData
 @MainActor
 enum TestModelContainer {
     static func make() -> ModelContainer {
-        let schema = Schema([Meeting.self, Recording.self, Speaker.self, Summary.self, Transcript.self])
+        // Tests use the current (V2) schema so new entities like `Folder` and
+        // V2-only fields are available; migration-specific tests build their
+        // own V1 containers.
+        let schema = Schema(KurnSchemaV2.models)
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])

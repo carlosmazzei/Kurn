@@ -3,11 +3,12 @@
 //  Kurn
 //
 //  Lists all meetings with a search field (full-text across titles, notes and
-//  transcripts), library bucket (All / Favorites / Archive) + date filters, a
-//  configurable sort menu, status/summary chips, leading swipe for
+//  transcripts), a library selector that opens a sidebar drawer (built-in
+//  buckets All / Inbox / Favorites / Archive plus user folders), date filters,
+//  a configurable sort menu, status/summary chips, leading swipe for
 //  favorite/archive, trailing swipe for delete, a long-press context menu
-//  (favorite / archive / rename / share / delete), and entry points for
-//  creating a meeting or opening settings.
+//  (favorite / archive / move to folder / rename / share / delete), and entry
+//  points for creating a meeting or opening settings.
 //
 
 import SwiftData
@@ -41,6 +42,7 @@ struct MeetingsListView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(RecordingAccessGate.self) private var accessGate
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
+    @Query private var folders: [Folder]
 
     @State private var showingSettings = false
     @State private var pendingDelete: Meeting?
@@ -54,15 +56,43 @@ struct MeetingsListView: View {
     @State private var shareItem: ShareItem?
     @State private var searchText = ""
     @State private var filter: MeetingDateFilter = .all
-    @State private var bucket: MeetingsLibraryBucket = .all
+    @State private var selection: LibrarySelection = .allMeetings
+    @State private var showingSidebar = false
+    /// Set when the context-menu "Move to folder…" action is invoked; presents
+    /// `FolderPickerView` against the chosen meeting.
+    @State private var movingMeeting: Meeting?
 
     private var isLocked: Bool {
         settings.requireAuthForRecordings && !accessGate.isUnlocked
     }
 
+    /// The currently-selected folder, looked up through the dedicated `@Query`
+    /// so renames and deletions reflect immediately in the chip title.
+    private var selectedFolder: Folder? {
+        guard case .folder(let id) = selection else { return nil }
+        return folders.first(where: { $0.persistentModelID == id })
+    }
+
+    /// Title shown in the chip row reflecting the current `selection`.
+    private var selectionTitle: String {
+        switch selection {
+        case .bucket(let bucket): return bucket.displayName
+        case .folder:
+            return selectedFolder?.name
+                ?? NSLocalizedString("folder.deleted", comment: "Deleted folder fallback")
+        }
+    }
+
+    private var selectionSystemImage: String {
+        switch selection {
+        case .bucket(let bucket): return bucket.systemImage
+        case .folder: return selectedFolder?.iconName ?? "folder"
+        }
+    }
+
     private var filtered: [Meeting] {
         let searched = meetings.filter { meeting in
-            guard bucket.contains(meeting) else { return false }
+            guard selection.contains(meeting) else { return false }
             guard filter.matches(meeting.createdAt) else { return false }
             return meeting.matches(search: searchText)
         }
@@ -158,6 +188,14 @@ struct MeetingsListView: View {
                                 systemImage: meeting.isArchived ? "tray.and.arrow.up" : "archivebox"
                             )
                         }
+                        Button {
+                            movingMeeting = meeting
+                        } label: {
+                            Label(
+                                NSLocalizedString("folder.move_to", comment: "Move to folder"),
+                                systemImage: "folder"
+                            )
+                        }
                         Divider()
                         Button {
                             editingMeeting = meeting
@@ -209,6 +247,13 @@ struct MeetingsListView: View {
         }
         .sheet(item: $shareItem) { item in
             ActivityView(items: [item.url])
+        }
+        .sheet(item: $movingMeeting) { meeting in
+            FolderPickerView(meeting: meeting)
+        }
+        .sheet(isPresented: $showingSidebar) {
+            FolderSidebarView(selection: $selection)
+                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
@@ -307,7 +352,7 @@ struct MeetingsListView: View {
 
     private var filterChips: some View {
         HStack(spacing: 8) {
-            bucketMenu
+            sidebarTrigger
             ForEach(MeetingDateFilter.allCases) { option in
                 FilterChip(title: option.title, isSelected: filter == option) {
                     filter = option
@@ -318,25 +363,29 @@ struct MeetingsListView: View {
         }
     }
 
-    private var bucketMenu: some View {
-        Menu {
-            Picker(
-                NSLocalizedString("meetings.bucket", comment: "Library bucket"),
-                selection: $bucket
-            ) {
-                ForEach(MeetingsLibraryBucket.allCases) { option in
-                    Label(option.displayName, systemImage: option.systemImage).tag(option)
-                }
+    /// Button on the chip row that opens `FolderSidebarView`. The label
+    /// mirrors the active selection (built-in bucket icon or folder icon +
+    /// name) so the user always sees what they're looking at.
+    private var sidebarTrigger: some View {
+        let isDefault = selection == .allMeetings
+        return Button { showingSidebar = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: selectionSystemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(selectionTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
             }
-        } label: {
-            Image(systemName: bucket.systemImage)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(bucket == .all ? Theme.textSecondary : Theme.accent)
-                .frame(width: 32, height: 32)
-                .background(Theme.fill, in: Circle())
+            .foregroundStyle(isDefault ? Theme.textSecondary : Theme.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Theme.fill, in: Capsule())
         }
-        .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library bucket"))
-        .accessibilityValue(bucket.displayName)
+        .buttonStyle(.plain)
+        .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
+        .accessibilityValue(selectionTitle)
     }
 
     private var sortMenu: some View {
