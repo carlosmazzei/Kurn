@@ -27,7 +27,8 @@ struct KurnApp: App {
             Recording.self,
             Transcript.self,
             Speaker.self,
-            Summary.self
+            Summary.self,
+            Folder.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

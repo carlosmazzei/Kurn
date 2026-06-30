@@ -13,7 +13,9 @@ import SwiftData
 @MainActor
 enum TestModelContainer {
     static func make() -> ModelContainer {
-        let schema = Schema([Meeting.self, Recording.self, Speaker.self, Summary.self, Transcript.self])
+        let schema = Schema([
+            Meeting.self, Recording.self, Speaker.self, Summary.self, Transcript.self, Folder.self
+        ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])

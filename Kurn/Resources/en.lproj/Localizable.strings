@@ -98,8 +98,21 @@
 "meetings.unarchive" = "Unarchive";
 "meetings.bucket" = "Library";
 "meetings.bucket.all" = "All";
+"meetings.bucket.inbox" = "Inbox";
 "meetings.bucket.favorites" = "Favorites";
 "meetings.bucket.archive" = "Archive";
+"folder.section.library" = "Library";
+"folder.section.folders" = "Folders";
+"folder.new" = "New Folder";
+"folder.rename" = "Rename";
+"folder.delete" = "Delete";
+"folder.delete.confirm" = "Delete this folder?";
+"folder.delete.message" = "Its meetings stay in the Inbox; only the folder is removed.";
+"folder.move_to" = "Move to Folder";
+"folder.inbox" = "Inbox (no folder)";
+"folder.name_placeholder" = "Folder name";
+"folder.empty" = "No folders yet. Tap + to create one.";
+"folder.deleted" = "Deleted folder";
 
 /* Common */
 "common.delete" = "Delete";
