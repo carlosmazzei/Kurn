@@ -37,6 +37,7 @@ final class AppSettings {
         static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let logLevel = "settings.logLevel"
         static let requireAuthForRecordings = "settings.requireAuthForRecordings"
+        static let meetingsSortOrder = "settings.meetingsSortOrder"
     }
 
     private let defaults = UserDefaults.standard
@@ -69,6 +70,12 @@ final class AppSettings {
     /// Recording audio quality (encoder bit rate). Defaults to high.
     var audioQuality: AudioQuality {
         didSet { defaults.set(audioQuality.rawValue, forKey: Keys.audioQuality) }
+    }
+
+    /// How the meetings list is sorted. Defaults to newest first to match the
+    /// previous hard-coded behavior. See `MeetingsSortOrder.apply(to:)`.
+    var meetingsSortOrder: MeetingsSortOrder {
+        didSet { defaults.set(meetingsSortOrder.rawValue, forKey: Keys.meetingsSortOrder) }
     }
 
     /// Opt-in live transcription preview during recording (FluidAudio streaming
@@ -293,6 +300,9 @@ final class AppSettings {
         audioQuality = AudioQuality(
             rawValue: defaults.string(forKey: Keys.audioQuality) ?? ""
         ) ?? .high
+        meetingsSortOrder = MeetingsSortOrder(
+            rawValue: defaults.string(forKey: Keys.meetingsSortOrder) ?? ""
+        ) ?? .dateNewest
         liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).

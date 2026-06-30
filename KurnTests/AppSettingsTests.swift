@@ -25,7 +25,7 @@ struct AppSettingsTests {
         "settings.vadEngine", "settings.languageDetectionEngine",
         "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
         "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
-        "settings.logLevel"
+        "settings.logLevel", "settings.meetingsSortOrder"
     ]
 
     /// Run `body` against a freshly-defaulted AppSettings, restoring the user's

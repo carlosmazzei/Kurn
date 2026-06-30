@@ -2,9 +2,10 @@
 //  MeetingsListView.swift
 //  Kurn
 //
-//  Lists all meetings (most recent first) with a search field, date filters,
-//  status/summary indicators, delete (confirmed), and entry points for creating
-//  a meeting or opening settings.
+//  Lists all meetings with a search field (full-text across titles, notes and
+//  transcripts), date filters, a configurable sort menu, status/summary chips,
+//  swipe-to-delete, a long-press context menu (rename / share / delete), and
+//  entry points for creating a meeting or opening settings.
 //
 
 import SwiftData
@@ -45,6 +46,10 @@ struct MeetingsListView: View {
     @State private var selectedMeeting: Meeting?
     /// Set when the center record button creates a meeting to record into.
     @State private var recordMeeting: Meeting?
+    /// Set by the context-menu "Rename" action; presents `MeetingFormView`.
+    @State private var editingMeeting: Meeting?
+    /// Set by the context-menu "Share" action; presents `ActivityView`.
+    @State private var shareItem: ShareItem?
     @State private var searchText = ""
     @State private var filter: MeetingDateFilter = .all
 
@@ -53,13 +58,11 @@ struct MeetingsListView: View {
     }
 
     private var filtered: [Meeting] {
-        meetings.filter { meeting in
+        let searched = meetings.filter { meeting in
             guard filter.matches(meeting.createdAt) else { return false }
-            guard !searchText.isEmpty else { return true }
-            let needle = searchText.lowercased()
-            return meeting.title.lowercased().contains(needle)
-                || preview(for: meeting).lowercased().contains(needle)
+            return meeting.matches(search: searchText)
         }
+        return settings.meetingsSortOrder.apply(to: searched)
     }
 
     var body: some View {
@@ -100,6 +103,33 @@ struct MeetingsListView: View {
                             Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                         }
                     }
+                    .contextMenu {
+                        Button {
+                            editingMeeting = meeting
+                        } label: {
+                            Label(
+                                NSLocalizedString("meetings.rename", comment: "Rename"),
+                                systemImage: "pencil"
+                            )
+                        }
+                        Button {
+                            share(meeting)
+                        } label: {
+                            Label(
+                                NSLocalizedString("detail.share", comment: "Share"),
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            pendingDelete = meeting
+                        } label: {
+                            Label(
+                                NSLocalizedString("common.delete", comment: "Delete"),
+                                systemImage: "trash"
+                            )
+                        }
+                    }
                 }
             }
 
@@ -118,6 +148,12 @@ struct MeetingsListView: View {
         }
         .sheet(item: $recordMeeting) { meeting in
             NavigationStack { RecorderView(meeting: meeting) }
+        }
+        .sheet(item: $editingMeeting) { meeting in
+            NavigationStack { MeetingFormView(meeting: meeting) }
+        }
+        .sheet(item: $shareItem) { item in
+            ActivityView(items: [item.url])
         }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
@@ -222,7 +258,36 @@ struct MeetingsListView: View {
                 }
             }
             Spacer()
+            sortMenu
         }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker(
+                NSLocalizedString("meetings.sort", comment: "Sort"),
+                selection: Binding(
+                    get: { settings.meetingsSortOrder },
+                    set: { settings.meetingsSortOrder = $0 }
+                )
+            ) {
+                ForEach(MeetingsSortOrder.allCases) { order in
+                    Label(order.displayName, systemImage: order.systemImage).tag(order)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 32, height: 32)
+                .background(Theme.fill, in: Circle())
+        }
+        .accessibilityLabel(NSLocalizedString("meetings.sort", comment: "Sort"))
+    }
+
+    private func share(_ meeting: Meeting) {
+        guard let url = try? MeetingExport.temporaryFile(for: meeting) else { return }
+        shareItem = ShareItem(url: url)
     }
 
     private var emptyState: some View {
@@ -322,6 +387,8 @@ private struct MeetingCard: View {
             .font(.system(size: 13))
             .foregroundStyle(Theme.textSecondary)
 
+            metaChips
+
             if !preview.isEmpty {
                 Text(preview)
                     .font(.system(size: 14))
@@ -330,5 +397,40 @@ private struct MeetingCard: View {
             }
         }
         .kurnCard()
+    }
+
+    /// Optional row of scannable chips: # speakers, # recordings, summary
+    /// template. Each chip only appears when it adds information (≥2 speakers,
+    /// >1 recording, template named).
+    @ViewBuilder
+    private var metaChips: some View {
+        let speakerCount = meeting.speakers.count
+        let recordingCount = meeting.recordings.count
+        let templateName = meeting.summary?.templateName ?? ""
+        if speakerCount >= 2 || recordingCount > 1 || !templateName.isEmpty {
+            HStack(spacing: 6) {
+                if speakerCount >= 2 {
+                    metaChip(systemImage: "person.2.fill", text: "\(speakerCount)")
+                }
+                if recordingCount > 1 {
+                    metaChip(systemImage: "waveform", text: "\(recordingCount)")
+                }
+                if !templateName.isEmpty {
+                    metaChip(systemImage: "doc.text", text: templateName)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func metaChip(systemImage: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage).font(.system(size: 10, weight: .semibold))
+            Text(text).font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(Theme.textSecondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Theme.fill, in: Capsule())
     }
 }

@@ -86,4 +86,22 @@ final class Meeting {
     var hasAnyTranscript: Bool {
         recordings.contains { $0.transcript != nil }
     }
+
+    /// Whether this meeting contains `needle` anywhere the meetings list
+    /// searches: title, notes, or any recording's transcript plain text. Cheap
+    /// string fields are checked first so the transcript JSON decode (per
+    /// `Transcript.plainText`) is skipped whenever an earlier field matches.
+    /// Match is case-insensitive and locale-aware. An empty `needle` matches.
+    func matches(search needle: String) -> Bool {
+        guard !needle.isEmpty else { return true }
+        if title.localizedCaseInsensitiveContains(needle) { return true }
+        if notes.localizedCaseInsensitiveContains(needle) { return true }
+        for recording in recordings {
+            if let plain = recording.transcript?.plainText,
+               plain.localizedCaseInsensitiveContains(needle) {
+                return true
+            }
+        }
+        return false
+    }
 }

@@ -85,6 +85,13 @@
 "meetings.empty.title" = "No Meetings Yet";
 "meetings.empty.subtitle" = "Tap + to create your first meeting and start recording.";
 "meetings.delete.confirm" = "Delete this meeting and its recordings?";
+"meetings.rename" = "Rename";
+"meetings.sort" = "Sort";
+"meetings.sort.date_newest" = "Newest first";
+"meetings.sort.date_oldest" = "Oldest first";
+"meetings.sort.title_az" = "Title A–Z";
+"meetings.sort.duration_longest" = "Longest first";
+"meetings.sort.duration_shortest" = "Shortest first";
 
 /* Common */
 "common.delete" = "Delete";

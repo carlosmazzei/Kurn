@@ -85,6 +85,13 @@
 "meetings.empty.title" = "Nenhuma Reunião";
 "meetings.empty.subtitle" = "Toque em + para criar sua primeira reunião e começar a gravar.";
 "meetings.delete.confirm" = "Excluir esta reunião e suas gravações?";
+"meetings.rename" = "Renomear";
+"meetings.sort" = "Ordenar";
+"meetings.sort.date_newest" = "Mais recentes primeiro";
+"meetings.sort.date_oldest" = "Mais antigas primeiro";
+"meetings.sort.title_az" = "Título A–Z";
+"meetings.sort.duration_longest" = "Mais longas primeiro";
+"meetings.sort.duration_shortest" = "Mais curtas primeiro";
 
 /* Comum */
 "common.delete" = "Excluir";
