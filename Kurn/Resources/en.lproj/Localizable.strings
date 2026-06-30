@@ -113,6 +113,11 @@
 "folder.name_placeholder" = "Folder name";
 "folder.empty" = "No folders yet. Tap + to create one.";
 "folder.deleted" = "Deleted folder";
+"folder.icon" = "Icon";
+"folder.color" = "Color";
+"folder.section.subfolders" = "Subfolders";
+"folder.select_this" = "Select this folder";
+"folder.open_subfolders" = "Open subfolders";
 
 /* Common */
 "common.delete" = "Delete";

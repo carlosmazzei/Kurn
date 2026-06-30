@@ -113,6 +113,11 @@
 "folder.name_placeholder" = "Nome da pasta";
 "folder.empty" = "Nenhuma pasta ainda. Toque em + para criar uma.";
 "folder.deleted" = "Pasta apagada";
+"folder.icon" = "Ícone";
+"folder.color" = "Cor";
+"folder.section.subfolders" = "Subpastas";
+"folder.select_this" = "Selecionar esta pasta";
+"folder.open_subfolders" = "Abrir subpastas";
 
 /* Comum */
 "common.delete" = "Excluir";

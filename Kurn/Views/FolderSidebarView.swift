@@ -3,11 +3,14 @@
 //  Kurn
 //
 //  Sheet-presented drawer that drives the `LibrarySelection` shown by
-//  `MeetingsListView`. Lists every built-in bucket (All / Inbox / Favorites /
-//  Archive) with its count, then the user's root folders (subfolders are
-//  hidden until a follow-up adds breadcrumb navigation). Includes inline
-//  create / rename / delete; delete is `.nullify`, so meetings only move back
-//  to the Inbox — their audio, transcripts and summaries are preserved.
+//  `MeetingsListView`. The root level lists every built-in bucket
+//  (All / Inbox / Favorites / Archive) and the user's root folders; tapping a
+//  folder's row body selects it and closes the sheet, while tapping the
+//  trailing chevron drills into its subfolders (with breadcrumb via the
+//  enclosing NavigationStack). "+ New" always creates a folder at the level
+//  the user is currently looking at. Deletion uses `.nullify`, so meetings
+//  only move back to the Inbox — their audio, transcripts and summaries are
+//  preserved.
 //
 
 import SwiftData
@@ -23,106 +26,123 @@ struct FolderSidebarView: View {
     @Query(filter: #Predicate<Folder> { $0.parent == nil }, sort: \Folder.createdAt)
     private var rootFolders: [Folder]
 
-    @State private var creatingFolder = false
-    @State private var newFolderName = ""
-    @State private var renaming: Folder?
-    @State private var renameText = ""
+    /// Chain of folders the user has drilled into, oldest first. Driven by
+    /// `NavigationStack(path:)` so the system back gesture / button restores
+    /// state automatically.
+    @State private var path: [Folder] = []
+    /// Set by the "+ New" button. Wraps the parent context (root or current
+    /// drill-down folder) so the form knows where to insert the new folder.
+    @State private var creating: NewFolderContext?
+    @State private var editing: Folder?
     @State private var pendingDelete: Folder?
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section(NSLocalizedString("folder.section.library", comment: "Library")) {
-                    ForEach(MeetingsLibraryBucket.allCases) { bucket in
-                        bucketRow(bucket)
-                    }
+        NavigationStack(path: $path) {
+            rootContent
+                .navigationDestination(for: Folder.self) { folder in
+                    childrenContent(of: folder)
                 }
-                Section {
-                    if rootFolders.isEmpty {
-                        Text(NSLocalizedString("folder.empty", comment: "No folders yet"))
-                            .font(.footnote)
-                            .foregroundStyle(Theme.textTertiary)
-                    } else {
-                        ForEach(rootFolders) { folder in
-                            folderRow(folder)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text(NSLocalizedString("folder.section.folders", comment: "Folders"))
-                        Spacer()
-                        Button {
-                            newFolderName = ""
-                            creatingFolder = true
-                        } label: {
-                            Label(
-                                NSLocalizedString("folder.new", comment: "New folder"),
-                                systemImage: "plus.circle.fill"
-                            )
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(Theme.accent)
-                        }
-                        .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
-                    }
-                }
-            }
-            .navigationTitle(NSLocalizedString("meetings.bucket", comment: "Library"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+        }
+        .sheet(item: $creating) { ctx in
+            FolderFormView(mode: .create(parent: ctx.parent))
+        }
+        .sheet(item: $editing) { folder in
+            FolderFormView(mode: .edit(folder))
+        }
+        .kurnDialog(
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            iconSystemName: "archivebox.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("folder.delete.confirm", comment: "Delete folder?"),
+            message: NSLocalizedString("folder.delete.message", comment: "Meetings go to Inbox"),
+            primaryTitle: NSLocalizedString("folder.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: {
+                if let folder = pendingDelete { deleteFolder(folder) }
+                pendingDelete = nil
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
+            secondaryAction: { pendingDelete = nil }
+        )
+    }
+
+    // MARK: - Root level
+
+    private var rootContent: some View {
+        List {
+            Section(NSLocalizedString("folder.section.library", comment: "Library")) {
+                ForEach(MeetingsLibraryBucket.allCases) { bucket in
+                    bucketRow(bucket)
                 }
             }
-            .alert(
-                NSLocalizedString("folder.new", comment: "New folder"),
-                isPresented: $creatingFolder
-            ) {
-                TextField(
-                    NSLocalizedString("folder.name_placeholder", comment: "Folder name"),
-                    text: $newFolderName
-                )
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {}
-                Button(NSLocalizedString("common.save", comment: "Save")) {
-                    createFolder()
+            folderSection(folders: rootFolders, parent: nil)
+        }
+        .navigationTitle(NSLocalizedString("meetings.bucket", comment: "Library"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
+            }
+        }
+    }
+
+    // MARK: - Drilled-in level
+
+    private func childrenContent(of parent: Folder) -> some View {
+        List {
+            folderSection(folders: parent.children.sorted(by: { $0.createdAt < $1.createdAt }),
+                          parent: parent)
+        }
+        .navigationTitle(parent.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    selection = .folder(parent.persistentModelID)
+                    dismiss()
+                } label: {
+                    Label(
+                        NSLocalizedString("folder.select_this", comment: "Select this folder"),
+                        systemImage: "checkmark.circle"
+                    )
+                }
+                .accessibilityLabel(NSLocalizedString("folder.select_this", comment: "Select this folder"))
+            }
+        }
+    }
+
+    // MARK: - Reusable folder section
+
+    @ViewBuilder
+    private func folderSection(folders: [Folder], parent: Folder?) -> some View {
+        Section {
+            if folders.isEmpty {
+                Text(NSLocalizedString("folder.empty", comment: "No folders yet"))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textTertiary)
+            } else {
+                ForEach(folders) { folder in
+                    folderRow(folder)
                 }
             }
-            .alert(
-                NSLocalizedString("folder.rename", comment: "Rename folder"),
-                isPresented: Binding(
-                    get: { renaming != nil },
-                    set: { if !$0 { renaming = nil } }
-                )
-            ) {
-                TextField(
-                    NSLocalizedString("folder.name_placeholder", comment: "Folder name"),
-                    text: $renameText
-                )
-                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {
-                    renaming = nil
+        } header: {
+            HStack {
+                Text(parent == nil
+                     ? NSLocalizedString("folder.section.folders", comment: "Folders")
+                     : NSLocalizedString("folder.section.subfolders", comment: "Subfolders"))
+                Spacer()
+                Button {
+                    creating = NewFolderContext(parent: parent)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.accent)
                 }
-                Button(NSLocalizedString("common.save", comment: "Save")) {
-                    commitRename()
-                }
+                .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
             }
-            .kurnDialog(
-                isPresented: Binding(
-                    get: { pendingDelete != nil },
-                    set: { if !$0 { pendingDelete = nil } }
-                ),
-                iconSystemName: "archivebox.fill",
-                iconTint: Theme.warning,
-                title: NSLocalizedString("folder.delete.confirm", comment: "Delete folder?"),
-                message: NSLocalizedString("folder.delete.message", comment: "Meetings go to Inbox"),
-                primaryTitle: NSLocalizedString("folder.delete", comment: "Delete"),
-                primaryRole: .destructive,
-                primaryAction: {
-                    if let folder = pendingDelete { deleteFolder(folder) }
-                    pendingDelete = nil
-                },
-                secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
-                secondaryAction: { pendingDelete = nil }
-            )
         }
     }
 
@@ -159,29 +179,45 @@ struct FolderSidebarView: View {
     private func folderRow(_ folder: Folder) -> some View {
         let isSelected = selection == .folder(folder.persistentModelID)
         let count = folder.meetings.count
-        return Button {
-            selection = .folder(folder.persistentModelID)
-            dismiss()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: folder.iconName)
-                    .frame(width: 26, alignment: .center)
-                    .foregroundStyle(Color(hex: folder.colorHex))
-                Text(folder.name)
-                    .foregroundStyle(Theme.textPrimary)
-                Spacer()
-                Text("\(count)")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.textTertiary)
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
+        let hasChildren = !folder.children.isEmpty
+        return HStack(spacing: 0) {
+            Button {
+                selection = .folder(folder.persistentModelID)
+                dismiss()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: folder.iconName)
+                        .frame(width: 26, alignment: .center)
+                        .foregroundStyle(Color(hex: folder.colorHex))
+                    Text(folder.name)
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Text("\(count)")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textTertiary)
+                    if isSelected {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if hasChildren {
+                Button { path.append(folder) } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.textTertiary)
+                        .padding(.leading, 10)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
+            }
         }
-        .buttonStyle(.plain)
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 pendingDelete = folder
@@ -189,10 +225,9 @@ struct FolderSidebarView: View {
                 Label(NSLocalizedString("folder.delete", comment: "Delete"), systemImage: "trash")
             }
             Button {
-                renameText = folder.name
-                renaming = folder
+                editing = folder
             } label: {
-                Label(NSLocalizedString("folder.rename", comment: "Rename"), systemImage: "pencil")
+                Label(NSLocalizedString("folder.rename", comment: "Edit"), systemImage: "pencil")
             }
             .tint(Theme.info)
         }
@@ -200,31 +235,24 @@ struct FolderSidebarView: View {
 
     // MARK: - Mutations
 
-    private func createFolder() {
-        let trimmed = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let folder = Folder(name: trimmed)
-        modelContext.insert(folder)
-        try? modelContext.save()
-    }
-
-    private func commitRename() {
-        guard let folder = renaming else { return }
-        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            folder.name = trimmed
-            try? modelContext.save()
-        }
-        renaming = nil
-    }
-
     private func deleteFolder(_ folder: Folder) {
-        // The relationship rule is .nullify on both sides, so SwiftData detaches
-        // child meetings and subfolders automatically. Nothing else to do.
+        // Relationship rule is .nullify on both sides, so SwiftData detaches
+        // child meetings and subfolders automatically.
         if selection == .folder(folder.persistentModelID) {
             selection = .bucket(.all)
         }
+        // If the user is currently drilled into this folder, pop back so the
+        // navigation stack does not point at a deleted model.
+        path.removeAll { $0.persistentModelID == folder.persistentModelID }
         modelContext.delete(folder)
         try? modelContext.save()
     }
+}
+
+/// Wrapper used to identify the parent context for a folder being created so
+/// `sheet(item:)` can drive the create flow with a single state variable for
+/// both root and subfolder cases.
+private struct NewFolderContext: Identifiable {
+    let id = UUID()
+    let parent: Folder?
 }
