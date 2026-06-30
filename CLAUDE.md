@@ -167,3 +167,7 @@ logging gate reflects the user's choice immediately (also synced once on init).
 - **Tests:** Swift Testing (`@Test`, `#expect`). Use
   `TestModelContainer.make()` for an in-memory `ModelContainer` when exercising real
   SwiftData relationship behavior.
+- **Git & PRs:** write all commit messages and pull request titles/descriptions in
+  English, regardless of the language used in chat. (User-facing app strings are
+  still localized per the localization convention above — this rule is only about
+  repository metadata.)
