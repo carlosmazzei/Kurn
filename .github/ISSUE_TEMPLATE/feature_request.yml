@@ -1,0 +1,84 @@
+name: Feature request
+description: Suggest a new feature or enhancement for Kurn.
+title: "[Feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement!
+        For substantial changes (new screens, new services, new providers, large
+        refactors), opening this issue **before** sending a pull request helps
+        align on the approach.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions and did not find a duplicate.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What problem are you trying to solve? Who benefits?
+      placeholder: |
+        Today, when I ..., I have to ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work? Sketches, mockups, or links welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider, and why did you discard them?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app does this affect?
+      options:
+        - Recording
+        - Transcription
+        - Speaker diarization
+        - AI summary / providers
+        - Live Activity / Dynamic Island
+        - Apple Watch companion
+        - Settings
+        - Export
+        - Localization
+        - New platform
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: local-first
+    attributes:
+      label: Local-first considerations
+      description: |
+        Kurn is local-first — data stays on device by default and network calls
+        only happen when the user opts in. Please confirm:
+      options:
+        - label: This feature can be designed in a way that keeps user data local by default (or makes any cloud round-trip explicit and opt-in).
+          required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Anything else we should know.
+      required: false

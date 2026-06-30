@@ -1,0 +1,132 @@
+name: Bug report
+description: Report a reproducible problem in Kurn (iOS app, Watch app, or Live Activity).
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report!
+        Please **do not** report security issues here — use
+        [Private Vulnerability Reporting](https://github.com/carlosmazzei/Kurn/security/advisories/new)
+        instead.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I am running the latest version on the `main` branch (or the latest tagged release).
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear, concise description of the bug.
+      placeholder: When I do X, Y happens instead of Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps so we can reproduce locally.
+      placeholder: |
+        1. Open the app
+        2. Start a recording
+        3. Lock the screen
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages, logs, or screenshots if you have them.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app is affected?
+      options:
+        - Recording (audio capture / pause / resume)
+        - Transcription (on-device)
+        - Transcription (OpenAI Whisper)
+        - Speaker diarization
+        - AI summary
+        - Live Activity / Dynamic Island
+        - Apple Watch companion
+        - Settings / API keys / Keychain
+        - Export (Markdown)
+        - Localization
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: e.g. iPhone 15 Pro, iPad Air (5th gen), Apple Watch Series 9
+      placeholder: iPhone 15 Pro
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS version
+      description: iOS / iPadOS / watchOS version
+      placeholder: iOS 17.5
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version / commit
+      description: App version from Settings, or the commit SHA you built from.
+      placeholder: 0.x.y or commit abcdef0
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: AI provider (if relevant)
+      description: Which provider was selected when the bug happened?
+      options:
+        - Not applicable
+        - OpenAI
+        - Anthropic
+        - Google AI
+        - Groq
+        - Other / custom
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / additional context
+      description: |
+        Console output, screenshots, recordings, or anything else that helps.
+        **Do not paste API keys, full transcripts, or other private data.**
+      render: text
+    validations:
+      required: false
