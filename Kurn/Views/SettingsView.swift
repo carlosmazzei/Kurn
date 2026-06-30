@@ -141,6 +141,18 @@ struct SettingsView: View {
             // MARK: Downloaded models
             modelsSection
 
+            // MARK: About
+            Section(NSLocalizedString("settings.about", comment: "About")) {
+                NavigationLink {
+                    AcknowledgementsView()
+                } label: {
+                    Label(
+                        NSLocalizedString("settings.acknowledgements", comment: "Acknowledgements"),
+                        systemImage: "doc.text"
+                    )
+                }
+            }
+
             Section {
                 Button(role: .destructive) { showingDeleteConfirm = true } label: {
                     Text(NSLocalizedString("settings.delete_all", comment: "Delete All Data"))
