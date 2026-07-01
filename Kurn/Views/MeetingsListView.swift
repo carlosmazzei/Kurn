@@ -14,35 +14,13 @@
 import SwiftData
 import SwiftUI
 
-/// Date-range filter for the meetings list.
-private enum MeetingDateFilter: String, CaseIterable, Identifiable {
-    case all, today, thisWeek
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: return NSLocalizedString("filter.all", comment: "All")
-        case .today: return NSLocalizedString("filter.today", comment: "Today")
-        case .thisWeek: return NSLocalizedString("filter.this_week", comment: "This week")
-        }
-    }
-
-    func matches(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        switch self {
-        case .all: return true
-        case .today: return calendar.isDateInToday(date)
-        case .thisWeek:
-            return calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear)
-        }
-    }
-}
-
 struct MeetingsListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppSettings.self) private var settings
     @Environment(RecordingAccessGate.self) private var accessGate
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
+    @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
 
     @State private var showingSettings = false
     @State private var pendingDelete: Meeting?
@@ -55,12 +33,16 @@ struct MeetingsListView: View {
     /// Set by the context-menu "Share" action; presents `ActivityView`.
     @State private var shareItem: ShareItem?
     @State private var searchText = ""
-    @State private var filter: MeetingDateFilter = .all
+    @State private var filter = MeetingFilter()
     @State private var selection: LibrarySelection = .allMeetings
     @State private var showingSidebar = false
+    @State private var showingFilterBar = false
     /// Set when the context-menu "Move to folder…" action is invoked; presents
     /// `FolderPickerView` against the chosen meeting.
     @State private var movingMeeting: Meeting?
+    /// Set when the context-menu "Edit tags" action is invoked; presents
+    /// `TagPickerView` against the chosen meeting.
+    @State private var taggingMeeting: Meeting?
 
     private var isLocked: Bool {
         settings.requireAuthForRecordings && !accessGate.isUnlocked
@@ -73,6 +55,12 @@ struct MeetingsListView: View {
         return folders.first(where: { $0.persistentModelID == id })
     }
 
+    /// The currently-selected smart folder, if any.
+    private var selectedSmartFolder: SmartFolder? {
+        guard case .smartFolder(let id) = selection else { return nil }
+        return smartFolders.first(where: { $0.id == id })
+    }
+
     /// Title shown in the chip row reflecting the current `selection`.
     private var selectionTitle: String {
         switch selection {
@@ -80,6 +68,9 @@ struct MeetingsListView: View {
         case .folder:
             return selectedFolder?.name
                 ?? NSLocalizedString("folder.deleted", comment: "Deleted folder fallback")
+        case .smartFolder:
+            return selectedSmartFolder?.name
+                ?? NSLocalizedString("folder.deleted", comment: "Deleted smart folder fallback")
         }
     }
 
@@ -87,13 +78,18 @@ struct MeetingsListView: View {
         switch selection {
         case .bucket(let bucket): return bucket.systemImage
         case .folder: return selectedFolder?.iconName ?? "folder"
+        case .smartFolder: return selectedSmartFolder?.iconName ?? "sparkles.square.fill.on.square"
         }
+    }
+
+    private var smartFolderFilter: MeetingFilter? {
+        selectedSmartFolder?.filter
     }
 
     private var filtered: [Meeting] {
         let searched = meetings.filter { meeting in
-            guard selection.contains(meeting) else { return false }
-            guard filter.matches(meeting.createdAt) else { return false }
+            guard selection.contains(meeting, smartFolderFilter: smartFolderFilter) else { return false }
+            guard filter.matches(meeting) else { return false }
             return meeting.matches(search: searchText)
         }
         return settings.meetingsSortOrder.apply(to: searched)
@@ -111,7 +107,7 @@ struct MeetingsListView: View {
 
     var body: some View {
         if isLocked {
-            LockedRecordingsView(gate: accessGate)
+            LockedRecordingsView(gate: accessGate, showingSettings: $showingSettings)
                 .background(Theme.background.ignoresSafeArea())
                 .toolbar(.hidden, for: .navigationBar)
                 .task { await accessGate.authenticate() }
@@ -196,6 +192,14 @@ struct MeetingsListView: View {
                                 systemImage: "folder"
                             )
                         }
+                        Button {
+                            taggingMeeting = meeting
+                        } label: {
+                            Label(
+                                NSLocalizedString("meetings.tag.edit", comment: "Edit tags"),
+                                systemImage: "tag"
+                            )
+                        }
                         Divider()
                         Button {
                             editingMeeting = meeting
@@ -251,9 +255,15 @@ struct MeetingsListView: View {
         .sheet(item: $movingMeeting) { meeting in
             FolderPickerView(meeting: meeting)
         }
+        .sheet(item: $taggingMeeting) { meeting in
+            TagPickerView(meeting: meeting)
+        }
         .sheet(isPresented: $showingSidebar) {
             FolderSidebarView(selection: $selection)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingFilterBar) {
+            FilterBarView(filter: $filter)
         }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
@@ -281,11 +291,17 @@ struct MeetingsListView: View {
         )
     }
 
-    // MARK: - Subviews
+    private func share(_ meeting: Meeting) {
+        guard let url = try? MeetingExport.temporaryFile(for: meeting) else { return }
+        shareItem = ShareItem(url: url)
+    }
+}
 
-    // MARK: - Bottom bar
+// MARK: - Subviews (kept out of the struct body to stay under the linter limit)
 
-    private var bottomBar: some View {
+extension MeetingsListView {
+
+    var bottomBar: some View {
         HStack(alignment: .center) {
             bottomTab(icon: "square.grid.2x2.fill",
                       label: NSLocalizedString("tab.meetings", comment: "Meetings"),
@@ -303,7 +319,7 @@ struct MeetingsListView: View {
         .overlay(alignment: .top) { recordButton.offset(y: -26) }
     }
 
-    private func bottomTab(icon: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
+    func bottomTab(icon: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Image(systemName: icon).font(.system(size: 18))
@@ -314,7 +330,7 @@ struct MeetingsListView: View {
         .buttonStyle(.plain)
     }
 
-    private var recordButton: some View {
+    var recordButton: some View {
         Button {
             let meeting = MeetingsViewModel(modelContext: modelContext).createMeeting(title: "")
             recordMeeting = meeting
@@ -329,7 +345,7 @@ struct MeetingsListView: View {
         .accessibilityLabel(Text(NSLocalizedString("meetings.new", comment: "New Meeting")))
     }
 
-    private var searchField: some View {
+    var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(Theme.textTertiary)
@@ -350,23 +366,52 @@ struct MeetingsListView: View {
         .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private var filterChips: some View {
-        HStack(spacing: 8) {
-            sidebarTrigger
-            ForEach(MeetingDateFilter.allCases) { option in
-                FilterChip(title: option.title, isSelected: filter == option) {
-                    filter = option
+    var filterChips: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                sidebarTrigger
+                filterMenu
+                Spacer()
+                sortMenu
+            }
+            HStack(spacing: 8) {
+                ForEach(MeetingDateFilter.allCases) { option in
+                    FilterChip(
+                        title: option.title,
+                        isSelected: filter.dateRange == option,
+                        tint: filter.dateRange == option ? Theme.accent : .primary
+                    ) {
+                        filter.dateRange = option
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    var filterMenu: some View {
+        Button { showingFilterBar = true } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 12, weight: .semibold))
+                if filter.isActive {
+                    Text("\(filter.activeCount)")
+                        .font(.system(size: 11, weight: .semibold))
                 }
             }
-            Spacer()
-            sortMenu
+            .foregroundStyle(filter.isActive ? Theme.accent : Theme.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Theme.fill, in: Capsule())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(NSLocalizedString("filter.title", comment: "Filters"))
     }
 
     /// Button on the chip row that opens `FolderSidebarView`. The label
     /// mirrors the active selection (built-in bucket icon or folder icon +
     /// name) so the user always sees what they're looking at.
-    private var sidebarTrigger: some View {
+    var sidebarTrigger: some View {
         let isDefault = selection == .allMeetings
         return Button { showingSidebar = true } label: {
             HStack(spacing: 6) {
@@ -388,7 +433,7 @@ struct MeetingsListView: View {
         .accessibilityValue(selectionTitle)
     }
 
-    private var sortMenu: some View {
+    var sortMenu: some View {
         Menu {
             Picker(
                 NSLocalizedString("meetings.sort", comment: "Sort"),
@@ -411,12 +456,7 @@ struct MeetingsListView: View {
         .accessibilityLabel(NSLocalizedString("meetings.sort", comment: "Sort"))
     }
 
-    private func share(_ meeting: Meeting) {
-        guard let url = try? MeetingExport.temporaryFile(for: meeting) else { return }
-        shareItem = ShareItem(url: url)
-    }
-
-    private var emptyState: some View {
+    var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: "mic.fill")
                 .font(.largeTitle)
@@ -432,137 +472,10 @@ struct MeetingsListView: View {
         .padding(.top, 80)
     }
 
-    private func preview(for meeting: Meeting) -> String {
-        if let segment = meeting.recordings
+    func preview(for meeting: Meeting) -> String {
+        meeting.recordings
             .sorted(by: { $0.recordedAt < $1.recordedAt })
-            .compactMap({ $0.transcript?.segments.first?.text })
-            .first {
-            return segment
-        }
-        return meeting.notes
-    }
-}
-
-/// Full-screen overlay shown in place of the meetings list while the gate is
-/// locked. Triggers authentication automatically when it appears and offers a
-/// retry button when the user cancels the prompt or biometrics fail.
-private struct LockedRecordingsView: View {
-    let gate: RecordingAccessGate
-
-    var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(Theme.textSecondary)
-            Text(NSLocalizedString("recordings.locked_title", comment: "Recordings Locked"))
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-            Text(NSLocalizedString("recordings.locked_subtitle", comment: "Authenticate to view"))
-                .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-            if let message = gate.lastError?.errorDescription {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.warning)
-                    .multilineTextAlignment(.center)
-            }
-            Button {
-                Task { await gate.authenticate() }
-            } label: {
-                Text(NSLocalizedString("recordings.unlock_button", comment: "Unlock"))
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
-        }
-        .padding(.horizontal, 36)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// One card in the meetings list.
-private struct MeetingCard: View {
-    let meeting: Meeting
-    let preview: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                if meeting.isFavorite {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(Theme.warning)
-                        .font(.system(size: 13))
-                        .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
-                }
-                Text(meeting.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                if meeting.summary != nil {
-                    Image(systemName: "sparkles").foregroundStyle(Theme.info)
-                }
-                StatusBadge(status: meeting.aggregateStatus)
-            }
-            HStack(spacing: 6) {
-                Text(meeting.createdAt.meetingDisplay)
-                if meeting.totalDuration > 0 {
-                    Text("·")
-                    Text(meeting.totalDuration.clockDisplay)
-                }
-            }
-            .font(.system(size: 13))
-            .foregroundStyle(Theme.textSecondary)
-
-            metaChips
-
-            if !preview.isEmpty {
-                Text(preview)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(2)
-            }
-        }
-        .kurnCard()
-    }
-
-    /// Optional row of scannable chips: # speakers, # recordings, summary
-    /// template. Each chip only appears when it adds information (≥2 speakers,
-    /// >1 recording, template named).
-    @ViewBuilder
-    private var metaChips: some View {
-        let speakerCount = meeting.speakers.count
-        let recordingCount = meeting.recordings.count
-        let templateName = meeting.summary?.templateName ?? ""
-        if speakerCount >= 2 || recordingCount > 1 || !templateName.isEmpty {
-            HStack(spacing: 6) {
-                if speakerCount >= 2 {
-                    metaChip(systemImage: "person.2.fill", text: "\(speakerCount)")
-                }
-                if recordingCount > 1 {
-                    metaChip(systemImage: "waveform", text: "\(recordingCount)")
-                }
-                if !templateName.isEmpty {
-                    metaChip(systemImage: "doc.text", text: templateName)
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    private func metaChip(systemImage: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage).font(.system(size: 10, weight: .semibold))
-            Text(text).font(.system(size: 11, weight: .medium))
-        }
-        .foregroundStyle(Theme.textSecondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Theme.fill, in: Capsule())
+            .compactMap { $0.transcript?.segments.first?.text }
+            .first ?? meeting.notes
     }
 }

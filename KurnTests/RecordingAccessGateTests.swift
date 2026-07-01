@@ -92,15 +92,14 @@ private final class StubAuthenticator: LocalAuthenticator, @unchecked Sendable {
     }
 
     var callCount: Int {
-        lock.lock(); defer { lock.unlock() }
-        return _callCount
+        lock.withLock { _callCount }
     }
 
     func evaluate(reason: String) async throws {
-        lock.lock()
-        _callCount += 1
-        let outcome = result
-        lock.unlock()
+        let outcome = lock.withLock {
+            _callCount += 1
+            return result
+        }
         // Yield once so concurrent callers can observe the in-flight task.
         await Task.yield()
         switch outcome {

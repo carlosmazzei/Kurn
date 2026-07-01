@@ -32,6 +32,11 @@ final class Meeting {
     /// destroying them.
     var folder: Folder?
 
+    /// User-defined tags attached to this meeting. The inverse is defined on
+    /// `Tag.meetings` with `.nullify`, so deleting a tag detaches it from
+    /// meetings without deleting them.
+    var tags: [Tag] = []
+
     // Deleting a meeting tears down everything that belongs to it.
     @Relationship(deleteRule: .cascade, inverse: \Recording.meeting)
     var recordings: [Recording]

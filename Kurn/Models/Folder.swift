@@ -43,8 +43,8 @@ final class Folder {
     init(
         id: UUID = UUID(),
         name: String,
-        iconName: String = "folder.fill",
-        colorHex: String = "#5E5CE6",
+        iconName: String = FolderIconCatalog.default,
+        colorHex: String = FolderColorPalette.default,
         createdAt: Date = Date(),
         parent: Folder? = nil
     ) {

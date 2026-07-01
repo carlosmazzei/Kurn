@@ -14,24 +14,30 @@ import SwiftUI
 struct MeetingDetailView: View {
     @Bindable var meeting: Meeting
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppSettings.self) private var settings
+    @Environment(\.modelContext) var modelContext
+    @Environment(AppSettings.self) var settings
 
     enum Tab: Hashable { case recordings, transcript, summary }
 
-    @State private var player = AudioPlayerService()
-    @State private var txVM: TranscriptionViewModel?
+    @State var player = AudioPlayerService()
+    @State var txVM: TranscriptionViewModel?
     @State private var tab: Tab = .recordings
 
     @State private var showingRecorder = false
     @State private var showingEdit = false
-    @State private var showingTemplatePicker = false
-    @State private var shareItem: ShareItem?
+    @State var showingTemplatePicker = false
+    @State var shareItem: ShareItem?
     /// Set when the user taps redo on a transcribed recording; drives the
     /// per-segment re-transcription confirmation dialog.
     @State private var pendingRetranscribe: Recording?
     /// Set when the user picks "Re-transcribe all" from the menu.
     @State private var pendingRetranscribeAll = false
+    /// Set when auto-tagging is running.
+    @State var isAutoTagging = false
+    /// Auto-tagging suggestions awaiting confirmation.
+    @State var autoTagSuggestion: AutoTaggingService.Suggestion?
+    /// Auto-tagging failure surfaced to the user.
+    @State var autoTagError: AppError?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,6 +70,14 @@ struct MeetingDetailView: View {
             }
         }
         .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
+        .errorAlert($autoTagError)
+        .sheet(item: $autoTagSuggestion) { suggestion in
+            AutoTagConfirmView(
+                meeting: meeting,
+                suggestion: suggestion,
+                onApply: { applyAutoTagSuggestion(suggestion) }
+            )
+        }
         .kurnDialog(
             isPresented: Binding(
                 get: { pendingRetranscribe != nil },
@@ -113,6 +127,9 @@ struct MeetingDetailView: View {
             }
             .font(.system(size: 13))
             .foregroundStyle(Theme.textSecondary)
+            if !meeting.tags.isEmpty {
+                TagChipsView(tags: meeting.tags)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
@@ -419,12 +436,21 @@ struct MeetingDetailView: View {
                         Label(NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"), systemImage: "arrow.clockwise")
                     }
                 }
+                if settings.autoTaggingEnabled {
+                    Button { suggestTags() } label: {
+                        if isAutoTagging {
+                            Label(NSLocalizedString("tag.auto_suggest", comment: "Suggest tags"), systemImage: "ellipsis")
+                        } else {
+                            Label(NSLocalizedString("tag.auto_suggest", comment: "Suggest tags"), systemImage: "wand.and.stars")
+                        }
+                    }
+                    .disabled(isAutoTagging)
+                }
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
         }
     }
-
 }
 
 private struct SegmentPlaybackScrubber: View {
@@ -501,106 +527,5 @@ private struct SegmentPlaybackScrubber: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
         .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
-    }
-}
-
-// MARK: - Actions & helpers
-//
-// Kept in a same-file extension so it stays out of the view's `type_body_length`
-// budget while retaining access to the view's private state.
-
-extension MeetingDetailView {
-
-    private var sortedRecordings: [Recording] {
-        meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }
-    }
-
-    private func togglePlay(_ recording: Recording) {
-        do {
-            if player.loadedFileName == recording.fileName {
-                player.togglePlayPause()
-            } else {
-                try player.load(fileName: recording.fileName)
-                player.play()
-            }
-        } catch let error as AppError {
-            txVM?.error = error
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
-        }
-    }
-
-    private func seek(_ recording: Recording, to time: TimeInterval) {
-        do {
-            if player.loadedFileName != recording.fileName {
-                try player.load(fileName: recording.fileName)
-            }
-            player.seek(to: time)
-            player.play()
-        } catch let error as AppError {
-            txVM?.error = error
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
-        }
-    }
-
-    private func startTranscription(_ recording: Recording) {
-        guard let txVM else { return }
-        Task {
-            await txVM.transcribe(
-                recording,
-                language: meeting.language,
-                config: settings.pipelineConfiguration
-            )
-        }
-    }
-
-    private func retranscribe(_ recording: Recording) {
-        // `transcribe` replaces any existing transcript for this recording.
-        startTranscription(recording)
-    }
-
-    private func retranscribeAll() {
-        guard let txVM else { return }
-        Task {
-            await txVM.retranscribeAll(
-                meeting,
-                language: meeting.language,
-                config: settings.pipelineConfiguration
-            )
-        }
-    }
-
-    private func generateSummary() {
-        showingTemplatePicker = true
-    }
-
-    private func runSummary(with template: SummaryTemplate) {
-        guard let txVM else { return }
-        settings.lastSummaryTemplateID = template.id
-        let provider = settings.aiProvider
-        let model = settings.summaryModel(for: provider)
-        Task {
-            await txVM.generateSummary(
-                for: meeting,
-                provider: provider,
-                model: model,
-                template: template
-            )
-        }
-    }
-
-    private func deleteRecording(_ recording: Recording) {
-        if player.loadedFileName == recording.fileName { player.stop() }
-        MeetingsViewModel(modelContext: modelContext).deleteRecording(recording)
-    }
-
-    private func share() {
-        do {
-            let url = try MeetingExport.temporaryFile(for: meeting)
-            shareItem = ShareItem(url: url)
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
-        }
     }
 }

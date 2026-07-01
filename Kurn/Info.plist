@@ -38,6 +38,8 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Kurn uses Face ID to protect your meeting recordings from unauthorized access.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Kurn needs the microphone to record meetings.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
