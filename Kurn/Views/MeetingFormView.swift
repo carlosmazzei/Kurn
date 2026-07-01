@@ -20,6 +20,7 @@ struct MeetingFormView: View {
     @State private var notes = ""
     @State private var language: MeetingLanguage = .autoDetect
     @State private var initialized = false
+    @State private var showingTagPicker = false
 
     var body: some View {
         Form {
@@ -46,6 +47,32 @@ struct MeetingFormView: View {
                         Text(lang.displayName).tag(lang)
                     }
                 }
+            }
+            if let meeting {
+                Section(NSLocalizedString("tag.title", comment: "Tags")) {
+                    Button {
+                        showingTagPicker = true
+                    } label: {
+                        HStack {
+                            if meeting.tags.isEmpty {
+                                Text(NSLocalizedString("meetings.tag.add", comment: "Add tag"))
+                                    .foregroundStyle(Theme.textSecondary)
+                            } else {
+                                TagChipsView(tags: meeting.tags)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .sheet(isPresented: $showingTagPicker) {
+            if let meeting {
+                NavigationStack { TagPickerView(meeting: meeting) }
             }
         }
         .navigationTitle(
