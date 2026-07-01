@@ -32,6 +32,14 @@ enum ModelStoreProtection {
             appropriateFor: nil, create: true
         ))
         guard let appSupport else { return }
+        let base = appSupport.appendingPathComponent(baseName)
+        if !fm.fileExists(atPath: base.path) {
+            // Expected on a fresh install (nothing to protect yet) or the
+            // first call before ModelContainer creates the store. If this
+            // logs on every launch instead, `baseName` no longer matches
+            // what SwiftData actually names the store.
+            AppLog.persistence.atDebug.debug("modelStoreProtection: no store file found at expected location")
+        }
         for suffix in [""] + sidecarSuffixes {
             RecordingProtection.apply(to: appSupport.appendingPathComponent(baseName + suffix))
         }

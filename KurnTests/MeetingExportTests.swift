@@ -128,7 +128,7 @@ struct MeetingExportTests {
     @Test func temporaryFileSanitizesTitleForFileName() throws {
         let meeting = Meeting(title: "Q&A: Sprint / Review?")
         let url = try MeetingExport.temporaryFile(for: meeting)
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 
         #expect(url.pathExtension == "md")
         #expect(!url.lastPathComponent.contains("/"))
@@ -139,7 +139,23 @@ struct MeetingExportTests {
     @Test func temporaryFileFallsBackToDefaultNameWhenTitleHasNoAlphanumerics() throws {
         let meeting = Meeting(title: "###")
         let url = try MeetingExport.temporaryFile(for: meeting)
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         #expect(url.lastPathComponent == "meeting.md")
+    }
+
+    @Test func temporaryFileIsUniquePerCallEvenForIdenticalTitles() throws {
+        let first = Meeting(title: "Standup")
+        let second = Meeting(title: "Standup")
+        let firstURL = try MeetingExport.temporaryFile(for: first)
+        let secondURL = try MeetingExport.temporaryFile(for: second)
+        defer {
+            try? FileManager.default.removeItem(at: firstURL.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: secondURL.deletingLastPathComponent())
+        }
+
+        #expect(firstURL != secondURL)
+        #expect(firstURL.deletingLastPathComponent() != secondURL.deletingLastPathComponent())
+        #expect(FileManager.default.fileExists(atPath: firstURL.path))
+        #expect(FileManager.default.fileExists(atPath: secondURL.path))
     }
 }

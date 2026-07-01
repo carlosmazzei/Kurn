@@ -37,10 +37,12 @@ struct RecorderView: View {
                     meeting: meeting,
                     modelContext: modelContext,
                     defaultMode: settings.transcriptionEngine.storageMode,
-                    micPickup: settings.micPickup,
-                    audioQuality: settings.audioQuality,
-                    liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
-                    hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
+                    options: RecorderOptions(
+                        micPickup: settings.micPickup,
+                        audioQuality: settings.audioQuality,
+                        liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
+                        hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
+                    )
                 )
             }
         }
