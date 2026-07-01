@@ -77,7 +77,10 @@ actor AudioChunker {
                     duration: CMTime(seconds: length, preferredTimescale: 600)
                 )
             )
-            RecordingProtection.apply(to: outURL)
+            // In-flight class (not `.completeUnlessOpen`): chunk files must be
+            // readable with the device locked so a background Whisper run can
+            // keep feeding uploads; they're deleted when the run finishes.
+            RecordingProtection.applyInFlight(to: outURL)
             chunks.append(Chunk(url: outURL, offset: start))
             start += length
             index += 1

@@ -47,14 +47,32 @@ enum RecordingProtection {
         return url
     }
 
+    /// Protection class for short-lived pipeline artifacts — exported upload
+    /// chunks and multipart request bodies — that must stay readable while the
+    /// device is locked, so a background transcription can keep feeding
+    /// uploads after the screen turns off. Weaker than `.completeUnlessOpen`
+    /// (the file key stays available after the first unlock of the boot), but
+    /// these are transient copies deleted when the run finishes; the original
+    /// recordings keep the stronger class.
+    static let inFlightProtectionType: FileProtectionType = .completeUntilFirstUserAuthentication
+
     /// Apply the protection attribute to a single file. Silently ignored for
     /// missing files so callers can fire-and-forget after writing.
     static func apply(to fileURL: URL) {
+        apply(protectionType, to: fileURL)
+    }
+
+    /// Apply the weaker in-flight class to a transient pipeline artifact.
+    static func applyInFlight(to fileURL: URL) {
+        apply(inFlightProtectionType, to: fileURL)
+    }
+
+    private static func apply(_ type: FileProtectionType, to fileURL: URL) {
         let fm = FileManager.default
         guard fm.fileExists(atPath: fileURL.path) else { return }
         do {
             try fm.setAttributes(
-                [.protectionKey: protectionType],
+                [.protectionKey: type],
                 ofItemAtPath: fileURL.path
             )
         } catch {

@@ -9,8 +9,26 @@
 import SwiftData
 import SwiftUI
 
+#if canImport(UIKit)
+/// Minimal app delegate: SwiftUI has no scene hook for background-URLSession
+/// relaunch events, and without answering this callback iOS stops relaunching
+/// the app for finished Whisper chunk uploads.
+final class KurnAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping @Sendable () -> Void
+    ) {
+        WhisperBackgroundUploader.handleEvents(identifier: identifier, completionHandler: completionHandler)
+    }
+}
+#endif
+
 @main
 struct KurnApp: App {
+    #if canImport(UIKit)
+    @UIApplicationDelegateAdaptor(KurnAppDelegate.self) private var appDelegate
+    #endif
     /// Shared, observable preferences (provider, default mode/language).
     @State private var settings = AppSettings()
     /// Per-session Face ID / passcode gate guarding the recordings UI. Reset

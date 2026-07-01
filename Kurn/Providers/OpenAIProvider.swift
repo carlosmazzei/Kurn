@@ -16,12 +16,24 @@ struct OpenAIProvider: LLMProvider {
     private let session: URLSession
     private let chatModel: String
     private let whisperModel = "whisper-1"
+    /// Route transcription uploads through the background `URLSession`
+    /// (`WhisperBackgroundUploader`) so they survive the app suspending or the
+    /// phone locking. Off by default so injected-session tests and summary
+    /// calls are unaffected; `ProviderFactory.whisperProvider()` turns it on.
+    private let usesBackgroundUploads: Bool
 
-    init(provider: AIProvider = .openAI, apiKey: String, model: String = "gpt-5.4", session: URLSession = .shared) {
+    init(
+        provider: AIProvider = .openAI,
+        apiKey: String,
+        model: String = "gpt-5.4",
+        session: URLSession = .shared,
+        usesBackgroundUploads: Bool = false
+    ) {
         self.provider = provider
         self.apiKey = apiKey
         self.chatModel = model
         self.session = session
+        self.usesBackgroundUploads = usesBackgroundUploads
     }
 
     // MARK: - Transcription (Whisper)
@@ -56,7 +68,7 @@ struct OpenAIProvider: LLMProvider {
             fields.append(("language", code))
         }
 
-        request.httpBody = multipartBody(
+        let body = multipartBody(
             boundary: boundary,
             fields: fields,
             file: MultipartFile(
@@ -67,7 +79,15 @@ struct OpenAIProvider: LLMProvider {
             )
         )
 
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+        let data: Data
+        if usesBackgroundUploads {
+            let result = try await WhisperBackgroundUploader.shared.sendValidated(request, body: body)
+            data = result.0
+        } else {
+            request.httpBody = body
+            let result = try await LLMHTTP.sendValidated(request, session: session)
+            data = result.0
+        }
 
         do {
             let decoded = try JSONDecoder().decode(WhisperVerboseResponse.self, from: data)
