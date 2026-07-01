@@ -26,6 +26,7 @@ final class RecorderViewModel {
     private let modelContext: ModelContext
     private let defaultMode: TranscriptionMode
     private let liveTranscriptionEnabled: Bool
+    private let hideLiveActivityMeetingTitle: Bool
     private let lockScreenController = LockScreenRecordingController()
 
     init(
@@ -34,12 +35,14 @@ final class RecorderViewModel {
         defaultMode: TranscriptionMode,
         micPickup: MicPickup = .wholeRoom,
         audioQuality: AudioQuality = .high,
-        liveTranscriptionEnabled: Bool = false
+        liveTranscriptionEnabled: Bool = false,
+        hideLiveActivityMeetingTitle: Bool = true
     ) {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
         self.liveTranscriptionEnabled = liveTranscriptionEnabled
+        self.hideLiveActivityMeetingTitle = hideLiveActivityMeetingTitle
         self.recorder.micPickup = micPickup
         self.recorder.audioBitRate = audioQuality.bitRate
         self.recorder.onStateChanged = { [weak self] state, elapsed in
@@ -115,8 +118,11 @@ final class RecorderViewModel {
             // (or stall/fail), and the Lock Screen widget must never be held
             // hostage to it — otherwise it appears late or, if the load hangs,
             // never at all.
+            let liveActivityTitle = hideLiveActivityMeetingTitle
+                ? NSLocalizedString("recording.live_activity.generic_title", comment: "Generic Live Activity title")
+                : meeting.title
             lockScreenController.start(
-                title: meeting.title,
+                title: liveActivityTitle,
                 state: recorder.state,
                 elapsed: recorder.elapsed
             )

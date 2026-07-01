@@ -75,6 +75,7 @@ enum MeetingExport {
         let name = (safeTitle.isEmpty ? "meeting" : safeTitle) + ".md"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try text.data(using: .utf8)?.write(to: url, options: .atomic)
+        RecordingProtection.apply(to: url)
         return url
     }
 }

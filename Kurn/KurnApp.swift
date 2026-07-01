@@ -32,6 +32,7 @@ struct KurnApp: App {
             Tag.self,
             SmartFolder.self
         ])
+        ModelStoreProtection.apply()
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
@@ -56,26 +57,38 @@ struct KurnApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(settings)
-                .environment(accessGate)
-                .onChange(of: scenePhase, initial: true) { _, phase in
-                    // Lock the recordings gate whenever the app leaves the
-                    // foreground so the next time it comes back the user has
-                    // to authenticate again.
-                    if phase == .background {
-                        accessGate.lock()
-                    }
-                    // Pre-warm the FluidAudio ASR model while the app is in the
-                    // foreground. The one-time CoreML/ANE compilation costs tens
-                    // of seconds and fails outright if first attempted from the
-                    // background ("could not communicate with a helper
-                    // application"), so doing it here — gated to users who've
-                    // selected and consented to the on-device engine — keeps
-                    // later transcriptions fast and reliable.
-                    guard phase == .active, settings.usesFluidAudioModel else { return }
-                    prewarmFluidAudioModel()
+            ZStack {
+                ContentView()
+                    .environment(settings)
+                    .environment(accessGate)
+                // Covers meeting/transcript content in the app-switcher
+                // snapshot taken while the scene isn't active.
+                if scenePhase != .active {
+                    PrivacyCoverView()
                 }
+            }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                // Lock the recordings gate whenever the app leaves the
+                // foreground so the next time it comes back the user has
+                // to authenticate again. `.inactive` (Control Center, an
+                // incoming call, a notification banner) precedes
+                // `.background`, so it's covered too — except while a
+                // biometric/passcode prompt is in flight, since that prompt
+                // itself can transiently trigger `.inactive` and locking
+                // here would cancel the very authentication underway.
+                if (phase == .background || phase == .inactive) && !accessGate.isAuthenticating {
+                    accessGate.lock()
+                }
+                // Pre-warm the FluidAudio ASR model while the app is in the
+                // foreground. The one-time CoreML/ANE compilation costs tens
+                // of seconds and fails outright if first attempted from the
+                // background ("could not communicate with a helper
+                // application"), so doing it here — gated to users who've
+                // selected and consented to the on-device engine — keeps
+                // later transcriptions fast and reliable.
+                guard phase == .active, settings.usesFluidAudioModel else { return }
+                prewarmFluidAudioModel()
+            }
         }
         .modelContainer(modelContainer)
     }

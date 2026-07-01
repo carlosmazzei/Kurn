@@ -37,15 +37,12 @@ struct GoogleProvider: LLMProvider {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         let cleanModel = model.replacingOccurrences(of: "models/", with: "")
-        var components = URLComponents(
-            url: LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models/\(cleanModel):generateContent")
-                ?? URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(cleanModel):generateContent")!,
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-        var request = URLRequest(url: components.url!)
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models/\(cleanModel):generateContent")
+            ?? URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(cleanModel):generateContent")!
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
         // Gemini has no dedicated system role here; fold it into the user turn.
         let combined = "\(systemPrompt)\n\n\(userPrompt)"

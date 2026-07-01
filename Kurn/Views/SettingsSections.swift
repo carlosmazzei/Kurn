@@ -231,12 +231,20 @@ extension SettingsView {
                     set: { settings.requireAuthForRecordings = $0 }
                 )
             )
+            Toggle(
+                NSLocalizedString("settings.hide_live_activity_meeting_title", comment: "Hide meeting title on Lock Screen"),
+                isOn: Binding(
+                    get: { settings.hideLiveActivityMeetingTitle },
+                    set: { settings.hideLiveActivityMeetingTitle = $0 }
+                )
+            )
         } header: {
             Text(NSLocalizedString("settings.recording", comment: "Recording"))
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
                 Text(NSLocalizedString("settings.require_auth_for_recordings_footer", comment: "Explains authentication and at-rest encryption"))
+                Text(NSLocalizedString("settings.hide_live_activity_meeting_title_footer", comment: "Explains Live Activity title redaction"))
             }
         }
     }

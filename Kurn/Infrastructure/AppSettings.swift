@@ -37,6 +37,7 @@ final class AppSettings {
         static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let logLevel = "settings.logLevel"
         static let requireAuthForRecordings = "settings.requireAuthForRecordings"
+        static let hideLiveActivityMeetingTitle = "settings.hideLiveActivityMeetingTitle"
         static let meetingsSortOrder = "settings.meetingsSortOrder"
         static let autoTaggingEnabled = "settings.autoTaggingEnabled"
     }
@@ -97,6 +98,16 @@ final class AppSettings {
     /// of this toggle. Defaults to on so the secure path is the default.
     var requireAuthForRecordings: Bool {
         didSet { defaults.set(requireAuthForRecordings, forKey: Keys.requireAuthForRecordings) }
+    }
+
+    /// When on, the Lock Screen / Dynamic Island Live Activity shows a generic
+    /// "Recording…" label instead of the real meeting title, since the Live
+    /// Activity is visible to anyone glancing at a locked phone. Defaults to
+    /// on so the private option is the default.
+    var hideLiveActivityMeetingTitle: Bool {
+        didSet {
+            defaults.set(hideLiveActivityMeetingTitle, forKey: Keys.hideLiveActivityMeetingTitle)
+        }
     }
 
     /// Speaker diarization engine used by the transcription pipeline. Defaults
@@ -315,6 +326,9 @@ final class AppSettings {
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
         requireAuthForRecordings = defaults.object(forKey: Keys.requireAuthForRecordings) as? Bool ?? true
+        // `object(forKey:)` so an absent key defaults to `true` rather than
+        // `false` (which is what `defaults.bool(forKey:)` would return).
+        hideLiveActivityMeetingTitle = defaults.object(forKey: Keys.hideLiveActivityMeetingTitle) as? Bool ?? true
         diarizationEngine = DiarizationEngine(
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic

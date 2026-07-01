@@ -50,6 +50,12 @@ final class RecordingAccessGate {
     /// view can show the reason and a retry button.
     private(set) var lastError: AppError?
 
+    /// True while a biometric/passcode evaluation is in progress. The system
+    /// prompt itself (especially the passcode fallback screen) can transiently
+    /// flip `scenePhase` to `.inactive`, so callers reacting to scene-phase
+    /// changes should not lock (and cancel this task) while this is true.
+    var isAuthenticating: Bool { inFlight != nil }
+
     @ObservationIgnored private let authenticator: LocalAuthenticator
     @ObservationIgnored private var inFlight: Task<Void, Never>?
 

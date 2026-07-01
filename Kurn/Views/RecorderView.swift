@@ -39,7 +39,8 @@ struct RecorderView: View {
                     defaultMode: settings.transcriptionEngine.storageMode,
                     micPickup: settings.micPickup,
                     audioQuality: settings.audioQuality,
-                    liveTranscriptionEnabled: settings.liveTranscriptionEnabled
+                    liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
+                    hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
                 )
             }
         }

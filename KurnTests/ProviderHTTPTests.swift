@@ -109,7 +109,7 @@ struct ProviderHTTPTests {
 
     // MARK: - Google
 
-    @Test func googleSummarizePassesKeyQueryAndParsesCandidates() async throws {
+    @Test func googleSummarizePassesKeyHeaderAndParsesCandidates() async throws {
         MockURLProtocol.enqueue([
             MockURLProtocol.json([
                 "candidates": [["content": ["parts": [["text": #"{"sections":[{"title":"Summary","body":"ok"}]}"#]]]]]
@@ -122,7 +122,8 @@ struct ProviderHTTPTests {
 
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString.contains("generateContent") == true)
-        #expect(request.url?.query?.contains("key=gk") == true)
+        #expect(request.url?.query == nil)
+        #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
     }
 
     // MARK: - Error mapping & retry (shared LLMHTTP)
