@@ -389,3 +389,5 @@
 "recordings.open_settings" = "Abrir Ajustes";
 "error.authentication_not_available" = "Este aparelho não tem código ou biometria configurados. Configure um código de desbloqueio ou abra os Ajustes para desativar a autenticação de gravações.";
 "error.auto_tagging" = "Não foi possível sugerir tags: %@";
+"error.summary_truncated" = "O resumo foi cortado por atingir o limite de saída do modelo. Tente um template com menos seções ou um modelo com limite de saída maior.";
+"detail.summarizing.progress" = "Resumindo parte %1$d de %2$d…";

@@ -48,13 +48,14 @@ struct AnthropicProvider: LLMProvider {
             ?? URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = LLMHTTP.summaryTimeout
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 2000,
+            "max_tokens": LLMHTTP.summaryMaxOutputTokens,
             "system": systemPrompt,
             "messages": [
                 ["role": "user", "content": userPrompt]
@@ -68,7 +69,8 @@ struct AnthropicProvider: LLMProvider {
         return try LLMHTTP.summaryResult(
             from: data,
             as: MessagesResponse.self,
-            emptyMessage: "empty Anthropic response"
+            emptyMessage: "empty Anthropic response",
+            isTruncated: { $0.stopReason == "max_tokens" }
         ) { decoded in
             decoded.content
                 .filter { $0.type == "text" }
@@ -87,4 +89,10 @@ private struct MessagesResponse: Decodable {
         let text: String?
     }
     let content: [Block]
+    let stopReason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case content
+        case stopReason = "stop_reason"
+    }
 }

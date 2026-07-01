@@ -20,6 +20,9 @@ final class TranscriptionViewModel {
     /// Active pipeline phase per recording, so the UI can show the current stage.
     private(set) var phases: [UUID: TranscriptionPhase] = [:]
     private(set) var isSummarizing = false
+    /// Staged-summary progress as (stage, total) when a long transcript is
+    /// being summarized in parts; nil for single-pass summaries.
+    private(set) var summaryProgress: (stage: Int, total: Int)?
     var error: AppError?
     /// Non-fatal diarization failures (e.g. a FluidAudio model download error),
     /// keyed by recording so concurrent transcriptions of different recordings
@@ -268,6 +271,7 @@ final class TranscriptionViewModel {
         }
 
         isSummarizing = true
+        summaryProgress = nil
         AppLog.transcription.atNotice.notice("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
         do {
             let result = try await summaryService.generate(
@@ -275,7 +279,11 @@ final class TranscriptionViewModel {
                 meetingTitle: title,
                 provider: provider,
                 model: model,
-                template: template
+                template: template,
+                onProgress: { [weak self] stage, total in
+                    // Reported off the main actor; hop back before mutating state.
+                    Task { @MainActor in self?.summaryProgress = (stage, total) }
+                }
             )
             if let existing = meeting.summary {
                 existing.sections = result.sections
@@ -304,5 +312,6 @@ final class TranscriptionViewModel {
             AppLog.transcription.atError.error("VM: summary failed: \(error.localizedDescription, privacy: .public)")
         }
         isSummarizing = false
+        summaryProgress = nil
     }
 }

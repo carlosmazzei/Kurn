@@ -389,3 +389,5 @@
 "recordings.open_settings" = "Open Settings";
 "error.authentication_not_available" = "This device has no passcode or biometrics configured. Set a device passcode, or open Settings to turn off recording authentication.";
 "error.auto_tagging" = "Could not suggest tags: %@";
+"error.summary_truncated" = "The summary was cut off because it reached the model's output limit. Try a template with fewer sections or a model with a larger output limit.";
+"detail.summarizing.progress" = "Summarizing part %1$d of %2$d…";

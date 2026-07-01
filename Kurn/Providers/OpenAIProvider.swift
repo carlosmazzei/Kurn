@@ -98,12 +98,13 @@ struct OpenAIProvider: LLMProvider {
             ?? URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = LLMHTTP.summaryTimeout
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "model": chatModel,
-            "max_completion_tokens": 2000,
+            "max_completion_tokens": LLMHTTP.summaryMaxOutputTokens,
             "response_format": ["type": "json_object"],
             "messages": [
                 ["role": "system", "content": systemPrompt],
@@ -117,7 +118,8 @@ struct OpenAIProvider: LLMProvider {
         return try LLMHTTP.summaryResult(
             from: data,
             as: ChatResponse.self,
-            emptyMessage: "empty chat response"
+            emptyMessage: "empty chat response",
+            isTruncated: { $0.isTruncated }
         ) { $0.choices.first?.message.content }
     }
 

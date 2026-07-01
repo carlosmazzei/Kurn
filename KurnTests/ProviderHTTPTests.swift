@@ -36,6 +36,28 @@ struct ProviderHTTPTests {
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["model"] as? String == "gpt-test")
         #expect(body?["messages"] != nil)
+        #expect(body?["max_completion_tokens"] as? Int == LLMHTTP.summaryMaxOutputTokens)
+        #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
+    }
+
+    @Test func openAITruncatedSummaryThrowsSummaryTruncated() async {
+        // finish_reason "length" means the JSON payload was cut off by the
+        // output-token cap; the specific error must surface, not a decode error.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "choices": [["message": ["content": #"{"sections":[{"ti"#], "finish_reason": "length"]]
+            ])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected an error")
+        } catch AppError.summaryTruncated {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
     }
 
     @Test func openAITranscribeUploadsMultipartAndParsesSegments() async throws {
@@ -100,6 +122,25 @@ struct ProviderHTTPTests {
         #expect(request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01")
     }
 
+    @Test func anthropicTruncatedSummaryThrowsSummaryTruncated() async {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "content": [["type": "text", "text": #"{"sections":[{"ti"#]],
+                "stop_reason": "max_tokens"
+            ])
+        ])
+        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected an error")
+        } catch AppError.summaryTruncated {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
     @Test func anthropicDoesNotSupportTranscription() async {
         let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
         await #expect(throws: AppError.self) {
@@ -124,6 +165,24 @@ struct ProviderHTTPTests {
         #expect(request.url?.absoluteString.contains("generateContent") == true)
         #expect(request.url?.query == nil)
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+    }
+
+    @Test func googleTruncatedSummaryThrowsSummaryTruncated() async {
+        // A MAX_TOKENS candidate may omit its content block entirely; decoding
+        // must still succeed so the truncation check runs.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["candidates": [["finishReason": "MAX_TOKENS"]]])
+        ])
+        let provider = GoogleProvider(apiKey: "gk", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected an error")
+        } catch AppError.summaryTruncated {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
     }
 
     // MARK: - Error mapping & retry (shared LLMHTTP)

@@ -157,6 +157,7 @@ struct MeetingDetailView: View {
                     meeting: meeting,
                     settings: settings,
                     isSummarizing: txVM?.isSummarizing == true,
+                    summaryProgress: txVM?.summaryProgress,
                     onGenerate: { generateSummary() }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
