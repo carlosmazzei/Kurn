@@ -94,7 +94,11 @@ final class RecordingAccessGate {
             lastError = nil
         } catch {
             isUnlocked = false
-            lastError = .authenticationFailed(error.localizedDescription)
+            if let laError = error as? LAError, laError.code == .passcodeNotSet {
+                lastError = .authenticationNotAvailable
+            } else {
+                lastError = .authenticationFailed(error.localizedDescription)
+            }
         }
     }
 }
