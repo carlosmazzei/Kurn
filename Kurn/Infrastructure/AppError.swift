@@ -23,6 +23,8 @@ enum AppError: LocalizedError, Identifiable {
     case resourceUnavailable(String)
     case authenticationRequired
     case authenticationFailed(String)
+    case authenticationNotAvailable
+    case autoTaggingFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
@@ -92,6 +94,16 @@ enum AppError: LocalizedError, Identifiable {
         case .authenticationFailed(let detail):
             return String(
                 format: NSLocalizedString("error.authentication_failed", comment: "Authentication failed"),
+                detail
+            )
+        case .authenticationNotAvailable:
+            return NSLocalizedString(
+                "error.authentication_not_available",
+                comment: "Device has no passcode or biometrics configured"
+            )
+        case .autoTaggingFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.auto_tagging", comment: "Auto-tagging failed"),
                 detail
             )
         }

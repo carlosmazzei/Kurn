@@ -100,6 +100,26 @@ struct SettingsView: View {
                 }
             }
 
+            // MARK: Tags
+            Section {
+                NavigationLink {
+                    TagManagementView()
+                } label: {
+                    Label(
+                        NSLocalizedString("tag.manage", comment: "Manage Tags"),
+                        systemImage: "tag"
+                    )
+                }
+                Toggle(
+                    NSLocalizedString("settings.auto_tagging", comment: "Auto-tagging"),
+                    isOn: $settings.autoTaggingEnabled
+                )
+            } header: {
+                Text(NSLocalizedString("tag.title", comment: "Tags"))
+            } footer: {
+                Text(NSLocalizedString("settings.auto_tagging_footer", comment: "Auto-tagging footer"))
+            }
+
             // MARK: Summary templates
             Section {
                 ForEach(settings.summaryTemplates) { template in

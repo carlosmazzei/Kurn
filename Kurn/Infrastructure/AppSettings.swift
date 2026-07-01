@@ -38,6 +38,7 @@ final class AppSettings {
         static let logLevel = "settings.logLevel"
         static let requireAuthForRecordings = "settings.requireAuthForRecordings"
         static let meetingsSortOrder = "settings.meetingsSortOrder"
+        static let autoTaggingEnabled = "settings.autoTaggingEnabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -76,6 +77,12 @@ final class AppSettings {
     /// previous hard-coded behavior. See `MeetingsSortOrder.apply(to:)`.
     var meetingsSortOrder: MeetingsSortOrder {
         didSet { defaults.set(meetingsSortOrder.rawValue, forKey: Keys.meetingsSortOrder) }
+    }
+
+    /// Whether auto-tagging is enabled. When on, the app can suggest tags after
+    /// a transcription finishes and the user can apply them with one tap.
+    var autoTaggingEnabled: Bool {
+        didSet { defaults.set(autoTaggingEnabled, forKey: Keys.autoTaggingEnabled) }
     }
 
     /// Opt-in live transcription preview during recording (FluidAudio streaming
@@ -303,6 +310,7 @@ final class AppSettings {
         meetingsSortOrder = MeetingsSortOrder(
             rawValue: defaults.string(forKey: Keys.meetingsSortOrder) ?? ""
         ) ?? .dateNewest
+        autoTaggingEnabled = defaults.object(forKey: Keys.autoTaggingEnabled) as? Bool ?? false
         liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
