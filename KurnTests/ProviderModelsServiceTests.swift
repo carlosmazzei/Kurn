@@ -7,6 +7,7 @@
 //  Gemini's API key is sent as a header rather than a URL query parameter.
 //
 
+import Foundation
 import Testing
 @testable import Kurn
 
