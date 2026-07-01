@@ -25,6 +25,7 @@ struct ContentView: View {
         .environment(AppSettings())
         .environment(RecordingAccessGate())
         .modelContainer(for: [
-            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self
+            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
+            Folder.self, Tag.self, SmartFolder.self
         ], inMemory: true)
 }
