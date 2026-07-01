@@ -291,10 +291,15 @@ struct TranscriptionService {
         let resume = checkpoint.flatMap { cp in
             cp.matches(engine: engine, language: language, compacted: compacted) ? cp.runnerProgress : nil
         }
-        let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = onCheckpoint.map { sink in
-            { progress in
-                sink(TranscriptionCheckpoint(engine: engine, language: language, compacted: compacted, progress: progress))
+        let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?
+        if let onCheckpoint {
+            checkpointSink = { progress in
+                onCheckpoint(
+                    TranscriptionCheckpoint(engine: engine, language: language, compacted: compacted, progress: progress)
+                )
             }
+        } else {
+            checkpointSink = nil
         }
 
         let raw: RawTranscript
