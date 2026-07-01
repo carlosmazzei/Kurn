@@ -102,6 +102,24 @@ final class TranscriptionViewModel {
         transcriptionTasks[recording.id]?.cancel()
     }
 
+    /// Cancel every in-flight transcription started via `startTranscription`.
+    /// Used when a `BGProcessingTask` window expires: each run checkpoints and
+    /// parks as `.pending` for the next resume pass.
+    func cancelAllTranscriptions() {
+        for task in transcriptionTasks.values {
+            task.cancel()
+        }
+    }
+
+    /// Wait until every transcription task started via `startTranscription`
+    /// has finished (each removes itself from the registry as it completes).
+    func awaitActiveTranscriptions() async {
+        while let entry = transcriptionTasks.first {
+            await entry.value.value
+            transcriptionTasks[entry.key] = nil
+        }
+    }
+
     func transcribe(
         _ recording: Recording,
         language: MeetingLanguage,

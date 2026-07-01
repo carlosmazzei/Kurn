@@ -88,6 +88,11 @@ struct KurnApp: App {
         // `.inProgress` become `.pending` (checkpointed, resumable) or
         // `.failed`, before the first resume pass below runs.
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
+        #if canImport(BackgroundTasks)
+        // BGTaskScheduler requires all handlers registered before the app
+        // finishes launching.
+        TranscriptionScheduler.register(container: container)
+        #endif
     }
 
     var body: some Scene {
@@ -113,6 +118,13 @@ struct KurnApp: App {
                 // locked placeholder), abandoning the in-progress recording.
                 if phase == .background {
                     accessGate.lock()
+                    #if canImport(BackgroundTasks)
+                    // Ask the system for a processing window to advance any
+                    // interrupted transcription while we're backgrounded.
+                    TranscriptionScheduler.scheduleIfWorkRemains(
+                        container: modelContainer, settings: settings
+                    )
+                    #endif
                 }
                 // Resume transcriptions interrupted by backgrounding or a
                 // process death. `.pending` recordings carry a checkpoint, so
