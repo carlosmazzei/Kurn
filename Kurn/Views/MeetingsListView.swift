@@ -367,20 +367,25 @@ extension MeetingsListView {
     }
 
     var filterChips: some View {
-        HStack(spacing: 8) {
-            sidebarTrigger
-            ForEach(MeetingDateFilter.allCases) { option in
-                FilterChip(
-                    title: option.title,
-                    isSelected: filter.dateRange == option,
-                    tint: filter.dateRange == option ? Theme.accent : .primary
-                ) {
-                    filter.dateRange = option
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                sidebarTrigger
+                filterMenu
+                Spacer()
+                sortMenu
             }
-            filterMenu
-            Spacer()
-            sortMenu
+            HStack(spacing: 8) {
+                ForEach(MeetingDateFilter.allCases) { option in
+                    FilterChip(
+                        title: option.title,
+                        isSelected: filter.dateRange == option,
+                        tint: filter.dateRange == option ? Theme.accent : .primary
+                    ) {
+                        filter.dateRange = option
+                    }
+                }
+                Spacer(minLength: 0)
+            }
         }
     }
 

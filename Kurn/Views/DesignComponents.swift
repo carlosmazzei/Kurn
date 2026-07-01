@@ -59,7 +59,6 @@ struct FilterChip: View {
             Text(title)
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
                 .foregroundStyle(isSelected ? selectedForeground : Theme.textSecondary)
