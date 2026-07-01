@@ -29,13 +29,13 @@ struct SystemLocalAuthenticator: LocalAuthenticator {
         let context = LAContext()
         var error: NSError?
         guard context.canEvaluatePolicy(
-            .deviceOwnerAuthentication,
+            .deviceOwnerAuthenticationWithBiometrics,
             error: &error
         ) else {
             throw error ?? LAError(.authenticationFailed)
         }
         try await context.evaluatePolicy(
-            .deviceOwnerAuthentication,
+            .deviceOwnerAuthenticationWithBiometrics,
             localizedReason: reason
         )
     }
@@ -94,7 +94,8 @@ final class RecordingAccessGate {
             lastError = nil
         } catch {
             isUnlocked = false
-            if let laError = error as? LAError, laError.code == .passcodeNotSet {
+            if let laError = error as? LAError,
+               laError.code == .passcodeNotSet || laError.code == .biometryNotAvailable {
                 lastError = .authenticationNotAvailable
             } else {
                 lastError = .authenticationFailed(error.localizedDescription)
