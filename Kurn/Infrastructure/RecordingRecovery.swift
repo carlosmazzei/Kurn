@@ -15,6 +15,16 @@ import Foundation
 import SwiftData
 
 enum RecordingRecovery {
+    /// Snapshot of any Live Activities left over from a previous process.
+    /// This must be captured synchronously at launch, BEFORE any recording UI
+    /// exists, so a brand-new Live Activity started moments after launch is
+    /// not mistaken for an orphan. Ending activities happens asynchronously,
+    /// so reading `.activities` inside a background Task could race a new
+    /// recording and tear it right back down.
+    static func orphanedActivities() -> [Activity<RecordingActivityAttributes>] {
+        Activity<RecordingActivityAttributes>.activities
+    }
+
     /// Ends any Live Activity left over from a previous process and reattaches
     /// any orphaned audio file to its meeting. Safe to call unconditionally at
     /// launch: a fresh process never has a live recording session yet, so any
@@ -36,7 +46,7 @@ enum RecordingRecovery {
         // Task instead could race a brand-new Live Activity started moments
         // after launch and tear it right back down. Only the launch-time
         // snapshot is touched.
-        let orphaned = Activity<RecordingActivityAttributes>.activities
+        let orphaned = orphanedActivities()
         if !orphaned.isEmpty {
             Task {
                 for activity in orphaned {
@@ -44,6 +54,7 @@ enum RecordingRecovery {
                 }
             }
         }
+
         recoverOrphanedAudioFiles(modelContainer: modelContainer)
     }
 

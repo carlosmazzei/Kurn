@@ -29,13 +29,13 @@ struct SystemLocalAuthenticator: LocalAuthenticator {
         let context = LAContext()
         var error: NSError?
         guard context.canEvaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
+            .deviceOwnerAuthentication,
             error: &error
         ) else {
             throw error ?? LAError(.authenticationFailed)
         }
         try await context.evaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
+            .deviceOwnerAuthentication,
             localizedReason: reason
         )
     }

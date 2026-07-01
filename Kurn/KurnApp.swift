@@ -48,11 +48,10 @@ struct KurnApp: App {
         #endif
         // Clean up after a process that died mid-recording (orphaned Live
         // Activity + an unsaved audio file with no matching `Recording` row).
-        // Run off the main thread so a large legacy-file migration never blocks
-        // the first frame.
-        Task(priority: .userInitiated) {
-            RecordingRecovery.recoverOrphans(modelContainer: container)
-        }
+        // The snapshot of any orphaned Live Activities is taken synchronously
+        // at launch, before any recording UI exists, so a new recording started
+        // immediately after launch is never mistaken for an orphan.
+        RecordingRecovery.recoverOrphans(modelContainer: container)
     }
 
     var body: some Scene {
