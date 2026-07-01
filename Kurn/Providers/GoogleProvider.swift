@@ -41,6 +41,7 @@ struct GoogleProvider: LLMProvider {
             ?? URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(cleanModel):generateContent")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = LLMHTTP.summaryTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
@@ -50,7 +51,7 @@ struct GoogleProvider: LLMProvider {
             "contents": [["role": "user", "parts": [["text": combined]]]],
             "generationConfig": [
                 "responseMimeType": "application/json",
-                "maxOutputTokens": 2000
+                "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
             ]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -60,8 +61,9 @@ struct GoogleProvider: LLMProvider {
         return try LLMHTTP.summaryResult(
             from: data,
             as: GeminiResponse.self,
-            emptyMessage: "empty Gemini response"
-        ) { $0.candidates?.first?.content.parts.compactMap { $0.text }.joined() }
+            emptyMessage: "empty Gemini response",
+            isTruncated: { $0.candidates?.first?.finishReason == "MAX_TOKENS" }
+        ) { $0.candidates?.first?.content?.parts.compactMap { $0.text }.joined() }
     }
 }
 
@@ -70,7 +72,11 @@ private struct GeminiResponse: Decodable {
 }
 
 private struct GeminiCandidate: Decodable {
-    let content: GeminiContent
+    // Optional: a candidate stopped by MAX_TOKENS or a safety filter can omit
+    // the content block entirely, and decoding must still succeed so the
+    // truncation check gets a chance to run.
+    let content: GeminiContent?
+    let finishReason: String?
 }
 
 private struct GeminiContent: Decodable {

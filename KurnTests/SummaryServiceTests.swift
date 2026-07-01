@@ -3,6 +3,7 @@
 //  KurnTests
 //
 
+import Foundation
 import Testing
 @testable import Kurn
 
@@ -66,5 +67,63 @@ struct SummaryServiceTests {
                 template: .general
             )
         }
+    }
+
+    // MARK: - splitTranscript (staged summarization)
+
+    @Test func splitTranscriptReturnsSingleBlockWhenUnderLimit() {
+        let text = "[0:00] Speaker 1: short"
+        #expect(SummaryService.splitTranscript(text, maxChars: 100) == [text])
+    }
+
+    @Test func splitTranscriptNeverCutsALine() {
+        let lines = (0..<50).map { "[0:\(String(format: "%02d", $0))] Speaker 1: line number \($0)" }
+        let text = lines.joined(separator: "\n")
+        let blocks = SummaryService.splitTranscript(text, maxChars: 200)
+
+        #expect(blocks.count > 1)
+        for block in blocks {
+            #expect(block.count <= 200)
+            for line in block.split(separator: "\n") {
+                #expect(lines.contains(String(line)))
+            }
+        }
+    }
+
+    @Test func splitTranscriptBlocksReassembleToOriginal() {
+        let lines = (0..<100).map { "[0:\(String(format: "%02d", $0 % 60))] Speaker \($0 % 3): something said here \($0)" }
+        let text = lines.joined(separator: "\n")
+        let blocks = SummaryService.splitTranscript(text, maxChars: 500)
+        #expect(blocks.joined(separator: "\n") == text)
+    }
+
+    @Test func splitTranscriptPreservesEmptyLines() {
+        let text = String(repeating: "line\n\n", count: 30).trimmingCharacters(in: .whitespacesAndNewlines)
+        let blocks = SummaryService.splitTranscript(text, maxChars: 40)
+        #expect(blocks.joined(separator: "\n") == text)
+    }
+
+    @Test func splitTranscriptKeepsOversizedLineWhole() {
+        let long = String(repeating: "x", count: 300)
+        let text = "short\n\(long)\nshort"
+        let blocks = SummaryService.splitTranscript(text, maxChars: 100)
+        #expect(blocks.contains(long))
+        #expect(blocks.joined(separator: "\n") == text)
+    }
+
+    // MARK: - markdownText (map-stage notes rendering)
+
+    @Test func markdownTextRendersTitlesBodiesAndItems() {
+        let sections = [
+            SummarySection(title: "Decisions", body: "We agreed.", items: ["ship it"]),
+            SummarySection(title: "Open Questions", items: ["budget?", "timeline?"])
+        ]
+        let text = SummaryService.markdownText(from: sections)
+        #expect(text == "## Decisions\nWe agreed.\n- ship it\n\n## Open Questions\n- budget?\n- timeline?")
+    }
+
+    @Test func markdownTextSkipsEmptyParts() {
+        let sections = [SummarySection(title: "Only Title")]
+        #expect(SummaryService.markdownText(from: sections) == "## Only Title")
     }
 }

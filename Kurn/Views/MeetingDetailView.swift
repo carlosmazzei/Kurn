@@ -157,6 +157,7 @@ struct MeetingDetailView: View {
                     meeting: meeting,
                     settings: settings,
                     isSummarizing: txVM?.isSummarizing == true,
+                    summaryProgress: txVM?.summaryProgress,
                     onGenerate: { generateSummary() }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
@@ -215,15 +216,37 @@ struct MeetingDetailView: View {
                 Spacer(minLength: 8)
 
                 if isTranscribing {
-                    // The phase label carries any known percentage via its
-                    // `displayName`; the bar below mirrors it visually.
-                    if let phase {
-                        Text(phase.displayName)
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                    HStack(spacing: 8) {
+                        // The phase label carries any known percentage via its
+                        // `displayName`; the bar below mirrors it visually.
+                        if let phase {
+                            Text(phase.displayName)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        Button {
+                            cancelTranscription(recording)
+                        } label: {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.fill, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
                     }
+                } else if recording.transcriptionStatus == .pending {
+                    // Interrupted mid-run with a checkpoint; tapping resumes
+                    // right away instead of waiting for the next foreground pass.
+                    Button {
+                        startTranscription(recording)
+                    } label: {
+                        StatusBadge(status: .pending)
+                    }
+                    .buttonStyle(.plain)
                 } else if recording.transcriptionStatus == .done {
                     HStack(spacing: 8) {
                         StatusBadge(status: .done)

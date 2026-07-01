@@ -36,6 +36,28 @@ struct ProviderHTTPTests {
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["model"] as? String == "gpt-test")
         #expect(body?["messages"] != nil)
+        #expect(body?["max_completion_tokens"] as? Int == LLMHTTP.summaryMaxOutputTokens)
+        #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
+    }
+
+    @Test func openAITruncatedSummaryThrowsSummaryTruncated() async {
+        // finish_reason "length" means the JSON payload was cut off by the
+        // output-token cap; the specific error must surface, not a decode error.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "choices": [["message": ["content": #"{"sections":[{"ti"#], "finish_reason": "length"]]
+            ])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected an error")
+        } catch AppError.summaryTruncated {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
     }
 
     @Test func openAITranscribeUploadsMultipartAndParsesSegments() async throws {
@@ -100,6 +122,25 @@ struct ProviderHTTPTests {
         #expect(request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01")
     }
 
+    @Test func anthropicTruncatedSummaryThrowsSummaryTruncated() async {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "content": [["type": "text", "text": #"{"sections":[{"ti"#]],
+                "stop_reason": "max_tokens"
+            ])
+        ])
+        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected an error")
+        } catch AppError.summaryTruncated {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
     @Test func anthropicDoesNotSupportTranscription() async {
         let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
         await #expect(throws: AppError.self) {
@@ -124,6 +165,24 @@ struct ProviderHTTPTests {
         #expect(request.url?.absoluteString.contains("generateContent") == true)
         #expect(request.url?.query == nil)
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+    }
+
+    @Test func googleTruncatedSummaryThrowsSummaryTruncated() async {
+        // A MAX_TOKENS candidate may omit its content block entirely; decoding
+        // must still succeed so the truncation check runs.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["candidates": [["finishReason": "MAX_TOKENS"]]])
+        ])
+        let provider = GoogleProvider(apiKey: "gk", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected an error")
+        } catch AppError.summaryTruncated {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
     }
 
     // MARK: - Error mapping & retry (shared LLMHTTP)
@@ -153,6 +212,47 @@ struct ProviderHTTPTests {
             _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
         }
     }
+
+    // MARK: - Provider models listing (ProviderModelsService)
+
+    /// Swap a Keychain key for the duration of `body`, restoring the original.
+    @discardableResult
+    private func withKey<R>(_ key: KeychainKey, value: String, _ body: () async throws -> R) async rethrows -> R {
+        let original = KeychainManager.shared.get(key)
+        KeychainManager.shared.set(value, for: key)
+        defer {
+            if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
+        }
+        return try await body()
+    }
+
+    // Lives in this suite (not its own) because it scripts the process-global
+    // MockURLProtocol: `.serialized` only orders tests WITHIN a suite, and a
+    // separate suite would race this one for the scripted stubs.
+    @Test func googleModelsSendsKeyHeaderNotQuery() async throws {
+        try await withKey(.google, value: "gk") {
+            MockURLProtocol.enqueue([
+                MockURLProtocol.json([
+                    "models": [
+                        [
+                            "name": "models/gemini-1.5-pro",
+                            "baseModelId": NSNull(),
+                            "supportedGenerationMethods": ["generateContent"]
+                        ]
+                    ]
+                ])
+            ])
+            let service = ProviderModelsService(session: MockURLProtocol.session())
+            let models = try await service.models(for: .google)
+            #expect(models.contains("gemini-1.5-pro"))
+
+            let request = try #require(MockURLProtocol.lastRequest)
+            #expect(request.url?.query == nil)
+            #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+        }
+    }
+
+    // MARK: - Error mapping & retry (shared LLMHTTP, continued)
 
     @Test func rateLimitIsRetriedThenSucceeds() async throws {
         // First a 429 with a short Retry-After, then a success — the shared retry

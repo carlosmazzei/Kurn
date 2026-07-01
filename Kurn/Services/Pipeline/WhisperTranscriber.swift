@@ -21,52 +21,43 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
+        try await transcribeResumable(url: url, language: language, onProgress: onProgress)
+    }
+
+    /// Chunked transcription that can resume from a persisted checkpoint:
+    /// `resume` (when its plan matches) skips already-uploaded chunks, and
+    /// `onChunkCompleted` reports durable progress after each chunk so an
+    /// interruption loses at most the in-flight upload.
+    func transcribeResumable(
+        url: URL,
+        language: MeetingLanguage,
+        resume: ChunkedTranscriptionRunner.Progress? = nil,
+        onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider()
         let chunks = try await chunker.chunk(url: url)
         let total = chunks.count
         AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s)")
         defer { Task { await chunker.cleanup(chunks) } }
 
-        var allSpans: [TranscribedSpan] = []
-        var detectedLanguage = ""
-
-        // Show 0% immediately so the user sees a determinate bar from the start.
-        onProgress(0)
-
-        for (index, chunk) in chunks.enumerated() {
-            let data = try Data(contentsOf: chunk.url)
-            AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
-            let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
-            let result: RawTranscript
-            do {
-                result = try await provider.transcribe(
+        return try await ChunkedTranscriptionRunner.run(
+            chunks: chunks,
+            resume: resume,
+            transcribeChunk: { chunk, index in
+                let data = try Data(contentsOf: chunk.url)
+                AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
+                let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
+                defer { progressPulse.cancel() }
+                return try await provider.transcribe(
                     audioData: data,
                     fileName: chunk.url.lastPathComponent,
                     language: language
                 )
-            } catch {
-                progressPulse.cancel()
-                throw error
-            }
-            progressPulse.cancel()
-            if detectedLanguage.isEmpty { detectedLanguage = result.language }
-            // Offset chunk-local timestamps back to absolute meeting time.
-            for span in result.spans {
-                allSpans.append(
-                    TranscribedSpan(
-                        text: span.text,
-                        start: span.start + chunk.offset,
-                        end: span.end + chunk.offset,
-                        confidence: span.confidence
-                    )
-                )
-            }
-            // Advance after each upload completes so the bar reaches 100% when
-            // the last chunk lands (rather than stalling at (total-1)/total).
-            onProgress(Double(index + 1) / Double(total))
-        }
-
-        return RawTranscript(spans: allSpans, language: detectedLanguage)
+            },
+            onChunkCompleted: onChunkCompleted,
+            onProgress: onProgress
+        )
     }
 
     static func estimatedProgress(completedChunks: Int, totalChunks: Int, elapsed: TimeInterval) -> Double {

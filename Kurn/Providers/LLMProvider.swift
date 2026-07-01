@@ -34,6 +34,15 @@ protocol LLMProvider: Sendable {
 /// HTTP plumbing shared by the cloud providers: both OpenAI and Anthropic talk
 /// to JSON APIs that report failures as `{ "error": { "message" } }`.
 enum LLMHTTP {
+    /// Timeout for summary requests. `URLSession.shared`'s default (60s) is
+    /// tuned for small JSON calls; a long meeting transcript makes the model
+    /// generate for minutes, and the non-streaming request only completes when
+    /// the whole generation finishes. Mirrors the transcribe path's 300s.
+    static let summaryTimeout: TimeInterval = 300
+    /// Output budget for summary generations. The previous 2000-token cap cut
+    /// long-meeting summaries off mid-JSON, which then failed to parse; 8192
+    /// leaves room for a detailed multi-section summary on every vendor.
+    static let summaryMaxOutputTokens = 8192
     /// Total attempts (initial try + retries) for a transient failure.
     static let maxAttempts = 3
     /// Base unit for exponential backoff. Kept small so the UI isn't blocked
@@ -67,17 +76,25 @@ enum LLMHTTP {
 
     /// Decode a summary response, extract its text content, and parse the shared
     /// JSON contract into a `SummaryResult`. Centralizes the decode→parse→error
-    /// flow every provider's `summarize` shares. The first catch deliberately
-    /// re-throws `AppError`s (e.g. the empty-content and `SummaryJSON.parse`
-    /// failures) so they aren't re-wrapped by the generic `decodingError` catch.
+    /// flow every provider's `summarize` shares. `isTruncated` inspects the
+    /// vendor's finish/stop reason: a generation cut off by the output-token cap
+    /// is syntactically broken JSON, so surface the specific truncation error
+    /// instead of the confusing decode failure it would otherwise become. The
+    /// first catch deliberately re-throws `AppError`s (e.g. the empty-content
+    /// and `SummaryJSON.parse` failures) so they aren't re-wrapped by the
+    /// generic `decodingError` catch.
     static func summaryResult<T: Decodable>(
         from data: Data,
         as type: T.Type,
         emptyMessage: String,
+        isTruncated: (T) -> Bool = { _ in false },
         extractContent: (T) -> String?
     ) throws -> SummaryResult {
         do {
             let decoded = try JSONDecoder().decode(type, from: data)
+            guard !isTruncated(decoded) else {
+                throw AppError.summaryTruncated
+            }
             guard let content = extractContent(decoded), !content.isEmpty else {
                 throw AppError.decodingError(emptyMessage)
             }
@@ -206,8 +223,18 @@ struct ChatResponse: Decodable {
     struct Choice: Decodable {
         struct Message: Decodable { let content: String }
         let message: Message
+        let finishReason: String?
+
+        enum CodingKeys: String, CodingKey {
+            case message
+            case finishReason = "finish_reason"
+        }
     }
     let choices: [Choice]
+
+    /// True when generation stopped because it hit the output-token cap, which
+    /// leaves the JSON payload cut off mid-structure.
+    var isTruncated: Bool { choices.first?.finishReason == "length" }
 }
 
 // MARK: - Shared JSON shape

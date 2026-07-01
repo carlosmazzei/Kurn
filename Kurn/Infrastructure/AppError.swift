@@ -25,6 +25,7 @@ enum AppError: LocalizedError, Identifiable {
     case authenticationFailed(String)
     case authenticationNotAvailable
     case autoTaggingFailed(String)
+    case summaryTruncated
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
@@ -105,6 +106,11 @@ enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.auto_tagging", comment: "Auto-tagging failed"),
                 detail
+            )
+        case .summaryTruncated:
+            return NSLocalizedString(
+                "error.summary_truncated",
+                comment: "Summary generation hit the model's output limit"
             )
         }
     }

@@ -102,6 +102,9 @@ final class Meeting {
         if recordings.contains(where: { $0.transcriptionStatus == .inProgress }) {
             return .inProgress
         }
+        if recordings.contains(where: { $0.transcriptionStatus == .pending }) {
+            return .pending
+        }
         if recordings.allSatisfy({ $0.transcriptionStatus == .done }) {
             return .done
         }

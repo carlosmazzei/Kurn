@@ -21,7 +21,8 @@ actor AudioChunker {
     /// Size above which a recording is chunked before upload (~20 MB).
     static let sizeThresholdBytes: Int64 = 20 * 1024 * 1024
 
-    private let chunkDuration: TimeInterval = 600 // 10 minutes
+    /// Length of each exported chunk.
+    static let chunkDuration: TimeInterval = 600 // 10 minutes
 
     /// Return the file split into chunks in the temporary directory. If the file
     /// is small enough, returns it unmodified as a single chunk at offset 0.
@@ -32,7 +33,24 @@ actor AudioChunker {
             return [Chunk(url: url, offset: 0)]
         }
         AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes > threshold, splitting…")
+        return try await split(url: url)
+    }
 
+    /// Split by duration regardless of file size. Used by the on-device Speech
+    /// engine, where the constraint is the length a single recognition task can
+    /// reliably handle (a 2h file in one `SFSpeechRecognitionTask` is fragile),
+    /// not an upload size cap. Files no longer than one chunk come back whole.
+    func chunkByDuration(url: URL) async throws -> [Chunk] {
+        let asset = AVURLAsset(url: url)
+        let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
+        guard totalSeconds.isFinite, totalSeconds > Self.chunkDuration else {
+            return [Chunk(url: url, offset: 0)]
+        }
+        AppLog.transcription.atDebug.debug("chunk: \(totalSeconds, privacy: .public)s > \(Self.chunkDuration, privacy: .public)s, splitting by duration…")
+        return try await split(url: url)
+    }
+
+    private func split(url: URL) async throws -> [Chunk] {
         let asset = AVURLAsset(url: url)
         let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
         guard totalSeconds.isFinite, totalSeconds > 0 else {
@@ -45,7 +63,7 @@ actor AudioChunker {
         let tmpDir = FileManager.default.temporaryDirectory
 
         while start < totalSeconds {
-            let length = min(chunkDuration, totalSeconds - start)
+            let length = min(Self.chunkDuration, totalSeconds - start)
             let outURL = tmpDir.appendingPathComponent(
                 "kurn_chunk_\(UUID().uuidString)_\(index).m4a"
             )
@@ -59,7 +77,10 @@ actor AudioChunker {
                     duration: CMTime(seconds: length, preferredTimescale: 600)
                 )
             )
-            RecordingProtection.apply(to: outURL)
+            // In-flight class (not `.completeUnlessOpen`): chunk files must be
+            // readable with the device locked so a background Whisper run can
+            // keep feeding uploads; they're deleted when the run finishes.
+            RecordingProtection.applyInFlight(to: outURL)
             chunks.append(Chunk(url: outURL, offset: start))
             start += length
             index += 1

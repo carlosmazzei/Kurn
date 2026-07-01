@@ -90,6 +90,9 @@ struct SummaryTab: View {
     let meeting: Meeting
     let settings: AppSettings
     let isSummarizing: Bool
+    /// (stage, total) when a long transcript is summarized in parts; nil for
+    /// single-pass summaries.
+    var summaryProgress: (stage: Int, total: Int)?
     let onGenerate: () -> Void
 
     var body: some View {
@@ -101,7 +104,7 @@ struct SummaryTab: View {
         } else if isSummarizing {
             VStack(spacing: 14) {
                 ProgressView()
-                Text(NSLocalizedString("detail.summarizing", comment: "Generating..."))
+                Text(summarizingLabel)
                     .foregroundStyle(Theme.textSecondary)
             }
             .frame(maxWidth: .infinity).padding(.top, 80)
@@ -138,6 +141,16 @@ struct SummaryTab: View {
             if canGenerate { generateButton(regenerate: false) }
         }
         .frame(maxWidth: .infinity).padding(.top, 40)
+    }
+
+    private var summarizingLabel: String {
+        if let progress = summaryProgress {
+            return String(
+                format: NSLocalizedString("detail.summarizing.progress", comment: "Summarizing part i of n"),
+                progress.stage, progress.total
+            )
+        }
+        return NSLocalizedString("detail.summarizing", comment: "Generating...")
     }
 
     private var summaryModelNudge: String {

@@ -33,6 +33,9 @@ enum ProviderFactory {
     static func whisperProvider() throws -> OpenAIProvider {
         let key = KeychainManager.shared.get(.openAI) ?? ""
         guard !key.isEmpty else { throw AppError.noAPIKey(provider: AIProvider.openAI.displayName) }
-        return OpenAIProvider(apiKey: key)
+        // Background uploads: chunk transfers keep running when the app is
+        // suspended or the phone is locked, so a long transcription doesn't
+        // need the app to stay in the foreground.
+        return OpenAIProvider(apiKey: key, usesBackgroundUploads: true)
     }
 }

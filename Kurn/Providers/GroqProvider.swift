@@ -40,12 +40,13 @@ struct GroqProvider: LLMProvider {
             ?? URL(string: "https://api.groq.com/openai/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = LLMHTTP.summaryTimeout
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 2000,
+            "max_tokens": LLMHTTP.summaryMaxOutputTokens,
             "response_format": ["type": "json_object"],
             "messages": [
                 ["role": "system", "content": systemPrompt],
@@ -59,7 +60,8 @@ struct GroqProvider: LLMProvider {
         return try LLMHTTP.summaryResult(
             from: data,
             as: ChatResponse.self,
-            emptyMessage: "empty Groq response"
+            emptyMessage: "empty Groq response",
+            isTruncated: { $0.isTruncated }
         ) { $0.choices.first?.message.content }
     }
 }

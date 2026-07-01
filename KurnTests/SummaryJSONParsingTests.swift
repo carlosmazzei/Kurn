@@ -85,4 +85,17 @@ struct SummaryJSONParsingTests {
             try SummaryJSON.parse("{\"sections\": [ this is not valid }")
         }
     }
+
+    @Test func throwsDecodingErrorOnTruncatedJSON() {
+        // A generation cut off by the output-token cap ends mid-structure; the
+        // parser must fail cleanly rather than return a partial summary.
+        let raw = """
+        {"sections": [
+          {"title": "Overview", "body": "Recap"},
+          {"title": "Action Items", "items": ["follow up", "sche
+        """
+        #expect(throws: AppError.self) {
+            try SummaryJSON.parse(raw)
+        }
+    }
 }

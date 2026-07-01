@@ -25,13 +25,18 @@ final class BackgroundActivity {
     #endif
 
     /// Request background execution time. No-op if already active or unavailable.
-    func begin(name: String) {
+    /// - Parameter onExpiration: invoked (on the main actor) just before the
+    ///   system reclaims the window, giving the owner a chance to pause its
+    ///   work cleanly (e.g. cancel a transcription so it checkpoints) instead
+    ///   of being frozen mid-flight.
+    func begin(name: String, onExpiration: (@MainActor @Sendable () -> Void)? = nil) {
         #if canImport(UIKit)
         guard taskID == .invalid else { return }
         taskID = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             // The system is about to reclaim the time; release it cleanly so it
             // doesn't kill the app for overrunning.
             AppLog.transcription.atNotice.notice("background activity expired: \(name, privacy: .public)")
+            onExpiration?()
             self?.end()
         }
         AppLog.transcription.atDebug.debug("background activity begin: \(name, privacy: .public)")
