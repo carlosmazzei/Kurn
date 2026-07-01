@@ -28,7 +28,9 @@ struct KurnApp: App {
             Transcript.self,
             Speaker.self,
             Summary.self,
-            Folder.self
+            Folder.self,
+            Tag.self,
+            SmartFolder.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
@@ -39,13 +41,18 @@ struct KurnApp: App {
     }()
 
     init() {
+        let container = modelContainer
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()
         #endif
         // Clean up after a process that died mid-recording (orphaned Live
         // Activity + an unsaved audio file with no matching `Recording` row).
-        RecordingRecovery.recoverOrphans(modelContainer: modelContainer)
+        // Run off the main thread so a large legacy-file migration never blocks
+        // the first frame.
+        Task(priority: .userInitiated) {
+            RecordingRecovery.recoverOrphans(modelContainer: container)
+        }
     }
 
     var body: some Scene {

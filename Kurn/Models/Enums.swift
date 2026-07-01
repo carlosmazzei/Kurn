@@ -6,13 +6,29 @@
 //
 
 import Foundation
+import SwiftData
 
 /// Lifecycle of a recording's transcription.
-enum TranscriptionStatus: String, Codable, Sendable {
+enum TranscriptionStatus: String, Codable, Sendable, CaseIterable, Identifiable {
     case none
     case inProgress
     case done
     case failed
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none:
+            return NSLocalizedString("status.none", comment: "No transcript")
+        case .inProgress:
+            return NSLocalizedString("status.in_progress", comment: "In progress")
+        case .done:
+            return NSLocalizedString("status.done", comment: "Done")
+        case .failed:
+            return NSLocalizedString("status.failed", comment: "Failed")
+        }
+    }
 }
 
 /// Fine-grained stage within an in-progress transcription, surfaced to the UI so
@@ -198,6 +214,7 @@ enum MeetingsLibraryBucket: String, Codable, Sendable, CaseIterable, Identifiabl
 enum LibrarySelection: Hashable, Sendable {
     case bucket(MeetingsLibraryBucket)
     case folder(PersistentIdentifier)
+    case smartFolder(UUID)
 
     static let allMeetings: LibrarySelection = .bucket(.all)
     static let inbox: LibrarySelection = .bucket(.inbox)
@@ -205,13 +222,16 @@ enum LibrarySelection: Hashable, Sendable {
     /// Whether `meeting` matches this selection. `Inbox` (the synthetic bucket
     /// for meetings without a folder) and per-folder views both exclude
     /// archived meetings; `Archive` and `Favorites` work as on PR 2a.
-    func contains(_ meeting: Meeting) -> Bool {
+    /// Smart folders apply their saved predicate.
+    func contains(_ meeting: Meeting, smartFolderFilter: MeetingFilter? = nil) -> Bool {
         switch self {
         case .bucket(let bucket):
             return bucket.contains(meeting)
         case .folder(let id):
             guard !meeting.isArchived else { return false }
             return meeting.folder?.persistentModelID == id
+        case .smartFolder:
+            return smartFolderFilter?.matches(meeting) ?? false
         }
     }
 }

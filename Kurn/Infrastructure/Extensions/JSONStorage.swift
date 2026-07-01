@@ -21,4 +21,9 @@ enum JSONStorage {
     static func decode<T: Decodable>(_ type: [T].Type, from data: Data) -> [T] {
         (try? JSONDecoder().decode([T].self, from: data)) ?? []
     }
+
+    /// Decode a single JSON value from `Data`, falling back to `nil` on failure.
+    static func decode<T: Decodable>(_ type: T.Type, from data: Data) -> T? {
+        try? JSONDecoder().decode(T.self, from: data)
+    }
 }
