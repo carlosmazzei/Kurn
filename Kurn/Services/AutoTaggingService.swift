@@ -89,10 +89,10 @@ struct AutoTaggingService: Sendable {
         guard let wire = try? JSONDecoder().decode(Wire.self, from: data) else {
             return Suggestion(tagIDs: [], newTagNames: [])
         }
-        let availableIDs = Set(availableTags.map { $0.id.uuidString })
+        let availableIDs = Set(availableTags.map(\.id))
         let existingIDs = wire.existing
-            .filter { availableIDs.contains($0) }
             .compactMap { UUID(uuidString: $0) }
+            .filter { availableIDs.contains($0) }
         let newNames = wire.new
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }

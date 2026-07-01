@@ -94,9 +94,13 @@ final class RecordingAccessGate {
             lastError = nil
         } catch {
             isUnlocked = false
-            if let laError = error as? LAError,
-               laError.code == .passcodeNotSet || laError.code == .biometryNotAvailable {
-                lastError = .authenticationNotAvailable
+            if let laError = error as? LAError {
+                switch laError.code {
+                case .passcodeNotSet, .biometryNotAvailable:
+                    lastError = .authenticationNotAvailable
+                default:
+                    lastError = .authenticationFailed(error.localizedDescription)
+                }
             } else {
                 lastError = .authenticationFailed(error.localizedDescription)
             }

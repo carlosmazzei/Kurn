@@ -22,14 +22,14 @@ struct AutoTagConfirmView: View {
         NavigationStack {
             List {
                 Section {
-                    if existingTags.isEmpty && newTagNames.isEmpty {
+                    if existingTags.isEmpty && suggestion.newTagNames.isEmpty {
                         Text(NSLocalizedString("tag.auto_suggest.empty", comment: "No tags suggested"))
                             .foregroundStyle(Theme.textSecondary)
                     } else {
                         ForEach(existingTags) { tag in
                             tagRow(tag)
                         }
-                        ForEach(newTagNames, id: \.self) { name in
+                        ForEach(suggestion.newTagNames, id: \.self) { name in
                             HStack(spacing: 12) {
                                 Image(systemName: "sparkles")
                                     .foregroundStyle(Theme.accent)
@@ -60,7 +60,7 @@ struct AutoTagConfirmView: View {
                         onApply()
                         dismiss()
                     }
-                    .disabled(existingTags.isEmpty && newTagNames.isEmpty)
+                    .disabled(existingTags.isEmpty && suggestion.newTagNames.isEmpty)
                 }
             }
         }
@@ -68,10 +68,6 @@ struct AutoTagConfirmView: View {
 
     private var existingTags: [Tag] {
         allTags.filter { suggestion.tagIDs.contains($0.id) }
-    }
-
-    private var newTagNames: [String] {
-        suggestion.newTagNames
     }
 
     private func tagRow(_ tag: Tag) -> some View {

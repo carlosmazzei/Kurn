@@ -25,25 +25,19 @@ extension MeetingDetailView {
         let tagInputs = allTags.map { AutoTaggingService.TagInput(id: $0.id, name: $0.name) }
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
-        Task {
+        Task { @MainActor in
+            defer { isAutoTagging = false }
             do {
-                let suggestion = try await AutoTaggingService().suggestTags(
+                autoTagSuggestion = try await AutoTaggingService().suggestTags(
                     meetingTitle: title,
                     transcript: transcript,
                     availableTags: tagInputs,
                     provider: provider,
                     model: model
                 )
-                await MainActor.run {
-                    autoTagSuggestion = suggestion
-                    isAutoTagging = false
-                }
             } catch {
                 AppLog.ui.atError.error("Auto-tagging failed: \(error, privacy: .public)")
-                await MainActor.run {
-                    autoTagError = .autoTaggingFailed(error.localizedDescription)
-                    isAutoTagging = false
-                }
+                autoTagError = .autoTaggingFailed(error.localizedDescription)
             }
         }
     }

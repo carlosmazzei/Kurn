@@ -473,12 +473,9 @@ extension MeetingsListView {
     }
 
     func preview(for meeting: Meeting) -> String {
-        if let segment = meeting.recordings
+        meeting.recordings
             .sorted(by: { $0.recordedAt < $1.recordedAt })
-            .compactMap({ $0.transcript?.segments.first?.text })
-            .first {
-            return segment
-        }
-        return meeting.notes
+            .compactMap { $0.transcript?.segments.first?.text }
+            .first ?? meeting.notes
     }
 }

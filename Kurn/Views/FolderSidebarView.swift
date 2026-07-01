@@ -114,10 +114,7 @@ struct FolderSidebarView: View {
     }
 
     private var analyticsMeetings: [Meeting] {
-        if let folder = analyticsFolder {
-            return folder.meetings
-        }
-        return meetings
+        analyticsFolder?.meetings ?? meetings
     }
 
     // MARK: - Drilled-in level
