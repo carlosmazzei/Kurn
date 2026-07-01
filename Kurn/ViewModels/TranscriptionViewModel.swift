@@ -30,6 +30,17 @@ final class TranscriptionViewModel {
     /// succeeds; this is a banner, not an `AppError`.
     private(set) var diarizationWarnings: [UUID: String] = [:]
 
+    /// Task handles for transcriptions started via `startTranscription`, so
+    /// they can be cancelled (by the user or by the background window expiring).
+    private var transcriptionTasks: [UUID: Task<Void, Never>] = [:]
+    /// Recordings this instance is transcribing, so `@Sendable` pipeline
+    /// callbacks can reach the model by ID after hopping to the main actor.
+    private var activeRecordings: [UUID: Recording] = [:]
+    /// Recordings in flight across ALL instances — `MeetingDetailView` creates
+    /// a view model per screen and the app-level resume coordinator has its
+    /// own, and a recording must never transcribe twice concurrently.
+    private static var globalActiveIDs: Set<UUID> = []
+
     private let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
     private let summaryService = SummaryService()
@@ -66,18 +77,52 @@ final class TranscriptionViewModel {
         await OnDeviceTranscriber().requestAuthorization()
     }
 
+    /// Start (or resume) a transcription as a cancellable task owned by this
+    /// view model. Prefer this over calling `transcribe` directly: it keeps a
+    /// task handle so the run can be paused when the background window expires
+    /// or the user cancels.
+    func startTranscription(
+        _ recording: Recording,
+        language: MeetingLanguage,
+        config: PipelineConfiguration
+    ) {
+        let recordingID = recording.id
+        guard transcriptionTasks[recordingID] == nil,
+              !Self.globalActiveIDs.contains(recordingID) else { return }
+        transcriptionTasks[recordingID] = Task { [weak self] in
+            await self?.transcribe(recording, language: language, config: config)
+            self?.transcriptionTasks[recordingID] = nil
+        }
+    }
+
+    /// Cancel an in-flight transcription started via `startTranscription`.
+    /// Progress up to the last completed chunk stays in the checkpoint and the
+    /// recording is left `.pending`, so a later run resumes rather than restarts.
+    func cancelTranscription(_ recording: Recording) {
+        transcriptionTasks[recording.id]?.cancel()
+    }
+
     func transcribe(
         _ recording: Recording,
         language: MeetingLanguage,
         config: PipelineConfiguration
     ) async {
-        guard !transcribingIDs.contains(recording.id) else { return }
+        guard !transcribingIDs.contains(recording.id),
+              !Self.globalActiveIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id
         AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public)")
 
         transcribingIDs.insert(recordingID)
+        Self.globalActiveIDs.insert(recordingID)
+        activeRecordings[recordingID] = recording
         phases[recordingID] = .preparing
+        defer {
+            transcribingIDs.remove(recordingID)
+            Self.globalActiveIDs.remove(recordingID)
+            activeRecordings[recordingID] = nil
+            phases[recordingID] = nil
+        }
         recording.transcriptionStatus = .inProgress
         recording.transcriptionMode = config.transcription.storageMode
         persist()
@@ -92,8 +137,6 @@ final class TranscriptionViewModel {
                 AppLog.transcription.atError.error("VM: speech permission denied")
                 recording.transcriptionStatus = .failed
                 persist()
-                transcribingIDs.remove(recordingID)
-                phases[recordingID] = nil
                 error = .permissionDenied(
                     NSLocalizedString("error.speech_permission", comment: "Speech permission")
                 )
@@ -106,12 +149,23 @@ final class TranscriptionViewModel {
         let fileName = recording.fileName
         diarizationWarnings[recordingID] = nil
 
+        // Progress persisted by an earlier interrupted run; the pipeline skips
+        // already-transcribed chunks when it still matches.
+        let checkpoint = recording.transcriptionCheckpoint
+        if let checkpoint {
+            AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public)")
+        }
+
         // Long transcriptions (especially the chunked Whisper path) would
         // otherwise be aborted when the app is backgrounded and the system
         // suspends it. Hold a background-task assertion for the duration so the
-        // work gets a finite grace window instead of being killed immediately.
+        // work gets a finite grace window; when the system reclaims it, cancel
+        // the run so it checkpoints as `.pending` (resumed on next foreground)
+        // instead of freezing mid-chunk.
         let background = BackgroundActivity()
-        background.begin(name: "ai.kurn.transcription")
+        background.begin(name: "ai.kurn.transcription") { [weak self] in
+            self?.transcriptionTasks[recordingID]?.cancel()
+        }
         defer { background.end() }
 
         do {
@@ -120,52 +174,112 @@ final class TranscriptionViewModel {
                 fileName: fileName,
                 language: language,
                 config: config,
+                checkpoint: checkpoint,
                 onPhase: { [weak self] phase in
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.phases[recordingID] = phase }
                 },
                 onDiarizationWarning: { [weak self] message in
                     Task { @MainActor in self?.diarizationWarnings[recordingID] = message }
+                },
+                onCheckpoint: { [weak self] checkpoint in
+                    Task { @MainActor in self?.storeCheckpoint(checkpoint, for: recordingID) }
                 }
             )
 
-            // Replace any existing transcript. Detach the old one first: a
-            // `delete` isn't applied to the relationship until the next save, so
-            // without this `recording.transcript` still points at the old
-            // transcript when the new one's inverse is established — which traps
-            // with "relationship already has a value but it's not the target".
-            if let existing = recording.transcript {
-                recording.transcript = nil
-                modelContext.delete(existing)
-            }
-            // Assigning `recording` in the initializer establishes the
-            // relationship (SwiftData maintains the inverse `recording.transcript`),
-            // so no manual back-assignment is needed.
-            let transcript = Transcript(
-                recording: recording,
-                segments: output.segments,
-                language: output.language
-            )
-            modelContext.insert(transcript)
-            recording.transcriptionStatus = .done
-
-            syncSpeakers(for: recording.meeting)
-            persist()
+            saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
-        } catch let appError as AppError {
-            recording.transcriptionStatus = .failed
+        } catch is CancellationError {
+            // Paused, not failed: chunk progress is already checkpointed, and
+            // `.pending` gets picked up by the next foreground resume pass.
+            recording.transcriptionStatus = .pending
             persist()
-            error = appError
-            AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
+            AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
+        } catch let appError as AppError {
+            if isCancellation(appError) {
+                recording.transcriptionStatus = .pending
+                persist()
+                AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
+            } else {
+                // Failed — but the checkpoint is kept, so a manual retry
+                // resumes from the last completed chunk.
+                recording.transcriptionStatus = .failed
+                persist()
+                error = appError
+                AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
+            }
         } catch {
             recording.transcriptionStatus = .failed
             persist()
             self.error = .transcriptionFailed(error.localizedDescription)
             AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
+    }
 
-        transcribingIDs.remove(recordingID)
-        phases[recordingID] = nil
+    /// Persist a finished pipeline run: replace any existing transcript, mark
+    /// the recording done, and drop its resume checkpoint.
+    private func saveTranscript(_ output: TranscriptionService.Output, for recording: Recording) {
+        // Replace any existing transcript. Detach the old one first: a
+        // `delete` isn't applied to the relationship until the next save, so
+        // without this `recording.transcript` still points at the old
+        // transcript when the new one's inverse is established — which traps
+        // with "relationship already has a value but it's not the target".
+        if let existing = recording.transcript {
+            recording.transcript = nil
+            modelContext.delete(existing)
+        }
+        // Assigning `recording` in the initializer establishes the
+        // relationship (SwiftData maintains the inverse `recording.transcript`),
+        // so no manual back-assignment is needed.
+        let transcript = Transcript(
+            recording: recording,
+            segments: output.segments,
+            language: output.language
+        )
+        modelContext.insert(transcript)
+        recording.transcriptionStatus = .done
+        recording.transcriptionCheckpointData = nil
+
+        syncSpeakers(for: recording.meeting)
+        persist()
+    }
+
+    /// Whether an `AppError` is really the transcription task being cancelled
+    /// (URLSession surfaces cancellation of an in-flight upload as a network
+    /// error rather than `CancellationError`).
+    private func isCancellation(_ error: AppError) -> Bool {
+        if case .networkError(let urlError) = error {
+            return urlError.code == .cancelled
+        }
+        return false
+    }
+
+    /// Persist chunk progress reported by the pipeline so an interruption at
+    /// any point resumes from the last completed chunk.
+    private func storeCheckpoint(_ checkpoint: TranscriptionCheckpoint, for id: UUID) {
+        guard let recording = activeRecordings[id] else { return }
+        recording.transcriptionCheckpoint = checkpoint
+        persist()
+    }
+
+    /// Start every recording left `.pending` — interrupted mid-transcription
+    /// with its progress checkpointed. Called when the app becomes active;
+    /// safe to call repeatedly (in-flight recordings are skipped by the
+    /// re-entrancy guards).
+    func resumePendingTranscriptions(settings: AppSettings) {
+        let pendingRaw = TranscriptionStatus.pending.rawValue
+        let descriptor = FetchDescriptor<Recording>(
+            predicate: #Predicate { $0.transcriptionStatusRaw == pendingRaw }
+        )
+        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else { return }
+        AppLog.transcription.atNotice.notice("VM: resuming \(pending.count, privacy: .public) pending transcription(s)")
+        for recording in pending {
+            startTranscription(
+                recording,
+                language: recording.meeting?.language ?? .autoDetect,
+                config: settings.pipelineConfiguration
+            )
+        }
     }
 
     /// Re-transcribe every recording of a meeting, in chronological order. Each

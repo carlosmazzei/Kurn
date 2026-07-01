@@ -45,14 +45,17 @@ extension MeetingDetailView {
     }
 
     func startTranscription(_ recording: Recording) {
-        guard let txVM else { return }
-        Task {
-            await txVM.transcribe(
-                recording,
-                language: meeting.language,
-                config: settings.pipelineConfiguration
-            )
-        }
+        // Routed through the view model's task registry so the run can be
+        // cancelled (by the user or when the background grace window expires).
+        txVM?.startTranscription(
+            recording,
+            language: meeting.language,
+            config: settings.pipelineConfiguration
+        )
+    }
+
+    func cancelTranscription(_ recording: Recording) {
+        txVM?.cancelTranscription(recording)
     }
 
     func retranscribe(_ recording: Recording) {

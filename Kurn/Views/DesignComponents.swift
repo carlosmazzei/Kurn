@@ -31,6 +31,7 @@ struct StatusBadge: View {
         switch status {
         case .none: return NSLocalizedString("status.todo", comment: "To transcribe")
         case .inProgress: return NSLocalizedString("status.in_progress", comment: "")
+        case .pending: return NSLocalizedString("status.pending", comment: "Queued to resume")
         case .done: return NSLocalizedString("status.done", comment: "")
         case .failed: return NSLocalizedString("status.failed", comment: "")
         }
@@ -39,7 +40,7 @@ struct StatusBadge: View {
     private var color: Color {
         switch status {
         case .none: return Theme.info
-        case .inProgress: return Theme.warning
+        case .inProgress, .pending: return Theme.warning
         case .done: return Theme.success
         case .failed: return Theme.accent
         }

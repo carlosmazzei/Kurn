@@ -19,6 +19,10 @@ struct TranscriptionService {
     /// Reports a non-fatal diarization failure (e.g. a FluidAudio model
     /// download error). Transcription still succeeds with a fallback turn.
     typealias DiarizationWarningHandler = @Sendable (String) -> Void
+    /// Durable-progress sink invoked after every completed chunk on the
+    /// resumable engines. The receiver persists the checkpoint so an
+    /// interrupted transcription can continue instead of starting over.
+    typealias CheckpointHandler = @Sendable (TranscriptionCheckpoint) -> Void
 
     struct Output: Sendable {
         var segments: [TranscriptSegment]
@@ -47,17 +51,26 @@ struct TranscriptionService {
     private let fluidAudioDiarizer = FluidAudioDiarizer()
     private let diarizationPreprocessor = DiarizationPreprocessor()
     private let vadCompactor = VADAudioCompactor()
+    private let onDeviceChunker = AudioChunker()
 
     /// Transcribe one recording file and return diarized segments, driving each
     /// pipeline stage through the engine selected in `config`.
-    /// - Parameter onPhase: optional progress callback reporting the active stage.
+    /// - Parameters:
+    ///   - checkpoint: progress persisted by an earlier interrupted run. The
+    ///     deterministic pre-transcription stages re-run; the chunk loop then
+    ///     skips already-transcribed chunks when the checkpoint still matches
+    ///     the derived plan (engine, language, chunk count).
+    ///   - onPhase: optional progress callback reporting the active stage.
+    ///   - onCheckpoint: durable-progress sink, called after every chunk.
     func transcribe(
         fileURL: URL,
         fileName: String,
         language: MeetingLanguage,
         config: PipelineConfiguration,
+        checkpoint: TranscriptionCheckpoint? = nil,
         onPhase: @escaping PhaseHandler = { _ in },
-        onDiarizationWarning: DiarizationWarningHandler? = nil
+        onDiarizationWarning: DiarizationWarningHandler? = nil,
+        onCheckpoint: CheckpointHandler? = nil
     ) async throws -> Output {
         let started = Date()
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
@@ -143,7 +156,9 @@ struct TranscriptionService {
                 regions: regions,
                 engine: config.transcription,
                 language: resolvedLanguage,
-                onPhase: onPhase
+                checkpoint: checkpoint,
+                onPhase: onPhase,
+                onCheckpoint: onCheckpoint
             )
             async let speakerTurns = diarize(
                 originalURL: fileURL,
@@ -162,7 +177,9 @@ struct TranscriptionService {
                 regions: regions,
                 engine: config.transcription,
                 language: resolvedLanguage,
-                onPhase: onPhase
+                checkpoint: checkpoint,
+                onPhase: onPhase,
+                onCheckpoint: onCheckpoint
             )
             turns = try await diarize(
                 originalURL: fileURL,
@@ -246,15 +263,23 @@ struct TranscriptionService {
     /// timestamps are remapped from the compacted timeline back to the original
     /// so they line up with diarization. Falls back to the original audio when
     /// compaction isn't worthwhile.
+    ///
+    /// The Whisper and Apple Speech engines run chunked and resumable: a
+    /// matching `checkpoint` skips already-transcribed chunks and
+    /// `onCheckpoint` persists progress after each one. Checkpoint spans live
+    /// on the (possibly compacted) engine-input timeline — the same timeline a
+    /// resume re-derives — and are remapped to the original timeline below,
+    /// after the whole engine pass completes.
     private func transcribeGated(
         cleanedURL: URL,
         regions: [SpeechRegion],
         engine: TranscriptionEngine,
         language: MeetingLanguage,
-        onPhase: @escaping PhaseHandler
+        checkpoint: TranscriptionCheckpoint? = nil,
+        onPhase: @escaping PhaseHandler,
+        onCheckpoint: CheckpointHandler? = nil
     ) async throws -> RawTranscript {
         try await ResourceGuard.requireTranscriptionHeadroom()
-        let transcriber = resolveTranscriber(engine)
         let compaction = (try? await vadCompactor.compact(url: cleanedURL, regions: regions)) ?? nil
         try await ResourceGuard.requireTranscriptionHeadroom()
         let target = compaction?.url ?? cleanedURL
@@ -262,11 +287,41 @@ struct TranscriptionService {
             if let url = compaction?.url { vadCompactor.cleanup(url) }
         }
 
-        let raw = try await transcriber.transcribe(
-            url: target,
-            language: language,
-            onProgress: { progress in onPhase(.transcribing(progress: progress)) }
-        )
+        let compacted = compaction != nil
+        let resume = checkpoint.flatMap { cp in
+            cp.matches(engine: engine, language: language, compacted: compacted) ? cp.runnerProgress : nil
+        }
+        let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = onCheckpoint.map { sink in
+            { progress in
+                sink(TranscriptionCheckpoint(engine: engine, language: language, compacted: compacted, progress: progress))
+            }
+        }
+
+        let raw: RawTranscript
+        switch engine {
+        case .whisperAPI:
+            raw = try await whisperTranscriber.transcribeResumable(
+                url: target,
+                language: language,
+                resume: resume,
+                onChunkCompleted: checkpointSink,
+                onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+            )
+        case .appleSpeech:
+            raw = try await transcribeOnDeviceChunked(
+                url: target,
+                language: language,
+                resume: resume,
+                onChunkCompleted: checkpointSink,
+                onPhase: onPhase
+            )
+        case .fluidAudioParakeet:
+            raw = try await resolveTranscriber(engine).transcribe(
+                url: target,
+                language: language,
+                onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+            )
+        }
         try await ResourceGuard.requireTranscriptionHeadroom()
         guard let map = compaction?.map else { return raw }
 
@@ -277,6 +332,43 @@ struct TranscriptionService {
             return TranscribedSpan(text: span.text, start: start, end: max(start, end), confidence: span.confidence)
         }
         return RawTranscript(spans: spans, language: raw.language)
+    }
+
+    /// Apple Speech over duration-based chunks instead of one recognition task
+    /// for the whole file — a single `SFSpeechRecognitionTask` over hours of
+    /// audio is unreliable, and per-chunk completion gives the checkpoint sink
+    /// durable progress to persist. Intra-chunk progress from the recognizer's
+    /// partial results is blended into the overall fraction.
+    private func transcribeOnDeviceChunked(
+        url: URL,
+        language: MeetingLanguage,
+        resume: ChunkedTranscriptionRunner.Progress?,
+        onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?,
+        onPhase: @escaping PhaseHandler
+    ) async throws -> RawTranscript {
+        let chunks = try await onDeviceChunker.chunkByDuration(url: url)
+        let total = chunks.count
+        defer {
+            let chunker = onDeviceChunker
+            Task { await chunker.cleanup(chunks) }
+        }
+
+        return try await ChunkedTranscriptionRunner.run(
+            chunks: chunks,
+            resume: resume,
+            transcribeChunk: { chunk, index in
+                try await appleTranscriber.transcribe(
+                    url: chunk.url,
+                    language: language,
+                    onProgress: { fraction in
+                        let clamped = min(1, max(0, fraction))
+                        onPhase(.transcribing(progress: (Double(index) + clamped) / Double(total)))
+                    }
+                )
+            },
+            onChunkCompleted: onChunkCompleted,
+            onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+        )
     }
 
     /// Dispatch to the chosen diarization engine. Both engines satisfy

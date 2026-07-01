@@ -196,6 +196,8 @@
 "status.done" = "Transcribed";
 "status.failed" = "Failed";
 "status.todo" = "Transcribe";
+"status.pending" = "Paused";
+"detail.cancel_transcription" = "Pause Transcription";
 
 /* Transcription phases */
 "phase.preparing" = "Preparing…";

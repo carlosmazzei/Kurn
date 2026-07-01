@@ -17,6 +17,11 @@ struct KurnApp: App {
     /// on every background transition so a borrowed-unlocked device cannot
     /// expose meeting audio just by reopening the app.
     @State private var accessGate = RecordingAccessGate()
+    /// App-level coordinator that resumes `.pending` transcriptions (runs
+    /// interrupted by backgrounding or a process death) whenever the app
+    /// becomes active. Separate from the per-screen view models; cross-instance
+    /// re-entrancy guards keep them from double-transcribing a recording.
+    @State private var transcriptionResumer: TranscriptionViewModel?
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -61,6 +66,10 @@ struct KurnApp: App {
         // at launch, before any recording UI exists, so a new recording started
         // immediately after launch is never mistaken for an orphan.
         RecordingRecovery.recoverOrphans(modelContainer: container)
+        // And after one that died mid-transcription: recordings stuck at
+        // `.inProgress` become `.pending` (checkpointed, resumable) or
+        // `.failed`, before the first resume pass below runs.
+        TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
     }
 
     var body: some Scene {
@@ -86,6 +95,17 @@ struct KurnApp: App {
                 // locked placeholder), abandoning the in-progress recording.
                 if phase == .background {
                     accessGate.lock()
+                }
+                // Resume transcriptions interrupted by backgrounding or a
+                // process death. `.pending` recordings carry a checkpoint, so
+                // each continues from its last completed chunk.
+                if phase == .active {
+                    if transcriptionResumer == nil {
+                        transcriptionResumer = TranscriptionViewModel(
+                            modelContext: modelContainer.mainContext
+                        )
+                    }
+                    transcriptionResumer?.resumePendingTranscriptions(settings: settings)
                 }
                 // Pre-warm the FluidAudio ASR model while the app is in the
                 // foreground. The one-time CoreML/ANE compilation costs tens

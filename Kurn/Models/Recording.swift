@@ -20,6 +20,11 @@ final class Recording {
     var recordedAt: Date
     var transcriptionStatusRaw: String
     var transcriptionModeRaw: String
+    /// JSON-encoded `TranscriptionCheckpoint` while a chunked transcription is
+    /// in flight (SwiftData can't store arbitrary Codable values directly).
+    /// Cleared on success; kept on failure/interruption so the next attempt
+    /// resumes from the last completed chunk instead of starting over.
+    var transcriptionCheckpointData: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \Transcript.recording)
     var transcript: Transcript?
@@ -50,6 +55,16 @@ final class Recording {
     var transcriptionMode: TranscriptionMode {
         get { TranscriptionMode(rawValue: transcriptionModeRaw) ?? .onDevice }
         set { transcriptionModeRaw = newValue.rawValue }
+    }
+
+    var transcriptionCheckpoint: TranscriptionCheckpoint? {
+        get {
+            guard let data = transcriptionCheckpointData else { return nil }
+            return try? JSONDecoder().decode(TranscriptionCheckpoint.self, from: data)
+        }
+        set {
+            transcriptionCheckpointData = newValue.flatMap { try? JSONEncoder().encode($0) }
+        }
     }
 
     /// Absolute URL of the backing audio file in the current container.
