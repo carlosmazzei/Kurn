@@ -213,6 +213,47 @@ struct ProviderHTTPTests {
         }
     }
 
+    // MARK: - Provider models listing (ProviderModelsService)
+
+    /// Swap a Keychain key for the duration of `body`, restoring the original.
+    @discardableResult
+    private func withKey<R>(_ key: KeychainKey, value: String, _ body: () async throws -> R) async rethrows -> R {
+        let original = KeychainManager.shared.get(key)
+        KeychainManager.shared.set(value, for: key)
+        defer {
+            if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
+        }
+        return try await body()
+    }
+
+    // Lives in this suite (not its own) because it scripts the process-global
+    // MockURLProtocol: `.serialized` only orders tests WITHIN a suite, and a
+    // separate suite would race this one for the scripted stubs.
+    @Test func googleModelsSendsKeyHeaderNotQuery() async throws {
+        try await withKey(.google, value: "gk") {
+            MockURLProtocol.enqueue([
+                MockURLProtocol.json([
+                    "models": [
+                        [
+                            "name": "models/gemini-1.5-pro",
+                            "baseModelId": NSNull(),
+                            "supportedGenerationMethods": ["generateContent"]
+                        ]
+                    ]
+                ])
+            ])
+            let service = ProviderModelsService(session: MockURLProtocol.session())
+            let models = try await service.models(for: .google)
+            #expect(models.contains("gemini-1.5-pro"))
+
+            let request = try #require(MockURLProtocol.lastRequest)
+            #expect(request.url?.query == nil)
+            #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+        }
+    }
+
+    // MARK: - Error mapping & retry (shared LLMHTTP, continued)
+
     @Test func rateLimitIsRetriedThenSucceeds() async throws {
         // First a 429 with a short Retry-After, then a success — the shared retry
         // loop should transparently recover. Retry-After is honored, so the wait
