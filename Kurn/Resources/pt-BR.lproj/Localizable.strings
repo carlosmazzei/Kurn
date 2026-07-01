@@ -379,8 +379,11 @@
 /* Segurança das gravações */
 "settings.require_auth_for_recordings" = "Exigir autenticação";
 "settings.require_auth_for_recordings_footer" = "Pede Face ID, Touch ID ou o código do aparelho uma vez por sessão antes de mostrar as reuniões e gravações. Os arquivos de áudio ficam sempre criptografados em disco usando o código do aparelho.";
+"settings.hide_live_activity_meeting_title" = "Ocultar título na tela bloqueada";
+"settings.hide_live_activity_meeting_title_footer" = "Mostra um rótulo genérico \"Gravando…\" na tela bloqueada, no Dynamic Island e no Apple Watch pareado em vez do título real da reunião durante a gravação.";
 "recordings.locked_title" = "Gravações bloqueadas";
 "recordings.locked_subtitle" = "Autentique-se para ver suas reuniões e gravações.";
+"recording.live_activity.generic_title" = "Gravando…";
 "recordings.unlock_button" = "Desbloquear";
 "recordings.unlock_reason" = "Autentique-se para acessar as gravações das suas reuniões.";
 "recordings.open_settings" = "Abrir Ajustes";

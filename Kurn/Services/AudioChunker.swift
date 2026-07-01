@@ -59,6 +59,7 @@ actor AudioChunker {
                     duration: CMTime(seconds: length, preferredTimescale: 600)
                 )
             )
+            RecordingProtection.apply(to: outURL)
             chunks.append(Chunk(url: outURL, offset: start))
             start += length
             index += 1

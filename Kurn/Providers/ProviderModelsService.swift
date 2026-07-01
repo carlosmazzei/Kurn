@@ -35,12 +35,7 @@ struct ProviderModelsService: Sendable {
             }
         case .googleGemini:
             return try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
-                // Gemini authenticates via a `key` query param rather than a header.
-                if let url = request.url,
-                   var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-                    components.queryItems = [URLQueryItem(name: "key", value: apiKey)]
-                    request.url = components.url
-                }
+                request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
             } extract: { decoded in
                 decoded.models
                     .filter { $0.supportedGenerationMethods.contains("generateContent") }

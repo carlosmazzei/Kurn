@@ -75,6 +75,21 @@ struct RecordingAccessGateTests {
         #expect(gate.isUnlocked == true)
         #expect(authenticator.callCount == 2)
     }
+
+    @Test func isAuthenticatingIsTrueWhileInFlightAndFalseAfter() async {
+        let authenticator = StubAuthenticator(result: .success)
+        let gate = RecordingAccessGate(authenticator: authenticator)
+        #expect(gate.isAuthenticating == false)
+
+        let task = Task { await gate.authenticate() }
+        while !gate.isAuthenticating {
+            await Task.yield()
+        }
+        #expect(gate.isAuthenticating == true)
+
+        await task.value
+        #expect(gate.isAuthenticating == false)
+    }
 }
 
 private final class StubAuthenticator: LocalAuthenticator, @unchecked Sendable {

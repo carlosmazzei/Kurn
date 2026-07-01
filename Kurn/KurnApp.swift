@@ -32,9 +32,18 @@ struct KurnApp: App {
             Tag.self,
             SmartFolder.self
         ])
+        ModelStoreProtection.apply()
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            // On a fresh install the first `apply()` above was a no-op (the
+            // store didn't exist yet); SwiftData just created it, so apply
+            // again now the file exists. The protection attribute can be set
+            // on an already-open file and still takes effect on its next
+            // close, so this also hardens the just-created store for later
+            // in this same session.
+            ModelStoreProtection.apply()
+            return container
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
@@ -56,26 +65,38 @@ struct KurnApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(settings)
-                .environment(accessGate)
-                .onChange(of: scenePhase, initial: true) { _, phase in
-                    // Lock the recordings gate whenever the app leaves the
-                    // foreground so the next time it comes back the user has
-                    // to authenticate again.
-                    if phase == .background {
-                        accessGate.lock()
-                    }
-                    // Pre-warm the FluidAudio ASR model while the app is in the
-                    // foreground. The one-time CoreML/ANE compilation costs tens
-                    // of seconds and fails outright if first attempted from the
-                    // background ("could not communicate with a helper
-                    // application"), so doing it here — gated to users who've
-                    // selected and consented to the on-device engine — keeps
-                    // later transcriptions fast and reliable.
-                    guard phase == .active, settings.usesFluidAudioModel else { return }
-                    prewarmFluidAudioModel()
+            ZStack {
+                ContentView()
+                    .environment(settings)
+                    .environment(accessGate)
+                // Covers meeting/transcript content in the app-switcher
+                // snapshot taken while the scene isn't active.
+                if scenePhase != .active {
+                    PrivacyCoverView()
                 }
+            }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                // Lock the recordings gate whenever the app leaves the
+                // foreground so the next time it comes back the user has
+                // to authenticate again. Only `.background` triggers this —
+                // `.inactive` also fires for transient interruptions (a
+                // system alert, Control Center) while a recording's sheet is
+                // presented, and locking there would tear down that sheet
+                // (MeetingsListView swaps its whole unlocked branch for the
+                // locked placeholder), abandoning the in-progress recording.
+                if phase == .background {
+                    accessGate.lock()
+                }
+                // Pre-warm the FluidAudio ASR model while the app is in the
+                // foreground. The one-time CoreML/ANE compilation costs tens
+                // of seconds and fails outright if first attempted from the
+                // background ("could not communicate with a helper
+                // application"), so doing it here — gated to users who've
+                // selected and consented to the on-device engine — keeps
+                // later transcriptions fast and reliable.
+                guard phase == .active, settings.usesFluidAudioModel else { return }
+                prewarmFluidAudioModel()
+            }
         }
         .modelContainer(modelContainer)
     }

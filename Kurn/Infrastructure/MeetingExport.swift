@@ -65,6 +65,13 @@ enum MeetingExport {
     }
 
     /// Write the Markdown to a temporary `.md` file and return its URL.
+    ///
+    /// Each call gets its own UUID-named subdirectory under the temp
+    /// directory (rather than writing `<title>.md` straight into the shared
+    /// temp root) so two exports with the same or empty title — sharing
+    /// twice in quick succession, or two meetings that both fall back to
+    /// "meeting.md" — never collide on the same path while one share sheet
+    /// is still open and the other's `.atomic` write or later cleanup runs.
     @MainActor
     static func temporaryFile(for meeting: Meeting) throws -> URL {
         let text = markdown(for: meeting)
@@ -73,8 +80,12 @@ enum MeetingExport {
             .filter { !$0.isEmpty }
             .joined(separator: "-")
         let name = (safeTitle.isEmpty ? "meeting" : safeTitle) + ".md"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(name)
         try text.data(using: .utf8)?.write(to: url, options: .atomic)
+        RecordingProtection.apply(to: url)
         return url
     }
 }

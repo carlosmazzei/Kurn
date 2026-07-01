@@ -11,6 +11,16 @@ import Observation
 import os
 import SwiftData
 
+/// Recording-preference bundle for `RecorderViewModel.init`, grouping
+/// settings-derived options so the initializer doesn't accumulate a
+/// parameter per preference.
+struct RecorderOptions {
+    var micPickup: MicPickup = .wholeRoom
+    var audioQuality: AudioQuality = .high
+    var liveTranscriptionEnabled: Bool = false
+    var hideLiveActivityMeetingTitle: Bool = true
+}
+
 @MainActor
 @Observable
 final class RecorderViewModel {
@@ -26,22 +36,22 @@ final class RecorderViewModel {
     private let modelContext: ModelContext
     private let defaultMode: TranscriptionMode
     private let liveTranscriptionEnabled: Bool
+    private let hideLiveActivityMeetingTitle: Bool
     private let lockScreenController = LockScreenRecordingController()
 
     init(
         meeting: Meeting,
         modelContext: ModelContext,
         defaultMode: TranscriptionMode,
-        micPickup: MicPickup = .wholeRoom,
-        audioQuality: AudioQuality = .high,
-        liveTranscriptionEnabled: Bool = false
+        options: RecorderOptions = RecorderOptions()
     ) {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
-        self.liveTranscriptionEnabled = liveTranscriptionEnabled
-        self.recorder.micPickup = micPickup
-        self.recorder.audioBitRate = audioQuality.bitRate
+        self.liveTranscriptionEnabled = options.liveTranscriptionEnabled
+        self.hideLiveActivityMeetingTitle = options.hideLiveActivityMeetingTitle
+        self.recorder.micPickup = options.micPickup
+        self.recorder.audioBitRate = options.audioQuality.bitRate
         self.recorder.onStateChanged = { [weak self] state, elapsed in
             self?.lockScreenController.update(state: state, elapsed: elapsed)
             self?.pushWatchState(state: state, elapsed: elapsed)
@@ -49,7 +59,7 @@ final class RecorderViewModel {
         self.recorder.onLevelChanged = { level in
             PhoneSessionController.shared.pushLevel(level)
         }
-        if liveTranscriptionEnabled {
+        if options.liveTranscriptionEnabled {
             // Capture the service directly (not via `self`) so this closure,
             // invoked on the tap's real-time render thread, isn't inferred as
             // main-actor isolated — `append` is `nonisolated` precisely so it
@@ -73,11 +83,20 @@ final class RecorderViewModel {
     private func pushWatchState(state: AudioRecorderService.State, elapsed: TimeInterval) {
         PhoneSessionController.shared.pushState(
             state: state,
-            meetingTitle: meeting.title,
+            meetingTitle: displayTitle,
             accumulatedElapsed: elapsed,
             referenceDate: Date(),
             isAvailable: state != .idle
         )
+    }
+
+    /// Meeting title shown on the Lock Screen Live Activity and the paired
+    /// Watch — both are glanceable surfaces, so both honor the same
+    /// redaction setting.
+    private var displayTitle: String {
+        hideLiveActivityMeetingTitle
+            ? NSLocalizedString("recording.live_activity.generic_title", comment: "Generic Live Activity title")
+            : meeting.title
     }
 
     var state: AudioRecorderService.State { recorder.state }
@@ -116,7 +135,7 @@ final class RecorderViewModel {
             // hostage to it — otherwise it appears late or, if the load hangs,
             // never at all.
             lockScreenController.start(
-                title: meeting.title,
+                title: displayTitle,
                 state: recorder.state,
                 elapsed: recorder.elapsed
             )

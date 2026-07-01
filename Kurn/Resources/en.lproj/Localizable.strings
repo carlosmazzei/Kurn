@@ -379,8 +379,11 @@
 /* Recordings security */
 "settings.require_auth_for_recordings" = "Require Authentication";
 "settings.require_auth_for_recordings_footer" = "Ask for Face ID, Touch ID, or your device passcode once per session before showing meetings and recordings. Audio files are always encrypted on disk using the device passcode.";
+"settings.hide_live_activity_meeting_title" = "Hide Meeting Title on Lock Screen";
+"settings.hide_live_activity_meeting_title_footer" = "Shows a generic \"Recording…\" label on the Lock Screen, Dynamic Island, and paired Apple Watch instead of the real meeting title while recording.";
 "recordings.locked_title" = "Recordings Locked";
 "recordings.locked_subtitle" = "Authenticate to view your meetings and recordings.";
+"recording.live_activity.generic_title" = "Recording…";
 "recordings.unlock_button" = "Unlock";
 "recordings.unlock_reason" = "Authenticate to access your meeting recordings.";
 "recordings.open_settings" = "Open Settings";

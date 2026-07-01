@@ -25,7 +25,7 @@ struct AppSettingsTests {
         "settings.vadEngine", "settings.languageDetectionEngine",
         "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
         "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
-        "settings.logLevel", "settings.meetingsSortOrder"
+        "settings.logLevel", "settings.meetingsSortOrder", "settings.hideLiveActivityMeetingTitle"
     ]
 
     /// Run `body` against a freshly-defaulted AppSettings, restoring the user's
@@ -99,5 +99,13 @@ struct AppSettingsTests {
                 mode: .whisperAPI, language: .portuguese, multilingualConsented: false
             ) == .whisperAPI
         )
+    }
+
+    @Test func hideLiveActivityMeetingTitleDefaultsToTrueAndPersists() {
+        withScopedDefaults { settings in
+            #expect(settings.hideLiveActivityMeetingTitle == true)
+            settings.hideLiveActivityMeetingTitle = false
+            #expect(AppSettings().hideLiveActivityMeetingTitle == false)
+        }
     }
 }
