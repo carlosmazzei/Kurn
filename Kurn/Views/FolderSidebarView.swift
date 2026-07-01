@@ -25,6 +25,7 @@ struct FolderSidebarView: View {
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query(filter: #Predicate<Folder> { $0.parent == nil }, sort: \Folder.createdAt)
     private var rootFolders: [Folder]
+    @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
 
     /// Chain of folders the user has drilled into, oldest first. Driven by
     /// `NavigationStack(path:)` so the system back gesture / button restores
@@ -35,6 +36,8 @@ struct FolderSidebarView: View {
     @State private var creating: NewFolderContext?
     @State private var editing: Folder?
     @State private var pendingDelete: Folder?
+    @State private var showingAnalytics = false
+    @State private var analyticsFolder: Folder?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -48,6 +51,9 @@ struct FolderSidebarView: View {
         }
         .sheet(item: $editing) { folder in
             FolderFormView(mode: .edit(folder))
+        }
+        .sheet(isPresented: $showingAnalytics) {
+            FolderAnalyticsView(folder: analyticsFolder, meetings: analyticsMeetings)
         }
         .kurnDialog(
             isPresented: Binding(
@@ -78,15 +84,40 @@ struct FolderSidebarView: View {
                     bucketRow(bucket)
                 }
             }
+            if !smartFolders.isEmpty {
+                Section(NSLocalizedString("smart_folder.title", comment: "Smart Folders")) {
+                    ForEach(smartFolders) { smartFolder in
+                        smartFolderRow(smartFolder)
+                    }
+                }
+            }
             folderSection(folders: rootFolders, parent: nil)
         }
         .navigationTitle(NSLocalizedString("meetings.bucket", comment: "Library"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    analyticsFolder = nil
+                    showingAnalytics = true
+                } label: {
+                    Label(
+                        NSLocalizedString("analytics.insights", comment: "Insights"),
+                        systemImage: "chart.bar"
+                    )
+                }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
             }
         }
+    }
+
+    private var analyticsMeetings: [Meeting] {
+        if let folder = analyticsFolder {
+            return folder.meetings
+        }
+        return meetings
     }
 
     // MARK: - Drilled-in level
@@ -176,10 +207,37 @@ struct FolderSidebarView: View {
         .buttonStyle(.plain)
     }
 
+    private func smartFolderRow(_ smartFolder: SmartFolder) -> some View {
+        let isSelected = selection == .smartFolder(smartFolder.id)
+        let count = smartFolder.meetings(matching: meetings).count
+        return Button {
+            selection = .smartFolder(smartFolder.id)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: smartFolder.iconName)
+                    .frame(width: 26, alignment: .center)
+                    .foregroundStyle(Color(hex: smartFolder.colorHex))
+                Text(smartFolder.name)
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Text("\(count)")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textTertiary)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func folderRow(_ folder: Folder) -> some View {
         let isSelected = selection == .folder(folder.persistentModelID)
         let count = folder.meetings.count
-        let hasChildren = !folder.children.isEmpty
         return HStack(spacing: 0) {
             Button {
                 selection = .folder(folder.persistentModelID)
@@ -205,18 +263,16 @@ struct FolderSidebarView: View {
             }
             .buttonStyle(.plain)
 
-            if hasChildren {
-                Button { path.append(folder) } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.textTertiary)
-                        .padding(.leading, 10)
-                        .padding(.vertical, 6)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
+            Button { path.append(folder) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.textTertiary)
+                    .padding(.leading, 10)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
@@ -230,6 +286,17 @@ struct FolderSidebarView: View {
                 Label(NSLocalizedString("folder.rename", comment: "Edit"), systemImage: "pencil")
             }
             .tint(Theme.info)
+        }
+        .contextMenu {
+            Button {
+                analyticsFolder = folder
+                showingAnalytics = true
+            } label: {
+                Label(
+                    NSLocalizedString("analytics.insights", comment: "Insights"),
+                    systemImage: "chart.bar"
+                )
+            }
         }
     }
 
