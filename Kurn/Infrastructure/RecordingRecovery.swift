@@ -46,14 +46,7 @@ enum RecordingRecovery {
         // Task instead could race a brand-new Live Activity started moments
         // after launch and tear it right back down. Only the launch-time
         // snapshot is touched.
-        let orphaned = orphanedActivities()
-        if !orphaned.isEmpty {
-            Task {
-                for activity in orphaned {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                }
-            }
-        }
+        endOrphanedActivities()
 
         recoverOrphanedAudioFiles(context: ModelContext(modelContainer))
     }
@@ -75,15 +68,23 @@ enum RecordingRecovery {
             documentsURL: AudioFileStore.documentsURL,
             recordingsURL: AudioFileStore.recordingsDirectoryURL
         )
+        endOrphanedActivities()
+        recoverOrphanedAudioFiles(context: modelContainer.mainContext)
+    }
+
+    /// Snapshot and asynchronously end every leftover Live Activity.
+    /// Deliberately nonisolated: the snapshot is created inside this function,
+    /// so it forms a disconnected region that can be sent into the ending task
+    /// (capturing it from a `@MainActor` caller instead trips Swift 6's
+    /// region-based data-race check on the non-Sendable activities).
+    private static func endOrphanedActivities() {
         let orphaned = orphanedActivities()
-        if !orphaned.isEmpty {
-            Task {
-                for activity in orphaned {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                }
+        guard !orphaned.isEmpty else { return }
+        Task {
+            for activity in orphaned {
+                await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
-        recoverOrphanedAudioFiles(context: modelContainer.mainContext)
     }
 
     private static func recoverOrphanedAudioFiles(context: ModelContext) {
