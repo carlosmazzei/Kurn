@@ -62,6 +62,21 @@ struct TranscriptionRecoveryTests {
         #expect(recording.transcriptionStatus == .failed)
     }
 
+    @Test func activeRecordingsAreExcludedFromSweep() throws {
+        // The foreground sweep must not touch a run some view model in this
+        // process is actually working on — only orphaned `.inProgress` rows.
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let active = makeRecording(in: context, status: .inProgress, withCheckpoint: true)
+        let stale = makeRecording(in: context, status: .inProgress, withCheckpoint: true)
+        try context.save()
+
+        TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container, excluding: [active.id])
+
+        #expect(active.transcriptionStatus == .inProgress)
+        #expect(stale.transcriptionStatus == .pending)
+    }
+
     @Test func otherStatusesAreLeftAlone() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext

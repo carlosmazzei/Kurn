@@ -20,6 +20,9 @@ import SwiftData
 
 #if canImport(BackgroundTasks)
 import BackgroundTasks
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum TranscriptionScheduler {
 
@@ -82,10 +85,34 @@ enum TranscriptionScheduler {
         }
         let box = UncheckedSendableBox(task)
         Task { @MainActor in
+            // Processing windows usually open while the device is locked
+            // (idle, charging) — but the store and the recordings are Data
+            // Protected and unreadable then, which would turn every resume
+            // into a spurious failure. Try again in a later window instead.
+            #if canImport(UIKit)
+            guard UIApplication.shared.isProtectedDataAvailable else {
+                AppLog.transcription.atNotice.notice("bgTask: protected data unavailable (locked), deferring")
+                resubmit()
+                box.value.setTaskCompleted(success: false)
+                return
+            }
+            #endif
             let remaining = await BackgroundTranscriptionRunner.shared.run(container: container)
             AppLog.transcription.atNotice.notice("bgTask: window finished, remaining=\(remaining, privacy: .public)")
             box.value.setTaskCompleted(success: remaining == 0)
         }
+    }
+
+    /// Re-arm a processing request without touching the (possibly unreadable)
+    /// store. Network connectivity is required pessimistically — the common
+    /// backlog is Whisper chunks, and an on-device backlog just waits for the
+    /// next foreground pass instead.
+    @MainActor
+    private static func resubmit() {
+        let request = BGProcessingTaskRequest(identifier: taskIdentifier)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = false
+        try? BGTaskScheduler.shared.submit(request)
     }
 
     @MainActor
