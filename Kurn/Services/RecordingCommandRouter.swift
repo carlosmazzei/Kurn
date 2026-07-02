@@ -30,6 +30,12 @@ final class RecordingCommandRouter {
 
     private init() {}
 
+    /// Whether a live recorder session currently has its handlers registered.
+    /// Used to gate maintenance that must never run mid-recording (e.g. the
+    /// foreground orphan sweep, which would otherwise treat the in-progress
+    /// audio file — no `Recording` row yet — as an orphan).
+    var hasActiveSession: Bool { onStop != nil }
+
     func register(
         onTogglePause: @escaping () -> Void,
         onPause: @escaping () -> Void,

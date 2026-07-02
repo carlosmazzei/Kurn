@@ -46,6 +46,11 @@ struct RecorderView: View {
                 )
             }
         }
+        .onDisappear {
+            // Safety net: never let this view's teardown silently abandon a
+            // running recording (no-op after a normal stop/cancel).
+            vm?.finalizeIfAbandoned()
+        }
     }
 }
 

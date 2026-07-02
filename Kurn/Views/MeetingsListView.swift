@@ -106,13 +106,26 @@ struct MeetingsListView: View {
     }
 
     var body: some View {
-        if isLocked {
-            LockedRecordingsView(gate: accessGate, showingSettings: $showingSettings)
-                .background(Theme.background.ignoresSafeArea())
-                .toolbar(.hidden, for: .navigationBar)
-                .task { await accessGate.authenticate() }
-        } else {
-            unlockedBody
+        Group {
+            if isLocked {
+                LockedRecordingsView(gate: accessGate, showingSettings: $showingSettings)
+                    .background(Theme.background.ignoresSafeArea())
+                    .toolbar(.hidden, for: .navigationBar)
+                    .task { await accessGate.authenticate() }
+            } else {
+                unlockedBody
+            }
+        }
+        // The recorder sheet is attached OUTSIDE the locked/unlocked branch on
+        // purpose: the gate locks on every background transition, and a sheet
+        // attached to `unlockedBody` would be torn down with it — destroying
+        // the live RecorderViewModel mid-recording (audio orphaned unfinalized,
+        // Live Activity stuck) and then auto-presenting a fresh recorder after
+        // re-auth because `recordMeeting` survives the swap. Out here the
+        // running recorder stays presented above the locked placeholder; the
+        // meeting list below still requires authentication.
+        .sheet(item: $recordMeeting) { meeting in
+            NavigationStack { RecorderView(meeting: meeting) }
         }
     }
 
@@ -242,9 +255,6 @@ struct MeetingsListView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
-        }
-        .sheet(item: $recordMeeting) { meeting in
-            NavigationStack { RecorderView(meeting: meeting) }
         }
         .sheet(item: $editingMeeting) { meeting in
             NavigationStack { MeetingFormView(meeting: meeting) }
