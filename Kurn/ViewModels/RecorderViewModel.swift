@@ -217,4 +217,17 @@ final class RecorderViewModel {
         RecordingCommandRouter.shared.unregister()
         PhoneSessionController.shared.notifyEnded()
     }
+
+    /// Last-resort teardown, called when the hosting view disappears. If the
+    /// view hierarchy is torn down while a recording is still running (nothing
+    /// in SwiftUI guarantees the recorder sheet survives every ancestor swap),
+    /// deallocation without this would orphan the audio file unfinalized and
+    /// leave the Live Activity stuck. Stopping-and-saving here turns any
+    /// unexpected teardown into a saved recording; it's a no-op after a normal
+    /// stop or cancel.
+    func finalizeIfAbandoned() {
+        guard !didSaveRecording, recorder.state != .idle else { return }
+        AppLog.recorderUI.atError.error("finalizeIfAbandoned: view torn down mid-recording, stopping and saving")
+        stopAndSave()
+    }
 }

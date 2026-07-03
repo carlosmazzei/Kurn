@@ -41,6 +41,11 @@ final class TranscriptionViewModel {
     /// own, and a recording must never transcribe twice concurrently.
     private static var globalActiveIDs: Set<UUID> = []
 
+    /// Recordings some view model in this process is actually working on.
+    /// The foreground recovery sweep uses this to distinguish a live run
+    /// (leave alone) from a stale persisted `.inProgress` (reset to resumable).
+    static var activeTranscriptionIDs: Set<UUID> { globalActiveIDs }
+
     private let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
     private let summaryService = SummaryService()
@@ -88,7 +93,10 @@ final class TranscriptionViewModel {
     ) {
         let recordingID = recording.id
         guard transcriptionTasks[recordingID] == nil,
-              !Self.globalActiveIDs.contains(recordingID) else { return }
+              !Self.globalActiveIDs.contains(recordingID) else {
+            AppLog.transcription.atInfo.info("VM: start ignored, already in flight id=\(recordingID, privacy: .public)")
+            return
+        }
         transcriptionTasks[recordingID] = Task { [weak self] in
             await self?.transcribe(recording, language: language, config: config)
             self?.transcriptionTasks[recordingID] = nil
@@ -312,7 +320,12 @@ final class TranscriptionViewModel {
         config: PipelineConfiguration
     ) async {
         for recording in meeting.recordings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
-            await transcribe(recording, language: language, config: config)
+            // Through the task registry (not a bare `transcribe`) so the
+            // background-window expiration handler can pause these runs too.
+            startTranscription(recording, language: language, config: config)
+            if let task = transcriptionTasks[recording.id] {
+                await task.value
+            }
         }
     }
 

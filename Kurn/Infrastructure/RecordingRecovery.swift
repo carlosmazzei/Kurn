@@ -46,20 +46,48 @@ enum RecordingRecovery {
         // Task instead could race a brand-new Live Activity started moments
         // after launch and tear it right back down. Only the launch-time
         // snapshot is touched.
-        let orphaned = orphanedActivities()
-        if !orphaned.isEmpty {
-            Task {
-                for activity in orphaned {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                }
-            }
-        }
+        endOrphanedActivities()
 
-        recoverOrphanedAudioFiles(modelContainer: modelContainer)
+        recoverOrphanedAudioFiles(context: ModelContext(modelContainer))
     }
 
-    private static func recoverOrphanedAudioFiles(modelContainer: ModelContainer) {
-        let context = ModelContext(modelContainer)
+    /// Foreground-activation variant of `recoverOrphans`: reattaches orphaned
+    /// audio (and ends stuck Live Activities) without waiting for the next
+    /// cold launch — a recording abandoned by an unexpected UI teardown would
+    /// otherwise sit invisible on disk until the user happens to relaunch.
+    /// Skipped entirely while a recorder session is live: its in-progress file
+    /// has no `Recording` row yet and must never be treated as an orphan, and
+    /// its Live Activity is not stuck. Works on the main context so a
+    /// reattached recording appears in the UI immediately.
+    @MainActor
+    static func recoverOrphansOnActivate(modelContainer: ModelContainer) {
+        guard !RecordingCommandRouter.shared.hasActiveSession else { return }
+        // Same pre-scan migration as the launch path (idempotent and cheap),
+        // so the orphan scan below always sees the post-migration layout.
+        RecordingProtection.migrateLegacyRecordings(
+            documentsURL: AudioFileStore.documentsURL,
+            recordingsURL: AudioFileStore.recordingsDirectoryURL
+        )
+        endOrphanedActivities()
+        recoverOrphanedAudioFiles(context: modelContainer.mainContext)
+    }
+
+    /// Snapshot and asynchronously end every leftover Live Activity.
+    /// Deliberately nonisolated: the snapshot is created inside this function,
+    /// so it forms a disconnected region that can be sent into the ending task
+    /// (capturing it from a `@MainActor` caller instead trips Swift 6's
+    /// region-based data-race check on the non-Sendable activities).
+    private static func endOrphanedActivities() {
+        let orphaned = orphanedActivities()
+        guard !orphaned.isEmpty else { return }
+        Task {
+            for activity in orphaned {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
+
+    private static func recoverOrphanedAudioFiles(context: ModelContext) {
         guard let knownFileNames = try? context.fetch(FetchDescriptor<Recording>()).map(\.fileName) else {
             return
         }
@@ -87,9 +115,18 @@ enum RecordingRecovery {
         }
     }
 
+    /// Unreadable orphans at or above this size are kept on disk instead of
+    /// deleted: a large `.m4a` whose container was never finalized (the writer
+    /// was torn down without `stop()`) fails to open here, but it is the only
+    /// copy of the user's audio — deleting it destroys a potentially long
+    /// meeting with no recourse, while keeping it costs a little disk and
+    /// leaves repair/manual extraction possible.
+    static let keepUnreadableMinBytes = 1_000_000
+
     /// - Returns: whether `fileName` was reattached to a `Recording`. Files that
-    ///   can't be matched to a meeting or read back never get a second chance,
-    ///   so they're deleted instead of lingering in Documents forever.
+    ///   can't be matched to a meeting never get a second chance, so they're
+    ///   deleted instead of lingering in Documents forever; unreadable files
+    ///   are only deleted when they're too small to plausibly matter.
     private static func recover(fileName: String, at url: URL, context: ModelContext) -> Bool {
         guard let meetingID = meetingID(from: fileName) else {
             AudioFileStore.delete(fileName: fileName)
@@ -101,7 +138,15 @@ enum RecordingRecovery {
             AudioFileStore.delete(fileName: fileName)
             return false
         }
-        guard let duration = readableDuration(of: url), duration >= 0.5 else {
+        let duration = readableDuration(of: url)
+        guard let duration, duration >= 0.5 else {
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            if duration == nil, size >= Self.keepUnreadableMinBytes {
+                AppLog.recorder.atError.error(
+                    "recovery: keeping unreadable orphan \(fileName, privacy: .public) (\(size, privacy: .public) bytes) — container not finalized"
+                )
+                return false
+            }
             AudioFileStore.delete(fileName: fileName)
             return false
         }

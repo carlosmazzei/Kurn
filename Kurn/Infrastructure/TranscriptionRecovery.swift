@@ -2,13 +2,18 @@
 //  TranscriptionRecovery.swift
 //  Kurn
 //
-//  Runs once at launch to clean up after a process that died mid-transcription
-//  (the OS suspending and then killing the app during a long chunked run).
-//  Such a recording is left stuck at `.inProgress` in the store with nobody
-//  working on it. Recordings whose run saved a checkpoint become `.pending` so
+//  Cleans up recordings left stuck at `.inProgress` in the store with nobody
+//  working on them — a process death mid-run, or a persist that couldn't land
+//  (e.g. the app was relaunched in the background while the device was locked
+//  and the protected store was unreadable, turning the launch sweep into a
+//  silent no-op). Recordings whose run saved a checkpoint become `.pending` so
 //  the foreground resume pass picks them up where they left off; runs that
 //  never reached their first chunk have nothing to resume and are marked
 //  `.failed` for a manual retry.
+//
+//  Runs at launch AND on every foreground activation: only the latter can fix
+//  a store that was unreadable at launch, and `excluding` keeps it from
+//  touching runs genuinely in flight in this process.
 //
 
 import Foundation
@@ -16,19 +21,25 @@ import SwiftData
 
 enum TranscriptionRecovery {
 
-    /// Reset every recording left `.inProgress` by a dead process. Safe to call
-    /// unconditionally at launch: a fresh process has no transcription running
-    /// yet, so any `.inProgress` row is by definition stale. Works on the main
-    /// context — the one the view models read — so the corrected statuses are
-    /// visible immediately rather than waiting for a context refresh.
+    /// Reset every recording left `.inProgress` with nobody working on it.
+    /// - Parameter activeIDs: recordings a live view model is actually
+    ///   transcribing right now (empty at launch — a fresh process has no runs
+    ///   yet). Works on the main context — the one the view models read — so
+    ///   the corrected statuses are visible immediately rather than waiting
+    ///   for a context refresh.
     @MainActor
-    static func sweepStaleTranscriptions(modelContainer: ModelContainer) {
+    static func sweepStaleTranscriptions(
+        modelContainer: ModelContainer,
+        excluding activeIDs: Set<UUID> = []
+    ) {
         let context = modelContainer.mainContext
         let inProgressRaw = TranscriptionStatus.inProgress.rawValue
         let descriptor = FetchDescriptor<Recording>(
             predicate: #Predicate { $0.transcriptionStatusRaw == inProgressRaw }
         )
-        guard let stale = try? context.fetch(descriptor), !stale.isEmpty else { return }
+        guard let inProgress = try? context.fetch(descriptor) else { return }
+        let stale = inProgress.filter { !activeIDs.contains($0.id) }
+        guard !stale.isEmpty else { return }
 
         var resumable = 0
         for recording in stale {

@@ -130,6 +130,19 @@ struct KurnApp: App {
                 // process death. `.pending` recordings carry a checkpoint, so
                 // each continues from its last completed chunk.
                 if phase == .active {
+                    // Reattach any orphaned recording (and end stuck Live
+                    // Activities) without waiting for the next cold launch.
+                    // No-op while a recorder session is live.
+                    RecordingRecovery.recoverOrphansOnActivate(modelContainer: modelContainer)
+                    // Sweep again on every activation, not just at launch: a
+                    // background relaunch while the device was locked can't
+                    // read the protected store, leaving recordings stuck at
+                    // `.inProgress` that only a later, unlocked pass can fix.
+                    // Runs genuinely in flight in this process are excluded.
+                    TranscriptionRecovery.sweepStaleTranscriptions(
+                        modelContainer: modelContainer,
+                        excluding: TranscriptionViewModel.activeTranscriptionIDs
+                    )
                     if transcriptionResumer == nil {
                         transcriptionResumer = TranscriptionViewModel(
                             modelContext: modelContainer.mainContext
