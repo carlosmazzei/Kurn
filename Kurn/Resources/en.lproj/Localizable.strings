@@ -61,6 +61,7 @@
 
 /* Recorder */
 "recorder.route_changed" = "Recording paused: the audio device changed (e.g. headphones unplugged).";
+"recorder.engine_stalled" = "Recording paused: the system stopped audio capture. Tap resume to continue.";
 "recorder.title" = "New Recording";
 "recorder.add_title" = "Add title…";
 "recorder.pause" = "Pause";

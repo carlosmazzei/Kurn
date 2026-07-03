@@ -50,6 +50,10 @@ final class AudioRecorderService: NSObject {
     /// main-actor object directly.
     @ObservationIgnored private nonisolated let sink = RecordingSink()
     @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
+    /// Input format the tap (and the output file) were created with, so the
+    /// engine-stall recovery can tell an in-place restart (same format) from a
+    /// format change the current file can't absorb.
+    @ObservationIgnored private nonisolated(unsafe) var tapFormat: AVAudioFormat?
     /// True while `start` is asynchronously spinning up the engine, to block
     /// re-entrant start attempts during that window.
     @ObservationIgnored private var isStarting = false
@@ -266,6 +270,7 @@ final class AudioRecorderService: NSObject {
         // thread.
         Self.installTap(on: input, format: format, sink: sink)
         tapInstalled = true
+        tapFormat = format
 
         engine.prepare()
         do {
@@ -437,6 +442,24 @@ final class AudioRecorderService: NSObject {
             name: AVAudioSession.routeChangeNotification,
             object: nil
         )
+        // The engine can be stopped out from under a live recording with NO
+        // interruption notification: a configuration change (route/sample-rate
+        // shuffle, seen around locking and unlocking the device) or a
+        // media-services reset. Without these observers the recorder keeps
+        // counting elapsed time while no buffers reach the file — silent
+        // audio loss with only a frozen level meter as a symptom.
+        center.addObserver(
+            self,
+            selector: #selector(handleEngineConfigurationChange(_:)),
+            name: .AVAudioEngineConfigurationChange,
+            object: engine
+        )
+        center.addObserver(
+            self,
+            selector: #selector(handleMediaServicesReset(_:)),
+            name: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil
+        )
     }
 
     @objc private nonisolated func handleInterruption(_ note: Notification) {
@@ -469,6 +492,51 @@ final class AudioRecorderService: NSObject {
         @unknown default:
             break
         }
+    }
+
+    @objc private nonisolated func handleEngineConfigurationChange(_ note: Notification) {
+        Task { @MainActor in self.recoverEngineIfNeeded(reason: "configuration change") }
+    }
+
+    @objc private nonisolated func handleMediaServicesReset(_ note: Notification) {
+        Task { @MainActor in self.recoverEngineIfNeeded(reason: "media services reset") }
+    }
+
+    /// Restart an engine that stopped mid-recording. When the input format is
+    /// unchanged (the common case: the system bounced the engine around a
+    /// lock/unlock) the existing tap and output file are still valid, so a
+    /// plain restart resumes capture seamlessly. When the format DID change,
+    /// the current `.m4a` cannot accept the new buffers — fall back to pausing
+    /// with a visible banner so the user resumes deliberately (resume restarts
+    /// the engine) instead of silently losing everything after this moment.
+    private func recoverEngineIfNeeded(reason: String) {
+        guard state == .recording, !engine.isRunning else { return }
+        AppLog.recorder.atError.error("engine stopped mid-recording (\(reason, privacy: .public)); attempting restart")
+
+        let current = engine.inputNode.outputFormat(forBus: 0)
+        let formatUnchanged = tapFormat.map {
+            $0.sampleRate == current.sampleRate && $0.channelCount == current.channelCount
+        } ?? false
+
+        if formatUnchanged {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            engine.prepare()
+            do {
+                try engine.start()
+                AppLog.recorder.atNotice.notice("engine restarted in place after \(reason, privacy: .public)")
+                return
+            } catch {
+                AppLog.recorder.atError.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
+            }
+        } else {
+            AppLog.recorder.atError.error("input format changed (\(current.sampleRate, privacy: .public)Hz/\(current.channelCount, privacy: .public)ch); cannot restart in place")
+        }
+
+        pause()
+        routeChangeMessage = NSLocalizedString(
+            "recorder.engine_stalled",
+            comment: "Recording paused because the system stopped the audio engine"
+        )
     }
 
     @objc private nonisolated func handleRouteChange(_ note: Notification) {
