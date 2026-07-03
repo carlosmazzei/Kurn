@@ -38,7 +38,15 @@ summary with a configured AI provider.
 - Control active recordings from the Lock Screen, Dynamic Island, or Apple
   Watch.
 - Mirror recording state and input level to the Watch app.
-- Search meetings and filter them by all, today, or this week.
+- Search meetings and filter them by date range, tags, transcription status,
+  summary presence, and duration.
+- Organize meetings into user-defined folders, mark them favorite, or archive
+  them, alongside built-in All / Inbox / Favorites / Archive views.
+- Tag meetings and manage tags globally (rename, recolor, merge, delete), with
+  optional LLM-based tag suggestions from the transcript.
+- Save a filter as a Smart Folder that dynamically lists matching meetings.
+- View folder analytics: meeting counts, durations, status breakdown, tag
+  distribution, and top speakers.
 - Play saved recordings and seek from transcript timestamps.
 - Delete meetings and individual recording segments.
 - Track local audio storage usage and reset all app data from Settings.
@@ -58,6 +66,9 @@ summary with a configured AI provider.
 - Runs lightweight heuristic speaker diarization and fuses speaker turns with
   transcript spans.
 - Lets users rename detected speakers.
+- Resumes long transcriptions automatically after the app is backgrounded,
+  terminated, or interrupted, continuing from the last completed chunk instead
+  of starting over.
 
 Supported transcription languages are auto-detect, Portuguese, English,
 Spanish, French, German, Japanese, and Chinese.
@@ -234,10 +245,11 @@ models, async service APIs, and a SwiftData model container.
 Kurn/
 ├── KurnApp.swift                 # App entry point and SwiftData container
 ├── ContentView.swift            # Root NavigationStack
-├── Models/                      # SwiftData @Model types and enums
+├── Models/                      # SwiftData @Model types and shared value types
 ├── Views/                       # SwiftUI screens and reusable views
 ├── ViewModels/                  # Main-actor observable coordinators
-├── Services/                    # Audio, transcription, diarization, summaries
+├── Services/                    # Audio, diarization, summaries, folder analytics
+│   └── Pipeline/                # Transcription pipeline stages (protocol seams)
 ├── Providers/                   # OpenAI, Anthropic, Google AI, and Groq clients
 ├── Infrastructure/              # Keychain, errors, settings, export, extensions
 ├── Resources/                   # Localizations and privacy manifest
@@ -249,9 +261,15 @@ KurnWatch/
 └── WatchConnectivityManager.swift
 
 KurnLiveActivityExtension/
-├── RecordingActivityAttributes.swift
 └── RecordingLiveActivityWidget.swift
 ```
+
+`Models/` includes `Meeting`, `Recording`, `Transcript`, `Speaker`, `Summary`,
+`Tag`, `Folder`, and `SmartFolder`. `Infrastructure/` also hosts background
+transcription scheduling and recovery
+(`TranscriptionScheduler.swift`, `TranscriptionRecovery.swift`) and
+`RecordingActivityAttributes.swift`, which is shared into the
+`KurnLiveActivityExtension` target rather than duplicated.
 
 ## Important Implementation Notes
 
@@ -261,6 +279,8 @@ KurnLiveActivityExtension/
 - On-device transcription availability depends on Apple's Speech framework,
   simulator/device support, and the selected language.
 - Background audio recording is enabled through `UIBackgroundModes`.
+- Long transcriptions resume automatically via a `BGProcessingTask` and a
+  foreground recovery sweep, rather than failing when interrupted.
 - The main app and extensions use checked-in `Info.plist` files.
 
 ## Development Notes

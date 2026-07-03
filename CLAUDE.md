@@ -70,10 +70,12 @@ MVVM with `@Observable` `@MainActor` view models, value-type async services, and
 single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 
 - **Models/** — SwiftData `@Model` classes (`Meeting`, `Recording`, `Transcript`,
-  `Speaker`, `Summary`) plus shared value types in `Enums.swift`.
-- **Services/** — audio capture, transcription pipeline, diarization, summaries.
-  These are mostly `struct`/value types operating on plain values so they stay
-  decoupled from SwiftData and safe off the main actor.
+  `Speaker`, `Summary`, `Tag`, `Folder`, `SmartFolder`) plus shared value types
+  (`Enums.swift`, `MeetingFilter`, `TranscriptionCheckpoint`).
+- **Services/** — audio capture, transcription pipeline (`Services/Pipeline/`),
+  diarization, summaries, folder analytics, auto-tagging. These are mostly
+  `struct`/value types operating on plain values so they stay decoupled from
+  SwiftData and safe off the main actor.
 - **Providers/** — cloud LLM clients behind the `LLMProvider` protocol.
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and
   persisting results.
@@ -88,7 +90,33 @@ arbitrary `Codable` arrays**, so `Transcript.segments` (`[TranscriptSegment]`) a
 similar collections are encoded to/from JSON `Data` via computed properties
 (`Transcript.segmentsData`). Relationships are set by assigning the parent (e.g.
 `Recording(meeting:)`) — SwiftData maintains the inverse, so never append to the
-parent collection manually.
+parent collection manually. `Recording.transcriptionCheckpointData` uses the same
+JSON-`Data` pattern to persist a `TranscriptionCheckpoint` (see "Resumable
+transcription" below).
+
+Organization is layered on top of `Meeting` rather than replacing the aggregate
+root:
+
+- `isFavorite: Bool` and `archivedAt: Date?` (`isArchived`) are plain fields on
+  `Meeting`; `MeetingsLibraryBucket`/`LibrarySelection` (`Models/Enums.swift`)
+  bucket meetings into All/Inbox/Favorites/Archive.
+- `Folder` (`Models/Folder.swift`) — one folder per meeting (`Meeting.folder`,
+  `.nullify`, so deleting a folder detaches rather than deletes its meetings).
+  Self-referential `parent`/`children` exist for future subfolders; the sidebar
+  only shows root folders today. Icon/color come from `FolderCatalog.swift`.
+- `Tag` (`Models/Tag.swift`) — many-to-many via `Meeting.tags` (`.nullify`).
+  `AutoTaggingService` (`Services/AutoTaggingService.swift`) can suggest
+  existing/new tags from a transcript excerpt through the configured summary
+  LLM provider; it's off by default and gated in Settings.
+- `MeetingFilter` (`Models/MeetingFilter.swift`) — a `Codable` value type (not a
+  `@Model`) ANDing date range, tags, status, summary presence, and duration.
+  Used as live UI filter state and as a `SmartFolder`'s persisted predicate.
+- `SmartFolder` (`Models/SmartFolder.swift`) — stores a JSON-encoded
+  `MeetingFilter` and does not own meetings; `meetings(matching:)` filters an
+  in-memory list dynamically, like a saved search rather than a folder.
+- `FolderAnalytics` (`Services/FolderAnalytics.swift`) — pure value type
+  computing counts/durations/status/tag/speaker breakdowns for a folder or any
+  `[Meeting]`, rendered by `Views/FolderAnalyticsView.swift`.
 
 ### Secure local storage for recordings
 
@@ -117,21 +145,71 @@ the environment from `KurnApp` and re-locked on every
 `AppSettings.requireAuthForRecordings` (Settings → Recording) turns off the
 prompt while leaving the on-disk encryption in place.
 
+The recorder sheet is presented outside the access gate's locked/unlocked
+branch, so backgrounding mid-recording (which re-locks the gate) can't tear
+down the live `RecorderViewModel` and orphan its audio file;
+`RecordingRecovery` also no longer deletes unreadable orphans ≥1 MB outright.
+`AudioRecorderService` separately recovers from
+`AVAudioEngineConfigurationChange` (e.g. the engine bouncing when the device
+locks) by restarting in place, or pausing with a banner if the audio format
+changed.
+
 ### Transcription pipeline (`Services/TranscriptionService.swift`)
 
-The orchestration that requires reading several files together:
+Each stage is a protocol seam (`Services/Pipeline/PipelineStages.swift`:
+`AudioPreprocessing`, `VoiceActivityDetecting`, `LanguageDetecting`,
+`Transcribing`, plus `Diarizing` in `TranscriptionTypes.swift`) so the engine per
+stage is swappable without touching the orchestrator. `PipelineConfiguration`
+(built from `AppSettings`) picks one engine per stage; defaults are the
+always-available, no-download engines so a fresh install works offline.
 
-1. **Preprocess** audio (`AudioPreprocessor`); on any failure it falls back to the
-   original file so transcription never breaks.
-2. **Transcribe + diarize concurrently** (`async let`) over the same cleaned file —
-   engine is on-device (`OnDeviceTranscriber`, Apple Speech) or Whisper
-   (`AudioChunker` splits long audio, uploads chunks, offsets timestamps back to
-   absolute meeting time).
-3. **Fuse** transcript spans with heuristic speaker turns into
-   `[TranscriptSegment]`, merging consecutive same-speaker spans (capped at 30s).
+`TranscriptionService.transcribe` drives the stages in order:
+
+1. **Preprocess** audio with the selected engine (`AudioPreprocessor` or a
+   passthrough); on any failure it falls back to the original file so
+   transcription never breaks.
+2. **Detect language** (only surfaced as a phase when a real detector runs; the
+   default no-op detector defers to the transcription engine).
+3. **Detect speech** (VAD) — drives both silence-gating of the transcription
+   input and the heuristic diarizer's segmentation.
+4. **Transcribe + diarize** — concurrent (`async let`) for Whisper, since cloud
+   transcription keeps almost nothing on-device; sequential for on-device
+   engines, because running a large ASR model alongside the diarizer over a
+   long recording can push peak memory past the jetsam limit. Diarization reads
+   its own cleaned copy (`DiarizationPreprocessor`, minimal DSP preserving
+   natural timbre) rather than the ASR-tuned one, unless
+   `diarizationPreprocessingEnabled` is off.
+5. **Fuse** transcript spans with speaker turns into `[TranscriptSegment]`
+   via the pure, unit-tested `Pipeline/TranscriptFusion.swift` (merges
+   consecutive same-speaker spans, capped at 30s).
 
 Progress is reported via a `@Sendable` `PhaseHandler` (`TranscriptionPhase`); the
 receiver must hop to the main actor itself.
+
+#### Resumable transcription
+
+Long transcriptions survive backgrounding, app termination, and cancellation
+instead of restarting from scratch:
+
+- `Models/TranscriptionCheckpoint.swift` persists JSON (via
+  `Recording.transcriptionCheckpointData`) after every completed chunk: engine,
+  language, whether the VAD-compacted input was used, total/completed chunk
+  counts, and spans transcribed so far. `Pipeline/ChunkedTranscriptionRunner.swift`
+  is the shared chunk loop for both Whisper and chunked Apple Speech; a resume
+  is only honored if the re-derived chunk plan matches exactly (same engine,
+  language, compaction, chunk count), otherwise it starts over.
+- `Services/WhisperBackgroundUploader.swift` uploads Whisper chunks over a
+  background `URLSession` (file-based request bodies) so an in-flight upload
+  survives the app suspending or the device locking.
+- `Infrastructure/TranscriptionScheduler.swift` registers the
+  `ai.kurn.transcription.processing` `BGProcessingTask` and submits a request
+  on backgrounding whenever pending/in-progress work remains (skipped for
+  FluidAudio engines, which can't compile CoreML models in the background).
+  The task resumes pending recordings and checkpoints cooperatively before its
+  time window expires.
+- `Infrastructure/TranscriptionRecovery.swift` sweeps recordings stuck at
+  `.inProgress` on launch and every foreground activation: recordings with a
+  checkpoint reset to `.pending` (resumable), others to `.failed`.
 
 ### Providers (`Providers/`)
 
@@ -149,6 +227,15 @@ markdown fences and extracts the outermost `{...}` since models add prose. Templ
 picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` holds the
 template-driven body that the views and export render.
 
+Every provider HTTP call funnels through `LLMHTTP.sendValidated`, which retries
+transient transport errors and `429/500/502/503/504` with exponential
+backoff + jitter (honoring `Retry-After`), instead of failing outright on a
+momentary blip. `SummaryService` splits transcripts beyond ~80k chars into a
+map-reduce pass (condense each block, then summarize the combined notes) and
+raises the output budget/timeout (8192 tokens, 300s) so long transcripts don't
+truncate mid-JSON or time out; a truncated response surfaces as
+`AppError.summaryTruncated` instead of a confusing decode error.
+
 ### Cross-device control (Watch + Live Activity)
 
 `RecordingCommandRouter` (main-actor singleton) is the single dispatcher: the live
@@ -161,6 +248,11 @@ thread, 0.2s spacing).
 
 The watchOS target does **not** share source files with the app — types like
 `WatchCommand` are intentionally duplicated in `KurnWatch/`. Keep both copies in sync.
+
+`RecordingActivityAttributes` (`Infrastructure/RecordingActivityAttributes.swift`)
+is, by contrast, a single file compiled into both the `Kurn` and
+`KurnLiveActivityExtension` targets — unlike `WatchCommand`, there was no reason
+for it to drift, so it's shared rather than duplicated.
 
 ### Settings & secrets
 
