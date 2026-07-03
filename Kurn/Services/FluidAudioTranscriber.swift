@@ -73,9 +73,7 @@ actor FluidAudioTranscriber: Transcribing {
             throw appError
         } catch {
             AppLog.transcription.atError.error("fluidAudio: transcription failed: \(error.localizedDescription, privacy: .public)")
-            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                throw appError
-            }
+            try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
 

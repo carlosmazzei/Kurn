@@ -54,9 +54,7 @@ actor FluidAudioModelStore {
         } catch {
             loadTask = nil
             AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
-            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                throw appError
-            }
+            try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
     }

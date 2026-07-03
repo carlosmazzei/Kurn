@@ -23,16 +23,6 @@ struct GroqProvider: LLMProvider {
         self.session = session
     }
 
-    func transcribe(
-        audioData: Data,
-        fileName: String,
-        language: MeetingLanguage
-    ) async throws -> RawTranscript {
-        throw AppError.transcriptionFailed(
-            NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
-        )
-    }
-
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 

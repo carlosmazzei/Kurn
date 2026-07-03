@@ -29,6 +29,15 @@ protocol LLMProvider: Sendable {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult
 }
 
+extension LLMProvider {
+    /// Default for vendors with no speech endpoint wired here.
+    func transcribe(audioData: Data, fileName: String, language: MeetingLanguage) async throws -> RawTranscript {
+        throw AppError.transcriptionFailed(
+            NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
+        )
+    }
+}
+
 // MARK: - Shared HTTP helpers
 
 /// HTTP plumbing shared by the cloud providers: both OpenAI and Anthropic talk

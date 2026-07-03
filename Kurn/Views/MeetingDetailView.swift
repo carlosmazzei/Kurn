@@ -172,138 +172,28 @@ struct MeetingDetailView: View {
             sectionLabel(NSLocalizedString("detail.recordings", comment: "Recordings"))
                 .clearListRow(insets: EdgeInsets(top: 16, leading: 20, bottom: 4, trailing: 20))
             ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in
-                segmentRow(recording, index: index)
-                    .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) { deleteRecording(recording) } label: {
-                            Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
-                        }
+                RecordingSegmentRow(
+                    recording: recording,
+                    index: index,
+                    player: player,
+                    txVM: txVM,
+                    pendingRetranscribe: $pendingRetranscribe,
+                    onTogglePlay: { togglePlay(recording) },
+                    onCancelTranscription: { cancelTranscription(recording) },
+                    onStartTranscription: { startTranscription(recording) }
+                )
+                .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { deleteRecording(recording) } label: {
+                        Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                     }
+                }
             }
             addSegmentButton
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-    }
-
-    private func segmentRow(_ recording: Recording, index: Int) -> some View {
-        let isLoaded = player.loadedFileName == recording.fileName
-        let isTranscribing = txVM?.isTranscribing(recording) == true
-        let phase = txVM?.phase(for: recording)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Button { togglePlay(recording) } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Theme.fill)
-                            .frame(width: 34, height: 34)
-                        Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.textPrimary)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textTertiary)
-                }
-                Spacer(minLength: 8)
-
-                if isTranscribing {
-                    HStack(spacing: 8) {
-                        // The phase label carries any known percentage via its
-                        // `displayName`; the bar below mirrors it visually.
-                        if let phase {
-                            Text(phase.displayName)
-                                .font(.caption)
-                                .foregroundStyle(Theme.textSecondary)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        Button {
-                            cancelTranscription(recording)
-                        } label: {
-                            Image(systemName: "pause.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Theme.textSecondary)
-                                .frame(width: 30, height: 30)
-                                .background(Theme.fill, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
-                    }
-                } else if recording.transcriptionStatus == .pending {
-                    // Interrupted mid-run with a checkpoint; tapping resumes
-                    // right away instead of waiting for the next foreground pass.
-                    Button {
-                        startTranscription(recording)
-                    } label: {
-                        StatusBadge(status: .pending)
-                    }
-                    .buttonStyle(.plain)
-                } else if recording.transcriptionStatus == .done {
-                    HStack(spacing: 8) {
-                        StatusBadge(status: .done)
-                        Button {
-                            pendingRetranscribe = recording
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Theme.textSecondary)
-                                .frame(width: 30, height: 30)
-                                .background(Theme.fill, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
-                    }
-                } else {
-                    Button {
-                        startTranscription(recording)
-                    } label: {
-                        StatusBadge(status: .none)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            if isTranscribing {
-                transcriptionProgressBar(phase: phase)
-            }
-            // Show the scrubber whenever this recording is the loaded one — even
-            // while transcription is still running, so playback started mid-
-            // transcription still surfaces the slider and speed control.
-            if isLoaded {
-                SegmentPlaybackScrubber(
-                    currentTime: player.currentTime,
-                    duration: player.duration > 0 ? player.duration : recording.duration,
-                    isPlaying: player.isPlaying,
-                    playbackRate: player.playbackRate,
-                    onSeek: { player.seek(to: $0) },
-                    onCycleRate: { player.cycleRate() }
-                )
-            }
-        }
-        .kurnCard(padding: 14, cornerRadius: 16)
-    }
-
-    /// Thin bar shown beneath the row while a transcription is running.
-    /// Always determinate: every stage maps to a forward-only band of
-    /// `fractionComplete`, with the engine's real sub-progress filling the
-    /// transcribing band. An indeterminate linear bar renders as a dead, empty
-    /// line on iOS, so the user saw no movement during cleaning / detection.
-    @ViewBuilder
-    private func transcriptionProgressBar(phase: TranscriptionPhase?) -> some View {
-        let fraction = (phase ?? .preparing).fractionComplete
-        ProgressView(value: fraction)
-            .progressViewStyle(.linear)
-            .tint(Theme.accent)
-            .animation(.easeInOut(duration: 0.25), value: fraction)
     }
 
     private var addSegmentButton: some View {
@@ -473,6 +363,136 @@ struct MeetingDetailView: View {
                 Image(systemName: "ellipsis.circle")
             }
         }
+    }
+}
+
+private struct RecordingSegmentRow: View {
+    let recording: Recording
+    let index: Int
+    let player: AudioPlayerService
+    let txVM: TranscriptionViewModel?
+    @Binding var pendingRetranscribe: Recording?
+    let onTogglePlay: () -> Void
+    let onCancelTranscription: () -> Void
+    let onStartTranscription: () -> Void
+
+    var body: some View {
+        let isLoaded = player.loadedFileName == recording.fileName
+        let isTranscribing = txVM?.isTranscribing(recording) == true
+        let phase = txVM?.phase(for: recording)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Button { onTogglePlay() } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Theme.fill)
+                            .frame(width: 34, height: 34)
+                        Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.textPrimary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                Spacer(minLength: 8)
+
+                if isTranscribing {
+                    HStack(spacing: 8) {
+                        // The phase label carries any known percentage via its
+                        // `displayName`; the bar below mirrors it visually.
+                        if let phase {
+                            Text(phase.displayName)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        Button {
+                            onCancelTranscription()
+                        } label: {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.fill, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
+                    }
+                } else if recording.transcriptionStatus == .pending {
+                    // Interrupted mid-run with a checkpoint; tapping resumes
+                    // right away instead of waiting for the next foreground pass.
+                    Button {
+                        onStartTranscription()
+                    } label: {
+                        StatusBadge(status: .pending)
+                    }
+                    .buttonStyle(.plain)
+                } else if recording.transcriptionStatus == .done {
+                    HStack(spacing: 8) {
+                        StatusBadge(status: .done)
+                        Button {
+                            pendingRetranscribe = recording
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.fill, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+                    }
+                } else {
+                    Button {
+                        onStartTranscription()
+                    } label: {
+                        StatusBadge(status: .none)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if isTranscribing {
+                transcriptionProgressBar(phase: phase)
+            }
+            // Show the scrubber whenever this recording is the loaded one — even
+            // while transcription is still running, so playback started mid-
+            // transcription still surfaces the slider and speed control.
+            if isLoaded {
+                SegmentPlaybackScrubber(
+                    currentTime: player.currentTime,
+                    duration: player.duration > 0 ? player.duration : recording.duration,
+                    isPlaying: player.isPlaying,
+                    playbackRate: player.playbackRate,
+                    onSeek: { player.seek(to: $0) },
+                    onCycleRate: { player.cycleRate() }
+                )
+            }
+        }
+        .kurnCard(padding: 14, cornerRadius: 16)
+    }
+
+    /// Thin bar shown beneath the row while a transcription is running.
+    /// Always determinate: every stage maps to a forward-only band of
+    /// `fractionComplete`, with the engine's real sub-progress filling the
+    /// transcribing band. An indeterminate linear bar renders as a dead, empty
+    /// line on iOS, so the user saw no movement during cleaning / detection.
+    @ViewBuilder
+    private func transcriptionProgressBar(phase: TranscriptionPhase?) -> some View {
+        let fraction = (phase ?? .preparing).fractionComplete
+        ProgressView(value: fraction)
+            .progressViewStyle(.linear)
+            .tint(Theme.accent)
+            .animation(.easeInOut(duration: 0.25), value: fraction)
     }
 }
 

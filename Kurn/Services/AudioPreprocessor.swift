@@ -133,9 +133,7 @@ actor AudioPreprocessor: AudioPreprocessing {
             do {
                 status = try engine.renderOffline(framesToRender, to: renderBuffer)
             } catch {
-                if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                    throw appError
-                }
+                try ResourceGuard.rethrowIfResourceFailure(error)
                 throw error
             }
             switch status {
@@ -143,9 +141,7 @@ actor AudioPreprocessor: AudioPreprocessing {
                 do {
                     try outFile.write(from: renderBuffer)
                 } catch {
-                    if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                        throw appError
-                    }
+                    try ResourceGuard.rethrowIfResourceFailure(error)
                     throw error
                 }
             case .insufficientDataFromInputNode:

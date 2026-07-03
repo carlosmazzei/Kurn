@@ -60,10 +60,10 @@ final class Recording {
     var transcriptionCheckpoint: TranscriptionCheckpoint? {
         get {
             guard let data = transcriptionCheckpointData else { return nil }
-            return try? JSONDecoder().decode(TranscriptionCheckpoint.self, from: data)
+            return JSONStorage.decode(TranscriptionCheckpoint.self, from: data)
         }
         set {
-            transcriptionCheckpointData = newValue.flatMap { try? JSONEncoder().encode($0) }
+            transcriptionCheckpointData = newValue.map(JSONStorage.encode)
         }
     }
 
