@@ -7,6 +7,7 @@
 //  is written to Documents as it records.
 //
 
+import Combine
 import os
 import SwiftData
 import SwiftUI
@@ -59,6 +60,9 @@ private struct RecorderContent: View {
     let onFinished: () -> Void
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
+    /// Fixed 20 Hz drive for the waveform scroll — the same cadence as the
+    /// recorder's metering tick.
+    private let waveformClock = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack {
@@ -90,9 +94,14 @@ private struct RecorderContent: View {
             .padding(.bottom, 40)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onChange(of: vm.level) { _, newValue in
+        // Scroll on a fixed clock rather than on level *changes*: the
+        // change-driven path proved able to stall after a background/lock
+        // round-trip (frozen bars) even while capture continued. A clocked
+        // pull of the current level can't freeze while the view is on screen.
+        .onReceive(waveformClock) { _ in
+            guard vm.state == .recording else { return }
             levels.removeFirst()
-            levels.append(newValue)
+            levels.append(vm.level)
         }
         .onChange(of: vm.didSaveRecording) { _, saved in
             if saved { onFinished() }
