@@ -195,9 +195,8 @@ xcodebuild \
   test
 ```
 
-CI is configured in `.github/workflows/build-and-test.yml` (a reusable
-workflow) and `.github/workflows/swift.yml` (a thin caller on push/PR to
-`main`); both run clean test on macOS with the `Kurn` scheme.
+CI is configured in `.github/workflows/swift.yml` and runs clean test on macOS
+with the `Kurn` scheme.
 
 ## Releasing
 
@@ -208,9 +207,10 @@ Fastlane-driven process (see `fastlane/Fastfile`):
 1. A maintainer runs `bundle exec fastlane bump_version type:minor` (or
    `type:patch` / `type:major`) locally. This bumps the version across all
    targets, commits, tags the commit `vX.Y.Z`, and pushes both to `main`.
-2. Pushing the `vX.Y.Z` tag triggers `.github/workflows/release.yml`, which
-   reruns the full lint/build/test suite against the tagged commit and then
-   publishes a GitHub Release with auto-generated notes.
+2. Pushing the `vX.Y.Z` tag triggers the `release` job in
+   `.github/workflows/swift.yml` (gated on tag pushes), which runs after the
+   same `build-and-test` job that gates every push/PR, then publishes a
+   GitHub Release with auto-generated notes.
 
 No code signing, archiving, or App Store/TestFlight upload is automated yet —
 that requires provisioning Apple Developer certificates and an App Store
