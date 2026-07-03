@@ -168,6 +168,12 @@ English (`en`) and Brazilian Portuguese (`pt-BR`) under `Kurn/Resources/`.
 - Be ready to iterate on review. Push follow-up commits to the same branch
   rather than force-pushing rebases unless asked.
 
+## Releasing
+
+Cutting a release (version bump, git tag, GitHub Release) is a maintainer-only
+task — contributors don't need to touch versioning in regular PRs. See
+[README.md#releasing](README.md#releasing) for the process.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the

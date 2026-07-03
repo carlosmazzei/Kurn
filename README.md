@@ -198,6 +198,24 @@ xcodebuild \
 CI is configured in `.github/workflows/swift.yml` and runs clean test on macOS
 with the `Kurn` scheme.
 
+## Releasing
+
+Kurn versions follow `vMAJOR.MINOR.PATCH`, tracked by `MARKETING_VERSION` /
+`CURRENT_PROJECT_VERSION` in `Kurn.xcodeproj`. Cutting a release is a two-step,
+Fastlane-driven process (see `fastlane/Fastfile`):
+
+1. A maintainer runs `bundle exec fastlane bump_version type:minor` (or
+   `type:patch` / `type:major`) locally. This bumps the version across all
+   targets, commits, tags the commit `vX.Y.Z`, and pushes both to `main`.
+2. Pushing the `vX.Y.Z` tag triggers the `release` job in
+   `.github/workflows/swift.yml` (gated on tag pushes), which runs after the
+   same `build-and-test` job that gates every push/PR, then publishes a
+   GitHub Release with auto-generated notes.
+
+No code signing, archiving, or App Store/TestFlight upload is automated yet —
+that requires provisioning Apple Developer certificates and an App Store
+Connect API key as repo secrets, which is a separate future step.
+
 ## Linting
 
 Kurn uses SwiftLint for Swift style and static checks.

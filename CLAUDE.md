@@ -41,6 +41,20 @@ swiftlint lint --config .swiftlint.yml
 If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
 `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
 
+### Releasing
+
+`fastlane/Fastfile` has two lanes: `bump_version type:{patch,minor,major}` bumps
+`MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` across all targets via direct text
+substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
+which reorder unrelated parts of this file because it uses Xcode 16
+file-system-synchronized groups), then commits, tags `vX.Y.Z`, and pushes —
+run locally by a maintainer. Pushing that tag triggers the `release` job in
+`.github/workflows/swift.yml` (gated with `if: startsWith(github.ref,
+'refs/tags/v')`, `needs: build-and-test` so it only runs after the same
+lint/build/test job that gates every push/PR), which runs the CI-only
+`github_release` lane to publish a GitHub Release. No signing/archiving/
+TestFlight upload is wired up yet.
+
 SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
 function body at 120, cyclomatic complexity at 15, type body at 400.
 

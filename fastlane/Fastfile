@@ -1,0 +1,59 @@
+XCODEPROJ_PBXPROJ = File.expand_path("../Kurn.xcodeproj/project.pbxproj", __dir__)
+
+# Bumps MARKETING_VERSION / CURRENT_PROJECT_VERSION directly via text
+# substitution rather than `increment_version_number` / `xcodeproj`, which
+# rewrite and reorder large unrelated parts of this pbxproj (it uses Xcode
+# 16 file-system-synchronized groups) — this keeps release commits to just
+# the version lines.
+lane :bump_version do |options|
+  ensure_git_status_clean
+
+  bump_type = (options[:type] || "patch").to_s
+  UI.user_error!("type must be one of patch, minor, major") unless %w[patch minor major].include?(bump_type)
+
+  pbxproj = File.read(XCODEPROJ_PBXPROJ)
+  current_marketing = pbxproj[/MARKETING_VERSION = ([\d.]+);/, 1]
+  current_build = pbxproj[/CURRENT_PROJECT_VERSION = (\d+);/, 1]
+  UI.user_error!("Could not find MARKETING_VERSION/CURRENT_PROJECT_VERSION in #{XCODEPROJ_PBXPROJ}") if current_marketing.nil? || current_build.nil?
+
+  version_parts = current_marketing.split(".").map(&:to_i)
+  version_parts << 0 while version_parts.length < 3
+  new_version_parts = case bump_type
+                       when "major" then [version_parts[0] + 1, 0, 0]
+                       when "minor" then [version_parts[0], version_parts[1] + 1, 0]
+                       else [version_parts[0], version_parts[1], version_parts[2] + 1]
+                       end
+  new_marketing = new_version_parts.join(".")
+  new_build = current_build.to_i + 1
+
+  updated = pbxproj.gsub(/MARKETING_VERSION = [\d.]+;/, "MARKETING_VERSION = #{new_marketing};")
+  updated = updated.gsub(/CURRENT_PROJECT_VERSION = \d+;/, "CURRENT_PROJECT_VERSION = #{new_build};")
+  File.write(XCODEPROJ_PBXPROJ, updated)
+
+  tag = "v#{new_marketing}"
+  git_add(path: XCODEPROJ_PBXPROJ)
+  git_commit(path: XCODEPROJ_PBXPROJ, message: "chore: bump version to #{new_marketing} (#{new_build})")
+  add_git_tag(tag: tag)
+  push_to_git_remote(tags: true)
+
+  UI.success("Bumped to #{new_marketing} (#{new_build}) and pushed tag #{tag}.")
+end
+
+# CI-only: publishes a GitHub Release for the tag that triggered the
+# `release.yml` workflow, guarded against a stray/mismatched tag.
+lane :github_release do
+  tag = ENV["GITHUB_REF_NAME"].to_s
+  UI.user_error!("GITHUB_REF_NAME is not set - this lane runs from the release workflow") if tag.empty?
+
+  pbxproj = File.read(XCODEPROJ_PBXPROJ)
+  current_marketing = pbxproj[/MARKETING_VERSION = ([\d.]+);/, 1]
+  UI.user_error!("Tag #{tag} does not match project MARKETING_VERSION v#{current_marketing}") unless tag == "v#{current_marketing}"
+
+  set_github_release(
+    repository_name: "carlosmazzei/kurn",
+    tag_name: tag,
+    name: "Kurn #{tag}",
+    is_generate_release_notes: true,
+    api_token: ENV["GITHUB_TOKEN"]
+  )
+end
