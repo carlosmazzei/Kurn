@@ -92,9 +92,7 @@ struct TranscriptionService {
             cleanedURL = fileURL
             AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(appError.localizedDescription, privacy: .public)")
         } catch {
-            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                throw appError
-            }
+            try ResourceGuard.rethrowIfResourceFailure(error)
             cleanedURL = fileURL
             AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
         }
@@ -409,7 +407,7 @@ struct TranscriptionService {
                 cleanupURL = diarURL
                 AppLog.transcription.atInfo.info("diarize: using preprocessed input \(diarURL.lastPathComponent, privacy: .public)")
             } catch {
-                if let appError = ResourceGuard.appErrorIfResourceFailure(error) { throw appError }
+                try ResourceGuard.rethrowIfResourceFailure(error)
                 AppLog.transcription.atError.error("diarize: preprocess failed, falling back to original: \(error.localizedDescription, privacy: .public)")
                 diarURL = originalURL
                 cleanupURL = nil

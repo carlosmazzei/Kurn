@@ -140,9 +140,7 @@ actor DiarizationPreprocessor {
             do {
                 status = try engine.renderOffline(framesToRender, to: renderBuffer)
             } catch {
-                if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                    throw appError
-                }
+                try ResourceGuard.rethrowIfResourceFailure(error)
                 throw error
             }
             switch status {

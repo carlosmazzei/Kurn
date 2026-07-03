@@ -51,9 +51,7 @@ struct ModelDownloadConsent {
         } catch let appError as AppError {
             throw appError
         } catch {
-            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                throw appError
-            }
+            try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
         #else

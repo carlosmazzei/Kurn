@@ -157,9 +157,7 @@ struct VADAudioCompactor {
                     do {
                         try Self.writeSilence(frames: gapSamples, to: outFile, format: outFormat)
                     } catch {
-                        if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                            throw appError
-                        }
+                        try ResourceGuard.rethrowIfResourceFailure(error)
                         throw error
                     }
                     compactedTime += gap
@@ -170,9 +168,7 @@ struct VADAudioCompactor {
                         file: file, startSec: region.start, endSec: region.end, to: outFile
                     )
                 } catch {
-                    if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                        throw appError
-                    }
+                    try ResourceGuard.rethrowIfResourceFailure(error)
                     throw error
                 }
                 guard written > 0 else { continue }
@@ -216,9 +212,7 @@ struct VADAudioCompactor {
             }
         } catch {
             try? FileManager.default.removeItem(at: outURL)
-            if let appError = ResourceGuard.appErrorIfResourceFailure(error) {
-                throw appError
-            }
+            try ResourceGuard.rethrowIfResourceFailure(error)
             throw error
         }
         try ResourceGuard.requireFreeStorage(atLeast: ResourceGuard.minimumFreeStorageForTranscription)

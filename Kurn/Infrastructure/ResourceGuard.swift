@@ -74,6 +74,13 @@ enum ResourceGuard {
         return nil
     }
 
+    /// Throws the wrapped `AppError` when `error` is a resource-pressure
+    /// failure; otherwise returns normally so the caller applies its own
+    /// fallback/rethrow behavior.
+    static func rethrowIfResourceFailure(_ error: Error) throws {
+        if let appError = appErrorIfResourceFailure(error) { throw appError }
+    }
+
     static func appErrorIfResourceFailure(_ error: Error) -> AppError? {
         if let appError = error as? AppError { return appError }
 
