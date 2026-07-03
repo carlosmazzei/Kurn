@@ -10,16 +10,6 @@
 import ActivityKit
 import Foundation
 
-struct RecordingActivityAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable {
-        var isPaused: Bool
-        var elapsed: TimeInterval
-        var referenceDate: Date
-    }
-
-    var meetingTitle: String
-}
-
 @MainActor
 final class LockScreenRecordingController {
     nonisolated(unsafe) private var activity: Activity<RecordingActivityAttributes>?
