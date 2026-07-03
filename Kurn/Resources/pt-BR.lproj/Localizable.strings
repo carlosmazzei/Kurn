@@ -61,6 +61,7 @@
 
 /* Gravador */
 "recorder.route_changed" = "Gravação pausada: o dispositivo de áudio mudou (ex.: fones desconectados).";
+"recorder.engine_stalled" = "Gravação pausada: o sistema interrompeu a captura de áudio. Toque em retomar para continuar.";
 "recorder.title" = "Nova Gravação";
 "recorder.add_title" = "Adicionar título…";
 "recorder.pause" = "Pausar";
