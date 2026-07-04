@@ -500,7 +500,7 @@ private struct RecordingSegmentRow: View {
             }
 
             if isTranscribing {
-                transcriptionProgressBar(phase: phase)
+                transcriptionProgressBar(phase: phase, isCancelling: isCancelling)
                 if let phase, !isCancelling {
                     Text(phase.displayName)
                         .font(.caption2)
@@ -525,17 +525,22 @@ private struct RecordingSegmentRow: View {
     }
 
     /// Thin bar shown beneath the row while a transcription is running.
-    /// Always determinate: every stage maps to a forward-only band of
-    /// `fractionComplete`, with the engine's real sub-progress filling the
-    /// transcribing band. An indeterminate linear bar renders as a dead, empty
-    /// line on iOS, so the user saw no movement during cleaning / detection.
+    /// Indeterminate while cancelling — the Swift task waits for the concurrent
+    /// diarization child task to finish before the catch block runs, so the last
+    /// known fraction would be stale (stuck at e.g. 88%) for that entire window.
     @ViewBuilder
-    private func transcriptionProgressBar(phase: TranscriptionPhase?) -> some View {
-        let fraction = (phase ?? .preparing).fractionComplete
-        ProgressView(value: fraction)
-            .progressViewStyle(.linear)
-            .tint(Theme.accent)
-            .animation(.easeInOut(duration: 0.25), value: fraction)
+    private func transcriptionProgressBar(phase: TranscriptionPhase?, isCancelling: Bool) -> some View {
+        if isCancelling {
+            ProgressView()
+                .progressViewStyle(.linear)
+                .tint(Theme.accent.opacity(0.5))
+        } else {
+            let fraction = (phase ?? .preparing).fractionComplete
+            ProgressView(value: fraction)
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+                .animation(.easeInOut(duration: 0.25), value: fraction)
+        }
     }
 }
 
