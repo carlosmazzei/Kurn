@@ -483,9 +483,15 @@ extension MeetingsListView {
     }
 
     func preview(for meeting: Meeting) -> String {
-        meeting.recordings
+        let transcriptPreview = meeting.recordings
             .sorted(by: { $0.recordedAt < $1.recordedAt })
-            .compactMap { $0.transcript?.segments.first?.text }
-            .first ?? meeting.notes
+            .compactMap { recording -> String? in
+                recording.transcript?.segments
+                    .lazy
+                    .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .first { !$0.isEmpty && !$0.hasPrefix("[") }
+            }
+            .first
+        return transcriptPreview ?? meeting.notes
     }
 }
