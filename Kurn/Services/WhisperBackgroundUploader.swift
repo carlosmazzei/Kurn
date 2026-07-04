@@ -100,12 +100,14 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
                 buffers[task.taskIdentifier] = Data()
                 bodyFiles[task.taskIdentifier] = bodyURL
                 lock.unlock()
+                AppLog.transcription.atInfo.info("bgUpload: started task=\(task.taskIdentifier, privacy: .public)")
                 holder.start(task)
             }
         } onCancel: {
             // Cancelling the transfer makes the delegate complete with
             // URLError.cancelled, which the caller maps to a paused (.pending)
             // transcription rather than a failure.
+            AppLog.transcription.atNotice.notice("bgUpload: Swift task cancelled — cancelling URLSession upload")
             holder.cancel()
         }
     }
@@ -153,10 +155,14 @@ extension WhisperBackgroundUploader: URLSessionDataDelegate {
         }
         if let error {
             let urlError = (error as? URLError) ?? URLError(.unknown)
+            AppLog.transcription.atError.error("bgUpload: task=\(task.taskIdentifier, privacy: .public) failed: \(urlError.localizedDescription, privacy: .public) (code=\(urlError.code.rawValue, privacy: .public))")
             continuation.resume(throwing: AppError.networkError(urlError))
         } else if let response = task.response {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            AppLog.transcription.atInfo.info("bgUpload: task=\(task.taskIdentifier, privacy: .public) complete, HTTP \(status, privacy: .public), body=\(buffer.count, privacy: .public) bytes")
             continuation.resume(returning: (buffer, response))
         } else {
+            AppLog.transcription.atError.error("bgUpload: task=\(task.taskIdentifier, privacy: .public) complete but no response")
             continuation.resume(throwing: AppError.networkError(URLError(.badServerResponse)))
         }
     }

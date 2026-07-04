@@ -46,14 +46,17 @@ actor WhisperTranscriber: Transcribing {
             resume: resume,
             transcribeChunk: { chunk, index in
                 let data = try Data(contentsOf: chunk.url)
-                AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
+                AppLog.transcription.atInfo.info("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) sending \(data.count, privacy: .public) bytes to OpenAI")
                 let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
                 defer { progressPulse.cancel() }
-                return try await provider.transcribe(
+                let chunkStart = Date()
+                let result = try await provider.transcribe(
                     audioData: data,
                     fileName: chunk.url.lastPathComponent,
                     language: language
                 )
+                AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
+                return result
             },
             onChunkCompleted: onChunkCompleted,
             onProgress: onProgress
@@ -81,16 +84,19 @@ actor WhisperTranscriber: Transcribing {
     ) -> Task<Void, Never> {
         Task {
             let started = Date()
+            var nextHeartbeatAt: TimeInterval = 30
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(750))
                 guard !Task.isCancelled else { return }
-                onProgress(
-                    estimatedProgress(
-                        completedChunks: completedChunks,
-                        totalChunks: totalChunks,
-                        elapsed: Date().timeIntervalSince(started)
-                    )
-                )
+                let elapsed = Date().timeIntervalSince(started)
+                onProgress(estimatedProgress(completedChunks: completedChunks, totalChunks: totalChunks, elapsed: elapsed))
+                // Periodic heartbeat so the log shows the upload is alive (not hung).
+                // Progress saturates near 88% by design; without this the log goes
+                // silent and it's impossible to tell if the upload is still in flight.
+                if elapsed >= nextHeartbeatAt {
+                    AppLog.transcription.atNotice.notice("whisper: chunk \(completedChunks + 1, privacy: .public)/\(totalChunks, privacy: .public) still awaiting OpenAI response, elapsed=\(Int(elapsed), privacy: .public)s")
+                    nextHeartbeatAt += 30
+                }
             }
         }
     }

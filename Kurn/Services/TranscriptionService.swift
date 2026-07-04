@@ -167,7 +167,9 @@ struct TranscriptionService {
                 onWarning: onDiarizationWarning
             )
             raw = try await rawTranscript
+            AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(raw.spans.count, privacy: .public) — waiting for diarization")
             turns = try await speakerTurns
+            AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(turns.count, privacy: .public)")
         } else {
             AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
             raw = try await transcribeGated(

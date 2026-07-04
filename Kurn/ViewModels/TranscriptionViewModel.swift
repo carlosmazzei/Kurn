@@ -213,6 +213,7 @@ final class TranscriptionViewModel {
         // instead of freezing mid-chunk.
         let background = BackgroundActivity()
         background.begin(name: "ai.kurn.transcription") { [weak self] in
+            AppLog.transcription.atNotice.notice("VM: background task expired, cancelling id=\(recordingID, privacy: .public)")
             self?.transcriptionTasks[recordingID]?.cancel()
         }
         defer { background.end() }
