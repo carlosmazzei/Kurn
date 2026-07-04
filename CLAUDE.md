@@ -239,7 +239,9 @@ returns a flexible `{ "sections": [...] }` shape. `SummaryJSON.parse` tolerantly
 markdown fences and extracts the outermost `{...}` since models add prose. Templates
 (built-in presets + user-defined) live in `AppSettings.summaryTemplates`; the user
 picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` holds the
-template-driven body that the views and export render.
+template-driven body that the views and export render. `SummaryView` renders inline
+Markdown in titles, body text, and item text, with lightweight block handling for
+headings and lists.
 
 Every provider HTTP call funnels through `LLMHTTP.sendValidated`, which retries
 transient transport errors and `429/500/502/503/504` with exponential
@@ -248,7 +250,9 @@ momentary blip. `SummaryService` splits transcripts beyond ~80k chars into a
 map-reduce pass (condense each block, then summarize the combined notes) and
 raises the output budget/timeout (8192 tokens, 300s) so long transcripts don't
 truncate mid-JSON or time out; a truncated response surfaces as
-`AppError.summaryTruncated` instead of a confusing decode error.
+`AppError.summaryTruncated` instead of a confusing decode error. Summary generation is
+owned by `TranscriptionViewModel.startSummary`, which keeps the Summary tab in a
+non-reentrant progress state and supports cooperative cancellation.
 
 ### Cross-device control (Watch + Live Activity)
 

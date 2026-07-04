@@ -80,7 +80,13 @@ Spanish, French, German, Japanese, and Chinese.
 ## AI Summaries
 
 Kurn can generate a structured meeting summary from existing transcripts.
-Summaries include a markdown body, key decisions, and action items.
+Summaries are template-driven and render Markdown in section titles, body text,
+and bullet items, so provider output can use emphasis, links, inline code,
+headings, and ordered or unordered lists where helpful.
+
+Long transcripts are summarized in stages. The Summary tab keeps the generation
+state in place, shows progress for staged summaries, and lets the user cancel
+the current run without losing an existing summary.
 
 Supported summary providers:
 
@@ -296,7 +302,9 @@ transcription scheduling and recovery
 ## Important Implementation Notes
 
 - Cloud transcription always uses OpenAI Whisper.
-- Summary generation can use OpenAI, Anthropic, Google AI, or Groq.
+- Summary generation can use OpenAI, Anthropic, Google AI, or Groq, and long
+  transcripts use a staged map-reduce pass with progress and cancellation in
+  the Summary tab.
 - Speaker diarization is heuristic and approximate by design.
 - On-device transcription availability depends on Apple's Speech framework,
   simulator/device support, and the selected language.
