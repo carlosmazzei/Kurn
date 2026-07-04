@@ -26,7 +26,7 @@ enum TempFileCleaner {
     /// orphan because no single stage should run for that long.
     /// Called automatically at the start of every `TranscriptionService.transcribe` run.
     static func cleanupOrphanedTempFiles() {
-        Self.cleanup(olderThan: 3600)
+        _ = Self.cleanup(olderThan: 3600)
     }
 
     /// Force-remove all known temporary files and upload-body spool files.
