@@ -24,7 +24,12 @@ struct ProviderModelsService: Sendable {
 
     func models(for provider: AIProvider) async throws -> [String] {
         let apiKey = apiKey ?? KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        do {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        } catch {
+            AppLog.transcription.atError.error("ProviderModelsService: cannot load models for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
 
         switch provider.kind {
         case .openAICompatible:
@@ -39,29 +44,37 @@ struct ProviderModelsService: Sendable {
                 // Groq's /models endpoint sometimes rejects otherwise-valid keys with 403.
                 // Fall back to a known model list so the user can still pick a model.
                 if provider.id == AIProvider.groq.id {
+                    AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) /models failed (\(error.localizedDescription, privacy: .public)), falling back to known model list")
                     return Self.groqFallbackModels
                 }
+                AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 throw error
             }
             if provider.id == AIProvider.groq.id, fetched.isEmpty {
+                AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) returned no models, falling back to known model list")
                 return Self.groqFallbackModels
             }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(fetched.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
             return fetched
         case .anthropic:
-            return try await fetchModels(provider: provider, as: AnthropicModelListResponse.self) { request in
+            let models = try await fetchModels(provider: provider, as: AnthropicModelListResponse.self) { request in
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                 request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
             } extract: { decoded in
                 decoded.data.map(\.id)
             }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
+            return models
         case .googleGemini:
-            return try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
+            let models = try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
                 request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
             } extract: { decoded in
                 decoded.models
                     .filter { $0.supportedGenerationMethods.contains("generateContent") }
                     .map { $0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: "") }
             }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
+            return models
         }
     }
 

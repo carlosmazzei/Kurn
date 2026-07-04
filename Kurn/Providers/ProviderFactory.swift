@@ -13,7 +13,10 @@ enum ProviderFactory {
     /// selected provider has no stored key.
     static func summaryProvider(for provider: AIProvider, model: String) throws -> LLMProvider {
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        guard !key.isEmpty else {
+            AppLog.transcription.atError.error("ProviderFactory: missing API key for summary provider \(provider.displayName, privacy: .public)")
+            throw AppError.noAPIKey(provider: provider.displayName)
+        }
         let resolvedModel = model.isEmpty ? provider.defaultModel : model
         guard !resolvedModel.isEmpty else {
             throw AppError.apiError(statusCode: 0, message: NSLocalizedString("error.no_model_selected", comment: "No model selected"))
@@ -35,8 +38,12 @@ enum ProviderFactory {
     /// when the chosen provider has no stored key.
     static func whisperProvider(for provider: AIProvider, model: String) throws -> OpenAIProvider {
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        guard !key.isEmpty else {
+            AppLog.transcription.atError.error("ProviderFactory: missing API key for transcription provider \(provider.displayName, privacy: .public)")
+            throw AppError.noAPIKey(provider: provider.displayName)
+        }
         let resolvedModel = model.isEmpty ? provider.defaultTranscriptionModel : model
+        AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for Whisper transcription, model=\(resolvedModel, privacy: .public), endpoint=\(provider.baseURLString, privacy: .public)")
         // Background uploads: chunk transfers keep running when the app is
         // suspended or the phone is locked, so a long transcription doesn't
         // need the app to stay in the foreground.

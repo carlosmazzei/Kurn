@@ -51,6 +51,7 @@ struct OpenAIProvider: LLMProvider {
 
         let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "audio/transcriptions")
             ?? URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+        AppLog.transcription.atInfo.info("OpenAIProvider: transcribing \(audioData.count, privacy: .public) bytes via \(provider.displayName, privacy: .public) at \(url.absoluteString, privacy: .public), model=\(transcriptionModel, privacy: .public)")
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -85,13 +86,18 @@ struct OpenAIProvider: LLMProvider {
         )
 
         let data: Data
-        if usesBackgroundUploads {
-            let result = try await WhisperBackgroundUploader.shared.sendValidated(request, body: body)
-            data = result.0
-        } else {
-            request.httpBody = body
-            let result = try await LLMHTTP.sendValidated(request, session: session)
-            data = result.0
+        do {
+            if usesBackgroundUploads {
+                let result = try await WhisperBackgroundUploader.shared.sendValidated(request, body: body)
+                data = result.0
+            } else {
+                request.httpBody = body
+                let result = try await LLMHTTP.sendValidated(request, session: session)
+                data = result.0
+            }
+        } catch {
+            AppLog.transcription.atError.error("OpenAIProvider: transcription request failed for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            throw error
         }
 
         do {
@@ -108,8 +114,10 @@ struct OpenAIProvider: LLMProvider {
                 // Fallback: one span for the whole blob.
                 spans = [TranscribedSpan(text: decoded.text, start: 0, end: 0, confidence: nil)]
             }
+            AppLog.transcription.atInfo.info("OpenAIProvider: transcription succeeded for \(provider.displayName, privacy: .public), spans=\(spans.count, privacy: .public)")
             return RawTranscript(spans: spans, language: decoded.language ?? "")
         } catch {
+            AppLog.transcription.atError.error("OpenAIProvider: failed to decode transcription response from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw AppError.decodingError(error.localizedDescription)
         }
     }
@@ -144,8 +152,9 @@ struct OpenAIProvider: LLMProvider {
             from: data,
             as: ChatResponse.self,
             emptyMessage: "empty chat response",
-            isTruncated: { $0.isTruncated }
-        ) { $0.choices.first?.message.content }
+            isTruncated: { $0.isTruncated },
+            extractContent: { $0.choices.first?.message.content }
+        )
     }
 
     // MARK: - HTTP helpers
