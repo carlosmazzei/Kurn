@@ -46,20 +46,27 @@ struct RecordingLiveActivityWidget: Widget {
                         .padding(.bottom, 2)
                 }
             } compactLeading: {
-                // Per the design: just the pulsing record dot.
-                Circle()
-                    .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                    .frame(width: 8, height: 8)
+                // Kurn icon (circular clip avoids pill-edge clipping) + live timer.
+                HStack(spacing: 5) {
+                    KurnLogo(size: 18)
+                        .clipShape(Circle())
+                        .padding(.leading, 2)
+                    elapsedText(context)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
+                        .fixedSize()
+                }
             } compactTrailing: {
-                elapsedText(context)
-                    .font(.system(.caption2, design: .rounded).monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44)
-                    .minimumScaleFactor(0.8)
+                // Waveform mirrors the phone-call indicator: active while recording,
+                // dimmed when paused.
+                Image(systemName: context.state.isPaused ? "waveform.slash" : "waveform")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(context.state.isPaused ? .white.opacity(0.4) : .white)
+                    .padding(.trailing, 2)
             } minimal: {
-                Circle()
-                    .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                    .frame(width: 8, height: 8)
+                // Circular icon keeps the minimal indicator on-brand.
+                KurnLogo(size: 16)
+                    .clipShape(Circle())
             }
             .keylineTint(.kurnAccent)
         }
