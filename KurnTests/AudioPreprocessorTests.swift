@@ -41,4 +41,32 @@ struct AudioPreprocessorTests {
         #expect(!FileManager.default.fileExists(atPath: tmpURL.path))
         #expect(FileManager.default.fileExists(atPath: documentsURL.path))
     }
+
+    @Test func processFailureDoesNotLeakCleanedTempFile() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+        let invalidURL = tmp.appendingPathComponent("\(UUID().uuidString).m4a")
+        try Data([0x00, 0x01, 0x02]).write(to: invalidURL)
+        defer { try? FileManager.default.removeItem(at: invalidURL) }
+
+        let prefix = "kurn_clean_"
+        let before = countTempFiles(prefix: prefix)
+
+        let preprocessor = AudioPreprocessor()
+        await #expect(throws: Error.self) {
+            try await preprocessor.process(url: invalidURL)
+        }
+
+        let after = countTempFiles(prefix: prefix)
+        #expect(after == before)
+    }
+
+    private func countTempFiles(prefix: String) -> Int {
+        let tmp = FileManager.default.temporaryDirectory
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: tmp,
+            includingPropertiesForKeys: [.nameKey],
+            options: .skipsHiddenFiles
+        ) else { return 0 }
+        return files.filter { $0.lastPathComponent.hasPrefix(prefix) }.count
+    }
 }

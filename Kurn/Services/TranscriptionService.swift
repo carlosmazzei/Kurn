@@ -480,7 +480,9 @@ struct TranscriptionService {
     /// Uses a 1-hour age threshold so it never touches files an in-flight
     /// transcription is still using; anything that old is almost certainly an
     /// orphan because no single stage should run for that long.
-    private static func cleanupOrphanedTempFiles() {
+    /// Exposed internally for tests; called automatically at the start of every
+    /// `transcribe` run.
+    internal static func cleanupOrphanedTempFiles() {
         let tmp = FileManager.default.temporaryDirectory
         let prefixes = [
             "kurn_clean_",

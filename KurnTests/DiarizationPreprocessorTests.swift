@@ -139,7 +139,35 @@ struct DiarizationPreprocessorTests {
         #expect(FileManager.default.fileExists(atPath: documentsURL.path))
     }
 
+    @Test func processFailureDoesNotLeakDiarizationTempFile() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+        let invalidURL = tmp.appendingPathComponent("\(UUID().uuidString).wav")
+        try Data([0x00, 0x01, 0x02]).write(to: invalidURL)
+        defer { try? FileManager.default.removeItem(at: invalidURL) }
+
+        let prefix = "kurn_diar_"
+        let before = Self.countTempFiles(prefix: prefix)
+
+        let preprocessor = DiarizationPreprocessor()
+        await #expect(throws: Error.self) {
+            try await preprocessor.process(url: invalidURL)
+        }
+
+        let after = Self.countTempFiles(prefix: prefix)
+        #expect(after == before)
+    }
+
     // MARK: - Helpers
+
+    private static func countTempFiles(prefix: String) -> Int {
+        let tmp = FileManager.default.temporaryDirectory
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: tmp,
+            includingPropertiesForKeys: [.nameKey],
+            options: .skipsHiddenFiles
+        ) else { return 0 }
+        return files.filter { $0.lastPathComponent.hasPrefix(prefix) }.count
+    }
 
     /// Decode a Float32 mono WAV produced by the preprocessor into a `[Float]`.
     private static func readWAVSamples(url: URL) throws -> [Float] {

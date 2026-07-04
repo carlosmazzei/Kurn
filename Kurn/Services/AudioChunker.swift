@@ -90,14 +90,22 @@ actor AudioChunker {
             try? FileManager.default.removeItem(at: outURL)
 
             let chunkStart = Date()
-            try await export(
-                asset: asset,
-                to: outURL,
-                range: CMTimeRange(
-                    start: CMTime(seconds: start, preferredTimescale: 600),
-                    duration: CMTime(seconds: length, preferredTimescale: 600)
+            do {
+                try await export(
+                    asset: asset,
+                    to: outURL,
+                    range: CMTimeRange(
+                        start: CMTime(seconds: start, preferredTimescale: 600),
+                        duration: CMTime(seconds: length, preferredTimescale: 600)
+                    )
                 )
-            )
+            } catch {
+                // Remove the partially-written file for the failed chunk so it
+                // doesn't become an orphan when the caller's defer cleans up the
+                // already-successful chunks.
+                try? FileManager.default.removeItem(at: outURL)
+                throw error
+            }
             // In-flight class (not `.completeUnlessOpen`): chunk files must be
             // readable with the device locked so a background Whisper run can
             // keep feeding uploads; they're deleted when the run finishes.

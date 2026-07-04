@@ -100,6 +100,13 @@ enum TranscriptionPhase: Sendable, Equatable {
 }
 
 /// Chunk counter surfaced in the transcription progress UI.
+///
+/// `completed` is the chunk currently being shown to the user: it is the index
+/// of the chunk in flight (1-based), not the count of fully finished chunks.
+/// For example, when the first of three chunks is being uploaded, the UI shows
+/// "chunk 1 of 3" even though zero chunks have finished. Once the first chunk
+/// completes, the display advances to "chunk 2 of 3" while the next chunk is
+/// processed. `total` is the total number of chunks in the plan.
 struct ChunkProgress: Sendable, Equatable {
     let completed: Int
     let total: Int

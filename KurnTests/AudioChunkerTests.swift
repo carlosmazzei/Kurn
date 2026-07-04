@@ -64,4 +64,23 @@ struct AudioChunkerTests {
         // Should be a safe no-op (e.g. when transcription bailed before chunking).
         await AudioChunker().cleanup([])
     }
+
+    @Test func chunkCleanupRemovesAllExportedTempFiles() async throws {
+        let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let chunker = AudioChunker()
+        let chunks = try await chunker.chunk(url: url)
+        #expect(chunks.count > 1)
+
+        for chunk in chunks {
+            #expect(FileManager.default.fileExists(atPath: chunk.url.path))
+        }
+
+        await chunker.cleanup(chunks)
+
+        for chunk in chunks {
+            #expect(!FileManager.default.fileExists(atPath: chunk.url.path))
+        }
+    }
 }
