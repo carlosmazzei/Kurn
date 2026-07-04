@@ -33,6 +33,12 @@ final class TranscriptionViewModel {
     /// Task handles for transcriptions started via `startTranscription`, so
     /// they can be cancelled (by the user or by the background window expiring).
     private var transcriptionTasks: [UUID: Task<Void, Never>] = [:]
+    /// Recordings being fully stopped (not just paused): on cancellation their
+    /// checkpoint is cleared and status resets to `.none` instead of `.pending`.
+    private var stoppingIDs: Set<UUID> = []
+    /// Recordings for which a cancel/stop was requested but the cooperative task
+    /// cancellation hasn't propagated yet. The UI uses this for immediate feedback.
+    private(set) var cancellingIDs: Set<UUID> = []
     /// Recordings this instance is transcribing, so `@Sendable` pipeline
     /// callbacks can reach the model by ID after hopping to the main actor.
     private var activeRecordings: [UUID: Recording] = [:]
@@ -67,6 +73,10 @@ final class TranscriptionViewModel {
 
     func isTranscribing(_ recording: Recording) -> Bool {
         transcribingIDs.contains(recording.id)
+    }
+
+    func isCancelling(_ recording: Recording) -> Bool {
+        cancellingIDs.contains(recording.id)
     }
 
     /// The pipeline stage currently running for a recording, if any.
@@ -107,6 +117,15 @@ final class TranscriptionViewModel {
     /// Progress up to the last completed chunk stays in the checkpoint and the
     /// recording is left `.pending`, so a later run resumes rather than restarts.
     func cancelTranscription(_ recording: Recording) {
+        cancellingIDs.insert(recording.id)
+        transcriptionTasks[recording.id]?.cancel()
+    }
+
+    /// Fully stop an in-flight transcription: cancels the task, clears any saved
+    /// checkpoint, and resets status to `.none` so the user must start fresh.
+    func stopTranscription(_ recording: Recording) {
+        cancellingIDs.insert(recording.id)
+        stoppingIDs.insert(recording.id)
         transcriptionTasks[recording.id]?.cancel()
     }
 
@@ -148,6 +167,7 @@ final class TranscriptionViewModel {
             Self.globalActiveIDs.remove(recordingID)
             activeRecordings[recordingID] = nil
             phases[recordingID] = nil
+            cancellingIDs.remove(recordingID)
         }
         recording.transcriptionStatus = .inProgress
         recording.transcriptionMode = config.transcription.storageMode
@@ -216,16 +236,29 @@ final class TranscriptionViewModel {
             saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
         } catch is CancellationError {
-            // Paused, not failed: chunk progress is already checkpointed, and
-            // `.pending` gets picked up by the next foreground resume pass.
-            recording.transcriptionStatus = .pending
+            if stoppingIDs.remove(recordingID) != nil {
+                // Full stop: discard the checkpoint so the next run starts fresh.
+                recording.transcriptionCheckpointData = nil
+                recording.transcriptionStatus = .none
+                AppLog.transcription.atNotice.notice("VM: transcribe stopped id=\(recordingID, privacy: .public)")
+            } else {
+                // Paused: chunk progress is already checkpointed and `.pending`
+                // gets picked up by the next foreground resume pass.
+                recording.transcriptionStatus = .pending
+                AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
+            }
             persist()
-            AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
         } catch let appError as AppError {
             if isCancellation(appError) {
-                recording.transcriptionStatus = .pending
+                if stoppingIDs.remove(recordingID) != nil {
+                    recording.transcriptionCheckpointData = nil
+                    recording.transcriptionStatus = .none
+                    AppLog.transcription.atNotice.notice("VM: transcribe stopped id=\(recordingID, privacy: .public)")
+                } else {
+                    recording.transcriptionStatus = .pending
+                    AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
+                }
                 persist()
-                AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
             } else {
                 // Failed — but the checkpoint is kept, so a manual retry
                 // resumes from the last completed chunk.

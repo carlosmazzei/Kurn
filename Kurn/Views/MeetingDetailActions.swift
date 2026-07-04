@@ -58,6 +58,10 @@ extension MeetingDetailView {
         txVM?.cancelTranscription(recording)
     }
 
+    func stopTranscription(_ recording: Recording) {
+        txVM?.stopTranscription(recording)
+    }
+
     func retranscribe(_ recording: Recording) {
         // `transcribe` replaces any existing transcript for this recording.
         startTranscription(recording)

@@ -182,6 +182,7 @@ struct MeetingDetailView: View {
                     pendingRetranscribe: $pendingRetranscribe,
                     onTogglePlay: { togglePlay(recording) },
                     onCancelTranscription: { cancelTranscription(recording) },
+                    onStopTranscription: { stopTranscription(recording) },
                     onStartTranscription: { startTranscription(recording) }
                 )
                 .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
@@ -376,11 +377,13 @@ private struct RecordingSegmentRow: View {
     @Binding var pendingRetranscribe: Recording?
     let onTogglePlay: () -> Void
     let onCancelTranscription: () -> Void
+    let onStopTranscription: () -> Void
     let onStartTranscription: () -> Void
 
     var body: some View {
         let isLoaded = player.loadedFileName == recording.fileName
         let isTranscribing = txVM?.isTranscribing(recording) == true
+        let isCancelling = txVM?.isCancelling(recording) == true
         let phase = txVM?.phase(for: recording)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
@@ -410,24 +413,42 @@ private struct RecordingSegmentRow: View {
                     HStack(spacing: 8) {
                         // The phase label carries any known percentage via its
                         // `displayName`; the bar below mirrors it visually.
-                        if let phase {
-                            Text(phase.displayName)
-                                .font(.caption)
-                                .foregroundStyle(Theme.textSecondary)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        Button {
-                            onCancelTranscription()
-                        } label: {
-                            Image(systemName: "pause.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Theme.textSecondary)
+                        if isCancelling {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.7)
                                 .frame(width: 30, height: 30)
-                                .background(Theme.fill, in: Circle())
+                        } else {
+                            if let phase {
+                                Text(phase.displayName)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                            Button {
+                                onCancelTranscription()
+                            } label: {
+                                Image(systemName: "pause.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .frame(width: 30, height: 30)
+                                    .background(Theme.fill, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
+                            Button {
+                                onStopTranscription()
+                            } label: {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(width: 30, height: 30)
+                                    .background(Theme.fill, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(NSLocalizedString("detail.stop_transcription", comment: "Stop transcription"))
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(NSLocalizedString("detail.cancel_transcription", comment: "Pause transcription"))
                     }
                 } else if recording.transcriptionStatus == .pending {
                     // Interrupted mid-run with a checkpoint; tapping resumes
