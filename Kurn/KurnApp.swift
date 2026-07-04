@@ -35,11 +35,13 @@ struct KurnApp: App {
     /// on every background transition so a borrowed-unlocked device cannot
     /// expose meeting audio just by reopening the app.
     @State private var accessGate = RecordingAccessGate()
-    /// App-level coordinator that resumes `.pending` transcriptions (runs
-    /// interrupted by backgrounding or a process death) whenever the app
-    /// becomes active. Separate from the per-screen view models; cross-instance
-    /// re-entrancy guards keep them from double-transcribing a recording.
-    @State private var transcriptionResumer: TranscriptionViewModel?
+    /// App-wide transcription coordinator, shared by both the foreground
+    /// resume pass (below) and every meeting-detail screen (injected via the
+    /// environment). One instance means a run started by the resumer is visible
+    /// as in-progress — with live phase/progress and a working pause — on the
+    /// detail screen, instead of each screen owning a separate view model whose
+    /// per-instance progress can't see a run another instance started.
+    @State private var transcription: TranscriptionViewModel
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -74,6 +76,11 @@ struct KurnApp: App {
 
     init() {
         let container = modelContainer
+        // Build the shared transcription coordinator on the app's main context
+        // so the resume pass and the detail screens are the same instance.
+        _transcription = State(
+            initialValue: TranscriptionViewModel(modelContext: container.mainContext)
+        )
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()
@@ -101,6 +108,7 @@ struct KurnApp: App {
                 ContentView()
                     .environment(settings)
                     .environment(accessGate)
+                    .environment(transcription)
                 // Covers meeting/transcript content in the app-switcher
                 // snapshot taken while the scene isn't active.
                 if scenePhase != .active {
@@ -143,12 +151,7 @@ struct KurnApp: App {
                         modelContainer: modelContainer,
                         excluding: TranscriptionViewModel.activeTranscriptionIDs
                     )
-                    if transcriptionResumer == nil {
-                        transcriptionResumer = TranscriptionViewModel(
-                            modelContext: modelContainer.mainContext
-                        )
-                    }
-                    transcriptionResumer?.resumePendingTranscriptions(settings: settings)
+                    transcription.resumePendingTranscriptions(settings: settings)
                 }
                 // Pre-warm the FluidAudio ASR model while the app is in the
                 // foreground. The one-time CoreML/ANE compilation costs tens

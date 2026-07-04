@@ -21,11 +21,14 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    let container = try! ModelContainer(
+        for: Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
+            Folder.self, Tag.self, SmartFolder.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    return ContentView()
         .environment(AppSettings())
         .environment(RecordingAccessGate())
-        .modelContainer(for: [
-            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
-            Folder.self, Tag.self, SmartFolder.self
-        ], inMemory: true)
+        .environment(TranscriptionViewModel(modelContext: container.mainContext))
+        .modelContainer(container)
 }
