@@ -411,21 +411,12 @@ private struct RecordingSegmentRow: View {
 
                 if isTranscribing {
                     HStack(spacing: 8) {
-                        // The phase label carries any known percentage via its
-                        // `displayName`; the bar below mirrors it visually.
                         if isCancelling {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .scaleEffect(0.7)
                                 .frame(width: 30, height: 30)
                         } else {
-                            if let phase {
-                                Text(phase.displayName)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.textSecondary)
-                                    .lineLimit(1)
-                                    .fixedSize(horizontal: true, vertical: false)
-                            }
                             Button {
                                 onCancelTranscription()
                             } label: {
@@ -510,6 +501,11 @@ private struct RecordingSegmentRow: View {
 
             if isTranscribing {
                 transcriptionProgressBar(phase: phase)
+                if let phase, !isCancelling {
+                    Text(phase.displayName)
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textTertiary)
+                }
             }
             // Show the scrubber whenever this recording is the loaded one — even
             // while transcription is still running, so playback started mid-
