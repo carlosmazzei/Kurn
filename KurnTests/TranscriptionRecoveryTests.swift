@@ -2,9 +2,10 @@
 //  TranscriptionRecoveryTests.swift
 //  KurnTests
 //
-//  The launch-time sweep turns recordings a dead process left at `.inProgress`
-//  into `.pending` (checkpoint saved — resumable) or `.failed` (nothing to
-//  resume), and must leave every other status untouched.
+//  The launch-time sweep turns all recordings a dead process left at `.inProgress`
+//  into `.pending` so every stale run can retry (with its checkpoint when one
+//  exists, or from the beginning otherwise), and must leave every other status
+//  untouched.
 //
 
 import Foundation
@@ -51,7 +52,7 @@ struct TranscriptionRecoveryTests {
         #expect(recording.transcriptionCheckpointData != nil)
     }
 
-    @Test func staleInProgressWithoutCheckpointBecomesFailed() throws {
+    @Test func staleInProgressWithoutCheckpointBecomesPending() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
         let recording = makeRecording(in: context, status: .inProgress)
@@ -59,7 +60,7 @@ struct TranscriptionRecoveryTests {
 
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
 
-        #expect(recording.transcriptionStatus == .failed)
+        #expect(recording.transcriptionStatus == .pending)
     }
 
     @Test func activeRecordingsAreExcludedFromSweep() throws {

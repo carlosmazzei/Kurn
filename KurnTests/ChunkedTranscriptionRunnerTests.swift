@@ -100,6 +100,7 @@ struct ChunkedTranscriptionRunnerTests {
 
     @Test func reportsDurableProgressAfterEveryChunk() async throws {
         let snapshots = ProgressSnapshots()
+        let progressSnapshots = ProgressFractionSnapshots()
 
         _ = try await ChunkedTranscriptionRunner.run(
             chunks: chunks([0, 600, 1200]),
@@ -110,13 +111,19 @@ struct ChunkedTranscriptionRunnerTests {
                     language: "en"
                 )
             },
-            onChunkCompleted: { progress in snapshots.record(progress) }
+            onChunkCompleted: { progress in snapshots.record(progress) },
+            onProgress: { progress, currentChunk, total in progressSnapshots.record(fraction: progress, currentChunk: currentChunk, total: total) }
         )
 
         let recorded = snapshots.values
         #expect(recorded.map(\.completedChunks) == [1, 2, 3])
         #expect(recorded.allSatisfy { $0.totalChunks == 3 })
         #expect(recorded.last?.spans.count == 3)
+
+        let progressValues = progressSnapshots.values
+        #expect(progressValues.map(\.fraction) == [0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0])
+        #expect(progressValues.map(\.currentChunk) == [1, 2, 3, 3])
+        #expect(progressValues.allSatisfy { $0.total == 3 })
     }
 
     @Test func completedResumeTranscribesNothing() async throws {
@@ -162,5 +169,29 @@ private final class ProgressSnapshots: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         storage.append(progress)
+    }
+}
+
+/// Synchronous recorder for the chunk-aware `onProgress` values.
+private final class ProgressFractionSnapshots: @unchecked Sendable {
+    struct Snapshot: Sendable {
+        let fraction: Double
+        let currentChunk: Int
+        let total: Int
+    }
+
+    private let lock = NSLock()
+    private var storage: [Snapshot] = []
+
+    var values: [Snapshot] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func record(fraction: Double, currentChunk: Int, total: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage.append(Snapshot(fraction: fraction, currentChunk: currentChunk, total: total))
     }
 }

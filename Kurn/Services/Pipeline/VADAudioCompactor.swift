@@ -48,6 +48,8 @@ enum VADAudioLoader {
         let inputFile = try AVAudioFile(forReading: url)
         let inputFormat = inputFile.processingFormat
         let totalInputFrames = inputFile.length
+        let inputDuration = Double(totalInputFrames) / inputFormat.sampleRate
+        AppLog.transcription.atDebug.debug("vadLoader: decoding \(url.lastPathComponent, privacy: .public) sampleRate=\(inputFormat.sampleRate, privacy: .public) channels=\(inputFormat.channelCount, privacy: .public) frames=\(totalInputFrames, privacy: .public) duration=\(String(format: "%.1f", inputDuration), privacy: .public)s")
         guard totalInputFrames > 0, inputFormat.sampleRate > 0 else { return [] }
 
         guard let outputFormat = AVAudioFormat(
@@ -104,6 +106,9 @@ enum VADAudioLoader {
 
         player.stop()
         engine.stop()
+        let outputDuration = Double(output.count) / sampleRate
+        let memoryBytes = output.count * MemoryLayout<Float>.size
+        AppLog.transcription.atDebug.debug("vadLoader: decoded \(output.count, privacy: .public) samples (\(String(format: "%.1f", outputDuration), privacy: .public)s, \(memoryBytes, privacy: .public) bytes) from \(url.lastPathComponent, privacy: .public)")
         return output
     }
 }
@@ -133,11 +138,21 @@ struct VADAudioCompactor {
         let inFormat = file.processingFormat
         guard inFormat.sampleRate > 0, file.length > 0 else { return nil }
         let totalDuration = Double(file.length) / inFormat.sampleRate
+        let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        AppLog.transcription.atInfo.info("vadCompact: input \(url.lastPathComponent, privacy: .public) size=\(fileSize, privacy: .public) bytes duration=\(String(format: "%.1f", totalDuration), privacy: .public)s regions=\(regions.count, privacy: .public)")
 
         let merged = Self.normalize(regions: regions, pad: pad, totalDuration: totalDuration)
-        guard !merged.isEmpty else { return nil }
+        guard !merged.isEmpty else {
+            AppLog.transcription.atDebug.debug("vadCompact: no speech regions after normalize, skipping compaction")
+            return nil
+        }
         let kept = merged.reduce(0) { $0 + ($1.end - $1.start) }
-        guard totalDuration - kept >= minSavings else { return nil }
+        let savings = totalDuration - kept
+        AppLog.transcription.atDebug.debug("vadCompact: speech=\(String(format: "%.1f", kept), privacy: .public)s silence=\(String(format: "%.1f", savings), privacy: .public)s")
+        guard savings >= minSavings else {
+            AppLog.transcription.atDebug.debug("vadCompact: savings \(String(format: "%.1f", savings), privacy: .public)s < \(String(format: "%.1f", minSavings), privacy: .public)s, skipping compaction")
+            return nil
+        }
 
         let outURL = Self.tempURL()
         let outFile = try AVAudioFile(forWriting: outURL, settings: Self.aacSettings(sampleRate: sampleRate))
@@ -186,7 +201,8 @@ struct VADAudioCompactor {
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
 
-        AppLog.transcription.atInfo.info("vadCompact: \(String(format: "%.1f", totalDuration), privacy: .public)s -> \(String(format: "%.1f", kept), privacy: .public)s speech (\(map.count, privacy: .public) regions)")
+        let compactSize = (try? outURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        AppLog.transcription.atInfo.info("vadCompact: \(String(format: "%.1f", totalDuration), privacy: .public)s -> \(String(format: "%.1f", kept), privacy: .public)s speech (\(map.count, privacy: .public) regions), output size=\(compactSize, privacy: .public) bytes")
         return CompactionResult(url: outURL, map: map)
     }
 

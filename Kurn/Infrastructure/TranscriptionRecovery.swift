@@ -6,10 +6,12 @@
 //  working on them — a process death mid-run, or a persist that couldn't land
 //  (e.g. the app was relaunched in the background while the device was locked
 //  and the protected store was unreadable, turning the launch sweep into a
-//  silent no-op). Recordings whose run saved a checkpoint become `.pending` so
-//  the foreground resume pass picks them up where they left off; runs that
-//  never reached their first chunk have nothing to resume and are marked
-//  `.failed` for a manual retry.
+//  silent no-op). All stale recordings are reset to `.pending` so the
+//  foreground resume pass retries them; those with a checkpoint resume from
+//  where they left off, those without start from the beginning. The audio
+//  file is always intact, so every case is retryable — marking no-checkpoint
+//  runs as `.failed` prevented Whisper uploads killed mid-flight (background
+//  task expiry, process death at ~94% upload) from ever retrying.
 //
 //  Runs at launch AND on every foreground activation: only the latter can fix
 //  a store that was unreadable at launch, and `excluding` keeps it from
@@ -41,18 +43,14 @@ enum TranscriptionRecovery {
         let stale = inProgress.filter { !activeIDs.contains($0.id) }
         guard !stale.isEmpty else { return }
 
-        var resumable = 0
+        var withCheckpoint = 0
         for recording in stale {
-            if recording.transcriptionCheckpointData != nil {
-                recording.transcriptionStatus = .pending
-                resumable += 1
-            } else {
-                recording.transcriptionStatus = .failed
-            }
+            recording.transcriptionStatus = .pending
+            if recording.transcriptionCheckpointData != nil { withCheckpoint += 1 }
         }
         do {
             try context.save()
-            AppLog.transcription.atNotice.notice("recovery: swept \(stale.count, privacy: .public) stale transcription(s), \(resumable, privacy: .public) resumable")
+            AppLog.transcription.atNotice.notice("recovery: swept \(stale.count, privacy: .public) stale transcription(s), \(withCheckpoint, privacy: .public) with checkpoint")
         } catch {
             AppLog.transcription.atError.error("recovery: sweep save failed: \(error.localizedDescription, privacy: .public)")
         }

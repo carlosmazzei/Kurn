@@ -50,8 +50,10 @@ enum TranscriptionPhase: Sendable, Equatable {
     case detectingSpeech
     /// Active transcription. `progress` is a fraction in `0...1` when the engine
     /// can report it (e.g. the chunked Whisper path), or `nil` when the stage is
-    /// indeterminate (e.g. a single on-device pass).
-    case transcribing(progress: Double?)
+    /// indeterminate (e.g. a single on-device pass). `chunks` carries the current
+    /// chunk number and total for long recordings so the UI can show both a bar
+    /// and a "chunk X of Y" label.
+    case transcribing(progress: Double?, chunks: ChunkProgress? = nil)
     case finalizing
 
     /// Short, user-facing description of the current stage.
@@ -61,11 +63,17 @@ enum TranscriptionPhase: Sendable, Equatable {
         case .preprocessing: return NSLocalizedString("phase.preprocessing", comment: "Cleaning audio")
         case .detectingLanguage: return NSLocalizedString("phase.detecting_language", comment: "Detecting language")
         case .detectingSpeech: return NSLocalizedString("phase.detecting_speech", comment: "Detecting speech")
-        case .transcribing(let progress):
+        case .transcribing(let progress, let chunks):
             guard let progress else {
                 return NSLocalizedString("phase.transcribing", comment: "Transcribing")
             }
             let percent = Int((progress * 100).rounded())
+            if let chunks {
+                return String(
+                    format: NSLocalizedString("phase.transcribing_chunk_progress", comment: "Transcribing with percent and chunk count"),
+                    percent, chunks.completed, chunks.total
+                )
+            }
             return String(
                 format: NSLocalizedString("phase.transcribing_progress", comment: "Transcribing with percent"),
                 percent
@@ -81,14 +89,20 @@ enum TranscriptionPhase: Sendable, Equatable {
     /// Within transcribing, the engine's real sub-progress fills that band.
     var fractionComplete: Double {
         switch self {
-        case .preparing: return 0.02
-        case .preprocessing: return 0.08
-        case .detectingLanguage: return 0.16
-        case .detectingSpeech: return 0.24
-        case .transcribing(let progress): return 0.30 + 0.62 * min(1, max(0, progress ?? 0))
-        case .finalizing: return 0.96
+        case .preparing: return 0.05
+        case .preprocessing: return 0.15
+        case .detectingLanguage: return 0.22
+        case .detectingSpeech: return 0.28
+        case .transcribing(let progress, _): return 0.30 + 0.62 * min(1, max(0, progress ?? 0))
+        case .finalizing: return 0.95
         }
     }
+}
+
+/// Chunk counter surfaced in the transcription progress UI.
+struct ChunkProgress: Sendable, Equatable {
+    let completed: Int
+    let total: Int
 }
 
 /// Microphone pickup pattern preference for the built-in mic.

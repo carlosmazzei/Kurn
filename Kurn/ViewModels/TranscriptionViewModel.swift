@@ -202,7 +202,7 @@ final class TranscriptionViewModel {
         // already-transcribed chunks when it still matches.
         let checkpoint = recording.transcriptionCheckpoint
         if let checkpoint {
-            AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public)")
+            AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) engine=\(checkpoint.engineRaw, privacy: .public) lang=\(checkpoint.languageRaw, privacy: .public) compacted=\(checkpoint.compacted, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public) spans=\(checkpoint.spans.count, privacy: .public)")
         }
 
         // Long transcriptions (especially the chunked Whisper path) would
@@ -213,6 +213,7 @@ final class TranscriptionViewModel {
         // instead of freezing mid-chunk.
         let background = BackgroundActivity()
         background.begin(name: "ai.kurn.transcription") { [weak self] in
+            AppLog.transcription.atNotice.notice("VM: background task expired, cancelling id=\(recordingID, privacy: .public)")
             self?.transcriptionTasks[recordingID]?.cancel()
         }
         defer { background.end() }
@@ -341,12 +342,16 @@ final class TranscriptionViewModel {
         }
     }
 
-    /// Whether an `AppError` is really the transcription task being cancelled
-    /// (URLSession surfaces cancellation of an in-flight upload as a network
-    /// error rather than `CancellationError`).
+    /// Whether an `AppError` should pause transcription (→ `.pending`) rather
+    /// than fail it. Covers two cases:
+    /// - `.cancelled`: the Swift task was cancelled (background-task expiry,
+    ///   user-initiated pause, or stop).
+    /// - `.timedOut`: the per-chunk 600 s deadline fired because OpenAI never
+    ///   responded (TCP stall, server issue). Retrying is safe — the audio file
+    ///   is intact and the chunk runner will re-upload from the checkpoint.
     private func isCancellation(_ error: AppError) -> Bool {
         if case .networkError(let urlError) = error {
-            return urlError.code == .cancelled
+            return urlError.code == .cancelled || urlError.code == .timedOut
         }
         return false
     }

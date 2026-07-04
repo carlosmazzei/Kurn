@@ -21,7 +21,11 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        try await transcribeResumable(url: url, language: language, onProgress: onProgress)
+        try await transcribeResumable(
+            url: url,
+            language: language,
+            onProgress: { progress, _, _ in onProgress(progress) }
+        )
     }
 
     /// Chunked transcription that can resume from a persisted checkpoint:
@@ -33,7 +37,7 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
-        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+        onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider()
         let chunks = try await chunker.chunk(url: url)
@@ -46,17 +50,24 @@ actor WhisperTranscriber: Transcribing {
             resume: resume,
             transcribeChunk: { chunk, index in
                 let data = try Data(contentsOf: chunk.url)
-                AppLog.transcription.atDebug.debug("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) (\(data.count, privacy: .public) bytes)")
+                AppLog.transcription.atInfo.info("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) sending \(data.count, privacy: .public) bytes to OpenAI")
                 let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
                 defer { progressPulse.cancel() }
-                return try await provider.transcribe(
-                    audioData: data,
-                    fileName: chunk.url.lastPathComponent,
-                    language: language
-                )
+                let chunkStart = Date()
+                let result = try await Self.withChunkTimeout(seconds: 600) {
+                    try await provider.transcribe(
+                        audioData: data,
+                        fileName: chunk.url.lastPathComponent,
+                        language: language
+                    )
+                }
+                AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
+                return result
             },
             onChunkCompleted: onChunkCompleted,
-            onProgress: onProgress
+            onProgress: { progress, currentChunk, total in
+                onProgress(progress, currentChunk, total)
+            }
         )
     }
 
@@ -74,23 +85,47 @@ actor WhisperTranscriber: Transcribing {
         return (Double(completed) + inFlightChunkFraction) / Double(totalChunks)
     }
 
+    /// Runs `operation`, cancelling it and throwing `URLError.timedOut` if it
+    /// doesn't complete within `seconds`. `TranscriptionViewModel.isCancellation`
+    /// maps `.timedOut` to `.pending` so a stuck upload retries automatically.
+    private static func withChunkTimeout<T: Sendable>(
+        seconds: TimeInterval,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                AppLog.transcription.atError.error("whisper: chunk timed out after \(Int(seconds), privacy: .public)s — upload will retry")
+                throw AppError.networkError(URLError(.timedOut))
+            }
+            defer { group.cancelAll() }
+            let result = try await group.next()!
+            return result
+        }
+    }
+
     private static func startProgressPulse(
         completedChunks: Int,
         totalChunks: Int,
-        onProgress: @escaping @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double, Int, Int) -> Void
     ) -> Task<Void, Never> {
         Task {
             let started = Date()
+            var nextHeartbeatAt: TimeInterval = 30
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(750))
                 guard !Task.isCancelled else { return }
-                onProgress(
-                    estimatedProgress(
-                        completedChunks: completedChunks,
-                        totalChunks: totalChunks,
-                        elapsed: Date().timeIntervalSince(started)
-                    )
-                )
+                let elapsed = Date().timeIntervalSince(started)
+                let progress = estimatedProgress(completedChunks: completedChunks, totalChunks: totalChunks, elapsed: elapsed)
+                onProgress(progress, completedChunks + 1, totalChunks)
+                // Periodic heartbeat so the log shows the upload is alive (not hung).
+                // Progress saturates near 88% by design; without this the log goes
+                // silent and it's impossible to tell if the upload is still in flight.
+                if elapsed >= nextHeartbeatAt {
+                    AppLog.transcription.atNotice.notice("whisper: chunk \(completedChunks + 1, privacy: .public)/\(totalChunks, privacy: .public) still awaiting OpenAI response, elapsed=\(Int(elapsed), privacy: .public)s")
+                    nextHeartbeatAt += 30
+                }
             }
         }
     }

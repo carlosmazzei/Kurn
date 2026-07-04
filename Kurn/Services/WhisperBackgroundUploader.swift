@@ -65,6 +65,7 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
     /// Background sessions require file-based uploads, so the body is spooled
     /// to disk (readable while the device is locked) for the attempt.
     func sendValidated(_ request: URLRequest, body: Data) async throws -> (Data, URLResponse) {
+        cleanupOrphanedUploadBodies()
         var attempt = 0
         while true {
             do {
@@ -100,12 +101,14 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
                 buffers[task.taskIdentifier] = Data()
                 bodyFiles[task.taskIdentifier] = bodyURL
                 lock.unlock()
+                AppLog.transcription.atInfo.info("bgUpload: started task=\(task.taskIdentifier, privacy: .public)")
                 holder.start(task)
             }
         } onCancel: {
             // Cancelling the transfer makes the delegate complete with
             // URLError.cancelled, which the caller maps to a paused (.pending)
             // transcription rather than a failure.
+            AppLog.transcription.atNotice.notice("bgUpload: Swift task cancelled — cancelling URLSession upload")
             holder.cancel()
         }
     }
@@ -117,10 +120,37 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
         let url = dir.appendingPathComponent(UUID().uuidString + ".multipart")
         try body.write(to: url, options: [.atomic])
         // Readable while locked so uploads continue with the screen off. The
-        // file is deleted as soon as its transfer completes, and anything
-        // orphaned by a process death lives in tmp, which the system purges.
+        // file is deleted as soon as its transfer completes; orphaned bodies
+        // from process death are swept on the next upload.
         RecordingProtection.applyInFlight(to: url)
         return url
+    }
+
+    /// Remove leftover upload body files from earlier killed/crashed uploads.
+    /// Unlike the generic tmp purge, this runs immediately so a recurring failure
+    /// (e.g. long-chunk timeouts) does not accumulate one body file per attempt.
+    /// Files currently tracked as in-flight are left untouched.
+    private func cleanupOrphanedUploadBodies() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WhisperUploadBodies", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: dir.path) else { return }
+        let keys: [URLResourceKey] = [.nameKey, .isRegularFileKey]
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: keys,
+            options: .skipsHiddenFiles
+        ) else { return }
+        lock.lock()
+        let inFlight = Set(bodyFiles.values.map { $0.path })
+        lock.unlock()
+        var removed = 0
+        for file in files where file.pathExtension == "multipart" && !inFlight.contains(file.path) {
+            try? FileManager.default.removeItem(at: file)
+            removed += 1
+        }
+        if removed > 0 {
+            AppLog.transcription.atDebug.debug("bgUpload: cleaned up \(removed, privacy: .public) orphaned upload body file(s)")
+        }
     }
 }
 
@@ -153,10 +183,14 @@ extension WhisperBackgroundUploader: URLSessionDataDelegate {
         }
         if let error {
             let urlError = (error as? URLError) ?? URLError(.unknown)
+            AppLog.transcription.atError.error("bgUpload: task=\(task.taskIdentifier, privacy: .public) failed: \(urlError.localizedDescription, privacy: .public) (code=\(urlError.code.rawValue, privacy: .public))")
             continuation.resume(throwing: AppError.networkError(urlError))
         } else if let response = task.response {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            AppLog.transcription.atInfo.info("bgUpload: task=\(task.taskIdentifier, privacy: .public) complete, HTTP \(status, privacy: .public), body=\(buffer.count, privacy: .public) bytes")
             continuation.resume(returning: (buffer, response))
         } else {
+            AppLog.transcription.atError.error("bgUpload: task=\(task.taskIdentifier, privacy: .public) complete but no response")
             continuation.resume(throwing: AppError.networkError(URLError(.badServerResponse)))
         }
     }

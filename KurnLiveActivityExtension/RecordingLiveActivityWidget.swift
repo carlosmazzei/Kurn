@@ -46,20 +46,22 @@ struct RecordingLiveActivityWidget: Widget {
                         .padding(.bottom, 2)
                 }
             } compactLeading: {
-                // Per the design: just the pulsing record dot.
-                Circle()
-                    .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                    .frame(width: 8, height: 8)
+                // Circular clip avoids pill-edge clipping on the icon corners.
+                KurnLogo(size: 20)
+                    .clipShape(Circle())
+                    .padding(.leading, 2)
             } compactTrailing: {
+                // Timer in accent color mirrors the phone-call trailing (one icon, one text).
                 elapsedText(context)
-                    .font(.system(.caption2, design: .rounded).monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
                     .frame(width: 44)
                     .minimumScaleFactor(0.8)
+                    .padding(.trailing, 2)
             } minimal: {
-                Circle()
-                    .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                    .frame(width: 8, height: 8)
+                // Circular icon keeps the minimal indicator on-brand.
+                KurnLogo(size: 16)
+                    .clipShape(Circle())
             }
             .keylineTint(.kurnAccent)
         }
