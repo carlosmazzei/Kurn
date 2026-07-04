@@ -120,6 +120,7 @@ struct KurnApp: App {
                 }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
+                transcription.appSettings = settings
                 // Lock the recordings gate whenever the app leaves the
                 // foreground so the next time it comes back the user has
                 // to authenticate again. Only `.background` triggers this —

@@ -483,6 +483,9 @@ extension MeetingsListView {
     }
 
     func preview(for meeting: Meeting) -> String {
+        if let aiTitle = meeting.aiTitle, !aiTitle.isEmpty {
+            return aiTitle
+        }
         let transcriptPreview = meeting.recordings
             .sorted(by: { $0.recordedAt < $1.recordedAt })
             .compactMap { recording -> String? in

@@ -55,6 +55,9 @@ final class TranscriptionViewModel {
     private let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
     private let summaryService = SummaryService()
+    /// App-wide settings, set by `KurnApp` so title generation can use the
+    /// configured LLM provider without passing settings through every call site.
+    var appSettings: AppSettings?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -235,6 +238,9 @@ final class TranscriptionViewModel {
 
             saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
+            if let settings = appSettings {
+                await generateAITitle(for: recording.meeting, settings: settings)
+            }
         } catch is CancellationError {
             if stoppingIDs.remove(recordingID) != nil {
                 // Full stop: discard the checkpoint so the next run starts fresh.
@@ -298,9 +304,41 @@ final class TranscriptionViewModel {
         modelContext.insert(transcript)
         recording.transcriptionStatus = .done
         recording.transcriptionCheckpointData = nil
+        // Clear the AI title so re-transcription regenerates it from the new transcript.
+        recording.meeting?.aiTitle = nil
 
         syncSpeakers(for: recording.meeting)
         persist()
+    }
+
+    /// Generate and persist a short AI-derived meeting title after transcription.
+    /// Best-effort: errors are logged and swallowed so a failed title never
+    /// blocks or surfaces as a user-facing error.
+    private func generateAITitle(for meeting: Meeting?, settings: AppSettings) async {
+        guard let meeting, meeting.aiTitle == nil else { return }
+        guard KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount) else { return }
+        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = meeting.recordings
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .compactMap { recording in
+                guard let segments = recording.transcript?.segments else { return nil }
+                return (offset: meeting.startOffset(of: recording), segments: segments)
+            }
+        let transcriptText = SummaryService.assembleTranscriptText(from: groups)
+        guard !transcriptText.isEmpty else { return }
+        let provider = settings.aiProvider
+        let model = settings.summaryModel(for: provider)
+        do {
+            let title = try await summaryService.generateTitle(
+                transcriptText: transcriptText,
+                provider: provider,
+                model: model
+            )
+            meeting.aiTitle = title
+            persist()
+            AppLog.transcription.atNotice.notice("VM: AI title id=\(meeting.id, privacy: .public) \"\(title, privacy: .private)\"")
+        } catch {
+            AppLog.transcription.atInfo.info("VM: AI title skipped: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Whether an `AppError` is really the transcription task being cancelled

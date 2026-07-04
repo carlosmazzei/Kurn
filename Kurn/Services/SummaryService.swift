@@ -185,6 +185,35 @@ struct SummaryService {
         .joined(separator: "\n\n")
     }
 
+    /// Generate a short 5–7 word meeting title from the transcript. Uses the
+    /// same provider as the full summary but sends only a small excerpt and
+    /// expects a one-line JSON reply, so it's fast and cheap. Best-effort:
+    /// callers should catch and ignore errors rather than surfacing them.
+    func generateTitle(
+        transcriptText: String,
+        provider: AIProvider,
+        model: String
+    ) async throws -> String {
+        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let excerpt = String(transcriptText.prefix(2_000))
+        let system = """
+        You generate short meeting titles. \
+        Return ONLY valid JSON in this exact format with no other text: \
+        {"sections":[{"title":"5 to 7 word title here","body":""}]}
+        The title must be written in the same language as the transcript.
+        """
+        let result = try await llm.summarize(
+            systemPrompt: system,
+            userPrompt: "Transcript:\n\(excerpt)"
+        )
+        let title = result.sections.first?.title
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !title.isEmpty else {
+            throw AppError.decodingError("empty title in response")
+        }
+        return title
+    }
+
     /// Assemble a single prompt-ready transcript string from per-recording
     /// segment lists. `[mm:ss] Speaker: text` lines, one per segment. Each group
     /// carries the recording's `offset` (seconds from the meeting start), so the
