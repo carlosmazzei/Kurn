@@ -9,7 +9,7 @@ import Testing
 
 struct AudioChunkerTests {
 
-    @Test func chunkReturnsOriginalFileUnmodifiedWhenUnderSizeThreshold() async throws {
+    @Test func chunkReturnsOriginalFileUnmodifiedWhenUnderThresholds() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).m4a")
         try Data(repeating: 0, count: 1024).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -20,6 +20,15 @@ struct AudioChunkerTests {
         #expect(chunks.count == 1)
         #expect(chunks[0].url == url)
         #expect(chunks[0].offset == 0)
+    }
+
+    @Test func longAudioUnderSizeThresholdIsSplitByDuration() async throws {
+        let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let chunks = try await AudioChunker().chunk(url: url)
+        #expect(chunks.count > 1)
+        #expect(chunks.allSatisfy { $0.offset >= 0 })
     }
 
     @Test func cleanupOnlyRemovesFilesInsideTemporaryDirectory() async throws {

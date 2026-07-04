@@ -202,7 +202,7 @@ final class TranscriptionViewModel {
         // already-transcribed chunks when it still matches.
         let checkpoint = recording.transcriptionCheckpoint
         if let checkpoint {
-            AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public)")
+            AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) engine=\(checkpoint.engineRaw, privacy: .public) lang=\(checkpoint.languageRaw, privacy: .public) compacted=\(checkpoint.compacted, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public) spans=\(checkpoint.spans.count, privacy: .public)")
         }
 
         // Long transcriptions (especially the chunked Whisper path) would

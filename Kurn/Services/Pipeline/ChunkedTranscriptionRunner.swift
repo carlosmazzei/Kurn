@@ -33,13 +33,14 @@ enum ChunkedTranscriptionRunner {
     ///   - transcribeChunk: transcribes one chunk (given its zero-based index)
     ///     into chunk-local spans.
     ///   - onChunkCompleted: durable-progress sink invoked after each chunk.
-    ///   - onProgress: 0...1 fraction of chunks completed.
+    ///   - onProgress: 0...1 fraction of chunks completed, plus the current
+    ///     chunk number and total (the current chunk is clamped to `1...total`).
     static func run(
         chunks: [AudioChunker.Chunk],
         resume: Progress?,
         transcribeChunk: @Sendable (AudioChunker.Chunk, Int) async throws -> RawTranscript,
         onChunkCompleted: (@Sendable (Progress) -> Void)? = nil,
-        onProgress: @Sendable (Double) -> Void = { _ in }
+        onProgress: @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         var state: Progress
         if let resume, resume.totalChunks == chunks.count,
@@ -53,7 +54,12 @@ enum ChunkedTranscriptionRunner {
             state = Progress(totalChunks: chunks.count, completedChunks: 0, detectedLanguage: "", spans: [])
         }
 
-        onProgress(chunks.isEmpty ? 1 : Double(state.completedChunks) / Double(chunks.count))
+        let total = max(1, chunks.count)
+        onProgress(
+            chunks.isEmpty ? 1 : Double(state.completedChunks) / Double(total),
+            max(1, min(total, state.completedChunks + 1)),
+            total
+        )
 
         for index in state.completedChunks..<chunks.count {
             try Task.checkCancellation()
@@ -77,7 +83,10 @@ enum ChunkedTranscriptionRunner {
             onChunkCompleted?(state)
             // Advance after each chunk completes so the bar reaches 100% when
             // the last chunk lands (rather than stalling at (total-1)/total).
-            onProgress(Double(index + 1) / Double(chunks.count))
+            // The current chunk is the next one in flight (or the last one if
+            // this was the final chunk).
+            let currentChunk = max(1, min(total, index + 2))
+            onProgress(Double(index + 1) / Double(total), currentChunk, total)
         }
 
         return RawTranscript(spans: state.spans, language: state.detectedLanguage)

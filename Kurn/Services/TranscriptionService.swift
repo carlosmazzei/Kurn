@@ -8,6 +8,7 @@
 //  is decoupled from SwiftData and safe to call off the main actor.
 //
 
+import AVFoundation
 import Foundation
 
 struct TranscriptionService {
@@ -73,7 +74,10 @@ struct TranscriptionService {
         onCheckpoint: CheckpointHandler? = nil
     ) async throws -> Output {
         let started = Date()
-        AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
+        Self.cleanupOrphanedTempFiles()
+        let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        let fileDuration = (try? await AVURLAsset(url: fileURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
+        AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) size=\(fileSize, privacy: .public) bytes duration=\(String(format: "%.1f", fileDuration), privacy: .public)s engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
         // 1. Clean the audio (selected preprocessing engine) for the
@@ -280,7 +284,19 @@ struct TranscriptionService {
         onCheckpoint: CheckpointHandler? = nil
     ) async throws -> RawTranscript {
         try await ResourceGuard.requireTranscriptionHeadroom()
-        let compaction = (try? await vadCompactor.compact(url: cleanedURL, regions: regions)) ?? nil
+        let compaction: CompactionResult?
+        do {
+            compaction = try await vadCompactor.compact(url: cleanedURL, regions: regions)
+        } catch {
+            try ResourceGuard.rethrowIfResourceFailure(error)
+            AppLog.transcription.atError.error("transcribe: VAD compaction failed: \(error.localizedDescription, privacy: .public)")
+            compaction = nil
+        }
+        if let compaction {
+            AppLog.transcription.atInfo.info("transcribe: compaction applied, target \(compaction.url.lastPathComponent, privacy: .public)")
+        } else {
+            AppLog.transcription.atInfo.info("transcribe: no compaction, using cleaned audio")
+        }
         try await ResourceGuard.requireTranscriptionHeadroom()
         let target = compaction?.url ?? cleanedURL
         defer {
@@ -288,8 +304,13 @@ struct TranscriptionService {
         }
 
         let compacted = compaction != nil
-        let resume = checkpoint.flatMap { cp in
-            cp.matches(engine: engine, language: language, compacted: compacted) ? cp.runnerProgress : nil
+        let resume = checkpoint.flatMap { cp -> ChunkedTranscriptionRunner.Progress? in
+            if cp.matches(engine: engine, language: language, compacted: compacted) {
+                AppLog.transcription.atNotice.notice("transcribe: checkpoint matches engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) chunks=\(cp.totalChunks, privacy: .public)/\(cp.completedChunks, privacy: .public)")
+                return cp.runnerProgress
+            }
+            AppLog.transcription.atNotice.notice("transcribe: checkpoint mismatch stored(engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) totalChunks=\(cp.totalChunks, privacy: .public)) != current(engine=\(engine.rawValue, privacy: .public) lang=\(language.rawValue, privacy: .public) compacted=\(compacted, privacy: .public)), starting over")
+            return nil
         }
         let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?
         if let onCheckpoint {
@@ -303,6 +324,9 @@ struct TranscriptionService {
         }
 
         let raw: RawTranscript
+        let targetSize = (try? target.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        let targetDuration = (try? await AVURLAsset(url: target).load(.duration)).map(CMTimeGetSeconds) ?? 0
+        AppLog.transcription.atNotice.notice("transcribe: engine input \(target.lastPathComponent, privacy: .public) size=\(targetSize, privacy: .public) bytes duration=\(String(format: "%.1f", targetDuration), privacy: .public)s compacted=\(compacted, privacy: .public)")
         switch engine {
         case .whisperAPI:
             raw = try await whisperTranscriber.transcribeResumable(
@@ -310,7 +334,9 @@ struct TranscriptionService {
                 language: language,
                 resume: resume,
                 onChunkCompleted: checkpointSink,
-                onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+                onProgress: { progress, completed, total in
+                    onPhase(.transcribing(progress: progress, chunks: total > 0 ? ChunkProgress(completed: completed, total: total) : nil))
+                }
             )
         case .appleSpeech:
             raw = try await transcribeOnDeviceChunked(
@@ -324,7 +350,7 @@ struct TranscriptionService {
             raw = try await resolveTranscriber(engine).transcribe(
                 url: target,
                 language: language,
-                onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+                onProgress: { progress in onPhase(.transcribing(progress: progress, chunks: nil)) }
             )
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
@@ -367,12 +393,16 @@ struct TranscriptionService {
                     language: language,
                     onProgress: { fraction in
                         let clamped = min(1, max(0, fraction))
-                        onPhase(.transcribing(progress: (Double(index) + clamped) / Double(total)))
+                        let currentChunk = index + 1
+                        let overallProgress = (Double(index) + clamped) / Double(total)
+                        onPhase(.transcribing(progress: overallProgress, chunks: total > 1 ? ChunkProgress(completed: currentChunk, total: total) : nil))
                     }
                 )
             },
             onChunkCompleted: onChunkCompleted,
-            onProgress: { progress in onPhase(.transcribing(progress: progress)) }
+            onProgress: { progress, currentChunk, _ in
+                onPhase(.transcribing(progress: progress, chunks: total > 1 ? ChunkProgress(completed: currentChunk, total: total) : nil))
+            }
         )
     }
 
@@ -400,6 +430,10 @@ struct TranscriptionService {
         minSpeakers: Int,
         onWarning: DiarizationWarningHandler?
     ) async throws -> [SpeakerTurn] {
+        let started = Date()
+        let originalSize = (try? originalURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        let originalDuration = (try? await AVURLAsset(url: originalURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
+        AppLog.transcription.atNotice.notice("diarize: start engine=\(engine.rawValue, privacy: .public) size=\(originalSize, privacy: .public) bytes duration=\(String(format: "%.1f", originalDuration), privacy: .public)s")
         try await ResourceGuard.requireTranscriptionHeadroom()
         let diarURL: URL
         let cleanupURL: URL?
@@ -429,13 +463,80 @@ struct TranscriptionService {
         case .heuristic:
             let turns = await heuristicDiarizer.diarize(url: diarURL, speechRegions: regions)
             try await ResourceGuard.requireTranscriptionHeadroom()
+            AppLog.transcription.atNotice.notice("diarize: complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
             return turns
         case .fluidAudio:
             let turns = await fluidAudioDiarizer.diarize(
                 url: diarURL, minSpeakers: minSpeakers, onDownloadFailure: onWarning
             )
             try await ResourceGuard.requireTranscriptionHeadroom()
+            let speakers = Set(turns.map { $0.speakerLabel }).count
+            AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public) speakers=\(speakers, privacy: .public)")
             return turns
+        }
+    }
+
+    /// Sweep old temporary files left behind by killed/crashed transcriptions.
+    /// Uses a 1-hour age threshold so it never touches files an in-flight
+    /// transcription is still using; anything that old is almost certainly an
+    /// orphan because no single stage should run for that long.
+    private static func cleanupOrphanedTempFiles() {
+        let tmp = FileManager.default.temporaryDirectory
+        let prefixes = [
+            "kurn_clean_",
+            "kurn_vad_",
+            "kurn_diar_",
+            "kurn_chunk_"
+        ]
+        let keys: [URLResourceKey] = [.nameKey, .creationDateKey, .isRegularFileKey]
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: tmp,
+            includingPropertiesForKeys: keys,
+            options: .skipsHiddenFiles
+        ) else { return }
+
+        let cutoff = Date().addingTimeInterval(-3600)
+        var removed = 0
+        var removedBytes: Int64 = 0
+        for file in files {
+            let values = try? file.resourceValues(forKeys: [.nameKey, .creationDateKey, .fileSizeKey])
+            let name = values?.name ?? file.lastPathComponent
+            guard prefixes.contains(where: { name.hasPrefix($0) }) else { continue }
+            guard let creationDate = values?.creationDate, creationDate < cutoff else { continue }
+            let size = values?.fileSize ?? 0
+            do {
+                try FileManager.default.removeItem(at: file)
+                removed += 1
+                removedBytes += Int64(size)
+            } catch {
+                AppLog.transcription.atDebug.debug("transcribe: could not remove orphan temp file \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        if removed > 0 {
+            AppLog.transcription.atDebug.debug("transcribe: cleaned up \(removed, privacy: .public) orphaned temp file(s), \(removedBytes, privacy: .public) bytes")
+        }
+
+        // Also sweep the upload-body subdirectory.
+        let uploadDir = tmp.appendingPathComponent("WhisperUploadBodies", isDirectory: true)
+        guard let uploadFiles = try? FileManager.default.contentsOfDirectory(
+            at: uploadDir,
+            includingPropertiesForKeys: keys,
+            options: .skipsHiddenFiles
+        ) else { return }
+        for file in uploadFiles where file.pathExtension == "multipart" {
+            let values = try? file.resourceValues(forKeys: [.creationDateKey, .fileSizeKey])
+            guard let creationDate = values?.creationDate, creationDate < cutoff else { continue }
+            let size = values?.fileSize ?? 0
+            do {
+                try FileManager.default.removeItem(at: file)
+                removed += 1
+                removedBytes += Int64(size)
+            } catch {
+                AppLog.transcription.atDebug.debug("transcribe: could not remove orphan upload body \(file.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        if removed > 0 {
+            AppLog.transcription.atDebug.debug("transcribe: total orphaned temp files removed: \(removed, privacy: .public), \(removedBytes, privacy: .public) bytes")
         }
     }
 }

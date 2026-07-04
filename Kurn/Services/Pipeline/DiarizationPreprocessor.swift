@@ -49,9 +49,16 @@ actor DiarizationPreprocessor {
         normalizePeakInPlace(&samples, targetDBFS: Self.targetPeakDBFS)
         try await ResourceGuard.requireTranscriptionHeadroom()
 
-        let outURL = try writeWAV(samples: samples)
-        AppLog.transcription.atInfo.info("diarPreprocess: done in \(Date().timeIntervalSince(started), privacy: .public)s -> \(outURL.lastPathComponent, privacy: .public)")
-        return outURL
+        var outURL: URL?
+        let writtenURL = try writeWAV(samples: samples)
+        outURL = writtenURL
+        defer {
+            if let url = outURL { cleanup(url) }
+        }
+
+        AppLog.transcription.atInfo.info("diarPreprocess: done in \(Date().timeIntervalSince(started), privacy: .public)s -> \(writtenURL.lastPathComponent, privacy: .public)")
+        outURL = nil
+        return writtenURL
     }
 
     /// Remove a diarization-preprocessor output. Only touches files inside the

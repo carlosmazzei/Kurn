@@ -208,6 +208,7 @@
 "phase.detecting_speech" = "Detectando fala…";
 "phase.transcribing" = "Transcrevendo…";
 "phase.transcribing_progress" = "Transcrevendo… %d%%";
+"phase.transcribing_chunk_progress" = "Transcrevendo… %d%% (chunk %d de %d)";
 "phase.finalizing" = "Finalizando…";
 
 /* Formulário de reunião */

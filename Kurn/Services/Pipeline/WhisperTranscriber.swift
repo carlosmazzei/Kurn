@@ -21,7 +21,11 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        try await transcribeResumable(url: url, language: language, onProgress: onProgress)
+        try await transcribeResumable(
+            url: url,
+            language: language,
+            onProgress: { progress, _, _ in onProgress(progress) }
+        )
     }
 
     /// Chunked transcription that can resume from a persisted checkpoint:
@@ -33,7 +37,7 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
-        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+        onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider()
         let chunks = try await chunker.chunk(url: url)
@@ -61,7 +65,9 @@ actor WhisperTranscriber: Transcribing {
                 return result
             },
             onChunkCompleted: onChunkCompleted,
-            onProgress: onProgress
+            onProgress: { progress, currentChunk, total in
+                onProgress(progress, currentChunk, total)
+            }
         )
     }
 
@@ -102,7 +108,7 @@ actor WhisperTranscriber: Transcribing {
     private static func startProgressPulse(
         completedChunks: Int,
         totalChunks: Int,
-        onProgress: @escaping @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double, Int, Int) -> Void
     ) -> Task<Void, Never> {
         Task {
             let started = Date()
@@ -111,7 +117,8 @@ actor WhisperTranscriber: Transcribing {
                 try? await Task.sleep(for: .milliseconds(750))
                 guard !Task.isCancelled else { return }
                 let elapsed = Date().timeIntervalSince(started)
-                onProgress(estimatedProgress(completedChunks: completedChunks, totalChunks: totalChunks, elapsed: elapsed))
+                let progress = estimatedProgress(completedChunks: completedChunks, totalChunks: totalChunks, elapsed: elapsed)
+                onProgress(progress, completedChunks + 1, totalChunks)
                 // Periodic heartbeat so the log shows the upload is alive (not hung).
                 // Progress saturates near 88% by design; without this the log goes
                 // silent and it's impossible to tell if the upload is still in flight.

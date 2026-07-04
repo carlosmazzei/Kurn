@@ -208,6 +208,7 @@
 "phase.detecting_speech" = "Detecting speech…";
 "phase.transcribing" = "Transcribing…";
 "phase.transcribing_progress" = "Transcribing… %d%%";
+"phase.transcribing_chunk_progress" = "Transcribing… %d%% (chunk %d of %d)";
 "phase.finalizing" = "Finalizing…";
 
 /* Meeting form */

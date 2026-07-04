@@ -94,6 +94,10 @@ actor AudioPreprocessor: AudioPreprocessing {
         let outURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("kurn_clean_\(UUID().uuidString).m4a")
         try? FileManager.default.removeItem(at: outURL)
+        var success = false
+        defer {
+            if !success { cleanup(outURL) }
+        }
 
         let outSettings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -165,6 +169,7 @@ actor AudioPreprocessor: AudioPreprocessing {
         player.stop()
         engine.stop()
         try await ResourceGuard.requireTranscriptionHeadroom()
+        success = true
         AppLog.transcription.atInfo.info("preprocess: done in \(Date().timeIntervalSince(renderStart), privacy: .public)s (total \(Date().timeIntervalSince(started), privacy: .public)s) -> \(outURL.lastPathComponent, privacy: .public)")
         return outURL
     }

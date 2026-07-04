@@ -26,14 +26,22 @@ actor AudioChunker {
 
     /// Return the file split into chunks in the temporary directory. If the file
     /// is small enough, returns it unmodified as a single chunk at offset 0.
+    /// Whisper chunks are capped by both request size and duration: a long but
+    /// highly-compressed recording (e.g. 45 min at ~11 MB) is still too long for
+    /// a single API call, so we split it into 10-minute chunks even when the
+    /// size is below the threshold.
     func chunk(url: URL) async throws -> [Chunk] {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-        if Int64(size) <= Self.sizeThresholdBytes {
-            AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes <= threshold, single chunk")
+        let duration = (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
+        AppLog.transcription.atInfo.info("chunk: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", duration), privacy: .public)s")
+        let fitsSize = Int64(size) <= Self.sizeThresholdBytes
+        let fitsDuration = duration.isFinite && duration <= Self.chunkDuration
+        if fitsSize, fitsDuration {
+            AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes / \(String(format: "%.1f", duration), privacy: .public)s <= thresholds, single chunk")
             return [Chunk(url: url, offset: 0)]
         }
-        AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes > threshold, splitting…")
-        return try await split(url: url)
+        AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes / \(String(format: "%.1f", duration), privacy: .public)s exceeds thresholds, splitting…")
+        return try await split(url: url, knownDuration: duration)
     }
 
     /// Split by duration regardless of file size. Used by the on-device Speech
@@ -41,26 +49,38 @@ actor AudioChunker {
     /// reliably handle (a 2h file in one `SFSpeechRecognitionTask` is fragile),
     /// not an upload size cap. Files no longer than one chunk come back whole.
     func chunkByDuration(url: URL) async throws -> [Chunk] {
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let asset = AVURLAsset(url: url)
         let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
+        AppLog.transcription.atInfo.info("chunkByDuration: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", totalSeconds), privacy: .public)s")
         guard totalSeconds.isFinite, totalSeconds > Self.chunkDuration else {
             return [Chunk(url: url, offset: 0)]
         }
         AppLog.transcription.atDebug.debug("chunk: \(totalSeconds, privacy: .public)s > \(Self.chunkDuration, privacy: .public)s, splitting by duration…")
-        return try await split(url: url)
+        return try await split(url: url, knownDuration: totalSeconds)
     }
 
-    private func split(url: URL) async throws -> [Chunk] {
+    private func split(url: URL, knownDuration: TimeInterval) async throws -> [Chunk] {
+        let exportStart = Date()
         let asset = AVURLAsset(url: url)
-        let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
+        let totalSeconds = knownDuration.isFinite && knownDuration > 0
+            ? knownDuration
+            : (try? await CMTimeGetSeconds(asset.load(.duration))) ?? 0
         guard totalSeconds.isFinite, totalSeconds > 0 else {
+            AppLog.transcription.atError.error("chunk: split failed, duration is invalid or zero")
             return [Chunk(url: url, offset: 0)]
         }
 
         var chunks: [Chunk] = []
+        var completed = false
         var start: TimeInterval = 0
         var index = 0
         let tmpDir = FileManager.default.temporaryDirectory
+        defer {
+            if !completed, !chunks.isEmpty {
+                cleanup(chunks)
+            }
+        }
 
         while start < totalSeconds {
             let length = min(Self.chunkDuration, totalSeconds - start)
@@ -69,6 +89,7 @@ actor AudioChunker {
             )
             try? FileManager.default.removeItem(at: outURL)
 
+            let chunkStart = Date()
             try await export(
                 asset: asset,
                 to: outURL,
@@ -81,11 +102,23 @@ actor AudioChunker {
             // readable with the device locked so a background Whisper run can
             // keep feeding uploads; they're deleted when the run finishes.
             RecordingProtection.applyInFlight(to: outURL)
+            let chunkSize = (try? outURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            let chunkDuration = (try? await AVURLAsset(url: outURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
+            AppLog.transcription.atInfo.info("chunk: exported \(index + 1, privacy: .public) offset=\(String(format: "%.1f", start), privacy: .public)s length=\(String(format: "%.1f", length), privacy: .public)s duration=\(String(format: "%.1f", chunkDuration), privacy: .public)s size=\(chunkSize, privacy: .public) bytes in \(Date().timeIntervalSince(chunkStart), privacy: .public)s")
+            guard chunkSize > 0 else {
+                AppLog.transcription.atError.error("chunk: exported chunk \(index + 1, privacy: .public) is empty, discarding")
+                try? FileManager.default.removeItem(at: outURL)
+                throw AppError.audioError(
+                    NSLocalizedString("error.export_failed", comment: "Export failed")
+                )
+            }
             chunks.append(Chunk(url: outURL, offset: start))
             start += length
             index += 1
         }
 
+        completed = true
+        AppLog.transcription.atNotice.notice("chunk: split into \(chunks.count, privacy: .public) chunk(s) in \(Date().timeIntervalSince(exportStart), privacy: .public)s")
         return chunks
     }
 
@@ -93,8 +126,15 @@ actor AudioChunker {
     /// chunk list — it skips anything not in the temp directory.
     func cleanup(_ chunks: [Chunk]) {
         let tmp = FileManager.default.temporaryDirectory.path
+        var removed = 0
         for chunk in chunks where chunk.url.path.hasPrefix(tmp) {
-            try? FileManager.default.removeItem(at: chunk.url)
+            if FileManager.default.fileExists(atPath: chunk.url.path) {
+                try? FileManager.default.removeItem(at: chunk.url)
+                removed += 1
+            }
+        }
+        if removed > 0 {
+            AppLog.transcription.atDebug.debug("chunk: cleaned up \(removed, privacy: .public) temp chunk(s)")
         }
     }
 

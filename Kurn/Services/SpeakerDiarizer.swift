@@ -75,16 +75,20 @@ actor SpeakerDiarizer: Diarizing {
     /// built-in energy VAD. On any failure returns a single turn covering the
     /// whole clip so callers always get usable output.
     func diarize(url: URL) async -> [SpeakerTurn] {
+        let started = Date()
         guard let frames = loadFrames(url: url), !frames.isEmpty else {
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 0)]
         }
-        return finalize(regions: speechRegions(from: frames), frames: frames)
+        let turns = finalize(regions: speechRegions(from: frames), frames: frames)
+        AppLog.transcription.atNotice.notice("diarize: heuristic done in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
+        return turns
     }
 
     /// Same as `diarize(url:)` but uses speech regions produced by an external
     /// VAD engine (e.g. FluidAudio Silero) instead of the built-in energy VAD,
     /// then layers this engine's timbre features over those regions.
     func diarize(url: URL, speechRegions externalRegions: [SpeechRegion]) async -> [SpeakerTurn] {
+        let started = Date()
         guard let frames = loadFrames(url: url), !frames.isEmpty else {
             return [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 0)]
         }
@@ -102,7 +106,9 @@ actor SpeakerDiarizer: Diarizing {
         } else {
             regions = featureRegions(from: frames, speechRegions: externalRegions)
         }
-        return finalize(regions: regions, frames: frames)
+        let turns = finalize(regions: regions, frames: frames)
+        AppLog.transcription.atNotice.notice("diarize: heuristic done in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
+        return turns
     }
 
     /// Cluster the feature regions into speaker turns, falling back to a single
@@ -146,7 +152,12 @@ actor SpeakerDiarizer: Diarizing {
         // app's compressed AAC `.m4a` files (recordings and cleaned copy alike)
         // with a generic `erro 0`, which silently collapsed diarization to a
         // single speaker. See `VADAudioLoader.monoSamples`.
+        let decodeStart = Date()
         let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: analysisSampleRate)
+        let decodeDuration = Date().timeIntervalSince(decodeStart)
+        let memoryBytes = samples.count * MemoryLayout<Float>.size
+        let audioDuration = Double(samples.count) / analysisSampleRate
+        AppLog.transcription.atInfo.info("SpeakerDiarizer: decoded \(url.lastPathComponent, privacy: .public) frames=\(samples.count, privacy: .public) audioDuration=\(String(format: "%.1f", audioDuration), privacy: .public)s memory=\(memoryBytes, privacy: .public) bytes in \(decodeDuration, privacy: .public)s")
         guard !samples.isEmpty else { return [] }
 
         let sampleRate = analysisSampleRate
