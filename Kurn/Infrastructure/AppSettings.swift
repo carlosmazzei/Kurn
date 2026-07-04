@@ -16,6 +16,8 @@ final class AppSettings {
     private enum Keys {
         static let provider = "settings.aiProvider"
         static let providers = "settings.aiProviders"
+        static let transcriptionProvider = "settings.transcriptionProviderID"
+        static let transcriptionModels = "settings.transcriptionModels"
         static let defaultMode = "settings.defaultTranscriptionMode"
         static let defaultLanguage = "settings.defaultLanguage"
         static let micPickup = "settings.micPickup"
@@ -54,6 +56,24 @@ final class AppSettings {
 
     var aiProvider: AIProvider {
         providers.first(where: { $0.id == aiProviderID }) ?? providers.first ?? .openAI
+    }
+
+    /// Provider used for cloud (Whisper) transcription, chosen independently of
+    /// the summary `aiProvider`. Only meaningful when `transcriptionEngine` is
+    /// `.whisperAPI`. Defaults to OpenAI to preserve the previous behavior.
+    var transcriptionProviderID: String {
+        didSet { defaults.set(transcriptionProviderID, forKey: Keys.transcriptionProvider) }
+    }
+
+    /// Resolve `transcriptionProviderID` to a configured provider, falling back
+    /// to the first transcription-capable provider (or OpenAI) if it's stale or
+    /// points at a provider that can't transcribe.
+    var transcriptionProvider: AIProvider {
+        if let provider = providers.first(where: { $0.id == transcriptionProviderID }),
+           provider.supportsTranscription {
+            return provider
+        }
+        return providers.first(where: { $0.supportsTranscription }) ?? .openAI
     }
 
     var defaultMode: TranscriptionMode {
@@ -165,6 +185,8 @@ final class AppSettings {
             languageDetection: languageDetectionEngine,
             diarization: diarizationEngine,
             transcription: transcriptionEngine,
+            transcriptionProvider: transcriptionProvider,
+            transcriptionModel: transcriptionModel(for: transcriptionProvider),
             fluidAudioMinSpeakers: fluidAudioMinSpeakers,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled
         )
@@ -237,6 +259,27 @@ final class AppSettings {
         summaryModels[provider.rawValue] = model
     }
 
+    /// Per-provider chosen transcription (Whisper) model (rawValue → model id).
+    private var transcriptionModels: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(transcriptionModels) {
+                defaults.set(data, forKey: Keys.transcriptionModels)
+            }
+        }
+    }
+
+    /// Selected transcription model for a provider, falling back to its default
+    /// Whisper model (`whisper-1`, or `whisper-large-v3` for Groq).
+    func transcriptionModel(for provider: AIProvider) -> String {
+        let stored = transcriptionModels[provider.rawValue]
+        if let stored, !stored.isEmpty { return stored }
+        return provider.defaultTranscriptionModel
+    }
+
+    func setTranscriptionModel(_ model: String, for provider: AIProvider) {
+        transcriptionModels[provider.rawValue] = model
+    }
+
     /// Summary templates (built-in presets + user-defined). Built-ins are seeded
     /// from `SummaryTemplate.defaultTemplates` and merged on launch.
     var summaryTemplates: [SummaryTemplate] {
@@ -284,9 +327,14 @@ final class AppSettings {
         guard !provider.isBuiltIn else { return }
         providers.removeAll { $0.id == provider.id }
         summaryModels[provider.id] = nil
+        transcriptionModels[provider.id] = nil
         KeychainManager.shared.delete(provider.keychainAccount)
         if aiProviderID == provider.id {
             aiProviderID = providers.first?.id ?? AIProvider.openAI.id
+        }
+        if transcriptionProviderID == provider.id {
+            transcriptionProviderID = providers.first(where: { $0.supportsTranscription })?.id
+                ?? AIProvider.openAI.id
         }
     }
 
@@ -304,6 +352,11 @@ final class AppSettings {
         aiProviderID = loadedProviders.contains(where: { $0.id == storedProviderID })
             ? storedProviderID
             : AIProvider.openAI.id
+        let storedTranscriptionProviderID = defaults.string(forKey: Keys.transcriptionProvider)
+            ?? AIProvider.openAI.id
+        transcriptionProviderID = loadedProviders.contains(where: {
+            $0.id == storedTranscriptionProviderID && $0.supportsTranscription
+        }) ? storedTranscriptionProviderID : AIProvider.openAI.id
         let resolvedDefaultMode = TranscriptionMode(
             rawValue: defaults.string(forKey: Keys.defaultMode) ?? ""
         ) ?? .onDevice
@@ -373,6 +426,12 @@ final class AppSettings {
             summaryModels = decoded
         } else {
             summaryModels = [:]
+        }
+        if let data = defaults.data(forKey: Keys.transcriptionModels),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            transcriptionModels = decoded
+        } else {
+            transcriptionModels = [:]
         }
         let loadedTemplates: [SummaryTemplate]
         if let data = defaults.data(forKey: Keys.summaryTemplates),

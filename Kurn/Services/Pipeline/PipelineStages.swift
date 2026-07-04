@@ -68,6 +68,12 @@ struct PipelineConfiguration: Sendable, Equatable {
     var languageDetection: LanguageDetectionEngine = .byTranscriber
     var diarization: DiarizationEngine = .heuristic
     var transcription: TranscriptionEngine = .appleSpeech
+    /// Provider used by the `.whisperAPI` engine, chosen independently of the
+    /// summary provider. Ignored by the on-device engines.
+    var transcriptionProvider: AIProvider = .openAI
+    /// Whisper model requested from `transcriptionProvider` (e.g. `whisper-1`,
+    /// `whisper-large-v3`). Ignored by the on-device engines.
+    var transcriptionModel: String = "whisper-1"
     /// Floor on the FluidAudio diarizer's speaker count (`0` = auto-detect). Only
     /// the `.fluidAudio` engine reads it, to break its VBx single-speaker collapse
     /// by re-clustering with KMeans to at least this many speakers.

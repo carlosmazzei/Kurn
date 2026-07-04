@@ -15,23 +15,27 @@ struct OpenAIProvider: LLMProvider {
     private let apiKey: String
     private let session: URLSession
     private let chatModel: String
-    private let whisperModel = "whisper-1"
+    /// Whisper model requested on the transcription route. Configurable because
+    /// the model differs per vendor (OpenAI `whisper-1`, Groq `whisper-large-v3`).
+    private let transcriptionModel: String
     /// Route transcription uploads through the background `URLSession`
     /// (`WhisperBackgroundUploader`) so they survive the app suspending or the
     /// phone locking. Off by default so injected-session tests and summary
-    /// calls are unaffected; `ProviderFactory.whisperProvider()` turns it on.
+    /// calls are unaffected; `ProviderFactory.whisperProvider(for:model:)` turns it on.
     private let usesBackgroundUploads: Bool
 
     init(
         provider: AIProvider = .openAI,
         apiKey: String,
         model: String = "gpt-5.4",
+        transcriptionModel: String = "whisper-1",
         session: URLSession = .shared,
         usesBackgroundUploads: Bool = false
     ) {
         self.provider = provider
         self.apiKey = apiKey
         self.chatModel = model
+        self.transcriptionModel = transcriptionModel
         self.session = session
         self.usesBackgroundUploads = usesBackgroundUploads
     }
@@ -45,7 +49,8 @@ struct OpenAIProvider: LLMProvider {
     ) async throws -> RawTranscript {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        let url = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "audio/transcriptions")
+            ?? URL(string: "https://api.openai.com/v1/audio/transcriptions")!
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -61,7 +66,7 @@ struct OpenAIProvider: LLMProvider {
         )
 
         var fields: [(name: String, value: String)] = [
-            ("model", whisperModel),
+            ("model", transcriptionModel),
             ("response_format", "verbose_json")
         ]
         if let code = language.whisperCode {

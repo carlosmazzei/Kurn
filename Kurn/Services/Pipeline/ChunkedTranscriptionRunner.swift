@@ -100,6 +100,7 @@ extension TranscriptionCheckpoint {
         engine: TranscriptionEngine,
         language: MeetingLanguage,
         compacted: Bool,
+        providerID: String? = nil,
         progress: ChunkedTranscriptionRunner.Progress
     ) {
         self.init(
@@ -109,6 +110,7 @@ extension TranscriptionCheckpoint {
             totalChunks: progress.totalChunks,
             completedChunks: progress.completedChunks,
             detectedLanguage: progress.detectedLanguage,
+            providerID: providerID,
             spans: progress.spans.map {
                 Span(text: $0.text, start: $0.start, end: $0.end, confidence: $0.confidence)
             }

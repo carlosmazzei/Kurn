@@ -28,14 +28,23 @@ enum ProviderFactory {
         }
     }
 
-    /// Cloud transcription always uses OpenAI Whisper regardless of the summary
-    /// provider, so it needs the OpenAI key specifically.
-    static func whisperProvider() throws -> OpenAIProvider {
-        let key = KeychainManager.shared.get(.openAI) ?? ""
-        guard !key.isEmpty else { throw AppError.noAPIKey(provider: AIProvider.openAI.displayName) }
+    /// Build the cloud transcription (Whisper) provider chosen in Settings. Any
+    /// OpenAI-compatible provider (OpenAI, Groq, or a custom endpoint) can serve
+    /// the `/audio/transcriptions` route, so this resolves the selected provider's
+    /// key and base URL independently of the summary provider. Throws `.noAPIKey`
+    /// when the chosen provider has no stored key.
+    static func whisperProvider(for provider: AIProvider, model: String) throws -> OpenAIProvider {
+        let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
+        guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+        let resolvedModel = model.isEmpty ? provider.defaultTranscriptionModel : model
         // Background uploads: chunk transfers keep running when the app is
         // suspended or the phone is locked, so a long transcription doesn't
         // need the app to stay in the foreground.
-        return OpenAIProvider(apiKey: key, usesBackgroundUploads: true)
+        return OpenAIProvider(
+            provider: provider,
+            apiKey: key,
+            transcriptionModel: resolvedModel,
+            usesBackgroundUploads: true
+        )
     }
 }

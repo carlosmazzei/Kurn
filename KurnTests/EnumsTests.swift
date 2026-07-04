@@ -54,6 +54,18 @@ struct EnumsTests {
         #expect(AIProvider.google.kind == .googleGemini)
     }
 
+    @Test func onlyOpenAICompatibleProvidersSupportTranscription() {
+        #expect(AIProvider.openAI.supportsTranscription)
+        #expect(AIProvider.groq.supportsTranscription)
+        #expect(!AIProvider.anthropic.supportsTranscription)
+        #expect(!AIProvider.google.supportsTranscription)
+    }
+
+    @Test func defaultTranscriptionModelIsPerVendorWhisper() {
+        #expect(AIProvider.openAI.defaultTranscriptionModel == "whisper-1")
+        #expect(AIProvider.groq.defaultTranscriptionModel == "whisper-large-v3")
+    }
+
     // MARK: - TranscriptionMode
 
     @Test func transcriptionModeIdMatchesRawValue() {

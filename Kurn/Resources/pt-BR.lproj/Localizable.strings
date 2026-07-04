@@ -310,8 +310,9 @@
 "pipeline.preprocessing" = "Limpeza de Áudio";
 "pipeline.vad" = "Detecção de Voz";
 "pipeline.language_detection" = "Detecção de Idioma";
-"settings.whisper_openai_key_footer" = "A transcrição via Whisper API usa a chave de API da OpenAI configurada em Provedores de IA, independentemente do provedor de resumo selecionado.";
-"settings.whisper_openai_key_missing_footer" = "Configure a chave de API da OpenAI em Provedores de IA para habilitar a transcrição via Whisper API.";
+"settings.transcription_provider" = "Provedor de Transcrição";
+"settings.whisper_provider_key_footer" = "A transcrição via Whisper API usa o provedor selecionado acima, de forma independente do provedor de resumo. Pode-se usar qualquer provedor compatível com a OpenAI que tenha uma chave de API (como OpenAI ou Groq).";
+"settings.whisper_provider_key_missing_footer" = "Configure uma chave de API compatível com a OpenAI (como OpenAI ou Groq) em Provedores de IA para habilitar a transcrição via Whisper API.";
 "settings.summary" = "Resumo";
 "settings.recording" = "Gravação";
 "settings.model" = "Modelo";

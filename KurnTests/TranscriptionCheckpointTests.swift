@@ -67,6 +67,20 @@ struct TranscriptionCheckpointTests {
         #expect(!checkpoint.matches(engine: .whisperAPI, language: .english, compacted: false))
     }
 
+    @Test func matchesRequiresSameTranscriptionProvider() {
+        // A checkpoint recorded against one Whisper provider must not seed a
+        // resume for a different provider (which would stitch two vendors'
+        // chunks together). A legacy checkpoint (providerID nil) also won't
+        // match a provider-scoped resume.
+        let openAICheckpoint = TranscriptionCheckpoint(
+            engine: .whisperAPI, language: .english, compacted: true, providerID: AIProvider.openAI.id,
+            progress: sampleCheckpoint().runnerProgress
+        )
+        #expect(openAICheckpoint.matches(engine: .whisperAPI, language: .english, compacted: true, providerID: AIProvider.openAI.id))
+        #expect(!openAICheckpoint.matches(engine: .whisperAPI, language: .english, compacted: true, providerID: AIProvider.groq.id))
+        #expect(!openAICheckpoint.matches(engine: .whisperAPI, language: .english, compacted: true, providerID: nil))
+    }
+
     @Test func runnerProgressBridgesBothWays() {
         let checkpoint = sampleCheckpoint()
         let progress = checkpoint.runnerProgress

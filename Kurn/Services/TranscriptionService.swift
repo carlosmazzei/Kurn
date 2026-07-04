@@ -157,6 +157,8 @@ struct TranscriptionService {
                 cleanedURL: cleanedURL,
                 regions: regions,
                 engine: config.transcription,
+                transcriptionProvider: config.transcriptionProvider,
+                transcriptionModel: config.transcriptionModel,
                 language: resolvedLanguage,
                 checkpoint: checkpoint,
                 onPhase: onPhase,
@@ -180,6 +182,8 @@ struct TranscriptionService {
                 cleanedURL: cleanedURL,
                 regions: regions,
                 engine: config.transcription,
+                transcriptionProvider: config.transcriptionProvider,
+                transcriptionModel: config.transcriptionModel,
                 language: resolvedLanguage,
                 checkpoint: checkpoint,
                 onPhase: onPhase,
@@ -278,6 +282,8 @@ struct TranscriptionService {
         cleanedURL: URL,
         regions: [SpeechRegion],
         engine: TranscriptionEngine,
+        transcriptionProvider: AIProvider = .openAI,
+        transcriptionModel: String = "whisper-1",
         language: MeetingLanguage,
         checkpoint: TranscriptionCheckpoint? = nil,
         onPhase: @escaping PhaseHandler,
@@ -304,19 +310,22 @@ struct TranscriptionService {
         }
 
         let compacted = compaction != nil
+        // Only the cloud (Whisper) engine is provider-scoped; on-device engines
+        // carry no provider identity in their checkpoint.
+        let checkpointProviderID = engine == .whisperAPI ? transcriptionProvider.id : nil
         let resume = checkpoint.flatMap { cp -> ChunkedTranscriptionRunner.Progress? in
-            if cp.matches(engine: engine, language: language, compacted: compacted) {
+            if cp.matches(engine: engine, language: language, compacted: compacted, providerID: checkpointProviderID) {
                 AppLog.transcription.atNotice.notice("transcribe: checkpoint matches engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) chunks=\(cp.totalChunks, privacy: .public)/\(cp.completedChunks, privacy: .public)")
                 return cp.runnerProgress
             }
-            AppLog.transcription.atNotice.notice("transcribe: checkpoint mismatch stored(engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) totalChunks=\(cp.totalChunks, privacy: .public)) != current(engine=\(engine.rawValue, privacy: .public) lang=\(language.rawValue, privacy: .public) compacted=\(compacted, privacy: .public)), starting over")
+            AppLog.transcription.atNotice.notice("transcribe: checkpoint mismatch stored(engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) provider=\(cp.providerID ?? "-", privacy: .public) totalChunks=\(cp.totalChunks, privacy: .public)) != current(engine=\(engine.rawValue, privacy: .public) lang=\(language.rawValue, privacy: .public) compacted=\(compacted, privacy: .public) provider=\(checkpointProviderID ?? "-", privacy: .public)), starting over")
             return nil
         }
         let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?
         if let onCheckpoint {
             checkpointSink = { progress in
                 onCheckpoint(
-                    TranscriptionCheckpoint(engine: engine, language: language, compacted: compacted, progress: progress)
+                    TranscriptionCheckpoint(engine: engine, language: language, compacted: compacted, providerID: checkpointProviderID, progress: progress)
                 )
             }
         } else {
@@ -332,6 +341,8 @@ struct TranscriptionService {
             raw = try await whisperTranscriber.transcribeResumable(
                 url: target,
                 language: language,
+                provider: transcriptionProvider,
+                model: transcriptionModel,
                 resume: resume,
                 onChunkCompleted: checkpointSink,
                 onProgress: { progress, completed, total in

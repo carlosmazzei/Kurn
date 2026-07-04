@@ -76,10 +76,39 @@ struct ProviderFactoryTests {
         }
     }
 
-    @Test func whisperProviderThrowsNoAPIKeyWhenOpenAIKeyIsEmpty() {
+    @Test func whisperProviderThrowsNoAPIKeyWhenSelectedProviderKeyIsEmpty() {
         withClearedKey(.openAI) {
             #expect(throws: AppError.self) {
-                _ = try ProviderFactory.whisperProvider()
+                _ = try ProviderFactory.whisperProvider(for: .openAI, model: "whisper-1")
+            }
+        }
+    }
+
+    @Test func whisperProviderBuildsForOpenAIWhenKeyPresent() throws {
+        try withKey(.openAI, value: "test-key") {
+            let provider = try ProviderFactory.whisperProvider(for: .openAI, model: "whisper-1")
+            #expect(provider.provider == .openAI)
+        }
+    }
+
+    @Test func whisperProviderBuildsForGroqIndependentlyOfOpenAIKey() throws {
+        // A Groq key alone is enough — the transcription provider is decoupled
+        // from OpenAI. Clearing the OpenAI key proves it isn't consulted.
+        try withClearedKey(.openAI) {
+            try withKey(.groq, value: "groq-key") {
+                let provider = try ProviderFactory.whisperProvider(for: .groq, model: "whisper-large-v3")
+                #expect(provider.provider == .groq)
+            }
+        }
+    }
+
+    @Test func whisperProviderThrowsForGroqWhenGroqKeyMissingEvenWithOpenAIKey() throws {
+        // Selecting Groq must require Groq's own key, not fall back to OpenAI's.
+        try withKey(.openAI, value: "openai-key") {
+            withClearedKey(.groq) {
+                #expect(throws: AppError.self) {
+                    _ = try ProviderFactory.whisperProvider(for: .groq, model: "whisper-large-v3")
+                }
             }
         }
     }
