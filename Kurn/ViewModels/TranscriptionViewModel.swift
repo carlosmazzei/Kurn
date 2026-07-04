@@ -20,6 +20,9 @@ final class TranscriptionViewModel {
     /// Active pipeline phase per recording, so the UI can show the current stage.
     private(set) var phases: [UUID: TranscriptionPhase] = [:]
     private(set) var isSummarizing = false
+    /// True after the user asks to cancel a summary while the provider request
+    /// is still unwinding.
+    private(set) var isCancellingSummary = false
     /// Staged-summary progress as (stage, total) when a long transcript is
     /// being summarized in parts; nil for single-pass summaries.
     private(set) var summaryProgress: (stage: Int, total: Int)?
@@ -42,6 +45,8 @@ final class TranscriptionViewModel {
     /// Recordings this instance is transcribing, so `@Sendable` pipeline
     /// callbacks can reach the model by ID after hopping to the main actor.
     private var activeRecordings: [UUID: Recording] = [:]
+    /// Active summary task, owned here so the detail screen can cancel it.
+    private var summaryTask: Task<Void, Never>?
     /// Recordings in flight across ALL instances — `MeetingDetailView` creates
     /// a view model per screen and the app-level resume coordinator has its
     /// own, and a recording must never transcribe twice concurrently.
@@ -488,14 +493,38 @@ final class TranscriptionViewModel {
 
     // MARK: - Summary
 
-    func generateSummary(
+    func startSummary(
+        for meeting: Meeting,
+        provider: AIProvider,
+        model: String,
+        template: SummaryTemplate
+    ) {
+        guard !isSummarizing else { return }
+        isSummarizing = true
+        isCancellingSummary = false
+        summaryProgress = nil
+        summaryTask = Task { [weak self, meeting] in
+            await self?.generateSummary(
+                for: meeting,
+                provider: provider,
+                model: model,
+                template: template
+            )
+        }
+    }
+
+    func cancelSummary() {
+        guard isSummarizing else { return }
+        isCancellingSummary = true
+        summaryTask?.cancel()
+    }
+
+    private func generateSummary(
         for meeting: Meeting,
         provider: AIProvider,
         model: String,
         template: SummaryTemplate
     ) async {
-        guard !isSummarizing else { return }
-
         // Assemble transcript text on the main actor (reads SwiftData). Each
         // group carries the recording's absolute start offset so the timestamps
         // stay chronological across multiple segments.
@@ -508,6 +537,13 @@ final class TranscriptionViewModel {
         let transcriptText = SummaryService.assembleTranscriptText(from: groups)
         let title = meeting.title
 
+        defer {
+            isSummarizing = false
+            isCancellingSummary = false
+            summaryProgress = nil
+            summaryTask = nil
+        }
+
         guard !transcriptText.isEmpty else {
             error = .transcriptionFailed(
                 NSLocalizedString("error.no_transcript", comment: "No transcript to summarize")
@@ -515,8 +551,6 @@ final class TranscriptionViewModel {
             return
         }
 
-        isSummarizing = true
-        summaryProgress = nil
         AppLog.transcription.atNotice.notice("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
         do {
             let result = try await summaryService.generate(
@@ -530,6 +564,7 @@ final class TranscriptionViewModel {
                     Task { @MainActor in self?.summaryProgress = (stage, total) }
                 }
             )
+            try Task.checkCancellation()
             if let existing = meeting.summary {
                 existing.sections = result.sections
                 existing.templateName = template.displayName
@@ -549,6 +584,10 @@ final class TranscriptionViewModel {
             }
             persist()
             AppLog.transcription.atNotice.notice("VM: summary done")
+        } catch is CancellationError {
+            AppLog.transcription.atNotice.notice("VM: summary cancelled")
+        } catch let AppError.networkError(urlError) where urlError.code == .cancelled || Task.isCancelled || isCancellingSummary {
+            AppLog.transcription.atNotice.notice("VM: summary cancelled")
         } catch let appError as AppError {
             error = appError
             AppLog.transcription.atError.error("VM: summary failed (AppError): \(appError.errorDescription ?? "nil", privacy: .public)")
@@ -556,7 +595,5 @@ final class TranscriptionViewModel {
             self.error = .apiError(statusCode: 0, message: error.localizedDescription)
             AppLog.transcription.atError.error("VM: summary failed: \(error.localizedDescription, privacy: .public)")
         }
-        isSummarizing = false
-        summaryProgress = nil
     }
 }

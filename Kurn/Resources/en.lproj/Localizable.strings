@@ -236,6 +236,11 @@
 "detail.summary.model_missing" = "No summary model selected";
 "detail.summary.regenerate" = "Regenerate";
 "detail.summary.generate" = "Generate Summary";
+"detail.summary.cancel" = "Cancel Summary";
+"detail.summary.cancelling" = "Cancelling summary…";
+"detail.summary.cancelling.subtitle" = "Stopping the current request. The existing summary will be kept.";
+"detail.summary.progress.subtitle" = "Processing the transcript in sections. You can keep this screen open or cancel the run.";
+"detail.summary.progress.single.subtitle" = "Asking the selected model to write the summary. This can take a moment.";
 "detail.share" = "Share";
 "detail.segment_count" = "%d segments";
 "detail.recording_n" = "Recording %d";

@@ -51,6 +51,7 @@ struct SummaryService {
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
 
         guard trimmed.count > Self.maxSinglePassChars else {
+            try Task.checkCancellation()
             let userPrompt = """
             Meeting title: \(meetingTitle)
 
@@ -91,6 +92,7 @@ struct SummaryService {
 
         var notes: [String] = []
         for (index, block) in blocks.enumerated() {
+            try Task.checkCancellation()
             onProgress?(index + 1, totalStages)
             let userPrompt = """
             Meeting title: \(meetingTitle)
@@ -106,6 +108,7 @@ struct SummaryService {
             AppLog.transcription.atInfo.info("summary: map block \(index + 1, privacy: .public)/\(blocks.count, privacy: .public) done")
         }
 
+        try Task.checkCancellation()
         onProgress?(totalStages, totalStages)
         let combinedNotes = notes.enumerated()
             .map { "Part \($0.offset + 1) of \(blocks.count):\n\($0.element)" }

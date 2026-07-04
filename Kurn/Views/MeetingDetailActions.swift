@@ -87,14 +87,16 @@ extension MeetingDetailView {
         settings.lastSummaryTemplateID = template.id
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
-        Task {
-            await txVM.generateSummary(
-                for: meeting,
-                provider: provider,
-                model: model,
-                template: template
-            )
-        }
+        txVM.startSummary(
+            for: meeting,
+            provider: provider,
+            model: model,
+            template: template
+        )
+    }
+
+    func cancelSummary() {
+        txVM?.cancelSummary()
     }
 
     func deleteRecording(_ recording: Recording) {

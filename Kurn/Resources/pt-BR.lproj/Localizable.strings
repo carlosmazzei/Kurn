@@ -236,6 +236,11 @@
 "detail.summary.model_missing" = "Nenhum modelo de resumo selecionado";
 "detail.summary.regenerate" = "Gerar novamente";
 "detail.summary.generate" = "Gerar Resumo";
+"detail.summary.cancel" = "Cancelar Resumo";
+"detail.summary.cancelling" = "Cancelando resumo…";
+"detail.summary.cancelling.subtitle" = "Interrompendo a solicitação atual. O resumo existente será mantido.";
+"detail.summary.progress.subtitle" = "Processando a transcrição em partes. Você pode manter esta tela aberta ou cancelar a geração.";
+"detail.summary.progress.single.subtitle" = "Pedindo ao modelo selecionado para escrever o resumo. Isso pode levar alguns instantes.";
 "detail.share" = "Compartilhar";
 "detail.segment_count" = "%d segmentos";
 "detail.recording_n" = "Gravação %d";

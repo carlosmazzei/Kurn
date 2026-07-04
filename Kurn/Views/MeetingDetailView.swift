@@ -159,8 +159,10 @@ struct MeetingDetailView: View {
                     meeting: meeting,
                     settings: settings,
                     isSummarizing: txVM?.isSummarizing == true,
+                    isCancellingSummary: txVM?.isCancellingSummary == true,
                     summaryProgress: txVM?.summaryProgress,
-                    onGenerate: { generateSummary() }
+                    onGenerate: { generateSummary() },
+                    onCancel: { cancelSummary() }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
             }

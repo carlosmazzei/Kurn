@@ -90,29 +90,88 @@ struct SummaryTab: View {
     let meeting: Meeting
     let settings: AppSettings
     let isSummarizing: Bool
+    let isCancellingSummary: Bool
     /// (stage, total) when a long transcript is summarized in parts; nil for
     /// single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
     let onGenerate: () -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         if let summary = meeting.summary {
             VStack(alignment: .leading, spacing: 16) {
+                if isSummarizing {
+                    summaryProgressPanel
+                }
                 SummaryView(summary: summary)
-                generateButton(regenerate: true)
+                if !isSummarizing {
+                    generateButton(regenerate: true)
+                }
             }
         } else if isSummarizing {
-            VStack(spacing: 14) {
-                ProgressView()
-                Text(summarizingLabel)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            .frame(maxWidth: .infinity).padding(.top, 80)
+            summaryProgressPanel
+                .padding(.top, 24)
         } else if meeting.hasAnyTranscript {
             summaryEmptyState(canGenerate: true)
         } else {
             summaryEmptyState(canGenerate: false)
         }
+    }
+
+    private var summaryProgressPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Theme.accent.opacity(0.14))
+                        .frame(width: 42, height: 42)
+                    if isCancellingSummary {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(progressTitle)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(progressSubtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            ProgressView(value: progressValue)
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+
+            Button(role: .cancel) {
+                onCancel()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "xmark.circle")
+                    Text(NSLocalizedString("detail.summary.cancel", comment: "Cancel summary"))
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isCancellingSummary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Theme.separator, lineWidth: 1)
+        )
     }
 
     private func summaryEmptyState(canGenerate: Bool) -> some View {
@@ -151,6 +210,27 @@ struct SummaryTab: View {
             )
         }
         return NSLocalizedString("detail.summarizing", comment: "Generating...")
+    }
+
+    private var progressTitle: String {
+        isCancellingSummary
+            ? NSLocalizedString("detail.summary.cancelling", comment: "Cancelling summary")
+            : summarizingLabel
+    }
+
+    private var progressSubtitle: String {
+        if isCancellingSummary {
+            return NSLocalizedString("detail.summary.cancelling.subtitle", comment: "Cancelling summary subtitle")
+        }
+        if summaryProgress != nil {
+            return NSLocalizedString("detail.summary.progress.subtitle", comment: "Staged summary subtitle")
+        }
+        return NSLocalizedString("detail.summary.progress.single.subtitle", comment: "Single-pass summary subtitle")
+    }
+
+    private var progressValue: Double? {
+        guard let progress = summaryProgress, progress.total > 0 else { return nil }
+        return Double(progress.stage) / Double(progress.total)
     }
 
     private var summaryModelNudge: String {
