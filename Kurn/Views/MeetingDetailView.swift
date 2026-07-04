@@ -16,11 +16,16 @@ struct MeetingDetailView: View {
 
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
+    /// Shared, app-wide transcription coordinator (injected from `KurnApp`). Using
+    /// the same instance the foreground resume pass uses means a run it restarted
+    /// shows here as in-progress with live progress, instead of a stale badge.
+    @Environment(TranscriptionViewModel.self) private var sharedTxVM
 
     enum Tab: Hashable { case recordings, transcript, summary }
 
     @State var player = AudioPlayerService()
-    @State var txVM: TranscriptionViewModel?
+    /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
+    var txVM: TranscriptionViewModel? { sharedTxVM }
     @State private var tab: Tab = .recordings
 
     @State private var showingRecorder = false
@@ -50,9 +55,6 @@ struct MeetingDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .onAppear {
-            if txVM == nil { txVM = TranscriptionViewModel(modelContext: modelContext) }
-        }
         .onDisappear { player.stop() }
         .sheet(isPresented: $showingRecorder) {
             NavigationStack { RecorderView(meeting: meeting) }
@@ -451,6 +453,30 @@ private struct RecordingSegmentRow: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
                     }
+                } else if recording.transcriptionStatus == .failed {
+                    // Show the real "Failed" state (not a mislabeled "Transcribe")
+                    // with a retry that restarts — resuming from the checkpoint if
+                    // the interrupted run left one.
+                    HStack(spacing: 8) {
+                        StatusBadge(status: .failed)
+                        Button {
+                            onStartTranscription()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(width: 30, height: 30)
+                                .background(Theme.fill, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+                    }
+                } else if recording.transcriptionStatus == .inProgress {
+                    // Persisted `.inProgress` but not actually running in this
+                    // process (a stale row awaiting the next recovery sweep, which
+                    // moves it to `.pending` to resume or `.failed` to retry).
+                    // Show the honest badge without a dead start button.
+                    StatusBadge(status: .inProgress)
                 } else {
                     Button {
                         onStartTranscription()

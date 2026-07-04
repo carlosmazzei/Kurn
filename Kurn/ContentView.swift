@@ -21,6 +21,9 @@ struct ContentView: View {
 }
 
 #Preview {
+    // `ContentView` renders `MeetingsListView`; only `MeetingDetailView` (reached
+    // via navigation) reads the shared `TranscriptionViewModel`, so this preview
+    // doesn't inject one.
     ContentView()
         .environment(AppSettings())
         .environment(RecordingAccessGate())
