@@ -9,23 +9,44 @@ import Foundation
 
 struct ProviderModelsService: Sendable {
     private let session: URLSession
+    private let apiKey: String?
     private let anthropicVersion = "2023-06-01"
 
-    init(session: URLSession = .shared) {
+    /// - Parameters:
+    ///   - session: URLSession used for the `/models` request.
+    ///   - apiKey: Optional override for the provider's API key. When `nil`,
+    ///     the key is read from the Keychain as usual. This is mainly for tests
+    ///     so they can avoid racing on the process-wide Keychain.
+    init(session: URLSession = .shared, apiKey: String? = nil) {
         self.session = session
+        self.apiKey = apiKey
     }
 
     func models(for provider: AIProvider) async throws -> [String] {
-        let apiKey = KeychainManager.shared.get(provider.keychainAccount) ?? ""
+        let apiKey = apiKey ?? KeychainManager.shared.get(provider.keychainAccount) ?? ""
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         switch provider.kind {
         case .openAICompatible:
-            return try await fetchModels(provider: provider, as: OpenAIModelListResponse.self) { request in
-                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            } extract: { decoded in
-                decoded.data.filter { $0.active != false }.map(\.id)
+            let fetched: [String]
+            do {
+                fetched = try await fetchModels(provider: provider, as: OpenAIModelListResponse.self) { request in
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                } extract: { decoded in
+                    decoded.data.filter { $0.active != false }.map(\.id)
+                }
+            } catch {
+                // Groq's /models endpoint sometimes rejects otherwise-valid keys with 403.
+                // Fall back to a known model list so the user can still pick a model.
+                if provider.id == AIProvider.groq.id {
+                    return Self.groqFallbackModels
+                }
+                throw error
             }
+            if provider.id == AIProvider.groq.id, fetched.isEmpty {
+                return Self.groqFallbackModels
+            }
+            return fetched
         case .anthropic:
             return try await fetchModels(provider: provider, as: AnthropicModelListResponse.self) { request in
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -63,6 +84,21 @@ struct ProviderModelsService: Sendable {
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
         return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
     }
+
+    /// Models known to be available on GroqCloud. Used when the provider's
+    /// `/models` endpoint is not reachable for the configured key (e.g. 403).
+    private static let groqFallbackModels: [String] = [
+        "llama-3.3-70b-versatile",
+        "llama-3.3-70b-specdec",
+        "llama-3.1-8b-instant",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "gemma2-9b-it",
+        "deepseek-r1-distill-llama-70b",
+        "qwen/qwen3-32b",
+        "whisper-large-v3",
+        "whisper-large-v3-turbo"
+    ].sorted()
 
     private static let invalidURL = AppError.apiError(statusCode: 0, message: "Invalid provider URL")
 
