@@ -311,6 +311,18 @@ extension SettingsView {
         storageText = AudioFileStore.formattedSize(AudioFileStore.totalAudioBytes())
     }
 
+    func refreshCacheCleanupPreview() {
+        Task { @MainActor in
+            cacheCleanupPreview = await loadCacheCleanupPreview()
+        }
+    }
+
+    func loadCacheCleanupPreview() async -> (files: Int, bytes: Int64) {
+        await Task.detached(priority: .utility) {
+            TempFileCleaner.reclaimableSpace()
+        }.value
+    }
+
     func deleteAllData() {
         try? modelContext.delete(model: Meeting.self)
         try? modelContext.save()

@@ -125,4 +125,27 @@ struct TempFileCleanerTests {
         #expect(!FileManager.default.fileExists(atPath: oldBody.path))
         #expect(!FileManager.default.fileExists(atPath: newBody.path))
     }
+
+    @Test func reclaimableSpaceCountsEligibleFilesWithoutRemovingThem() throws {
+        let before = TempFileCleaner.reclaimableSpace()
+        let tmp = FileManager.default.temporaryDirectory
+        let cleanURL = tmp.appendingPathComponent("kurn_clean_\(UUID().uuidString).m4a")
+        let uploadDir = tmp.appendingPathComponent("WhisperUploadBodies", isDirectory: true)
+        try FileManager.default.createDirectory(at: uploadDir, withIntermediateDirectories: true)
+        let bodyURL = uploadDir.appendingPathComponent("\(UUID().uuidString).multipart")
+        defer {
+            try? FileManager.default.removeItem(at: cleanURL)
+            try? FileManager.default.removeItem(at: bodyURL)
+        }
+
+        try Data([0x01, 0x02]).write(to: cleanURL)
+        try Data([0x03, 0x04, 0x05]).write(to: bodyURL)
+
+        let estimate = TempFileCleaner.reclaimableSpace()
+
+        #expect(estimate.files >= before.files + 2)
+        #expect(estimate.bytes >= before.bytes + 5)
+        #expect(FileManager.default.fileExists(atPath: cleanURL.path))
+        #expect(FileManager.default.fileExists(atPath: bodyURL.path))
+    }
 }

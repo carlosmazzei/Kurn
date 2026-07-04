@@ -40,11 +40,20 @@ enum TempFileCleaner {
         return result
     }
 
+    /// Return the files and bytes that `forceCleanup()` would remove right now.
+    static func reclaimableSpace() -> (files: Int, bytes: Int64) {
+        Self.scan(olderThan: nil, remove: false)
+    }
+
     private static func cleanup(olderThan: TimeInterval?) -> (files: Int, bytes: Int64) {
+        Self.scan(olderThan: olderThan, remove: true)
+    }
+
+    private static func scan(olderThan: TimeInterval?, remove: Bool) -> (files: Int, bytes: Int64) {
         let tmp = FileManager.default.temporaryDirectory
         let cutoff = olderThan.map { Date().addingTimeInterval(-$0) }
 
-        let pipelineResult = sweep(directory: tmp, cutoff: cutoff) { _, name in
+        let pipelineResult = sweep(directory: tmp, cutoff: cutoff, remove: remove) { _, name in
             Self.prefixes.contains(where: { name.hasPrefix($0) })
         }
 
@@ -52,7 +61,7 @@ enum TempFileCleaner {
         // background upload task is still actively reading from disk.
         let uploadDir = tmp.appendingPathComponent("WhisperUploadBodies", isDirectory: true)
         let inFlight = WhisperBackgroundUploader.shared.inFlightBodyFilePaths()
-        let uploadResult = sweep(directory: uploadDir, cutoff: cutoff) { file, _ in
+        let uploadResult = sweep(directory: uploadDir, cutoff: cutoff, remove: remove) { file, _ in
             file.pathExtension == "multipart" && !inFlight.contains(file.path)
         }
 
@@ -72,6 +81,7 @@ enum TempFileCleaner {
     private static func sweep(
         directory: URL,
         cutoff: Date?,
+        remove: Bool,
         isEligible: (URL, String) -> Bool
     ) -> (files: Int, bytes: Int64) {
         let keys: [URLResourceKey] = [.nameKey, .creationDateKey, .isRegularFileKey]
@@ -91,6 +101,11 @@ enum TempFileCleaner {
                 guard let creationDate = values?.creationDate, creationDate < cutoff else { continue }
             }
             let size = values?.fileSize ?? 0
+            if !remove {
+                removed += 1
+                removedBytes += Int64(size)
+                continue
+            }
             do {
                 try FileManager.default.removeItem(at: file)
                 removed += 1
