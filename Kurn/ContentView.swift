@@ -21,14 +21,14 @@ struct ContentView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
-            Folder.self, Tag.self, SmartFolder.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    return ContentView()
+    // `ContentView` renders `MeetingsListView`; only `MeetingDetailView` (reached
+    // via navigation) reads the shared `TranscriptionViewModel`, so this preview
+    // doesn't inject one.
+    ContentView()
         .environment(AppSettings())
         .environment(RecordingAccessGate())
-        .environment(TranscriptionViewModel(modelContext: container.mainContext))
-        .modelContainer(container)
+        .modelContainer(for: [
+            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
+            Folder.self, Tag.self, SmartFolder.self
+        ], inMemory: true)
 }
