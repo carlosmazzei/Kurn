@@ -31,6 +31,8 @@ struct SettingsView: View {
     @State var keyRevision = 0
     /// Confirmation for the user-triggered temp-file cleanup in Settings.
     @State var showingClearCacheConfirm = false
+    /// Current estimate of temp files that can be removed by the manual cleanup.
+    @State var cacheCleanupPreview: (files: Int, bytes: Int64) = (0, 0)
     /// Result of the temp-file cleanup (files count + bytes) to show in an alert.
     @State var cacheCleanupResult: (files: Int, bytes: Int64)?
 
@@ -161,12 +163,25 @@ struct SettingsView: View {
                     value: storageText
                 )
                 Button {
-                    showingClearCacheConfirm = true
+                    Task { @MainActor in
+                        cacheCleanupPreview = await loadCacheCleanupPreview()
+                        showingClearCacheConfirm = true
+                    }
                 } label: {
-                    Label(
-                        NSLocalizedString("settings.clear_cache", comment: "Clear temporary files"),
-                        systemImage: "trash"
-                    )
+                    HStack {
+                        Label(
+                            NSLocalizedString("settings.clear_cache", comment: "Clear temporary files"),
+                            systemImage: "trash"
+                        )
+                        Spacer()
+                        Text(
+                            String(
+                                format: NSLocalizedString("settings.clear_cache.preview", comment: "Reclaimable temp space"),
+                                AudioFileStore.formattedSize(cacheCleanupPreview.bytes)
+                            )
+                        )
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
             }
 
@@ -220,6 +235,7 @@ struct SettingsView: View {
         }
         .onAppear {
             refreshStorage()
+            refreshCacheCleanupPreview()
             refreshModelSizes()
             ensureSelectedProviderIsConfigured()
             ensureWhisperSelectionIsAllowed()
@@ -401,7 +417,11 @@ struct SettingsView: View {
             iconSystemName: "trash.fill",
             iconTint: Theme.accent,
             title: NSLocalizedString("settings.clear_cache.confirm", comment: "Clear temporary files"),
-            message: NSLocalizedString("settings.clear_cache.message", comment: "Clear cache message"),
+            message: String(
+                format: NSLocalizedString("settings.clear_cache.message", comment: "Clear cache message"),
+                cacheCleanupPreview.files,
+                AudioFileStore.formattedSize(cacheCleanupPreview.bytes)
+            ),
             primaryTitle: NSLocalizedString("settings.clear_cache", comment: "Clear temporary files"),
             primaryRole: .destructive,
             primaryAction: {
@@ -411,6 +431,7 @@ struct SettingsView: View {
                     }.value
                     cacheCleanupResult = result
                     refreshStorage()
+                    refreshCacheCleanupPreview()
                 }
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
