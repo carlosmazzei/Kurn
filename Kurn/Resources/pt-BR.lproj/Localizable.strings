@@ -348,6 +348,11 @@
 "settings.storage" = "Armazenamento";
 "settings.audio_quality" = "Qualidade de áudio";
 "settings.audio_usage" = "Arquivos de Áudio";
+"settings.clear_cache" = "Limpar Arquivos Temporários";
+"settings.clear_cache.confirm" = "Limpar arquivos temporários?";
+"settings.clear_cache.message" = "Isso remove arquivos de pré-processamento, diarização, chunks e uploads deixados no diretório temporário. Suas gravações e reuniões não são afetadas.";
+"settings.clear_cache.done" = "Arquivos Temporários Removidos";
+"settings.clear_cache.result" = "Removidos %d arquivo(s) (%@).";
 "settings.delete_all" = "Apagar Todos os Dados";
 "settings.delete_all.confirm" = "Apagar todas as reuniões e gravações?";
 "settings.delete_all.message" = "Isso remove permanentemente todas as reuniões, transcrições e arquivos de áudio. Não é possível desfazer.";

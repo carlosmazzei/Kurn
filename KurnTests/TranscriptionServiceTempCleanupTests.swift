@@ -10,7 +10,8 @@ import Foundation
 import Testing
 @testable import Kurn
 
-struct TranscriptionServiceTempCleanupTests {
+@Suite(.serialized)
+struct TempFileCleanerTests {
 
     @Test func cleanupOrphanedTempFilesRemovesOldFilesAndKeepsNewOnes() throws {
         let tmp = FileManager.default.temporaryDirectory
@@ -40,7 +41,7 @@ struct TranscriptionServiceTempCleanupTests {
             ofItemAtPath: oldURL.path
         )
 
-        TranscriptionService.cleanupOrphanedTempFiles()
+        TempFileCleaner.cleanupOrphanedTempFiles()
 
         #expect(!FileManager.default.fileExists(atPath: oldURL.path))
         #expect(FileManager.default.fileExists(atPath: newURL.path))
@@ -68,9 +69,60 @@ struct TranscriptionServiceTempCleanupTests {
             ofItemAtPath: oldBody.path
         )
 
-        TranscriptionService.cleanupOrphanedTempFiles()
+        TempFileCleaner.cleanupOrphanedTempFiles()
 
         #expect(!FileManager.default.fileExists(atPath: oldBody.path))
         #expect(FileManager.default.fileExists(atPath: newBody.path))
+    }
+
+    @Test func forceCleanupRemovesAllKnownFilesRegardlessOfAge() throws {
+        let tmp = FileManager.default.temporaryDirectory
+        let cleanURL = tmp.appendingPathComponent("kurn_clean_\(UUID().uuidString).m4a")
+        let vadURL = tmp.appendingPathComponent("kurn_vad_\(UUID().uuidString).m4a")
+        let diarURL = tmp.appendingPathComponent("kurn_diar_\(UUID().uuidString).wav")
+        let chunkURL = tmp.appendingPathComponent("kurn_chunk_\(UUID().uuidString).m4a")
+        let unknownURL = tmp.appendingPathComponent("other_\(UUID().uuidString).tmp")
+        defer {
+            try? FileManager.default.removeItem(at: cleanURL)
+            try? FileManager.default.removeItem(at: vadURL)
+            try? FileManager.default.removeItem(at: diarURL)
+            try? FileManager.default.removeItem(at: chunkURL)
+            try? FileManager.default.removeItem(at: unknownURL)
+        }
+
+        try Data([0x01]).write(to: cleanURL)
+        try Data([0x02]).write(to: vadURL)
+        try Data([0x03]).write(to: diarURL)
+        try Data([0x04]).write(to: chunkURL)
+        try Data([0x05]).write(to: unknownURL)
+
+        _ = TempFileCleaner.forceCleanup()
+
+        #expect(!FileManager.default.fileExists(atPath: cleanURL.path))
+        #expect(!FileManager.default.fileExists(atPath: vadURL.path))
+        #expect(!FileManager.default.fileExists(atPath: diarURL.path))
+        #expect(!FileManager.default.fileExists(atPath: chunkURL.path))
+        #expect(FileManager.default.fileExists(atPath: unknownURL.path))
+    }
+
+    @Test func forceCleanupRemovesAllUploadBodies() throws {
+        let uploadDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WhisperUploadBodies", isDirectory: true)
+        try FileManager.default.createDirectory(at: uploadDir, withIntermediateDirectories: true)
+
+        let oldBody = uploadDir.appendingPathComponent("\(UUID().uuidString).multipart")
+        let newBody = uploadDir.appendingPathComponent("\(UUID().uuidString).multipart")
+        defer {
+            try? FileManager.default.removeItem(at: oldBody)
+            try? FileManager.default.removeItem(at: newBody)
+        }
+
+        try Data([0x01]).write(to: oldBody)
+        try Data([0x02]).write(to: newBody)
+
+        _ = TempFileCleaner.forceCleanup()
+
+        #expect(!FileManager.default.fileExists(atPath: oldBody.path))
+        #expect(!FileManager.default.fileExists(atPath: newBody.path))
     }
 }

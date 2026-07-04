@@ -348,6 +348,11 @@
 "settings.storage" = "Storage";
 "settings.audio_quality" = "Audio quality";
 "settings.audio_usage" = "Audio Files";
+"settings.clear_cache" = "Clear Temporary Files";
+"settings.clear_cache.confirm" = "Clear temporary files?";
+"settings.clear_cache.message" = "This removes leftover preprocessing, diarization, chunk, and upload files from the temporary directory. Your recordings and meetings are not affected.";
+"settings.clear_cache.done" = "Temporary Files Cleared";
+"settings.clear_cache.result" = "Removed %d file(s) (%@).";
 "settings.delete_all" = "Delete All Data";
 "settings.delete_all.confirm" = "Delete all meetings and recordings?";
 "settings.delete_all.message" = "This permanently removes every meeting, transcript, and audio file. This cannot be undone.";

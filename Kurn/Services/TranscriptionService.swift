@@ -74,7 +74,7 @@ struct TranscriptionService {
         onCheckpoint: CheckpointHandler? = nil
     ) async throws -> Output {
         let started = Date()
-        Self.cleanupOrphanedTempFiles()
+        TempFileCleaner.cleanupOrphanedTempFiles()
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let fileDuration = (try? await AVURLAsset(url: fileURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) size=\(fileSize, privacy: .public) bytes duration=\(String(format: "%.1f", fileDuration), privacy: .public)s engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
@@ -484,72 +484,6 @@ struct TranscriptionService {
             let speakers = Set(turns.map { $0.speakerLabel }).count
             AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public) speakers=\(speakers, privacy: .public)")
             return turns
-        }
-    }
-
-    /// Sweep old temporary files left behind by killed/crashed transcriptions.
-    /// Uses a 1-hour age threshold so it never touches files an in-flight
-    /// transcription is still using; anything that old is almost certainly an
-    /// orphan because no single stage should run for that long.
-    /// Exposed internally for tests; called automatically at the start of every
-    /// `transcribe` run.
-    internal static func cleanupOrphanedTempFiles() {
-        let tmp = FileManager.default.temporaryDirectory
-        let prefixes = [
-            "kurn_clean_",
-            "kurn_vad_",
-            "kurn_diar_",
-            "kurn_chunk_"
-        ]
-        let keys: [URLResourceKey] = [.nameKey, .creationDateKey, .isRegularFileKey]
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: tmp,
-            includingPropertiesForKeys: keys,
-            options: .skipsHiddenFiles
-        ) else { return }
-
-        let cutoff = Date().addingTimeInterval(-3600)
-        var removed = 0
-        var removedBytes: Int64 = 0
-        for file in files {
-            let values = try? file.resourceValues(forKeys: [.nameKey, .creationDateKey, .fileSizeKey])
-            let name = values?.name ?? file.lastPathComponent
-            guard prefixes.contains(where: { name.hasPrefix($0) }) else { continue }
-            guard let creationDate = values?.creationDate, creationDate < cutoff else { continue }
-            let size = values?.fileSize ?? 0
-            do {
-                try FileManager.default.removeItem(at: file)
-                removed += 1
-                removedBytes += Int64(size)
-            } catch {
-                AppLog.transcription.atDebug.debug("transcribe: could not remove orphan temp file \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        if removed > 0 {
-            AppLog.transcription.atDebug.debug("transcribe: cleaned up \(removed, privacy: .public) orphaned temp file(s), \(removedBytes, privacy: .public) bytes")
-        }
-
-        // Also sweep the upload-body subdirectory.
-        let uploadDir = tmp.appendingPathComponent("WhisperUploadBodies", isDirectory: true)
-        guard let uploadFiles = try? FileManager.default.contentsOfDirectory(
-            at: uploadDir,
-            includingPropertiesForKeys: keys,
-            options: .skipsHiddenFiles
-        ) else { return }
-        for file in uploadFiles where file.pathExtension == "multipart" {
-            let values = try? file.resourceValues(forKeys: [.creationDateKey, .fileSizeKey])
-            guard let creationDate = values?.creationDate, creationDate < cutoff else { continue }
-            let size = values?.fileSize ?? 0
-            do {
-                try FileManager.default.removeItem(at: file)
-                removed += 1
-                removedBytes += Int64(size)
-            } catch {
-                AppLog.transcription.atDebug.debug("transcribe: could not remove orphan upload body \(file.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        if removed > 0 {
-            AppLog.transcription.atDebug.debug("transcribe: total orphaned temp files removed: \(removed, privacy: .public), \(removedBytes, privacy: .public) bytes")
         }
     }
 }

@@ -29,6 +29,10 @@ struct SettingsView: View {
     @State var showingAddTemplate = false
     /// Bumped after editing a key so the provider rows re-read keychain status.
     @State var keyRevision = 0
+    /// Confirmation for the user-triggered temp-file cleanup in Settings.
+    @State var showingClearCacheConfirm = false
+    /// Result of the temp-file cleanup (files count + bytes) to show in an alert.
+    @State var cacheCleanupResult: (files: Int, bytes: Int64)?
 
     @State var showingASRConsent = false
     @State var showingBatchASRConsent = false
@@ -156,6 +160,14 @@ struct SettingsView: View {
                     NSLocalizedString("settings.audio_usage", comment: "Audio usage"),
                     value: storageText
                 )
+                Button {
+                    showingClearCacheConfirm = true
+                } label: {
+                    Label(
+                        NSLocalizedString("settings.clear_cache", comment: "Clear temporary files"),
+                        systemImage: "trash"
+                    )
+                }
             }
 
             // MARK: Downloaded models
@@ -366,6 +378,39 @@ struct SettingsView: View {
             }
         ))
         .errorAlert($modelDownloadError)
+        .kurnDialog(
+            isPresented: Binding(
+                get: { cacheCleanupResult != nil },
+                set: { if !$0 { cacheCleanupResult = nil } }
+            ),
+            iconSystemName: "checkmark.circle.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.clear_cache.done", comment: "Temporary files cleared"),
+            message: cacheCleanupResult.map { result in
+                String(
+                    format: NSLocalizedString("settings.clear_cache.result", comment: "Cache cleared result"),
+                    result.files,
+                    AudioFileStore.formattedSize(result.bytes)
+                )
+            } ?? "",
+            primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
+            primaryAction: {}
+        )
+        .kurnDialog(
+            isPresented: $showingClearCacheConfirm,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.clear_cache.confirm", comment: "Clear temporary files"),
+            message: NSLocalizedString("settings.clear_cache.message", comment: "Clear cache message"),
+            primaryTitle: NSLocalizedString("settings.clear_cache", comment: "Clear temporary files"),
+            primaryRole: .destructive,
+            primaryAction: {
+                let result = TempFileCleaner.forceCleanup()
+                cacheCleanupResult = result
+                refreshStorage()
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
     }
 }
 
