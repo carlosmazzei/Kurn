@@ -2,7 +2,7 @@
   <img src="assets/icon-rounded.png" alt="Kurn icon" width="100" />
 </p>
 
-# Kurn
+<h1 align="center">Kurn</h1>
 
 [![iOS CI](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
