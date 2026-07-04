@@ -33,7 +33,12 @@ final class AudioPlayerService: NSObject {
         if loadedFileName == fileName, player != nil { return }
         stop()
 
-        let url = AudioFileStore.documentsURL.appendingPathComponent(fileName)
+        // Resolve through the shared store, which prefers the protected
+        // `Documents/Recordings/` directory (where the recorder writes) and only
+        // falls back to legacy `Documents/`. Building the path straight from
+        // `documentsURL` misses every file in the protected subdirectory, so
+        // playback failed with an OSStatus "operation could not be completed".
+        let url = AudioFileStore.resolveURL(fileName: fileName)
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
