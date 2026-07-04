@@ -102,6 +102,32 @@ struct ProviderHTTPTests {
         #expect(raw.spans.first?.text == "whole blob")
     }
 
+    @Test func transcribeUsesSelectedProviderBaseURLAndModel() async throws {
+        // A non-OpenAI OpenAI-compatible provider (Groq) must hit its own
+        // `/audio/transcriptions` endpoint with its own Whisper model, proving
+        // the transcription path is provider-driven rather than hardcoded.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["text": "olá", "language": "pt"])
+        ])
+        let provider = OpenAIProvider(
+            provider: .groq,
+            apiKey: "groq-secret",
+            transcriptionModel: "whisper-large-v3",
+            session: MockURLProtocol.session()
+        )
+
+        _ = try await provider.transcribe(
+            audioData: Data([1, 2, 3]), fileName: "clip.m4a", language: .portuguese
+        )
+
+        let request = try #require(MockURLProtocol.lastRequest)
+        #expect(request.url?.absoluteString == "https://api.groq.com/openai/v1/audio/transcriptions")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer groq-secret")
+        let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
+        #expect(bodyString.contains("whisper-large-v3"))
+        #expect(!bodyString.contains("whisper-1"))
+    }
+
     // MARK: - Anthropic
 
     @Test func anthropicSummarizeSendsVersionHeaderAndParsesContent() async throws {

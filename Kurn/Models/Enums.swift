@@ -481,6 +481,19 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
         legacyKeychainAccount ?? "provider_\(id)_api_key"
     }
 
+    /// Whether this provider can run cloud transcription. Only OpenAI-compatible
+    /// vendors expose the `/audio/transcriptions` (Whisper) route — OpenAI, Groq,
+    /// and any custom OpenAI-compatible endpoint. Anthropic/Gemini have no such
+    /// route, so they're excluded from the transcription-provider picker.
+    var supportsTranscription: Bool { kind == .openAICompatible }
+
+    /// Default Whisper model to request when the user hasn't picked one. Groq's
+    /// OpenAI-compatible audio route serves `whisper-large-v3` (not `whisper-1`),
+    /// so key off the built-in id; everything else defaults to OpenAI's `whisper-1`.
+    var defaultTranscriptionModel: String {
+        id == AIProvider.groq.id ? "whisper-large-v3" : "whisper-1"
+    }
+
     static let openAI = AIProvider(
         id: "openAI",
         displayName: "OpenAI",

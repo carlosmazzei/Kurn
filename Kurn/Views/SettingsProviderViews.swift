@@ -273,6 +273,97 @@ struct SummaryModelPicker: View {
     }
 }
 
+/// Picker for the cloud transcription (Whisper) model of a given provider,
+/// mirroring `SummaryModelPicker` but filtering the provider's model list to
+/// Whisper-family models (falling back to the full list when none are tagged).
+struct TranscriptionModelPicker: View {
+    let settings: AppSettings
+    let provider: AIProvider
+    let revision: Int
+
+    @State private var models: [String] = []
+    @State private var isLoading = false
+    @State private var errorText: String?
+
+    private var selectedModel: String {
+        settings.transcriptionModel(for: provider)
+    }
+
+    private var pickerModels: [String] {
+        let selected = selectedModel
+        guard !selected.isEmpty else { return models }
+        return models.contains(selected) ? models : [selected] + models
+    }
+
+    var body: some View {
+        Picker(
+            NSLocalizedString("settings.model", comment: "Model"),
+            selection: Binding(
+                get: { settings.transcriptionModel(for: provider) },
+                set: { settings.setTranscriptionModel($0, for: provider) }
+            )
+        ) {
+            if pickerModels.isEmpty {
+                Text(NSLocalizedString("settings.no_models", comment: "No models")).tag("")
+            } else {
+                ForEach(pickerModels, id: \.self) { Text($0).tag($0) }
+            }
+        }
+        .disabled(pickerModels.isEmpty)
+        .task(id: "\(provider.id)-\(revision)") {
+            await loadModels()
+        }
+
+        if isLoading {
+            HStack {
+                ProgressView()
+                Text(NSLocalizedString("settings.loading_models", comment: "Loading models"))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        } else if let errorText {
+            Text(errorText)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.textSecondary)
+        }
+
+        Button {
+            Task { await loadModels() }
+        } label: {
+            Label(NSLocalizedString("settings.refresh_models", comment: "Refresh models"), systemImage: "arrow.clockwise")
+        }
+        .disabled(isLoading || !KeychainManager.shared.hasValue(for: provider.keychainAccount))
+    }
+
+    @MainActor
+    private func loadModels() async {
+        guard KeychainManager.shared.hasValue(for: provider.keychainAccount) else {
+            models = []
+            errorText = NSLocalizedString("settings.models_need_key", comment: "Configure key to load models")
+            return
+        }
+
+        isLoading = true
+        errorText = nil
+        do {
+            let loaded = try await ProviderModelsService().models(for: provider)
+            // Prefer Whisper-family models; fall back to the full list when the
+            // provider doesn't tag them recognizably.
+            let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
+            models = whisperModels.isEmpty ? loaded : whisperModels
+            if settings.transcriptionModel(for: provider).isEmpty, let first = models.first {
+                settings.setTranscriptionModel(first, for: provider)
+            }
+            if models.isEmpty {
+                errorText = NSLocalizedString("settings.no_models_loaded", comment: "No models loaded")
+            }
+        } catch {
+            models = []
+            errorText = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
 // MARK: - Model download consent dialogs
 
 /// Consent dialogs shown before the first FluidAudio model download for a given feature.

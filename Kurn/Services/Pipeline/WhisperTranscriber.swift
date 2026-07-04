@@ -2,8 +2,9 @@
 //  WhisperTranscriber.swift
 //  Kurn
 //
-//  Cloud transcription via OpenAI Whisper. Splits long audio into chunks
-//  (`AudioChunker`), uploads each through the OpenAI provider, and offsets the
+//  Cloud transcription via a Whisper-compatible provider (OpenAI, Groq, or any
+//  OpenAI-compatible endpoint). Splits long audio into chunks (`AudioChunker`),
+//  uploads each through the selected provider, and offsets the
 //  per-chunk timestamps back to absolute meeting time. Reports a `0...1`
 //  progress fraction while each chunk is in flight and as chunks complete.
 //  Wraps what used to live inline in `TranscriptionService` so transcription is
@@ -24,6 +25,8 @@ actor WhisperTranscriber: Transcribing {
         try await transcribeResumable(
             url: url,
             language: language,
+            provider: .openAI,
+            model: AIProvider.openAI.defaultTranscriptionModel,
             onProgress: { progress, _, _ in onProgress(progress) }
         )
     }
@@ -35,14 +38,17 @@ actor WhisperTranscriber: Transcribing {
     func transcribeResumable(
         url: URL,
         language: MeetingLanguage,
+        provider transcriptionProvider: AIProvider,
+        model: String,
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
-        let provider = try ProviderFactory.whisperProvider()
+        let provider = try ProviderFactory.whisperProvider(for: transcriptionProvider, model: model)
+        let vendor = transcriptionProvider.displayName
         let chunks = try await chunker.chunk(url: url)
         let total = chunks.count
-        AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s)")
+        AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s) via \(vendor, privacy: .public)")
         defer { Task { await chunker.cleanup(chunks) } }
 
         return try await ChunkedTranscriptionRunner.run(
@@ -50,7 +56,7 @@ actor WhisperTranscriber: Transcribing {
             resume: resume,
             transcribeChunk: { chunk, index in
                 let data = try Data(contentsOf: chunk.url)
-                AppLog.transcription.atInfo.info("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) sending \(data.count, privacy: .public) bytes to OpenAI")
+                AppLog.transcription.atInfo.info("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) sending \(data.count, privacy: .public) bytes to \(vendor, privacy: .public)")
                 let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
                 defer { progressPulse.cancel() }
                 let chunkStart = Date()
@@ -123,7 +129,7 @@ actor WhisperTranscriber: Transcribing {
                 // Progress saturates near 88% by design; without this the log goes
                 // silent and it's impossible to tell if the upload is still in flight.
                 if elapsed >= nextHeartbeatAt {
-                    AppLog.transcription.atNotice.notice("whisper: chunk \(completedChunks + 1, privacy: .public)/\(totalChunks, privacy: .public) still awaiting OpenAI response, elapsed=\(Int(elapsed), privacy: .public)s")
+                    AppLog.transcription.atNotice.notice("whisper: chunk \(completedChunks + 1, privacy: .public)/\(totalChunks, privacy: .public) still awaiting response, elapsed=\(Int(elapsed), privacy: .public)s")
                     nextHeartbeatAt += 30
                 }
             }

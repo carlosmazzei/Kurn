@@ -18,6 +18,7 @@ struct AppSettingsTests {
 
     private static let keys = [
         "settings.aiProvider", "settings.aiProviders", "settings.defaultTranscriptionMode",
+        "settings.transcriptionProviderID", "settings.transcriptionModels",
         "settings.defaultLanguage", "settings.micPickup", "settings.audioQuality",
         "settings.summaryModels", "settings.summaryTemplates", "settings.lastSummaryTemplate",
         "settings.liveTranscriptionEnabled", "settings.diarizationEngine", "settings.transcriptionEngine",
@@ -90,6 +91,52 @@ struct AppSettingsTests {
             #expect(settings.summaryModel(for: .openAI) == AIProvider.openAI.defaultModel)
             settings.setSummaryModel("custom-model", for: .openAI)
             #expect(settings.summaryModel(for: .openAI) == "custom-model")
+        }
+    }
+
+    @Test func transcriptionProviderDefaultsToOpenAIAndResolvesSelection() {
+        withScopedDefaults { settings in
+            #expect(settings.transcriptionProvider.id == AIProvider.openAI.id)
+            settings.transcriptionProviderID = AIProvider.groq.id
+            #expect(settings.transcriptionProvider.id == "groq")
+        }
+    }
+
+    @Test func transcriptionProviderFallsBackWhenSelectedCannotTranscribe() {
+        withScopedDefaults { settings in
+            // Anthropic can't transcribe, so it must not be resolved as the
+            // transcription provider even when stored.
+            settings.transcriptionProviderID = AIProvider.anthropic.id
+            #expect(settings.transcriptionProvider.supportsTranscription)
+            #expect(settings.transcriptionProvider.id != AIProvider.anthropic.id)
+        }
+    }
+
+    @Test func transcriptionProviderIDPersists() {
+        withScopedDefaults { settings in
+            settings.transcriptionProviderID = AIProvider.groq.id
+            #expect(AppSettings().transcriptionProviderID == "groq")
+        }
+    }
+
+    @Test func transcriptionModelFallsBackToProviderDefaultThenStored() {
+        withScopedDefaults { settings in
+            #expect(settings.transcriptionModel(for: .openAI) == "whisper-1")
+            #expect(settings.transcriptionModel(for: .groq) == "whisper-large-v3")
+            settings.setTranscriptionModel("whisper-large-v3-turbo", for: .groq)
+            #expect(settings.transcriptionModel(for: .groq) == "whisper-large-v3-turbo")
+        }
+    }
+
+    @Test func pipelineConfigurationCarriesTranscriptionProviderAndModel() {
+        withScopedDefaults { settings in
+            settings.transcriptionEngine = .whisperAPI
+            settings.transcriptionProviderID = AIProvider.groq.id
+            settings.setTranscriptionModel("whisper-large-v3-turbo", for: .groq)
+
+            let config = settings.pipelineConfiguration
+            #expect(config.transcriptionProvider.id == "groq")
+            #expect(config.transcriptionModel == "whisper-large-v3-turbo")
         }
     }
 

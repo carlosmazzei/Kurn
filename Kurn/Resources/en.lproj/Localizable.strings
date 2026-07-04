@@ -310,8 +310,9 @@
 "pipeline.preprocessing" = "Audio Cleanup";
 "pipeline.vad" = "Voice Activity Detection";
 "pipeline.language_detection" = "Language Detection";
-"settings.whisper_openai_key_footer" = "Whisper API transcription uses the OpenAI API key configured in AI Providers, regardless of the selected summary provider.";
-"settings.whisper_openai_key_missing_footer" = "Configure the OpenAI API key in AI Providers to enable Whisper API transcription.";
+"settings.transcription_provider" = "Transcription Provider";
+"settings.whisper_provider_key_footer" = "Whisper API transcription uses the provider selected above, independently of the summary provider. Any OpenAI-compatible provider with an API key (such as OpenAI or Groq) can be used.";
+"settings.whisper_provider_key_missing_footer" = "Configure an OpenAI-compatible API key (such as OpenAI or Groq) in AI Providers to enable Whisper API transcription.";
 "settings.summary" = "Summary";
 "settings.recording" = "Recording";
 "settings.model" = "Model";

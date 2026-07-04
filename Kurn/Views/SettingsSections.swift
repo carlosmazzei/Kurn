@@ -29,10 +29,31 @@ extension SettingsView {
                 ForEach(TranscriptionEngine.allCases) { engine in
                     Text(engine.displayName)
                         .tag(engine)
-                        .disabled(engine == .whisperAPI && !hasOpenAIAPIKey)
+                        .disabled(engine == .whisperAPI && !hasAnyTranscriptionProvider)
                 }
             }
             .disabled(downloadingModel != nil)
+
+            // Cloud transcription provider + model, chosen independently of the
+            // summary provider. Only shown for the Whisper engine.
+            if settings.transcriptionEngine == .whisperAPI {
+                Picker(
+                    NSLocalizedString("settings.transcription_provider", comment: "Transcription provider"),
+                    selection: Binding(
+                        get: { settings.transcriptionProviderID },
+                        set: { settings.transcriptionProviderID = $0 }
+                    )
+                ) {
+                    ForEach(transcriptionProviders) { provider in
+                        Text(provider.displayName).tag(provider.id)
+                    }
+                }
+                TranscriptionModelPicker(
+                    settings: settings,
+                    provider: settings.transcriptionProvider,
+                    revision: keyRevision
+                )
+            }
 
             Picker(
                 NSLocalizedString("settings.default_language", comment: "Default language"),
@@ -143,10 +164,10 @@ extension SettingsView {
             Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
         } footer: {
             Text(NSLocalizedString(
-                hasOpenAIAPIKey
-                    ? "settings.whisper_openai_key_footer"
-                    : "settings.whisper_openai_key_missing_footer",
-                comment: "Whisper OpenAI key dependency"
+                hasAnyTranscriptionProvider
+                    ? "settings.whisper_provider_key_footer"
+                    : "settings.whisper_provider_key_missing_footer",
+                comment: "Whisper transcription provider key dependency"
             ))
         }
     }
@@ -155,7 +176,14 @@ extension SettingsView {
     /// to trigger a one-time model download (and deferring the change until it
     /// succeeds). Whisper without an OpenAI key is ignored (the row is disabled).
     func selectTranscriptionEngine(_ engine: TranscriptionEngine, settings: AppSettings) {
-        if engine == .whisperAPI && !hasOpenAIAPIKey { return }
+        if engine == .whisperAPI {
+            guard let first = transcriptionProviders.first else { return }
+            // Point the transcription provider at a configured, capable provider
+            // if the stored one is no longer valid.
+            if !transcriptionProviders.contains(where: { $0.id == settings.transcriptionProviderID }) {
+                settings.transcriptionProviderID = first.id
+            }
+        }
         if engine.requiredModelSet == .onDeviceASR && !settings.fluidAudioBatchASRModelsConsented {
             pendingTranscriptionEngine = engine
             showingBatchASRConsent = true
@@ -375,9 +403,19 @@ extension SettingsView {
         }
     }
 
-    var hasOpenAIAPIKey: Bool {
+    /// Configured providers that can run cloud (Whisper) transcription — the
+    /// candidate list for the transcription-provider picker.
+    var transcriptionProviders: [AIProvider] {
         _ = keyRevision
-        return KeychainManager.shared.hasValue(for: AIProvider.openAI.keychainAccount)
+        return settings.providers.filter {
+            $0.supportsTranscription && KeychainManager.shared.hasValue(for: $0.keychainAccount)
+        }
+    }
+
+    /// Whether at least one transcription-capable provider has a key, gating the
+    /// Whisper engine selection.
+    var hasAnyTranscriptionProvider: Bool {
+        !transcriptionProviders.isEmpty
     }
 
     func ensureSelectedProviderIsConfigured() {
@@ -389,8 +427,15 @@ extension SettingsView {
     }
 
     func ensureWhisperSelectionIsAllowed() {
-        if !hasOpenAIAPIKey && settings.transcriptionEngine == .whisperAPI {
+        guard settings.transcriptionEngine == .whisperAPI else { return }
+        // Revert to on-device only when no transcription-capable provider has a
+        // key; otherwise keep Whisper and repoint at a valid provider if the
+        // selected one lost its key or was removed.
+        let providers = transcriptionProviders
+        if providers.isEmpty {
             settings.transcriptionEngine = .appleSpeech
+        } else if !providers.contains(where: { $0.id == settings.transcriptionProviderID }) {
+            settings.transcriptionProviderID = providers[0].id
         }
     }
 }

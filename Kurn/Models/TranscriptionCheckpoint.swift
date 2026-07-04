@@ -30,6 +30,11 @@ struct TranscriptionCheckpoint: Codable, Sendable {
     var completedChunks: Int
     /// Language reported by the engine for the first chunk (may be empty).
     var detectedLanguage: String
+    /// `AIProvider.id` that produced these chunks, for the `.whisperAPI` engine
+    /// (`nil` for on-device engines and for checkpoints written before this was
+    /// tracked). A resume that switched the transcription provider would stitch
+    /// together chunks from two vendors, so a differing id discards the checkpoint.
+    var providerID: String?
     /// Spans of every completed chunk, already offset to the input's timeline.
     var spans: [Span]
 
@@ -40,8 +45,19 @@ struct TranscriptionCheckpoint: Codable, Sendable {
         var confidence: Float?
     }
 
-    /// Whether this checkpoint can seed a resume of the given run.
-    func matches(engine: TranscriptionEngine, language: MeetingLanguage, compacted: Bool) -> Bool {
-        engineRaw == engine.rawValue && languageRaw == language.rawValue && self.compacted == compacted
+    /// Whether this checkpoint can seed a resume of the given run. `providerID`
+    /// is the transcription provider of the run being resumed (`nil` for
+    /// on-device engines); a mismatch — including a legacy checkpoint that never
+    /// recorded one — restarts rather than mixing vendors.
+    func matches(
+        engine: TranscriptionEngine,
+        language: MeetingLanguage,
+        compacted: Bool,
+        providerID: String? = nil
+    ) -> Bool {
+        engineRaw == engine.rawValue
+            && languageRaw == language.rawValue
+            && self.compacted == compacted
+            && self.providerID == providerID
     }
 }
