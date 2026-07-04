@@ -46,22 +46,17 @@ struct RecordingLiveActivityWidget: Widget {
                         .padding(.bottom, 2)
                 }
             } compactLeading: {
-                // Kurn icon (circular clip avoids pill-edge clipping) + live timer.
-                HStack(spacing: 5) {
-                    KurnLogo(size: 18)
-                        .clipShape(Circle())
-                        .padding(.leading, 2)
-                    elapsedText(context)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                        .fixedSize()
-                }
+                // Circular clip avoids pill-edge clipping on the icon corners.
+                KurnLogo(size: 20)
+                    .clipShape(Circle())
+                    .padding(.leading, 2)
             } compactTrailing: {
-                // Waveform mirrors the phone-call indicator: active while recording,
-                // dimmed when paused.
-                Image(systemName: context.state.isPaused ? "waveform.slash" : "waveform")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(context.state.isPaused ? .white.opacity(0.4) : .white)
+                // Timer in accent color mirrors the phone-call trailing (one icon, one text).
+                elapsedText(context)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
+                    .frame(width: 44)
+                    .minimumScaleFactor(0.8)
                     .padding(.trailing, 2)
             } minimal: {
                 // Circular icon keeps the minimal indicator on-brand.
