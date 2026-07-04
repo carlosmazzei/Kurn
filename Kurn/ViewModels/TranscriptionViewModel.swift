@@ -369,6 +369,12 @@ final class TranscriptionViewModel {
             return "network error \(urlError.code.rawValue): \(urlError.localizedDescription)"
         case .transcriptionFailed(let detail):
             return "transcription engine failed: \(detail)"
+        case .audioError(let detail):
+            return "audio error: \(detail)"
+        case .decodingError(let detail):
+            return "decoding error: \(detail)"
+        case .resourceUnavailable(let detail):
+            return "resource unavailable: \(detail)"
         default:
             return error.errorDescription ?? "unknown"
         }

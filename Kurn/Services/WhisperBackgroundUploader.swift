@@ -140,9 +140,7 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
             includingPropertiesForKeys: keys,
             options: .skipsHiddenFiles
         ) else { return }
-        lock.lock()
-        let inFlight = Set(bodyFiles.values.map { $0.path })
-        lock.unlock()
+        let inFlight = inFlightBodyFilePaths()
         var removed = 0
         for file in files where file.pathExtension == "multipart" && !inFlight.contains(file.path) {
             try? FileManager.default.removeItem(at: file)
@@ -151,6 +149,17 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
         if removed > 0 {
             AppLog.transcription.atDebug.debug("bgUpload: cleaned up \(removed, privacy: .public) orphaned upload body file(s)")
         }
+    }
+
+    /// Paths of upload-body spool files currently attached to an in-flight
+    /// `URLSessionUploadTask`. Exposed so other cleanup code (`TempFileCleaner`,
+    /// which sweeps the same `WhisperUploadBodies` directory on a broader,
+    /// age-based schedule and via the user-triggered "clear cache" action) can
+    /// avoid deleting a file the background session is actively reading from disk.
+    func inFlightBodyFilePaths() -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return Set(bodyFiles.values.map { $0.path })
     }
 }
 

@@ -40,19 +40,20 @@ struct ProviderModelsService: Sendable {
                 } extract: { decoded in
                     decoded.data.filter { $0.active != false }.map(\.id)
                 }
+            } catch let AppError.apiError(status, _) where status == 403 && !provider.fallbackModels.isEmpty {
+                // Some vendors' /models endpoints (e.g. Groq's) sometimes reject an
+                // otherwise-valid key with 403. Fall back to a known model list so
+                // the user can still pick a model, rather than surfacing a
+                // confusing auth error for a key that actually works.
+                AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) /models returned 403, falling back to known model list")
+                return provider.fallbackModels
             } catch {
-                // Groq's /models endpoint sometimes rejects otherwise-valid keys with 403.
-                // Fall back to a known model list so the user can still pick a model.
-                if provider.id == AIProvider.groq.id {
-                    AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) /models failed (\(error.localizedDescription, privacy: .public)), falling back to known model list")
-                    return Self.groqFallbackModels
-                }
                 AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 throw error
             }
-            if provider.id == AIProvider.groq.id, fetched.isEmpty {
+            if fetched.isEmpty, !provider.fallbackModels.isEmpty {
                 AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) returned no models, falling back to known model list")
-                return Self.groqFallbackModels
+                return provider.fallbackModels
             }
             AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(fetched.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
             return fetched
@@ -97,21 +98,6 @@ struct ProviderModelsService: Sendable {
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
         return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
     }
-
-    /// Models known to be available on GroqCloud. Used when the provider's
-    /// `/models` endpoint is not reachable for the configured key (e.g. 403).
-    private static let groqFallbackModels: [String] = [
-        "llama-3.3-70b-versatile",
-        "llama-3.3-70b-specdec",
-        "llama-3.1-8b-instant",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "gemma2-9b-it",
-        "deepseek-r1-distill-llama-70b",
-        "qwen/qwen3-32b",
-        "whisper-large-v3",
-        "whisper-large-v3-turbo"
-    ].sorted()
 
     private static let invalidURL = AppError.apiError(statusCode: 0, message: "Invalid provider URL")
 

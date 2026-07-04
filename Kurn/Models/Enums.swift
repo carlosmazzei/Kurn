@@ -494,6 +494,26 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
         id == AIProvider.groq.id ? "whisper-large-v3" : "whisper-1"
     }
 
+    /// Known-good models to fall back to when this provider's `/models`
+    /// endpoint is unreachable (e.g. Groq's occasionally rejects an
+    /// otherwise-valid key with a 403) or returns an empty list. Empty when no
+    /// such fallback is known for this provider.
+    var fallbackModels: [String] {
+        guard id == AIProvider.groq.id else { return [] }
+        return [
+            "llama-3.3-70b-versatile",
+            "llama-3.3-70b-specdec",
+            "llama-3.1-8b-instant",
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "gemma2-9b-it",
+            "deepseek-r1-distill-llama-70b",
+            "qwen/qwen3-32b",
+            "whisper-large-v3",
+            "whisper-large-v3-turbo"
+        ].sorted()
+    }
+
     static let openAI = AIProvider(
         id: "openAI",
         displayName: "OpenAI",

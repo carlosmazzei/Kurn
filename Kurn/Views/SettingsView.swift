@@ -405,9 +405,13 @@ struct SettingsView: View {
             primaryTitle: NSLocalizedString("settings.clear_cache", comment: "Clear temporary files"),
             primaryRole: .destructive,
             primaryAction: {
-                let result = TempFileCleaner.forceCleanup()
-                cacheCleanupResult = result
-                refreshStorage()
+                Task {
+                    let result = await Task.detached(priority: .utility) {
+                        TempFileCleaner.forceCleanup()
+                    }.value
+                    cacheCleanupResult = result
+                    refreshStorage()
+                }
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )

@@ -13,9 +13,11 @@ enum ProviderFactory {
     /// selected provider has no stored key.
     static func summaryProvider(for provider: AIProvider, model: String) throws -> LLMProvider {
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        guard !key.isEmpty else {
+        do {
+            try LLMHTTP.requireAPIKey(key, provider: provider)
+        } catch {
             AppLog.transcription.atError.error("ProviderFactory: missing API key for summary provider \(provider.displayName, privacy: .public)")
-            throw AppError.noAPIKey(provider: provider.displayName)
+            throw error
         }
         let resolvedModel = model.isEmpty ? provider.defaultModel : model
         guard !resolvedModel.isEmpty else {
@@ -38,9 +40,11 @@ enum ProviderFactory {
     /// when the chosen provider has no stored key.
     static func whisperProvider(for provider: AIProvider, model: String) throws -> OpenAIProvider {
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        guard !key.isEmpty else {
+        do {
+            try LLMHTTP.requireAPIKey(key, provider: provider)
+        } catch {
             AppLog.transcription.atError.error("ProviderFactory: missing API key for transcription provider \(provider.displayName, privacy: .public)")
-            throw AppError.noAPIKey(provider: provider.displayName)
+            throw error
         }
         let resolvedModel = model.isEmpty ? provider.defaultTranscriptionModel : model
         AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for Whisper transcription, model=\(resolvedModel, privacy: .public), endpoint=\(provider.baseURLString, privacy: .public)")

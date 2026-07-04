@@ -314,6 +314,19 @@ struct ProviderHTTPTests {
         }
     }
 
+    @Test func groqModelsDoesNotFallBackOn401() async throws {
+        // Unlike the documented 403 quirk, a 401 means the key itself is
+        // wrong/revoked — that must still surface as an error instead of
+        // silently showing the static fallback list.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["error": ["message": "Invalid API key"]], status: 401)
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "bad-groq-key")
+        await #expect(throws: AppError.self) {
+            _ = try await service.models(for: .groq)
+        }
+    }
+
     // MARK: - Error mapping & retry (shared LLMHTTP, continued)
 
     @Test func rateLimitIsRetriedThenSucceeds() async throws {
