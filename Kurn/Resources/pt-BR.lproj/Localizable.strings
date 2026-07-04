@@ -199,6 +199,7 @@
 "status.todo" = "Transcrever";
 "status.pending" = "Pausada";
 "detail.cancel_transcription" = "Pausar transcrição";
+"detail.stop_transcription" = "Parar transcrição";
 
 /* Fases da transcrição */
 "phase.preparing" = "Preparando…";

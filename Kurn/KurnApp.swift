@@ -90,6 +90,10 @@ struct KurnApp: App {
         // The snapshot of any orphaned Live Activities is taken synchronously
         // at launch, before any recording UI exists, so a new recording started
         // immediately after launch is never mistaken for an orphan.
+        // Migrate keychain items to AfterFirstUnlock accessibility so background
+        // transcription tasks (WhisperBackgroundUploader, BGProcessingTask resume)
+        // can read API keys while the device is locked after the first unlock.
+        KeychainManager.shared.migrateToBackgroundAccessible()
         RecordingRecovery.recoverOrphans(modelContainer: container)
         // And after one that died mid-transcription: recordings stuck at
         // `.inProgress` become `.pending` (checkpointed, resumable) or
@@ -116,6 +120,7 @@ struct KurnApp: App {
                 }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
+                transcription.appSettings = settings
                 // Lock the recordings gate whenever the app leaves the
                 // foreground so the next time it comes back the user has
                 // to authenticate again. Only `.background` triggers this —

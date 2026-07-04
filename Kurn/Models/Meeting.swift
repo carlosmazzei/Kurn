@@ -15,6 +15,10 @@ final class Meeting {
     var title: String
     var createdAt: Date
     var notes: String
+    /// Short AI-generated title produced after the first transcription completes.
+    /// Nil until generated; displayed in the meetings list instead of a raw
+    /// transcript excerpt. Cleared on re-transcription so it stays in sync.
+    var aiTitle: String?
     /// Stored raw value of `MeetingLanguage` for the transcription preference.
     var languageRaw: String
     /// User-pinned meeting. Surfaced as a star on the card and as the

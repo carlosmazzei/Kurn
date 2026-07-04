@@ -3,8 +3,9 @@
 //  Kurn
 //
 //  Thin wrapper over the Security framework for storing API keys. Keys live in
-//  the keychain (never UserDefaults) with `WhenUnlockedThisDeviceOnly` access so
-//  they are not included in encrypted backups and never leave the device.
+//  the keychain (never UserDefaults) with `AfterFirstUnlockThisDeviceOnly` access
+//  so they are not included in encrypted backups, never leave the device, and
+//  remain readable by background tasks after the first unlock of the day.
 //
 
 import Foundation
@@ -48,7 +49,7 @@ final class KeychainManager: @unchecked Sendable {
 
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
@@ -93,6 +94,39 @@ final class KeychainManager: @unchecked Sendable {
     func hasValue(for account: String) -> Bool {
         guard let value = get(account) else { return false }
         return !value.isEmpty
+    }
+
+    /// Re-save all stored keys under this service with `AfterFirstUnlockThisDeviceOnly`
+    /// accessibility so background transcription tasks can read them after the
+    /// first device unlock, without waiting for the screen to be unlocked again.
+    /// Must be called from the foreground (device unlocked) — typically once at
+    /// app launch. Safe to call repeatedly; each call is a no-op when no items
+    /// exist or when all items already have the target accessibility.
+    func migrateToBackgroundAccessible() {
+        let migrationKey = "ai.kurn.keychain.migratedAfterFirstUnlock"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let items = result as? [[String: Any]] else {
+            UserDefaults.standard.set(true, forKey: migrationKey)
+            return
+        }
+        for item in items {
+            guard let account = item[kSecAttrAccount as String] as? String,
+                  let data = item[kSecValueData as String] as? Data,
+                  let value = String(data: data, encoding: .utf8),
+                  !value.isEmpty else { continue }
+            set(value, for: account)
+        }
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        AppLog.persistence.atNotice.notice("keychain: migrated \(items.count, privacy: .public) item(s) to AfterFirstUnlock accessibility")
     }
 
     func delete(_ key: KeychainKey) {
