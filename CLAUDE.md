@@ -304,3 +304,7 @@ logging gate reflects the user's choice immediately (also synced once on init).
   English, regardless of the language used in chat. (User-facing app strings are
   still localized per the localization convention above — this rule is only about
   repository metadata.)
+- **Do not commit directly to `main`:** create a feature branch for every change,
+  push it, and open a pull request. Only merge through the GitHub PR workflow so
+  CI runs before the change lands on `main`. The only exceptions are fastlane
+  version/tag bumps run explicitly by a maintainer.
