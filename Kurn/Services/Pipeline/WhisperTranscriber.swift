@@ -50,11 +50,13 @@ actor WhisperTranscriber: Transcribing {
                 let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
                 defer { progressPulse.cancel() }
                 let chunkStart = Date()
-                let result = try await provider.transcribe(
-                    audioData: data,
-                    fileName: chunk.url.lastPathComponent,
-                    language: language
-                )
+                let result = try await Self.withChunkTimeout(seconds: 600) {
+                    try await provider.transcribe(
+                        audioData: data,
+                        fileName: chunk.url.lastPathComponent,
+                        language: language
+                    )
+                }
                 AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
                 return result
             },
@@ -75,6 +77,26 @@ actor WhisperTranscriber: Transcribing {
         let seconds = max(0, elapsed)
         let inFlightChunkFraction = min(0.88, seconds / (seconds + 20))
         return (Double(completed) + inFlightChunkFraction) / Double(totalChunks)
+    }
+
+    /// Runs `operation`, cancelling it and throwing `URLError.timedOut` if it
+    /// doesn't complete within `seconds`. `TranscriptionViewModel.isCancellation`
+    /// maps `.timedOut` to `.pending` so a stuck upload retries automatically.
+    private static func withChunkTimeout<T: Sendable>(
+        seconds: TimeInterval,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                AppLog.transcription.atError.error("whisper: chunk timed out after \(Int(seconds), privacy: .public)s — upload will retry")
+                throw AppError.networkError(URLError(.timedOut))
+            }
+            defer { group.cancelAll() }
+            let result = try await group.next()!
+            return result
+        }
     }
 
     private static func startProgressPulse(

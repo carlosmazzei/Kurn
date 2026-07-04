@@ -342,12 +342,16 @@ final class TranscriptionViewModel {
         }
     }
 
-    /// Whether an `AppError` is really the transcription task being cancelled
-    /// (URLSession surfaces cancellation of an in-flight upload as a network
-    /// error rather than `CancellationError`).
+    /// Whether an `AppError` should pause transcription (→ `.pending`) rather
+    /// than fail it. Covers two cases:
+    /// - `.cancelled`: the Swift task was cancelled (background-task expiry,
+    ///   user-initiated pause, or stop).
+    /// - `.timedOut`: the per-chunk 600 s deadline fired because OpenAI never
+    ///   responded (TCP stall, server issue). Retrying is safe — the audio file
+    ///   is intact and the chunk runner will re-upload from the checkpoint.
     private func isCancellation(_ error: AppError) -> Bool {
         if case .networkError(let urlError) = error {
-            return urlError.code == .cancelled
+            return urlError.code == .cancelled || urlError.code == .timedOut
         }
         return false
     }
