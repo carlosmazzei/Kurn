@@ -495,6 +495,6 @@ extension MeetingsListView {
                     .first { !$0.isEmpty && !$0.hasPrefix("[") }
             }
             .first
-        return transcriptPreview ?? meeting.notes
+        return transcriptPreview ?? ""
     }
 }
