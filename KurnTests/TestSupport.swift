@@ -7,6 +7,16 @@ import Foundation
 import SwiftData
 @testable import Kurn
 
+/// Actor used to serialize tests that inspect the temporary directory, avoiding
+/// race conditions when other tests create or remove temp files concurrently.
+actor TempFileTestLocker {
+    func run<T: Sendable>(operation: @Sendable () async throws -> T) async rethrows -> T {
+        try await operation()
+    }
+}
+
+let tempFileTestLock = TempFileTestLocker()
+
 /// Shared helper for tests that need real SwiftData relationship behavior
 /// (inverse relationships are only guaranteed once objects are inserted into
 /// a context) without touching the on-disk store.
