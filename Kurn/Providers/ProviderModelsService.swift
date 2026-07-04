@@ -9,38 +9,73 @@ import Foundation
 
 struct ProviderModelsService: Sendable {
     private let session: URLSession
+    private let apiKey: String?
     private let anthropicVersion = "2023-06-01"
 
-    init(session: URLSession = .shared) {
+    /// - Parameters:
+    ///   - session: URLSession used for the `/models` request.
+    ///   - apiKey: Optional override for the provider's API key. When `nil`,
+    ///     the key is read from the Keychain as usual. This is mainly for tests
+    ///     so they can avoid racing on the process-wide Keychain.
+    init(session: URLSession = .shared, apiKey: String? = nil) {
         self.session = session
+        self.apiKey = apiKey
     }
 
     func models(for provider: AIProvider) async throws -> [String] {
-        let apiKey = KeychainManager.shared.get(provider.keychainAccount) ?? ""
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        let apiKey = apiKey ?? KeychainManager.shared.get(provider.keychainAccount) ?? ""
+        do {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        } catch {
+            AppLog.transcription.atError.error("ProviderModelsService: cannot load models for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
 
         switch provider.kind {
         case .openAICompatible:
-            return try await fetchModels(provider: provider, as: OpenAIModelListResponse.self) { request in
-                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            } extract: { decoded in
-                decoded.data.filter { $0.active != false }.map(\.id)
+            let fetched: [String]
+            do {
+                fetched = try await fetchModels(provider: provider, as: OpenAIModelListResponse.self) { request in
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                } extract: { decoded in
+                    decoded.data.filter { $0.active != false }.map(\.id)
+                }
+            } catch let AppError.apiError(status, _) where status == 403 && !provider.fallbackModels.isEmpty {
+                // Some vendors' /models endpoints (e.g. Groq's) sometimes reject an
+                // otherwise-valid key with 403. Fall back to a known model list so
+                // the user can still pick a model, rather than surfacing a
+                // confusing auth error for a key that actually works.
+                AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) /models returned 403, falling back to known model list")
+                return provider.fallbackModels
+            } catch {
+                AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                throw error
             }
+            if fetched.isEmpty, !provider.fallbackModels.isEmpty {
+                AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) returned no models, falling back to known model list")
+                return provider.fallbackModels
+            }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(fetched.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
+            return fetched
         case .anthropic:
-            return try await fetchModels(provider: provider, as: AnthropicModelListResponse.self) { request in
+            let models = try await fetchModels(provider: provider, as: AnthropicModelListResponse.self) { request in
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                 request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
             } extract: { decoded in
                 decoded.data.map(\.id)
             }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
+            return models
         case .googleGemini:
-            return try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
+            let models = try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
                 request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
             } extract: { decoded in
                 decoded.models
                     .filter { $0.supportedGenerationMethods.contains("generateContent") }
                     .map { $0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: "") }
             }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
+            return models
         }
     }
 

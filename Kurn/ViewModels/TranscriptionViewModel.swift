@@ -272,7 +272,8 @@ final class TranscriptionViewModel {
                 recording.transcriptionStatus = .failed
                 persist()
                 error = appError
-                AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
+                let context = Self.logContext(for: appError)
+                AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public) context=\(context, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
             }
         } catch {
             recording.transcriptionStatus = .failed
@@ -354,6 +355,29 @@ final class TranscriptionViewModel {
             return urlError.code == .cancelled || urlError.code == .timedOut
         }
         return false
+    }
+
+    /// A concise, log-friendly description of the failure category so logs and
+    /// bug reports can distinguish missing keys, API errors, network issues, etc.
+    private static func logContext(for error: AppError) -> String {
+        switch error {
+        case .noAPIKey(let provider):
+            return "missing API key for \(provider)"
+        case .apiError(let status, let message):
+            return "provider API error \(status): \(message)"
+        case .networkError(let urlError):
+            return "network error \(urlError.code.rawValue): \(urlError.localizedDescription)"
+        case .transcriptionFailed(let detail):
+            return "transcription engine failed: \(detail)"
+        case .audioError(let detail):
+            return "audio error: \(detail)"
+        case .decodingError(let detail):
+            return "decoding error: \(detail)"
+        case .resourceUnavailable(let detail):
+            return "resource unavailable: \(detail)"
+        default:
+            return error.errorDescription ?? "unknown"
+        }
     }
 
     /// Persist chunk progress reported by the pipeline so an interruption at

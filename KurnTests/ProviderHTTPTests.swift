@@ -241,40 +241,89 @@ struct ProviderHTTPTests {
 
     // MARK: - Provider models listing (ProviderModelsService)
 
-    /// Swap a Keychain key for the duration of `body`, restoring the original.
-    @discardableResult
-    private func withKey<R>(_ key: KeychainKey, value: String, _ body: () async throws -> R) async rethrows -> R {
-        let original = KeychainManager.shared.get(key)
-        KeychainManager.shared.set(value, for: key)
-        defer {
-            if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
-        }
-        return try await body()
-    }
-
     // Lives in this suite (not its own) because it scripts the process-global
     // MockURLProtocol: `.serialized` only orders tests WITHIN a suite, and a
     // separate suite would race this one for the scripted stubs.
     @Test func googleModelsSendsKeyHeaderNotQuery() async throws {
-        try await withKey(.google, value: "gk") {
-            MockURLProtocol.enqueue([
-                MockURLProtocol.json([
-                    "models": [
-                        [
-                            "name": "models/gemini-1.5-pro",
-                            "baseModelId": NSNull(),
-                            "supportedGenerationMethods": ["generateContent"]
-                        ]
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "models": [
+                    [
+                        "name": "models/gemini-1.5-pro",
+                        "baseModelId": NSNull(),
+                        "supportedGenerationMethods": ["generateContent"]
                     ]
-                ])
+                ]
             ])
-            let service = ProviderModelsService(session: MockURLProtocol.session())
-            let models = try await service.models(for: .google)
-            #expect(models.contains("gemini-1.5-pro"))
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "gk")
+        let models = try await service.models(for: .google)
+        #expect(models.contains("gemini-1.5-pro"))
 
-            let request = try #require(MockURLProtocol.lastRequest)
-            #expect(request.url?.query == nil)
-            #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+        let request = try #require(MockURLProtocol.lastRequest)
+        #expect(request.url?.query == nil)
+        #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+    }
+
+    @Test func groqModelsFallsBackToKnownListOn403() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["error": ["message": "Forbidden"]], status: 403)
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "groq-secret")
+        let models = try await service.models(for: .groq)
+        #expect(models.contains("llama-3.3-70b-versatile"))
+        #expect(models.contains("whisper-large-v3"))
+
+        let request = try #require(MockURLProtocol.lastRequest)
+        #expect(request.url?.absoluteString == "https://api.groq.com/openai/v1/models")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer groq-secret")
+    }
+
+    @Test func groqModelsFallsBackToKnownListWhenEmpty() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["data": []])
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "groq-secret")
+        let models = try await service.models(for: .groq)
+        #expect(models.contains("llama-3.1-8b-instant"))
+        #expect(models.contains("whisper-large-v3-turbo"))
+    }
+
+    @Test func groqModelsReturnsAPIResponseWhenAvailable() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "data": [
+                    ["id": "llama-3.3-70b-versatile", "active": true],
+                    ["id": "custom-groq-model", "active": true]
+                ]
+            ])
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "groq-secret")
+        let models = try await service.models(for: .groq)
+        #expect(models.contains("custom-groq-model"))
+        #expect(models.contains("llama-3.3-70b-versatile"))
+    }
+
+    @Test func openAIModelsDoesNotFallBackOn403() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["error": ["message": "Invalid auth"]], status: 401)
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "secret")
+        await #expect(throws: AppError.self) {
+            _ = try await service.models(for: .openAI)
+        }
+    }
+
+    @Test func groqModelsDoesNotFallBackOn401() async throws {
+        // Unlike the documented 403 quirk, a 401 means the key itself is
+        // wrong/revoked — that must still surface as an error instead of
+        // silently showing the static fallback list.
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["error": ["message": "Invalid API key"]], status: 401)
+        ])
+        let service = ProviderModelsService(session: MockURLProtocol.session(), apiKey: "bad-groq-key")
+        await #expect(throws: AppError.self) {
+            _ = try await service.models(for: .groq)
         }
     }
 

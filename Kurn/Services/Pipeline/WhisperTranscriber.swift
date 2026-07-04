@@ -60,15 +60,20 @@ actor WhisperTranscriber: Transcribing {
                 let progressPulse = Self.startProgressPulse(completedChunks: index, totalChunks: total, onProgress: onProgress)
                 defer { progressPulse.cancel() }
                 let chunkStart = Date()
-                let result = try await Self.withChunkTimeout(seconds: 600) {
-                    try await provider.transcribe(
-                        audioData: data,
-                        fileName: chunk.url.lastPathComponent,
-                        language: language
-                    )
+                do {
+                    let result = try await Self.withChunkTimeout(seconds: 600) {
+                        try await provider.transcribe(
+                            audioData: data,
+                            fileName: chunk.url.lastPathComponent,
+                            language: language
+                        )
+                    }
+                    AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
+                    return result
+                } catch {
+                    AppLog.transcription.atError.error("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) failed for \(vendor, privacy: .public) after \(Date().timeIntervalSince(chunkStart), privacy: .public)s: \(error.localizedDescription, privacy: .public)")
+                    throw error
                 }
-                AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
-                return result
             },
             onChunkCompleted: onChunkCompleted,
             onProgress: { progress, currentChunk, total in
