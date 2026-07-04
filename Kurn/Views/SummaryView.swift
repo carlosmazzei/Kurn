@@ -48,7 +48,8 @@ struct SummaryView: View {
     private func sectionCard(_ section: SummarySection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if !section.title.isEmpty {
-                Text(section.title).font(.headline)
+                markdownInlineText(section.title)
+                    .font(.headline)
             }
             if !section.body.isEmpty {
                 MarkdownText(section.body)
@@ -59,7 +60,7 @@ struct SummaryView: View {
                         .foregroundStyle(Theme.accent)
                         .font(.system(size: 6))
                         .padding(.top, 7)
-                    Text(item)
+                    markdownInlineText(item)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -68,7 +69,7 @@ struct SummaryView: View {
     }
 }
 
-/// Minimal block-level Markdown renderer (headings, bullets, paragraphs). Avoids
+/// Minimal block-level Markdown renderer (headings, lists, paragraphs). Avoids
 /// a third-party dependency while handling the shapes the summary prompt yields.
 struct MarkdownText: View {
     let raw: String
@@ -104,18 +105,34 @@ struct MarkdownText: View {
         } else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
             HStack(alignment: .top, spacing: 6) {
                 Text("•")
-                inlineText(String(trimmed.dropFirst(2)))
+                markdownInlineText(String(trimmed.dropFirst(2)))
+            }
+        } else if let orderedItem = orderedListItem(trimmed) {
+            HStack(alignment: .top, spacing: 6) {
+                Text("\(orderedItem.number).")
+                    .foregroundStyle(Theme.textSecondary)
+                markdownInlineText(orderedItem.text)
             }
         } else {
-            inlineText(trimmed)
+            markdownInlineText(trimmed)
         }
     }
 
-    /// Render inline emphasis/bold using AttributedString's markdown parser.
-    private func inlineText(_ text: String) -> Text {
-        if let attributed = try? AttributedString(markdown: text) {
-            return Text(attributed)
-        }
-        return Text(text)
+    private func orderedListItem(_ text: String) -> (number: Int, text: String)? {
+        guard let separator = text.firstRange(of: ". ") else { return nil }
+        let prefix = text[..<separator.lowerBound]
+        guard let number = Int(prefix), number > 0 else { return nil }
+        let body = text[separator.upperBound...].trimmingCharacters(in: .whitespaces)
+        guard !body.isEmpty else { return nil }
+        return (number, body)
     }
+}
+
+/// Render inline Markdown for any summary text, falling back to plain text when
+/// a provider returns malformed Markdown.
+private func markdownInlineText(_ text: String) -> Text {
+    if let attributed = try? AttributedString(markdown: text) {
+        return Text(attributed)
+    }
+    return Text(text)
 }
