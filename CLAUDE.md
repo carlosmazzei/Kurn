@@ -85,11 +85,13 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 
 - **Models/** — SwiftData `@Model` classes (`Meeting`, `Recording`, `Transcript`,
   `Speaker`, `Summary`, `Tag`, `Folder`, `SmartFolder`) plus shared value types
-  (`Enums.swift`, `MeetingFilter`, `TranscriptionCheckpoint`).
+  (`Enums.swift`, `MeetingFilter`, `TranscriptionCheckpoint`, `FolderCatalog`,
+  `SummarySection`, `SummaryTemplate`).
 - **Services/** — audio capture, transcription pipeline (`Services/Pipeline/`),
-  diarization, summaries, folder analytics, auto-tagging. These are mostly
-  `struct`/value types operating on plain values so they stay decoupled from
-  SwiftData and safe off the main actor.
+  on-device FluidAudio engines, diarization, live transcription preview,
+  summaries, folder analytics, auto-tagging. These are mostly `struct`/`actor`
+  types operating on plain values so they stay decoupled from SwiftData and
+  safe off the main actor.
 - **Providers/** — cloud LLM clients behind the `LLMProvider` protocol.
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and
   persisting results.
@@ -116,12 +118,20 @@ root:
   bucket meetings into All/Inbox/Favorites/Archive.
 - `Folder` (`Models/Folder.swift`) — one folder per meeting (`Meeting.folder`,
   `.nullify`, so deleting a folder detaches rather than deletes its meetings).
-  Self-referential `parent`/`children` exist for future subfolders; the sidebar
-  only shows root folders today. Icon/color come from `FolderCatalog.swift`.
+  Self-referential `parent`/`children` support subfolders, with breadcrumb
+  drill-down navigation (`Views/FolderSidebarView.swift`, driven by a
+  `NavigationStack(path:)` of drilled-into folders). Icon/color are picked from
+  the curated lists in `FolderCatalog.swift` (`FolderIconCatalog`,
+  `FolderColorPalette`) via `Views/FolderFormView.swift`, so free-form
+  icon/hex entry can't produce an invalid symbol or color. `FolderPickerView`
+  mirrors the same drill-down to move a meeting into a folder.
 - `Tag` (`Models/Tag.swift`) — many-to-many via `Meeting.tags` (`.nullify`).
   `AutoTaggingService` (`Services/AutoTaggingService.swift`) can suggest
   existing/new tags from a transcript excerpt through the configured summary
-  LLM provider; it's off by default and gated in Settings.
+  LLM provider; it's off by default and gated in Settings. Suggestions are
+  reviewed in `AutoTagConfirmView` before `MeetingDetailAutoTagging` (a
+  `MeetingDetailView` extension) applies them — attaching existing tags by id
+  and creating new `Tag` rows for suggested names.
 - `MeetingFilter` (`Models/MeetingFilter.swift`) — a `Codable` value type (not a
   `@Model`) ANDing date range, tags, status, summary presence, and duration.
   Used as live UI filter state and as a `SmartFolder`'s persisted predicate.
@@ -168,6 +178,14 @@ down the live `RecorderViewModel` and orphan its audio file;
 locks) by restarting in place, or pausing with a banner if the audio format
 changed.
 
+`ModelStoreProtection` (`Infrastructure/ModelStoreProtection.swift`) applies
+the same `.completeUnlessOpen` file protection to the SwiftData store itself
+(`default.store` plus its `-shm`/`-wal` sidecars in Application Support),
+since transcripts and summaries live there as JSON `Data`. It must run before
+the `ModelContainer` is created and is a no-op on a fresh install with no
+store file yet. Despite the similar name, it is unrelated to `ModelStore`
+(below), which manages downloaded FluidAudio model files, not app data.
+
 ### Transcription pipeline (`Services/TranscriptionService.swift`)
 
 Each stage is a protocol seam (`Services/Pipeline/PipelineStages.swift`:
@@ -176,6 +194,17 @@ Each stage is a protocol seam (`Services/Pipeline/PipelineStages.swift`:
 stage is swappable without touching the orchestrator. `PipelineConfiguration`
 (built from `AppSettings`) picks one engine per stage; defaults are the
 always-available, no-download engines so a fresh install works offline.
+`TranscriptionService` holds one instance of every engine and maps the chosen
+enum to it — engines are never spun up per call. The concrete choices per
+stage (enums in `Models/Enums.swift`) are:
+
+| Stage | `AppSettings` property | Default (no download) | Alternative (FluidAudio, model download) |
+| --- | --- | --- | --- |
+| Preprocessing | `preprocessingEngine` | `.standardDSP` (`AudioPreprocessor`) | `.none` (passthrough — not FluidAudio, just skips cleanup) |
+| VAD | `vadEngine` | `.energyThreshold` (`Pipeline/EnergyVAD.swift`) | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD) |
+| Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber) | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`) |
+| Diarization | `diarizationEngine` | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) | `.fluidAudio` (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) |
+| Transcription | `transcriptionEngine` | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale) | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language) or `.whisperAPI` (cloud) |
 
 `TranscriptionService.transcribe` drives the stages in order:
 
@@ -192,13 +221,51 @@ always-available, no-download engines so a fresh install works offline.
    long recording can push peak memory past the jetsam limit. Diarization reads
    its own cleaned copy (`DiarizationPreprocessor`, minimal DSP preserving
    natural timbre) rather than the ASR-tuned one, unless
-   `diarizationPreprocessingEnabled` is off.
+   `diarizationPreprocessingEnabled` is off. `fluidAudioMinSpeakers` forces the
+   `.fluidAudio` diarizer to re-cluster with KMeans to at least that many
+   speakers, working around its VBx step collapsing far-field/single-mic audio
+   into one cluster; the heuristic engine ignores it.
 5. **Fuse** transcript spans with speaker turns into `[TranscriptSegment]`
    via the pure, unit-tested `Pipeline/TranscriptFusion.swift` (merges
    consecutive same-speaker spans, capped at 30s).
 
+Every stage call is preceded by `ResourceGuard.requireTranscriptionHeadroom()`
+(`Infrastructure/ResourceGuard.swift`, 750MB disk floor), which throws
+`AppError.resourceUnavailable` rather than let the pipeline run out of disk
+mid-transcription; `TempFileCleaner.cleanupOrphanedTempFiles()` runs at the
+start of every `transcribe` call to sweep temp files (`kurn_clean_`,
+`kurn_vad_`, `kurn_diar_`, `kurn_chunk_` prefixes, plus stale Whisper upload
+spool files) older than an hour that earlier interrupted runs left behind; the
+same cleaner backs the manual "Free up space" action in Settings.
+
 Progress is reported via a `@Sendable` `PhaseHandler` (`TranscriptionPhase`); the
 receiver must hop to the main actor itself.
+
+#### FluidAudio on-device models and download consent
+
+The FluidAudio-backed engines above (and the live transcription preview below)
+download CoreML models on first use rather than bundling them, so enabling one
+never fetches models for a feature the user hasn't opted into:
+
+- `Infrastructure/ModelDownloadConsent.swift` is the single place that
+  triggers a download, one `ModelSet` case (`.liveTranscriptionASR`,
+  `.onDeviceASR`, `.diarization`, `.vad`) at a time, gated behind a matching
+  `AppSettings.fluidAudio*Consented` flag the user sets in Settings. Each
+  engine's `requiredModelSet` (on the `TranscriptionEngine`/`VADEngine`/
+  `DiarizationEngine`/`LanguageDetectionEngine` enums) says which set it needs.
+- `Services/FluidAudioModelStore.swift` (`actor`, `.shared`) caches the loaded
+  multilingual Parakeet batch ASR model so `FluidAudioTranscriber` and
+  `FluidAudioLanguageDetector` share one loaded copy instead of each compiling
+  their own CoreML/ANE artifacts; `prewarm()` is called from the foreground
+  (from `AppSettings.usesFluidAudioModel`) since ANE compilation can fail if
+  attempted from the background.
+- `Services/ModelStore.swift` (distinct from the above) is a pure-Foundation
+  on-disk manager for the downloaded model folders under
+  `Application Support/FluidAudio/Models`, grouped by `ModelGroup`. It backs
+  the Settings screen that lists installed models with disk usage and lets the
+  user delete a group to reclaim space.
+- `ResourceGuard.requireModelDownloadHeadroom()` (2.5GB disk floor) gates every
+  download attempt in addition to the 750MB transcription floor above.
 
 #### Resumable transcription
 
@@ -224,6 +291,28 @@ instead of restarting from scratch:
 - `Infrastructure/TranscriptionRecovery.swift` sweeps recordings stuck at
   `.inProgress` on launch and every foreground activation: recordings with a
   checkpoint reset to `.pending` (resumable), others to `.failed`.
+- `Infrastructure/BackgroundActivity.swift` wraps
+  `UIApplication.beginBackgroundTask`/`endBackgroundTask`, requesting a finite
+  execution window so a long transcription isn't suspended the instant the app
+  backgrounds; its `onExpiration` callback lets the checkpoint machinery pause
+  cleanly instead of being frozen mid-chunk when the system reclaims the
+  window.
+
+### Live transcription preview (`Services/LiveTranscriptionService.swift`)
+
+An opt-in (`AppSettings.liveTranscriptionEnabled`, off by default),
+preview-only transcript shown while recording — nothing it produces is
+persisted; the authoritative transcript still comes from `TranscriptionService`
+after the recording stops. `RecorderViewModel` feeds it live audio buffers
+through a `nonisolated append(_:)` entry point wired to
+`AudioRecorderService.onAudioBuffer`. It picks a streaming engine by the
+meeting's language: English uses the lightweight
+`StreamingModelVariant.parakeetEou160ms` manager; every other language
+(including auto-detect) uses `Services/FluidAudioMultilingualStreamingManager.swift`,
+which adapts FluidAudio's `StreamingNemotronMultilingualAsrManager` to the
+app's `StreamingAsrManager` protocol. An in-flight gate drops buffers instead
+of queuing them when a previous chunk is still processing, so the preview
+never falls behind the microphone.
 
 ### Providers (`Providers/`)
 
@@ -233,11 +322,23 @@ single place that resolves a provider from `AppSettings` + Keychain and throws
 `AIProviderKind` (`openAICompatible`, `anthropic`, `googleGemini`); Groq reuses the
 OpenAI-compatible client. **Cloud transcription always uses OpenAI Whisper**
 (`ProviderFactory.whisperProvider()`) regardless of the chosen summary provider.
+`Providers/ProviderModelsService.swift` separately lists a provider's available
+summary models by querying its own `/models` endpoint (auth style branches on
+`AIProviderKind`), falling back to `AIProvider.fallbackModels` on a 403 or an
+empty response (some vendors, e.g. Groq, reject otherwise-valid keys) — this
+backs the model picker in Settings and is distinct from the
+completion-calling `LLMProvider` clients above.
+
 Summaries are template-driven: `SummaryPrompt.system(for:)` builds the system prompt
-from the chosen `SummaryTemplate` (persona/focus + suggested sections), and the model
-returns a flexible `{ "sections": [...] }` shape. `SummaryJSON.parse` tolerantly strips
+from the chosen `SummaryTemplate` (`Models/SummaryTemplate.swift` — persona/
+instructions plus suggested sections; built-ins are `.general`, `.standup`, and
+`.interview`, collected in `defaultTemplates`), and the model returns a flexible
+`{ "sections": [...] }` shape decoded into `[SummarySection]`
+(`Models/SummarySection.swift` — title, Markdown body, bullet items) rather than
+a fixed set of fields. `SummaryJSON.parse` tolerantly strips
 markdown fences and extracts the outermost `{...}` since models add prose. Templates
-(built-in presets + user-defined) live in `AppSettings.summaryTemplates`; the user
+(built-in presets + user-defined, created/edited via `Views/TemplateEditorView.swift`
+— built-ins can't be renamed or deleted) live in `AppSettings.summaryTemplates`; the user
 picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` holds the
 template-driven body that the views and export render. `SummaryView` renders inline
 Markdown in titles, body text, and item text, with lightweight block handling for
@@ -262,10 +363,17 @@ recording. Both the Lock Screen Live Activity (via `kurn://recording/...` deep l
 and the Apple Watch (via `PhoneSessionController` over WatchConnectivity) route
 through it. The recorder pushes state to the Watch with `updateApplicationContext`
 (survives disconnects) and throttles audio-level pushes (`sendMessage` off the main
-thread, 0.2s spacing).
+thread, 0.2s spacing). `Services/LockScreenRecordingController.swift` owns the
+ActivityKit (`Activity<RecordingActivityAttributes>`) lifecycle — `start`/
+`update`/`end` mirror `AudioRecorderService.State` into the activity's
+`ContentState`; the actual Live Activity UI is rendered separately by the
+`KurnLiveActivityExtension` widget target.
 
 The watchOS target does **not** share source files with the app — types like
-`WatchCommand` are intentionally duplicated in `KurnWatch/`. Keep both copies in sync.
+`WatchCommand` and the wire-contract constants in `WatchSessionProtocol.swift`
+(the `WCSession` application-context/message dictionary keys and state
+strings) are intentionally duplicated byte-for-byte in `KurnWatch/`. Keep both
+copies in sync.
 
 `RecordingActivityAttributes` (`Infrastructure/RecordingActivityAttributes.swift`)
 is, by contrast, a single file compiled into both the `Kurn` and
