@@ -15,6 +15,15 @@ import SwiftUI // for Color.speakerHex palette helper
 @MainActor
 @Observable
 final class TranscriptionViewModel {
+    /// An ordered update emitted by the transcription pipeline's `@Sendable`
+    /// callbacks and applied on the main actor in emission order (see
+    /// `transcribe(_:language:config:)`).
+    private enum PipelineEvent: Sendable {
+        case phase(TranscriptionPhase)
+        case diarizationWarning(String)
+        case checkpoint(TranscriptionCheckpoint)
+    }
+
     /// IDs of recordings currently transcribing, for per-row spinners.
     private(set) var transcribingIDs: Set<UUID> = []
     /// Active pipeline phase per recording, so the UI can show the current stage.
@@ -223,6 +232,37 @@ final class TranscriptionViewModel {
         }
         defer { background.end() }
 
+        // Pipeline callbacks fire off the main actor. Route every one through a
+        // single ordered channel (rather than spawning an independent
+        // `Task { @MainActor }` per callback, which has no ordering guarantee)
+        // so phase/warning/checkpoint updates apply in emission order and are
+        // fully drained before the completion/error path mutates the recording.
+        // Without this, a checkpoint enqueued near the end of the run could land
+        // *after* `saveTranscript`/the stop path clears the checkpoint, leaving a
+        // stale checkpoint on a finished recording and corrupting resume state.
+        let (events, continuation) = AsyncStream<PipelineEvent>.makeStream()
+        let consumer = Task { @MainActor [weak self] in
+            for await event in events {
+                guard let self else { continue }
+                switch event {
+                case .phase(let phase): self.phases[recordingID] = phase
+                case .diarizationWarning(let message): self.diarizationWarnings[recordingID] = message
+                case .checkpoint(let checkpoint): self.storeCheckpoint(checkpoint, for: recordingID)
+                }
+            }
+        }
+        // `finish()` is idempotent; the explicit `drainEvents()` calls close the
+        // stream first, this is only a safety net for any future exit path.
+        defer { continuation.finish() }
+
+        // Close the channel and wait for the consumer to apply every pending
+        // event before touching completion/error state. Call this first in the
+        // success path and in every `catch`, ahead of any recording mutation.
+        func drainEvents() async {
+            continuation.finish()
+            await consumer.value
+        }
+
         do {
             let output = try await transcriptionService.transcribe(
                 fileURL: fileURL,
@@ -230,17 +270,11 @@ final class TranscriptionViewModel {
                 language: language,
                 config: config,
                 checkpoint: checkpoint,
-                onPhase: { [weak self] phase in
-                    // Reported off the main actor; hop back before mutating state.
-                    Task { @MainActor in self?.phases[recordingID] = phase }
-                },
-                onDiarizationWarning: { [weak self] message in
-                    Task { @MainActor in self?.diarizationWarnings[recordingID] = message }
-                },
-                onCheckpoint: { [weak self] checkpoint in
-                    Task { @MainActor in self?.storeCheckpoint(checkpoint, for: recordingID) }
-                }
+                onPhase: { continuation.yield(.phase($0)) },
+                onDiarizationWarning: { continuation.yield(.diarizationWarning($0)) },
+                onCheckpoint: { continuation.yield(.checkpoint($0)) }
             )
+            await drainEvents()
 
             saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
@@ -248,6 +282,7 @@ final class TranscriptionViewModel {
                 await generateAITitle(for: recording.meeting, settings: settings)
             }
         } catch is CancellationError {
+            await drainEvents()
             if stoppingIDs.remove(recordingID) != nil {
                 // Full stop: discard the checkpoint so the next run starts fresh.
                 recording.transcriptionCheckpointData = nil
@@ -261,6 +296,7 @@ final class TranscriptionViewModel {
             }
             persist()
         } catch let appError as AppError {
+            await drainEvents()
             if isCancellation(appError) {
                 if stoppingIDs.remove(recordingID) != nil {
                     recording.transcriptionCheckpointData = nil
@@ -281,6 +317,7 @@ final class TranscriptionViewModel {
                 AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public) context=\(context, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
             }
         } catch {
+            await drainEvents()
             recording.transcriptionStatus = .failed
             persist()
             self.error = .transcriptionFailed(error.localizedDescription)
