@@ -324,8 +324,14 @@ extension SettingsView {
     }
 
     func deleteAllData() {
-        try? modelContext.delete(model: Meeting.self)
-        try? modelContext.save()
+        do {
+            try modelContext.delete(model: Meeting.self)
+            try modelContext.save()
+        } catch {
+            AppLog.persistence.atError.error("Failed to delete all data: \(error.localizedDescription, privacy: .public)")
+            dataError = .persistenceFailed(error.localizedDescription)
+            return
+        }
         AudioFileStore.deleteAllAudio()
         refreshStorage()
     }

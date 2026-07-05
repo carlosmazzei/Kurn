@@ -21,6 +21,8 @@ struct MeetingFormView: View {
     @State private var language: MeetingLanguage = .autoDetect
     @State private var initialized = false
     @State private var showingTagPicker = false
+    /// Set when saving fails, so the failure surfaces and the form stays open.
+    @State private var saveError: AppError?
 
     var body: some View {
         Form {
@@ -90,6 +92,7 @@ struct MeetingFormView: View {
             }
         }
         .onAppear(perform: setupIfNeeded)
+        .errorAlert($saveError)
     }
 
     private func setupIfNeeded() {
@@ -113,13 +116,17 @@ struct MeetingFormView: View {
             meeting.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
             meeting.notes = notes
             meeting.language = language
-            try? modelContext.save()
+            if let failure = modelContext.saveOrError() {
+                saveError = failure
+                return
+            }
         } else {
-            MeetingsViewModel(modelContext: modelContext).createMeeting(
-                title: title,
-                notes: notes,
-                language: language
-            )
+            let viewModel = MeetingsViewModel(modelContext: modelContext)
+            viewModel.createMeeting(title: title, notes: notes, language: language)
+            if let failure = viewModel.error {
+                saveError = failure
+                return
+            }
         }
         dismiss()
     }

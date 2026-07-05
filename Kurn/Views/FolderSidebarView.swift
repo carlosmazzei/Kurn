@@ -38,6 +38,8 @@ struct FolderSidebarView: View {
     @State private var pendingDelete: Folder?
     @State private var showingAnalytics = false
     @State private var analyticsFolder: Folder?
+    /// Set when deleting a folder fails to save, surfaced via `.errorAlert`.
+    @State private var saveError: AppError?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -73,6 +75,7 @@ struct FolderSidebarView: View {
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
             secondaryAction: { pendingDelete = nil }
         )
+        .errorAlert($saveError)
     }
 
     // MARK: - Root level
@@ -309,7 +312,7 @@ struct FolderSidebarView: View {
         // navigation stack does not point at a deleted model.
         path.removeAll { $0.persistentModelID == folder.persistentModelID }
         modelContext.delete(folder)
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
     }
 }
 

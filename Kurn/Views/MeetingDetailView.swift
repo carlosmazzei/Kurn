@@ -246,7 +246,7 @@ struct MeetingDetailView: View {
                     recordings: transcribed,
                     player: player,
                     onSeek: { rec, time in seek(rec, to: time) },
-                    onRenameCommit: { try? modelContext.save() }
+                    onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } }
                 )
             }
         }
@@ -319,7 +319,7 @@ struct MeetingDetailView: View {
         ToolbarItem(placement: .topBarTrailing) {
             Button {
                 meeting.isFavorite.toggle()
-                try? modelContext.save()
+                if let failure = modelContext.saveOrError() { txVM?.error = failure }
             } label: {
                 Image(systemName: meeting.isFavorite ? "star.fill" : "star")
                     .foregroundStyle(meeting.isFavorite ? Theme.warning : Theme.textSecondary)
@@ -340,7 +340,7 @@ struct MeetingDetailView: View {
                 }
                 Button {
                     meeting.archivedAt = meeting.isArchived ? nil : Date()
-                    try? modelContext.save()
+                    if let failure = modelContext.saveOrError() { txVM?.error = failure }
                 } label: {
                     Label(
                         meeting.isArchived

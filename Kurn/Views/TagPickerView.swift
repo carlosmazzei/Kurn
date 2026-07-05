@@ -18,6 +18,8 @@ struct TagPickerView: View {
     @Query(sort: \Tag.name) private var allTags: [Tag]
     @State private var newTagName = ""
     @State private var pendingDelete: Tag?
+    /// Set when a tag add/remove/create/delete save fails, surfaced via `.errorAlert`.
+    @State private var saveError: AppError?
 
     var body: some View {
         NavigationStack {
@@ -81,6 +83,7 @@ struct TagPickerView: View {
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
             secondaryAction: { pendingDelete = nil }
         )
+        .errorAlert($saveError)
     }
 
     private func tagRow(_ tag: Tag) -> some View {
@@ -119,7 +122,7 @@ struct TagPickerView: View {
         } else {
             meeting.tags.append(tag)
         }
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
     }
 
     private func createTag() {
@@ -128,19 +131,19 @@ struct TagPickerView: View {
         if let existing = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
             if !meeting.tags.contains(where: { $0.id == existing.id }) {
                 meeting.tags.append(existing)
-                try? modelContext.save()
+                saveError = modelContext.saveOrError()
             }
         } else {
             let tag = Tag(name: name)
             modelContext.insert(tag)
             meeting.tags.append(tag)
-            try? modelContext.save()
+            saveError = modelContext.saveOrError()
         }
         newTagName = ""
     }
 
     private func deleteTag(_ tag: Tag) {
         modelContext.delete(tag)
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
     }
 }
