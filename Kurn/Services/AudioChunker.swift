@@ -63,6 +63,11 @@ actor AudioChunker {
     private func split(url: URL, knownDuration: TimeInterval) async throws -> [Chunk] {
         let exportStart = Date()
         let asset = AVURLAsset(url: url)
+        // AVAssetExportSession silently produces an empty file if the asset's
+        // tracks haven't been loaded yet when `knownDuration` short-circuits the
+        // `.duration` load below, this asset's properties are otherwise never
+        // resolved before being handed to the export session.
+        _ = try? await asset.load(.tracks)
         let totalSeconds = knownDuration.isFinite && knownDuration > 0
             ? knownDuration
             : (try? await CMTimeGetSeconds(asset.load(.duration))) ?? 0
