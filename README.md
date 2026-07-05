@@ -18,8 +18,8 @@ summaries. It is built with Swift 6, SwiftUI, SwiftData, AVFoundation, Apple's
 Speech framework, ActivityKit, and WatchConnectivity.
 
 Recordings and meeting data are stored on device by default. Network requests
-only happen when the user chooses OpenAI Whisper transcription or generates a
-summary with a configured AI provider.
+only happen when the user chooses cloud (Whisper-compatible) transcription or
+generates a summary with a configured AI provider.
 
 ## Current App
 
@@ -53,7 +53,8 @@ summary with a configured AI provider.
   distribution, and top speakers.
 - Play saved recordings and seek from transcript timestamps.
 - Delete meetings and individual recording segments.
-- Track local audio storage usage and reset all app data from Settings.
+- Track local audio storage usage, manage downloaded on-device transcription
+  models, and reset all app data from Settings.
 
 ## Recording And Transcription
 
@@ -62,13 +63,27 @@ summary with a configured AI provider.
 - Supports high, standard, and low audio quality presets.
 - Handles audio interruptions and route changes, including automatic pause on
   relevant route changes.
+- Optional live transcription preview while recording (opt-in, off by
+  default) — a rolling on-device preview shown during the meeting; it never
+  replaces the full transcript generated afterward.
 - Cleans audio before transcription with preprocessing, while falling back to
   the original file if preprocessing fails.
-- Transcribes on device with Apple's Speech framework.
-- Optionally transcribes with OpenAI Whisper using chunked uploads for longer
-  recordings.
-- Runs lightweight heuristic speaker diarization and fuses speaker turns with
+- Transcribes on device with Apple's Speech framework, or on device with
+  FluidAudio's multilingual model, which additionally auto-detects the spoken
+  language.
+- Optionally transcribes with a cloud Whisper-compatible API using chunked
+  uploads for longer recordings. The transcription provider (OpenAI, Groq, or
+  a custom OpenAI-compatible endpoint) is chosen independently of the summary
+  provider.
+- Runs speaker diarization, either a lightweight built-in heuristic or
+  FluidAudio's neural on-device engine, and fuses speaker turns with
   transcript spans.
+- Voice-activity detection and language detection are each independently
+  configurable between an always-available built-in engine and a FluidAudio
+  on-device model.
+- FluidAudio's on-device models are downloaded only after the user opts in per
+  feature in Settings, and can be listed and deleted individually to reclaim
+  storage.
 - Lets users rename detected speakers.
 - Resumes long transcriptions automatically after the app is backgrounded,
   terminated, or interrupted, continuing from the last completed chunk instead
@@ -82,7 +97,9 @@ Spanish, French, German, Japanese, and Chinese.
 Kurn can generate a structured meeting summary from existing transcripts.
 Summaries are template-driven and render Markdown in section titles, body text,
 and bullet items, so provider output can use emphasis, links, inline code,
-headings, and ordered or unordered lists where helpful.
+headings, and ordered or unordered lists where helpful. Built-in templates
+cover General, Stand-up, and Interview meetings; users can also create,
+edit, and delete their own custom templates in Settings.
 
 Long transcripts are summarized in stages. The Summary tab keeps the generation
 state in place, shows progress for staged summaries, and lets the user cancel
@@ -95,18 +112,23 @@ Supported summary providers:
 - Google AI
 - Groq
 
-Each provider has selectable models in Settings. Cloud transcription always uses
-OpenAI Whisper, regardless of the selected summary provider.
+Each provider has selectable models in Settings. Cloud transcription uses a
+Whisper-compatible API chosen independently of the summary provider, from
+whichever OpenAI-compatible provider (OpenAI, Groq, or a custom endpoint) has
+a configured key — Anthropic and Google AI don't expose a transcription API,
+so they're only usable for summaries.
 
 ## Configuration
 
 Kurn works without cloud credentials when using on-device transcription.
 Cloud features require user-provided API keys.
 
-- OpenAI key: required for Whisper transcription and OpenAI summaries.
+- OpenAI key: required for OpenAI summaries, and usable for Whisper
+  transcription.
 - Anthropic key: required for Anthropic summaries.
 - Google AI key: required for Gemini summaries.
-- Groq key: required for Groq summaries.
+- Groq key: required for Groq summaries, and usable for Whisper transcription
+  (Groq serves `whisper-large-v3`).
 - API keys are stored in the Keychain.
 - Non-secret preferences are stored in `UserDefaults`.
 
@@ -276,8 +298,9 @@ Kurn/
 ├── Models/                      # SwiftData @Model types and shared value types
 ├── Views/                       # SwiftUI screens and reusable views
 ├── ViewModels/                  # Main-actor observable coordinators
-├── Services/                    # Audio, diarization, summaries, folder analytics
-│   └── Pipeline/                # Transcription pipeline stages (protocol seams)
+├── Services/                    # Audio, diarization, live preview, summaries, folder analytics
+│   └── Pipeline/                # Transcription pipeline stages (protocol seams,
+│                                 # each with a built-in and a FluidAudio engine)
 ├── Providers/                   # OpenAI, Anthropic, Google AI, and Groq clients
 ├── Infrastructure/              # Keychain, errors, settings, export, extensions
 ├── Resources/                   # Localizations and privacy manifest
@@ -293,21 +316,29 @@ KurnLiveActivityExtension/
 ```
 
 `Models/` includes `Meeting`, `Recording`, `Transcript`, `Speaker`, `Summary`,
-`Tag`, `Folder`, and `SmartFolder`. `Infrastructure/` also hosts background
-transcription scheduling and recovery
-(`TranscriptionScheduler.swift`, `TranscriptionRecovery.swift`) and
-`RecordingActivityAttributes.swift`, which is shared into the
-`KurnLiveActivityExtension` target rather than duplicated.
+`Tag`, `Folder`, `SmartFolder`, `SummaryTemplate`, `SummarySection`, and
+`FolderCatalog`. `Infrastructure/` also hosts background transcription
+scheduling and recovery (`TranscriptionScheduler.swift`,
+`TranscriptionRecovery.swift`, `BackgroundActivity.swift`), disk/memory
+guardrails and on-device model downloads (`ResourceGuard.swift`,
+`ModelDownloadConsent.swift`), and `RecordingActivityAttributes.swift`, which
+is shared into the `KurnLiveActivityExtension` target rather than duplicated.
 
 ## Important Implementation Notes
 
-- Cloud transcription always uses OpenAI Whisper.
+- Cloud transcription uses a Whisper-compatible API (OpenAI or Groq today),
+  chosen independently of the summary provider.
 - Summary generation can use OpenAI, Anthropic, Google AI, or Groq, and long
   transcripts use a staged map-reduce pass with progress and cancellation in
   the Summary tab.
-- Speaker diarization is heuristic and approximate by design.
-- On-device transcription availability depends on Apple's Speech framework,
-  simulator/device support, and the selected language.
+- Speaker diarization, voice-activity detection, transcription, and language
+  detection are each independently configurable between a built-in engine
+  (available offline, no download) and a FluidAudio on-device engine; the
+  built-in diarizer is heuristic and approximate by design, while FluidAudio's
+  is a neural model that requires a one-time, opt-in download.
+- On-device transcription availability depends on Apple's Speech framework
+  or the downloaded FluidAudio model, simulator/device support, and the
+  selected language.
 - Background audio recording is enabled through `UIBackgroundModes`.
 - Long transcriptions resume automatically via a `BGProcessingTask` and a
   foreground recovery sweep, rather than failing when interrupted.
@@ -319,9 +350,11 @@ Useful files:
 
 - `Kurn/Services/AudioRecorderService.swift`
 - `Kurn/Services/TranscriptionService.swift`
+- `Kurn/Services/LiveTranscriptionService.swift`
 - `Kurn/Services/SummaryService.swift`
 - `Kurn/Services/SpeakerDiarizer.swift`
 - `Kurn/Services/PhoneSessionController.swift`
+- `Kurn/Infrastructure/ModelDownloadConsent.swift`
 - `Kurn/Views/SettingsView.swift`
 - `Kurn/Infrastructure/MeetingExport.swift`
 
