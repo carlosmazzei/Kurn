@@ -33,11 +33,11 @@ private struct WatchRecordingContext: Sendable {
     let accumulatedElapsed: TimeInterval
 
     init(_ context: [String: Any]) {
-        isAvailable = (context["isAvailable"] as? Bool) ?? false
-        rawState = (context["state"] as? String) ?? "idle"
-        meetingTitle = (context["meetingTitle"] as? String) ?? ""
-        referenceDate = (context["referenceDate"] as? Date) ?? Date()
-        accumulatedElapsed = (context["accumulatedElapsed"] as? TimeInterval) ?? 0
+        isAvailable = (context[WatchSessionKey.isAvailable] as? Bool) ?? false
+        rawState = (context[WatchSessionKey.state] as? String) ?? WatchSessionState.idle
+        meetingTitle = (context[WatchSessionKey.meetingTitle] as? String) ?? ""
+        referenceDate = (context[WatchSessionKey.referenceDate] as? Date) ?? Date()
+        accumulatedElapsed = (context[WatchSessionKey.accumulatedElapsed] as? TimeInterval) ?? 0
     }
 }
 
@@ -68,9 +68,9 @@ final class WatchConnectivityManager: NSObject {
         }
         let ok = await withCheckedContinuation { continuation in
             WCSession.default.sendMessage(
-                ["command": command.rawValue],
+                [WatchSessionKey.command: command.rawValue],
                 replyHandler: { reply in
-                    continuation.resume(returning: (reply["ok"] as? Bool) ?? false)
+                    continuation.resume(returning: (reply[WatchSessionKey.ok] as? Bool) ?? false)
                 },
                 errorHandler: { _ in
                     continuation.resume(returning: false)
@@ -84,13 +84,13 @@ final class WatchConnectivityManager: NSObject {
     private func applyContext(_ context: WatchRecordingContext) {
         self.isAvailable = context.isAvailable
         switch context.rawState {
-        case "recording":
+        case WatchSessionState.recording:
             state = .recording(
                 meetingTitle: context.meetingTitle,
                 referenceDate: context.referenceDate,
                 accumulatedElapsed: context.accumulatedElapsed
             )
-        case "paused":
+        case WatchSessionState.paused:
             state = .paused(
                 meetingTitle: context.meetingTitle,
                 accumulatedElapsed: context.accumulatedElapsed
@@ -124,7 +124,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        guard let level = message["level"] as? Float else { return }
+        guard let level = message[WatchSessionKey.level] as? Float else { return }
         Task { @MainActor in
             self.level = level
         }

@@ -50,11 +50,11 @@ final class PhoneSessionController: NSObject {
         let session = WCSession.default
         guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
         let context: [String: Any] = [
-            "state": stateString(state),
-            "meetingTitle": meetingTitle,
-            "referenceDate": referenceDate,
-            "accumulatedElapsed": accumulatedElapsed,
-            "isAvailable": isAvailable
+            WatchSessionKey.state: stateString(state),
+            WatchSessionKey.meetingTitle: meetingTitle,
+            WatchSessionKey.referenceDate: referenceDate,
+            WatchSessionKey.accumulatedElapsed: accumulatedElapsed,
+            WatchSessionKey.isAvailable: isAvailable
         ]
         try? session.updateApplicationContext(context)
     }
@@ -88,15 +88,15 @@ final class PhoneSessionController: NSObject {
         DispatchQueue.global(qos: .utility).async {
             let session = WCSession.default
             guard session.activationState == .activated, session.isReachable else { return }
-            session.sendMessage(["level": level], replyHandler: nil, errorHandler: nil)
+            session.sendMessage([WatchSessionKey.level: level], replyHandler: nil, errorHandler: nil)
         }
     }
 
     private func stateString(_ state: AudioRecorderService.State) -> String {
         switch state {
-        case .idle: return "idle"
-        case .recording: return "recording"
-        case .paused: return "paused"
+        case .idle: return WatchSessionState.idle
+        case .recording: return WatchSessionState.recording
+        case .paused: return WatchSessionState.paused
         }
     }
 }
@@ -119,8 +119,8 @@ extension PhoneSessionController: WCSessionDelegate {
         didReceiveMessage message: [String: Any],
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
-        guard let raw = message["command"] as? String, let command = WatchCommand(rawValue: raw) else {
-            replyHandler(["ok": false, "error": "unknown_command"])
+        guard let raw = message[WatchSessionKey.command] as? String, let command = WatchCommand(rawValue: raw) else {
+            replyHandler([WatchSessionKey.ok: false, WatchSessionKey.error: WatchSessionReplyError.unknownCommand])
             return
         }
         let reply = WatchCommandReplyHandler(reply: replyHandler)
@@ -128,7 +128,9 @@ extension PhoneSessionController: WCSessionDelegate {
             let handled = await MainActor.run {
                 RecordingCommandRouter.shared.handleWatchCommand(command)
             }
-            reply.call(handled ? ["ok": true] : ["ok": false, "error": "no_active_recording"])
+            reply.call(handled
+                ? [WatchSessionKey.ok: true]
+                : [WatchSessionKey.ok: false, WatchSessionKey.error: WatchSessionReplyError.noActiveRecording])
         }
     }
 }
