@@ -101,6 +101,8 @@ struct TranscriptionService {
             AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
         }
         defer {
+            // `defer` can't `await`, so the async temp-file cleanup is fired as a
+            // detached step; `TempFileCleaner` sweeps anything left if it's lost.
             if cleanedURL != fileURL {
                 let url = cleanedURL
                 Task { await preprocessor.cleanup(url) }
@@ -391,6 +393,8 @@ struct TranscriptionService {
         let chunks = try await onDeviceChunker.chunkByDuration(url: url)
         let total = chunks.count
         defer {
+            // `defer` can't `await`, so the async chunk cleanup is fired as a
+            // detached step; `TempFileCleaner` sweeps anything left if it's lost.
             let chunker = onDeviceChunker
             Task { await chunker.cleanup(chunks) }
         }

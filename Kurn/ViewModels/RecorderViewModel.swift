@@ -169,10 +169,24 @@ final class RecorderViewModel {
         }
     }
 
+    /// Stop the optional live-transcription preview. Fired from the synchronous
+    /// teardown paths (`stopAndSave`/`cancel`), which the Watch / Live Activity
+    /// command router invokes through a non-async closure, so the stop can't be
+    /// awaited here. It captures the service directly — not `self` — so finishing
+    /// the ASR engine never keeps the whole view model (and its model context and
+    /// recorder) alive past teardown; only the small preview service is retained
+    /// until it finishes. The finalized preview text isn't persisted (the real
+    /// transcript comes from the full pipeline later), so not awaiting is safe.
+    private func stopLiveTranscription() {
+        guard liveTranscriptionEnabled else { return }
+        let live = liveTranscription
+        Task { await live.stop() }
+    }
+
     /// Stop, save the segment to SwiftData, and flag completion.
     func stopAndSave() {
         AppLog.recorderUI.atNotice.notice("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
-        if liveTranscriptionEnabled { Task { await liveTranscription.stop() } }
+        stopLiveTranscription()
         guard let result = recorder.stop() else {
             lockScreenController.end()
             RecordingCommandRouter.shared.unregister()
@@ -211,7 +225,7 @@ final class RecorderViewModel {
     }
 
     func cancel() {
-        if liveTranscriptionEnabled { Task { await liveTranscription.stop() } }
+        stopLiveTranscription()
         recorder.cancel()
         lockScreenController.end()
         RecordingCommandRouter.shared.unregister()
