@@ -95,15 +95,13 @@ actor AudioChunker {
             try? FileManager.default.removeItem(at: outURL)
 
             let chunkStart = Date()
+            let range = CMTimeRange(
+                start: CMTime(seconds: start, preferredTimescale: 600),
+                duration: CMTime(seconds: length, preferredTimescale: 600)
+            )
+            let chunkSize: Int
             do {
-                try await export(
-                    asset: asset,
-                    to: outURL,
-                    range: CMTimeRange(
-                        start: CMTime(seconds: start, preferredTimescale: 600),
-                        duration: CMTime(seconds: length, preferredTimescale: 600)
-                    )
-                )
+                chunkSize = try await exportRetryingIfEmpty(asset: asset, to: outURL, range: range)
             } catch {
                 // Remove the partially-written file for the failed chunk so it
                 // doesn't become an orphan when the caller's defer cleans up the
@@ -115,16 +113,8 @@ actor AudioChunker {
             // readable with the device locked so a background Whisper run can
             // keep feeding uploads; they're deleted when the run finishes.
             RecordingProtection.applyInFlight(to: outURL)
-            let chunkSize = (try? outURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             let chunkDuration = (try? await AVURLAsset(url: outURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
             AppLog.transcription.atInfo.info("chunk: exported \(index + 1, privacy: .public) offset=\(String(format: "%.1f", start), privacy: .public)s length=\(String(format: "%.1f", length), privacy: .public)s duration=\(String(format: "%.1f", chunkDuration), privacy: .public)s size=\(chunkSize, privacy: .public) bytes in \(Date().timeIntervalSince(chunkStart), privacy: .public)s")
-            guard chunkSize > 0 else {
-                AppLog.transcription.atError.error("chunk: exported chunk \(index + 1, privacy: .public) is empty, discarding")
-                try? FileManager.default.removeItem(at: outURL)
-                throw AppError.audioError(
-                    NSLocalizedString("error.export_failed", comment: "Export failed")
-                )
-            }
             chunks.append(Chunk(url: outURL, offset: start))
             start += length
             index += 1
@@ -149,6 +139,30 @@ actor AudioChunker {
         if removed > 0 {
             AppLog.transcription.atDebug.debug("chunk: cleaned up \(removed, privacy: .public) temp chunk(s)")
         }
+    }
+
+    /// `AVAssetExportSession` can report `.completed` while writing a 0-byte
+    /// file under transient resource contention (seen under heavily parallel
+    /// test runs); one retry has proven reliable, so treat an empty result as
+    /// retryable rather than failing the whole chunk immediately.
+    private func exportRetryingIfEmpty(
+        asset: AVURLAsset,
+        to outURL: URL,
+        range: CMTimeRange
+    ) async throws -> Int {
+        for attempt in 0..<2 {
+            try? FileManager.default.removeItem(at: outURL)
+            try await export(asset: asset, to: outURL, range: range)
+            let size = (try? outURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            if size > 0 {
+                return size
+            }
+            AppLog.transcription.atError.error("chunk: export produced an empty file (attempt \(attempt + 1, privacy: .public))")
+        }
+        try? FileManager.default.removeItem(at: outURL)
+        throw AppError.audioError(
+            NSLocalizedString("error.export_failed", comment: "Export failed")
+        )
     }
 
     private func export(
