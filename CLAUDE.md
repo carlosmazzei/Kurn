@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Kurn is a local-first iOS + watchOS app (Swift 6, SwiftUI, SwiftData) for recording
 meetings, transcribing audio, diarizing speakers, and generating structured AI
 summaries. Everything is stored on device; network calls happen only when the user
-opts into OpenAI Whisper transcription or a cloud summary provider.
+opts into cloud (Whisper-compatible) transcription or a cloud summary provider.
 
 There is no Swift Package or `Package.swift` — the project is an Xcode project
 (`Kurn.xcodeproj`) with three targets: `Kurn` (app), `KurnWatch` (watchOS companion),
@@ -320,8 +320,16 @@ never falls behind the microphone.
 single place that resolves a provider from `AppSettings` + Keychain and throws
 `AppError.noAPIKey` when a key is missing. Vendor API shapes are modeled by
 `AIProviderKind` (`openAICompatible`, `anthropic`, `googleGemini`); Groq reuses the
-OpenAI-compatible client. **Cloud transcription always uses OpenAI Whisper**
-(`ProviderFactory.whisperProvider()`) regardless of the chosen summary provider.
+OpenAI-compatible client. **Cloud (`.whisperAPI`) transcription is not pinned to
+OpenAI** — `AIProvider.supportsTranscription` is true for any `openAICompatible`
+provider (OpenAI, Groq, or a custom OpenAI-compatible endpoint the user adds),
+since they're the only ones exposing a Whisper-shaped `/audio/transcriptions`
+route; Anthropic/Gemini are excluded. `AppSettings.transcriptionProviderID`
+picks which one to use, independently of the summary provider, surfaced as a
+"Transcription provider" picker in Settings shown only when the Whisper engine
+is selected. `ProviderFactory.whisperProvider(for:model:)` resolves the chosen
+provider + model (Groq defaults to `whisper-large-v3`; everything else to
+`whisper-1`).
 `Providers/ProviderModelsService.swift` separately lists a provider's available
 summary models by querying its own `/models` endpoint (auth style branches on
 `AIProviderKind`), falling back to `AIProvider.fallbackModels` on a 403 or an

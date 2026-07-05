@@ -18,8 +18,8 @@ summaries. It is built with Swift 6, SwiftUI, SwiftData, AVFoundation, Apple's
 Speech framework, ActivityKit, and WatchConnectivity.
 
 Recordings and meeting data are stored on device by default. Network requests
-only happen when the user chooses OpenAI Whisper transcription or generates a
-summary with a configured AI provider.
+only happen when the user chooses cloud (Whisper-compatible) transcription or
+generates a summary with a configured AI provider.
 
 ## Current App
 
@@ -71,8 +71,10 @@ summary with a configured AI provider.
 - Transcribes on device with Apple's Speech framework, or on device with
   FluidAudio's multilingual model, which additionally auto-detects the spoken
   language.
-- Optionally transcribes with OpenAI Whisper using chunked uploads for longer
-  recordings.
+- Optionally transcribes with a cloud Whisper-compatible API using chunked
+  uploads for longer recordings. The transcription provider (OpenAI, Groq, or
+  a custom OpenAI-compatible endpoint) is chosen independently of the summary
+  provider.
 - Runs speaker diarization, either a lightweight built-in heuristic or
   FluidAudio's neural on-device engine, and fuses speaker turns with
   transcript spans.
@@ -110,18 +112,23 @@ Supported summary providers:
 - Google AI
 - Groq
 
-Each provider has selectable models in Settings. Cloud transcription always uses
-OpenAI Whisper, regardless of the selected summary provider.
+Each provider has selectable models in Settings. Cloud transcription uses a
+Whisper-compatible API chosen independently of the summary provider, from
+whichever OpenAI-compatible provider (OpenAI, Groq, or a custom endpoint) has
+a configured key — Anthropic and Google AI don't expose a transcription API,
+so they're only usable for summaries.
 
 ## Configuration
 
 Kurn works without cloud credentials when using on-device transcription.
 Cloud features require user-provided API keys.
 
-- OpenAI key: required for Whisper transcription and OpenAI summaries.
+- OpenAI key: required for OpenAI summaries, and usable for Whisper
+  transcription.
 - Anthropic key: required for Anthropic summaries.
 - Google AI key: required for Gemini summaries.
-- Groq key: required for Groq summaries.
+- Groq key: required for Groq summaries, and usable for Whisper transcription
+  (Groq serves `whisper-large-v3`).
 - API keys are stored in the Keychain.
 - Non-secret preferences are stored in `UserDefaults`.
 
@@ -319,7 +326,8 @@ is shared into the `KurnLiveActivityExtension` target rather than duplicated.
 
 ## Important Implementation Notes
 
-- Cloud transcription always uses OpenAI Whisper.
+- Cloud transcription uses a Whisper-compatible API (OpenAI or Groq today),
+  chosen independently of the summary provider.
 - Summary generation can use OpenAI, Anthropic, Google AI, or Groq, and long
   transcripts use a staged map-reduce pass with progress and cancellation in
   the Summary tab.
