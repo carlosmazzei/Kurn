@@ -192,7 +192,7 @@ struct SettingsView: View {
             modelsSection
 
             // MARK: About
-            Section(NSLocalizedString("settings.about", comment: "About")) {
+            Section {
                 NavigationLink {
                     AcknowledgementsView()
                 } label: {
@@ -201,6 +201,16 @@ struct SettingsView: View {
                         systemImage: "doc.text"
                     )
                 }
+                Link(destination: URL(string: "https://github.com/sponsors/carlosmazzei")!) {
+                    Label(
+                        NSLocalizedString("settings.sponsor", comment: "Sponsor Kurn"),
+                        systemImage: "heart"
+                    )
+                }
+            } header: {
+                Text(NSLocalizedString("settings.about", comment: "About"))
+            } footer: {
+                Text(NSLocalizedString("settings.appstore_status", comment: "App Store status note"))
             }
 
             Section {

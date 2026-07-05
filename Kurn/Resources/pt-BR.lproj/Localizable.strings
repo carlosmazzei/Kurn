@@ -379,6 +379,8 @@
 /* Sobre e agradecimentos */
 "settings.about" = "Sobre";
 "settings.acknowledgements" = "Agradecimentos";
+"settings.sponsor" = "Patrocinar o Kurn";
+"settings.appstore_status" = "O Kurn ainda não está na App Store. Quando o total de patrocínios via GitHub Sponsors atingir US$ 100, o app será enviado à App Store e continuará gratuito para baixar.";
 "ack.intro" = "O reconhecimento de fala no dispositivo, a diarização de participantes e a detecção de atividade de voz são powered by Fluid Inference. O Kurn usa o pacote FluidAudio e baixa sob demanda os modelos de machine learning abaixo. Cada componente é usado sob sua própria licença.";
 "ack.packages" = "Pacotes Swift";
 "ack.models" = "Modelos de Machine Learning";

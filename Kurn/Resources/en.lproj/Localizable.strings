@@ -379,6 +379,8 @@
 /* About & acknowledgements */
 "settings.about" = "About";
 "settings.acknowledgements" = "Acknowledgements";
+"settings.sponsor" = "Sponsor Kurn";
+"settings.appstore_status" = "Kurn isn't on the App Store yet. Once combined GitHub Sponsors funding reaches $100, it will be submitted to the App Store and stay free to download.";
 "ack.intro" = "On-device speech recognition, speaker diarization, and voice-activity detection are powered by Fluid Inference. Kurn uses the FluidAudio package and downloads the machine-learning models below on demand. Each component is used under its own license.";
 "ack.packages" = "Swift Packages";
 "ack.models" = "Machine-Learning Models";
