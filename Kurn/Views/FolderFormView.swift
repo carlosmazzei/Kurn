@@ -27,6 +27,8 @@ struct FolderFormView: View {
     @State private var iconName: String = FolderIconCatalog.default
     @State private var colorHex: String = FolderColorPalette.default
     @State private var initialized = false
+    /// Set when saving the folder fails, so the failure surfaces and the form stays open.
+    @State private var saveError: AppError?
 
     private var navigationTitle: String {
         switch mode {
@@ -75,6 +77,7 @@ struct FolderFormView: View {
                 }
             }
             .onAppear(perform: hydrate)
+            .errorAlert($saveError)
         }
     }
 
@@ -161,7 +164,10 @@ struct FolderFormView: View {
             folder.iconName = iconName
             folder.colorHex = colorHex
         }
-        try? modelContext.save()
+        if let failure = modelContext.saveOrError() {
+            saveError = failure
+            return
+        }
         dismiss()
     }
 }

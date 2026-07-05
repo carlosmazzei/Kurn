@@ -55,6 +55,9 @@ struct SettingsView: View {
     /// flags themselves are set after success, so a failure leaves the
     /// feature off and the consent alert available to retry.
     @State var modelDownloadError: AppError?
+    /// Set when "Delete all data" fails to erase the store, so the failure
+    /// surfaces instead of the wipe silently doing nothing.
+    @State var dataError: AppError?
 
     var body: some View {
         @Bindable var settings = settings
@@ -394,6 +397,7 @@ struct SettingsView: View {
             }
         ))
         .errorAlert($modelDownloadError)
+        .errorAlert($dataError)
         .kurnDialog(
             isPresented: Binding(
                 get: { cacheCleanupResult != nil },

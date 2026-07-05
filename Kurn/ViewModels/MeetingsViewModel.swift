@@ -15,6 +15,9 @@ import SwiftData
 @Observable
 final class MeetingsViewModel {
     private let modelContext: ModelContext
+    /// Set when a persistence operation fails, so the hosting view can surface it
+    /// via `.errorAlert` instead of the failure being dropped silently.
+    var error: AppError?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -34,7 +37,7 @@ final class MeetingsViewModel {
             : trimmed
         let meeting = Meeting(title: finalTitle, notes: notes, language: language)
         modelContext.insert(meeting)
-        try? modelContext.save()
+        if let failure = modelContext.saveOrError() { error = failure }
         return meeting
     }
 
@@ -44,7 +47,7 @@ final class MeetingsViewModel {
             AudioFileStore.delete(fileName: recording.fileName)
         }
         modelContext.delete(meeting)
-        try? modelContext.save()
+        if let failure = modelContext.saveOrError() { error = failure }
     }
 
     /// Delete a single recording segment: remove its audio file from disk, then
@@ -53,6 +56,6 @@ final class MeetingsViewModel {
     func deleteRecording(_ recording: Recording) {
         AudioFileStore.delete(fileName: recording.fileName)
         modelContext.delete(recording)
-        try? modelContext.save()
+        if let failure = modelContext.saveOrError() { error = failure }
     }
 }

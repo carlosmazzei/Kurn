@@ -101,7 +101,9 @@ extension MeetingDetailView {
 
     func deleteRecording(_ recording: Recording) {
         if player.loadedFileName == recording.fileName { player.stop() }
-        MeetingsViewModel(modelContext: modelContext).deleteRecording(recording)
+        let viewModel = MeetingsViewModel(modelContext: modelContext)
+        viewModel.deleteRecording(recording)
+        if let failure = viewModel.error { txVM?.error = failure }
     }
 
     func share() {

@@ -124,4 +124,30 @@ struct MeetingsViewModelTests {
         #expect(!meeting.title.isEmpty)
         #expect(!meeting.title.contains("\n"))
     }
+
+    // MARK: - Persistence error surfacing
+
+    /// A healthy in-memory context saves cleanly, so no error is surfaced on the
+    /// happy path. This guards the wiring that replaced the silent `try?` saves:
+    /// `error` stays nil unless a save actually fails.
+    @Test func healthyCreateAndDeleteSurfaceNoError() {
+        let (viewModel, _) = makeViewModel()
+        let meeting = viewModel.createMeeting(title: "Standup")
+        #expect(viewModel.error == nil)
+        viewModel.delete(meeting)
+        #expect(viewModel.error == nil)
+    }
+
+    @Test func healthyDeleteRecordingSurfacesNoError() throws {
+        let (viewModel, context) = makeViewModel()
+        let meeting = viewModel.createMeeting(title: "Standup")
+        let file = try makeAudioFile()
+        defer { try? FileManager.default.removeItem(at: file.url) }
+        let recording = Recording(meeting: meeting, fileName: file.name, duration: 4)
+        context.insert(recording)
+        try context.save()
+
+        viewModel.deleteRecording(recording)
+        #expect(viewModel.error == nil)
+    }
 }

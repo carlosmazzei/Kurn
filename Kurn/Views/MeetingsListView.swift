@@ -43,6 +43,9 @@ struct MeetingsListView: View {
     /// Set when the context-menu "Edit tags" action is invoked; presents
     /// `TagPickerView` against the chosen meeting.
     @State private var taggingMeeting: Meeting?
+    /// Set when a favorite/archive/create/delete persistence op fails, so the
+    /// failure surfaces instead of being dropped silently.
+    @State private var saveError: AppError?
 
     private var isLocked: Bool {
         settings.requireAuthForRecordings && !accessGate.isUnlocked
@@ -97,12 +100,12 @@ struct MeetingsListView: View {
 
     private func toggleFavorite(_ meeting: Meeting) {
         meeting.isFavorite.toggle()
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
     }
 
     private func toggleArchive(_ meeting: Meeting) {
         meeting.archivedAt = meeting.isArchived ? nil : Date()
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
     }
 
     var body: some View {
@@ -291,7 +294,9 @@ struct MeetingsListView: View {
             primaryRole: .destructive,
             primaryAction: {
                 guard let meeting = pendingDelete else { return }
-                MeetingsViewModel(modelContext: modelContext).delete(meeting)
+                let viewModel = MeetingsViewModel(modelContext: modelContext)
+                viewModel.delete(meeting)
+                saveError = viewModel.error
                 pendingDelete = nil
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
@@ -299,6 +304,7 @@ struct MeetingsListView: View {
                 pendingDelete = nil
             }
         )
+        .errorAlert($saveError)
     }
 
     private func share(_ meeting: Meeting) {
@@ -342,7 +348,9 @@ extension MeetingsListView {
 
     var recordButton: some View {
         Button {
-            let meeting = MeetingsViewModel(modelContext: modelContext).createMeeting(title: "")
+            let viewModel = MeetingsViewModel(modelContext: modelContext)
+            let meeting = viewModel.createMeeting(title: "")
+            saveError = viewModel.error
             recordMeeting = meeting
         } label: {
             ZStack {

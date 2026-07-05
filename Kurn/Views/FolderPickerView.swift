@@ -23,6 +23,9 @@ struct FolderPickerView: View {
     private var rootFolders: [Folder]
 
     @State private var path: [Folder] = []
+    /// Set when moving the meeting fails to save, so the failure surfaces and the
+    /// sheet stays open.
+    @State private var saveError: AppError?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -31,6 +34,7 @@ struct FolderPickerView: View {
                     childrenContent(of: folder)
                 }
         }
+        .errorAlert($saveError)
     }
 
     // MARK: - Levels
@@ -139,7 +143,10 @@ struct FolderPickerView: View {
 
     private func move(to folder: Folder?) {
         meeting.folder = folder
-        try? modelContext.save()
+        if let failure = modelContext.saveOrError() {
+            saveError = failure
+            return
+        }
         dismiss()
     }
 }

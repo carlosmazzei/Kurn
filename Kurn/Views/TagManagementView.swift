@@ -21,6 +21,8 @@ struct TagManagementView: View {
     @State private var pendingDelete: Tag?
     @State private var mergeTarget: Tag?
     @State private var mergeSource: Tag?
+    /// Set when a tag create/delete/merge save fails, surfaced via `.errorAlert`.
+    @State private var saveError: AppError?
 
     var body: some View {
         NavigationStack {
@@ -89,6 +91,7 @@ struct TagManagementView: View {
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
             secondaryAction: { pendingDelete = nil }
         )
+        .errorAlert($saveError)
     }
 
     private func tagRow(_ tag: Tag) -> some View {
@@ -136,13 +139,13 @@ struct TagManagementView: View {
         }
         let tag = Tag(name: name)
         modelContext.insert(tag)
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
         newTagName = ""
     }
 
     private func deleteTag(_ tag: Tag) {
         modelContext.delete(tag)
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
     }
 
     private func merge(source: Tag, into target: Tag) {
@@ -151,7 +154,7 @@ struct TagManagementView: View {
             meeting.tags.append(target)
         }
         modelContext.delete(source)
-        try? modelContext.save()
+        saveError = modelContext.saveOrError()
         mergeSource = nil
     }
 }
@@ -165,6 +168,8 @@ struct TagEditorView: View {
 
     @State private var name = ""
     @State private var colorHex = ""
+    /// Set when saving the edited tag fails, so the failure surfaces.
+    @State private var saveError: AppError?
 
     var body: some View {
         NavigationStack {
@@ -210,6 +215,7 @@ struct TagEditorView: View {
                 name = tag.name
                 colorHex = tag.colorHex
             }
+            .errorAlert($saveError)
         }
     }
 
@@ -218,7 +224,10 @@ struct TagEditorView: View {
         guard !trimmed.isEmpty else { return }
         tag.name = trimmed
         tag.colorHex = colorHex
-        try? modelContext.save()
+        if let failure = modelContext.saveOrError() {
+            saveError = failure
+            return
+        }
         dismiss()
     }
 }
