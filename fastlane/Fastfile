@@ -45,15 +45,21 @@ lane :github_release do
   tag = ENV["GITHUB_REF_NAME"].to_s
   UI.user_error!("GITHUB_REF_NAME is not set - this lane runs from the release workflow") if tag.empty?
 
+  repository_name = ENV["GITHUB_REPOSITORY"].to_s
+  repository_name = "carlosmazzei/Kurn" if repository_name.empty?
+
+  github_token = ENV["GITHUB_TOKEN"].to_s
+  UI.user_error!("GITHUB_TOKEN is not set - cannot publish GitHub release") if github_token.empty?
+
   pbxproj = File.read(XCODEPROJ_PBXPROJ)
   current_marketing = pbxproj[/MARKETING_VERSION = ([\d.]+);/, 1]
   UI.user_error!("Tag #{tag} does not match project MARKETING_VERSION v#{current_marketing}") unless tag == "v#{current_marketing}"
 
   set_github_release(
-    repository_name: "carlosmazzei/kurn",
+    repository_name: repository_name,
     tag_name: tag,
     name: "Kurn #{tag}",
     is_generate_release_notes: true,
-    api_token: ENV["GITHUB_TOKEN"]
+    api_token: github_token
   )
 end
