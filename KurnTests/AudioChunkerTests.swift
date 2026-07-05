@@ -23,7 +23,10 @@ struct AudioChunkerTests {
     }
 
     @Test func longAudioUnderSizeThresholdIsSplitByDuration() async throws {
-        let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
+        // A non-zero tone, not silence: exporting a pure-silence AAC source
+        // through AVAssetExportSession can yield an empty output file on some
+        // AVFoundation versions, which isn't what this test is exercising.
+        let url = try AudioFixtures.m4aTone(hz: 220, amplitude: 0.1, seconds: 15 * 60)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let chunks = try await AudioChunker().chunk(url: url)
@@ -66,7 +69,8 @@ struct AudioChunkerTests {
     }
 
     @Test func chunkCleanupRemovesAllExportedTempFiles() async throws {
-        let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
+        // Non-zero tone; see comment in longAudioUnderSizeThresholdIsSplitByDuration().
+        let url = try AudioFixtures.m4aTone(hz: 220, amplitude: 0.1, seconds: 15 * 60)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let chunker = AudioChunker()
