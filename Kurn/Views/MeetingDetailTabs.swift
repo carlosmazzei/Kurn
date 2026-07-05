@@ -147,9 +147,13 @@ struct SummaryTab: View {
                 Spacer(minLength: 0)
             }
 
-            ProgressView(value: progressValue)
-                .progressViewStyle(.linear)
-                .tint(Theme.accent)
+            if let progressValue {
+                ProgressView(value: progressValue)
+                    .progressViewStyle(.linear)
+                    .tint(Theme.accent)
+            } else {
+                IndeterminateSummaryProgressBar()
+            }
 
             Button(role: .cancel) {
                 onCancel()
@@ -262,5 +266,33 @@ struct SummaryTab: View {
         }
         .buttonStyle(.plain)
         .disabled(isSummarizing)
+    }
+}
+
+private struct IndeterminateSummaryProgressBar: View {
+    @State private var phase = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let segmentWidth = max(48, width * 0.34)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Theme.fill)
+                Capsule()
+                    .fill(Theme.accent)
+                    .frame(width: segmentWidth)
+                    .offset(x: phase ? width : -segmentWidth)
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: 4)
+        .onAppear {
+            phase = false
+            withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: false)) {
+                phase = true
+            }
+        }
     }
 }
