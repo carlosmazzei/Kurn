@@ -602,23 +602,14 @@ final class TranscriptionViewModel {
                 }
             )
             try Task.checkCancellation()
-            if let existing = meeting.summary {
-                existing.sections = result.sections
-                existing.templateName = template.displayName
-                existing.provider = provider
-                existing.model = model
-                existing.updatedAt = Date()
-            } else {
-                let summary = Summary(
-                    meeting: meeting,
-                    sections: result.sections,
-                    templateName: template.displayName,
-                    provider: provider,
-                    model: model
-                )
-                modelContext.insert(summary)
-                meeting.summary = summary
-            }
+            let summary = Summary(
+                meeting: meeting,
+                sections: result.sections,
+                templateName: template.displayName,
+                provider: provider,
+                model: model
+            )
+            modelContext.insert(summary)
             persist()
             AppLog.transcription.atNotice.notice("VM: summary done")
         } catch is CancellationError {

@@ -15,6 +15,12 @@ extension MeetingDetailView {
         meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }
     }
 
+    /// The summary currently shown in the Summary tab — used both for
+    /// rendering and for export, so the two can never disagree.
+    var selectedSummary: Summary? {
+        meeting.summaries.first { $0.id == selectedSummaryID } ?? meeting.latestSummary
+    }
+
     func togglePlay(_ recording: Recording) {
         do {
             if player.loadedFileName == recording.fileName {
@@ -99,6 +105,14 @@ extension MeetingDetailView {
         txVM?.cancelSummary()
     }
 
+    func deleteSummary(_ summary: Summary) {
+        modelContext.delete(summary)
+        if let failure = modelContext.saveOrError() { txVM?.error = failure }
+        if selectedSummaryID == summary.id {
+            selectedSummaryID = meeting.latestSummary?.id
+        }
+    }
+
     func deleteRecording(_ recording: Recording) {
         if player.loadedFileName == recording.fileName { player.stop() }
         let viewModel = MeetingsViewModel(modelContext: modelContext)
@@ -108,7 +122,7 @@ extension MeetingDetailView {
 
     func share() {
         do {
-            let url = try MeetingExport.temporaryFile(for: meeting)
+            let url = try MeetingExport.temporaryFile(for: meeting, summary: selectedSummary)
             shareItem = ShareItem(url: url)
         } catch {
             txVM?.error = .audioError(error.localizedDescription)

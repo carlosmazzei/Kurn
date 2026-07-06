@@ -32,6 +32,12 @@ struct MeetingDetailView: View {
     @State private var showingEdit = false
     @State var showingTemplatePicker = false
     @State var shareItem: ShareItem?
+    /// Which of `meeting.summaries` is currently shown in the Summary tab.
+    /// Falls back to the newest summary when nil or no longer present.
+    @State var selectedSummaryID: UUID?
+    /// Set when the user picks "Delete" on a summary chip; drives the
+    /// confirmation dialog.
+    @State var pendingDeleteSummary: Summary?
     /// Set when the user taps redo on a transcribed recording; drives the
     /// per-segment re-transcription confirmation dialog.
     @State private var pendingRetranscribe: Recording?
@@ -94,6 +100,23 @@ struct MeetingDetailView: View {
             primaryAction: {
                 guard let recording = pendingRetranscribe else { return }
                 retranscribe(recording)
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
+            isPresented: Binding(
+                get: { pendingDeleteSummary != nil },
+                set: { if !$0 { pendingDeleteSummary = nil } }
+            ),
+            iconSystemName: "trash.circle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("detail.summary.delete_confirm.title", comment: "Delete summary confirmation"),
+            message: NSLocalizedString("detail.summary.delete_confirm.message", comment: "Delete summary message"),
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: {
+                guard let summary = pendingDeleteSummary else { return }
+                deleteSummary(summary)
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
@@ -161,10 +184,16 @@ struct MeetingDetailView: View {
                     isSummarizing: txVM?.isSummarizing == true,
                     isCancellingSummary: txVM?.isCancellingSummary == true,
                     summaryProgress: txVM?.summaryProgress,
+                    selectedSummaryID: selectedSummaryID,
                     onGenerate: { generateSummary() },
-                    onCancel: { cancelSummary() }
+                    onCancel: { cancelSummary() },
+                    onSelectSummary: { selectedSummaryID = $0.id },
+                    onDeleteSummary: { pendingDeleteSummary = $0 }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
+            }
+            .onChange(of: meeting.summaries.count) { _, _ in
+                selectedSummaryID = meeting.latestSummary?.id
             }
         }
     }

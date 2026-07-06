@@ -94,6 +94,9 @@ struct KurnApp: App {
         // transcription tasks (WhisperBackgroundUploader, BGProcessingTask resume)
         // can read API keys while the device is locked after the first unlock.
         KeychainManager.shared.migrateToBackgroundAccessible()
+        // One-shot: carry any pre-existing single summary into the new
+        // multi-summary relationship before anything reads `meeting.summaries`.
+        SummaryMigration.migrateLegacySummaries(modelContainer: container)
         RecordingRecovery.recoverOrphans(modelContainer: container)
         // And after one that died mid-transcription: recordings stuck at
         // `.inProgress` become `.pending` (checkpointed, resumable) or
