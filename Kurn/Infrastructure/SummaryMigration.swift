@@ -8,12 +8,19 @@
 //  meeting whose legacy `summary` is already nil (fresh install, or already
 //  migrated) is a no-op.
 //
+//  TODO: delete this file, `Meeting.summary`, and `Summary.meeting` once this
+//  build has run at least once on every local store — this is a single-user,
+//  pre-release app, so there's no installed base that needs the bridge kept
+//  around long-term.
+//
 
 import Foundation
 import SwiftData
 
 enum SummaryMigration {
 
+    /// TODO: remove alongside `Meeting.summary`/`Summary.meeting` once every
+    /// local store has run this at least once.
     @MainActor
     static func migrateLegacySummaries(modelContainer: ModelContainer) {
         let context = modelContainer.mainContext

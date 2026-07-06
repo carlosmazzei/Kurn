@@ -96,6 +96,8 @@ struct KurnApp: App {
         KeychainManager.shared.migrateToBackgroundAccessible()
         // One-shot: carry any pre-existing single summary into the new
         // multi-summary relationship before anything reads `meeting.summaries`.
+        // TODO: remove this call along with `SummaryMigration` once this build
+        // has run at least once on every local store.
         SummaryMigration.migrateLegacySummaries(modelContainer: container)
         RecordingRecovery.recoverOrphans(modelContainer: container)
         // And after one that died mid-transcription: recordings stuck at

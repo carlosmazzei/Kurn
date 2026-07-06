@@ -194,6 +194,9 @@ struct ModelTests {
         #expect(try context.fetch(FetchDescriptor<Summary>()).isEmpty)
     }
 
+    // TODO: delete this test along with `SummaryMigration`, `Meeting.summary`,
+    // and `Summary.meeting` once this build has run at least once on every
+    // local store (single-user, pre-release app).
     @Test func summaryMigrationMovesLegacySummaryIntoSummariesArray() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
