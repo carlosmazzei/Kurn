@@ -48,15 +48,6 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \Speaker.meeting)
     var speakers: [Speaker]
 
-    /// Legacy one-to-one slot. Superseded by `summaries` below; kept only so
-    /// `SummaryMigration` can carry a pre-existing summary forward on
-    /// upgrade. Never written to by new code.
-    // TODO: remove along with `SummaryMigration` once this build has run at
-    // least once on every local store (single-user, pre-release app — no
-    // installed base to protect long-term).
-    @Relationship(deleteRule: .cascade, inverse: \Summary.meeting)
-    var summary: Summary?
-
     /// All AI-generated summaries for this meeting. A meeting can accumulate
     /// one per generation run/template; see `latestSummary` for the default.
     @Relationship(deleteRule: .cascade, inverse: \Summary.owningMeeting)
@@ -82,7 +73,6 @@ final class Meeting {
         self.folder = folder
         self.recordings = []
         self.speakers = []
-        self.summary = nil
         self.summaries = []
     }
 

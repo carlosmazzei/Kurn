@@ -194,27 +194,6 @@ struct ModelTests {
         #expect(try context.fetch(FetchDescriptor<Summary>()).isEmpty)
     }
 
-    // TODO: delete this test along with `SummaryMigration`, `Meeting.summary`,
-    // and `Summary.meeting` once this build has run at least once on every
-    // local store (single-user, pre-release app).
-    @Test func summaryMigrationMovesLegacySummaryIntoSummariesArray() throws {
-        let container = TestModelContainer.make()
-        let context = container.mainContext
-        let meeting = Meeting(title: "Standup")
-        context.insert(meeting)
-        // Simulate a pre-upgrade row: only the legacy one-to-one slot is set.
-        let legacy = Summary(provider: .openAI)
-        legacy.meeting = meeting
-        meeting.summary = legacy
-        context.insert(legacy)
-        try context.save()
-
-        SummaryMigration.migrateLegacySummaries(modelContainer: container)
-
-        #expect(meeting.summary == nil)
-        #expect(meeting.summaries.map(\.id) == [legacy.id])
-    }
-
     // MARK: - Transcript
 
     @Test func segmentsRoundTripThroughJSONStorage() {
