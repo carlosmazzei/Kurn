@@ -114,9 +114,7 @@ struct SummaryTab: View {
     var body: some View {
         if let selectedSummary {
             VStack(alignment: .leading, spacing: 16) {
-                if sortedSummaries.count > 1 {
-                    summarySwitcher(selected: selectedSummary)
-                }
+                summarySwitcher(selected: selectedSummary)
                 if isSummarizing {
                     summaryProgressPanel
                 }
@@ -153,6 +151,11 @@ struct SummaryTab: View {
                         }
                     }
                 }
+                FilterChip(title: "+", isSelected: false) {
+                    onGenerate()
+                }
+                .disabled(isSummarizing)
+                .accessibilityLabel(NSLocalizedString("detail.summary.new", comment: "New Summary"))
             }
         }
     }
