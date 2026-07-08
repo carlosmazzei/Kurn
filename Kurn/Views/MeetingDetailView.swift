@@ -126,7 +126,7 @@ struct MeetingDetailView: View {
             iconTint: Theme.accent,
             title: NSLocalizedString("detail.retranscribe_all.confirm.title", comment: "Re-transcribe all confirmation"),
             message: NSLocalizedString("detail.retranscribe_all.confirm.message", comment: "Re-transcribe all message"),
-            primaryTitle: NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"),
+            primaryTitle: NSLocalizedString("detail.retranscribe_all.confirm.action", comment: "Re-transcribe all confirm button"),
             primaryRole: .destructive,
             primaryAction: retranscribeAll,
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")

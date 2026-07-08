@@ -254,6 +254,7 @@
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";
 "detail.retranscribe.confirm.message" = "This replaces the existing transcript with a new one from the original audio. This can't be undone.";
 "detail.retranscribe_all" = "Re-transcribe all";
+"detail.retranscribe_all.confirm.action" = "Re-transcribe all";
 "detail.retranscribe_all.confirm.title" = "Re-transcribe every recording?";
 "detail.retranscribe_all.confirm.message" = "This replaces all existing transcripts with new ones from the original audio, in order. This can't be undone.";
 "detail.transcript.empty.title" = "No transcript yet";

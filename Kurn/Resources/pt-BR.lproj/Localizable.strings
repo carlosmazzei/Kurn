@@ -254,6 +254,7 @@
 "detail.retranscribe.confirm.title" = "Refazer a transcrição desta gravação?";
 "detail.retranscribe.confirm.message" = "Isto substitui a transcrição atual por uma nova, a partir do áudio original. Não dá para desfazer.";
 "detail.retranscribe_all" = "Refazer todas as transcrições";
+"detail.retranscribe_all.confirm.action" = "Refazer tudo";
 "detail.retranscribe_all.confirm.title" = "Refazer a transcrição de todas as gravações?";
 "detail.retranscribe_all.confirm.message" = "Isto substitui todas as transcrições atuais por novas, a partir do áudio original, em ordem. Não dá para desfazer.";
 "detail.transcript.empty.title" = "Sem transcrição ainda";
