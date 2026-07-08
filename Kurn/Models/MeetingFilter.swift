@@ -28,8 +28,8 @@ struct MeetingFilter: Hashable, Sendable, Codable {
             if meetingTagIDs.isDisjoint(with: tagIDs) { return false }
         }
         if !statuses.isEmpty, !statuses.contains(meeting.aggregateStatus) { return false }
-        if hasSummary == true && meeting.summary == nil { return false }
-        if hasSummary == false && meeting.summary != nil { return false }
+        if hasSummary == true && meeting.summaries.isEmpty { return false }
+        if hasSummary == false && !meeting.summaries.isEmpty { return false }
         let duration = meeting.totalDuration
         if let min = minDuration, duration < min { return false }
         if let max = maxDuration, duration > max { return false }

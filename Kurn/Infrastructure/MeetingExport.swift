@@ -10,8 +10,10 @@ import Foundation
 
 enum MeetingExport {
     /// Build the full Markdown representation of a meeting.
+    /// - Parameter summary: the summary currently shown on screen, if any —
+    ///   a meeting can have several; only this one is included.
     @MainActor
-    static func markdown(for meeting: Meeting) -> String {
+    static func markdown(for meeting: Meeting, summary: Summary?) -> String {
         var out = "# \(meeting.title)\n\n"
         out += "_\(meeting.createdAt.meetingDisplay)_\n\n"
         if meeting.totalDuration > 0 {
@@ -22,7 +24,7 @@ enum MeetingExport {
             out += "## Notes\n\n\(meeting.notes)\n\n"
         }
 
-        if let summary = meeting.summary {
+        if let summary {
             out += "## Summary\n\n"
             for section in summary.sections {
                 if !section.title.isEmpty {
@@ -73,8 +75,8 @@ enum MeetingExport {
     /// "meeting.md" — never collide on the same path while one share sheet
     /// is still open and the other's `.atomic` write or later cleanup runs.
     @MainActor
-    static func temporaryFile(for meeting: Meeting) throws -> URL {
-        let text = markdown(for: meeting)
+    static func temporaryFile(for meeting: Meeting, summary: Summary?) throws -> URL {
+        let text = markdown(for: meeting, summary: summary)
         let safeTitle = meeting.title
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }

@@ -81,7 +81,7 @@ struct MeetingCard: View {
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                if meeting.summary != nil {
+                if !meeting.summaries.isEmpty {
                     Image(systemName: "sparkles").foregroundStyle(Theme.info)
                 }
                 StatusBadge(status: meeting.aggregateStatus)
@@ -115,7 +115,7 @@ struct MeetingCard: View {
     private var metaChips: some View {
         let speakerCount = meeting.speakers.count
         let recordingCount = meeting.recordings.count
-        let templateName = meeting.summary?.templateName ?? ""
+        let templateName = meeting.latestSummary?.templateName ?? ""
         let hasTags = !meeting.tags.isEmpty
         if speakerCount >= 2 || recordingCount > 1 || !templateName.isEmpty || hasTags {
             HStack(spacing: 6) {

@@ -234,13 +234,16 @@
 "detail.summary.needs_transcript" = "Transcribe at least one recording to generate a summary.";
 "detail.summary.model_nudge" = "Will use %1$@ · model %2$@";
 "detail.summary.model_missing" = "No summary model selected";
-"detail.summary.regenerate" = "Regenerate";
+"detail.summary.new" = "New Summary";
+"detail.summary.untitled" = "Summary";
 "detail.summary.generate" = "Generate Summary";
 "detail.summary.cancel" = "Cancel Summary";
 "detail.summary.cancelling" = "Cancelling summary…";
-"detail.summary.cancelling.subtitle" = "Stopping the current request. The existing summary will be kept.";
+"detail.summary.cancelling.subtitle" = "Stopping the current request. Summaries already generated are kept.";
 "detail.summary.progress.subtitle" = "Processing the transcript in sections. You can keep this screen open or cancel the run.";
 "detail.summary.progress.single.subtitle" = "Asking the selected model to write the summary. This can take a moment.";
+"detail.summary.delete_confirm.title" = "Delete this summary?";
+"detail.summary.delete_confirm.message" = "This can't be undone.";
 "detail.share" = "Share";
 "detail.segment_count" = "%d segments";
 "detail.recording_n" = "Recording %d";
@@ -251,6 +254,7 @@
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";
 "detail.retranscribe.confirm.message" = "This replaces the existing transcript with a new one from the original audio. This can't be undone.";
 "detail.retranscribe_all" = "Re-transcribe all";
+"detail.retranscribe_all.confirm.action" = "Re-transcribe all";
 "detail.retranscribe_all.confirm.title" = "Re-transcribe every recording?";
 "detail.retranscribe_all.confirm.message" = "This replaces all existing transcripts with new ones from the original audio, in order. This can't be undone.";
 "detail.transcript.empty.title" = "No transcript yet";

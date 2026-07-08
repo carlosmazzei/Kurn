@@ -17,7 +17,7 @@ struct MeetingExportTests {
 
     @Test func markdownIncludesTitleAndNotes() {
         let meeting = Meeting(title: "Sprint Planning", notes: "Bring laptops")
-        let markdown = MeetingExport.markdown(for: meeting)
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
         #expect(markdown.contains("# Sprint Planning"))
         #expect(markdown.contains("## Notes"))
         #expect(markdown.contains("Bring laptops"))
@@ -25,7 +25,7 @@ struct MeetingExportTests {
 
     @Test func markdownOmitsNotesSectionWhenEmpty() {
         let meeting = Meeting(title: "Sprint Planning")
-        let markdown = MeetingExport.markdown(for: meeting)
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
         #expect(!markdown.contains("## Notes"))
     }
 
@@ -43,9 +43,8 @@ struct MeetingExportTests {
             provider: .openAI
         )
         context.insert(summary)
-        meeting.summary = summary
 
-        let markdown = MeetingExport.markdown(for: meeting)
+        let markdown = MeetingExport.markdown(for: meeting, summary: summary)
         #expect(markdown.contains("## Summary"))
         #expect(markdown.contains("### Recap"))
         #expect(markdown.contains("We aligned on scope."))
@@ -53,6 +52,30 @@ struct MeetingExportTests {
         #expect(markdown.contains("- Ship next week"))
         #expect(markdown.contains("### Actions"))
         #expect(markdown.contains("- Write tests"))
+    }
+
+    @Test func markdownRendersOnlyTheSelectedSummaryWhenMultipleExist() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+        let general = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "General", body: "General recap")],
+            templateName: "General",
+            provider: .openAI
+        )
+        let standup = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "Standup", body: "Standup recap")],
+            templateName: "Standup",
+            provider: .openAI
+        )
+        context.insert(general)
+        context.insert(standup)
+
+        let markdown = MeetingExport.markdown(for: meeting, summary: standup)
+        #expect(markdown.contains("Standup recap"))
+        #expect(!markdown.contains("General recap"))
     }
 
     @Test func markdownUsesSpeakerDisplayNameInTranscript() {
@@ -71,7 +94,7 @@ struct MeetingExportTests {
         context.insert(transcript)
         recording.transcript = transcript
 
-        let markdown = MeetingExport.markdown(for: meeting)
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
         #expect(markdown.contains("## Transcript"))
         #expect(markdown.contains("Carlos:"))
         #expect(markdown.contains("Let's begin"))
@@ -95,7 +118,7 @@ struct MeetingExportTests {
             recording.transcript = transcript
         }
 
-        let markdown = MeetingExport.markdown(for: meeting)
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
         #expect(markdown.contains("### Segment 1"))
         #expect(markdown.contains("### Segment 2"))
     }
@@ -120,14 +143,14 @@ struct MeetingExportTests {
             recording.transcript = transcript
         }
 
-        let markdown = MeetingExport.markdown(for: meeting)
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
         #expect(markdown.contains("[0:00] Speaker 1:** part 0"))
         #expect(markdown.contains("[0:30] Speaker 1:** part 1"))
     }
 
     @Test func temporaryFileSanitizesTitleForFileName() throws {
         let meeting = Meeting(title: "Q&A: Sprint / Review?")
-        let url = try MeetingExport.temporaryFile(for: meeting)
+        let url = try MeetingExport.temporaryFile(for: meeting, summary: nil)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 
         #expect(url.pathExtension == "md")
@@ -138,7 +161,7 @@ struct MeetingExportTests {
 
     @Test func temporaryFileFallsBackToDefaultNameWhenTitleHasNoAlphanumerics() throws {
         let meeting = Meeting(title: "###")
-        let url = try MeetingExport.temporaryFile(for: meeting)
+        let url = try MeetingExport.temporaryFile(for: meeting, summary: nil)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         #expect(url.lastPathComponent == "meeting.md")
     }
@@ -146,8 +169,8 @@ struct MeetingExportTests {
     @Test func temporaryFileIsUniquePerCallEvenForIdenticalTitles() throws {
         let first = Meeting(title: "Standup")
         let second = Meeting(title: "Standup")
-        let firstURL = try MeetingExport.temporaryFile(for: first)
-        let secondURL = try MeetingExport.temporaryFile(for: second)
+        let firstURL = try MeetingExport.temporaryFile(for: first, summary: nil)
+        let secondURL = try MeetingExport.temporaryFile(for: second, summary: nil)
         defer {
             try? FileManager.default.removeItem(at: firstURL.deletingLastPathComponent())
             try? FileManager.default.removeItem(at: secondURL.deletingLastPathComponent())

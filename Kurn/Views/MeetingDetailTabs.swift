@@ -84,8 +84,9 @@ private struct SpeakerRow: View {
     }
 }
 
-/// Summary tab content: the generated summary (or an empty state) plus the
-/// generate/regenerate button.
+/// Summary tab content: a switcher across every generated summary (when more
+/// than one exists), the selected summary's body, and a button to generate
+/// another one (or an empty state when none exist yet).
 struct SummaryTab: View {
     let meeting: Meeting
     let settings: AppSettings
@@ -94,18 +95,32 @@ struct SummaryTab: View {
     /// (stage, total) when a long transcript is summarized in parts; nil for
     /// single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
+    /// Currently selected summary's id; falls back to the newest when nil or
+    /// no longer present (e.g. it was just deleted).
+    let selectedSummaryID: UUID?
     let onGenerate: () -> Void
     let onCancel: () -> Void
+    let onSelectSummary: (Summary) -> Void
+    let onDeleteSummary: (Summary) -> Void
+
+    private var sortedSummaries: [Summary] {
+        meeting.summaries.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var selectedSummary: Summary? {
+        sortedSummaries.first { $0.id == selectedSummaryID } ?? sortedSummaries.first
+    }
 
     var body: some View {
-        if let summary = meeting.summary {
+        if let selectedSummary {
             VStack(alignment: .leading, spacing: 16) {
+                summarySwitcher(selected: selectedSummary)
                 if isSummarizing {
                     summaryProgressPanel
                 }
-                SummaryView(summary: summary)
+                SummaryView(summary: selectedSummary)
                 if !isSummarizing {
-                    generateButton(regenerate: true)
+                    newSummaryButton
                 }
             }
         } else if isSummarizing {
@@ -116,6 +131,40 @@ struct SummaryTab: View {
         } else {
             summaryEmptyState(canGenerate: false)
         }
+    }
+
+    private func summarySwitcher(selected: Summary) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(sortedSummaries) { summary in
+                    FilterChip(
+                        title: chipTitle(for: summary),
+                        isSelected: summary.id == selected.id
+                    ) {
+                        onSelectSummary(summary)
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            onDeleteSummary(summary)
+                        } label: {
+                            Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
+                        }
+                    }
+                }
+                FilterChip(title: "+", isSelected: false) {
+                    onGenerate()
+                }
+                .disabled(isSummarizing)
+                .accessibilityLabel(NSLocalizedString("detail.summary.new", comment: "New Summary"))
+            }
+        }
+    }
+
+    private func chipTitle(for summary: Summary) -> String {
+        let name = summary.templateName?.isEmpty == false
+            ? summary.templateName!
+            : NSLocalizedString("detail.summary.untitled", comment: "Summary")
+        return "\(name) · \(summary.createdAt.shortTime)"
     }
 
     private var summaryProgressPanel: some View {
@@ -201,7 +250,7 @@ struct SummaryTab: View {
             .padding(.horizontal, 14).padding(.vertical, 6)
             .background(Theme.fill, in: Capsule())
 
-            if canGenerate { generateButton(regenerate: false) }
+            if canGenerate { generateButton(title: NSLocalizedString("detail.summary.generate", comment: "Generate Summary")) }
         }
         .frame(maxWidth: .infinity).padding(.top, 40)
     }
@@ -250,13 +299,15 @@ struct SummaryTab: View {
         )
     }
 
-    private func generateButton(regenerate: Bool) -> some View {
+    private var newSummaryButton: some View {
+        generateButton(title: NSLocalizedString("detail.summary.new", comment: "New Summary"))
+    }
+
+    private func generateButton(title: String) -> some View {
         Button { onGenerate() } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
-                Text(regenerate
-                     ? NSLocalizedString("detail.summary.regenerate", comment: "Regenerate")
-                     : NSLocalizedString("detail.summary.generate", comment: "Generate Summary"))
+                Text(title)
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.white)

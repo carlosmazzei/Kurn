@@ -12,7 +12,9 @@ import SwiftData
 @Model
 final class Summary {
     @Attribute(.unique) var id: UUID
-    var meeting: Meeting?
+    /// Inverse of `Meeting.summaries`. Every summary created after the
+    /// multi-summary feature shipped is linked through this property.
+    var owningMeeting: Meeting?
     /// JSON-encoded `[SummarySection]` — the template-driven summary body.
     private var sectionsData: Data = Data()
     /// Display name of the template used to generate this summary, if any.
@@ -33,7 +35,7 @@ final class Summary {
         updatedAt: Date = Date()
     ) {
         self.id = id
-        self.meeting = meeting
+        self.owningMeeting = meeting
         self.sectionsData = JSONStorage.encode(sections)
         self.templateName = templateName
         self.providerRaw = provider.rawValue

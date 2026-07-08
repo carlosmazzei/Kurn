@@ -27,8 +27,19 @@ extension Date {
         return formatter
     }()
 
+    private static let shortTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     /// Medium date + short time, localized. e.g. "Jun 16, 2025 at 9:30 AM".
     var meetingDisplay: String { Self.meetingFormatter.string(from: self) }
+
+    /// Time only, localized. e.g. "9:30 AM". Used where a full date is too
+    /// long, e.g. a chip label distinguishing same-day summaries.
+    var shortTime: String { Self.shortTimeFormatter.string(from: self) }
 
     /// Compact date used in default meeting titles. e.g. "2025-06-16".
     var isoDay: String { Self.isoDayFormatter.string(from: self) }

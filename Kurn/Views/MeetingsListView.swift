@@ -308,7 +308,7 @@ struct MeetingsListView: View {
     }
 
     private func share(_ meeting: Meeting) {
-        guard let url = try? MeetingExport.temporaryFile(for: meeting) else { return }
+        guard let url = try? MeetingExport.temporaryFile(for: meeting, summary: meeting.latestSummary) else { return }
         shareItem = ShareItem(url: url)
     }
 }

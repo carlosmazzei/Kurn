@@ -157,6 +157,43 @@ struct ModelTests {
         #expect(summary.model == nil)
     }
 
+    @Test func generatingASecondSummaryDoesNotDisturbTheFirst() throws {
+        let context = makeContext()
+        let meeting = Meeting(title: "Standup")
+        context.insert(meeting)
+
+        let now = Date()
+        let first = Summary(meeting: meeting, templateName: "General", provider: .openAI, createdAt: now)
+        context.insert(first)
+        try context.save()
+
+        let second = Summary(
+            meeting: meeting, templateName: "Standup", provider: .openAI,
+            createdAt: now.addingTimeInterval(1)
+        )
+        context.insert(second)
+        try context.save()
+
+        #expect(meeting.summaries.count == 2)
+        #expect(Set(meeting.summaries.map(\.id)) == Set([first.id, second.id]))
+        #expect(meeting.latestSummary?.id == second.id)
+    }
+
+    @Test func summariesAreCascadeDeletedWithMeeting() throws {
+        let context = makeContext()
+        let meeting = Meeting(title: "Standup")
+        context.insert(meeting)
+        context.insert(Summary(meeting: meeting, provider: .openAI))
+        context.insert(Summary(meeting: meeting, provider: .openAI))
+        try context.save()
+        #expect(try context.fetch(FetchDescriptor<Summary>()).count == 2)
+
+        context.delete(meeting)
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<Summary>()).isEmpty)
+    }
+
     // MARK: - Transcript
 
     @Test func segmentsRoundTripThroughJSONStorage() {
