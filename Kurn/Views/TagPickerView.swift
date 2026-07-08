@@ -18,6 +18,7 @@ struct TagPickerView: View {
     @Query(sort: \Tag.name) private var allTags: [Tag]
     @State private var newTagName = ""
     @State private var pendingDelete: Tag?
+    @State private var editingTag: Tag?
     /// Set when a tag add/remove/create/delete save fails, surfaced via `.errorAlert`.
     @State private var saveError: AppError?
 
@@ -64,6 +65,9 @@ struct TagPickerView: View {
                     Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
                 }
             }
+        }
+        .sheet(item: $editingTag) { tag in
+            TagEditorView(tag: tag)
         }
         .kurnDialog(
             isPresented: Binding(
@@ -113,6 +117,12 @@ struct TagPickerView: View {
             } label: {
                 Label(NSLocalizedString("tag.delete", comment: "Delete"), systemImage: "trash")
             }
+            Button {
+                editingTag = tag
+            } label: {
+                Label(NSLocalizedString("tag.edit", comment: "Edit"), systemImage: "pencil")
+            }
+            .tint(Theme.info)
         }
     }
 
