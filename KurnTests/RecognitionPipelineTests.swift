@@ -75,7 +75,9 @@ struct RecognitionPipelineTests {
         ("de", MeetingLanguage.german),
         ("ja", MeetingLanguage.japanese),
         ("zh-Hans", MeetingLanguage.chinese),
-        ("ru", MeetingLanguage.autoDetect)
+        ("ru", MeetingLanguage.russian),
+        ("yue", MeetingLanguage.cantonese),
+        ("xx", MeetingLanguage.autoDetect)
     ])
     func detectedCodeMapsToLanguage(code: String, expected: MeetingLanguage) {
         #expect(MeetingLanguage(detectedCode: code) == expected)

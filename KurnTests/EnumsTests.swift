@@ -15,6 +15,9 @@ struct EnumsTests {
         #expect(MeetingLanguage.autoDetect.whisperCode == nil)
     }
 
+    /// Regression guard: these 7 cases' rawValues, locales, and whisper codes
+    /// are persisted in shipped user data (`Meeting.languageRaw`) and must
+    /// never change.
     @Test(arguments: [
         (MeetingLanguage.portuguese, "pt-BR", "pt"),
         (MeetingLanguage.english, "en-US", "en"),
@@ -24,7 +27,7 @@ struct EnumsTests {
         (MeetingLanguage.japanese, "ja-JP", "ja"),
         (MeetingLanguage.chinese, "zh-CN", "zh")
     ])
-    func localeAndWhisperCodeMatchExpected(language: MeetingLanguage, locale: String, whisperCode: String) {
+    func legacyLocaleAndWhisperCodeUnchanged(language: MeetingLanguage, locale: String, whisperCode: String) {
         #expect(language.localeIdentifier == locale)
         #expect(language.whisperCode == whisperCode)
     }
@@ -32,6 +35,31 @@ struct EnumsTests {
     @Test func rawValueRoundTripsForAllCases() {
         for language in MeetingLanguage.allCases {
             #expect(MeetingLanguage(rawValue: language.rawValue) == language)
+        }
+    }
+
+    @Test func everyNonAutoDetectCaseHasAWhisperCodeAndLocale() {
+        for language in MeetingLanguage.allCases where language != .autoDetect {
+            let code = language.whisperCode
+            #expect(code != nil)
+            #expect((2...3).contains(code?.count ?? 0))
+            #expect(language.localeIdentifier != nil)
+        }
+    }
+
+    @Test func whisperCodesAreUnique() {
+        let codes = MeetingLanguage.allCases.compactMap(\.whisperCode)
+        #expect(codes.count == Set(codes).count)
+    }
+
+    @Test func allCasesCountMatchesWhisperLanguageCount() {
+        // 1 autoDetect + 100 languages Whisper supports.
+        #expect(MeetingLanguage.allCases.count == 101)
+    }
+
+    @Test func displayNameIsNeverEmpty() {
+        for language in MeetingLanguage.allCases {
+            #expect(!language.displayName.isEmpty)
         }
     }
 
