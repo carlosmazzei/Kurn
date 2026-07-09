@@ -38,7 +38,8 @@ generates a summary with a configured AI provider.
 - Local `.m4a` audio files saved in a protected subdirectory of the app's
   Documents directory, encrypted at rest with iOS Data Protection and gated
   behind Face ID / Touch ID / passcode once per session by default.
-- English and Brazilian Portuguese localizations.
+- UI localized into 7 languages, and transcription supports every language
+  Whisper does — see [Supported Languages](#supported-languages).
 - App Privacy Manifest with no tracking and no collected data types.
 
 ## Features
@@ -96,8 +97,21 @@ generates a summary with a configured AI provider.
   terminated, or interrupted, continuing from the last completed chunk instead
   of starting over.
 
-Supported transcription languages are auto-detect, Portuguese, English,
-Spanish, French, German, Japanese, and Chinese.
+Transcription supports auto-detect plus every language OpenAI's Whisper model
+recognizes (101 options total) — see [Supported Languages](#supported-languages)
+for the full list and per-engine caveats.
+
+## Supported Languages
+
+Kurn's UI and its transcription-language list are independent and configured
+separately. The UI is localized into 7 languages (English, Brazilian
+Portuguese, Spanish, French, German, Italian, Chinese), while the
+transcription-language picker covers auto-detect plus every language Whisper
+supports (101 options).
+
+The full language lists, per-engine transcription support notes, and a guide
+for contributing a new UI language live in
+[`docs/supported-languages.md`](docs/supported-languages.md).
 
 ## AI Summaries
 
