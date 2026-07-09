@@ -40,15 +40,19 @@ struct MeetingFormView: View {
                 )
                 .lineLimit(3...8)
             }
-            Section(NSLocalizedString("form.language_section", comment: "Language")) {
+            Section {
                 Picker(
                     NSLocalizedString("form.language", comment: "Language"),
                     selection: $language
                 ) {
                     ForEach(MeetingLanguage.allCases) { lang in
-                        Text(lang.displayName).tag(lang)
+                        LanguagePickerRow(language: lang, engine: settings.transcriptionEngine).tag(lang)
                     }
                 }
+            } header: {
+                Text(NSLocalizedString("form.language_section", comment: "Language"))
+            } footer: {
+                Text(NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon"))
             }
             if let meeting {
                 Section(NSLocalizedString("tag.title", comment: "Tags")) {

@@ -62,7 +62,9 @@ extension SettingsView {
                     set: { settings.defaultLanguage = $0 }
                 )
             ) {
-                ForEach(MeetingLanguage.allCases) { Text($0.displayName).tag($0) }
+                ForEach(MeetingLanguage.allCases) { lang in
+                    LanguagePickerRow(language: lang, engine: settings.transcriptionEngine).tag(lang)
+                }
             }
 
             // Audio cleanup/normalization.
@@ -163,12 +165,15 @@ extension SettingsView {
         } header: {
             Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
         } footer: {
-            Text(NSLocalizedString(
-                hasAnyTranscriptionProvider
-                    ? "settings.whisper_provider_key_footer"
-                    : "settings.whisper_provider_key_missing_footer",
-                comment: "Whisper transcription provider key dependency"
-            ))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString(
+                    hasAnyTranscriptionProvider
+                        ? "settings.whisper_provider_key_footer"
+                        : "settings.whisper_provider_key_missing_footer",
+                    comment: "Whisper transcription provider key dependency"
+                ))
+                Text(NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon"))
+            }
         }
     }
 

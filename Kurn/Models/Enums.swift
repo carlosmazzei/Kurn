@@ -617,65 +617,6 @@ struct TranscriptSegment: Codable, Identifiable, Hashable, Sendable {
     var duration: TimeInterval { max(0, endTime - startTime) }
 }
 
-/// Supported transcription languages, with the BCP-47 locale used for both the
-/// on-device recognizer and Whisper hints. `autoDetect` lets the engine decide.
-enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
-    case autoDetect
-    case portuguese
-    case english
-    case spanish
-    case french
-    case german
-    case japanese
-    case chinese
-
-    var id: String { rawValue }
-
-    /// BCP-47 identifier, or `nil` for auto-detect.
-    var localeIdentifier: String? {
-        switch self {
-        case .autoDetect: return nil
-        case .portuguese: return "pt-BR"
-        case .english: return "en-US"
-        case .spanish: return "es-ES"
-        case .french: return "fr-FR"
-        case .german: return "de-DE"
-        case .japanese: return "ja-JP"
-        case .chinese: return "zh-CN"
-        }
-    }
-
-    /// Two-letter code Whisper expects in its `language` field, or `nil`.
-    var whisperCode: String? {
-        guard let id = localeIdentifier else { return nil }
-        return String(id.prefix(2))
-    }
-
-    /// Map a two-letter language code (e.g. from a language detector) to a
-    /// supported `MeetingLanguage`, or `.autoDetect` when it isn't one we pin.
-    init(detectedCode code: String) {
-        switch code.lowercased().prefix(2) {
-        case "pt": self = .portuguese
-        case "en": self = .english
-        case "es": self = .spanish
-        case "fr": self = .french
-        case "de": self = .german
-        case "ja": self = .japanese
-        case "zh": self = .chinese
-        default: self = .autoDetect
-        }
-    }
-
-    var displayName: String {
-        switch self {
-        case .autoDetect: return NSLocalizedString("lang.auto", comment: "Auto-detect")
-        case .portuguese: return NSLocalizedString("lang.pt", comment: "Portuguese")
-        case .english: return NSLocalizedString("lang.en", comment: "English")
-        case .spanish: return NSLocalizedString("lang.es", comment: "Spanish")
-        case .french: return NSLocalizedString("lang.fr", comment: "French")
-        case .german: return NSLocalizedString("lang.de", comment: "German")
-        case .japanese: return NSLocalizedString("lang.ja", comment: "Japanese")
-        case .chinese: return NSLocalizedString("lang.zh", comment: "Chinese")
-        }
-    }
-}
+// `MeetingLanguage` lives in its own file, `Models/MeetingLanguage.swift`,
+// since its table-driven implementation (covering every Whisper-supported
+// language) is too large to sit alongside the other enums here.
