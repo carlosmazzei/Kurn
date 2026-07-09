@@ -60,6 +60,6 @@ lane :github_release do
     tag_name: tag,
     name: "Kurn #{tag}",
     is_generate_release_notes: true,
-    api_token: github_token
+    api_bearer: github_token
   )
 end
