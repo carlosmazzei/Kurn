@@ -16,7 +16,7 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Improve documentation** — README, docs, comments, or localization strings
   are all welcome.
 - **Submit code** — see "Development workflow" and "Pull requests" below.
-- **Translate** — Kurn ships with English and Brazilian Portuguese. New
+- **Translate** — Kurn's UI currently ships in 7 languages. New UI
   localizations are welcome; see "Localization".
 
 If you plan to send a substantial change (new screen, new service, new
@@ -125,15 +125,16 @@ code:
 
 ## Localization
 
-User-facing strings are localized through `NSLocalizedString`. Kurn ships
-English (`en`) and Brazilian Portuguese (`pt-BR`) under `Kurn/Resources/`.
+User-facing strings are localized through `NSLocalizedString`, with per-locale
+`Localizable.strings` files under `Kurn/Resources/`.
 
 - When you add or change a user-facing string, update **all** existing
   localizations. Do not leave keys out of sync.
 - `displayName` on enums is the localization seam — keep it as the only way to
   surface enum cases to the user.
-- New languages are welcome. Add a new `.lproj` directory under
-  `Kurn/Resources/`, translate the string tables, and note it in the PR.
+- For the full list of UI and transcription languages, and step-by-step
+  instructions for contributing a new UI language, see
+  [`docs/supported-languages.md`](docs/supported-languages.md).
 
 ## Tests
 
