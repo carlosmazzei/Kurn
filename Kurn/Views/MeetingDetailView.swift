@@ -32,6 +32,7 @@ struct MeetingDetailView: View {
     @State private var showingEdit = false
     @State var showingTemplatePicker = false
     @State var shareItem: ShareItem?
+    @State var showingShareSelection = false
     /// Which of `meeting.summaries` is currently shown in the Summary tab.
     /// Falls back to the newest summary when nil or no longer present.
     @State var selectedSummaryID: UUID?
@@ -68,7 +69,12 @@ struct MeetingDetailView: View {
         .sheet(isPresented: $showingEdit) {
             NavigationStack { MeetingFormView(meeting: meeting) }
         }
-        .sheet(item: $shareItem) { item in ActivityView(items: [item.url]) }
+        .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
+        .sheet(isPresented: $showingShareSelection) {
+            MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
+                shareItem = ShareItem(urls: urls)
+            }
+        }
         .sheet(isPresented: $showingTemplatePicker) {
             SummaryTemplatePicker(
                 templates: settings.summaryTemplates,
@@ -364,7 +370,7 @@ struct MeetingDetailView: View {
                 Button { showingEdit = true } label: {
                     Label(NSLocalizedString("common.edit", comment: "Edit"), systemImage: "pencil")
                 }
-                Button { share() } label: {
+                Button { showingShareSelection = true } label: {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
                 Button {

@@ -119,13 +119,4 @@ extension MeetingDetailView {
         viewModel.deleteRecording(recording)
         if let failure = viewModel.error { txVM?.error = failure }
     }
-
-    func share() {
-        do {
-            let url = try MeetingExport.temporaryFile(for: meeting, summary: selectedSummary)
-            shareItem = ShareItem(url: url)
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
-        }
-    }
 }

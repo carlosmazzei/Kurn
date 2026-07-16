@@ -509,3 +509,11 @@
 "error.auto_tagging" = "Could not suggest tags: %@";
 "error.summary_truncated" = "The summary was cut off because it reached the model's output limit. Try a template with fewer sections or a model with a larger output limit.";
 "detail.summarizing.progress" = "Summarizing part %1$d of %2$d…";
+
+/* Share selection */
+"share.select.title" = "Share";
+"share.select.summaries" = "Summaries";
+"share.select.transcripts" = "Transcripts";
+"share.copy" = "Copy";
+"share.copy_all" = "Copy All";
+"share.share_action" = "Share";

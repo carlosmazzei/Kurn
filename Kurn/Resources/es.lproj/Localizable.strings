@@ -509,3 +509,11 @@
 "error.auto_tagging" = "No se pudieron sugerir etiquetas: %@";
 "error.summary_truncated" = "El resumen se cortó porque alcanzó el límite de salida del modelo. Prueba una plantilla con menos secciones o un modelo con un límite de salida mayor.";
 "detail.summarizing.progress" = "Resumiendo parte %1$d de %2$d…";
+
+/* Share selection */
+"share.select.title" = "Compartir";
+"share.select.summaries" = "Resúmenes";
+"share.select.transcripts" = "Transcripciones";
+"share.copy" = "Copiar";
+"share.copy_all" = "Copiar todo";
+"share.share_action" = "Compartir";

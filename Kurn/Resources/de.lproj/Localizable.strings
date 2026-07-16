@@ -509,3 +509,11 @@
 "error.auto_tagging" = "Tags konnten nicht vorgeschlagen werden: %@";
 "error.summary_truncated" = "Die Zusammenfassung wurde abgeschnitten, weil das Ausgabelimit des Modells erreicht wurde. Versuchen Sie eine Vorlage mit weniger Abschnitten oder ein Modell mit größerem Ausgabelimit.";
 "detail.summarizing.progress" = "Teil %1$d von %2$d wird zusammengefasst…";
+
+/* Share selection */
+"share.select.title" = "Teilen";
+"share.select.summaries" = "Zusammenfassungen";
+"share.select.transcripts" = "Transkripte";
+"share.copy" = "Kopieren";
+"share.copy_all" = "Alles kopieren";
+"share.share_action" = "Teilen";
