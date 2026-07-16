@@ -16,12 +16,15 @@ import os
 import OSLog
 
 /// A plain snapshot of one log entry, decoupled from `OSLogEntryLog` (an
-/// OS-constructed type with no public initializer) so formatting logic can be
-/// unit-tested with synthetic data instead of a live `OSLogStore`.
+/// OS-constructed type with no public initializer, and not audited as
+/// `Sendable` in a way that's safe to store directly in a `Sendable` struct)
+/// so formatting logic can be unit-tested with synthetic data instead of a
+/// live `OSLogStore`. `level` is already resolved to a display string at
+/// snapshot time, not kept as `OSLogEntryLog.Level`.
 struct LogEntrySnapshot: Sendable {
     let date: Date
     let category: String
-    let level: OSLogEntryLog.Level
+    let level: String
     let message: String
 }
 
@@ -34,7 +37,7 @@ enum LogExport {
         out += "Generated: \(formatter.string(from: generatedAt))\n"
         out += "Entries: \(entries.count)\n\n"
         for entry in entries {
-            out += "[\(formatter.string(from: entry.date))] [\(entry.category)] [\(levelName(entry.level))] \(entry.message)\n"
+            out += "[\(formatter.string(from: entry.date))] [\(entry.category)] [\(entry.level)] \(entry.message)\n"
         }
         return out
     }
@@ -64,7 +67,7 @@ enum LogExport {
                 LogEntrySnapshot(
                     date: entry.date,
                     category: entry.category,
-                    level: entry.level,
+                    level: levelName(entry.level),
                     message: entry.composedMessage
                 )
             }
