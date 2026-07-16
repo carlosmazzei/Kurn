@@ -181,4 +181,68 @@ struct MeetingExportTests {
         #expect(FileManager.default.fileExists(atPath: firstURL.path))
         #expect(FileManager.default.fileExists(atPath: secondURL.path))
     }
+
+    @Test func transcriptMarkdownIncludesOnlyThatRecordingsSegments() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+
+        let baseDate = Date()
+        var recordings: [Recording] = []
+        for index in 0..<2 {
+            let recording = Recording(
+                meeting: meeting, fileName: "r\(index).m4a", duration: 10,
+                recordedAt: baseDate.addingTimeInterval(TimeInterval(index * 60))
+            )
+            context.insert(recording)
+            let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "part \(index)")
+            let transcript = Transcript(recording: recording, segments: [segment])
+            context.insert(transcript)
+            recording.transcript = transcript
+            recordings.append(recording)
+        }
+
+        let markdown = MeetingExport.transcriptMarkdown(for: meeting, recording: recordings[0])
+        #expect(markdown.contains("# Sprint Planning"))
+        #expect(markdown.contains("## Transcript"))
+        #expect(markdown.contains("part 0"))
+        #expect(!markdown.contains("part 1"))
+        #expect(!markdown.contains("### Segment"))
+    }
+
+    @Test func summaryMarkdownIncludesOnlyThatSummarysSections() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+        let general = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "General", body: "General recap")],
+            templateName: "General",
+            provider: .openAI
+        )
+        let standup = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "Standup", body: "Standup recap")],
+            templateName: "Standup",
+            provider: .openAI
+        )
+        context.insert(general)
+        context.insert(standup)
+
+        let markdown = MeetingExport.summaryMarkdown(for: meeting, summary: standup)
+        #expect(markdown.contains("# Sprint Planning"))
+        #expect(markdown.contains("## Summary"))
+        #expect(markdown.contains("Standup recap"))
+        #expect(!markdown.contains("General recap"))
+    }
+
+    @Test func temporaryFileWithSuggestedNameSanitizesAndWritesText() throws {
+        let url = try MeetingExport.temporaryFile(markdown: "hello world", suggestedName: "Q&A: Sprint / Review?")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        #expect(url.pathExtension == "md")
+        #expect(!url.lastPathComponent.contains("/"))
+        #expect(!url.lastPathComponent.contains("?"))
+        #expect(try String(contentsOf: url, encoding: .utf8) == "hello world")
+    }
 }

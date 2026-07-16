@@ -509,3 +509,11 @@
 "error.auto_tagging" = "Impossible de suggérer des tags : %@";
 "error.summary_truncated" = "Le résumé a été tronqué car il a atteint la limite de sortie du modèle. Essayez un modèle avec moins de sections ou un modèle avec une limite de sortie plus élevée.";
 "detail.summarizing.progress" = "Résumé de la partie %1$d sur %2$d…";
+
+/* Share selection */
+"share.select.title" = "Partager";
+"share.select.summaries" = "Résumés";
+"share.select.transcripts" = "Transcriptions";
+"share.copy" = "Copier";
+"share.copy_all" = "Tout copier";
+"share.share_action" = "Partager";

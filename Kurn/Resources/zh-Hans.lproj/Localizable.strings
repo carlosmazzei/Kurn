@@ -509,3 +509,11 @@
 "error.auto_tagging" = "无法推荐标签：%@";
 "error.summary_truncated" = "由于达到模型的输出上限，摘要被截断。请尝试使用分节较少的模板，或使用输出上限更大的模型。";
 "detail.summarizing.progress" = "正在总结第 %1$d 部分，共 %2$d 部分…";
+
+/* Share selection */
+"share.select.title" = "分享";
+"share.select.summaries" = "摘要";
+"share.select.transcripts" = "转录内容";
+"share.copy" = "复制";
+"share.copy_all" = "全部复制";
+"share.share_action" = "分享";

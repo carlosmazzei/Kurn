@@ -263,7 +263,7 @@ struct MeetingsListView: View {
             NavigationStack { MeetingFormView(meeting: meeting) }
         }
         .sheet(item: $shareItem) { item in
-            ActivityView(items: [item.url])
+            ActivityView(items: item.urls)
         }
         .sheet(item: $movingMeeting) { meeting in
             FolderPickerView(meeting: meeting)
@@ -309,7 +309,7 @@ struct MeetingsListView: View {
 
     private func share(_ meeting: Meeting) {
         guard let url = try? MeetingExport.temporaryFile(for: meeting, summary: meeting.latestSummary) else { return }
-        shareItem = ShareItem(url: url)
+        shareItem = ShareItem(urls: [url])
     }
 }
 
