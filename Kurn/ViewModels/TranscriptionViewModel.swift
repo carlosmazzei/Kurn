@@ -278,6 +278,7 @@ final class TranscriptionViewModel {
 
             saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
+            appSettings?.recordTranscriptionEngineUsed(config.transcription)
             if let settings = appSettings {
                 await generateAITitle(for: recording.meeting, settings: settings)
             }
@@ -612,6 +613,7 @@ final class TranscriptionViewModel {
             modelContext.insert(summary)
             persist()
             AppLog.transcription.atNotice.notice("VM: summary done")
+            appSettings?.recordSummaryTemplateUsed(template.id)
         } catch is CancellationError {
             AppLog.transcription.atNotice.notice("VM: summary cancelled")
         } catch let AppError.networkError(urlError) where urlError.code == .cancelled || Task.isCancelled || isCancellingSummary {

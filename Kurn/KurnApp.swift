@@ -6,6 +6,9 @@
 //  shared app settings. Launch screen is provided declaratively (no storyboard).
 //
 
+#if canImport(MetricKit)
+import MetricKit
+#endif
 import SwiftData
 import SwiftUI
 
@@ -84,6 +87,12 @@ struct KurnApp: App {
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()
+        #endif
+        #if canImport(MetricKit)
+        // Registered unconditionally (consent is checked at delivery time in
+        // DiagnosticsSubscriber.didReceive) so subscription doesn't depend on
+        // AppSettings' construction order relative to this init.
+        MXMetricManager.shared.add(DiagnosticsSubscriber.shared)
         #endif
         // Clean up after a process that died mid-recording (orphaned Live
         // Activity + an unsaved audio file with no matching `Recording` row).

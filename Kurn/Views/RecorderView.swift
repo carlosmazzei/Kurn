@@ -43,7 +43,8 @@ struct RecorderView: View {
                         audioQuality: settings.audioQuality,
                         liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
                         hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
-                    )
+                    ),
+                    onRecordingSaved: { settings.recordRecordingCompleted() }
                 )
             }
         }

@@ -444,6 +444,17 @@
 "settings.diagnostics" = "Diagnostics";
 "settings.log_level" = "Logging";
 "settings.log_level_footer" = "Controls how much detail the app writes to the system log (Console.app, subsystem ai.kurn.app). Off disables logging entirely; Verbose includes high-frequency traces useful when reporting a bug.";
+"settings.export_logs" = "Export Logs";
+"settings.export_logs_footer" = "Shares the last 24 hours of the app's own log entries as a text file, for support or bug reports.";
+"settings.diagnostic_reports" = "Diagnostic Reports";
+"settings.diagnostic_reports_footer" = "When on, crash and freeze reports captured on this device are saved here. Nothing is ever sent anywhere automatically — reports only leave the device if you tap Share on one.";
+"settings.diagnostic_reports.consent_title" = "Enable Diagnostic Reports";
+"settings.diagnostic_reports.consent_message" = "Kurn will save crash and freeze reports on this device only. Nothing is sent anywhere automatically — you choose if and when to share a report.";
+"settings.diagnostic_reports.enable" = "Enable";
+"settings.diagnostic_reports.view" = "View Diagnostic Reports";
+"settings.diagnostic_reports.empty" = "No diagnostic reports yet";
+"settings.diagnostic_reports.crash" = "Crash";
+"settings.diagnostic_reports.hang" = "Freeze";
 "log_level.off" = "Off";
 "log_level.error" = "Errors only";
 "log_level.notice" = "Standard";
@@ -508,7 +519,21 @@
 "error.authentication_not_available" = "This device has no passcode or biometrics configured. Set a device passcode, or open Settings to turn off recording authentication.";
 "error.auto_tagging" = "Could not suggest tags: %@";
 "error.summary_truncated" = "The summary was cut off because it reached the model's output limit. Try a template with fewer sections or a model with a larger output limit.";
+"error.log_export" = "Could not export logs: %@";
 "detail.summarizing.progress" = "Summarizing part %1$d of %2$d…";
+
+/* Usage insights ("My Data") */
+"usage_insights.title" = "Usage Insights";
+"usage_insights.overview" = "Overview";
+"usage_insights.recordings_completed" = "Recordings Completed";
+"usage_insights.most_used_engine" = "Most-Used Transcription Engine";
+"usage_insights.engine_usage" = "Transcription Engine Usage";
+"usage_insights.summary_templates" = "Summary Template Usage";
+"usage_insights.empty" = "No data yet";
+"usage_insights.clear" = "Clear My Data";
+"usage_insights.clear_confirm" = "Clear usage data?";
+"usage_insights.clear_message" = "This clears your local usage counters (recordings completed, engine and template usage). It only affects data on this device and cannot be undone.";
+"usage_insights.footer" = "Usage counters are stored only on this device and are never transmitted anywhere.";
 
 /* Share selection */
 "share.select.title" = "Share";

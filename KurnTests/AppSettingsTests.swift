@@ -26,7 +26,8 @@ struct AppSettingsTests {
         "settings.vadEngine", "settings.languageDetectionEngine",
         "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
         "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
-        "settings.logLevel", "settings.meetingsSortOrder", "settings.hideLiveActivityMeetingTitle"
+        "settings.logLevel", "settings.meetingsSortOrder", "settings.hideLiveActivityMeetingTitle",
+        AppSettingsKeys.diagnosticReportsConsented, "settings.usageStats"
     ]
 
     /// Run `body` against a freshly-defaulted AppSettings, restoring the user's
@@ -153,6 +154,39 @@ struct AppSettingsTests {
             #expect(settings.hideLiveActivityMeetingTitle == true)
             settings.hideLiveActivityMeetingTitle = false
             #expect(AppSettings().hideLiveActivityMeetingTitle == false)
+        }
+    }
+
+    @Test func diagnosticReportsConsentedDefaultsToFalseAndPersists() {
+        withScopedDefaults { settings in
+            #expect(settings.diagnosticReportsConsented == false)
+            settings.diagnosticReportsConsented = true
+            #expect(AppSettings().diagnosticReportsConsented == true)
+        }
+    }
+
+    @Test func usageStatsIncrementsAndResets() {
+        withScopedDefaults { settings in
+            #expect(settings.usageStatsSnapshot == UsageStats())
+
+            settings.recordRecordingCompleted()
+            settings.recordRecordingCompleted()
+            settings.recordTranscriptionEngineUsed(.appleSpeech)
+            settings.recordTranscriptionEngineUsed(.appleSpeech)
+            settings.recordTranscriptionEngineUsed(.whisperAPI)
+            settings.recordSummaryTemplateUsed(SummaryTemplate.general.id)
+
+            #expect(settings.usageStatsSnapshot.recordingsCompleted == 2)
+            #expect(settings.usageStatsSnapshot.transcriptionEngineUsage["appleSpeech"] == 2)
+            #expect(settings.usageStatsSnapshot.transcriptionEngineUsage["whisperAPI"] == 1)
+            #expect(settings.usageStatsSnapshot.summaryTemplateUsage[SummaryTemplate.general.id] == 1)
+            #expect(settings.usageStatsSnapshot.mostUsedTranscriptionEngine == .appleSpeech)
+
+            // Persists across a fresh instance.
+            #expect(AppSettings().usageStatsSnapshot.recordingsCompleted == 2)
+
+            settings.resetUsageStats()
+            #expect(settings.usageStatsSnapshot == UsageStats())
         }
     }
 }

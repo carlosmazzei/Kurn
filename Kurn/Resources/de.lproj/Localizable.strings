@@ -444,6 +444,17 @@
 "settings.diagnostics" = "Diagnose";
 "settings.log_level" = "Protokollierung";
 "settings.log_level_footer" = "Legt fest, wie detailliert die App ins Systemprotokoll schreibt (Console.app, Subsystem ai.kurn.app). Aus deaktiviert die Protokollierung vollständig; Ausführlich enthält häufige Traces, die beim Melden eines Fehlers hilfreich sind.";
+"settings.export_logs" = "Protokolle exportieren";
+"settings.export_logs_footer" = "Teilt die letzten 24 Stunden der App-Protokolleinträge als Textdatei, für Support oder Fehlerberichte.";
+"settings.diagnostic_reports" = "Diagnoseberichte";
+"settings.diagnostic_reports_footer" = "Wenn aktiviert, werden auf diesem Gerät erfasste Absturz- und Einfrierberichte hier gespeichert. Es wird nichts automatisch irgendwohin gesendet — Berichte verlassen das Gerät nur, wenn Sie bei einem Bericht auf Teilen tippen.";
+"settings.diagnostic_reports.consent_title" = "Diagnoseberichte aktivieren";
+"settings.diagnostic_reports.consent_message" = "Kurn speichert Absturz- und Einfrierberichte nur auf diesem Gerät. Es wird nichts automatisch irgendwohin gesendet — Sie entscheiden, ob und wann ein Bericht geteilt wird.";
+"settings.diagnostic_reports.enable" = "Aktivieren";
+"settings.diagnostic_reports.view" = "Diagnoseberichte anzeigen";
+"settings.diagnostic_reports.empty" = "Noch keine Diagnoseberichte";
+"settings.diagnostic_reports.crash" = "Absturz";
+"settings.diagnostic_reports.hang" = "Einfrieren";
 "log_level.off" = "Aus";
 "log_level.error" = "Nur Fehler";
 "log_level.notice" = "Standard";
@@ -508,7 +519,21 @@
 "error.authentication_not_available" = "Für dieses Gerät sind weder Code noch Biometrie konfiguriert. Legen Sie einen Gerätecode fest oder öffnen Sie die Einstellungen, um die Authentifizierung für Aufnahmen zu deaktivieren.";
 "error.auto_tagging" = "Tags konnten nicht vorgeschlagen werden: %@";
 "error.summary_truncated" = "Die Zusammenfassung wurde abgeschnitten, weil das Ausgabelimit des Modells erreicht wurde. Versuchen Sie eine Vorlage mit weniger Abschnitten oder ein Modell mit größerem Ausgabelimit.";
+"error.log_export" = "Protokolle konnten nicht exportiert werden: %@";
 "detail.summarizing.progress" = "Teil %1$d von %2$d wird zusammengefasst…";
+
+/* Usage insights ("Meine Daten") */
+"usage_insights.title" = "Nutzungsstatistik";
+"usage_insights.overview" = "Übersicht";
+"usage_insights.recordings_completed" = "Abgeschlossene Aufnahmen";
+"usage_insights.most_used_engine" = "Meistgenutzte Transkriptions-Engine";
+"usage_insights.engine_usage" = "Nutzung der Transkriptions-Engines";
+"usage_insights.summary_templates" = "Nutzung der Zusammenfassungsvorlagen";
+"usage_insights.empty" = "Noch keine Daten";
+"usage_insights.clear" = "Meine Daten löschen";
+"usage_insights.clear_confirm" = "Nutzungsdaten löschen?";
+"usage_insights.clear_message" = "Dies löscht Ihre lokalen Nutzungszähler (abgeschlossene Aufnahmen, Engine- und Vorlagennutzung). Betrifft nur Daten auf diesem Gerät und kann nicht rückgängig gemacht werden.";
+"usage_insights.footer" = "Nutzungszähler werden nur auf diesem Gerät gespeichert und niemals irgendwohin übertragen.";
 
 /* Share selection */
 "share.select.title" = "Teilen";

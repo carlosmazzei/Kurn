@@ -38,7 +38,8 @@ struct AppErrorTests {
             .persistenceFailed("disk full"),
             .modelDownloadRequired("diarization"),
             .modelDownloadFailed("network unavailable"),
-            .resourceUnavailable("low memory")
+            .resourceUnavailable("low memory"),
+            .logExportFailed("no logs available")
         ]
         for error in cases {
             #expect(!(error.errorDescription ?? "").isEmpty)
