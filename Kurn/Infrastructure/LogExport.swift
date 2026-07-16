@@ -13,6 +13,7 @@
 
 import Foundation
 import os
+import OSLog
 
 /// A plain snapshot of one log entry, decoupled from `OSLogEntryLog` (an
 /// OS-constructed type with no public initializer) so formatting logic can be

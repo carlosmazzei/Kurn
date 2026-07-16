@@ -16,7 +16,7 @@
 import Foundation
 import MetricKit
 
-final class DiagnosticsSubscriber: NSObject, MXMetricManagerSubscriber {
+final class DiagnosticsSubscriber: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
     static let shared = DiagnosticsSubscriber()
 
     private override init() {}
@@ -33,8 +33,8 @@ final class DiagnosticsSubscriber: NSObject, MXMetricManagerSubscriber {
             return
         }
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
         for payload in payloads {
-            let osVersion = payload.metaData?.osVersion ?? "unknown"
             let receivedAt = payload.timeStampEnd
             let hasCrash = !(payload.crashDiagnostics?.isEmpty ?? true)
             let hasHang = !(payload.hangDiagnostics?.isEmpty ?? true)
