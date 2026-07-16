@@ -23,7 +23,7 @@ struct DiagnosticReportFormatterTests {
             receivedAt: receivedAt,
             appVersion: "1.2.3",
             osVersion: "iOS 18.0",
-            jsonRepresentation: fixtureJSON
+            jsonRepresentation: Self.fixtureJSON
         )
         #expect(text.contains("crash"))
         #expect(text.contains("1.2.3"))
@@ -36,7 +36,7 @@ struct DiagnosticReportFormatterTests {
             receivedAt: Date(),
             appVersion: "1.0",
             osVersion: "iOS 18.0",
-            jsonRepresentation: fixtureJSON
+            jsonRepresentation: Self.fixtureJSON
         )
         #expect(text.contains("threadAttributed"))
         #expect(text.contains("exceptionType"))
