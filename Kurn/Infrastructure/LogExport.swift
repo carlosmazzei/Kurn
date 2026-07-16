@@ -5,10 +5,12 @@
 //  Exports the app's own recent log history (already flowing through AppLog /
 //  os.Logger) to a shareable text file, for support/bug-report purposes.
 //
-//  `OSLogStore.local()` can only read the *calling process's own* persisted
-//  unified-log entries, with no special entitlement required — that's exactly
-//  the mechanism this needs, and why this can't (and doesn't try to) export
-//  KurnWatch's logs, which live in a different process.
+//  `OSLogStore(scope: .currentProcessIdentifier)` can only read the *calling
+//  process's own* persisted unified-log entries, with no special entitlement
+//  required — that's exactly the mechanism this needs, and why this can't
+//  (and doesn't try to) export KurnWatch's logs, which live in a different
+//  process. Note `OSLogStore.local()` (the macOS-only entry point) is
+//  unavailable on iOS; the `scope:` initializer is the iOS-compatible one.
 //
 
 import Foundation
@@ -57,7 +59,7 @@ enum LogExport {
     /// Read this process's own persisted log entries for `AppLog.subsystem`
     /// from the last `hoursBack` hours.
     static func fetchRecentEntries(hoursBack: Int = 24) throws -> [LogEntrySnapshot] {
-        let store = try OSLogStore.local()
+        let store = try OSLogStore(scope: .currentProcessIdentifier)
         let cutoff = Date().addingTimeInterval(-Double(hoursBack) * 3600)
         let position = store.position(date: cutoff)
         let predicate = NSPredicate(format: "subsystem == %@", AppLog.subsystem)
