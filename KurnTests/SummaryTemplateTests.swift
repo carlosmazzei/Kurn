@@ -27,6 +27,20 @@ struct SummaryTemplateTests {
         #expect(prompt.contains("SAME LANGUAGE"))
     }
 
+    @Test func systemPromptDescribesMarkdownCapabilities() {
+        let prompt = SummaryPrompt.system(for: .general)
+        // The renderer supports these blocks; the prompt must advertise them so
+        // models actually emit them.
+        #expect(prompt.contains("- [ ]"))
+        #expect(prompt.contains("- [x]"))
+        #expect(prompt.contains("blockquotes"))
+        #expect(prompt.contains("|---|"))
+        #expect(prompt.contains("fenced code blocks"))
+        #expect(prompt.contains("start an entry with \"[ ] \" or \"[x] \""))
+        // The JSON-only instruction must not contradict fenced code inside "body".
+        #expect(prompt.contains("no markdown fences around it"))
+    }
+
     @Test func systemPromptOmitsSectionListWhenNoSections() {
         let template = SummaryTemplate.custom(
             name: "Freeform",

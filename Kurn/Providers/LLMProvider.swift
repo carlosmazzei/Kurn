@@ -351,9 +351,19 @@ enum SummaryPrompt {
           ]
         }
         Each section needs a "title". Use "body" for prose and "items" for bullet \
-        lists; either may be omitted when not needed. Translate the section titles \
-        into the transcript's language.
-        Output ONLY the JSON, no markdown fences.
+        lists; either may be omitted when not needed.
+        "body" is rendered as Markdown and supports: **bold** and *italic*, #### \
+        subheadings, bullet and numbered lists (nest by indenting two spaces), task \
+        checkboxes ("- [ ]" open, "- [x]" done), "> " blockquotes, pipe tables with \
+        a |---| separator row, and ``` fenced code blocks.
+        Prefer task checkboxes for action items and to-dos (include owner and \
+        deadline when stated), a table when comparing options or listing structured \
+        facts, and "> " blockquotes when quoting a speaker verbatim. Use plain \
+        prose everywhere else — do not force formatting where it does not help.
+        "items" entries render as bullets; start an entry with "[ ] " or "[x] " to \
+        render it as a task checkbox instead.
+        Translate the section titles into the transcript's language.
+        Output ONLY the JSON object itself — no markdown fences around it.
         """
         return prompt
     }
