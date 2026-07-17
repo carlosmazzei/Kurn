@@ -10,6 +10,13 @@
 import Foundation
 import Observation
 
+/// UserDefaults key for diagnostic-reports consent, hoisted out of `AppSettings.Keys`
+/// (which is `private`) so `DiagnosticsSubscriber` can read it directly without
+/// holding an `AppSettings` reference — see that type for why.
+enum AppSettingsKeys {
+    static let diagnosticReportsConsented = "settings.diagnosticReportsConsented"
+}
+
 @MainActor
 @Observable
 final class AppSettings {
@@ -42,6 +49,7 @@ final class AppSettings {
         static let hideLiveActivityMeetingTitle = "settings.hideLiveActivityMeetingTitle"
         static let meetingsSortOrder = "settings.meetingsSortOrder"
         static let autoTaggingEnabled = "settings.autoTaggingEnabled"
+        static let usageStats = "settings.usageStats"
     }
 
     private let defaults = UserDefaults.standard
@@ -229,6 +237,18 @@ final class AppSettings {
         didSet { defaults.set(fluidAudioVADModelsConsented, forKey: Keys.fluidAudioVADModelsConsented) }
     }
 
+    /// Whether the user has opted in to on-device MetricKit diagnostic reports
+    /// (crashes + hangs). Off by default: until this is `true`,
+    /// `DiagnosticsSubscriber` discards every payload it receives instead of
+    /// persisting it, so nothing is captured without explicit consent. Even
+    /// when on, nothing leaves the device automatically — reports only leave
+    /// via an explicit "Share" action on a specific report.
+    var diagnosticReportsConsented: Bool {
+        didSet {
+            defaults.set(diagnosticReportsConsented, forKey: AppSettingsKeys.diagnosticReportsConsented)
+        }
+    }
+
     /// Minimum severity emitted by `AppLog`. Persisted here and pushed to
     /// `AppLog.minimumLevel` so the choice survives relaunches. `.off` disables
     /// all app logging.
@@ -237,6 +257,37 @@ final class AppSettings {
             defaults.set(logLevel.rawValue, forKey: Keys.logLevel)
             AppLog.minimumLevel = logLevel
         }
+    }
+
+    /// Local-only usage counters (recordings completed, engine/template usage),
+    /// shown read-only in the "My Data" screen. Never transmitted anywhere.
+    private var usageStats: UsageStats {
+        didSet {
+            if let data = try? JSONEncoder().encode(usageStats) {
+                defaults.set(data, forKey: Keys.usageStats)
+            }
+        }
+    }
+
+    /// Read-only snapshot for the "My Data" screen.
+    var usageStatsSnapshot: UsageStats { usageStats }
+
+    func recordRecordingCompleted() {
+        usageStats.recordingsCompleted += 1
+    }
+
+    func recordTranscriptionEngineUsed(_ engine: TranscriptionEngine) {
+        usageStats.transcriptionEngineUsage[engine.rawValue, default: 0] += 1
+    }
+
+    func recordSummaryTemplateUsed(_ templateID: String) {
+        usageStats.summaryTemplateUsage[templateID, default: 0] += 1
+    }
+
+    /// Clear every local usage counter. Surfaced as "Clear my data" on the
+    /// usage insights screen.
+    func resetUsageStats() {
+        usageStats = UsageStats()
     }
 
     /// Per-provider chosen summary model (rawValue → model id).
@@ -394,6 +445,7 @@ final class AppSettings {
         fluidAudioBatchASRModelsConsented = batchASRConsented
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
         fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
+        diagnosticReportsConsented = defaults.bool(forKey: AppSettingsKeys.diagnosticReportsConsented)
         // Transcription engine: prefer the stored value; otherwise migrate the
         // legacy `defaultMode` + on-device-multilingual pairing into the new
         // single explicit choice.
@@ -432,6 +484,12 @@ final class AppSettings {
             transcriptionModels = decoded
         } else {
             transcriptionModels = [:]
+        }
+        if let data = defaults.data(forKey: Keys.usageStats),
+           let decoded = try? JSONDecoder().decode(UsageStats.self, from: data) {
+            usageStats = decoded
+        } else {
+            usageStats = UsageStats()
         }
         let loadedTemplates: [SummaryTemplate]
         if let data = defaults.data(forKey: Keys.summaryTemplates),

@@ -63,7 +63,9 @@ enum LogLevel: String, Codable, Sendable, CaseIterable, Identifiable, Comparable
 }
 
 enum AppLog {
-    private static let subsystem = "ai.kurn.app"
+    /// Exposed (not `private`) so `LogExport` can scope its `OSLogStore` query
+    /// to this app's own entries without duplicating the literal.
+    static let subsystem = "ai.kurn.app"
 
     /// Minimum severity that is actually emitted. Defaults from the environment
     /// at launch; `AppSettings` overrides it with the user's stored preference.

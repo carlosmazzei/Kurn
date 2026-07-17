@@ -4,7 +4,12 @@
 <dict>
     <!-- Kurn does not track users or collect data for the developer.
          Audio and transcripts stay on-device; when the user opts in, audio or
-         transcript text is sent to their own configured OpenAI/Anthropic key. -->
+         transcript text is sent to their own configured OpenAI/Anthropic key.
+         Diagnostic reports (MetricKit crash/hang data), exported logs, and
+         local usage counters are all on-device only and never transmitted
+         automatically — diagnostic reports and logs leave the device only
+         through an explicit user-initiated share action, and usage counters
+         never leave the device at all. -->
     <key>NSPrivacyTracking</key>
     <false/>
     <key>NSPrivacyTrackingDomains</key>

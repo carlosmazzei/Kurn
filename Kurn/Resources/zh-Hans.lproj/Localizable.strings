@@ -444,6 +444,17 @@
 "settings.diagnostics" = "诊断";
 "settings.log_level" = "日志记录";
 "settings.log_level_footer" = "控制应用写入系统日志（Console.app，子系统 ai.kurn.app）的详细程度。「关闭」将完全禁用日志；「详尽」包含高频跟踪信息，适用于报告问题时使用。";
+"settings.export_logs" = "导出日志";
+"settings.export_logs_footer" = "将应用最近 24 小时的日志记录以文本文件形式分享，用于支持或错误报告。";
+"settings.diagnostic_reports" = "诊断报告";
+"settings.diagnostic_reports_footer" = "开启后，在本设备上捕获的崩溃和卡死报告将保存在这里。不会自动发送到任何地方——只有当你点击某条报告的「分享」时，报告才会离开设备。";
+"settings.diagnostic_reports.consent_title" = "启用诊断报告";
+"settings.diagnostic_reports.consent_message" = "Kurn 只会将崩溃和卡死报告保存在本设备上，不会自动发送到任何地方——是否以及何时分享报告由你决定。";
+"settings.diagnostic_reports.enable" = "启用";
+"settings.diagnostic_reports.view" = "查看诊断报告";
+"settings.diagnostic_reports.empty" = "暂无诊断报告";
+"settings.diagnostic_reports.crash" = "崩溃";
+"settings.diagnostic_reports.hang" = "卡死";
 "log_level.off" = "关闭";
 "log_level.error" = "仅错误";
 "log_level.notice" = "标准";
@@ -508,7 +519,21 @@
 "error.authentication_not_available" = "此设备未设置密码或生物识别。请设置设备密码，或前往设置关闭录音身份验证。";
 "error.auto_tagging" = "无法推荐标签：%@";
 "error.summary_truncated" = "由于达到模型的输出上限，摘要被截断。请尝试使用分节较少的模板，或使用输出上限更大的模型。";
+"error.log_export" = "无法导出日志：%@";
 "detail.summarizing.progress" = "正在总结第 %1$d 部分，共 %2$d 部分…";
+
+/* Usage insights ("我的数据") */
+"usage_insights.title" = "使用情况";
+"usage_insights.overview" = "概览";
+"usage_insights.recordings_completed" = "已完成的录音";
+"usage_insights.most_used_engine" = "最常用的转录引擎";
+"usage_insights.engine_usage" = "转录引擎使用情况";
+"usage_insights.summary_templates" = "摘要模板使用情况";
+"usage_insights.empty" = "暂无数据";
+"usage_insights.clear" = "清除我的数据";
+"usage_insights.clear_confirm" = "清除使用数据？";
+"usage_insights.clear_message" = "这将清除你本地的使用计数（已完成的录音、引擎和模板使用情况）。仅影响本设备上的数据，且无法撤销。";
+"usage_insights.footer" = "使用计数仅保存在本设备上，绝不会传输到任何地方。";
 
 /* Share selection */
 "share.select.title" = "分享";

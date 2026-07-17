@@ -38,18 +38,25 @@ final class RecorderViewModel {
     private let liveTranscriptionEnabled: Bool
     private let hideLiveActivityMeetingTitle: Bool
     private let lockScreenController = LockScreenRecordingController()
+    /// Invoked once a recording is actually persisted (not on the "ignored"
+    /// no-result/too-short paths, and not on a save failure) — lets the caller
+    /// bump the local usage counter without threading `AppSettings` through
+    /// this view model.
+    private let onRecordingSaved: () -> Void
 
     init(
         meeting: Meeting,
         modelContext: ModelContext,
         defaultMode: TranscriptionMode,
-        options: RecorderOptions = RecorderOptions()
+        options: RecorderOptions = RecorderOptions(),
+        onRecordingSaved: @escaping () -> Void = {}
     ) {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
         self.liveTranscriptionEnabled = options.liveTranscriptionEnabled
         self.hideLiveActivityMeetingTitle = options.hideLiveActivityMeetingTitle
+        self.onRecordingSaved = onRecordingSaved
         self.recorder.micPickup = options.micPickup
         self.recorder.audioBitRate = options.audioQuality.bitRate
         self.recorder.onStateChanged = { [weak self] state, elapsed in
@@ -215,6 +222,7 @@ final class RecorderViewModel {
         modelContext.insert(recording)
         do {
             try modelContext.save()
+            onRecordingSaved()
         } catch {
             self.error = .persistenceFailed(error.localizedDescription)
         }

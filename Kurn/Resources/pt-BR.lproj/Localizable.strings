@@ -444,6 +444,17 @@
 "settings.diagnostics" = "Diagnóstico";
 "settings.log_level" = "Registro (logs)";
 "settings.log_level_footer" = "Controla o nível de detalhe que o app grava no log do sistema (Console.app, subsistema ai.kurn.app). Desligado desativa o registro por completo; Detalhado inclui rastreamentos frequentes, úteis ao relatar um problema.";
+"settings.export_logs" = "Exportar Logs";
+"settings.export_logs_footer" = "Compartilha as últimas 24 horas dos registros do app como um arquivo de texto, para suporte ou relatos de bugs.";
+"settings.diagnostic_reports" = "Relatórios de Diagnóstico";
+"settings.diagnostic_reports_footer" = "Quando ativado, relatórios de falhas e travamentos capturados neste dispositivo são salvos aqui. Nada é enviado automaticamente para lugar nenhum — os relatórios só saem do dispositivo se você tocar em Compartilhar em algum deles.";
+"settings.diagnostic_reports.consent_title" = "Ativar Relatórios de Diagnóstico";
+"settings.diagnostic_reports.consent_message" = "O Kurn salvará relatórios de falhas e travamentos somente neste dispositivo. Nada é enviado automaticamente para lugar nenhum — você escolhe se e quando compartilhar um relatório.";
+"settings.diagnostic_reports.enable" = "Ativar";
+"settings.diagnostic_reports.view" = "Ver Relatórios de Diagnóstico";
+"settings.diagnostic_reports.empty" = "Nenhum relatório de diagnóstico ainda";
+"settings.diagnostic_reports.crash" = "Falha";
+"settings.diagnostic_reports.hang" = "Travamento";
 "log_level.off" = "Desligado";
 "log_level.error" = "Apenas erros";
 "log_level.notice" = "Padrão";
@@ -508,7 +519,21 @@
 "error.authentication_not_available" = "Este aparelho não tem código ou biometria configurados. Configure um código de desbloqueio ou abra os Ajustes para desativar a autenticação de gravações.";
 "error.auto_tagging" = "Não foi possível sugerir tags: %@";
 "error.summary_truncated" = "O resumo foi cortado por atingir o limite de saída do modelo. Tente um template com menos seções ou um modelo com limite de saída maior.";
+"error.log_export" = "Não foi possível exportar os logs: %@";
 "detail.summarizing.progress" = "Resumindo parte %1$d de %2$d…";
+
+/* Usage insights ("Meus Dados") */
+"usage_insights.title" = "Uso do App";
+"usage_insights.overview" = "Visão Geral";
+"usage_insights.recordings_completed" = "Gravações Concluídas";
+"usage_insights.most_used_engine" = "Motor de Transcrição Mais Usado";
+"usage_insights.engine_usage" = "Uso por Motor de Transcrição";
+"usage_insights.summary_templates" = "Uso por Template de Resumo";
+"usage_insights.empty" = "Ainda sem dados";
+"usage_insights.clear" = "Limpar Meus Dados";
+"usage_insights.clear_confirm" = "Limpar dados de uso?";
+"usage_insights.clear_message" = "Isso limpa seus contadores de uso locais (gravações concluídas, uso de motor e de template). Afeta apenas os dados neste dispositivo e não pode ser desfeito.";
+"usage_insights.footer" = "Os contadores de uso ficam armazenados somente neste dispositivo e nunca são transmitidos para lugar nenhum.";
 
 /* Share selection */
 "share.select.title" = "Compartilhar";

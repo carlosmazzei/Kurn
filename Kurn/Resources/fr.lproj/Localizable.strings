@@ -444,6 +444,17 @@
 "settings.diagnostics" = "Diagnostics";
 "settings.log_level" = "Journalisation";
 "settings.log_level_footer" = "Contrôle le niveau de détail que l'app écrit dans le journal système (Console.app, sous-système ai.kurn.app). Désactivé coupe entièrement la journalisation ; Détaillé inclut des traces fréquentes utiles pour signaler un bug.";
+"settings.export_logs" = "Exporter les journaux";
+"settings.export_logs_footer" = "Partage les dernières 24 heures des journaux de l'app sous forme de fichier texte, pour le support ou les rapports de bugs.";
+"settings.diagnostic_reports" = "Rapports de diagnostic";
+"settings.diagnostic_reports_footer" = "Lorsque c'est activé, les rapports de plantage et de blocage capturés sur cet appareil sont enregistrés ici. Rien n'est jamais envoyé automatiquement où que ce soit — les rapports ne quittent l'appareil que si vous appuyez sur Partager sur l'un d'eux.";
+"settings.diagnostic_reports.consent_title" = "Activer les rapports de diagnostic";
+"settings.diagnostic_reports.consent_message" = "Kurn enregistrera les rapports de plantage et de blocage uniquement sur cet appareil. Rien n'est jamais envoyé automatiquement où que ce soit — vous choisissez si et quand partager un rapport.";
+"settings.diagnostic_reports.enable" = "Activer";
+"settings.diagnostic_reports.view" = "Voir les rapports de diagnostic";
+"settings.diagnostic_reports.empty" = "Aucun rapport de diagnostic pour l'instant";
+"settings.diagnostic_reports.crash" = "Plantage";
+"settings.diagnostic_reports.hang" = "Blocage";
 "log_level.off" = "Désactivé";
 "log_level.error" = "Erreurs uniquement";
 "log_level.notice" = "Standard";
@@ -508,7 +519,21 @@
 "error.authentication_not_available" = "Cet appareil n'a ni code ni biométrie configurés. Définissez un code d'accès, ou ouvrez Réglages pour désactiver l'authentification des enregistrements.";
 "error.auto_tagging" = "Impossible de suggérer des tags : %@";
 "error.summary_truncated" = "Le résumé a été tronqué car il a atteint la limite de sortie du modèle. Essayez un modèle avec moins de sections ou un modèle avec une limite de sortie plus élevée.";
+"error.log_export" = "Impossible d'exporter les journaux : %@";
 "detail.summarizing.progress" = "Résumé de la partie %1$d sur %2$d…";
+
+/* Usage insights ("Mes données") */
+"usage_insights.title" = "Statistiques d'utilisation";
+"usage_insights.overview" = "Aperçu";
+"usage_insights.recordings_completed" = "Enregistrements terminés";
+"usage_insights.most_used_engine" = "Moteur de transcription le plus utilisé";
+"usage_insights.engine_usage" = "Utilisation par moteur de transcription";
+"usage_insights.summary_templates" = "Utilisation par modèle de résumé";
+"usage_insights.empty" = "Aucune donnée pour l'instant";
+"usage_insights.clear" = "Effacer mes données";
+"usage_insights.clear_confirm" = "Effacer les données d'utilisation ?";
+"usage_insights.clear_message" = "Cela efface vos compteurs d'utilisation locaux (enregistrements terminés, utilisation des moteurs et des modèles). Cela n'affecte que les données de cet appareil et ne peut pas être annulé.";
+"usage_insights.footer" = "Les compteurs d'utilisation sont stockés uniquement sur cet appareil et ne sont jamais transmis où que ce soit.";
 
 /* Share selection */
 "share.select.title" = "Partager";

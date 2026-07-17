@@ -59,6 +59,13 @@ struct SettingsView: View {
     /// surfaces instead of the wipe silently doing nothing.
     @State var dataError: AppError?
 
+    /// Share sheet payload for an exported log file, set by `exportLogs()`.
+    @State var diagnosticsShareItem: ShareItem?
+    /// Surfaced if reading/writing the log export fails.
+    @State var logExportError: AppError?
+    /// Consent dialog for opting in to on-device MetricKit diagnostic reports.
+    @State var showingDiagnosticReportsConsent = false
+
     var body: some View {
         @Bindable var settings = settings
 
@@ -158,6 +165,20 @@ struct SettingsView: View {
 
             // MARK: Diagnostics
             diagnosticsSection(settings: settings)
+
+            // MARK: My Data
+            Section {
+                NavigationLink {
+                    UsageInsightsView()
+                } label: {
+                    Label(
+                        NSLocalizedString("usage_insights.title", comment: "Usage Insights"),
+                        systemImage: "chart.bar"
+                    )
+                }
+            } footer: {
+                Text(NSLocalizedString("usage_insights.footer", comment: "Explains local-only usage data"))
+            }
 
             // MARK: Storage
             Section(NSLocalizedString("settings.storage", comment: "Storage")) {
@@ -408,6 +429,20 @@ struct SettingsView: View {
         ))
         .errorAlert($modelDownloadError)
         .errorAlert($dataError)
+        .errorAlert($logExportError)
+        .sheet(item: $diagnosticsShareItem) { item in
+            ActivityView(items: item.urls)
+        }
+        .kurnDialog(
+            isPresented: $showingDiagnosticReportsConsent,
+            iconSystemName: "exclamationmark.triangle.fill",
+            iconTint: Theme.info,
+            title: NSLocalizedString("settings.diagnostic_reports.consent_title", comment: "Enable diagnostic reports"),
+            message: NSLocalizedString("settings.diagnostic_reports.consent_message", comment: "Explains on-device diagnostic reports"),
+            primaryTitle: NSLocalizedString("settings.diagnostic_reports.enable", comment: "Enable"),
+            primaryAction: { settings.diagnosticReportsConsented = true },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
         .kurnDialog(
             isPresented: Binding(
                 get: { cacheCleanupResult != nil },

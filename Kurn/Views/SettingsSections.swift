@@ -294,10 +294,49 @@ extension SettingsView {
             ) {
                 ForEach(LogLevel.allCases) { Text($0.displayName).tag($0) }
             }
+            Button {
+                exportLogs()
+            } label: {
+                Label(NSLocalizedString("settings.export_logs", comment: "Export logs"), systemImage: "square.and.arrow.up")
+            }
+            Toggle(
+                NSLocalizedString("settings.diagnostic_reports", comment: "Diagnostic reports"),
+                isOn: Binding(
+                    get: { settings.diagnosticReportsConsented },
+                    set: { enabled in
+                        if enabled {
+                            showingDiagnosticReportsConsent = true
+                        } else {
+                            settings.diagnosticReportsConsented = false
+                        }
+                    }
+                )
+            )
+            NavigationLink {
+                DiagnosticReportsListView()
+            } label: {
+                Label(
+                    NSLocalizedString("settings.diagnostic_reports.view", comment: "View diagnostic reports"),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
         } header: {
             Text(NSLocalizedString("settings.diagnostics", comment: "Diagnostics"))
         } footer: {
-            Text(NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels"))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels"))
+                Text(NSLocalizedString("settings.export_logs_footer", comment: "Explains log export"))
+                Text(NSLocalizedString("settings.diagnostic_reports_footer", comment: "Explains diagnostic reports"))
+            }
+        }
+    }
+
+    func exportLogs() {
+        do {
+            let url = try LogExport.temporaryFile()
+            diagnosticsShareItem = ShareItem(urls: [url])
+        } catch {
+            logExportError = .logExportFailed(error.localizedDescription)
         }
     }
 

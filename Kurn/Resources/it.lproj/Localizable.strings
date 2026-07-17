@@ -444,6 +444,17 @@
 "settings.diagnostics" = "Diagnostica";
 "settings.log_level" = "Registro";
 "settings.log_level_footer" = "Controlla il livello di dettaglio scritto dall'app nel log di sistema (Console.app, sottosistema ai.kurn.app). Disattivato disabilita completamente la registrazione; Dettagliato include tracce ad alta frequenza utili per segnalare un problema.";
+"settings.export_logs" = "Esporta Log";
+"settings.export_logs_footer" = "Condivide le ultime 24 ore dei log dell'app come file di testo, per supporto o segnalazioni di bug.";
+"settings.diagnostic_reports" = "Rapporti di Diagnostica";
+"settings.diagnostic_reports_footer" = "Quando attivo, i rapporti di crash e blocco catturati su questo dispositivo vengono salvati qui. Nulla viene mai inviato automaticamente altrove — i rapporti lasciano il dispositivo solo se tocchi Condividi su uno di essi.";
+"settings.diagnostic_reports.consent_title" = "Attiva Rapporti di Diagnostica";
+"settings.diagnostic_reports.consent_message" = "Kurn salverà i rapporti di crash e blocco solo su questo dispositivo. Nulla viene mai inviato automaticamente altrove — decidi tu se e quando condividere un rapporto.";
+"settings.diagnostic_reports.enable" = "Attiva";
+"settings.diagnostic_reports.view" = "Visualizza Rapporti di Diagnostica";
+"settings.diagnostic_reports.empty" = "Ancora nessun rapporto di diagnostica";
+"settings.diagnostic_reports.crash" = "Crash";
+"settings.diagnostic_reports.hang" = "Blocco";
 "log_level.off" = "Disattivato";
 "log_level.error" = "Solo errori";
 "log_level.notice" = "Standard";
@@ -508,7 +519,21 @@
 "error.authentication_not_available" = "Questo dispositivo non ha un codice o dati biometrici configurati. Imposta un codice del dispositivo, oppure apri le Impostazioni per disattivare l'autenticazione per le registrazioni.";
 "error.auto_tagging" = "Impossibile suggerire tag: %@";
 "error.summary_truncated" = "Il riassunto è stato troncato perché ha raggiunto il limite di output del modello. Prova un modello con meno sezioni o uno con un limite di output più ampio.";
+"error.log_export" = "Impossibile esportare i log: %@";
 "detail.summarizing.progress" = "Riassunto della parte %1$d di %2$d…";
+
+/* Usage insights ("I Miei Dati") */
+"usage_insights.title" = "Statistiche di Utilizzo";
+"usage_insights.overview" = "Panoramica";
+"usage_insights.recordings_completed" = "Registrazioni Completate";
+"usage_insights.most_used_engine" = "Motore di Trascrizione Più Usato";
+"usage_insights.engine_usage" = "Utilizzo per Motore di Trascrizione";
+"usage_insights.summary_templates" = "Utilizzo per Modello di Riassunto";
+"usage_insights.empty" = "Ancora nessun dato";
+"usage_insights.clear" = "Cancella i Miei Dati";
+"usage_insights.clear_confirm" = "Cancellare i dati di utilizzo?";
+"usage_insights.clear_message" = "Questo cancella i contatori di utilizzo locali (registrazioni completate, utilizzo di motori e modelli). Riguarda solo i dati su questo dispositivo e non può essere annullato.";
+"usage_insights.footer" = "I contatori di utilizzo sono salvati solo su questo dispositivo e non vengono mai trasmessi altrove.";
 
 /* Share selection */
 "share.select.title" = "Condividi";
