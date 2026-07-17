@@ -542,3 +542,7 @@
 "share.copy" = "Kopieren";
 "share.copy_all" = "Alles kopieren";
 "share.share_action" = "Teilen";
+
+/* Markdown task checkboxes */
+"markdown.task.checked" = "Erledigte Aufgabe";
+"markdown.task.unchecked" = "Offene Aufgabe";
