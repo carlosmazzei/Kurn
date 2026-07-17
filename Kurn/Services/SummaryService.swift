@@ -143,8 +143,9 @@ struct SummaryService {
         them, so completeness matters more than polish. Capture every \
         decision, action item (with owner and deadline when stated), open \
         question, key fact, number, date, and name, and keep the [mm:ss] \
-        timestamps of important moments. Do not editorialize and do not drop \
-        topics.
+        timestamps of important moments. Record action items as markdown task \
+        checkboxes ("- [ ] task — owner, deadline") so their status survives \
+        into the final summary. Do not editorialize and do not drop topics.
         """,
         sections: ["Discussion", "Decisions", "Action Items", "Open Questions"]
     )
