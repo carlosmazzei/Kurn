@@ -1,0 +1,27 @@
+# Fastlane snapshot configuration for App Store screenshots.
+#
+# Captures against the dedicated KurnUITests scheme (not the app's default
+# `Kurn` scheme) so a screenshot run never also re-executes the KurnTests
+# unit test suite. See fastlane/Fastfile's `screenshots` lane and
+# Kurn/DebugSupport/ScreenshotSeedData.swift for how the app seeds mock data
+# for these runs.
+
+scheme("KurnUITests")
+
+devices([
+  "iPhone 17 Pro Max",
+  "iPhone 17",
+  "iPad Pro 13-inch (M4)"
+])
+
+# English-only for the first pass. Add "pt-BR" once every UI test navigation
+# call is driven by `.accessibilityIdentifier` (not label text), so a
+# locale-specific label change can't silently break screenshot capture.
+languages([
+  "en-US"
+])
+
+output_directory("./fastlane/screenshots")
+clear_previous_screenshots(true)
+override_status_bar(true)
+concurrent_simulators(false)

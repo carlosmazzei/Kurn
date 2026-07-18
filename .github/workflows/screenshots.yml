@@ -1,0 +1,34 @@
+name: App Store Screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Prepare simulator runtimes
+        run: |
+          sudo xcodebuild -runFirstLaunch
+          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
+            xcodebuild -downloadPlatform iOS
+          fi
+
+      - name: Generate screenshots
+        run: bundle exec fastlane screenshots
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: fastlane/screenshots
