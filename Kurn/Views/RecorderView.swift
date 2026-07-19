@@ -41,6 +41,7 @@ struct RecorderView: View {
                     options: RecorderOptions(
                         micPickup: settings.micPickup,
                         audioQuality: settings.audioQuality,
+                        alwaysUseBuiltInMic: settings.alwaysUseBuiltInMic,
                         liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
                         hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
                     ),
@@ -110,9 +111,27 @@ private struct RecorderContent: View {
         }
         .task {
             // The recorder spins up its audio engine off the main actor, so this
-            // does not block the sheet's present animation.
-            AppLog.recorderUI.atNotice.notice("RecorderContent.task: starting recording")
-            await vm.startRecording()
+            // does not block the sheet's present animation. `prepareToRecord`
+            // may first await the user's microphone choice via `micChoices`.
+            AppLog.recorderUI.atNotice.notice("RecorderContent.task: preparing to record")
+            await vm.prepareToRecord()
+        }
+        .confirmationDialog(
+            NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"),
+            isPresented: Binding(
+                get: { !vm.micChoices.isEmpty },
+                set: { isPresented in
+                    if !isPresented { vm.chooseMic(uid: nil) }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(vm.micChoices) { option in
+                Button(option.name) { vm.chooseMic(uid: option.id) }
+            }
+            Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {
+                vm.chooseMic(uid: nil)
+            }
         }
         .kurnDialog(
             isPresented: $vm.permissionDenied,

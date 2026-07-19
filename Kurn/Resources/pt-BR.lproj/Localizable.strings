@@ -167,6 +167,7 @@
 "recorder.live_loading" = "Preparando transcrição em tempo real…";
 "recorder.live_unavailable" = "Transcrição em tempo real indisponível.";
 "recorder.connecting" = "Conectando…";
+"recorder.choose_mic.title" = "Escolher microfone";
 
 /* Reuniões */
 "meeting.default_title" = "Reunião – %@";
@@ -442,6 +443,8 @@
 "settings.mic_pickup_footer" = "Sala toda capta todos (omnidirecional); Foco em quem fala prioriza a pessoa à frente (direcional). Afeta apenas o microfone embutido.";
 "micpickup.whole_room" = "Sala toda";
 "micpickup.focus_speaker" = "Foco em quem fala";
+"settings.always_use_built_in_mic" = "Sempre usar o microfone do iPhone";
+"settings.always_use_built_in_mic_footer" = "Pula a pergunta e grava sempre com o microfone embutido do iPhone, mesmo com um acessório Bluetooth conectado. Se desativado, você será perguntado qual microfone usar quando houver mais de um disponível.";
 "settings.diagnostics" = "Diagnóstico";
 "settings.log_level" = "Registro (logs)";
 "settings.log_level_footer" = "Controla o nível de detalhe que o app grava no log do sistema (Console.app, subsistema ai.kurn.app). Desligado desativa o registro por completo; Detalhado inclui rastreamentos frequentes, úteis ao relatar um problema.";

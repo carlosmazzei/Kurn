@@ -167,6 +167,7 @@
 "recorder.live_loading" = "Preparing live transcription…";
 "recorder.live_unavailable" = "Live transcription unavailable.";
 "recorder.connecting" = "Connecting…";
+"recorder.choose_mic.title" = "Choose Microphone";
 
 /* Meetings */
 "meeting.default_title" = "Meeting – %@";
@@ -442,6 +443,8 @@
 "settings.mic_pickup_footer" = "Whole room captures everyone (omnidirectional); Focus on speaker favours the person in front (directional). Only affects the built-in mic.";
 "micpickup.whole_room" = "Whole room";
 "micpickup.focus_speaker" = "Focus on speaker";
+"settings.always_use_built_in_mic" = "Always Use iPhone Microphone";
+"settings.always_use_built_in_mic_footer" = "Skips asking and always records with the iPhone's built-in mic, even if a Bluetooth accessory is connected. When off, you'll be asked which microphone to use if more than one is available.";
 "settings.diagnostics" = "Diagnostics";
 "settings.log_level" = "Logging";
 "settings.log_level_footer" = "Controls how much detail the app writes to the system log (Console.app, subsystem ai.kurn.app). Off disables logging entirely; Verbose includes high-frequency traces useful when reporting a bug.";

@@ -20,6 +20,7 @@ struct AppSettingsTests {
         "settings.aiProvider", "settings.aiProviders", "settings.defaultTranscriptionMode",
         "settings.transcriptionProviderID", "settings.transcriptionModels",
         "settings.defaultLanguage", "settings.micPickup", "settings.audioQuality",
+        "settings.alwaysUseBuiltInMic",
         "settings.summaryModels", "settings.summaryTemplates", "settings.lastSummaryTemplate",
         "settings.liveTranscriptionEnabled", "settings.diarizationEngine", "settings.transcriptionEngine",
         "settings.diarizationPreprocessingEnabled", "settings.preprocessingEngine",

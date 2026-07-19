@@ -167,6 +167,7 @@
 "recorder.live_loading" = "Préparation de la transcription en direct…";
 "recorder.live_unavailable" = "Transcription en direct indisponible.";
 "recorder.connecting" = "Connexion…";
+"recorder.choose_mic.title" = "Choisir le microphone";
 
 /* Réunions */
 "meeting.default_title" = "Réunion – %@";
@@ -442,6 +443,8 @@
 "settings.mic_pickup_footer" = "Toute la pièce capte tout le monde (omnidirectionnel) ; Focus sur l'intervenant privilégie la personne en face (directionnel). Concerne uniquement le micro intégré.";
 "micpickup.whole_room" = "Toute la pièce";
 "micpickup.focus_speaker" = "Focus sur l'intervenant";
+"settings.always_use_built_in_mic" = "Toujours utiliser le micro de l'iPhone";
+"settings.always_use_built_in_mic_footer" = "Ignore la question et enregistre toujours avec le micro intégré de l'iPhone, même si un accessoire Bluetooth est connecté. Si désactivé, on vous demandera quel microphone utiliser lorsque plusieurs sont disponibles.";
 "settings.diagnostics" = "Diagnostics";
 "settings.log_level" = "Journalisation";
 "settings.log_level_footer" = "Contrôle le niveau de détail que l'app écrit dans le journal système (Console.app, sous-système ai.kurn.app). Désactivé coupe entièrement la journalisation ; Détaillé inclut des traces fréquentes utiles pour signaler un bug.";

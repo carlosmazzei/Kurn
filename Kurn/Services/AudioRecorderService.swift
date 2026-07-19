@@ -34,6 +34,14 @@ final class AudioRecorderService: NSObject {
     var micPickup: MicPickup = .wholeRoom
     /// AAC encoder bit rate (bits/sec) for the output file. Set before `start`.
     var audioBitRate: Int = 64_000
+    /// When true, always select the iPhone's built-in microphone even if an
+    /// external (e.g. Bluetooth) input is connected, and skip offering a
+    /// choice. Set before `start`. Mirrors `AppSettings.alwaysUseBuiltInMic`.
+    var forceBuiltInMic = false
+    /// Explicit input chosen by the caller (e.g. via a microphone picker) for
+    /// this recording, identified by `AVAudioSessionPortDescription.uid`. Set
+    /// before `start`. `nil` defers to `forceBuiltInMic`/the system route.
+    var preferredInputUID: String?
     /// Normalized 0...1 microphone level driven from the metering timer.
     private(set) var level: Float = 0
     /// Elapsed recording time (excludes paused spans).
@@ -113,6 +121,8 @@ final class AudioRecorderService: NSObject {
 
         let pickup = micPickup
         let bitRate = audioBitRate
+        let forceBuiltIn = forceBuiltInMic
+        let preferredUID = preferredInputUID
         let fileName = AudioFileStore.fileName(meetingID: meetingID)
         let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
         AppLog.recorder.atDebug.debug("start: writing to \(fileName, privacy: .public)")
@@ -121,7 +131,13 @@ final class AudioRecorderService: NSObject {
             // Heavy AVAudioSession + AVAudioEngine setup runs OFF the main actor
             // (see `setUpEngine`) so the UI — e.g. the recorder sheet animating
             // in — stays responsive while the engine spins up.
-            try await setUpEngine(writingTo: url, pickup: pickup, bitRate: bitRate)
+            try await setUpEngine(
+                writingTo: url,
+                pickup: pickup,
+                bitRate: bitRate,
+                forceBuiltIn: forceBuiltIn,
+                preferredInputUID: preferredUID
+            )
         } catch let error as AppError {
             AppLog.recorder.atError.error("start: setup threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
             teardownEngine()
@@ -149,8 +165,14 @@ final class AudioRecorderService: NSObject {
     /// Configure the audio session and start the engine. `nonisolated` + `async`
     /// so the (synchronously blocking) AVFoundation setup runs off the main
     /// actor instead of stalling the UI.
-    private nonisolated func setUpEngine(writingTo url: URL, pickup: MicPickup, bitRate: Int) async throws {
-        try await configureSession(pickup: pickup)
+    private nonisolated func setUpEngine(
+        writingTo url: URL,
+        pickup: MicPickup,
+        bitRate: Int,
+        forceBuiltIn: Bool,
+        preferredInputUID: String?
+    ) async throws {
+        try await configureSession(pickup: pickup, forceBuiltIn: forceBuiltIn, preferredInputUID: preferredInputUID)
         try await beginEngine(writingTo: url, bitRate: bitRate)
     }
 
@@ -337,7 +359,11 @@ final class AudioRecorderService: NSObject {
 
     // MARK: - Session
 
-    private nonisolated func configureSession(pickup: MicPickup) async throws {
+    private nonisolated func configureSession(
+        pickup: MicPickup,
+        forceBuiltIn: Bool,
+        preferredInputUID: String?
+    ) async throws {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(
@@ -346,7 +372,7 @@ final class AudioRecorderService: NSObject {
                 options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try await activateSession(session)
-            configureMicrophone(session, pickup: pickup)
+            configureMicrophone(session, pickup: pickup, forceBuiltIn: forceBuiltIn, preferredInputUID: preferredInputUID)
             AppLog.recorder.atDebug.debug("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
         } catch {
             AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
@@ -373,20 +399,45 @@ final class AudioRecorderService: NSObject {
         }
     }
 
-    /// Configure the built-in mic's polar pattern according to `micPickup`:
-    /// whole-room favours an omnidirectional pickup (every participant), while
-    /// focus-speaker favours cardioid (the person in front). Both fall back to
-    /// subcardioid, then the hardware default. Skipped entirely when an external
-    /// mic (Bluetooth / wired headset) is available, so we never override the
-    /// user's preferred input.
-    private nonisolated func configureMicrophone(_ session: AVAudioSession, pickup: MicPickup) {
+    /// Select which physical input the session uses, then (for the built-in
+    /// mic only) the polar pattern.
+    ///
+    /// Priority: an explicit `preferredInputUID` (from a per-recording
+    /// microphone picker) always wins. Otherwise, if `forceBuiltIn` is set
+    /// (Settings → always use the iPhone mic), the built-in mic is selected
+    /// even with an accessory connected. Otherwise the system's own route
+    /// choice is left alone — unless there's no external input at all, in
+    /// which case the built-in mic is selected explicitly so its polar
+    /// pattern can be steered.
+    private nonisolated func configureMicrophone(
+        _ session: AVAudioSession,
+        pickup: MicPickup,
+        forceBuiltIn: Bool,
+        preferredInputUID: String?
+    ) {
         guard let inputs = session.availableInputs else { return }
+
+        if let uid = preferredInputUID, let match = inputs.first(where: { $0.uid == uid }) {
+            try? session.setPreferredInput(match)
+            if match.portType == .builtInMic {
+                applyPolarPattern(to: match, pickup: pickup)
+            }
+            return
+        }
+
+        guard let builtIn = inputs.first(where: { $0.portType == .builtInMic }) else { return }
         let hasExternal = inputs.contains { $0.portType != .builtInMic }
-        guard !hasExternal,
-              let builtIn = inputs.first(where: { $0.portType == .builtInMic }) else { return }
+        guard forceBuiltIn || !hasExternal else { return }
 
         try? session.setPreferredInput(builtIn)
+        applyPolarPattern(to: builtIn, pickup: pickup)
+    }
 
+    /// Steer the built-in mic's polar pattern according to `micPickup`:
+    /// whole-room favours an omnidirectional pickup (every participant), while
+    /// focus-speaker favours cardioid (the person in front). Both fall back to
+    /// subcardioid, then the hardware default.
+    private nonisolated func applyPolarPattern(to builtIn: AVAudioSessionPortDescription, pickup: MicPickup) {
         guard let sources = builtIn.dataSources, !sources.isEmpty else { return }
 
         // Try patterns in priority order for the chosen pickup mode; apply the
