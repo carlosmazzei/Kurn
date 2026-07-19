@@ -166,6 +166,7 @@
 "recorder.live_listening" = "Listening…";
 "recorder.live_loading" = "Preparing live transcription…";
 "recorder.live_unavailable" = "Live transcription unavailable.";
+"recorder.connecting" = "Connecting…";
 
 /* Meetings */
 "meeting.default_title" = "Meeting – %@";
