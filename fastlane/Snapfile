@@ -11,7 +11,7 @@ scheme("KurnUITests")
 devices([
   "iPhone 17 Pro Max",
   "iPhone 17",
-  "iPad Pro 13-inch (M4)"
+  "iPad Pro 13-inch (M5)"
 ])
 
 # English-only for the first pass. Add "pt-BR" once every UI test navigation

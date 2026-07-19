@@ -8,15 +8,10 @@
 //  present. Run via `bundle exec fastlane screenshots` (fastlane/Fastfile),
 //  not as part of the default `iOS CI` build-and-test job.
 //
-//  NOTE: this file lives in a file-system-synchronized group. It only
-//  compiles once the `KurnUITests` UI Testing Bundle target has been created
-//  in Xcode (File > New > Target > UI Testing Bundle, "Target to be Tested":
-//  Kurn) — see the App Store screenshots plan for the exact steps. Until
-//  then this source has no target and is not built by any scheme.
-//
 
 import XCTest
 
+@MainActor
 final class ScreenshotUITests: XCTestCase {
     private var app: XCUIApplication!
 
