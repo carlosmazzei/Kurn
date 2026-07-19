@@ -150,8 +150,8 @@ final class AudioRecorderService: NSObject {
     /// so the (synchronously blocking) AVFoundation setup runs off the main
     /// actor instead of stalling the UI.
     private nonisolated func setUpEngine(writingTo url: URL, pickup: MicPickup, bitRate: Int) async throws {
-        try configureSession(pickup: pickup)
-        try beginEngine(writingTo: url, bitRate: bitRate)
+        try await configureSession(pickup: pickup)
+        try await beginEngine(writingTo: url, bitRate: bitRate)
     }
 
     func pause() {
@@ -231,13 +231,24 @@ final class AudioRecorderService: NSObject {
     /// Open the output file and start the engine, installing a tap that writes
     /// captured buffers and tracks the input level. `nonisolated` so it can run
     /// off the main actor from `setUpEngine`.
-    private nonisolated func beginEngine(writingTo url: URL, bitRate: Int) throws {
+    private nonisolated func beginEngine(writingTo url: URL, bitRate: Int) async throws {
         let input = engine.inputNode
         // Keep the recorder on the standard input unit. VoiceProcessingIO can
         // block engine startup on some routes/devices, freezing this screen.
         try? input.setVoiceProcessingEnabled(false)
 
-        let format = input.outputFormat(forBus: 0)
+        // Right after a session activation that pulled in a Bluetooth route,
+        // the accessory may still be mid-handshake switching from A2DP/idle
+        // to HFP, so the input format can briefly read as 0/0. Poll briefly
+        // before giving up rather than failing on the first read.
+        var format = input.outputFormat(forBus: 0)
+        if format.sampleRate <= 0 || format.channelCount <= 0 {
+            for _ in 0..<4 {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                format = input.outputFormat(forBus: 0)
+                if format.sampleRate > 0, format.channelCount > 0 { break }
+            }
+        }
         AppLog.recorder.atDebug.debug("beginEngine: inputFormat sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)")
         guard format.sampleRate > 0, format.channelCount > 0 else {
             AppLog.recorder.atError.error("beginEngine: invalid input format (sampleRate or channelCount is 0)")
@@ -313,7 +324,7 @@ final class AudioRecorderService: NSObject {
 
     // MARK: - Session
 
-    private nonisolated func configureSession(pickup: MicPickup) throws {
+    private nonisolated func configureSession(pickup: MicPickup) async throws {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(
@@ -321,12 +332,31 @@ final class AudioRecorderService: NSObject {
                 mode: .default,
                 options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
-            try session.setActive(true)
+            try await activateSession(session)
             configureMicrophone(session, pickup: pickup)
             AppLog.recorder.atDebug.debug("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
         } catch {
             AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
             throw AppError.audioError(error.localizedDescription)
+        }
+    }
+
+    /// Activate the session with a short retry/backoff. Requesting
+    /// `.playAndRecord` while a Bluetooth headset is connected forces the
+    /// accessory to switch profile (A2DP/idle → HFP), an asynchronous radio
+    /// handshake that can make `setActive(true)` throw transiently while it's
+    /// in flight. A brief retry rides out that window instead of failing the
+    /// whole recording start on the first attempt.
+    private nonisolated func activateSession(_ session: AVAudioSession, attempts: Int = 3) async throws {
+        for attempt in 1...attempts {
+            do {
+                try session.setActive(true)
+                return
+            } catch {
+                if attempt == attempts { throw error }
+                AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying: \(error.localizedDescription, privacy: .public)")
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
         }
     }
 
