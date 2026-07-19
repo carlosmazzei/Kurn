@@ -167,6 +167,7 @@
 "recorder.live_loading" = "正在准备实时转录…";
 "recorder.live_unavailable" = "实时转录不可用。";
 "recorder.connecting" = "正在连接…";
+"recorder.choose_mic.title" = "选择麦克风";
 
 /* 会议 */
 "meeting.default_title" = "会议 – %@";
@@ -442,6 +443,8 @@
 "settings.mic_pickup_footer" = "全房间可采集所有人的声音（全向）；聚焦发言人更偏向正前方的人（定向）。仅影响内置麦克风。";
 "micpickup.whole_room" = "全房间";
 "micpickup.focus_speaker" = "聚焦发言人";
+"settings.always_use_built_in_mic" = "始终使用 iPhone 麦克风";
+"settings.always_use_built_in_mic_footer" = "跳过询问，始终使用 iPhone 内置麦克风录制，即使已连接蓝牙配件。关闭时，如果有多个麦克风可用，将询问您使用哪一个。";
 "settings.diagnostics" = "诊断";
 "settings.log_level" = "日志记录";
 "settings.log_level_footer" = "控制应用写入系统日志（Console.app，子系统 ai.kurn.app）的详细程度。「关闭」将完全禁用日志；「详尽」包含高频跟踪信息，适用于报告问题时使用。";

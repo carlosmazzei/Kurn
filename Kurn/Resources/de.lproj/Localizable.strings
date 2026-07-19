@@ -167,6 +167,7 @@
 "recorder.live_loading" = "Live-Transkription wird vorbereitet…";
 "recorder.live_unavailable" = "Live-Transkription nicht verfügbar.";
 "recorder.connecting" = "Verbindung wird hergestellt…";
+"recorder.choose_mic.title" = "Mikrofon wählen";
 
 /* Meetings */
 "meeting.default_title" = "Meeting – %@";
@@ -442,6 +443,8 @@
 "settings.mic_pickup_footer" = "Ganzer Raum erfasst alle (omnidirektional); Fokus auf Sprecher bevorzugt die Person davor (gerichtet). Betrifft nur das eingebaute Mikrofon.";
 "micpickup.whole_room" = "Ganzer Raum";
 "micpickup.focus_speaker" = "Fokus auf Sprecher";
+"settings.always_use_built_in_mic" = "Immer iPhone-Mikrofon verwenden";
+"settings.always_use_built_in_mic_footer" = "Überspringt die Nachfrage und nimmt immer mit dem eingebauten iPhone-Mikrofon auf, auch wenn ein Bluetooth-Zubehör verbunden ist. Wenn deaktiviert, werden Sie gefragt, welches Mikrofon verwendet werden soll, sofern mehr als eines verfügbar ist.";
 "settings.diagnostics" = "Diagnose";
 "settings.log_level" = "Protokollierung";
 "settings.log_level_footer" = "Legt fest, wie detailliert die App ins Systemprotokoll schreibt (Console.app, Subsystem ai.kurn.app). Aus deaktiviert die Protokollierung vollständig; Ausführlich enthält häufige Traces, die beim Melden eines Fehlers hilfreich sind.";

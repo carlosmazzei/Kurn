@@ -29,6 +29,7 @@ final class AppSettings {
         static let defaultLanguage = "settings.defaultLanguage"
         static let micPickup = "settings.micPickup"
         static let audioQuality = "settings.audioQuality"
+        static let alwaysUseBuiltInMic = "settings.alwaysUseBuiltInMic"
         static let summaryModels = "settings.summaryModels"
         static let summaryTemplates = "settings.summaryTemplates"
         static let lastSummaryTemplate = "settings.lastSummaryTemplate"
@@ -100,6 +101,14 @@ final class AppSettings {
     /// Recording audio quality (encoder bit rate). Defaults to high.
     var audioQuality: AudioQuality {
         didSet { defaults.set(audioQuality.rawValue, forKey: Keys.audioQuality) }
+    }
+
+    /// When on, recordings always use the iPhone's built-in microphone, even
+    /// if an external (e.g. Bluetooth) input is connected, and the recorder
+    /// never asks which microphone to use. Off by default, so a connected
+    /// accessory is offered as a choice when more than one input is available.
+    var alwaysUseBuiltInMic: Bool {
+        didSet { defaults.set(alwaysUseBuiltInMic, forKey: Keys.alwaysUseBuiltInMic) }
     }
 
     /// How the meetings list is sorted. Defaults to newest first to match the
@@ -422,6 +431,7 @@ final class AppSettings {
         audioQuality = AudioQuality(
             rawValue: defaults.string(forKey: Keys.audioQuality) ?? ""
         ) ?? .high
+        alwaysUseBuiltInMic = defaults.bool(forKey: Keys.alwaysUseBuiltInMic)
         meetingsSortOrder = MeetingsSortOrder(
             rawValue: defaults.string(forKey: Keys.meetingsSortOrder) ?? ""
         ) ?? .dateNewest

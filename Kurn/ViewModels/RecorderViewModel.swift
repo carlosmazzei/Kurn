@@ -6,6 +6,7 @@
 //  error state, and persists a finished segment as a `Recording` in SwiftData.
 //
 
+import AVFoundation
 import Foundation
 import Observation
 import os
@@ -17,8 +18,17 @@ import SwiftData
 struct RecorderOptions {
     var micPickup: MicPickup = .wholeRoom
     var audioQuality: AudioQuality = .high
+    var alwaysUseBuiltInMic: Bool = false
     var liveTranscriptionEnabled: Bool = false
     var hideLiveActivityMeetingTitle: Bool = true
+}
+
+/// One entry in the microphone picker shown before recording starts when more
+/// than one input is available and `alwaysUseBuiltInMic` is off.
+struct MicInputOption: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let isBuiltIn: Bool
 }
 
 @MainActor
@@ -36,12 +46,18 @@ final class RecorderViewModel {
     /// `recorder.state` stays `.idle` for that whole window, so the view needs
     /// this separate flag to show a "connecting" cue instead of looking stuck.
     private(set) var isStarting = false
+    /// Candidate inputs awaiting the user's choice before recording starts;
+    /// empty once resolved — either the user picked one, only one input was
+    /// available, or `alwaysUseBuiltInMic` skipped the prompt entirely.
+    private(set) var micChoices: [MicInputOption] = []
 
     private let meeting: Meeting
     private let modelContext: ModelContext
     private let defaultMode: TranscriptionMode
+    private let alwaysUseBuiltInMic: Bool
     private let liveTranscriptionEnabled: Bool
     private let hideLiveActivityMeetingTitle: Bool
+    private var micChoiceContinuation: CheckedContinuation<String?, Never>?
     private let lockScreenController = LockScreenRecordingController()
     /// Invoked once a recording is actually persisted (not on the "ignored"
     /// no-result/too-short paths, and not on a save failure) — lets the caller
@@ -59,11 +75,13 @@ final class RecorderViewModel {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
+        self.alwaysUseBuiltInMic = options.alwaysUseBuiltInMic
         self.liveTranscriptionEnabled = options.liveTranscriptionEnabled
         self.hideLiveActivityMeetingTitle = options.hideLiveActivityMeetingTitle
         self.onRecordingSaved = onRecordingSaved
         self.recorder.micPickup = options.micPickup
         self.recorder.audioBitRate = options.audioQuality.bitRate
+        self.recorder.forceBuiltInMic = options.alwaysUseBuiltInMic
         self.recorder.onStateChanged = { [weak self] state, elapsed in
             self?.lockScreenController.update(state: state, elapsed: elapsed)
             self?.pushWatchState(state: state, elapsed: elapsed)
@@ -120,6 +138,50 @@ final class RecorderViewModel {
     var meetingTitle: String {
         get { meeting.title }
         set { meeting.title = newValue }
+    }
+
+    /// Entry point from the recorder sheet: resolve which microphone to use —
+    /// asking the user via `micChoices` when more than one input is available
+    /// and Settings isn't forcing the built-in mic — then begin recording.
+    func prepareToRecord() async {
+        if !alwaysUseBuiltInMic {
+            let session = AVAudioSession.sharedInstance()
+            // `availableInputs` only lists a Bluetooth accessory once the
+            // session's category allows Bluetooth HFP input. On a fresh
+            // launch the session is still at its default category (no
+            // recording has configured it yet), so without this the very
+            // first recording only ever sees the built-in mic and silently
+            // skips the picker — setting the category here (without
+            // activating) is enough for the query below to see a connected
+            // accessory too, even before `AudioRecorderService` runs its own
+            // (activating) `configureSession`.
+            try? session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetoothHFP]
+            )
+            let inputs = session.availableInputs ?? []
+            if inputs.count > 1 {
+                AppLog.recorderUI.atDebug.debug("prepareToRecord: \(inputs.count, privacy: .public) inputs available, asking user")
+                let uid = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+                    micChoiceContinuation = continuation
+                    micChoices = inputs.map {
+                        MicInputOption(id: $0.uid, name: $0.portName, isBuiltIn: $0.portType == .builtInMic)
+                    }
+                }
+                recorder.preferredInputUID = uid
+            }
+        }
+        await startRecording()
+    }
+
+    /// Resolve the pending microphone choice (or `nil` to defer to the system
+    /// default) and unblock `prepareToRecord()`. Called from the picker UI,
+    /// including its cancel/dismiss path.
+    func chooseMic(uid: String?) {
+        micChoices = []
+        micChoiceContinuation?.resume(returning: uid)
+        micChoiceContinuation = nil
     }
 
     /// Request permission (if needed) and begin recording.
