@@ -31,6 +31,11 @@ final class RecorderViewModel {
     var permissionDenied = false
     /// Set once a recording has been saved so the view can dismiss.
     var didSaveRecording = false
+    /// True while `startRecording()` is setting up the audio session/engine
+    /// (including any Bluetooth-route retry) but recording hasn't begun yet —
+    /// `recorder.state` stays `.idle` for that whole window, so the view needs
+    /// this separate flag to show a "connecting" cue instead of looking stuck.
+    private(set) var isStarting = false
 
     private let meeting: Meeting
     private let modelContext: ModelContext
@@ -133,6 +138,8 @@ final class RecorderViewModel {
         let liveStartTask: Task<Void, Never>? = liveTranscriptionEnabled
             ? Task { @MainActor [weak self] in await self?.liveTranscription.start(language: liveLanguage) }
             : nil
+        isStarting = true
+        defer { isStarting = false }
         do {
             try await recorder.start(meetingID: meeting.id)
             // Bring up the Live Activity / Dynamic Island the instant the

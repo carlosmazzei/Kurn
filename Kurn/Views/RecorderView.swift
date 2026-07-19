@@ -80,6 +80,7 @@ private struct RecorderContent: View {
                 topBar
                 Spacer()
                 statusBadge
+                startingIndicator
                 timer
                     .padding(.top, 22)
                 waveform
@@ -163,6 +164,20 @@ private struct RecorderContent: View {
                 .font(.system(size: 13, weight: .bold))
                 .tracking(2.5)
                 .foregroundStyle(vm.state == .paused ? Theme.warning : Theme.accent)
+        }
+    }
+
+    @ViewBuilder
+    private var startingIndicator: some View {
+        if vm.isStarting {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .tint(.white)
+                Text(NSLocalizedString("recorder.connecting", comment: "Setting up the microphone before recording starts"))
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .padding(.top, 10)
         }
     }
 

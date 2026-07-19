@@ -166,6 +166,7 @@
 "recorder.live_listening" = "正在聆听…";
 "recorder.live_loading" = "正在准备实时转录…";
 "recorder.live_unavailable" = "实时转录不可用。";
+"recorder.connecting" = "正在连接…";
 
 /* 会议 */
 "meeting.default_title" = "会议 – %@";
