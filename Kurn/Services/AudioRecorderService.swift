@@ -264,12 +264,25 @@ final class AudioRecorderService: NSObject {
         settings[AVEncoderBitRateKey] = bitRate
         settings[AVEncoderAudioQualityKey] = AVAudioQuality.high.rawValue
 
+        // Some routes (e.g. Bluetooth HFP hearing aids/headsets negotiating a
+        // narrowband 16kHz mono link) report a sample rate whose AAC encoder
+        // can't honor an explicit bit rate as high as the user's chosen
+        // quality — AudioConverterSetProperty rejects it and AVAudioFile's
+        // init throws. Retry once letting the codec pick its own bit rate for
+        // that sample rate rather than failing the recording outright.
         let file: AVAudioFile
         do {
             file = try AVAudioFile(forWriting: url, settings: settings)
         } catch {
-            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed: \(error.localizedDescription, privacy: .public)")
-            throw error
+            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public) at sampleRate=\(format.sampleRate, privacy: .public); retrying without explicit bit rate: \(error.localizedDescription, privacy: .public)")
+            var fallbackSettings = settings
+            fallbackSettings.removeValue(forKey: AVEncoderBitRateKey)
+            do {
+                file = try AVAudioFile(forWriting: url, settings: fallbackSettings)
+            } catch {
+                AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed: \(error.localizedDescription, privacy: .public)")
+                throw error
+            }
         }
         sink.open(file, onBuffer: onAudioBuffer)
 
