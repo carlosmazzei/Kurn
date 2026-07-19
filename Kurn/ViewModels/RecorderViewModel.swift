@@ -145,7 +145,22 @@ final class RecorderViewModel {
     /// and Settings isn't forcing the built-in mic — then begin recording.
     func prepareToRecord() async {
         if !alwaysUseBuiltInMic {
-            let inputs = AVAudioSession.sharedInstance().availableInputs ?? []
+            let session = AVAudioSession.sharedInstance()
+            // `availableInputs` only lists a Bluetooth accessory once the
+            // session's category allows Bluetooth HFP input. On a fresh
+            // launch the session is still at its default category (no
+            // recording has configured it yet), so without this the very
+            // first recording only ever sees the built-in mic and silently
+            // skips the picker — setting the category here (without
+            // activating) is enough for the query below to see a connected
+            // accessory too, even before `AudioRecorderService` runs its own
+            // (activating) `configureSession`.
+            try? session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetoothHFP]
+            )
+            let inputs = session.availableInputs ?? []
             if inputs.count > 1 {
                 AppLog.recorderUI.atDebug.debug("prepareToRecord: \(inputs.count, privacy: .public) inputs available, asking user")
                 let uid = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
