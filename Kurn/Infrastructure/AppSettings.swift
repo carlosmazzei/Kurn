@@ -439,7 +439,17 @@ final class AppSettings {
         liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
+        // Screenshot automation (fastlane `snapshot`) always forces this off so
+        // the recordings lock screen never blocks an unattended UI test run.
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
+            requireAuthForRecordings = false
+        } else {
+            requireAuthForRecordings = defaults.object(forKey: Keys.requireAuthForRecordings) as? Bool ?? true
+        }
+        #else
         requireAuthForRecordings = defaults.object(forKey: Keys.requireAuthForRecordings) as? Bool ?? true
+        #endif
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
         hideLiveActivityMeetingTitle = defaults.object(forKey: Keys.hideLiveActivityMeetingTitle) as? Bool ?? true

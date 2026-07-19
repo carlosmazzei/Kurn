@@ -60,6 +60,22 @@ struct KurnApp: App {
             Tag.self,
             SmartFolder.self
         ])
+        #if DEBUG
+        // App Store screenshot automation (fastlane `snapshot` + KurnUITests):
+        // an in-memory store pre-populated with mock meetings/transcripts/
+        // summaries, never touching the real on-disk store. Compiled out of
+        // Release builds entirely, so this can never ship to the App Store.
+        if ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
+            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            do {
+                let container = try ModelContainer(for: schema, configurations: [configuration])
+                ScreenshotSeedData.seed(into: container.mainContext)
+                return container
+            } catch {
+                fatalError("Failed to create screenshot ModelContainer: \(error)")
+            }
+        }
+        #endif
         ModelStoreProtection.apply()
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

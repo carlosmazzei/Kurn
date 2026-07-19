@@ -326,6 +326,7 @@ struct MeetingDetailView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("tab.\(value)")
     }
 
     // MARK: - Shared bits

@@ -63,3 +63,13 @@ lane :github_release do
     api_bearer: github_token
   )
 end
+
+# Generates App Store screenshots from the KurnUITests target. The app is
+# launched with the "UI-Testing-Screenshots" argument (see KurnApp.swift and
+# Kurn/DebugSupport/ScreenshotSeedData.swift), which swaps in a seeded,
+# in-memory SwiftData store and bypasses the recordings lock screen — no real
+# recordings, transcripts, or API keys are ever involved. Never touches
+# project.pbxproj, matching bump_version's reasoning above.
+lane :screenshots do
+  capture_screenshots
+end

@@ -153,6 +153,7 @@ struct MeetingsListView: View {
                         MeetingCard(meeting: meeting, preview: preview(for: meeting))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("meetingCard")
                     .clearListRow(insets: EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                         Button { toggleFavorite(meeting) } label: {
@@ -322,10 +323,12 @@ extension MeetingsListView {
             bottomTab(icon: "square.grid.2x2.fill",
                       label: NSLocalizedString("tab.meetings", comment: "Meetings"),
                       active: true) {}
+                .accessibilityIdentifier("nav.meetings")
             Spacer()
             bottomTab(icon: "gearshape.fill",
                       label: NSLocalizedString("settings.title", comment: "Settings"),
                       active: false) { showingSettings = true }
+                .accessibilityIdentifier("nav.settings")
         }
         .padding(.horizontal, 56)
         .padding(.top, 10)
