@@ -8,6 +8,12 @@
 
 scheme("KurnUITests")
 
+# Restricts capture to the screenshot-producing test class only. Without
+# this, snapshot runs the whole KurnUITests scheme; a runaway launch test
+# on one device once looped for ~6h with nothing to bound it (see the
+# timeout-minutes note in .github/workflows/screenshots.yml).
+only_testing(["KurnUITests/ScreenshotUITests"])
+
 devices([
   "iPhone 17 Pro Max",
   "iPhone 17",

@@ -3,9 +3,14 @@ name: App Store Screenshots
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   screenshots:
     runs-on: macos-26
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
