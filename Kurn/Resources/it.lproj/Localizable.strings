@@ -550,3 +550,29 @@
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Attività completata";
 "markdown.task.unchecked" = "Attività da fare";
+
+/* Semantic search & chat */
+"error.embedding_unavailable" = "La ricerca semantica sul dispositivo non è disponibile: %@";
+"error.semantic_index" = "Impossibile creare l'indice semantico: %@";
+"error.embedding_no_model" = "Nessun modello di embedding sul dispositivo è disponibile per questo dispositivo.";
+"error.embedding_no_assets" = "Impossibile scaricare il modello linguistico sul dispositivo.";
+"error.provider_no_chat" = "Questo provider non supporta la chat.";
+"tab.chat" = "Chat";
+"meetings.ask" = "Chiedi";
+"chat.error.empty_question" = "Scrivi una domanda.";
+"chat.thinking" = "Sto pensando…";
+"chat.starter.title" = "Fai una domanda su questa riunione";
+"chat.starter.subtitle" = "Le risposte si basano sulla trascrizione, con timestamp che puoi toccare.";
+"chat.placeholder" = "Fai una domanda…";
+"chat.disabled.title" = "La ricerca semantica è disattivata";
+"chat.disabled.subtitle" = "Attiva la ricerca semantica in Impostazioni per chattare sulle tue riunioni.";
+"chat.no_index.title" = "Non c'è ancora nulla di cui parlare";
+"chat.no_index.subtitle" = "Trascrivi prima una riunione, poi fai domande su ciò che è stato detto.";
+"chat.ask.title" = "Interroga le tue riunioni";
+"settings.semantic_search_title" = "Ricerca semantica e chat";
+"settings.semantic_search" = "Ricerca semantica";
+"settings.semantic_indexed_passages" = "Passaggi indicizzati";
+"settings.semantic_rebuild" = "Ricostruisci indice";
+"settings.semantic_rebuilding" = "Ricostruzione…";
+"settings.semantic_clear" = "Cancella indice";
+"settings.semantic_search_footer" = "Trova le riunioni per significato e alimenta la chat, usando un modello sul dispositivo. Il testo e i vettori restano cifrati sul tuo dispositivo.";

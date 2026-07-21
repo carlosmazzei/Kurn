@@ -15,8 +15,16 @@ struct SettingsView: View {
     // section builders and actions can live in an `extension` in
     // `SettingsSections.swift`, keeping this file under SwiftLint's length limit.
     @Environment(AppSettings.self) var settings
+    @Environment(SemanticIndexCoordinator.self) var semanticIndex
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
+
+    /// Count of indexed passages shown in the semantic-search section, refreshed
+    /// on appear and after a rebuild/clear.
+    @State var semanticChunkCount = 0
+    /// True while a rebuild is running, so the buttons show progress and can't
+    /// be re-triggered.
+    @State var isRebuildingIndex = false
 
     @State var storageText = "—"
     @State var showingDeleteConfirm = false
@@ -135,6 +143,9 @@ struct SettingsView: View {
             } footer: {
                 Text(NSLocalizedString("settings.auto_tagging_footer", comment: "Auto-tagging footer"))
             }
+
+            // MARK: Semantic search & chat
+            semanticSearchSection(settings: settings)
 
             // MARK: Summary templates
             Section {

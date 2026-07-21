@@ -16,6 +16,59 @@ import SwiftUI
 extension SettingsView {
 
     @ViewBuilder
+    func semanticSearchSection(settings: AppSettings) -> some View {
+        Section {
+            Toggle(
+                NSLocalizedString("settings.semantic_search", comment: "Semantic search toggle"),
+                isOn: Binding(
+                    get: { settings.semanticSearchEnabled },
+                    set: { settings.semanticSearchEnabled = $0 }
+                )
+            )
+            LabeledContent(
+                NSLocalizedString("settings.semantic_indexed_passages", comment: "Indexed passages"),
+                value: "\(semanticChunkCount)"
+            )
+            Button {
+                Task {
+                    isRebuildingIndex = true
+                    await semanticIndex.rebuild()
+                    semanticChunkCount = semanticIndex.indexedChunkCount()
+                    isRebuildingIndex = false
+                }
+            } label: {
+                if isRebuildingIndex {
+                    HStack {
+                        ProgressView()
+                        Text(NSLocalizedString("settings.semantic_rebuilding", comment: "Rebuilding index"))
+                    }
+                } else {
+                    Label(
+                        NSLocalizedString("settings.semantic_rebuild", comment: "Rebuild index"),
+                        systemImage: "arrow.clockwise"
+                    )
+                }
+            }
+            .disabled(isRebuildingIndex)
+            Button(role: .destructive) {
+                semanticIndex.clearIndex()
+                semanticChunkCount = semanticIndex.indexedChunkCount()
+            } label: {
+                Label(
+                    NSLocalizedString("settings.semantic_clear", comment: "Clear index"),
+                    systemImage: "trash"
+                )
+            }
+            .disabled(isRebuildingIndex || semanticChunkCount == 0)
+        } header: {
+            Text(NSLocalizedString("settings.semantic_search_title", comment: "Semantic search section title"))
+        } footer: {
+            Text(NSLocalizedString("settings.semantic_search_footer", comment: "Semantic search footer"))
+        }
+        .task { semanticChunkCount = semanticIndex.indexedChunkCount() }
+    }
+
+    @ViewBuilder
     func transcriptionSection(settings: AppSettings) -> some View {
         Section {
             // Transcription engine (the stage that turns audio into text).

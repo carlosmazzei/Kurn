@@ -33,6 +33,13 @@ struct MeetingsListView: View {
     /// Set by the context-menu "Share" action; presents `ActivityView`.
     @State private var shareItem: ShareItem?
     @State private var searchText = ""
+    /// Best semantic hit per meeting for the current query, filled by a debounced
+    /// task. Empty when the query is empty or the feature is off, so the list
+    /// falls back to plain substring matching.
+    @State private var semanticHits: [SemanticSearchService.Hit] = []
+    /// Presents the library-wide "Ask" chat sheet.
+    @State private var showingAsk = false
+    private let semanticSearchService = SemanticSearchService()
     @State private var filter = MeetingFilter()
     @State private var selection: LibrarySelection = .allMeetings
     @State private var showingSidebar = false
@@ -89,13 +96,59 @@ struct MeetingsListView: View {
         selectedSmartFolder?.filter
     }
 
-    private var filtered: [Meeting] {
-        let searched = meetings.filter { meeting in
-            guard selection.contains(meeting, smartFolderFilter: smartFolderFilter) else { return false }
-            guard filter.matches(meeting) else { return false }
-            return meeting.matches(search: searchText)
+    /// Meetings passing the current bucket/folder + structured filter, before any
+    /// text search. Shared by substring and semantic search.
+    private var scoped: [Meeting] {
+        meetings.filter { meeting in
+            selection.contains(meeting, smartFolderFilter: smartFolderFilter)
+                && filter.matches(meeting)
         }
-        return settings.meetingsSortOrder.apply(to: searched)
+    }
+
+    private var filtered: [Meeting] {
+        let base = scoped
+        guard !searchText.isEmpty else { return settings.meetingsSortOrder.apply(to: base) }
+
+        let substring = base.filter { $0.matches(search: searchText) }
+        // Augment with semantically-relevant meetings the substring pass missed,
+        // in descending relevance. When the feature is off or nothing was
+        // embedded yet, `semanticHits` is empty and this is a no-op.
+        guard settings.semanticSearchEnabled, !semanticHits.isEmpty else {
+            return settings.meetingsSortOrder.apply(to: substring)
+        }
+        let substringIDs = Set(substring.map(\.id))
+        let byID = Dictionary(base.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let semanticOnly = semanticHits.compactMap { hit -> Meeting? in
+            guard !substringIDs.contains(hit.meetingID) else { return nil }
+            return byID[hit.meetingID]
+        }
+        return settings.meetingsSortOrder.apply(to: substring) + semanticOnly
+    }
+
+    /// Debounced semantic search: embed the query once and keep the best hit per
+    /// meeting. Runs off the substring path so typing stays instant.
+    private func runSemanticSearch() async {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard settings.semanticSearchEnabled, !query.isEmpty else {
+            semanticHits = []
+            return
+        }
+        // Debounce so we don't embed on every keystroke.
+        try? await Task.sleep(for: .milliseconds(350))
+        guard !Task.isCancelled else { return }
+
+        let candidates = scoped.flatMap { $0.semanticChunks.map(\.searchCandidate) }
+        guard !candidates.isEmpty else {
+            semanticHits = []
+            return
+        }
+        do {
+            let hits = try await semanticSearchService.search(query: query, in: candidates, limit: 40)
+            guard !Task.isCancelled else { return }
+            semanticHits = SemanticSearchService.bestPerMeeting(hits)
+        } catch {
+            semanticHits = []
+        }
     }
 
     private func toggleFavorite(_ meeting: Meeting) {
@@ -282,6 +335,24 @@ struct MeetingsListView: View {
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }
+        .sheet(isPresented: $showingAsk) {
+            NavigationStack {
+                MeetingChatView(meeting: nil, onJump: { hit in
+                    showingAsk = false
+                    if let meeting = meetings.first(where: { $0.id == hit.meetingID }) {
+                        selectedMeeting = meeting
+                    }
+                })
+                .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
+                    }
+                }
+            }
+        }
+        .task(id: searchText) { await runSemanticSearch() }
         .kurnDialog(
             isPresented: Binding(
                 get: { pendingDelete != nil },
@@ -393,6 +464,9 @@ extension MeetingsListView {
                 sidebarTrigger
                 filterMenu
                 Spacer()
+                if settings.semanticSearchEnabled {
+                    askButton
+                }
                 sortMenu
             }
             HStack(spacing: 8) {
@@ -408,6 +482,22 @@ extension MeetingsListView {
                 Spacer(minLength: 0)
             }
         }
+    }
+
+    var askButton: some View {
+        Button { showingAsk = true } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(NSLocalizedString("meetings.ask", comment: "Ask"))
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Theme.accent.opacity(0.12), in: Capsule())
+            .foregroundStyle(Theme.accent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("meetings.ask")
     }
 
     var filterMenu: some View {

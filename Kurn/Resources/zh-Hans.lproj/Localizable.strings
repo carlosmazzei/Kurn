@@ -550,3 +550,29 @@
 /* Markdown task checkboxes */
 "markdown.task.checked" = "已完成任务";
 "markdown.task.unchecked" = "未完成任务";
+
+/* Semantic search & chat */
+"error.embedding_unavailable" = "设备端语义搜索不可用：%@";
+"error.semantic_index" = "无法构建语义索引：%@";
+"error.embedding_no_model" = "此设备没有可用的设备端嵌入模型。";
+"error.embedding_no_assets" = "无法下载设备端语言模型。";
+"error.provider_no_chat" = "此提供方不支持聊天。";
+"tab.chat" = "聊天";
+"meetings.ask" = "提问";
+"chat.error.empty_question" = "请输入问题。";
+"chat.thinking" = "思考中…";
+"chat.starter.title" = "询问这次会议";
+"chat.starter.subtitle" = "回答基于转录内容，并附有可点按的时间戳。";
+"chat.placeholder" = "输入问题…";
+"chat.disabled.title" = "语义搜索已关闭";
+"chat.disabled.subtitle" = "在设置中开启语义搜索，即可就会议内容进行聊天。";
+"chat.no_index.title" = "暂时没有可聊天的内容";
+"chat.no_index.subtitle" = "请先转录一次会议，然后就所说内容提问。";
+"chat.ask.title" = "询问你的会议";
+"settings.semantic_search_title" = "语义搜索与聊天";
+"settings.semantic_search" = "语义搜索";
+"settings.semantic_indexed_passages" = "已索引的片段";
+"settings.semantic_rebuild" = "重建索引";
+"settings.semantic_rebuilding" = "正在重建…";
+"settings.semantic_clear" = "清除索引";
+"settings.semantic_search_footer" = "使用设备端模型按含义查找会议并支持聊天。文本和向量在你的设备上保持加密。";

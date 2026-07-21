@@ -79,6 +79,47 @@ struct AnthropicProvider: LLMProvider {
         }
     }
 
+    // MARK: - Chat (Messages API, plain text)
+
+    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "messages")
+            ?? URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = LLMHTTP.chatTimeout
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Anthropic takes the system prompt as a top-level field; the message
+        // list carries only the user/assistant turns.
+        let wire = messages
+            .filter { $0.role != .system }
+            .map { ["role": $0.role.rawValue, "content": $0.content] }
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": LLMHTTP.chatMaxOutputTokens,
+            "system": systemPrompt,
+            "messages": wire
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+
+        return try LLMHTTP.textResult(
+            from: data,
+            as: MessagesResponse.self,
+            emptyMessage: "empty Anthropic response"
+        ) { decoded in
+            decoded.content
+                .filter { $0.type == "text" }
+                .compactMap { $0.text }
+                .joined()
+        }
+    }
+
 }
 
 // MARK: - Response shapes

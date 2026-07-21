@@ -186,6 +186,16 @@ the `ModelContainer` is created and is a no-op on a fresh install with no
 store file yet. Despite the similar name, it is unrelated to `ModelStore`
 (below), which manages downloaded FluidAudio model files, not app data.
 
+**All meeting-derived persisted data is encrypted at rest by this same
+mechanism.** The semantic-search index (`SemanticChunk` — passage text plus its
+embedding `vectorData`) and any future chat-history model are `@Model`s in the
+one app store, so they inherit `.completeUnlessOpen` automatically. The rule
+this imposes: never write vectors, transcript-derived text, or chat content to a
+loose file, a cache directory, or `UserDefaults` — keep it in the SwiftData
+store. Embedding vectors are stored in-store as raw `Float32` `Data`
+(`Infrastructure/Extensions/VectorData.swift`), deliberately not in a separate
+on-disk vector file, precisely so no unprotected sidecar is introduced.
+
 ### Transcription pipeline (`Services/TranscriptionService.swift`)
 
 Each stage is a protocol seam (`Services/Pipeline/PipelineStages.swift`:
@@ -388,6 +398,36 @@ is, by contrast, a single file compiled into both the `Kurn` and
 `KurnLiveActivityExtension` targets — unlike `WatchCommand`, there was no reason
 for it to drift, so it's shared rather than duplicated.
 
+### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/MeetingChatService.swift`)
+
+On-device semantic search over transcripts plus a retrieval-augmented "chat with
+your meetings", built with **no new external dependency**: embeddings come from
+Apple's `NaturalLanguage` framework (`NLContextualEmbedding`, multilingual,
+loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern as
+`FluidAudioModelStore`), and chat reuses the existing cloud `LLMProvider` stack.
+
+- **Indexing.** After a transcript is persisted, `TranscriptChunker` splits it
+  into short passages (absolute meeting timestamps + dominant speaker),
+  `SemanticIndexService` embeds them off-main, and `SemanticIndexCoordinator`
+  (`@MainActor`, app-wide, created in `KurnApp`) persists them as `SemanticChunk`
+  rows. Indexing is automatic on transcription completion and a low-priority
+  launch/foreground **backfill** re-indexes meetings transcribed before the
+  feature existed (or by an older embedder, tracked via `modelIdentifier`). Gated
+  by `AppSettings.semanticSearchEnabled` (on by default).
+- **Search.** `SemanticSearchService` embeds the query once and ranks stored
+  chunk vectors by cosine similarity (`vDSP` dot product on unit-normalized
+  vectors). `MeetingsListView` runs a debounced hybrid pass: instant substring
+  matching plus semantically-relevant meetings the substring pass missed.
+- **Chat.** `LLMProvider` gained a plain-text `chat(systemPrompt:messages:)`
+  (implemented for OpenAI/Anthropic/Google; no JSON-mode forcing) alongside
+  `summarize`. `MeetingChatService` retrieves top passages, builds a grounded
+  prompt (answer only from excerpts, cite `[mm:ss]`, reply in the transcript
+  language), and calls the configured summary provider. `MeetingChatViewModel` +
+  `MeetingChatView` drive an in-memory conversation, surfaced as a per-meeting
+  Chat tab (`MeetingDetailView`) and a library-wide "Ask" sheet
+  (`MeetingsListView`). History is in-memory only — nothing chat-related is
+  persisted, so there is nothing extra to encrypt.
+
 ### Settings & secrets
 
 `AppSettings` (`@MainActor @Observable`) holds non-secret preferences in
@@ -404,8 +444,11 @@ logging gate reflects the user's choice immediately (also synced once on init).
   a `LocalizedError` whose messages come from `NSLocalizedString`. New error cases
   must add a matching localization key.
 - **Localization:** user-facing strings use `NSLocalizedString`; the app ships
-  English and Brazilian Portuguese (`Kurn/Resources/`). `displayName` on enums is the
-  localization seam.
+  **seven languages** — English, Brazilian Portuguese, Spanish, French, Italian,
+  German, and Simplified Chinese (`Kurn/Resources/{en,pt-BR,es,fr,it,de,zh-Hans}.lproj/`).
+  Every new user-facing string must be added as a key to **all seven**
+  `Localizable.strings` files in the same change — none skipped. `displayName` on
+  enums is the localization seam.
 - **Logging:** use `AppLog.<category>` (subsystem `ai.kurn.app`), which wraps
   `os.Logger` in a `CategoryLogger` that gates every message by `AppLog.minimumLevel`.
   Pick the severity per call site — `.debug` for high-frequency/per-iteration traces,

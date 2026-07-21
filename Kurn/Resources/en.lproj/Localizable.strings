@@ -550,3 +550,29 @@
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Completed task";
 "markdown.task.unchecked" = "Open task";
+
+/* Semantic search & chat */
+"error.embedding_unavailable" = "On-device semantic search is unavailable: %@";
+"error.semantic_index" = "Could not build the semantic index: %@";
+"error.embedding_no_model" = "No on-device embedding model is available for this device.";
+"error.embedding_no_assets" = "The on-device language model could not be downloaded.";
+"error.provider_no_chat" = "This provider does not support chat.";
+"tab.chat" = "Chat";
+"meetings.ask" = "Ask";
+"chat.error.empty_question" = "Please type a question.";
+"chat.thinking" = "Thinking…";
+"chat.starter.title" = "Ask about this meeting";
+"chat.starter.subtitle" = "Answers are grounded in the transcript, with timestamps you can tap.";
+"chat.placeholder" = "Ask a question…";
+"chat.disabled.title" = "Semantic search is off";
+"chat.disabled.subtitle" = "Turn on semantic search in Settings to chat about your meetings.";
+"chat.no_index.title" = "Nothing to chat about yet";
+"chat.no_index.subtitle" = "Transcribe a meeting first, then ask questions about what was said.";
+"chat.ask.title" = "Ask your meetings";
+"settings.semantic_search_title" = "Semantic Search & Chat";
+"settings.semantic_search" = "Semantic search";
+"settings.semantic_indexed_passages" = "Indexed passages";
+"settings.semantic_rebuild" = "Rebuild index";
+"settings.semantic_rebuilding" = "Rebuilding…";
+"settings.semantic_clear" = "Clear index";
+"settings.semantic_search_footer" = "Finds meetings by meaning and powers chat, using an on-device model. Text and vectors stay encrypted on your device.";
