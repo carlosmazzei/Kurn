@@ -15,6 +15,17 @@ import SwiftData
 import SwiftUI
 
 struct MeetingsListView: View {
+    /// Max number of semantic-only meetings appended to the substring matches.
+    /// A hard cap is what keeps search feeling like a filter: without it, the
+    /// permissive similarity floor of on-device embeddings floods the list.
+    private static let semanticResultLimit = 5
+    /// Minimum cosine similarity for a chunk to count. `NLContextualEmbedding`
+    /// mean-pooled vectors aren't zero-centered, so this floor is well above 0.
+    private static let semanticMinScore: Float = 0.35
+    /// Keep only meetings within this margin of the top match, so a query with
+    /// one clearly-relevant meeting doesn't drag in loosely-related ones.
+    private static let semanticScoreMargin: Float = 0.06
+
     @Environment(\.modelContext) private var modelContext
     @Environment(AppSettings.self) private var settings
     @Environment(RecordingAccessGate.self) private var accessGate
@@ -143,12 +154,22 @@ struct MeetingsListView: View {
             return
         }
         do {
-            let hits = try await semanticSearchService.search(query: query, in: candidates, limit: 40)
+            let hits = try await semanticSearchService.search(
+                query: query, in: candidates, limit: 30, minScore: Self.semanticMinScore
+            )
             guard !Task.isCancelled else { return }
-            semanticHits = SemanticSearchService.bestPerMeeting(hits)
+            semanticHits = Self.boundedHits(SemanticSearchService.bestPerMeeting(hits))
         } catch {
             semanticHits = []
         }
+    }
+
+    /// Keep only meetings close to the top match, capped to a few, so semantic
+    /// results augment the substring filter instead of flooding it.
+    private static func boundedHits(_ hits: [SemanticSearchService.Hit]) -> [SemanticSearchService.Hit] {
+        guard let top = hits.first?.score else { return [] }
+        let floor = top - semanticScoreMargin
+        return Array(hits.filter { $0.score >= floor }.prefix(semanticResultLimit))
     }
 
     private func toggleFavorite(_ meeting: Meeting) {
