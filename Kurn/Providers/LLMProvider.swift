@@ -423,6 +423,8 @@ enum SummaryPrompt {
         prose everywhere else — do not force formatting where it does not help.
         "items" entries render as bullets; start an entry with "[ ] " or "[x] " to \
         render it as a task checkbox instead.
+        Use real line breaks inside "body" — never write the two characters \
+        backslash-n. Keep each "items" entry to a single line.
         Translate the section titles into the transcript's language.
         Output ONLY the JSON object itself — no markdown fences around it.
         """

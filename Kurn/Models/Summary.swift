@@ -45,7 +45,12 @@ final class Summary {
     }
 
     var sections: [SummarySection] {
-        get { JSONStorage.decode([SummarySection].self, from: sectionsData) }
+        // Normalize on read so both already-stored and new summaries are cleaned
+        // in one place: some models double-escape newlines in the JSON they
+        // return, which would otherwise render as a literal "\n". Every consumer
+        // (views, export) reads through this getter, so the fix reaches all of
+        // them without a migration.
+        get { JSONStorage.decode([SummarySection].self, from: sectionsData).map { $0.normalizedWhitespace() } }
         set { sectionsData = JSONStorage.encode(newValue) }
     }
 

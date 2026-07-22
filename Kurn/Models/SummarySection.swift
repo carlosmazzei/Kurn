@@ -24,4 +24,15 @@ struct SummarySection: Codable, Sendable, Hashable {
         self.body = body
         self.items = items
     }
+
+    /// A copy with any literal `\n`/`\t` escape sequences (from a model that
+    /// double-escaped its JSON) turned back into real whitespace, so the section
+    /// renders and exports as intended instead of showing "\n".
+    func normalizedWhitespace() -> SummarySection {
+        SummarySection(
+            title: title.unescapingLiteralWhitespace(),
+            body: body.unescapingLiteralWhitespace(),
+            items: items.map { $0.unescapingLiteralWhitespace() }
+        )
+    }
 }
