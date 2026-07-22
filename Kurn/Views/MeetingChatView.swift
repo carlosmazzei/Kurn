@@ -23,6 +23,7 @@ struct MeetingChatView: View {
 
     @State private var vm = MeetingChatViewModel()
     @State private var input = ""
+    @FocusState private var inputFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,6 +55,11 @@ struct MeetingChatView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             }
+            .scrollDismissesKeyboard(.interactively)
+            // Tap on the message area lowers the keyboard. `simultaneousGesture`
+            // (not `onTapGesture`) so it doesn't swallow citation-button taps or
+            // block scrolling.
+            .simultaneousGesture(TapGesture().onEnded { inputFocused = false })
             .onChange(of: vm.turns.count) { _, _ in
                 if let last = vm.turns.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
             }
@@ -139,6 +145,7 @@ struct MeetingChatView: View {
             )
             .lineLimit(1...4)
             .textFieldStyle(.plain)
+            .focused($inputFocused)
             .padding(.horizontal, 14).padding(.vertical, 10)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.separator, lineWidth: 1))
@@ -209,6 +216,7 @@ struct MeetingChatView: View {
         let model = settings.summaryModel(for: provider)
         vm.send(question: input, candidates: candidates(), provider: provider, model: model)
         input = ""
+        inputFocused = false
     }
 
     /// Snapshot the chunks to search over: this meeting's, or every meeting's
