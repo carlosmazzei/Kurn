@@ -42,6 +42,7 @@ final class MeetingChatViewModel {
         transcriptText: String?,
         candidates: [SemanticSearchService.Candidate],
         summariesByMeeting: [UUID: String] = [:],
+        articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
         provider: AIProvider,
         model: String
     ) {
@@ -64,7 +65,8 @@ final class MeetingChatViewModel {
                 } else {
                     answer = try await chatService.answerAcrossLibrary(
                         question: trimmed, history: history, candidates: candidates,
-                        summariesByMeeting: summariesByMeeting, provider: provider, model: model
+                        summariesByMeeting: summariesByMeeting, articlesByMeeting: articlesByMeeting,
+                        provider: provider, model: model
                     )
                 }
                 self.turns.append(Turn(role: .assistant, text: answer.text, citations: answer.citations))

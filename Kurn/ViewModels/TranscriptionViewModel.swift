@@ -75,6 +75,9 @@ final class TranscriptionViewModel {
     /// App-wide semantic-index coordinator, set by `KurnApp`. A finished
     /// transcription updates the meeting's on-device index through it.
     var semanticIndexCoordinator: SemanticIndexCoordinator?
+    /// App-wide wiki coordinator, set by `KurnApp`. A finished transcription
+    /// refreshes the meeting's condensed wiki article through it (opt-in).
+    var wikiCoordinator: WikiCoordinator?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -289,6 +292,9 @@ final class TranscriptionViewModel {
             // searchable and available to chat retrieval. Best-effort and gated
             // on the feature toggle inside the coordinator.
             await semanticIndexCoordinator?.indexIfEnabled(recording.meeting)
+            // Refresh the meeting's condensed wiki article for the library-wide
+            // chat's synthesis path. Opt-in and key-gated inside the coordinator.
+            await wikiCoordinator?.generateIfEnabled(recording.meeting)
         } catch is CancellationError {
             await drainEvents()
             if stoppingIDs.remove(recordingID) != nil {

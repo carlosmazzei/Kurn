@@ -49,6 +49,10 @@ struct KurnApp: App {
     /// completion path and the launch/foreground backfill sweep. One instance so
     /// both operate on the same main context.
     @State private var semanticIndex: SemanticIndexCoordinator
+    /// App-wide wiki coordinator, shared by the transcription completion path and
+    /// the launch/foreground backfill sweep. One instance so both operate on the
+    /// same main context.
+    @State private var wiki: WikiCoordinator
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -63,7 +67,8 @@ struct KurnApp: App {
             Folder.self,
             Tag.self,
             SmartFolder.self,
-            SemanticChunk.self
+            SemanticChunk.self,
+            WikiArticle.self
         ])
         #if DEBUG
         // App Store screenshot automation (fastlane `snapshot` + KurnUITests):
@@ -108,6 +113,9 @@ struct KurnApp: App {
         _semanticIndex = State(
             initialValue: SemanticIndexCoordinator(modelContext: container.mainContext)
         )
+        _wiki = State(
+            initialValue: WikiCoordinator(modelContext: container.mainContext)
+        )
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()
@@ -147,6 +155,7 @@ struct KurnApp: App {
                     .environment(accessGate)
                     .environment(transcription)
                     .environment(semanticIndex)
+                    .environment(wiki)
                 // Covers meeting/transcript content in the app-switcher
                 // snapshot taken while the scene isn't active.
                 if scenePhase != .active {
@@ -156,7 +165,9 @@ struct KurnApp: App {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 transcription.appSettings = settings
                 semanticIndex.appSettings = settings
+                wiki.appSettings = settings
                 transcription.semanticIndexCoordinator = semanticIndex
+                transcription.wikiCoordinator = wiki
                 // Lock the recordings gate whenever the app leaves the
                 // foreground so the next time it comes back the user has
                 // to authenticate again. Only `.background` triggers this —
@@ -198,6 +209,11 @@ struct KurnApp: App {
                     // embedder). Low-priority, cancellable, and a no-op when the
                     // feature is off or everything is already indexed.
                     Task(priority: .utility) { await semanticIndex.backfill() }
+                    // Backfill the LLM-generated wiki for meetings without an
+                    // up-to-date article. Opt-in, key-gated, and batch-limited
+                    // inside the coordinator, so this is a no-op unless the user
+                    // turned the feature on.
+                    Task(priority: .utility) { await wiki.backfill() }
                 }
                 // Pre-warm the FluidAudio ASR model while the app is in the
                 // foreground. The one-time CoreML/ANE compilation costs tens

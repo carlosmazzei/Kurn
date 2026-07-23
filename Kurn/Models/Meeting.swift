@@ -59,6 +59,14 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \SemanticChunk.meeting)
     var semanticChunks: [SemanticChunk]
 
+    /// LLM-generated condensed "wiki" of this meeting, used by the library-wide
+    /// chat's synthesis path. One per meeting; regenerated when the transcript or
+    /// generating model changes. Cascade-deleted with the meeting. Optional and
+    /// defaulted to `nil` so it's a lightweight-additive migration for meetings
+    /// created before this field existed.
+    @Relationship(deleteRule: .cascade, inverse: \WikiArticle.meeting)
+    var wikiArticle: WikiArticle?
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -81,6 +89,7 @@ final class Meeting {
         self.speakers = []
         self.summaries = []
         self.semanticChunks = []
+        self.wikiArticle = nil
     }
 
     /// Convenience: whether the meeting is currently archived.
@@ -135,6 +144,23 @@ final class Meeting {
 
     var hasAnyTranscript: Bool {
         recordings.contains { $0.transcript != nil }
+    }
+
+    /// The whole meeting transcript as one prompt-ready string of
+    /// `[mm:ss] Speaker: text` lines across every recording, in chronological
+    /// order with each recording's offset applied so timestamps read as one
+    /// continuous timeline. Empty when nothing is transcribed. Shared by the
+    /// summary/wiki generation and full-context chat so the assembly lives in one
+    /// place; the semantic indexer needs per-recording structure and keeps its
+    /// own variant.
+    func assembledTranscriptText() -> String {
+        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = recordings
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .compactMap { recording in
+                guard let segments = recording.transcript?.segments, !segments.isEmpty else { return nil }
+                return (offset: startOffset(of: recording), segments: segments)
+            }
+        return SummaryService.assembleTranscriptText(from: groups)
     }
 
     /// Whether this meeting contains `needle` anywhere the meetings list
