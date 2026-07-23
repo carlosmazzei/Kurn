@@ -41,6 +41,7 @@ final class MeetingChatViewModel {
         question: String,
         transcriptText: String?,
         candidates: [SemanticSearchService.Candidate],
+        summariesByMeeting: [UUID: String] = [:],
         provider: AIProvider,
         model: String
     ) {
@@ -49,9 +50,7 @@ final class MeetingChatViewModel {
 
         turns.append(Turn(role: .user, text: trimmed))
         isResponding = true
-        // Prior turns as plain history (without their retrieval contexts, to
-        // keep the token cost down); the current question carries fresh context.
-        let history = Array(turns.dropLast().map { ChatMessage(role: $0.role, content: $0.text) })
+        let history = Self.buildHistory(from: Array(turns.dropLast()))
 
         task = Task { [weak self] in
             guard let self else { return }
@@ -64,8 +63,8 @@ final class MeetingChatViewModel {
                     )
                 } else {
                     answer = try await chatService.answerAcrossLibrary(
-                        question: trimmed, history: history,
-                        candidates: candidates, provider: provider, model: model
+                        question: trimmed, history: history, candidates: candidates,
+                        summariesByMeeting: summariesByMeeting, provider: provider, model: model
                     )
                 }
                 self.turns.append(Turn(role: .assistant, text: answer.text, citations: answer.citations))
@@ -79,6 +78,29 @@ final class MeetingChatViewModel {
             self.isResponding = false
             self.task = nil
         }
+    }
+
+    /// Prior turns as chat history. Turns are plain text to keep token cost
+    /// down, but the most recent answer's retrieved excerpts are re-appended as a
+    /// compact context block so follow-up questions stay grounded in what the
+    /// previous answer was based on. (Full per-turn context is intentionally not
+    /// kept — that is the synthesis path's job, not the lookup path's.)
+    static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
+        var history = prior.map { ChatMessage(role: $0.role, content: $0.text) }
+        if let lastAnswer = prior.last(where: { $0.role == .assistant }),
+           !lastAnswer.citations.isEmpty {
+            history.append(ChatMessage(role: .user, content: contextBlock(from: lastAnswer.citations)))
+        }
+        return history
+    }
+
+    /// A short, bounded reminder of the excerpts the previous answer used.
+    private static func contextBlock(from hits: [SemanticSearchService.Hit]) -> String {
+        let lines = hits.prefix(8).map { hit -> String in
+            let meeting = hit.meetingTitle.isEmpty ? "" : " (\(hit.meetingTitle))"
+            return "[\(hit.start.clockDisplay)]\(meeting) \(hit.speakerLabel): \(hit.text)"
+        }.joined(separator: "\n")
+        return "For reference, my previous answer was grounded on these excerpts:\n\(lines)"
     }
 
     /// Cancel an in-flight reply.

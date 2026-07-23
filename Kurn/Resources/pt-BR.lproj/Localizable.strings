@@ -561,6 +561,7 @@
 "meetings.ask" = "Perguntar";
 "chat.error.empty_question" = "Digite uma pergunta.";
 "chat.thinking" = "Pensando…";
+"chat.untitled_meeting" = "Reunião sem título";
 "chat.starter.title" = "Pergunte sobre esta reunião";
 "chat.starter.subtitle" = "As respostas se baseiam na transcrição, com carimbos de tempo que você pode tocar.";
 "chat.placeholder" = "Faça uma pergunta…";

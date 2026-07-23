@@ -125,6 +125,14 @@ struct MeetingChatView: View {
         }
     }
 
+    /// Citation chip text. In the library-wide ask the meeting title is shown so
+    /// a quote can be traced to its source meeting; per-meeting scope omits it.
+    private func citationLabel(for hit: SemanticSearchService.Hit) -> String {
+        let base = "\(hit.start.clockDisplay) · \(hit.speakerLabel)"
+        guard meeting == nil, !hit.meetingTitle.isEmpty else { return base }
+        return "\(hit.meetingTitle) · \(base)"
+    }
+
     private func citations(_ hits: [SemanticSearchService.Hit]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -132,7 +140,7 @@ struct MeetingChatView: View {
                     Button { onJump?(hit) } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "quote.opening").font(.system(size: 10))
-                            Text("\(hit.start.clockDisplay) · \(hit.speakerLabel)")
+                            Text(citationLabel(for: hit))
                                 .font(.system(size: 12, weight: .medium))
                         }
                         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -243,6 +251,10 @@ struct MeetingChatView: View {
         canChat && !vm.isResponding && !input.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Max characters of a meeting's summary passed to the library chat as an
+    /// overview, so overviews stay a connective aid without dominating the prompt.
+    private static let summaryContextLimit = 1_500
+
     private func send() {
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
@@ -250,11 +262,29 @@ struct MeetingChatView: View {
             question: input,
             transcriptText: meetingTranscriptText(),
             candidates: candidates(),
+            summariesByMeeting: summariesByMeeting(),
             provider: provider,
             model: model
         )
         input = ""
         inputFocused = false
+    }
+
+    /// Per-meeting summary overviews for the library-wide ask (meetingID →
+    /// condensed markdown). Empty for single-meeting scope, which grounds on the
+    /// full transcript instead. Built here on the main actor; the service only
+    /// renders the ones whose meeting shows up in the retrieved excerpts.
+    private func summariesByMeeting() -> [UUID: String] {
+        guard meeting == nil else { return [:] }
+        let meetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
+        var result: [UUID: String] = [:]
+        for item in meetings {
+            guard let summary = item.latestSummary else { continue }
+            let markdown = SummaryService.markdownText(from: summary.sections)
+            guard !markdown.isEmpty else { continue }
+            result[item.id] = String(markdown.prefix(Self.summaryContextLimit))
+        }
+        return result
     }
 
     /// Snapshot the chunks to search over: this meeting's, or every meeting's

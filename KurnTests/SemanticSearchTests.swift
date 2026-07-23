@@ -110,6 +110,25 @@ struct SemanticSearchTests {
         #expect(best.first?.text == "top")
     }
 
+    @Test func diversifyCapsHitsPerMeetingPreservingRank() {
+        let m1 = UUID()
+        let m2 = UUID()
+        func h(_ text: String, meeting: UUID, score: Float) -> SemanticSearchService.Hit {
+            SemanticSearchService.Hit(chunkID: UUID(), meetingID: meeting, recordingID: UUID(),
+                                      text: text, start: 0, end: 1, speakerLabel: "S1", score: score)
+        }
+        // Ranked order: a1, a2, a3 (m1), b1 (m2).
+        let hits = [
+            h("a1", meeting: m1, score: 0.9), h("a2", meeting: m1, score: 0.8),
+            h("a3", meeting: m1, score: 0.7), h("b1", meeting: m2, score: 0.6)
+        ]
+        let diversified = SemanticSearchService.diversify(hits, maxPerMeeting: 2)
+        #expect(diversified.map(\.text) == ["a1", "a2", "b1"])
+        // maxPerMeeting: 1 matches bestPerMeeting.
+        #expect(SemanticSearchService.diversify(hits, maxPerMeeting: 1).map(\.text) == ["a1", "b1"])
+        #expect(SemanticSearchService.diversify(hits, maxPerMeeting: 0).isEmpty)
+    }
+
     @Test func emptyQueryReturnsNoHits() async throws {
         let service = SemanticSearchService(embedder: StubEmbedder(table: [:]))
         let hits = try await service.search(query: "   ", in: [], minScore: 0)

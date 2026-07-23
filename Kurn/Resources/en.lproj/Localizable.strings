@@ -561,6 +561,7 @@
 "meetings.ask" = "Ask";
 "chat.error.empty_question" = "Please type a question.";
 "chat.thinking" = "Thinking…";
+"chat.untitled_meeting" = "Untitled meeting";
 "chat.starter.title" = "Ask about this meeting";
 "chat.starter.subtitle" = "Answers are grounded in the transcript, with timestamps you can tap.";
 "chat.placeholder" = "Ask a question…";

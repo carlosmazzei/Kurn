@@ -30,6 +30,12 @@ struct SemanticSearchService {
         var end: TimeInterval
         var speakerLabel: String
         var vector: [Float]
+        /// Owning meeting's display title, read on the main actor when the
+        /// snapshot is built. Lets the library-wide chat attribute a passage to a
+        /// meeting and compare across meetings — the raw chunk carries none.
+        var meetingTitle: String = ""
+        /// Owning meeting's creation date, for the same attribution.
+        var meetingDate: Date = .distantPast
     }
 
     /// A ranked passage, carrying enough to render a snippet and deep-link to
@@ -44,6 +50,11 @@ struct SemanticSearchService {
         var end: TimeInterval
         var speakerLabel: String
         var score: Float
+        /// Owning meeting's display title, carried through from the `Candidate`
+        /// so citations and the library prompt can name their source meeting.
+        var meetingTitle: String = ""
+        /// Owning meeting's creation date.
+        var meetingDate: Date = .distantPast
     }
 
     /// Embed `query` once and return the top `limit` candidates whose cosine
@@ -67,16 +78,7 @@ struct SemanticSearchService {
         for candidate in candidates where candidate.vector.count == queryVector.count {
             let score = vDSP.dot(queryVector, candidate.vector)
             guard score >= minScore else { continue }
-            hits.append(Hit(
-                chunkID: candidate.chunkID,
-                meetingID: candidate.meetingID,
-                recordingID: candidate.recordingID,
-                text: candidate.text,
-                start: candidate.start,
-                end: candidate.end,
-                speakerLabel: candidate.speakerLabel,
-                score: score
-            ))
+            hits.append(makeHit(from: candidate, score: score))
         }
 
         hits.sort { $0.score > $1.score }
@@ -130,7 +132,9 @@ struct SemanticSearchService {
             start: candidate.start,
             end: candidate.end,
             speakerLabel: candidate.speakerLabel,
-            score: score
+            score: score,
+            meetingTitle: candidate.meetingTitle,
+            meetingDate: candidate.meetingDate
         )
     }
 
@@ -188,14 +192,25 @@ struct SemanticSearchService {
         return score.map { (index: $0.key, score: $0.value) }.sorted { $0.score > $1.score }
     }
 
-    /// Best hit per meeting (highest score), preserving global rank order —
-    /// used by the meetings list, which shows one row per meeting.
-    static func bestPerMeeting(_ hits: [Hit]) -> [Hit] {
-        var seen = Set<UUID>()
+    /// Keep at most `maxPerMeeting` hits from any one meeting, preserving global
+    /// rank order. Used by the library-wide chat to diversify the pool before
+    /// reranking so one highly-relevant meeting can't crowd out the rest.
+    static func diversify(_ hits: [Hit], maxPerMeeting: Int) -> [Hit] {
+        guard maxPerMeeting > 0 else { return [] }
+        var counts: [UUID: Int] = [:]
         var result: [Hit] = []
-        for hit in hits where seen.insert(hit.meetingID).inserted {
+        for hit in hits {
+            let count = counts[hit.meetingID, default: 0]
+            guard count < maxPerMeeting else { continue }
+            counts[hit.meetingID] = count + 1
             result.append(hit)
         }
         return result
+    }
+
+    /// Best hit per meeting (highest score), preserving global rank order —
+    /// used by the meetings list, which shows one row per meeting.
+    static func bestPerMeeting(_ hits: [Hit]) -> [Hit] {
+        diversify(hits, maxPerMeeting: 1)
     }
 }

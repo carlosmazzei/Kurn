@@ -33,10 +33,25 @@ struct MeetingChatService {
         var citations: [SemanticSearchService.Hit]
     }
 
-    /// Passages fed to the model after reranking.
+    /// Whether retrieval is grounding a single meeting or the whole library.
+    /// Library scope diversifies across meetings and attributes each excerpt to
+    /// its source meeting; single-meeting scope keeps the original behaviour.
+    enum Scope {
+        case singleMeeting
+        case library
+    }
+
+    /// Passages fed to the model after reranking (single-meeting scope).
     static let retrievalLimit = 10
     /// Candidate pool size pulled from hybrid retrieval before reranking.
     static let poolSize = 30
+    /// Wider pool for the library-wide "Ask": more meetings can contribute.
+    static let libraryPoolSize = 60
+    /// Larger answer window for the library so synthesis has more to work with.
+    static let libraryRetrievalLimit = 20
+    /// Cap on excerpts kept from any single meeting before reranking, so one
+    /// highly-relevant meeting can't crowd out the rest of the library.
+    static let maxHitsPerMeeting = 3
 
     // MARK: - Entry points
 
@@ -62,20 +77,29 @@ struct MeetingChatService {
             )
             return Answer(text: text, citations: [])
         }
-        return try await retrievedAnswer(question: trimmed, history: history, candidates: candidates, llm: llm)
+        return try await retrievedAnswer(
+            question: trimmed, history: history, candidates: candidates, scope: .singleMeeting, llm: llm
+        )
     }
 
-    /// Answer across the whole library (the "Ask" sheet). Always retrieval.
+    /// Answer across the whole library (the "Ask" sheet). Always retrieval, in
+    /// library scope: excerpts are diversified across meetings and attributed to
+    /// their source meeting, and any per-meeting summaries in `summariesByMeeting`
+    /// (meetingID → condensed markdown) are given to the model as overviews.
     func answerAcrossLibrary(
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
+        summariesByMeeting: [UUID: String] = [:],
         provider: AIProvider,
         model: String
     ) async throws -> Answer {
         let trimmed = try Self.requireQuestion(question)
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
-        return try await retrievedAnswer(question: trimmed, history: history, candidates: candidates, llm: llm)
+        return try await retrievedAnswer(
+            question: trimmed, history: history, candidates: candidates,
+            scope: .library, summariesByMeeting: summariesByMeeting, llm: llm
+        )
     }
 
     // MARK: - Retrieval pipeline
@@ -84,33 +108,45 @@ struct MeetingChatService {
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
+        scope: Scope,
+        summariesByMeeting: [UUID: String] = [:],
         llm: LLMProvider
     ) async throws -> Answer {
+        let poolSize = scope == .library ? Self.libraryPoolSize : Self.poolSize
+        let limit = scope == .library ? Self.libraryRetrievalLimit : Self.retrievalLimit
+
         // 1. Rewrite/expand the query for better dense + lexical recall (best effort).
         let expansion = try? await rewriteQuery(question, llm: llm)
         let denseText = expansion.map { "\(question)\n\($0)" } ?? question
         let lexicalQuery = expansion.map { "\(question) \($0)" } ?? question
 
         // 2. Hybrid retrieval → candidate pool.
-        let pool = try await searchService.hybridSearch(
-            query: lexicalQuery, denseText: denseText, in: candidates, poolSize: Self.poolSize
+        var pool = try await searchService.hybridSearch(
+            query: lexicalQuery, denseText: denseText, in: candidates, poolSize: poolSize
         )
         guard !pool.isEmpty else {
+            let empty = Self.userPrompt(question: question, hits: [], scope: scope, summaries: [:])
             let text = try await llm.chat(
-                systemPrompt: Self.systemPrompt,
-                messages: history + [ChatMessage(role: .user, content: Self.userPrompt(question: question, hits: []))]
+                systemPrompt: Self.systemPrompt(for: scope),
+                messages: history + [ChatMessage(role: .user, content: empty)]
             )
             return Answer(text: text, citations: [])
         }
 
+        // 2b. Diversify across meetings so the rerank sees breadth, not ten
+        // passages from one meeting (library scope only).
+        if scope == .library {
+            pool = SemanticSearchService.diversify(pool, maxPerMeeting: Self.maxHitsPerMeeting)
+        }
+
         // 3. Rerank with the LLM (best effort; degrade to fused order).
-        let top = (try? await rerank(question: question, pool: pool, llm: llm))
-            ?? Array(pool.prefix(Self.retrievalLimit))
+        let top = (try? await rerank(question: question, pool: pool, limit: limit, llm: llm))
+            ?? Array(pool.prefix(limit))
 
         // 4. Grounded answer.
-        let userPrompt = Self.userPrompt(question: question, hits: top)
+        let userPrompt = Self.userPrompt(question: question, hits: top, scope: scope, summaries: summariesByMeeting)
         let text = try await llm.chat(
-            systemPrompt: Self.systemPrompt,
+            systemPrompt: Self.systemPrompt(for: scope),
             messages: history + [ChatMessage(role: .user, content: userPrompt)]
         )
         return Answer(text: text, citations: top)
@@ -138,6 +174,7 @@ struct MeetingChatService {
     private func rerank(
         question: String,
         pool: [SemanticSearchService.Hit],
+        limit: Int,
         llm: LLMProvider
     ) async throws -> [SemanticSearchService.Hit]? {
         let numbered = pool.enumerated()
@@ -146,7 +183,7 @@ struct MeetingChatService {
         let system = """
         You rank transcript passages by relevance to a question. Reply with ONLY \
         the numbers of the most relevant passages, most relevant first, comma- \
-        separated (e.g. "4, 1, 9"). Pick at most \(Self.retrievalLimit). Omit \
+        separated (e.g. "4, 1, 9"). Pick at most \(limit). Omit \
         passages that are irrelevant.
         """
         let user = "Question: \(question)\n\nPassages:\n\(numbered)"
@@ -154,7 +191,7 @@ struct MeetingChatService {
 
         let picks = Self.parseIndices(reply, max: pool.count)
         guard !picks.isEmpty else { return nil }
-        return picks.prefix(Self.retrievalLimit).map { pool[$0] }
+        return picks.prefix(limit).map { pool[$0] }
     }
 
     /// Distinct absolute-second timestamps the model cited as `[mm:ss]` or
@@ -247,25 +284,124 @@ struct MeetingChatService {
     - Be concise and direct; quote a speaker verbatim only when it adds clarity.
     """
 
+    /// Grounding for the library-wide retrieval path: excerpts span several
+    /// meetings, each headed by its title and date, so the model must attribute
+    /// and compare across meetings.
+    static let librarySystemPrompt = """
+    You are an assistant that answers questions across a personal library of \
+    meetings, using ONLY the meeting overviews and transcript excerpts provided \
+    in each user message. Follow these rules:
+    - Each excerpt is grouped under the meeting it came from, headed by \
+    "### <meeting title> — <date>". Attribute every claim to a meeting by \
+    naming its title (and date when useful).
+    - When a question spans meetings, compare and connect what the different \
+    meetings say.
+    - Base your answer strictly on the provided overviews and excerpts. Do not \
+    invent facts or use outside knowledge about the participants or topics.
+    - If the material does not contain the answer, say so plainly instead of \
+    guessing.
+    - Cite the moments you rely on using their [mm:ss] timestamps.
+    - Reply in the SAME LANGUAGE as the excerpts.
+    - Be concise and direct; quote a speaker verbatim only when it adds clarity.
+    """
+
+    /// The system prompt for a retrieval scope.
+    static func systemPrompt(for scope: Scope) -> String {
+        switch scope {
+        case .singleMeeting: return systemPrompt
+        case .library: return librarySystemPrompt
+        }
+    }
+
     /// The per-turn user message for the retrieval path: the question plus the
-    /// retrieved passages, rendered as `[mm:ss] Speaker: text` lines to cite.
-    static func userPrompt(question: String, hits: [SemanticSearchService.Hit]) -> String {
-        guard !hits.isEmpty else {
+    /// retrieved passages. Single-meeting scope renders plain `[mm:ss] Speaker:
+    /// text` lines; library scope groups them by meeting (with title/date headers
+    /// and any per-meeting overviews) so the model can attribute across meetings.
+    static func userPrompt(
+        question: String,
+        hits: [SemanticSearchService.Hit],
+        scope: Scope,
+        summaries: [UUID: String]
+    ) -> String {
+        guard !hits.isEmpty else { return emptyPrompt(question: question, scope: scope) }
+        switch scope {
+        case .singleMeeting:
+            let excerpts = hits
+                .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
+                .joined(separator: "\n")
             return """
             Question: \(question)
 
-            No transcript excerpts matched this question. Tell the user you \
-            couldn't find anything about it in the meeting.
+            Relevant excerpts from the meeting transcript:
+            \(excerpts)
             """
+        case .library:
+            return libraryUserPrompt(question: question, hits: hits, summaries: summaries)
         }
-        let excerpts = hits
-            .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
-            .joined(separator: "\n")
+    }
+
+    /// The message when nothing matched, phrased for the scope.
+    private static func emptyPrompt(question: String, scope: Scope) -> String {
+        let closing = scope == .library
+            ? "couldn't find anything about it across their meetings."
+            : "couldn't find anything about it in the meeting."
         return """
         Question: \(question)
 
-        Relevant excerpts from the meeting transcript:
-        \(excerpts)
+        No transcript excerpts matched this question. Tell the user you \
+        \(closing)
         """
+    }
+
+    /// Group hits by meeting, ordered by their best-ranked appearance.
+    private static func groupByMeeting(
+        _ hits: [SemanticSearchService.Hit]
+    ) -> [(id: UUID, hits: [SemanticSearchService.Hit])] {
+        var order: [UUID] = []
+        var grouped: [UUID: [SemanticSearchService.Hit]] = [:]
+        for hit in hits {
+            if grouped[hit.meetingID] == nil { order.append(hit.meetingID) }
+            grouped[hit.meetingID, default: []].append(hit)
+        }
+        return order.map { (id: $0, hits: grouped[$0] ?? []) }
+    }
+
+    /// A `### <title> — <date>` header for the meeting a hit belongs to.
+    private static func meetingHeader(_ hit: SemanticSearchService.Hit) -> String {
+        let title = hit.meetingTitle.isEmpty
+            ? NSLocalizedString("chat.untitled_meeting", comment: "Fallback name for a meeting without a title")
+            : hit.meetingTitle
+        guard hit.meetingDate != .distantPast else { return "### \(title)" }
+        return "### \(title) — \(hit.meetingDate.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    /// Library-wide user message: optional per-meeting overviews, then excerpts
+    /// grouped and attributed by meeting.
+    private static func libraryUserPrompt(
+        question: String,
+        hits: [SemanticSearchService.Hit],
+        summaries: [UUID: String]
+    ) -> String {
+        let groups = groupByMeeting(hits)
+        let excerpts = groups.map { group -> String in
+            let head = group.hits.first.map(meetingHeader) ?? "###"
+            let lines = group.hits
+                .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
+                .joined(separator: "\n")
+            return "\(head)\n\(lines)"
+        }.joined(separator: "\n\n")
+
+        let overviews = groups.compactMap { group -> String? in
+            guard let summary = summaries[group.id], !summary.isEmpty,
+                  let head = group.hits.first.map(meetingHeader) else { return nil }
+            return "\(head)\n\(summary)"
+        }.joined(separator: "\n\n")
+
+        var prompt = "Question: \(question)\n"
+        if !overviews.isEmpty {
+            prompt += "\nMeeting overviews (condensed summaries of the meetings the excerpts below come from):\n\(overviews)\n"
+        }
+        prompt += "\nRelevant excerpts, grouped by meeting (each headed by its title and date):\n\(excerpts)"
+        return prompt
     }
 }

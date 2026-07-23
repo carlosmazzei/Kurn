@@ -88,7 +88,9 @@ final class SemanticChunk {
             start: startTime,
             end: endTime,
             speakerLabel: speakerLabel,
-            vector: vector
+            vector: vector,
+            meetingTitle: meeting?.aiTitle ?? meeting?.title ?? "",
+            meetingDate: meeting?.createdAt ?? .distantPast
         )
     }
 }
