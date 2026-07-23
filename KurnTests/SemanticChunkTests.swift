@@ -83,5 +83,33 @@ struct SemanticChunkTests {
         #expect(candidate.speakerLabel == "Speaker 2")
         #expect(candidate.meetingID == meeting.id)
         #expect(candidate.vector.count == 2)
+        // Meeting identity is carried on the snapshot for cross-meeting attribution.
+        #expect(candidate.meetingTitle == "Planning")
+        #expect(candidate.meetingDate == meeting.createdAt)
+    }
+
+    @Test func searchCandidatePrefersAITitle() throws {
+        let context = makeContext()
+        let meeting = Meeting(title: "Raw transcript excerpt")
+        meeting.aiTitle = "Q3 Budget Review"
+        context.insert(meeting)
+        let chunk = SemanticChunk(
+            meeting: meeting, recordingID: UUID(), text: "x",
+            startTime: 0, endTime: 1, speakerLabel: "S1",
+            vector: [1, 0], modelIdentifier: "test-v1"
+        )
+        context.insert(chunk)
+        try context.save()
+        #expect(chunk.searchCandidate.meetingTitle == "Q3 Budget Review")
+    }
+
+    @Test func searchCandidateWithoutMeetingUsesEmptyIdentity() {
+        let chunk = SemanticChunk(
+            recordingID: UUID(), text: "orphan", startTime: 0, endTime: 1,
+            speakerLabel: "S1", vector: [1, 0], modelIdentifier: "test-v1"
+        )
+        let candidate = chunk.searchCandidate
+        #expect(candidate.meetingTitle.isEmpty)
+        #expect(candidate.meetingDate == .distantPast)
     }
 }

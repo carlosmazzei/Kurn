@@ -561,6 +561,7 @@
 "meetings.ask" = "提问";
 "chat.error.empty_question" = "请输入问题。";
 "chat.thinking" = "思考中…";
+"chat.untitled_meeting" = "未命名会议";
 "chat.starter.title" = "询问这次会议";
 "chat.starter.subtitle" = "回答基于转录内容，并附有可点按的时间戳。";
 "chat.placeholder" = "输入问题…";

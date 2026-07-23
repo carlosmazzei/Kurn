@@ -561,6 +561,7 @@
 "meetings.ask" = "Fragen";
 "chat.error.empty_question" = "Bitte gib eine Frage ein.";
 "chat.thinking" = "Denkt nach …";
+"chat.untitled_meeting" = "Meeting ohne Titel";
 "chat.starter.title" = "Frag zu diesem Meeting";
 "chat.starter.subtitle" = "Antworten basieren auf dem Transkript, mit antippbaren Zeitstempeln.";
 "chat.placeholder" = "Stelle eine Frage …";
