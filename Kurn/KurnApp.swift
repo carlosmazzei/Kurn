@@ -45,6 +45,10 @@ struct KurnApp: App {
     /// detail screen, instead of each screen owning a separate view model whose
     /// per-instance progress can't see a run another instance started.
     @State private var transcription: TranscriptionViewModel
+    /// App-wide semantic-index coordinator, shared by the transcription
+    /// completion path and the launch/foreground backfill sweep. One instance so
+    /// both operate on the same main context.
+    @State private var semanticIndex: SemanticIndexCoordinator
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -58,7 +62,8 @@ struct KurnApp: App {
             Summary.self,
             Folder.self,
             Tag.self,
-            SmartFolder.self
+            SmartFolder.self,
+            SemanticChunk.self
         ])
         #if DEBUG
         // App Store screenshot automation (fastlane `snapshot` + KurnUITests):
@@ -100,6 +105,9 @@ struct KurnApp: App {
         _transcription = State(
             initialValue: TranscriptionViewModel(modelContext: container.mainContext)
         )
+        _semanticIndex = State(
+            initialValue: SemanticIndexCoordinator(modelContext: container.mainContext)
+        )
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()
@@ -138,6 +146,7 @@ struct KurnApp: App {
                     .environment(settings)
                     .environment(accessGate)
                     .environment(transcription)
+                    .environment(semanticIndex)
                 // Covers meeting/transcript content in the app-switcher
                 // snapshot taken while the scene isn't active.
                 if scenePhase != .active {
@@ -146,6 +155,8 @@ struct KurnApp: App {
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
                 transcription.appSettings = settings
+                semanticIndex.appSettings = settings
+                transcription.semanticIndexCoordinator = semanticIndex
                 // Lock the recordings gate whenever the app leaves the
                 // foreground so the next time it comes back the user has
                 // to authenticate again. Only `.background` triggers this —
@@ -182,6 +193,11 @@ struct KurnApp: App {
                         excluding: TranscriptionViewModel.activeTranscriptionIDs
                     )
                     transcription.resumePendingTranscriptions(settings: settings)
+                    // Backfill the on-device semantic index for meetings
+                    // transcribed before indexing existed (or by an older
+                    // embedder). Low-priority, cancellable, and a no-op when the
+                    // feature is off or everything is already indexed.
+                    Task(priority: .utility) { await semanticIndex.backfill() }
                 }
                 // Pre-warm the FluidAudio ASR model while the app is in the
                 // foreground. The one-time CoreML/ANE compilation costs tens

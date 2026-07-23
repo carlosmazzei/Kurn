@@ -53,6 +53,12 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \Summary.owningMeeting)
     var summaries: [Summary]
 
+    /// Embedded transcript passages backing semantic search and chat retrieval.
+    /// Rebuilt (not appended) whenever the meeting is re-indexed; cascade-deleted
+    /// so a removed meeting takes its on-device index with it.
+    @Relationship(deleteRule: .cascade, inverse: \SemanticChunk.meeting)
+    var semanticChunks: [SemanticChunk]
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -74,6 +80,7 @@ final class Meeting {
         self.recordings = []
         self.speakers = []
         self.summaries = []
+        self.semanticChunks = []
     }
 
     /// Convenience: whether the meeting is currently archived.

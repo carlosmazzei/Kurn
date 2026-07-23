@@ -550,3 +550,29 @@
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Erledigte Aufgabe";
 "markdown.task.unchecked" = "Offene Aufgabe";
+
+/* Semantic search & chat */
+"error.embedding_unavailable" = "Die semantische Suche auf dem Gerät ist nicht verfügbar: %@";
+"error.semantic_index" = "Der semantische Index konnte nicht erstellt werden: %@";
+"error.embedding_no_model" = "Für dieses Gerät ist kein Embedding-Modell verfügbar.";
+"error.embedding_no_assets" = "Das Sprachmodell konnte nicht auf das Gerät geladen werden.";
+"error.provider_no_chat" = "Dieser Anbieter unterstützt keinen Chat.";
+"tab.chat" = "Chat";
+"meetings.ask" = "Fragen";
+"chat.error.empty_question" = "Bitte gib eine Frage ein.";
+"chat.thinking" = "Denkt nach …";
+"chat.starter.title" = "Frag zu diesem Meeting";
+"chat.starter.subtitle" = "Antworten basieren auf dem Transkript, mit antippbaren Zeitstempeln.";
+"chat.placeholder" = "Stelle eine Frage …";
+"chat.disabled.title" = "Semantische Suche ist aus";
+"chat.disabled.subtitle" = "Aktiviere die semantische Suche in den Einstellungen, um über deine Meetings zu chatten.";
+"chat.no_index.title" = "Noch nichts zum Chatten";
+"chat.no_index.subtitle" = "Transkribiere zuerst ein Meeting und stelle dann Fragen zum Gesagten.";
+"chat.ask.title" = "Frag deine Meetings";
+"settings.semantic_search_title" = "Semantische Suche & Chat";
+"settings.semantic_search" = "Semantische Suche";
+"settings.semantic_indexed_passages" = "Indizierte Passagen";
+"settings.semantic_rebuild" = "Index neu aufbauen";
+"settings.semantic_rebuilding" = "Neuaufbau …";
+"settings.semantic_clear" = "Index löschen";
+"settings.semantic_search_footer" = "Findet Meetings nach Bedeutung und ermöglicht den Chat mithilfe eines Modells auf dem Gerät. Text und Vektoren bleiben auf deinem Gerät verschlüsselt.";

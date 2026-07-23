@@ -16,6 +16,19 @@ struct SummaryResult: Sendable {
     var sections: [SummarySection]
 }
 
+/// One turn in a chat conversation. `system` is passed separately to
+/// `LLMProvider.chat`, so message lists normally hold only `user`/`assistant`.
+struct ChatMessage: Sendable, Equatable {
+    enum Role: String, Sendable { case system, user, assistant }
+    let role: Role
+    let content: String
+
+    init(role: Role, content: String) {
+        self.role = role
+        self.content = content
+    }
+}
+
 protocol LLMProvider: Sendable {
     /// Vendor this provider represents.
     var provider: AIProvider { get }
@@ -27,6 +40,12 @@ protocol LLMProvider: Sendable {
 
     /// Produce a structured meeting summary from a fully built prompt.
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult
+
+    /// Free-form multi-turn chat completion. Unlike `summarize`, this returns
+    /// plain text (no JSON-section contract), so it backs the "chat with your
+    /// meetings" feature. `systemPrompt` carries the grounding instructions;
+    /// `messages` are the user/assistant turns in order.
+    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String
 }
 
 extension LLMProvider {
@@ -34,6 +53,15 @@ extension LLMProvider {
     func transcribe(audioData: Data, fileName: String, language: MeetingLanguage) async throws -> RawTranscript {
         throw AppError.transcriptionFailed(
             NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
+        )
+    }
+
+    /// Default for vendors without a chat path wired here (e.g. the unused
+    /// standalone Groq client — the factory routes Groq through `OpenAIProvider`).
+    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+        throw AppError.apiError(
+            statusCode: 0,
+            message: NSLocalizedString("error.provider_no_chat", comment: "Provider has no chat")
         )
     }
 }
@@ -52,6 +80,14 @@ enum LLMHTTP {
     /// long-meeting summaries off mid-JSON, which then failed to parse; 8192
     /// leaves room for a detailed multi-section summary on every vendor.
     static let summaryMaxOutputTokens = 8192
+    /// Output budget for chat replies. Smaller than a summary — a grounded
+    /// answer over retrieved passages is short — but generous enough for a
+    /// multi-paragraph explanation with quotes.
+    static let chatMaxOutputTokens = 2048
+    /// Timeout for chat requests. Shorter than a summary (which can generate for
+    /// minutes over a whole transcript); a RAG answer over a few passages is
+    /// quick, and a snappier timeout keeps the chat UI responsive.
+    static let chatTimeout: TimeInterval = 120
     /// Total attempts (initial try + retries) for a transient failure.
     static let maxAttempts = 3
     /// Base unit for exponential backoff. Kept small so the UI isn't blocked
@@ -109,6 +145,31 @@ enum LLMHTTP {
             }
             let json = try SummaryJSON.parse(content)
             return SummaryResult(sections: json.summarySections)
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.decodingError(error.localizedDescription)
+        }
+    }
+
+    /// Decode a chat response and extract its plain-text content. The
+    /// text sibling of `summaryResult`: no JSON-section parsing, just the
+    /// model's reply. Re-throws `AppError`s (e.g. the empty-content failure) so
+    /// they aren't re-wrapped by the generic decode catch.
+    static func textResult<T: Decodable>(
+        from data: Data,
+        as type: T.Type,
+        emptyMessage: String,
+        extractContent: (T) -> String?
+    ) throws -> String {
+        do {
+            let decoded = try JSONDecoder().decode(type, from: data)
+            guard let content = extractContent(decoded)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !content.isEmpty else {
+                throw AppError.decodingError(emptyMessage)
+            }
+            return content
         } catch let error as AppError {
             throw error
         } catch {
@@ -362,6 +423,8 @@ enum SummaryPrompt {
         prose everywhere else — do not force formatting where it does not help.
         "items" entries render as bullets; start an entry with "[ ] " or "[x] " to \
         render it as a task checkbox instead.
+        Use real line breaks inside "body" — never write the two characters \
+        backslash-n. Keep each "items" entry to a single line.
         Translate the section titles into the transcript's language.
         Output ONLY the JSON object itself — no markdown fences around it.
         """

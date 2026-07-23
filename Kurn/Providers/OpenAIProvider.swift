@@ -157,6 +157,38 @@ struct OpenAIProvider: LLMProvider {
         )
     }
 
+    // MARK: - Chat (Chat Completions, plain text)
+
+    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "chat/completions")
+            ?? URL(string: "https://api.openai.com/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = LLMHTTP.chatTimeout
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
+        wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
+        // No `response_format` here: chat replies are prose, not the summary JSON.
+        let body: [String: Any] = [
+            "model": chatModel,
+            "max_completion_tokens": LLMHTTP.chatMaxOutputTokens,
+            "messages": wire
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+
+        return try LLMHTTP.textResult(
+            from: data,
+            as: ChatResponse.self,
+            emptyMessage: "empty chat response"
+        ) { $0.choices.first?.message.content }
+    }
+
     // MARK: - HTTP helpers
 
     private func multipartBody(

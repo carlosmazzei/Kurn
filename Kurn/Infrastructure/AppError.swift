@@ -27,6 +27,8 @@ enum AppError: LocalizedError, Identifiable {
     case autoTaggingFailed(String)
     case summaryTruncated
     case logExportFailed(String)
+    case embeddingUnavailable(String)
+    case semanticIndexFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
@@ -116,6 +118,16 @@ enum AppError: LocalizedError, Identifiable {
         case .logExportFailed(let detail):
             return String(
                 format: NSLocalizedString("error.log_export", comment: "Log export failure"),
+                detail
+            )
+        case .embeddingUnavailable(let detail):
+            return String(
+                format: NSLocalizedString("error.embedding_unavailable", comment: "Embedding model unavailable"),
+                detail
+            )
+        case .semanticIndexFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.semantic_index", comment: "Semantic indexing failed"),
                 detail
             )
         }

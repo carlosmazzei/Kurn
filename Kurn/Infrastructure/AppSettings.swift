@@ -51,6 +51,7 @@ final class AppSettings {
         static let meetingsSortOrder = "settings.meetingsSortOrder"
         static let autoTaggingEnabled = "settings.autoTaggingEnabled"
         static let usageStats = "settings.usageStats"
+        static let semanticSearchEnabled = "settings.semanticSearchEnabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -127,6 +128,16 @@ final class AppSettings {
     /// ASR). Off by default; never replaces the post-recording transcript.
     var liveTranscriptionEnabled: Bool {
         didSet { defaults.set(liveTranscriptionEnabled, forKey: Keys.liveTranscriptionEnabled) }
+    }
+
+    /// Whether on-device semantic indexing, search, and meeting chat retrieval
+    /// are active. On by default: embeddings run fully on-device (Apple's
+    /// `NLContextualEmbedding`, no third-party model), and the vectors persist in
+    /// the encrypted SwiftData store. Turning it off makes list search fall back
+    /// to substring matching and disables the chat retrieval index; it does not
+    /// delete existing chunks (use "Clear index" in Settings for that).
+    var semanticSearchEnabled: Bool {
+        didSet { defaults.set(semanticSearchEnabled, forKey: Keys.semanticSearchEnabled) }
     }
 
     /// When on, the recordings UI requires Face ID / Touch ID / passcode once
@@ -437,6 +448,9 @@ final class AppSettings {
         ) ?? .dateNewest
         autoTaggingEnabled = defaults.object(forKey: Keys.autoTaggingEnabled) as? Bool ?? false
         liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
+        // `object(forKey:)` so an absent key defaults to `true` rather than
+        // `false` (which is what `defaults.bool(forKey:)` would return).
+        semanticSearchEnabled = defaults.object(forKey: Keys.semanticSearchEnabled) as? Bool ?? true
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
         // Screenshot automation (fastlane `snapshot`) always forces this off so

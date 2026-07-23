@@ -21,7 +21,7 @@ struct MeetingDetailView: View {
     /// shows here as in-progress with live progress, instead of a stale badge.
     @Environment(TranscriptionViewModel.self) private var sharedTxVM
 
-    enum Tab: Hashable { case recordings, transcript, summary }
+    enum Tab: Hashable { case recordings, transcript, summary, chat }
 
     @State var player = AudioPlayerService()
     /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
@@ -201,6 +201,30 @@ struct MeetingDetailView: View {
             .onChange(of: meeting.summaries.count) { _, _ in
                 selectedSummaryID = meeting.latestSummary?.id
             }
+        case .chat:
+            MeetingChatView(meeting: meeting, onJump: jumpToCitation, onJumpToTime: jumpToTime)
+        }
+    }
+
+    /// Citation tap in the Chat tab: switch to the transcript and seek the
+    /// source recording to the cited moment (converting the absolute meeting
+    /// timestamp back to recording-relative time).
+    private func jumpToCitation(_ hit: SemanticSearchService.Hit) {
+        guard let recording = sortedRecordings.first(where: { $0.id == hit.recordingID }) else { return }
+        tab = .transcript
+        seek(recording, to: max(0, hit.start - meeting.startOffset(of: recording)))
+    }
+
+    /// Tap on a `[mm:ss]` cited in a full-context answer: find the recording
+    /// whose span contains that absolute meeting time and seek into it.
+    private func jumpToTime(_ absolute: TimeInterval) {
+        for recording in sortedRecordings {
+            let offset = meeting.startOffset(of: recording)
+            if absolute >= offset && absolute <= offset + recording.duration {
+                tab = .transcript
+                seek(recording, to: max(0, absolute - offset))
+                return
+            }
         }
     }
 
@@ -303,6 +327,7 @@ struct MeetingDetailView: View {
             tabButton(.recordings, icon: "mic", label: NSLocalizedString("tab.recordings", comment: ""))
             tabButton(.transcript, icon: "text.alignleft", label: NSLocalizedString("tab.transcript", comment: ""))
             tabButton(.summary, icon: "sparkles", label: NSLocalizedString("tab.summary", comment: ""))
+            tabButton(.chat, icon: "bubble.left.and.text.bubble.right", label: NSLocalizedString("tab.chat", comment: ""))
         }
         .padding(.top, 6)
         .background(.bar)

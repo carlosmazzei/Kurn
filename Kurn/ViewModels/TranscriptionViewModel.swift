@@ -72,6 +72,9 @@ final class TranscriptionViewModel {
     /// App-wide settings, set by `KurnApp` so title generation can use the
     /// configured LLM provider without passing settings through every call site.
     var appSettings: AppSettings?
+    /// App-wide semantic-index coordinator, set by `KurnApp`. A finished
+    /// transcription updates the meeting's on-device index through it.
+    var semanticIndexCoordinator: SemanticIndexCoordinator?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
@@ -282,6 +285,10 @@ final class TranscriptionViewModel {
             if let settings = appSettings {
                 await generateAITitle(for: recording.meeting, settings: settings)
             }
+            // Refresh the on-device semantic index so the new transcript is
+            // searchable and available to chat retrieval. Best-effort and gated
+            // on the feature toggle inside the coordinator.
+            await semanticIndexCoordinator?.indexIfEnabled(recording.meeting)
         } catch is CancellationError {
             await drainEvents()
             if stoppingIDs.remove(recordingID) != nil {
