@@ -586,3 +586,4 @@
 "settings.wiki_rebuilding" = "Rebuilding…";
 "settings.wiki_clear" = "Clear wiki";
 "settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls.";
+"settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";

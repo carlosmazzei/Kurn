@@ -586,3 +586,4 @@
 "settings.wiki_rebuilding" = "Recreando…";
 "settings.wiki_clear" = "Borrar wiki";
 "settings.wiki_footer" = "Usa tu proveedor de IA de resúmenes para crear un artículo condensado por reunión, para que la función \"Preguntar\" de la biblioteca responda preguntas que abarcan o comparan reuniones. Desactivado por defecto: hace llamadas a la nube.";
+"settings.wiki_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para crear la wiki de reuniones.";

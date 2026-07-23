@@ -81,17 +81,17 @@ struct MeetingChatService {
             return Answer(text: text, citations: [])
         }
         return try await retrievedAnswer(
-            question: trimmed, history: history, candidates: candidates, scope: .singleMeeting, llm: llm
+            question: trimmed, history: history, candidates: candidates, llm: llm
         )
     }
 
-    /// Answer across the whole library (the "Ask" sheet). Routes the question:
-    /// pinpoint **lookups** go through library-scope retrieval (excerpts
-    /// diversified across meetings, attributed to their source meeting, with any
-    /// `summariesByMeeting` overviews); **synthesis/aggregate** questions are
-    /// answered over the condensed `articlesByMeeting` wiki articles, which can
-    /// count and cross-reference. When no articles are available the router
-    /// always chooses retrieval, so this degrades gracefully to the Phase-A path.
+    /// Answer across the whole library (the "Ask" sheet). Gives the model BOTH
+    /// the retrieved verbatim excerpts (for exact quotes and `[mm:ss]` citations)
+    /// AND the condensed wiki articles of the meetings in play (for synthesis,
+    /// comparison, and counting) in one grounded prompt — no lookup-vs-synthesis
+    /// routing. When no articles are available (wiki off/empty) it degrades to
+    /// excerpts only, i.e. the Phase-A retrieval path. See
+    /// `MeetingChatSynthesis.swift` for the combined answer.
     func answerAcrossLibrary(
         question: String,
         history: [ChatMessage],
@@ -103,71 +103,56 @@ struct MeetingChatService {
     ) async throws -> Answer {
         let trimmed = try Self.requireQuestion(question)
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
-
-        let route: QuestionRouter.Route = articlesByMeeting.isEmpty
-            ? .lookup
-            : await QuestionRouter.classify(trimmed, llm: llm)
-
-        switch route {
-        case .lookup:
-            return try await retrievedAnswer(
-                question: trimmed, history: history, candidates: candidates,
-                scope: .library, summariesByMeeting: summariesByMeeting, llm: llm
-            )
-        case .synthesis:
-            return try await synthesizedAnswer(
-                question: trimmed, history: history, candidates: candidates,
-                articles: articlesByMeeting, summariesByMeeting: summariesByMeeting, llm: llm
-            )
-        }
+        return try await libraryCombinedAnswer(
+            question: trimmed, history: history, candidates: candidates,
+            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm
+        )
     }
 
     // MARK: - Retrieval pipeline
 
-    // Not `private`: reused by the synthesis fallback in `MeetingChatSynthesis.swift`.
-    func retrievedAnswer(
+    /// Retrieve the top passages for `question`: query rewrite → hybrid retrieval
+    /// → optional per-meeting diversification → LLM rerank (degrading to fused
+    /// order). Shared by the single-meeting fallback and the library combined
+    /// answer. Not `private`: the latter lives in `MeetingChatSynthesis.swift`.
+    func retrievePassages(
         question: String,
-        history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
-        scope: Scope,
-        summariesByMeeting: [UUID: String] = [:],
+        poolSize: Int,
+        limit: Int,
+        diversify: Bool,
         llm: LLMProvider
-    ) async throws -> Answer {
-        let poolSize = scope == .library ? Self.libraryPoolSize : Self.poolSize
-        let limit = scope == .library ? Self.libraryRetrievalLimit : Self.retrievalLimit
-
-        // 1. Rewrite/expand the query for better dense + lexical recall (best effort).
+    ) async throws -> [SemanticSearchService.Hit] {
         let expansion = try? await rewriteQuery(question, llm: llm)
         let denseText = expansion.map { "\(question)\n\($0)" } ?? question
         let lexicalQuery = expansion.map { "\(question) \($0)" } ?? question
 
-        // 2. Hybrid retrieval → candidate pool.
         var pool = try await searchService.hybridSearch(
             query: lexicalQuery, denseText: denseText, in: candidates, poolSize: poolSize
         )
-        guard !pool.isEmpty else {
-            let empty = Self.userPrompt(question: question, hits: [], scope: scope, summaries: [:])
-            let text = try await llm.chat(
-                systemPrompt: Self.systemPrompt(for: scope),
-                messages: history + [ChatMessage(role: .user, content: empty)]
-            )
-            return Answer(text: text, citations: [])
-        }
-
-        // 2b. Diversify across meetings so the rerank sees breadth, not ten
-        // passages from one meeting (library scope only).
-        if scope == .library {
+        guard !pool.isEmpty else { return [] }
+        if diversify {
             pool = SemanticSearchService.diversify(pool, maxPerMeeting: Self.maxHitsPerMeeting)
         }
-
-        // 3. Rerank with the LLM (best effort; degrade to fused order).
-        let top = (try? await rerank(question: question, pool: pool, limit: limit, llm: llm))
+        return (try? await rerank(question: question, pool: pool, limit: limit, llm: llm))
             ?? Array(pool.prefix(limit))
+    }
 
-        // 4. Grounded answer.
-        let userPrompt = Self.userPrompt(question: question, hits: top, scope: scope, summaries: summariesByMeeting)
+    /// Retrieval-grounded answer over a single meeting's passages (the
+    /// long-meeting fallback for `answerAboutMeeting`).
+    private func retrievedAnswer(
+        question: String,
+        history: [ChatMessage],
+        candidates: [SemanticSearchService.Candidate],
+        llm: LLMProvider
+    ) async throws -> Answer {
+        let top = try await retrievePassages(
+            question: question, candidates: candidates,
+            poolSize: Self.poolSize, limit: Self.retrievalLimit, diversify: false, llm: llm
+        )
+        let userPrompt = Self.userPrompt(question: question, hits: top, scope: .singleMeeting, summaries: [:])
         let text = try await llm.chat(
-            systemPrompt: Self.systemPrompt(for: scope),
+            systemPrompt: Self.systemPrompt(for: .singleMeeting),
             messages: history + [ChatMessage(role: .user, content: userPrompt)]
         )
         return Answer(text: text, citations: top)
@@ -376,7 +361,8 @@ struct MeetingChatService {
     }
 
     /// Group hits by meeting, ordered by their best-ranked appearance.
-    private static func groupByMeeting(
+    /// Not `private`: reused by the combined answer in `MeetingChatSynthesis.swift`.
+    static func groupByMeeting(
         _ hits: [SemanticSearchService.Hit]
     ) -> [(id: UUID, hits: [SemanticSearchService.Hit])] {
         var order: [UUID] = []
@@ -389,7 +375,8 @@ struct MeetingChatService {
     }
 
     /// A `### <title> — <date>` header for the meeting a hit belongs to.
-    private static func meetingHeader(_ hit: SemanticSearchService.Hit) -> String {
+    /// Not `private`: reused by the combined answer in `MeetingChatSynthesis.swift`.
+    static func meetingHeader(_ hit: SemanticSearchService.Hit) -> String {
         let title = hit.meetingTitle.isEmpty
             ? NSLocalizedString("chat.untitled_meeting", comment: "Fallback name for a meeting without a title")
             : hit.meetingTitle

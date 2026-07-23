@@ -586,3 +586,4 @@
 "settings.wiki_rebuilding" = "正在重建…";
 "settings.wiki_clear" = "清除维基";
 "settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。";
+"settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";

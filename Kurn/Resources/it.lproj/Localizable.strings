@@ -586,3 +586,4 @@
 "settings.wiki_rebuilding" = "Ricreazione…";
 "settings.wiki_clear" = "Cancella wiki";
 "settings.wiki_footer" = "Usa il tuo provider IA per i riassunti per creare un articolo condensato per riunione, così la funzione \"Chiedi\" della libreria può rispondere a domande che abbracciano o confrontano più riunioni. Disattivata per impostazione predefinita: effettua chiamate al cloud.";
+"settings.wiki_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per creare la wiki delle riunioni.";
