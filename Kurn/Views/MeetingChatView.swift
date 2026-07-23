@@ -15,8 +15,11 @@ import SwiftUI
 struct MeetingChatView: View {
     /// The meeting to chat about, or `nil` to ask across the whole library.
     let meeting: Meeting?
-    /// Invoked when the user taps a citation (host decides where to jump).
+    /// Invoked when the user taps a retrieval citation (host decides where to jump).
     var onJump: ((SemanticSearchService.Hit) -> Void)?
+    /// Invoked when the user taps a cited `[mm:ss]` in a full-context answer;
+    /// the host seeks that absolute meeting time. Per-meeting scope only.
+    var onJumpToTime: ((TimeInterval) -> Void)?
 
     @Environment(AppSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
@@ -88,7 +91,36 @@ struct MeetingChatView: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Theme.separator, lineWidth: 1)
                     )
-                if !turn.citations.isEmpty { citations(turn.citations) }
+                if !turn.citations.isEmpty {
+                    citations(turn.citations)
+                } else if meeting != nil {
+                    // Full-context answer: no retrieval hits, so make the [mm:ss]
+                    // timestamps the model cited tappable.
+                    timestampChips(MeetingChatService.citedTimestamps(in: turn.text))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func timestampChips(_ times: [TimeInterval]) -> some View {
+        if !times.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(times, id: \.self) { time in
+                        Button { onJumpToTime?(time) } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "clock").font(.system(size: 10))
+                                Text(time.clockDisplay).font(.system(size: 12, weight: .medium))
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Theme.fill, in: Capsule())
+                            .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(onJumpToTime == nil)
+                    }
+                }
             }
         }
     }
@@ -214,7 +246,13 @@ struct MeetingChatView: View {
     private func send() {
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
-        vm.send(question: input, candidates: candidates(), provider: provider, model: model)
+        vm.send(
+            question: input,
+            transcriptText: meetingTranscriptText(),
+            candidates: candidates(),
+            provider: provider,
+            model: model
+        )
         input = ""
         inputFocused = false
     }
@@ -227,5 +265,19 @@ struct MeetingChatView: View {
         }
         let all = (try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []
         return all.map(\.searchCandidate)
+    }
+
+    /// The whole meeting transcript as `[mm:ss] Speaker: text` lines, for
+    /// full-context grounding. Nil for the library-wide ask (no single meeting).
+    private func meetingTranscriptText() -> String? {
+        guard let meeting else { return nil }
+        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = meeting.recordings
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .compactMap { recording in
+                guard let segments = recording.transcript?.segments, !segments.isEmpty else { return nil }
+                return (offset: meeting.startOffset(of: recording), segments: segments)
+            }
+        let text = SummaryService.assembleTranscriptText(from: groups)
+        return text.isEmpty ? nil : text
     }
 }

@@ -115,4 +115,39 @@ struct SemanticSearchTests {
         let hits = try await service.search(query: "   ", in: [], minScore: 0)
         #expect(hits.isEmpty)
     }
+
+    // MARK: - Hybrid retrieval
+
+    @Test func tokenizeLowercasesAndDropsSingleChars() {
+        let tokens = SemanticSearchService.tokenize("Preço, MCP e a decisão!")
+        #expect(tokens.contains("preço"))
+        #expect(tokens.contains("mcp"))
+        #expect(tokens.contains("decisão"))
+        #expect(!tokens.contains("e")) // single char dropped
+        #expect(!tokens.contains("a"))
+    }
+
+    @Test func bm25RanksDocContainingQueryTermFirst() {
+        let match = candidate(UUID(), meeting: UUID(), text: "we agreed on the pricing model", vector: [1, 0])
+        let noMatch = candidate(UUID(), meeting: UUID(), text: "lunch logistics and parking", vector: [0, 1])
+        let order = SemanticSearchService.bm25Order(query: "pricing", candidates: [noMatch, match])
+        #expect(order.first == 1) // index of the matching candidate
+        #expect(!order.contains(0)) // non-matching doc scores zero and is dropped
+    }
+
+    @Test func rrfRewardsItemsRankedHighInBothLists() {
+        let fused = SemanticSearchService.reciprocalRankFusion([[5, 1, 3], [1, 9, 5]])
+        // 1 is high in both, so it should win.
+        #expect(fused.first?.index == 1)
+    }
+
+    @Test func hybridDegradesToLexicalWhenEmbedderEmpty() async throws {
+        // StubEmbedder returns [] for anything not in its table → dense side empty,
+        // so ranking must fall back to lexical keyword matching.
+        let service = SemanticSearchService(embedder: StubEmbedder(table: [:]))
+        let match = candidate(UUID(), meeting: UUID(), text: "the budget was approved", vector: [1, 0])
+        let other = candidate(UUID(), meeting: UUID(), text: "unrelated chit chat", vector: [0, 1])
+        let hits = try await service.hybridSearch(query: "budget", in: [other, match], poolSize: 10)
+        #expect(hits.first?.text == "the budget was approved")
+    }
 }

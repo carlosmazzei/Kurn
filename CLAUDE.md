@@ -420,13 +420,20 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   matching plus semantically-relevant meetings the substring pass missed.
 - **Chat.** `LLMProvider` gained a plain-text `chat(systemPrompt:messages:)`
   (implemented for OpenAI/Anthropic/Google; no JSON-mode forcing) alongside
-  `summarize`. `MeetingChatService` retrieves top passages, builds a grounded
-  prompt (answer only from excerpts, cite `[mm:ss]`, reply in the transcript
-  language), and calls the configured summary provider. `MeetingChatViewModel` +
-  `MeetingChatView` drive an in-memory conversation, surfaced as a per-meeting
-  Chat tab (`MeetingDetailView`) and a library-wide "Ask" sheet
-  (`MeetingsListView`). History is in-memory only — nothing chat-related is
-  persisted, so there is nothing extra to encrypt.
+  `summarize`. `MeetingChatService` has two grounding strategies: **per-meeting**
+  (`answerAboutMeeting`) sends the **whole transcript** as context — a single
+  meeting almost always fits the single-pass budget (`SummaryService.maxSinglePassChars`),
+  which is far more accurate than retrieving a few passages; only over-budget
+  meetings fall back to retrieval. **Library-wide** (`answerAcrossLibrary`) and
+  the long-meeting fallback use a retrieval pipeline: LLM query rewrite → hybrid
+  dense (`NLContextualEmbedding` cosine) + lexical (BM25) retrieval fused with
+  Reciprocal Rank Fusion (`SemanticSearchService.hybridSearch`) → LLM rerank →
+  grounded answer. All prompts cite `[mm:ss]` and reply in the transcript
+  language. `MeetingChatViewModel` + `MeetingChatView` drive an in-memory
+  conversation, surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a
+  library-wide "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are
+  tappable and seek the transcript. History is in-memory only — nothing
+  chat-related is persisted, so there is nothing extra to encrypt.
 
 ### Settings & secrets
 

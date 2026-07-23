@@ -32,11 +32,14 @@ final class MeetingChatViewModel {
     private let chatService = MeetingChatService()
     private var task: Task<Void, Never>?
 
-    /// Send `question`, grounded in `candidates` (built by the view from the
-    /// meeting's or library's `SemanticChunk`s). `provider`/`model` come from the
+    /// Send `question`. When `transcriptText` is non-nil the scope is a single
+    /// meeting (full-transcript grounding, falling back to retrieval over
+    /// `candidates` only for very long meetings); when nil the scope is the whole
+    /// library (retrieval over `candidates`). `provider`/`model` come from the
     /// summary settings. No-op while a previous reply is still in flight.
     func send(
         question: String,
+        transcriptText: String?,
         candidates: [SemanticSearchService.Candidate],
         provider: AIProvider,
         model: String
@@ -48,18 +51,23 @@ final class MeetingChatViewModel {
         isResponding = true
         // Prior turns as plain history (without their retrieval contexts, to
         // keep the token cost down); the current question carries fresh context.
-        let history = turns.dropLast().map { ChatMessage(role: $0.role, content: $0.text) }
+        let history = Array(turns.dropLast().map { ChatMessage(role: $0.role, content: $0.text) })
 
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                let answer = try await chatService.answer(
-                    question: trimmed,
-                    history: Array(history),
-                    candidates: candidates,
-                    provider: provider,
-                    model: model
-                )
+                let answer: MeetingChatService.Answer
+                if let transcriptText {
+                    answer = try await chatService.answerAboutMeeting(
+                        question: trimmed, history: history, transcriptText: transcriptText,
+                        candidates: candidates, provider: provider, model: model
+                    )
+                } else {
+                    answer = try await chatService.answerAcrossLibrary(
+                        question: trimmed, history: history,
+                        candidates: candidates, provider: provider, model: model
+                    )
+                }
                 self.turns.append(Turn(role: .assistant, text: answer.text, citations: answer.citations))
             } catch is CancellationError {
                 // User cancelled; drop the pending assistant turn silently.

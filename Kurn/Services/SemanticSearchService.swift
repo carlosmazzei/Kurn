@@ -83,6 +83,111 @@ struct SemanticSearchService {
         return Array(hits.prefix(limit))
     }
 
+    // MARK: - Hybrid retrieval (dense + lexical, RRF-fused)
+
+    /// Retrieve a candidate pool by fusing dense (semantic) and lexical
+    /// (keyword) rankings with Reciprocal Rank Fusion. `denseText` is embedded
+    /// for the semantic side — pass a rewritten/expanded query or a hypothetical
+    /// answer; `query` drives the lexical side. Returns up to `poolSize` hits,
+    /// best first, scored by RRF. Used for chat retrieval; the meetings list
+    /// keeps the plain cosine `search` above. If the embedder is unavailable it
+    /// degrades to lexical-only.
+    func hybridSearch(
+        query: String,
+        denseText: String? = nil,
+        in candidates: [Candidate],
+        poolSize: Int = 30
+    ) async throws -> [Hit] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !candidates.isEmpty else { return [] }
+
+        let denseCandidate = denseText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let denseSource = denseCandidate.isEmpty ? trimmedQuery : denseCandidate
+        var denseOrder: [Int] = []
+        if !denseSource.isEmpty,
+           let queryVector = try? await embedder.embed(denseSource), !queryVector.isEmpty {
+            denseOrder = candidates.indices
+                .filter { candidates[$0].vector.count == queryVector.count }
+                .map { (index: $0, score: vDSP.dot(queryVector, candidates[$0].vector)) }
+                .sorted { $0.score > $1.score }
+                .map(\.index)
+        }
+
+        let lexicalOrder = Self.bm25Order(query: trimmedQuery, candidates: candidates)
+        // RRF degrades to whichever side is non-empty.
+        let fused = Self.reciprocalRankFusion([denseOrder, lexicalOrder])
+        return fused.prefix(poolSize).map { entry in
+            makeHit(from: candidates[entry.index], score: Float(entry.score))
+        }
+    }
+
+    private func makeHit(from candidate: Candidate, score: Float) -> Hit {
+        Hit(
+            chunkID: candidate.chunkID,
+            meetingID: candidate.meetingID,
+            recordingID: candidate.recordingID,
+            text: candidate.text,
+            start: candidate.start,
+            end: candidate.end,
+            speakerLabel: candidate.speakerLabel,
+            score: score
+        )
+    }
+
+    /// Candidate indices ranked by BM25 (k1=1.5, b=0.75) over the pool, dropping
+    /// zero-score docs. Pure and deterministic.
+    static func bm25Order(query: String, candidates: [Candidate]) -> [Int] {
+        let queryTerms = Set(tokenize(query))
+        guard !queryTerms.isEmpty else { return [] }
+
+        let docs = candidates.map { tokenize($0.text) }
+        let count = docs.count
+        let avgdl = Double(docs.reduce(0) { $0 + $1.count }) / Double(max(count, 1))
+
+        var docFreq: [String: Int] = [:]
+        for doc in docs {
+            let present = Set(doc)
+            for term in queryTerms where present.contains(term) { docFreq[term, default: 0] += 1 }
+        }
+
+        let k1 = 1.5, bParam = 0.75
+        var scored: [(index: Int, score: Double)] = []
+        for (index, doc) in docs.enumerated() where !doc.isEmpty {
+            var termFreq: [String: Int] = [:]
+            for term in doc { termFreq[term, default: 0] += 1 }
+            let docLen = Double(doc.count)
+            var score = 0.0
+            for term in queryTerms {
+                guard let freq = termFreq[term], freq > 0, let df = docFreq[term], df > 0 else { continue }
+                let idf = log(1 + (Double(count) - Double(df) + 0.5) / (Double(df) + 0.5))
+                let tfPart = (Double(freq) * (k1 + 1)) / (Double(freq) + k1 * (1 - bParam + bParam * docLen / avgdl))
+                score += idf * tfPart
+            }
+            if score > 0 { scored.append((index, score)) }
+        }
+        return scored.sorted { $0.score > $1.score }.map(\.index)
+    }
+
+    /// Split into lowercased alphanumeric tokens (Unicode-aware, so accented
+    /// Portuguese words survive), dropping single characters.
+    static func tokenize(_ text: String) -> [String] {
+        text.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count >= 2 }
+    }
+
+    /// Reciprocal Rank Fusion of several rank lists (each a list of candidate
+    /// indices, best first). Higher fused score = better.
+    static func reciprocalRankFusion(_ rankings: [[Int]], k: Int = 60) -> [(index: Int, score: Double)] {
+        var score: [Int: Double] = [:]
+        for ranking in rankings {
+            for (rank, index) in ranking.enumerated() {
+                score[index, default: 0] += 1.0 / Double(k + rank + 1)
+            }
+        }
+        return score.map { (index: $0.key, score: $0.value) }.sorted { $0.score > $1.score }
+    }
+
     /// Best hit per meeting (highest score), preserving global rank order —
     /// used by the meetings list, which shows one row per meeting.
     static func bestPerMeeting(_ hits: [Hit]) -> [Hit] {

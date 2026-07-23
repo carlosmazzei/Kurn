@@ -202,7 +202,7 @@ struct MeetingDetailView: View {
                 selectedSummaryID = meeting.latestSummary?.id
             }
         case .chat:
-            MeetingChatView(meeting: meeting, onJump: jumpToCitation)
+            MeetingChatView(meeting: meeting, onJump: jumpToCitation, onJumpToTime: jumpToTime)
         }
     }
 
@@ -213,6 +213,19 @@ struct MeetingDetailView: View {
         guard let recording = sortedRecordings.first(where: { $0.id == hit.recordingID }) else { return }
         tab = .transcript
         seek(recording, to: max(0, hit.start - meeting.startOffset(of: recording)))
+    }
+
+    /// Tap on a `[mm:ss]` cited in a full-context answer: find the recording
+    /// whose span contains that absolute meeting time and seek into it.
+    private func jumpToTime(_ absolute: TimeInterval) {
+        for recording in sortedRecordings {
+            let offset = meeting.startOffset(of: recording)
+            if absolute >= offset && absolute <= offset + recording.duration {
+                tab = .transcript
+                seek(recording, to: max(0, absolute - offset))
+                return
+            }
+        }
     }
 
     // MARK: - Recordings tab (List, so swipe-to-delete works)
