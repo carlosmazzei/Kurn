@@ -2,107 +2,111 @@
 //  MeetingChatSynthesis.swift
 //  Kurn
 //
-//  The library-wide chat's synthesis path, split out of `MeetingChatService` to
-//  keep that file under SwiftLint's length limit. Where the retrieval path
-//  answers pinpoint lookups from a handful of transcript passages, this answers
-//  questions that span, compare, or aggregate across meetings by reasoning over
-//  the condensed per-meeting wiki articles.
+//  The library-wide chat's combined answer, split out of `MeetingChatService` to
+//  keep that file under SwiftLint's length limit. Rather than route a question to
+//  either retrieval or the wiki, it gives the model BOTH in one grounded prompt:
+//  the retrieved verbatim excerpts (for exact quotes and `[mm:ss]` citations) and
+//  the condensed per-meeting wiki articles of the meetings in play (for
+//  synthesis, comparison, and counting). The model uses whichever it needs, so
+//  hybrid questions ("what did we decide about X and how did it evolve") are
+//  answered in a single pass.
 //
-//  Because articles are condensed (~1–4 KB each, not whole transcripts), many of
-//  them fit the single-pass budget, so the model can genuinely count and
-//  cross-reference. When the selected articles exceed the budget they are packed
-//  — whole, never split mid-article — into blocks and processed map-reduce, the
-//  same shape as `SummaryService.mapReduce`.
+//  Because articles are condensed (~1–4 KB each, not whole transcripts), the
+//  articles of a handful of meetings plus the excerpts fit the single-pass
+//  budget. When they don't — chiefly a global aggregate over a large library —
+//  the articles are packed whole (never split) into blocks and map-reduced, the
+//  same shape as `SummaryService.mapReduce`, with the excerpts carried into the
+//  reduce for citation. Citations are always the retrieved passages, so the
+//  answer keeps tappable `[mm:ss]` chips even for a synthesis answer.
 //
 
 import Foundation
 
 extension MeetingChatService {
 
-    /// Meetings whose articles are considered for a synthesis answer.
+    /// Meetings whose articles are considered for a non-global answer.
     static let synthesisMeetingLimit = 16
 
-    /// Answer a cross-meeting question over the condensed wiki articles. Falls
-    /// back to the retrieval path when no articles are available to reason over.
-    func synthesizedAnswer(
+    /// Answer a library-wide question over the retrieved excerpts and the wiki
+    /// articles of the meetings in play (all articles for a global aggregate).
+    func libraryCombinedAnswer(
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
+        summaries: [UUID: String],
         articles: [UUID: WikiArticleSnapshot],
-        summariesByMeeting: [UUID: String],
         llm: LLMProvider
     ) async throws -> Answer {
-        let selected = try await selectArticles(
-            question: question, candidates: candidates, articles: articles, llm: llm
+        let passages = try await retrievePassages(
+            question: question, candidates: candidates,
+            poolSize: Self.libraryPoolSize, limit: Self.libraryRetrievalLimit, diversify: true, llm: llm
         )
-        guard !selected.isEmpty else {
-            return try await retrievedAnswer(
-                question: question, history: history, candidates: candidates,
-                scope: .library, summariesByMeeting: summariesByMeeting, llm: llm
+        let selected = Self.selectArticles(question: question, passages: passages, articles: articles)
+
+        guard !passages.isEmpty || !selected.isEmpty else {
+            let empty = Self.userPrompt(question: question, hits: [], scope: .library, summaries: [:])
+            let text = try await llm.chat(
+                systemPrompt: Self.systemPrompt(for: .library),
+                messages: history + [ChatMessage(role: .user, content: empty)]
             )
+            return Answer(text: text, citations: [])
         }
-        let text = try await synthesize(question: question, history: history, articles: selected, llm: llm)
-        return Answer(text: text, citations: [])
+
+        let rendered = selected.map(Self.renderArticle)
+        let passagesBlock = Self.renderPassages(passages)
+        let overviews = Self.overviewsBlock(passages: passages, summaries: summaries, selected: selected)
+        let userPrompt = Self.combinedUserPrompt(
+            question: question, articlesBlock: rendered.joined(separator: "\n\n"),
+            passagesBlock: passagesBlock, overviewsBlock: overviews
+        )
+
+        // Fits in one pass → a single call that can quote and aggregate directly.
+        if userPrompt.count <= SummaryService.maxSinglePassChars {
+            let text = try await llm.chat(
+                systemPrompt: Self.combinedSystemPrompt,
+                messages: history + [ChatMessage(role: .user, content: userPrompt)]
+            )
+            return Answer(text: text, citations: passages)
+        }
+
+        // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
+        let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars)
+        let text = try await synthesizeMapReduce(
+            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm
+        )
+        return Answer(text: text, citations: passages)
     }
 
     // MARK: - Article selection
 
-    /// Pick the articles to reason over: every article for a global aggregate,
-    /// otherwise the top retrieval-ranked meetings that have an article.
-    private func selectArticles(
+    /// The articles to reason over: every article for a global aggregate,
+    /// otherwise the articles of the meetings that surfaced in the excerpts (in
+    /// passage-rank order, capped at `synthesisMeetingLimit`).
+    static func selectArticles(
         question: String,
-        candidates: [SemanticSearchService.Candidate],
-        articles: [UUID: WikiArticleSnapshot],
-        llm: LLMProvider
-    ) async throws -> [WikiArticleSnapshot] {
-        if QuestionRouter.isGlobalAggregate(question) {
+        passages: [SemanticSearchService.Hit],
+        articles: [UUID: WikiArticleSnapshot]
+    ) -> [WikiArticleSnapshot] {
+        guard !articles.isEmpty else { return [] }
+        if LibraryQuestion.isGlobalAggregate(question) {
             return Array(articles.values)
         }
-        let expansion = try? await rewriteQuery(question, llm: llm)
-        let denseText = expansion.map { "\(question)\n\($0)" } ?? question
-        let lexicalQuery = expansion.map { "\(question) \($0)" } ?? question
-        let pool = try await searchService.hybridSearch(
-            query: lexicalQuery, denseText: denseText, in: candidates, poolSize: Self.libraryPoolSize
-        )
         var selected: [WikiArticleSnapshot] = []
-        for hit in SemanticSearchService.diversify(pool, maxPerMeeting: 1) {
-            guard let article = articles[hit.meetingID] else { continue }
+        for group in groupByMeeting(passages) {
+            guard let article = articles[group.id] else { continue }
             selected.append(article)
-            if selected.count >= Self.synthesisMeetingLimit { break }
+            if selected.count >= synthesisMeetingLimit { break }
         }
-        // Retrieval found no article-backed meetings (e.g. embedder unavailable) —
-        // fall back to a bounded slice of whatever articles exist.
-        if selected.isEmpty { selected = Array(articles.values.prefix(Self.synthesisMeetingLimit)) }
         return selected
     }
 
-    // MARK: - Synthesis (single pass or map-reduce over whole articles)
-
-    private func synthesize(
-        question: String,
-        history: [ChatMessage],
-        articles: [WikiArticleSnapshot],
-        llm: LLMProvider
-    ) async throws -> String {
-        let rendered = articles.map { Self.renderArticle($0) }
-        // Fits in one pass → a single call that can count/aggregate directly.
-        if Self.packArticles(rendered, maxChars: SummaryService.maxSinglePassChars).count <= 1 {
-            let block = rendered.joined(separator: "\n\n")
-            let userPrompt = Self.synthesisUserPrompt(question: question, articlesBlock: block)
-            return try await llm.chat(
-                systemPrompt: Self.synthesisSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)]
-            )
-        }
-        // Otherwise map-reduce over whole-article blocks.
-        let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars)
-        return try await synthesizeMapReduce(question: question, history: history, blocks: blocks, llm: llm)
-    }
+    // MARK: - Map-reduce (over whole articles, for the overflow case)
 
     private func synthesizeMapReduce(
         question: String,
         history: [ChatMessage],
         blocks: [String],
+        passagesBlock: String,
         llm: LLMProvider
     ) async throws -> String {
         var partials: [String] = []
@@ -121,9 +125,11 @@ extension MeetingChatService {
         let combined = partials.enumerated()
             .map { "Part \($0.offset + 1):\n\($0.element)" }
             .joined(separator: "\n\n")
-        let reducePrompt = Self.synthesisReducePrompt(question: question, partials: combined)
+        let reducePrompt = Self.combinedReducePrompt(
+            question: question, partials: combined, passagesBlock: passagesBlock
+        )
         return try await llm.chat(
-            systemPrompt: Self.synthesisSystemPrompt,
+            systemPrompt: Self.combinedSystemPrompt,
             messages: history + [ChatMessage(role: .user, content: reducePrompt)]
         )
     }
@@ -139,6 +145,35 @@ extension MeetingChatService {
             ? "### \(title)"
             : "### \(title) — \(article.date.formatted(date: .abbreviated, time: .omitted))"
         return "\(head)\n\(article.bodyMarkdown)"
+    }
+
+    /// The retrieved excerpts grouped by meeting under their title/date headers,
+    /// or an empty string when there are none.
+    static func renderPassages(_ passages: [SemanticSearchService.Hit]) -> String {
+        guard !passages.isEmpty else { return "" }
+        return groupByMeeting(passages).map { group -> String in
+            let head = group.hits.first.map(meetingHeader) ?? "###"
+            let lines = group.hits
+                .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
+                .joined(separator: "\n")
+            return "\(head)\n\(lines)"
+        }.joined(separator: "\n\n")
+    }
+
+    /// Condensed summaries for passage meetings that don't yet have a wiki
+    /// article, so an unindexed meeting still contributes an overview.
+    static func overviewsBlock(
+        passages: [SemanticSearchService.Hit],
+        summaries: [UUID: String],
+        selected: [WikiArticleSnapshot]
+    ) -> String {
+        let hasArticle = Set(selected.map(\.meetingID))
+        return groupByMeeting(passages).compactMap { group -> String? in
+            guard !hasArticle.contains(group.id),
+                  let summary = summaries[group.id], !summary.isEmpty,
+                  let head = group.hits.first.map(meetingHeader) else { return nil }
+            return "\(head)\n\(summary)"
+        }.joined(separator: "\n\n")
     }
 
     /// Greedily pack whole rendered articles into blocks of at most `maxChars`,
@@ -165,29 +200,38 @@ extension MeetingChatService {
 
     // MARK: - Prompts
 
-    static let synthesisSystemPrompt = """
+    static let combinedSystemPrompt = """
     You are an assistant that answers questions across a personal library of \
-    meetings. You are given condensed per-meeting notes, each headed by its \
-    meeting title and date ("### <title> — <date>"). These notes are complete \
-    structured records of each meeting, so you CAN count, aggregate, compare, \
-    and find themes across meetings. Follow these rules:
-    - Attribute findings to meetings by naming their title (and date when useful).
-    - When counting or aggregating, be exhaustive over the notes provided and \
-    state the number.
-    - Base your answer strictly on the notes. Do not invent facts or use outside \
-    knowledge.
-    - Preserve any [mm:ss] timestamps when you cite a specific moment.
-    - Reply in the SAME LANGUAGE as the notes.
+    meetings. Each user message gives you two things, both grouped by meeting \
+    under "### <title> — <date>" headers:
+    - CONDENSED NOTES: complete structured notes per meeting. Use these to \
+    synthesize, compare across meetings, and count/aggregate. When counting, be \
+    exhaustive over the notes provided and state the number.
+    - VERBATIM EXCERPTS: exact transcript lines. Use these for direct quotes and \
+    cite the moments you rely on with their [mm:ss] timestamps.
+    Rules:
+    - Attribute every claim to a meeting by naming its title (and date when useful).
+    - Base your answer strictly on the notes and excerpts. Do not invent facts or \
+    use outside knowledge about the participants or topics.
+    - If the material does not contain the answer, say so plainly.
+    - Reply in the SAME LANGUAGE as the material.
     - Be well-organized: use short headings or bullets when comparing meetings.
     """
 
-    static func synthesisUserPrompt(question: String, articlesBlock: String) -> String {
-        """
-        Question: \(question)
-
-        Condensed notes for the relevant meetings:
-        \(articlesBlock)
-        """
+    static func combinedUserPrompt(
+        question: String, articlesBlock: String, passagesBlock: String, overviewsBlock: String
+    ) -> String {
+        var prompt = "Question: \(question)\n"
+        if !articlesBlock.isEmpty {
+            prompt += "\nCondensed notes per meeting:\n\(articlesBlock)\n"
+        }
+        if !overviewsBlock.isEmpty {
+            prompt += "\nAdditional meeting overviews (not yet in the notes above):\n\(overviewsBlock)\n"
+        }
+        if !passagesBlock.isEmpty {
+            prompt += "\nVerbatim excerpts to quote and cite [mm:ss]:\n\(passagesBlock)"
+        }
+        return prompt
     }
 
     static let synthesisMapSystemPrompt = """
@@ -210,8 +254,8 @@ extension MeetingChatService {
         """
     }
 
-    static func synthesisReducePrompt(question: String, partials: String) -> String {
-        """
+    static func combinedReducePrompt(question: String, partials: String, passagesBlock: String) -> String {
+        var prompt = """
         Question: \(question)
 
         The relevant meetings were processed in parts; the per-part findings \
@@ -221,5 +265,9 @@ extension MeetingChatService {
         Findings:
         \(partials)
         """
+        if !passagesBlock.isEmpty {
+            prompt += "\n\nVerbatim excerpts to quote and cite [mm:ss]:\n\(passagesBlock)"
+        }
+        return prompt
     }
 }

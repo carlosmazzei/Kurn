@@ -57,6 +57,12 @@ struct SettingsView: View {
                 ) {
                     SemanticSearchSettingsView()
                 }
+                link(
+                    NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"),
+                    systemImage: "book"
+                ) {
+                    WikiSettingsView(keyRevision: keyRevision)
+                }
             } header: {
                 Text(NSLocalizedString("settings.group.intelligence", comment: "Intelligence group"))
             }
