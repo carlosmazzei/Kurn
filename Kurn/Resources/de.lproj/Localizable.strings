@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "Die semantische Suche auf dem Gerät ist nicht verfügbar: %@";
 "error.semantic_index" = "Der semantische Index konnte nicht erstellt werden: %@";
+"error.wiki_generation" = "Das Meeting-Wiki konnte nicht erstellt werden: %@";
+"error.wiki_unavailable" = "Das Meeting-Wiki ist noch nicht bereit. Versuche es erneut, sobald es fertig generiert ist.";
 "error.embedding_no_model" = "Für dieses Gerät ist kein Embedding-Modell verfügbar.";
 "error.embedding_no_assets" = "Das Sprachmodell konnte nicht auf das Gerät geladen werden.";
 "error.provider_no_chat" = "Dieser Anbieter unterstützt keinen Chat.";
@@ -577,3 +579,10 @@
 "settings.semantic_rebuilding" = "Neuaufbau …";
 "settings.semantic_clear" = "Index löschen";
 "settings.semantic_search_footer" = "Findet Meetings nach Bedeutung und ermöglicht den Chat mithilfe eines Modells auf dem Gerät. Text und Vektoren bleiben auf deinem Gerät verschlüsselt.";
+"settings.wiki_title" = "Meeting-Wiki";
+"settings.wiki" = "Meeting-Wiki erstellen";
+"settings.wiki_articles" = "Wiki-Artikel";
+"settings.wiki_rebuild" = "Wiki neu erstellen";
+"settings.wiki_rebuilding" = "Wird neu erstellt …";
+"settings.wiki_clear" = "Wiki löschen";
+"settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt.";

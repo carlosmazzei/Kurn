@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "设备端语义搜索不可用：%@";
 "error.semantic_index" = "无法构建语义索引：%@";
+"error.wiki_generation" = "无法构建会议维基：%@";
+"error.wiki_unavailable" = "会议维基尚未准备好。请在生成完成后重试。";
 "error.embedding_no_model" = "此设备没有可用的设备端嵌入模型。";
 "error.embedding_no_assets" = "无法下载设备端语言模型。";
 "error.provider_no_chat" = "此提供方不支持聊天。";
@@ -577,3 +579,10 @@
 "settings.semantic_rebuilding" = "正在重建…";
 "settings.semantic_clear" = "清除索引";
 "settings.semantic_search_footer" = "使用设备端模型按含义查找会议并支持聊天。文本和向量在你的设备上保持加密。";
+"settings.wiki_title" = "会议维基";
+"settings.wiki" = "构建会议维基";
+"settings.wiki_articles" = "维基条目";
+"settings.wiki_rebuild" = "重建维基";
+"settings.wiki_rebuilding" = "正在重建…";
+"settings.wiki_clear" = "清除维基";
+"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。";

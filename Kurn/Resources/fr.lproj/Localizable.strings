@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "La recherche sémantique sur l'appareil est indisponible : %@";
 "error.semantic_index" = "Impossible de créer l'index sémantique : %@";
+"error.wiki_generation" = "Impossible de créer le wiki de la réunion : %@";
+"error.wiki_unavailable" = "Le wiki de la réunion n'est pas encore prêt. Réessayez une fois sa génération terminée.";
 "error.embedding_no_model" = "Aucun modèle d'embedding sur l'appareil n'est disponible pour cet appareil.";
 "error.embedding_no_assets" = "Impossible de télécharger le modèle de langue sur l'appareil.";
 "error.provider_no_chat" = "Ce fournisseur ne prend pas en charge le chat.";
@@ -577,3 +579,10 @@
 "settings.semantic_rebuilding" = "Reconstruction…";
 "settings.semantic_clear" = "Effacer l'index";
 "settings.semantic_search_footer" = "Trouve les réunions par leur sens et alimente le chat, à l'aide d'un modèle sur l'appareil. Le texte et les vecteurs restent chiffrés sur votre appareil.";
+"settings.wiki_title" = "Wiki des réunions";
+"settings.wiki" = "Créer le wiki des réunions";
+"settings.wiki_articles" = "Articles du wiki";
+"settings.wiki_rebuild" = "Recréer le wiki";
+"settings.wiki_rebuilding" = "Recréation…";
+"settings.wiki_clear" = "Effacer le wiki";
+"settings.wiki_footer" = "Utilise votre fournisseur d'IA de résumé pour créer un article condensé par réunion, afin que la fonction « Demander » de la bibliothèque réponde aux questions qui couvrent ou comparent plusieurs réunions. Désactivé par défaut — effectue des appels au cloud.";

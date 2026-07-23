@@ -263,11 +263,27 @@ struct MeetingChatView: View {
             transcriptText: meetingTranscriptText(),
             candidates: candidates(),
             summariesByMeeting: summariesByMeeting(),
+            articlesByMeeting: articlesByMeeting(),
             provider: provider,
             model: model
         )
         input = ""
         inputFocused = false
+    }
+
+    /// Condensed wiki articles for the library-wide ask (meetingID → snapshot).
+    /// Empty for single-meeting scope and when the wiki feature is off; the chat
+    /// service routes synthesis questions through these and falls back to
+    /// retrieval when the map is empty. Built here on the main actor.
+    private func articlesByMeeting() -> [UUID: WikiArticleSnapshot] {
+        guard meeting == nil, settings.wikiEnabled else { return [:] }
+        let articles = (try? modelContext.fetch(FetchDescriptor<WikiArticle>())) ?? []
+        var result: [UUID: WikiArticleSnapshot] = [:]
+        for article in articles {
+            guard let meetingID = article.meeting?.id else { continue }
+            result[meetingID] = article.snapshot
+        }
+        return result
     }
 
     /// Per-meeting summary overviews for the library-wide ask (meetingID →
@@ -301,13 +317,7 @@ struct MeetingChatView: View {
     /// full-context grounding. Nil for the library-wide ask (no single meeting).
     private func meetingTranscriptText() -> String? {
         guard let meeting else { return nil }
-        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = meeting.recordings
-            .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { recording in
-                guard let segments = recording.transcript?.segments, !segments.isEmpty else { return nil }
-                return (offset: meeting.startOffset(of: recording), segments: segments)
-            }
-        let text = SummaryService.assembleTranscriptText(from: groups)
+        let text = meeting.assembledTranscriptText()
         return text.isEmpty ? nil : text
     }
 }

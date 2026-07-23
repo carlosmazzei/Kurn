@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "On-device semantic search is unavailable: %@";
 "error.semantic_index" = "Could not build the semantic index: %@";
+"error.wiki_generation" = "Could not build the meeting wiki: %@";
+"error.wiki_unavailable" = "The meeting wiki isn't ready yet. Try again after it finishes generating.";
 "error.embedding_no_model" = "No on-device embedding model is available for this device.";
 "error.embedding_no_assets" = "The on-device language model could not be downloaded.";
 "error.provider_no_chat" = "This provider does not support chat.";
@@ -577,3 +579,10 @@
 "settings.semantic_rebuilding" = "Rebuilding…";
 "settings.semantic_clear" = "Clear index";
 "settings.semantic_search_footer" = "Finds meetings by meaning and powers chat, using an on-device model. Text and vectors stay encrypted on your device.";
+"settings.wiki_title" = "Meeting Wiki";
+"settings.wiki" = "Build meeting wiki";
+"settings.wiki_articles" = "Wiki articles";
+"settings.wiki_rebuild" = "Rebuild wiki";
+"settings.wiki_rebuilding" = "Rebuilding…";
+"settings.wiki_clear" = "Clear wiki";
+"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls.";

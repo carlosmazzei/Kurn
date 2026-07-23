@@ -69,6 +69,59 @@ extension SettingsView {
     }
 
     @ViewBuilder
+    func wikiSection(settings: AppSettings) -> some View {
+        Section {
+            Toggle(
+                NSLocalizedString("settings.wiki", comment: "Meeting wiki toggle"),
+                isOn: Binding(
+                    get: { settings.wikiEnabled },
+                    set: { settings.wikiEnabled = $0 }
+                )
+            )
+            LabeledContent(
+                NSLocalizedString("settings.wiki_articles", comment: "Wiki article count"),
+                value: "\(wikiArticleCount)"
+            )
+            Button {
+                Task {
+                    isRebuildingWiki = true
+                    await wiki.rebuildWiki()
+                    wikiArticleCount = wiki.articleCount()
+                    isRebuildingWiki = false
+                }
+            } label: {
+                if isRebuildingWiki {
+                    HStack {
+                        ProgressView()
+                        Text(NSLocalizedString("settings.wiki_rebuilding", comment: "Rebuilding wiki"))
+                    }
+                } else {
+                    Label(
+                        NSLocalizedString("settings.wiki_rebuild", comment: "Rebuild wiki"),
+                        systemImage: "arrow.clockwise"
+                    )
+                }
+            }
+            .disabled(isRebuildingWiki || !settings.wikiEnabled)
+            Button(role: .destructive) {
+                wiki.clearWiki()
+                wikiArticleCount = wiki.articleCount()
+            } label: {
+                Label(
+                    NSLocalizedString("settings.wiki_clear", comment: "Clear wiki"),
+                    systemImage: "trash"
+                )
+            }
+            .disabled(isRebuildingWiki || wikiArticleCount == 0)
+        } header: {
+            Text(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki section title"))
+        } footer: {
+            Text(NSLocalizedString("settings.wiki_footer", comment: "Meeting wiki footer"))
+        }
+        .task { wikiArticleCount = wiki.articleCount() }
+    }
+
+    @ViewBuilder
     func transcriptionSection(settings: AppSettings) -> some View {
         Section {
             // Transcription engine (the stage that turns audio into text).

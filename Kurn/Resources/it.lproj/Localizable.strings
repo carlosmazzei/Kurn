@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "La ricerca semantica sul dispositivo non è disponibile: %@";
 "error.semantic_index" = "Impossibile creare l'indice semantico: %@";
+"error.wiki_generation" = "Impossibile creare la wiki della riunione: %@";
+"error.wiki_unavailable" = "La wiki della riunione non è ancora pronta. Riprova quando la generazione è terminata.";
 "error.embedding_no_model" = "Nessun modello di embedding sul dispositivo è disponibile per questo dispositivo.";
 "error.embedding_no_assets" = "Impossibile scaricare il modello linguistico sul dispositivo.";
 "error.provider_no_chat" = "Questo provider non supporta la chat.";
@@ -577,3 +579,10 @@
 "settings.semantic_rebuilding" = "Ricostruzione…";
 "settings.semantic_clear" = "Cancella indice";
 "settings.semantic_search_footer" = "Trova le riunioni per significato e alimenta la chat, usando un modello sul dispositivo. Il testo e i vettori restano cifrati sul tuo dispositivo.";
+"settings.wiki_title" = "Wiki delle riunioni";
+"settings.wiki" = "Crea wiki delle riunioni";
+"settings.wiki_articles" = "Articoli della wiki";
+"settings.wiki_rebuild" = "Ricrea wiki";
+"settings.wiki_rebuilding" = "Ricreazione…";
+"settings.wiki_clear" = "Cancella wiki";
+"settings.wiki_footer" = "Usa il tuo provider IA per i riassunti per creare un articolo condensato per riunione, così la funzione \"Chiedi\" della libreria può rispondere a domande che abbracciano o confrontano più riunioni. Disattivata per impostazione predefinita: effettua chiamate al cloud.";

@@ -16,6 +16,7 @@ struct SettingsView: View {
     // `SettingsSections.swift`, keeping this file under SwiftLint's length limit.
     @Environment(AppSettings.self) var settings
     @Environment(SemanticIndexCoordinator.self) var semanticIndex
+    @Environment(WikiCoordinator.self) var wiki
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
 
@@ -25,6 +26,12 @@ struct SettingsView: View {
     /// True while a rebuild is running, so the buttons show progress and can't
     /// be re-triggered.
     @State var isRebuildingIndex = false
+    /// Count of wiki articles shown in the meeting-wiki section, refreshed on
+    /// appear and after a rebuild/clear.
+    @State var wikiArticleCount = 0
+    /// True while a wiki rebuild is running, so the buttons show progress and
+    /// can't be re-triggered.
+    @State var isRebuildingWiki = false
 
     @State var storageText = "—"
     @State var showingDeleteConfirm = false
@@ -146,6 +153,9 @@ struct SettingsView: View {
 
             // MARK: Semantic search & chat
             semanticSearchSection(settings: settings)
+
+            // MARK: Meeting wiki (cross-meeting synthesis)
+            wikiSection(settings: settings)
 
             // MARK: Summary templates
             Section {

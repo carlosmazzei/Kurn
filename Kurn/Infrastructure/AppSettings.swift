@@ -52,6 +52,7 @@ final class AppSettings {
         static let autoTaggingEnabled = "settings.autoTaggingEnabled"
         static let usageStats = "settings.usageStats"
         static let semanticSearchEnabled = "settings.semanticSearchEnabled"
+        static let wikiEnabled = "settings.wikiEnabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -138,6 +139,17 @@ final class AppSettings {
     /// delete existing chunks (use "Clear index" in Settings for that).
     var semanticSearchEnabled: Bool {
         didSet { defaults.set(semanticSearchEnabled, forKey: Keys.semanticSearchEnabled) }
+    }
+
+    /// Whether the LLM-generated per-meeting "wiki" is built and used by the
+    /// library-wide chat's synthesis path. Unlike `semanticSearchEnabled`, this
+    /// is **off by default**: generating articles makes cloud LLM calls (one per
+    /// meeting), so it must be an explicit opt-in. When on, articles are generated
+    /// after each transcription and backfilled in small batches, and cross-meeting
+    /// "synthesis" questions are answered over the articles instead of raw
+    /// passages.
+    var wikiEnabled: Bool {
+        didSet { defaults.set(wikiEnabled, forKey: Keys.wikiEnabled) }
     }
 
     /// When on, the recordings UI requires Face ID / Touch ID / passcode once
@@ -451,6 +463,9 @@ final class AppSettings {
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
         semanticSearchEnabled = defaults.object(forKey: Keys.semanticSearchEnabled) as? Bool ?? true
+        // Off by default: wiki generation makes paid cloud LLM calls, so it is an
+        // explicit opt-in (`bool(forKey:)` returns false for an absent key).
+        wikiEnabled = defaults.bool(forKey: Keys.wikiEnabled)
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
         // Screenshot automation (fastlane `snapshot`) always forces this off so

@@ -19,7 +19,10 @@
 import Foundation
 
 struct MeetingChatService {
-    private let searchService: SemanticSearchService
+    // Not `private`: the synthesis path in `MeetingChatSynthesis.swift` (a
+    // separate file) reuses the same retrieval helpers, and `private` is
+    // file-scoped.
+    let searchService: SemanticSearchService
 
     init(searchService: SemanticSearchService = SemanticSearchService()) {
         self.searchService = searchService
@@ -82,29 +85,47 @@ struct MeetingChatService {
         )
     }
 
-    /// Answer across the whole library (the "Ask" sheet). Always retrieval, in
-    /// library scope: excerpts are diversified across meetings and attributed to
-    /// their source meeting, and any per-meeting summaries in `summariesByMeeting`
-    /// (meetingID → condensed markdown) are given to the model as overviews.
+    /// Answer across the whole library (the "Ask" sheet). Routes the question:
+    /// pinpoint **lookups** go through library-scope retrieval (excerpts
+    /// diversified across meetings, attributed to their source meeting, with any
+    /// `summariesByMeeting` overviews); **synthesis/aggregate** questions are
+    /// answered over the condensed `articlesByMeeting` wiki articles, which can
+    /// count and cross-reference. When no articles are available the router
+    /// always chooses retrieval, so this degrades gracefully to the Phase-A path.
     func answerAcrossLibrary(
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
         summariesByMeeting: [UUID: String] = [:],
+        articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
         provider: AIProvider,
         model: String
     ) async throws -> Answer {
         let trimmed = try Self.requireQuestion(question)
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
-        return try await retrievedAnswer(
-            question: trimmed, history: history, candidates: candidates,
-            scope: .library, summariesByMeeting: summariesByMeeting, llm: llm
-        )
+
+        let route: QuestionRouter.Route = articlesByMeeting.isEmpty
+            ? .lookup
+            : await QuestionRouter.classify(trimmed, llm: llm)
+
+        switch route {
+        case .lookup:
+            return try await retrievedAnswer(
+                question: trimmed, history: history, candidates: candidates,
+                scope: .library, summariesByMeeting: summariesByMeeting, llm: llm
+            )
+        case .synthesis:
+            return try await synthesizedAnswer(
+                question: trimmed, history: history, candidates: candidates,
+                articles: articlesByMeeting, summariesByMeeting: summariesByMeeting, llm: llm
+            )
+        }
     }
 
     // MARK: - Retrieval pipeline
 
-    private func retrievedAnswer(
+    // Not `private`: reused by the synthesis fallback in `MeetingChatSynthesis.swift`.
+    func retrievedAnswer(
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
@@ -154,7 +175,8 @@ struct MeetingChatService {
 
     /// One LLM call producing extra search terms / a hypothetical answer sentence
     /// to widen recall. Returns nil when the model gives nothing useful.
-    private func rewriteQuery(_ question: String, llm: LLMProvider) async throws -> String? {
+    // Not `private`: reused by the synthesis path in `MeetingChatSynthesis.swift`.
+    func rewriteQuery(_ question: String, llm: LLMProvider) async throws -> String? {
         let system = """
         You expand a user's question into search keywords to retrieve matching \
         transcript passages. Reply with ONLY a short line of keywords and, \
