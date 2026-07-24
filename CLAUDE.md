@@ -9,6 +9,11 @@ meetings, transcribing audio, diarizing speakers, and generating structured AI
 summaries. Everything is stored on device; network calls happen only when the user
 opts into cloud (Whisper-compatible) transcription or a cloud summary provider.
 
+The iOS app targets **iOS 26.0** and uses the system's Liquid Glass chrome
+directly (see "Navigation chrome" below); the watchOS companion still targets
+watchOS 10.0. There is no `#available` fallback for pre-26 iOS — the floor is the
+deployment target.
+
 There is no Swift Package or `Package.swift` — the project is an Xcode project
 (`Kurn.xcodeproj`) with three targets: `Kurn` (app), `KurnWatch` (watchOS companion),
 and `KurnLiveActivityExtension` (widget/Live Activity). Tests live in `KurnTests`
@@ -444,6 +449,41 @@ providers keep a `legacyKeychainAccount` for backward compatibility; custom prov
 use `provider_<id>_api_key`. A few preferences also mirror to non-persistent global
 state in their `didSet` — e.g. `logLevel` pushes to `AppLog.minimumLevel` so the
 logging gate reflects the user's choice immediately (also synced once on init).
+
+### Navigation chrome (Liquid Glass)
+
+The app used to hide the navigation bar on every main screen and hand-draw its
+own header, bottom bar and floating record button. It no longer does — the rule
+now is **use the system's toolbar, and only fall back to custom content when a
+toolbar would be the wrong control**:
+
+- `MeetingsListView` uses `.navigationTitle` + `.searchable` and a single
+  `.toolbar { listToolbar }`. The toolbar content lives in
+  `Views/MeetingsListToolbar.swift` as an extension, which is why several of
+  `MeetingsListView`'s members are non-private — a `private` member is invisible
+  to an extension in another file.
+- **`ToolbarSpacer` is how glass groups are split.** In `listToolbar`, the
+  library/filter/Ask items share one glass capsule and
+  `ToolbarSpacer(.flexible, placement: .bottomBar)` gives the record button
+  (`.buttonStyle(.glassProminent)`, `.tint(Theme.accent)`) a capsule of its own.
+  `MeetingDetailView`'s `toolbarContent` uses `ToolbarSpacer(.fixed,
+  placement: .topBarTrailing)` the same way to separate the favorite toggle from
+  the overflow menu.
+- Two places deliberately stay custom content: `RecorderView`'s transport
+  controls (full-width, thumb-sized targets mid-recording — they take
+  `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), and
+  `MeetingChatView`'s composer (an input surface, attached via
+  `.safeAreaBar(edge: .bottom)`).
+- `MeetingDetailView`'s four sections are a segmented `Picker`, not a bottom
+  bar: they're view modes of one meeting rather than top-level destinations, and
+  a bottom bar there would collide with the Chat tab's composer.
+- Do not reintroduce `.background(.bar)`, hand-drawn `Divider` bar tops, or
+  `.toolbar(.hidden, for: .navigationBar)` on a main screen. The one remaining
+  `.toolbar(.hidden,…)` is the locked-recordings branch of `MeetingsListView`,
+  which intentionally shows no toolbar (and therefore no record button) until
+  the user authenticates.
+- Accessibility identifiers used by `KurnUITests/ScreenshotUITests.swift`
+  (`nav.settings`, `meetingCard`) must survive any further chrome rework.
 
 ## Conventions
 

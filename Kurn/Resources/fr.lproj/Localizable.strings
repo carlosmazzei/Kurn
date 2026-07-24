@@ -173,7 +173,7 @@
 "meeting.default_title" = "Réunion – %@";
 "meeting.has_summary" = "Résumé disponible";
 "meetings.title" = "Réunions";
-"meetings.new" = "Nouvelle Réunion";
+"meetings.record" = "Enregistrer";
 "meetings.search" = "Rechercher des enregistrements…";
 "filter.all" = "Toutes";
 "filter.today" = "Aujourd'hui";
@@ -355,7 +355,7 @@
 "detail.transcript.empty.title" = "Aucune transcription pour l'instant";
 "detail.transcript.empty.subtitle" = "Transcrivez un enregistrement pour voir la conversation ici.";
 "detail.summary.empty.title" = "Aucun résumé pour l'instant";
-"tab.meetings" = "Réunions";
+"detail.section" = "Section";
 "tab.recordings" = "Enregistrements";
 "tab.transcript" = "Transcription";
 "tab.summary" = "Résumé";

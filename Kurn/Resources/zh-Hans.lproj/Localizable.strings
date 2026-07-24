@@ -173,7 +173,7 @@
 "meeting.default_title" = "会议 – %@";
 "meeting.has_summary" = "有摘要";
 "meetings.title" = "会议";
-"meetings.new" = "新建会议";
+"meetings.record" = "录制";
 "meetings.search" = "搜索录音…";
 "filter.all" = "全部";
 "filter.today" = "今天";
@@ -355,7 +355,7 @@
 "detail.transcript.empty.title" = "暂无转录内容";
 "detail.transcript.empty.subtitle" = "转录一段录音即可在此查看对话内容。";
 "detail.summary.empty.title" = "暂无摘要";
-"tab.meetings" = "会议";
+"detail.section" = "板块";
 "tab.recordings" = "录音";
 "tab.transcript" = "转录";
 "tab.summary" = "摘要";

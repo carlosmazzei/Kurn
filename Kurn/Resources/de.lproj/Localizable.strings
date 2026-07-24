@@ -173,7 +173,7 @@
 "meeting.default_title" = "Meeting – %@";
 "meeting.has_summary" = "Hat Zusammenfassung";
 "meetings.title" = "Meetings";
-"meetings.new" = "Neues Meeting";
+"meetings.record" = "Aufnehmen";
 "meetings.search" = "Aufnahmen durchsuchen…";
 "filter.all" = "Alle";
 "filter.today" = "Heute";
@@ -355,7 +355,7 @@
 "detail.transcript.empty.title" = "Noch kein Transkript";
 "detail.transcript.empty.subtitle" = "Transkribieren Sie eine Aufnahme, um das Gespräch hier zu sehen.";
 "detail.summary.empty.title" = "Noch keine Zusammenfassung";
-"tab.meetings" = "Meetings";
+"detail.section" = "Bereich";
 "tab.recordings" = "Aufnahmen";
 "tab.transcript" = "Transkript";
 "tab.summary" = "Zusammenfassung";

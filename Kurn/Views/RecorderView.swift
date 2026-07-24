@@ -78,7 +78,6 @@ private struct RecorderContent: View {
             .opacity(vm.state == .recording ? 1 : 0.4)
 
             VStack(spacing: 0) {
-                topBar
                 Spacer()
                 statusBadge
                 startingIndicator
@@ -96,7 +95,20 @@ private struct RecorderContent: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(NSLocalizedString("recorder.title", comment: "Record"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(NSLocalizedString("common.cancel", comment: "Cancel")) {
+                    vm.cancel()
+                    onFinished()
+                }
+            }
+        }
+        // The backdrop is a fixed immersive black, so pin the whole screen —
+        // including the glass navigation bar — to the dark appearance rather
+        // than letting it render light chrome over black in light mode.
+        .preferredColorScheme(.dark)
         // Scroll on a fixed clock rather than on level *changes*: the
         // change-driven path proved able to stall after a background/lock
         // round-trip (frozen bars) even while capture continued. A clocked
@@ -147,25 +159,6 @@ private struct RecorderContent: View {
     }
 
     // MARK: - Subviews
-
-    private var topBar: some View {
-        HStack {
-            Button(NSLocalizedString("common.cancel", comment: "Cancel")) {
-                vm.cancel()
-                onFinished()
-            }
-            .foregroundStyle(.white.opacity(0.6))
-            Spacer()
-            Text(NSLocalizedString("recorder.title", comment: "Record"))
-                .font(.headline)
-                .foregroundStyle(.white)
-            Spacer()
-            // Balance the Cancel button so the title stays centered.
-            Text(NSLocalizedString("common.cancel", comment: "Cancel"))
-                .opacity(0)
-        }
-        .padding(.top, 8)
-    }
 
     @ViewBuilder
     private var statusBadge: some View {
@@ -291,12 +284,11 @@ private struct RecorderContent: View {
                     systemImage: vm.state == .paused ? "play.fill" : "pause.fill",
                     title: vm.state == .paused
                         ? NSLocalizedString("recorder.resume", comment: "Resume")
-                        : NSLocalizedString("recorder.pause", comment: "Pause"),
-                    foreground: .white,
-                    background: AnyShapeStyle(.white.opacity(0.1)),
-                    bordered: true
+                        : NSLocalizedString("recorder.pause", comment: "Pause")
                 )
             }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
             .disabled(vm.state == .idle)
 
             // Stop & save.
@@ -306,36 +298,27 @@ private struct RecorderContent: View {
             } label: {
                 pillLabel(
                     systemImage: "stop.fill",
-                    title: NSLocalizedString("recorder.stop", comment: "Stop"),
-                    foreground: .white,
-                    background: AnyShapeStyle(Theme.accent),
-                    bordered: false
+                    title: NSLocalizedString("recorder.stop", comment: "Stop")
                 )
             }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .tint(Theme.accent)
             .disabled(vm.state == .idle)
-            .shadow(color: Theme.accent.opacity(vm.state == .idle ? 0 : 0.45), radius: 14, y: 4)
         }
         .opacity(vm.state == .idle ? 0.5 : 1)
     }
 
-    private func pillLabel(
-        systemImage: String,
-        title: String,
-        foreground: Color,
-        background: AnyShapeStyle,
-        bordered: Bool
-    ) -> some View {
+    /// The transport controls stay full-width, thumb-sized content buttons
+    /// rather than toolbar items — they're the primary target mid-recording —
+    /// but take their surface from the glass button styles above.
+    private func pillLabel(systemImage: String, title: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: systemImage)
             Text(title).font(.system(size: 16, weight: .semibold))
         }
-        .foregroundStyle(foreground)
         .frame(maxWidth: .infinity)
         .frame(height: 58)
-        .background(background, in: Capsule())
-        .overlay(
-            Capsule().stroke(.white.opacity(bordered ? 0.1 : 0), lineWidth: 0.5)
-        )
     }
 
     private var barColor: Color {

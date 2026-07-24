@@ -30,7 +30,8 @@ generates a summary with a configured AI provider.
 
 ## Current App
 
-- Native iPhone and iPad app targeting iOS 17.0 or newer.
+- Native iPhone and iPad app targeting iOS 26.0 or newer, built around the
+  system's Liquid Glass navigation chrome.
 - Companion Apple Watch app targeting watchOS 10.0 or newer.
 - Lock Screen and Dynamic Island Live Activity for active recordings.
 - Local SwiftData store for meetings, recordings, speakers, transcripts, and
@@ -183,8 +184,9 @@ Kurn is designed to avoid a backend service controlled by the app.
 ## Requirements
 
 - macOS with Xcode installed.
-- Xcode 16 or newer. The project has been opened with Xcode 26.5.
-- iOS 17.0 or newer for the main app.
+- Xcode 26 or newer (the iOS 26 SDK is required). The project has been opened
+  with Xcode 26.5.
+- iOS 26.0 or newer for the main app.
 - watchOS 10.0 or newer for the Watch app.
 - An iOS simulator or a physical iPhone/iPad.
 - Optional: a paired Apple Watch or watchOS simulator for Watch remote control.
