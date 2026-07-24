@@ -56,6 +56,18 @@ struct MeetingChatService {
     /// highly-relevant meeting can't crowd out the rest of the library.
     static let maxHitsPerMeeting = 3
 
+    /// How many top cosine hits to scan when choosing which meetings' wiki
+    /// articles feed the library synthesis. Large so the relevance floor — not
+    /// this cap — decides breadth.
+    static let librarySynthesisPoolSize = 400
+    /// Minimum cosine similarity for a meeting's best passage to include that
+    /// meeting's article in the synthesis. The single knob that makes breadth
+    /// adaptive: a pinpoint question clears it for few meetings, a broad topic
+    /// or aggregate for many.
+    static let meetingRelevanceFloor: Float = 0.2
+    /// Upper bound on meetings whose articles enter one synthesis, to cap cost.
+    static let maxSynthesisMeetings = 40
+
     // MARK: - Entry points
 
     /// Answer about a single meeting. Sends the whole transcript when it fits the
@@ -136,6 +148,26 @@ struct MeetingChatService {
         }
         return (try? await rerank(question: question, pool: pool, limit: limit, llm: llm))
             ?? Array(pool.prefix(limit))
+    }
+
+    /// Distinct meetings whose best passage is semantically relevant to the
+    /// question — the meetings whose wiki articles feed the library synthesis.
+    /// Breadth is adaptive: only meetings clearing `meetingRelevanceFloor` are
+    /// included (few for a pinpoint question, many for a broad topic/aggregate),
+    /// most-relevant first, capped at `maxSynthesisMeetings`. Uses dense cosine
+    /// (`SemanticSearchService.search`) so the floor is a comparable similarity,
+    /// not an RRF rank. Not `private`: called from `MeetingChatSynthesis.swift`.
+    func selectRelevantMeetings(
+        question: String,
+        candidates: [SemanticSearchService.Candidate]
+    ) async throws -> [UUID] {
+        let hits = try await searchService.search(
+            query: question, in: candidates,
+            limit: Self.librarySynthesisPoolSize, minScore: Self.meetingRelevanceFloor
+        )
+        return SemanticSearchService.bestPerMeeting(hits)
+            .prefix(Self.maxSynthesisMeetings)
+            .map(\.meetingID)
     }
 
     /// Retrieval-grounded answer over a single meeting's passages (the

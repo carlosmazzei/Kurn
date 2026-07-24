@@ -11,6 +11,14 @@ import Foundation
 import Testing
 @testable import Kurn
 
+/// Deterministic embedder: returns the vector registered for a string (already
+/// normalized by the caller), so cosine selection is exact and OS-free.
+private struct StubEmbedder: TextEmbedding {
+    let modelIdentifier = "stub-v1"
+    let table: [String: [Float]]
+    func embed(_ texts: [String]) async throws -> [[Float]] { texts.map { table[$0] ?? [] } }
+}
+
 struct WikiSynthesisTests {
 
     private func snapshot(
@@ -19,11 +27,25 @@ struct WikiSynthesisTests {
         WikiArticleSnapshot(meetingID: meetingID, title: title, date: date, bodyMarkdown: body)
     }
 
-    private func hit(meetingID: UUID) -> SemanticSearchService.Hit {
+    private func hit(
+        meetingID: UUID, text: String = "t", date: Date = .distantPast
+    ) -> SemanticSearchService.Hit {
         SemanticSearchService.Hit(
             chunkID: UUID(), meetingID: meetingID, recordingID: UUID(),
-            text: "t", start: 0, end: 1, speakerLabel: "S1", score: 0.5,
-            meetingTitle: "M", meetingDate: .distantPast
+            text: text, start: 0, end: 1, speakerLabel: "S1", score: 0.5,
+            meetingTitle: "M", meetingDate: date
+        )
+    }
+
+    private func normalize(_ v: [Float]) -> [Float] {
+        let n = (v.reduce(0) { $0 + $1 * $1 }).squareRoot()
+        return n > 0 ? v.map { $0 / n } : v
+    }
+
+    private func candidate(meeting: UUID, vector: [Float]) -> SemanticSearchService.Candidate {
+        SemanticSearchService.Candidate(
+            chunkID: UUID(), meetingID: meeting, recordingID: UUID(),
+            text: "x", start: 0, end: 1, speakerLabel: "S1", vector: vector
         )
     }
 
@@ -77,42 +99,56 @@ struct WikiSynthesisTests {
         #expect(!text.hasPrefix("### \n")) // resolved to a localized fallback name
     }
 
-    // MARK: - Article selection
+    // MARK: - Article ordering
 
-    @Test func selectArticlesForGlobalAggregateReturnsAll() {
-        let a = snapshot("A", body: "x", meetingID: UUID())
-        let b = snapshot("B", body: "y", meetingID: UUID())
-        let articles = [a.meetingID: a, b.meetingID: b]
-        // No passages, but a global aggregate → every article is considered.
-        let selected = MeetingChatService.selectArticles(
-            question: "How many meetings mention risk?", passages: [], articles: articles
+    @Test func orderedArticlesSortsChronologicallyAndDropsMissing() {
+        let older = UUID(), newer = UUID(), noArticle = UUID()
+        let a = snapshot("Old", body: "x", date: Date(timeIntervalSince1970: 100), meetingID: older)
+        let b = snapshot("New", body: "y", date: Date(timeIntervalSince1970: 900), meetingID: newer)
+        let articles = [older: a, newer: b]
+        // Passed newest-first and including a meeting with no article.
+        let ordered = MeetingChatService.orderedArticles(
+            meetingIDs: [newer, noArticle, older], articles: articles
         )
-        #expect(selected.count == 2)
+        #expect(ordered.map(\.title) == ["Old", "New"]) // chronological, missing dropped
     }
 
-    @Test func selectArticlesForNormalQuestionFollowsPassageMeetings() {
+    // MARK: - Adaptive meeting selection (relevance floor)
+
+    @Test func selectRelevantMeetingsIncludesOnlyMeetingsAboveFloor() async throws {
+        let q = normalize([1, 0, 0])
         let m1 = UUID(), m2 = UUID(), m3 = UUID()
-        let a1 = snapshot("A1", body: "x", meetingID: m1)
-        let a2 = snapshot("A2", body: "y", meetingID: m2)
-        let a3 = snapshot("A3", body: "z", meetingID: m3)
-        let articles = [m1: a1, m2: a2, m3: a3]
-        // Passages surface m2 then m1 (not m3) → only those articles, in order.
-        let selected = MeetingChatService.selectArticles(
-            question: "How did the budget evolve?",
-            passages: [hit(meetingID: m2), hit(meetingID: m1)], articles: articles
+        let service = MeetingChatService(
+            searchService: SemanticSearchService(embedder: StubEmbedder(table: ["topic": q]))
         )
-        #expect(selected.map(\.meetingID) == [m2, m1])
+        let candidates = [
+            candidate(meeting: m1, vector: normalize([1, 0, 0])),     // cosine 1.0 → in
+            candidate(meeting: m2, vector: normalize([0, 1, 0])),     // cosine 0.0 → out (floor 0.2)
+            candidate(meeting: m3, vector: normalize([0.9, 0.1, 0]))  // cosine ~0.99 → in
+        ]
+        let ids = try await service.selectRelevantMeetings(question: "topic", candidates: candidates)
+        #expect(Set(ids) == [m1, m3])
+        #expect(!ids.contains(m2))
     }
 
-    @Test func selectArticlesWithNoArticlesIsEmpty() {
-        #expect(MeetingChatService.selectArticles(
-            question: "How many meetings?", passages: [], articles: [:]
-        ).isEmpty)
+    // MARK: - Passage rendering (chronological)
+
+    @Test func renderPassagesOrdersMeetingsByDate() {
+        let older = UUID(), newer = UUID()
+        // Newest meeting's hit appears first, but rendering must put oldest first.
+        let block = MeetingChatService.renderPassages([
+            hit(meetingID: newer, text: "newer point", date: Date(timeIntervalSince1970: 900)),
+            hit(meetingID: older, text: "older point", date: Date(timeIntervalSince1970: 100))
+        ])
+        let olderIdx = block.range(of: "older point").map { block.distance(from: block.startIndex, to: $0.lowerBound) }
+        let newerIdx = block.range(of: "newer point").map { block.distance(from: block.startIndex, to: $0.lowerBound) }
+        #expect(olderIdx != nil && newerIdx != nil)
+        #expect((olderIdx ?? 0) < (newerIdx ?? 0))
     }
 
     // MARK: - Prompt
 
-    @Test func combinedSystemPromptEnablesCountingAndAttribution() {
+    @Test func combinedSystemPromptEnablesCountingAttributionAndChronology() {
         let prompt = MeetingChatService.combinedSystemPrompt
         #expect(prompt.localizedCaseInsensitiveContains("count"))
         #expect(prompt.localizedCaseInsensitiveContains("attribute"))
@@ -120,6 +156,8 @@ struct WikiSynthesisTests {
         // Mentions both grounding sources.
         #expect(prompt.localizedCaseInsensitiveContains("notes"))
         #expect(prompt.localizedCaseInsensitiveContains("excerpts"))
+        // Chronological narration for evolution questions.
+        #expect(prompt.localizedCaseInsensitiveContains("chronological"))
     }
 
     @Test func combinedUserPromptIncludesBothBlocksWhenPresent() {

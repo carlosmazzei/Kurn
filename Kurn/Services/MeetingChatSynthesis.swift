@@ -24,9 +24,6 @@ import Foundation
 
 extension MeetingChatService {
 
-    /// Meetings whose articles are considered for a non-global answer.
-    static let synthesisMeetingLimit = 16
-
     /// Answer a library-wide question over the retrieved excerpts and the wiki
     /// articles of the meetings in play (all articles for a global aggregate).
     func libraryCombinedAnswer(
@@ -41,7 +38,12 @@ extension MeetingChatService {
             question: question, candidates: candidates,
             poolSize: Self.libraryPoolSize, limit: Self.libraryRetrievalLimit, diversify: true, llm: llm
         )
-        let selected = Self.selectArticles(question: question, passages: passages, articles: articles)
+        // Adaptive breadth: the wiki articles of every meeting whose best passage
+        // clears the relevance floor, ordered chronologically. One path serves
+        // pinpoint, evolution, and aggregate questions — the floor decides how
+        // wide it goes, not a per-type classifier.
+        let meetingIDs = try await selectRelevantMeetings(question: question, candidates: candidates)
+        let selected = Self.orderedArticles(meetingIDs: meetingIDs, articles: articles)
 
         guard !passages.isEmpty || !selected.isEmpty else {
             let empty = Self.userPrompt(question: question, hits: [], scope: .library, summaries: [:])
@@ -79,25 +81,14 @@ extension MeetingChatService {
 
     // MARK: - Article selection
 
-    /// The articles to reason over: every article for a global aggregate,
-    /// otherwise the articles of the meetings that surfaced in the excerpts (in
-    /// passage-rank order, capped at `synthesisMeetingLimit`).
-    static func selectArticles(
-        question: String,
-        passages: [SemanticSearchService.Hit],
+    /// The wiki articles for `meetingIDs`, dropping meetings that don't have one,
+    /// ordered chronologically (oldest first) so an evolution question reads as a
+    /// timeline and every other question is unaffected by the order.
+    static func orderedArticles(
+        meetingIDs: [UUID],
         articles: [UUID: WikiArticleSnapshot]
     ) -> [WikiArticleSnapshot] {
-        guard !articles.isEmpty else { return [] }
-        if LibraryQuestion.isGlobalAggregate(question) {
-            return Array(articles.values)
-        }
-        var selected: [WikiArticleSnapshot] = []
-        for group in groupByMeeting(passages) {
-            guard let article = articles[group.id] else { continue }
-            selected.append(article)
-            if selected.count >= synthesisMeetingLimit { break }
-        }
-        return selected
+        meetingIDs.compactMap { articles[$0] }.sorted { $0.date < $1.date }
     }
 
     // MARK: - Map-reduce (over whole articles, for the overflow case)
@@ -148,10 +139,14 @@ extension MeetingChatService {
     }
 
     /// The retrieved excerpts grouped by meeting under their title/date headers,
-    /// or an empty string when there are none.
+    /// ordered chronologically to match the articles, or an empty string when
+    /// there are none.
     static func renderPassages(_ passages: [SemanticSearchService.Hit]) -> String {
         guard !passages.isEmpty else { return "" }
-        return groupByMeeting(passages).map { group -> String in
+        let groups = groupByMeeting(passages).sorted {
+            ($0.hits.first?.meetingDate ?? .distantPast) < ($1.hits.first?.meetingDate ?? .distantPast)
+        }
+        return groups.map { group -> String in
             let head = group.hits.first.map(meetingHeader) ?? "###"
             let lines = group.hits
                 .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
@@ -210,6 +205,9 @@ extension MeetingChatService {
     - VERBATIM EXCERPTS: exact transcript lines. Use these for direct quotes and \
     cite the moments you rely on with their [mm:ss] timestamps.
     Rules:
+    - The meetings are given in chronological order (oldest first). When the \
+    question is about how something changed or evolved over time, narrate the \
+    progression and call out what changed between meetings, with their dates.
     - Attribute every claim to a meeting by naming its title (and date when useful).
     - Base your answer strictly on the notes and excerpts. Do not invent facts or \
     use outside knowledge about the participants or topics.

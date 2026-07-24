@@ -274,8 +274,8 @@ struct MeetingChatView: View {
 
     /// Condensed wiki articles for the library-wide ask (meetingID → snapshot).
     /// Empty for single-meeting scope and when the wiki feature is off; the chat
-    /// service routes synthesis questions through these and falls back to
-    /// retrieval when the map is empty. Built here on the main actor.
+    /// service grounds on these alongside the retrieved excerpts, and degrades to
+    /// excerpts only when the map is empty. Built here on the main actor.
     private func articlesByMeeting() -> [UUID: WikiArticleSnapshot] {
         guard meeting == nil, settings.wikiEnabled else { return [:] }
         let articles = (try? modelContext.fetch(FetchDescriptor<WikiArticle>())) ?? []
