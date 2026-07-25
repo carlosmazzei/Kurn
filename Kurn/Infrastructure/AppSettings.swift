@@ -430,14 +430,12 @@ final class AppSettings {
     }
 
     init() {
-        let loadedProviders: [AIProvider]
-        if let data = defaults.data(forKey: Keys.providers),
-           let decoded = try? JSONDecoder().decode([AIProvider].self, from: data),
-           !decoded.isEmpty {
-            loadedProviders = Self.mergedProviders(decoded)
-        } else {
-            loadedProviders = AIProvider.defaultProviders
-        }
+        // An empty stored list is treated as absent: it can only come from a
+        // corrupt write, and shipping the app with no providers at all is worse
+        // than re-seeding the built-ins.
+        let loadedProviders = defaults.decoded([AIProvider].self, forKey: Keys.providers)
+            .flatMap { $0.isEmpty ? nil : $0 }
+            .map(Self.mergedProviders) ?? AIProvider.defaultProviders
         providers = loadedProviders
         let storedProviderID = defaults.string(forKey: Keys.provider) ?? AIProvider.openAI.id
         aiProviderID = loadedProviders.contains(where: { $0.id == storedProviderID })
@@ -448,51 +446,32 @@ final class AppSettings {
         transcriptionProviderID = loadedProviders.contains(where: {
             $0.id == storedTranscriptionProviderID && $0.supportsTranscription
         }) ? storedTranscriptionProviderID : AIProvider.openAI.id
-        let resolvedDefaultMode = TranscriptionMode(
-            rawValue: defaults.string(forKey: Keys.defaultMode) ?? ""
-        ) ?? .onDevice
+        let resolvedDefaultMode = defaults.enumValue(forKey: Keys.defaultMode, default: TranscriptionMode.onDevice)
         defaultMode = resolvedDefaultMode
-        let resolvedDefaultLanguage = MeetingLanguage(
-            rawValue: defaults.string(forKey: Keys.defaultLanguage) ?? ""
-        ) ?? .autoDetect
+        let resolvedDefaultLanguage = defaults.enumValue(forKey: Keys.defaultLanguage, default: MeetingLanguage.autoDetect)
         defaultLanguage = resolvedDefaultLanguage
-        micPickup = MicPickup(
-            rawValue: defaults.string(forKey: Keys.micPickup) ?? ""
-        ) ?? .wholeRoom
-        audioQuality = AudioQuality(
-            rawValue: defaults.string(forKey: Keys.audioQuality) ?? ""
-        ) ?? .high
+        micPickup = defaults.enumValue(forKey: Keys.micPickup, default: .wholeRoom)
+        audioQuality = defaults.enumValue(forKey: Keys.audioQuality, default: .high)
         alwaysUseBuiltInMic = defaults.bool(forKey: Keys.alwaysUseBuiltInMic)
-        meetingsSortOrder = MeetingsSortOrder(
-            rawValue: defaults.string(forKey: Keys.meetingsSortOrder) ?? ""
-        ) ?? .dateNewest
-        autoTaggingEnabled = defaults.object(forKey: Keys.autoTaggingEnabled) as? Bool ?? false
+        meetingsSortOrder = defaults.enumValue(forKey: Keys.meetingsSortOrder, default: .dateNewest)
+        autoTaggingEnabled = defaults.bool(forKey: Keys.autoTaggingEnabled, default: false)
         liveTranscriptionEnabled = defaults.bool(forKey: Keys.liveTranscriptionEnabled)
-        // `object(forKey:)` so an absent key defaults to `true` rather than
-        // `false` (which is what `defaults.bool(forKey:)` would return).
-        semanticSearchEnabled = defaults.object(forKey: Keys.semanticSearchEnabled) as? Bool ?? true
+        semanticSearchEnabled = defaults.bool(forKey: Keys.semanticSearchEnabled, default: true)
         // Off by default: wiki generation makes paid cloud LLM calls, so it is an
-        // explicit opt-in (`bool(forKey:)` returns false for an absent key).
-        wikiEnabled = defaults.bool(forKey: Keys.wikiEnabled)
-        // `object(forKey:)` so an absent key defaults to `true` rather than
-        // `false` (which is what `defaults.bool(forKey:)` would return).
+        // explicit opt-in.
+        wikiEnabled = defaults.bool(forKey: Keys.wikiEnabled, default: false)
         // Screenshot automation (fastlane `snapshot`) always forces this off so
         // the recordings lock screen never blocks an unattended UI test run.
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
-            requireAuthForRecordings = false
-        } else {
-            requireAuthForRecordings = defaults.object(forKey: Keys.requireAuthForRecordings) as? Bool ?? true
-        }
+        let screenshotRun = ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots")
         #else
-        requireAuthForRecordings = defaults.object(forKey: Keys.requireAuthForRecordings) as? Bool ?? true
+        let screenshotRun = false
         #endif
-        // `object(forKey:)` so an absent key defaults to `true` rather than
-        // `false` (which is what `defaults.bool(forKey:)` would return).
-        hideLiveActivityMeetingTitle = defaults.object(forKey: Keys.hideLiveActivityMeetingTitle) as? Bool ?? true
-        diarizationEngine = DiarizationEngine(
-            rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
-        ) ?? .heuristic
+        requireAuthForRecordings = screenshotRun
+            ? false
+            : defaults.bool(forKey: Keys.requireAuthForRecordings, default: true)
+        hideLiveActivityMeetingTitle = defaults.bool(forKey: Keys.hideLiveActivityMeetingTitle, default: true)
+        diarizationEngine = defaults.enumValue(forKey: Keys.diarizationEngine, default: .heuristic)
         // Migration: the old key held a *minimum* speaker count that never
         // engaged (see `fluidAudioSpeakerCount`). Carry the number over as the
         // pinned count — it is the count the user believed they were asking for.
@@ -501,9 +480,7 @@ final class AppSettings {
         } else {
             fluidAudioSpeakerCount = defaults.integer(forKey: Keys.legacyFluidAudioMinSpeakers)
         }
-        // `object(forKey:)` so an absent key defaults to `true` rather than
-        // `false` (which is what `defaults.bool(forKey:)` would return).
-        diarizationPreprocessingEnabled = defaults.object(forKey: Keys.diarizationPreprocessingEnabled) as? Bool ?? true
+        diarizationPreprocessingEnabled = defaults.bool(forKey: Keys.diarizationPreprocessingEnabled, default: true)
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         let batchASRConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioBatchASRModelsConsented = batchASRConsented
@@ -522,47 +499,21 @@ final class AppSettings {
                 multilingualConsented: batchASRConsented
             )
         transcriptionEngine = resolvedTranscriptionEngine
-        preprocessingEngine = PreprocessingEngine(
-            rawValue: defaults.string(forKey: Keys.preprocessingEngine) ?? ""
-        ) ?? .standardDSP
-        vadEngine = VADEngine(
-            rawValue: defaults.string(forKey: Keys.vadEngine) ?? ""
-        ) ?? .energyThreshold
-        languageDetectionEngine = LanguageDetectionEngine(
-            rawValue: defaults.string(forKey: Keys.languageDetectionEngine) ?? ""
-        ) ?? .byTranscriber
+        preprocessingEngine = defaults.enumValue(forKey: Keys.preprocessingEngine, default: .standardDSP)
+        vadEngine = defaults.enumValue(forKey: Keys.vadEngine, default: .energyThreshold)
+        languageDetectionEngine = defaults.enumValue(forKey: Keys.languageDetectionEngine, default: .byTranscriber)
         // Fall back to the environment-derived default (set on `AppLog` at
         // launch) when the user hasn't chosen a level yet.
-        let resolvedLogLevel = (defaults.string(forKey: Keys.logLevel))
-            .flatMap(LogLevel.init(rawValue:)) ?? AppLog.minimumLevel
+        let resolvedLogLevel = defaults.enumValue(forKey: Keys.logLevel, default: AppLog.minimumLevel)
         logLevel = resolvedLogLevel
         AppLog.minimumLevel = resolvedLogLevel
-        if let data = defaults.data(forKey: Keys.summaryModels),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            summaryModels = decoded
-        } else {
-            summaryModels = [:]
-        }
-        if let data = defaults.data(forKey: Keys.transcriptionModels),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            transcriptionModels = decoded
-        } else {
-            transcriptionModels = [:]
-        }
-        if let data = defaults.data(forKey: Keys.usageStats),
-           let decoded = try? JSONDecoder().decode(UsageStats.self, from: data) {
-            usageStats = decoded
-        } else {
-            usageStats = UsageStats()
-        }
-        let loadedTemplates: [SummaryTemplate]
-        if let data = defaults.data(forKey: Keys.summaryTemplates),
-           let decoded = try? JSONDecoder().decode([SummaryTemplate].self, from: data),
-           !decoded.isEmpty {
-            loadedTemplates = Self.mergedTemplates(decoded)
-        } else {
-            loadedTemplates = SummaryTemplate.defaultTemplates
-        }
+        summaryModels = defaults.decoded([String: String].self, forKey: Keys.summaryModels) ?? [:]
+        transcriptionModels = defaults.decoded([String: String].self, forKey: Keys.transcriptionModels) ?? [:]
+        usageStats = defaults.decoded(UsageStats.self, forKey: Keys.usageStats) ?? UsageStats()
+        // As with `providers`, an empty stored list re-seeds the built-in presets.
+        let loadedTemplates = defaults.decoded([SummaryTemplate].self, forKey: Keys.summaryTemplates)
+            .flatMap { $0.isEmpty ? nil : $0 }
+            .map(Self.mergedTemplates) ?? SummaryTemplate.defaultTemplates
         summaryTemplates = loadedTemplates
         let storedTemplateID = defaults.string(forKey: Keys.lastSummaryTemplate)
             ?? SummaryTemplate.general.id

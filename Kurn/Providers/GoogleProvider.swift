@@ -26,15 +26,6 @@ struct GoogleProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        let cleanModel = model.replacingOccurrences(of: "models/", with: "")
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models/\(cleanModel):generateContent")
-            ?? URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(cleanModel):generateContent")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = LLMHTTP.summaryTimeout
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
-
         // Gemini has no dedicated system role here; fold it into the user turn.
         let combined = "\(systemPrompt)\n\n\(userPrompt)"
         let summarySchema: [String: Any] = [
@@ -58,15 +49,17 @@ struct GoogleProvider: LLMProvider {
             ],
             "required": ["sections"]
         ]
-        let body: [String: Any] = [
-            "contents": [["role": "user", "parts": [["text": combined]]]],
-            "generationConfig": [
-                "responseMimeType": "application/json",
-                "responseJsonSchema": summarySchema,
-                "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
+        let request = try makeRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: [
+                "contents": [["role": "user", "parts": [["text": combined]]]],
+                "generationConfig": [
+                    "responseMimeType": "application/json",
+                    "responseJsonSchema": summarySchema,
+                    "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
+                ]
             ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        )
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
@@ -74,23 +67,15 @@ struct GoogleProvider: LLMProvider {
             from: data,
             as: GeminiResponse.self,
             emptyMessage: "empty Gemini response",
-            isTruncated: { $0.candidates?.first?.finishReason == "MAX_TOKENS" }
-        ) { $0.candidates?.first?.content?.parts.compactMap { $0.text }.joined() }
+            isTruncated: { $0.candidates?.first?.finishReason == "MAX_TOKENS" },
+            extractContent: { Self.text(from: $0) }
+        )
     }
 
     // MARK: - Chat (generateContent, plain text)
 
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-
-        let cleanModel = model.replacingOccurrences(of: "models/", with: "")
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models/\(cleanModel):generateContent")
-            ?? URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(cleanModel):generateContent")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = LLMHTTP.chatTimeout
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
         // Gemini has no dedicated system role here; fold the system prompt into
         // the first user turn (as `summarize` does) and map assistant → model.
@@ -107,19 +92,47 @@ struct GoogleProvider: LLMProvider {
             contents = [["role": "user", "parts": [["text": systemPrompt]]]]
         }
         // No `responseMimeType: application/json`: chat replies are prose.
-        let body: [String: Any] = [
-            "contents": contents,
-            "generationConfig": ["maxOutputTokens": LLMHTTP.chatMaxOutputTokens]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let request = try makeRequest(
+            timeout: LLMHTTP.chatTimeout,
+            body: [
+                "contents": contents,
+                "generationConfig": ["maxOutputTokens": LLMHTTP.chatMaxOutputTokens]
+            ]
+        )
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         return try LLMHTTP.textResult(
             from: data,
             as: GeminiResponse.self,
-            emptyMessage: "empty Gemini response"
-        ) { $0.candidates?.first?.content?.parts.compactMap { $0.text }.joined() }
+            emptyMessage: "empty Gemini response",
+            extractContent: { Self.text(from: $0) }
+        )
+    }
+
+    // MARK: - Helpers
+
+    /// The `generateContent` route for the configured model. Gemini model IDs are
+    /// sometimes stored with a `models/` prefix already attached, so strip it
+    /// rather than emit `models/models/…`.
+    private var generateContentPath: String {
+        "models/\(model.replacingOccurrences(of: "models/", with: "")):generateContent"
+    }
+
+    /// A `generateContent` request with Gemini's API-key header.
+    private func makeRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
+        try LLMHTTP.jsonRequest(
+            provider: provider,
+            path: generateContentPath,
+            fallbackURL: "https://generativelanguage.googleapis.com/v1beta/\(generateContentPath)",
+            timeout: timeout,
+            headers: ["x-goog-api-key": apiKey],
+            body: body
+        )
+    }
+
+    private static func text(from response: GeminiResponse) -> String? {
+        response.candidates?.first?.content?.parts.compactMap { $0.text }.joined()
     }
 }
 

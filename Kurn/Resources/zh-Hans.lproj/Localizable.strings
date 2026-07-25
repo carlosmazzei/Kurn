@@ -17,7 +17,6 @@
 "error.recognizer_offline" = "设备端语音识别尚未就绪，请稍后重试。";
 "error.export_session" = "无法准备用于上传的音频。";
 "error.export_failed" = "音频导出失败。";
-"error.anthropic_no_transcribe" = "Anthropic 不提供转录服务，请使用设备端转录或 OpenAI Whisper。";
 "error.no_transcript" = "目前还没有可供总结的转录内容。";
 "error.speech_permission" = "设备端转录需要语音识别权限。";
 "error.model_download_required" = "%@ 需要一次性下载模型。";
@@ -275,9 +274,6 @@
 "analytics.no_speakers" = "未识别到发言人";
 "analytics.insights" = "洞察";
 "status.none" = "无转录";
-"status.in_progress" = "进行中";
-"status.done" = "已完成";
-"status.failed" = "失败";
 
 /* 通用 */
 "common.delete" = "删除";
@@ -560,7 +556,6 @@
 "error.wiki_unavailable" = "会议维基尚未准备好。请在生成完成后重试。";
 "error.embedding_no_model" = "此设备没有可用的设备端嵌入模型。";
 "error.embedding_no_assets" = "无法下载设备端语言模型。";
-"error.provider_no_chat" = "此提供方不支持聊天。";
 "tab.chat" = "聊天";
 "meetings.ask" = "提问";
 "chat.error.empty_question" = "请输入问题。";

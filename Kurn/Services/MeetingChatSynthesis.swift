@@ -143,16 +143,7 @@ extension MeetingChatService {
     /// there are none.
     static func renderPassages(_ passages: [SemanticSearchService.Hit]) -> String {
         guard !passages.isEmpty else { return "" }
-        let groups = groupByMeeting(passages).sorted {
-            ($0.hits.first?.meetingDate ?? .distantPast) < ($1.hits.first?.meetingDate ?? .distantPast)
-        }
-        return groups.map { group -> String in
-            let head = group.hits.first.map(meetingHeader) ?? "###"
-            let lines = group.hits
-                .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
-                .joined(separator: "\n")
-            return "\(head)\n\(lines)"
-        }.joined(separator: "\n\n")
+        return renderGroupedExcerpts(passages, chronological: true)
     }
 
     /// Condensed summaries for passage meetings that don't yet have a wiki

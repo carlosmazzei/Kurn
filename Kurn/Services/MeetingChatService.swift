@@ -217,7 +217,7 @@ struct MeetingChatService {
         llm: LLMProvider
     ) async throws -> [SemanticSearchService.Hit]? {
         let numbered = pool.enumerated()
-            .map { "\($0.offset + 1). [\($0.element.start.clockDisplay)] \($0.element.speakerLabel): \($0.element.text)" }
+            .map { "\($0.offset + 1). \($0.element.promptLine)" }
             .joined(separator: "\n")
         let system = """
         You rank transcript passages by relevance to a question. Reply with ONLY \
@@ -365,9 +365,7 @@ struct MeetingChatService {
         guard !hits.isEmpty else { return emptyPrompt(question: question, scope: scope) }
         switch scope {
         case .singleMeeting:
-            let excerpts = hits
-                .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
-                .joined(separator: "\n")
+            let excerpts = hits.map(\.promptLine).joined(separator: "\n")
             return """
             Question: \(question)
 
@@ -406,6 +404,28 @@ struct MeetingChatService {
         return order.map { (id: $0, hits: grouped[$0] ?? []) }
     }
 
+    /// Excerpts grouped under their meeting's `### <title> — <date>` header.
+    /// `chronological` orders the groups oldest-first (what the synthesis path
+    /// wants, so the excerpts line up with the wiki articles); otherwise groups
+    /// keep retrieval order, best-ranked meeting first.
+    /// Not `private`: reused by the combined answer in `MeetingChatSynthesis.swift`.
+    static func renderGroupedExcerpts(
+        _ hits: [SemanticSearchService.Hit],
+        chronological: Bool = false
+    ) -> String {
+        var groups = groupByMeeting(hits)
+        if chronological {
+            groups.sort {
+                ($0.hits.first?.meetingDate ?? .distantPast) < ($1.hits.first?.meetingDate ?? .distantPast)
+            }
+        }
+        return groups.map { group -> String in
+            let head = group.hits.first.map(meetingHeader) ?? "###"
+            let lines = group.hits.map(\.promptLine).joined(separator: "\n")
+            return "\(head)\n\(lines)"
+        }.joined(separator: "\n\n")
+    }
+
     /// A `### <title> — <date>` header for the meeting a hit belongs to.
     /// Not `private`: reused by the combined answer in `MeetingChatSynthesis.swift`.
     static func meetingHeader(_ hit: SemanticSearchService.Hit) -> String {
@@ -424,13 +444,7 @@ struct MeetingChatService {
         summaries: [UUID: String]
     ) -> String {
         let groups = groupByMeeting(hits)
-        let excerpts = groups.map { group -> String in
-            let head = group.hits.first.map(meetingHeader) ?? "###"
-            let lines = group.hits
-                .map { "[\($0.start.clockDisplay)] \($0.speakerLabel): \($0.text)" }
-                .joined(separator: "\n")
-            return "\(head)\n\(lines)"
-        }.joined(separator: "\n\n")
+        let excerpts = renderGroupedExcerpts(hits)
 
         let overviews = groups.compactMap { group -> String? in
             guard let summary = summaries[group.id], !summary.isEmpty,

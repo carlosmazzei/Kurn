@@ -297,30 +297,11 @@ final class TranscriptionViewModel {
             await wikiCoordinator?.generateIfEnabled(recording.meeting)
         } catch is CancellationError {
             await drainEvents()
-            if stoppingIDs.remove(recordingID) != nil {
-                // Full stop: discard the checkpoint so the next run starts fresh.
-                recording.transcriptionCheckpointData = nil
-                recording.transcriptionStatus = .none
-                AppLog.transcription.atNotice.notice("VM: transcribe stopped id=\(recordingID, privacy: .public)")
-            } else {
-                // Paused: chunk progress is already checkpointed and `.pending`
-                // gets picked up by the next foreground resume pass.
-                recording.transcriptionStatus = .pending
-                AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
-            }
-            persist()
+            finishCancelled(recording, id: recordingID)
         } catch let appError as AppError {
             await drainEvents()
             if isCancellation(appError) {
-                if stoppingIDs.remove(recordingID) != nil {
-                    recording.transcriptionCheckpointData = nil
-                    recording.transcriptionStatus = .none
-                    AppLog.transcription.atNotice.notice("VM: transcribe stopped id=\(recordingID, privacy: .public)")
-                } else {
-                    recording.transcriptionStatus = .pending
-                    AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
-                }
-                persist()
+                finishCancelled(recording, id: recordingID)
             } else {
                 // Failed — but the checkpoint is kept, so a manual retry
                 // resumes from the last completed chunk.
@@ -337,6 +318,25 @@ final class TranscriptionViewModel {
             self.error = .transcriptionFailed(error.localizedDescription)
             AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Settle a run that ended in cancellation. Which of the two cancellation
+    /// kinds it was is recorded in `stoppingIDs` by `stopTranscription`, and both
+    /// the `CancellationError` and the `AppError`-wrapped path land here — they
+    /// must stay in agreement, which is why this is one function.
+    private func finishCancelled(_ recording: Recording, id recordingID: UUID) {
+        if stoppingIDs.remove(recordingID) != nil {
+            // Full stop: discard the checkpoint so the next run starts fresh.
+            recording.transcriptionCheckpointData = nil
+            recording.transcriptionStatus = .none
+            AppLog.transcription.atNotice.notice("VM: transcribe stopped id=\(recordingID, privacy: .public)")
+        } else {
+            // Paused: chunk progress is already checkpointed and `.pending`
+            // gets picked up by the next foreground resume pass.
+            recording.transcriptionStatus = .pending
+            AppLog.transcription.atNotice.notice("VM: transcribe paused id=\(recordingID, privacy: .public)")
+        }
+        persist()
     }
 
     /// Persist a finished pipeline run: replace any existing transcript, mark

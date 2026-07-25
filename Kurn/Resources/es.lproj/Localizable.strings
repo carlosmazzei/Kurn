@@ -17,7 +17,6 @@
 "error.recognizer_offline" = "El reconocimiento de voz en el dispositivo no está listo. Inténtalo de nuevo en breve.";
 "error.export_session" = "No se pudo preparar el audio para subirlo.";
 "error.export_failed" = "Error al exportar el audio.";
-"error.anthropic_no_transcribe" = "Anthropic no ofrece transcripción. Usa el modo en el dispositivo o Whisper de OpenAI.";
 "error.no_transcript" = "Todavía no hay ninguna transcripción que resumir.";
 "error.speech_permission" = "Se requiere el permiso de reconocimiento de voz para la transcripción en el dispositivo.";
 "error.model_download_required" = "Se requiere una descarga única del modelo para %@.";
@@ -275,9 +274,6 @@
 "analytics.no_speakers" = "No se identificaron hablantes";
 "analytics.insights" = "Estadísticas";
 "status.none" = "Sin transcripción";
-"status.in_progress" = "En curso";
-"status.done" = "Hecho";
-"status.failed" = "Fallido";
 
 /* Común */
 "common.delete" = "Eliminar";
@@ -560,7 +556,6 @@
 "error.wiki_unavailable" = "La wiki de la reunión aún no está lista. Inténtalo de nuevo cuando termine de generarse.";
 "error.embedding_no_model" = "No hay ningún modelo de embeddings disponible en este dispositivo.";
 "error.embedding_no_assets" = "No se pudo descargar el modelo de lenguaje en el dispositivo.";
-"error.provider_no_chat" = "Este proveedor no admite el chat.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Preguntar";
 "chat.error.empty_question" = "Escribe una pregunta.";

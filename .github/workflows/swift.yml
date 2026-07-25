@@ -39,6 +39,28 @@ jobs:
       - name: Lint
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
 
+      # SwiftLint does not read .strings, and Xcode compiles them into a binary
+      # plist that silently collapses duplicate keys — so a duplicate is
+      # invisible to both the linter and the test suite. Check the sources.
+      - name: Check localization files
+        run: |
+          keys() { grep -o '^"[^"]*"' "$1" | sort; }
+          reference=Kurn/Resources/en.lproj/Localizable.strings
+          status=0
+          for f in Kurn/Resources/*.lproj/Localizable.strings; do
+            dupes=$(keys "$f" | uniq -d)
+            if [ -n "$dupes" ]; then
+              echo "::error file=$f::duplicate keys: $(echo $dupes | tr '\n' ' ')"
+              status=1
+            fi
+            if ! diff -q <(keys "$reference" | uniq) <(keys "$f" | uniq) >/dev/null; then
+              echo "::error file=$f::key set differs from en.lproj"
+              diff <(keys "$reference" | uniq) <(keys "$f" | uniq) || true
+              status=1
+            fi
+          done
+          exit $status
+
       - name: Prepare simulator runtimes
         run: |
           sudo xcodebuild -runFirstLaunch

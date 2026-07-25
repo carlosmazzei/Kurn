@@ -24,59 +24,36 @@ struct AnthropicProvider: LLMProvider {
         self.session = session
     }
 
-    // MARK: - Transcription (unsupported)
-
-    func transcribe(
-        audioData: Data,
-        fileName: String,
-        language: MeetingLanguage
-    ) async throws -> RawTranscript {
-        throw AppError.transcriptionFailed(
-            NSLocalizedString(
-                "error.anthropic_no_transcribe",
-                comment: "Anthropic does not support transcription"
-            )
-        )
-    }
+    // Transcription is unsupported: `AIProvider.supportsTranscription` is false
+    // for Anthropic, so the picker never offers it, and the `LLMProvider`
+    // extension's default `transcribe` covers the unreachable path.
 
     // MARK: - Summary (Messages API)
 
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "messages")
-            ?? URL(string: "https://api.anthropic.com/v1/messages")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = LLMHTTP.summaryTimeout
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "model": model,
-            "max_tokens": LLMHTTP.summaryMaxOutputTokens,
-            "system": systemPrompt,
-            "messages": [
-                ["role": "user", "content": userPrompt]
+        let request = try makeRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: [
+                "model": model,
+                "max_tokens": LLMHTTP.summaryMaxOutputTokens,
+                "system": systemPrompt,
+                "messages": [
+                    ["role": "user", "content": userPrompt]
+                ]
             ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        )
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
-        // Concatenate all text blocks (there is normally one for JSON output).
         return try LLMHTTP.summaryResult(
             from: data,
             as: MessagesResponse.self,
             emptyMessage: "empty Anthropic response",
-            isTruncated: { $0.stopReason == "max_tokens" }
-        ) { decoded in
-            decoded.content
-                .filter { $0.type == "text" }
-                .compactMap { $0.text }
-                .joined()
-        }
+            isTruncated: { $0.stopReason == "max_tokens" },
+            extractContent: { Self.text(from: $0) }
+        )
     }
 
     // MARK: - Chat (Messages API, plain text)
@@ -84,42 +61,52 @@ struct AnthropicProvider: LLMProvider {
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "messages")
-            ?? URL(string: "https://api.anthropic.com/v1/messages")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = LLMHTTP.chatTimeout
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
         // Anthropic takes the system prompt as a top-level field; the message
         // list carries only the user/assistant turns.
         let wire = messages
             .filter { $0.role != .system }
             .map { ["role": $0.role.rawValue, "content": $0.content] }
-        let body: [String: Any] = [
-            "model": model,
-            "max_tokens": LLMHTTP.chatMaxOutputTokens,
-            "system": systemPrompt,
-            "messages": wire
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let request = try makeRequest(
+            timeout: LLMHTTP.chatTimeout,
+            body: [
+                "model": model,
+                "max_tokens": LLMHTTP.chatMaxOutputTokens,
+                "system": systemPrompt,
+                "messages": wire
+            ]
+        )
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         return try LLMHTTP.textResult(
             from: data,
             as: MessagesResponse.self,
-            emptyMessage: "empty Anthropic response"
-        ) { decoded in
-            decoded.content
-                .filter { $0.type == "text" }
-                .compactMap { $0.text }
-                .joined()
-        }
+            emptyMessage: "empty Anthropic response",
+            extractContent: { Self.text(from: $0) }
+        )
     }
 
+    // MARK: - Helpers
+
+    /// A Messages API request with Anthropic's auth + version headers.
+    private func makeRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
+        try LLMHTTP.jsonRequest(
+            provider: provider,
+            path: "messages",
+            fallbackURL: "https://api.anthropic.com/v1/messages",
+            timeout: timeout,
+            headers: ["x-api-key": apiKey, "anthropic-version": apiVersion],
+            body: body
+        )
+    }
+
+    /// Concatenate all text blocks (there is normally one for JSON output).
+    private static func text(from response: MessagesResponse) -> String {
+        response.content
+            .filter { $0.type == "text" }
+            .compactMap { $0.text }
+            .joined()
+    }
 }
 
 // MARK: - Response shapes

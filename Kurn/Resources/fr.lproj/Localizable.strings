@@ -17,7 +17,6 @@
 "error.recognizer_offline" = "La reconnaissance vocale sur l'appareil n'est pas prête. Réessayez dans un instant.";
 "error.export_session" = "Impossible de préparer l'audio pour l'envoi.";
 "error.export_failed" = "Échec de l'exportation audio.";
-"error.anthropic_no_transcribe" = "Anthropic ne propose pas de transcription. Utilisez le mode sur l'appareil ou Whisper d'OpenAI.";
 "error.no_transcript" = "Aucune transcription à résumer pour l'instant.";
 "error.speech_permission" = "L'autorisation de reconnaissance vocale est requise pour la transcription sur l'appareil.";
 "error.model_download_required" = "Un téléchargement unique de modèle est requis pour %@.";
@@ -275,9 +274,6 @@
 "analytics.no_speakers" = "Aucun intervenant identifié";
 "analytics.insights" = "Analyses";
 "status.none" = "Aucune transcription";
-"status.in_progress" = "En cours";
-"status.done" = "Terminé";
-"status.failed" = "Échoué";
 
 /* Commun */
 "common.delete" = "Supprimer";
@@ -560,7 +556,6 @@
 "error.wiki_unavailable" = "Le wiki de la réunion n'est pas encore prêt. Réessayez une fois sa génération terminée.";
 "error.embedding_no_model" = "Aucun modèle d'embedding sur l'appareil n'est disponible pour cet appareil.";
 "error.embedding_no_assets" = "Impossible de télécharger le modèle de langue sur l'appareil.";
-"error.provider_no_chat" = "Ce fournisseur ne prend pas en charge le chat.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Demander";
 "chat.error.empty_question" = "Saisissez une question.";

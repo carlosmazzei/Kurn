@@ -17,7 +17,6 @@
 "error.recognizer_offline" = "On-device speech recognition is not ready. Try again shortly.";
 "error.export_session" = "Could not prepare the audio for upload.";
 "error.export_failed" = "Audio export failed.";
-"error.anthropic_no_transcribe" = "Anthropic does not provide transcription. Use on-device or OpenAI Whisper.";
 "error.no_transcript" = "There is no transcript to summarize yet.";
 "error.speech_permission" = "Speech recognition permission is required for on-device transcription.";
 "error.model_download_required" = "A one-time model download is required for %@.";
@@ -275,9 +274,6 @@
 "analytics.no_speakers" = "No speakers identified";
 "analytics.insights" = "Insights";
 "status.none" = "No transcript";
-"status.in_progress" = "In progress";
-"status.done" = "Done";
-"status.failed" = "Failed";
 
 /* Common */
 "common.delete" = "Delete";
@@ -560,7 +556,6 @@
 "error.wiki_unavailable" = "The meeting wiki isn't ready yet. Try again after it finishes generating.";
 "error.embedding_no_model" = "No on-device embedding model is available for this device.";
 "error.embedding_no_assets" = "The on-device language model could not be downloaded.";
-"error.provider_no_chat" = "This provider does not support chat.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Ask";
 "chat.error.empty_question" = "Please type a question.";

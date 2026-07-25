@@ -127,24 +127,18 @@ struct OpenAIProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "chat/completions")
-            ?? URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = LLMHTTP.summaryTimeout
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body: [String: Any] = [
-            "model": chatModel,
-            "max_completion_tokens": LLMHTTP.summaryMaxOutputTokens,
-            "response_format": ["type": "json_object"],
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": userPrompt]
+        let request = try makeRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: [
+                "model": chatModel,
+                "max_completion_tokens": LLMHTTP.summaryMaxOutputTokens,
+                "response_format": ["type": "json_object"],
+                "messages": [
+                    ["role": "system", "content": systemPrompt],
+                    ["role": "user", "content": userPrompt]
+                ]
             ]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        )
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
@@ -161,14 +155,6 @@ struct OpenAIProvider: LLMProvider {
 
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "chat/completions")
-            ?? URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = LLMHTTP.chatTimeout
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
         wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
@@ -187,7 +173,7 @@ struct OpenAIProvider: LLMProvider {
            chatModel.lowercased().hasPrefix("gpt-5") {
             body["reasoning_effort"] = "low"
         }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let request = try makeRequest(timeout: LLMHTTP.chatTimeout, body: body)
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
@@ -202,6 +188,20 @@ struct OpenAIProvider: LLMProvider {
     }
 
     // MARK: - HTTP helpers
+
+    /// A Chat Completions request with OpenAI's bearer auth. The transcription
+    /// route builds its own request: it is multipart rather than JSON, and can
+    /// be handed to the background uploader instead of `session`.
+    private func makeRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
+        try LLMHTTP.jsonRequest(
+            provider: provider,
+            path: "chat/completions",
+            fallbackURL: "https://api.openai.com/v1/chat/completions",
+            timeout: timeout,
+            headers: ["Authorization": "Bearer \(apiKey)"],
+            body: body
+        )
+    }
 
     private func multipartBody(
         boundary: String,
