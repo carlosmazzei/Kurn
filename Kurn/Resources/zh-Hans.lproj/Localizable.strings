@@ -576,3 +576,11 @@
 "settings.semantic_rebuilding" = "正在重建…";
 "settings.semantic_clear" = "清除索引";
 "settings.semantic_search_footer" = "使用设备端模型按含义查找会议并支持聊天。文本和向量在你的设备上保持加密。";
+
+/* Settings hub groups */
+"settings.group.intelligence" = "智能";
+"settings.group.capture" = "录制";
+"settings.group.library" = "资料库";
+"settings.group.system" = "系统";
+"settings.pipeline_advanced" = "高级流程";
+"settings.version" = "版本";

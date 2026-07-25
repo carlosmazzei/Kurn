@@ -576,3 +576,11 @@
 "settings.semantic_rebuilding" = "Recriando…";
 "settings.semantic_clear" = "Limpar índice";
 "settings.semantic_search_footer" = "Encontra reuniões por significado e habilita o chat, usando um modelo no dispositivo. O texto e os vetores permanecem criptografados no seu aparelho.";
+
+/* Settings hub groups */
+"settings.group.intelligence" = "Inteligência";
+"settings.group.capture" = "Captura";
+"settings.group.library" = "Biblioteca";
+"settings.group.system" = "Sistema";
+"settings.pipeline_advanced" = "Pipeline avançado";
+"settings.version" = "Versão";

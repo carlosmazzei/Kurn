@@ -1,0 +1,209 @@
+//
+//  TranscriptionSettingsView.swift
+//  Kurn
+//
+//  The recognition pipeline: which engine turns audio into text, and the stages
+//  around it (cleanup, voice-activity detection, language detection, speaker
+//  diarization). Split into "engine and language" and "advanced pipeline" so the
+//  choice most people make isn't buried under six stage pickers.
+//
+
+import SwiftUI
+
+struct TranscriptionSettingsView: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(ModelDownloadController.self) private var downloads
+
+    /// Bumped by the root when an API key changes, so the Whisper provider rows
+    /// re-read Keychain state.
+    let keyRevision: Int
+
+    private var transcriptionProviders: [AIProvider] {
+        _ = keyRevision
+        return settings.configuredTranscriptionProviders
+    }
+
+    private var hasAnyTranscriptionProvider: Bool { !transcriptionProviders.isEmpty }
+
+    var body: some View {
+        Form {
+            engineSection
+            pipelineSection
+        }
+        .navigationTitle(NSLocalizedString("settings.transcription", comment: "Transcription"))
+        .modelDownloadAlerts(downloads, settings: settings)
+    }
+
+    // MARK: - Engine and language
+
+    @ViewBuilder
+    private var engineSection: some View {
+        Section {
+            Picker(
+                NSLocalizedString("pipeline.transcription_engine", comment: "Transcription engine"),
+                selection: Binding(
+                    get: { settings.transcriptionEngine },
+                    set: {
+                        downloads.selectTranscriptionEngine(
+                            $0, settings: settings, transcriptionProviders: transcriptionProviders
+                        )
+                    }
+                )
+            ) {
+                ForEach(TranscriptionEngine.allCases) { engine in
+                    Text(engine.displayName)
+                        .tag(engine)
+                        .disabled(engine == .whisperAPI && !hasAnyTranscriptionProvider)
+                }
+            }
+            .disabled(downloads.isDownloading)
+
+            // Cloud transcription provider + model, chosen independently of the
+            // summary provider. Only shown for the Whisper engine.
+            if settings.transcriptionEngine == .whisperAPI {
+                Picker(
+                    NSLocalizedString("settings.transcription_provider", comment: "Transcription provider"),
+                    selection: Binding(
+                        get: { settings.transcriptionProviderID },
+                        set: { settings.transcriptionProviderID = $0 }
+                    )
+                ) {
+                    ForEach(transcriptionProviders) { provider in
+                        Text(provider.displayName).tag(provider.id)
+                    }
+                }
+                TranscriptionModelPicker(
+                    settings: settings,
+                    provider: settings.transcriptionProvider,
+                    revision: keyRevision
+                )
+            }
+
+            Picker(
+                NSLocalizedString("settings.default_language", comment: "Default language"),
+                selection: Binding(
+                    get: { settings.defaultLanguage },
+                    set: { settings.defaultLanguage = $0 }
+                )
+            ) {
+                ForEach(MeetingLanguage.allCases) { lang in
+                    LanguagePickerRow(language: lang, engine: settings.transcriptionEngine).tag(lang)
+                }
+            }
+
+            if downloads.downloadingModel == .onDeviceASR {
+                ModelDownloadProgressRow()
+            }
+        } header: {
+            Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString(
+                    hasAnyTranscriptionProvider
+                        ? "settings.whisper_provider_key_footer"
+                        : "settings.whisper_provider_key_missing_footer",
+                    comment: "Whisper transcription provider key dependency"
+                ))
+                Text(NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon"))
+            }
+        }
+    }
+
+    // MARK: - Advanced stages
+
+    @ViewBuilder
+    private var pipelineSection: some View {
+        Section {
+            // Audio cleanup/normalization.
+            Toggle(
+                NSLocalizedString("pipeline.preprocessing", comment: "Audio cleanup"),
+                isOn: Binding(
+                    get: { settings.preprocessingEngine == .standardDSP },
+                    set: { enabled in
+                        settings.preprocessingEngine = enabled ? .standardDSP : .none
+                    }
+                )
+            )
+
+            // Voice-activity detection.
+            Picker(
+                NSLocalizedString("pipeline.vad", comment: "Voice activity detection"),
+                selection: Binding(
+                    get: { settings.vadEngine },
+                    set: { downloads.selectVADEngine($0, settings: settings) }
+                )
+            ) {
+                ForEach(VADEngine.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(downloads.isDownloading)
+
+            // Language detection.
+            Picker(
+                NSLocalizedString("pipeline.language_detection", comment: "Language detection"),
+                selection: Binding(
+                    get: { settings.languageDetectionEngine },
+                    set: { downloads.selectLanguageDetectionEngine($0, settings: settings) }
+                )
+            ) {
+                ForEach(LanguageDetectionEngine.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(downloads.isDownloading)
+
+            // Speaker diarization.
+            Picker(
+                NSLocalizedString("settings.diarization_engine", comment: "Diarization engine"),
+                selection: Binding(
+                    get: { settings.diarizationEngine },
+                    set: { downloads.selectDiarizationEngine($0, settings: settings) }
+                )
+            ) {
+                ForEach(DiarizationEngine.allCases) { Text($0.displayName).tag($0) }
+            }
+            .disabled(downloads.isDownloading)
+
+            // Dedicated diarization cleanup. This controls only the diarization
+            // input; the ASR cleanup toggle above controls only the
+            // transcription path.
+            Toggle(
+                NSLocalizedString("settings.diarization_preprocessing", comment: "Diarization audio cleanup"),
+                isOn: Binding(
+                    get: { settings.diarizationPreprocessingEnabled },
+                    set: { settings.diarizationPreprocessingEnabled = $0 }
+                )
+            )
+            .disabled(downloads.isDownloading)
+
+            // Minimum-speakers floor for the neural (FluidAudio) engine. On
+            // far-field/single-mic audio its VBx step collapses everything into
+            // one speaker; a non-zero floor forces a KMeans re-cluster to at
+            // least this many. Hidden for the heuristic engine, which auto-detects.
+            if settings.diarizationEngine == .fluidAudio {
+                Stepper(
+                    value: Binding(
+                        get: { settings.fluidAudioMinSpeakers },
+                        set: { settings.fluidAudioMinSpeakers = $0 }
+                    ),
+                    in: 0...10
+                ) {
+                    HStack {
+                        Text(NSLocalizedString("settings.diarization_min_speakers", comment: "Minimum speakers"))
+                        Spacer()
+                        Text(
+                            settings.fluidAudioMinSpeakers == 0
+                                ? NSLocalizedString("settings.diarization_min_speakers_auto", comment: "Auto")
+                                : "\(settings.fluidAudioMinSpeakers)"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(downloads.isDownloading)
+            }
+
+            if downloads.downloadingModel == .diarization || downloads.downloadingModel == .vad {
+                ModelDownloadProgressRow()
+            }
+        } header: {
+            Text(NSLocalizedString("settings.pipeline_advanced", comment: "Advanced pipeline"))
+        }
+    }
+}

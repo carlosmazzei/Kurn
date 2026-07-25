@@ -450,6 +450,27 @@ use `provider_<id>_api_key`. A few preferences also mirror to non-persistent glo
 state in their `didSet` — e.g. `logLevel` pushes to `AppLog.minimumLevel` so the
 logging gate reflects the user's choice immediately (also synced once on init).
 
+Settings is a **hub, not one long form**. `SettingsView` is a short list of
+`NavigationLink` rows grouped into Intelligence / Capture / Library / System,
+each pushing a focused screen in `Views/Settings/` (`ProvidersSettingsView`,
+`SummarySettingsView`, `SemanticSearchSettingsView`, `RecordingSettingsView`,
+`TranscriptionSettingsView`, `TagsSettingsView`, `StorageSettingsView`,
+`DiagnosticsSettingsView`, `AboutSettingsView`). Three things deliberately stay
+on the root because they can't belong to any one screen: the destructive
+"Delete all data" reset, the `keyRevision` counter passed down so provider rows
+re-read Keychain status, and `ensureSelectedProviderIsConfigured()` /
+`ensureWhisperSelectionIsAllowed()` (`SettingsSections.swift`), which must run
+whichever screen the user drilled into — a key removed anywhere must never leave
+the summary or transcription provider pointing at one without a key.
+
+`ModelDownloadController` (`ViewModels/`, `@MainActor @Observable`) owns the
+FluidAudio download machinery — which `ModelSet` is in flight, the per-feature
+consent dialogs, the engine choices deferred until a download succeeds, and the
+installed-model list. It lives in the environment rather than in `@State`
+because Transcription, Recording and Storage are now separate screens that all
+read `isDownloading` and all can start a download. Screens that can trigger one
+attach `.modelDownloadAlerts(_:settings:)`.
+
 ### Navigation chrome (Liquid Glass)
 
 The app used to hide the navigation bar on every main screen and hand-draw its

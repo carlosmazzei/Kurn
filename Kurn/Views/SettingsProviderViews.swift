@@ -366,26 +366,59 @@ struct TranscriptionModelPicker: View {
 
 // MARK: - Model download consent dialogs
 
-/// Consent dialogs shown before the first FluidAudio model download for a given feature.
+/// Consent dialogs shown before the first FluidAudio model download for a given
+/// feature, plus the failure alert. Every Settings screen that can start a
+/// download attaches this, so the dialog follows whichever screen triggered it.
 struct ModelDownloadAlerts: ViewModifier {
-    @Binding var showingASRConsent: Bool
-    @Binding var showingBatchASRConsent: Bool
-    @Binding var showingDiarizationConsent: Bool
-    let onConfirmASR: () -> Void
-    let onConfirmBatchASR: () -> Void
-    let onCancelBatchASR: () -> Void
-    let onConfirmDiarization: () -> Void
-    let onCancelDiarization: () -> Void
-    @Binding var showingVADConsent: Bool
-    let onConfirmVAD: () -> Void
-    let onCancelVAD: () -> Void
+    @Bindable var downloads: ModelDownloadController
+    let settings: AppSettings
 
     func body(content: Content) -> some View {
         content
-            .modelDownloadDialog(isPresented: $showingASRConsent, onConfirm: onConfirmASR, onCancel: {})
-            .modelDownloadDialog(isPresented: $showingBatchASRConsent, onConfirm: onConfirmBatchASR, onCancel: onCancelBatchASR)
-            .modelDownloadDialog(isPresented: $showingDiarizationConsent, onConfirm: onConfirmDiarization, onCancel: onCancelDiarization)
-            .modelDownloadDialog(isPresented: $showingVADConsent, onConfirm: onConfirmVAD, onCancel: onCancelVAD)
+            .modelDownloadDialog(
+                isPresented: $downloads.showingASRConsent,
+                onConfirm: { downloads.confirmLiveTranscriptionASR(settings: settings) },
+                onCancel: {}
+            )
+            .modelDownloadDialog(
+                isPresented: $downloads.showingBatchASRConsent,
+                onConfirm: { downloads.confirmBatchASR(settings: settings) },
+                onCancel: { downloads.cancelBatchASR() }
+            )
+            .modelDownloadDialog(
+                isPresented: $downloads.showingDiarizationConsent,
+                onConfirm: { downloads.confirmDiarization(settings: settings) },
+                onCancel: { downloads.cancelDiarization() }
+            )
+            .modelDownloadDialog(
+                isPresented: $downloads.showingVADConsent,
+                onConfirm: { downloads.confirmVAD(settings: settings) },
+                onCancel: { downloads.cancelVAD() }
+            )
+            .errorAlert($downloads.error)
+    }
+}
+
+extension View {
+    /// Attach the model-download consent dialogs and failure alert.
+    func modelDownloadAlerts(
+        _ downloads: ModelDownloadController,
+        settings: AppSettings
+    ) -> some View {
+        modifier(ModelDownloadAlerts(downloads: downloads, settings: settings))
+    }
+}
+
+/// Indeterminate download indicator shown while a FluidAudio model set is being
+/// fetched. FluidAudio's high-level download API doesn't expose byte progress,
+/// so this is intentionally indeterminate.
+struct ModelDownloadProgressRow: View {
+    var body: some View {
+        HStack {
+            ProgressView()
+            Text(NSLocalizedString("settings.model_download.downloading", comment: "Downloading model"))
+                .foregroundStyle(Theme.textSecondary)
+        }
     }
 }
 

@@ -576,3 +576,11 @@
 "settings.semantic_rebuilding" = "Reconstruction…";
 "settings.semantic_clear" = "Effacer l'index";
 "settings.semantic_search_footer" = "Trouve les réunions par leur sens et alimente le chat, à l'aide d'un modèle sur l'appareil. Le texte et les vecteurs restent chiffrés sur votre appareil.";
+
+/* Settings hub groups */
+"settings.group.intelligence" = "Intelligence";
+"settings.group.capture" = "Capture";
+"settings.group.library" = "Bibliothèque";
+"settings.group.system" = "Système";
+"settings.pipeline_advanced" = "Pipeline avancé";
+"settings.version" = "Version";

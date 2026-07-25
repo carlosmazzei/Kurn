@@ -576,3 +576,11 @@
 "settings.semantic_rebuilding" = "Neuaufbau …";
 "settings.semantic_clear" = "Index löschen";
 "settings.semantic_search_footer" = "Findet Meetings nach Bedeutung und ermöglicht den Chat mithilfe eines Modells auf dem Gerät. Text und Vektoren bleiben auf deinem Gerät verschlüsselt.";
+
+/* Settings hub groups */
+"settings.group.intelligence" = "Intelligenz";
+"settings.group.capture" = "Aufnahme";
+"settings.group.library" = "Bibliothek";
+"settings.group.system" = "System";
+"settings.pipeline_advanced" = "Erweiterte Pipeline";
+"settings.version" = "Version";
