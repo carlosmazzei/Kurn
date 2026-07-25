@@ -274,9 +274,6 @@
 "analytics.no_speakers" = "Nessuno speaker identificato";
 "analytics.insights" = "Approfondimenti";
 "status.none" = "Nessuna trascrizione";
-"status.in_progress" = "In corso";
-"status.done" = "Completato";
-"status.failed" = "Non riuscito";
 
 /* Comune */
 "common.delete" = "Elimina";

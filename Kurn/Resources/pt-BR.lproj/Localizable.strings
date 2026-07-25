@@ -274,9 +274,6 @@
 "analytics.no_speakers" = "Nenhum speaker identificado";
 "analytics.insights" = "Insights";
 "status.none" = "Sem transcript";
-"status.in_progress" = "Em andamento";
-"status.done" = "Concluído";
-"status.failed" = "Falhou";
 
 /* Comum */
 "common.delete" = "Excluir";

@@ -274,9 +274,6 @@
 "analytics.no_speakers" = "Aucun intervenant identifié";
 "analytics.insights" = "Analyses";
 "status.none" = "Aucune transcription";
-"status.in_progress" = "En cours";
-"status.done" = "Terminé";
-"status.failed" = "Échoué";
 
 /* Commun */
 "common.delete" = "Supprimer";

@@ -274,9 +274,6 @@
 "analytics.no_speakers" = "Keine Sprecher erkannt";
 "analytics.insights" = "Insights";
 "status.none" = "Kein Transkript";
-"status.in_progress" = "In Bearbeitung";
-"status.done" = "Fertig";
-"status.failed" = "Fehlgeschlagen";
 
 /* Allgemein */
 "common.delete" = "Löschen";

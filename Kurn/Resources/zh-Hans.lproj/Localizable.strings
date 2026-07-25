@@ -274,9 +274,6 @@
 "analytics.no_speakers" = "未识别到发言人";
 "analytics.insights" = "洞察";
 "status.none" = "无转录";
-"status.in_progress" = "进行中";
-"status.done" = "已完成";
-"status.failed" = "失败";
 
 /* 通用 */
 "common.delete" = "删除";
