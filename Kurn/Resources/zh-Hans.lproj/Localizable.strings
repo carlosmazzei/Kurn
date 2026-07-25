@@ -259,6 +259,7 @@
 "tag.auto_suggest.empty" = "没有推荐的标签。";
 "tag.auto_suggest.error" = "无法推荐标签。";
 "tag.auto_suggest.disclaimer" = "AI 推荐的标签可能不准确，应用前请先检查。";
+"tag.auto_suggest.selection_hint" = "选择要应用的标签。";
 "tag.suggested_new" = "新建";
 "tag.merge" = "合并";
 "tag.merge_title" = "合并标签";

@@ -259,6 +259,7 @@
 "tag.auto_suggest.empty" = "No se sugirió ninguna etiqueta.";
 "tag.auto_suggest.error" = "No se pudieron sugerir etiquetas.";
 "tag.auto_suggest.disclaimer" = "Las etiquetas sugeridas por IA pueden ser inexactas. Revísalas antes de aplicarlas.";
+"tag.auto_suggest.selection_hint" = "Selecciona las etiquetas que deseas aplicar.";
 "tag.suggested_new" = "nueva";
 "tag.merge" = "Combinar";
 "tag.merge_title" = "Combinar Etiqueta";
