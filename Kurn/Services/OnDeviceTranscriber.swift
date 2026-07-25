@@ -62,9 +62,7 @@ actor OnDeviceTranscriber: Transcribing {
         let request = SFSpeechURLRecognitionRequest(url: url)
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
-        if #available(iOS 16.0, *) {
-            request.addsPunctuation = true
-        }
+        request.addsPunctuation = true
 
         // On-device recognition is roughly real-time or faster; allow a generous
         // multiple of the clip length (with a floor) before treating a task that

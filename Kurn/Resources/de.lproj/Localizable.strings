@@ -173,7 +173,7 @@
 "meeting.default_title" = "Meeting – %@";
 "meeting.has_summary" = "Hat Zusammenfassung";
 "meetings.title" = "Meetings";
-"meetings.new" = "Neues Meeting";
+"meetings.record" = "Aufnehmen";
 "meetings.search" = "Aufnahmen durchsuchen…";
 "filter.all" = "Alle";
 "filter.today" = "Heute";
@@ -355,7 +355,7 @@
 "detail.transcript.empty.title" = "Noch kein Transkript";
 "detail.transcript.empty.subtitle" = "Transkribieren Sie eine Aufnahme, um das Gespräch hier zu sehen.";
 "detail.summary.empty.title" = "Noch keine Zusammenfassung";
-"tab.meetings" = "Meetings";
+"detail.section" = "Bereich";
 "tab.recordings" = "Aufnahmen";
 "tab.transcript" = "Transkript";
 "tab.summary" = "Zusammenfassung";
@@ -576,3 +576,11 @@
 "settings.semantic_rebuilding" = "Neuaufbau …";
 "settings.semantic_clear" = "Index löschen";
 "settings.semantic_search_footer" = "Findet Meetings nach Bedeutung und ermöglicht den Chat mithilfe eines Modells auf dem Gerät. Text und Vektoren bleiben auf deinem Gerät verschlüsselt.";
+
+/* Settings hub groups */
+"settings.group.intelligence" = "Intelligenz";
+"settings.group.capture" = "Aufnahme";
+"settings.group.library" = "Bibliothek";
+"settings.group.system" = "System";
+"settings.pipeline_advanced" = "Erweiterte Pipeline";
+"settings.version" = "Version";

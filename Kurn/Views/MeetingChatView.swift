@@ -37,9 +37,12 @@ struct MeetingChatView: View {
             } else {
                 conversation
             }
-            composer
         }
         .background(Theme.background)
+        // A composer is an input surface, not a toolbar, so it stays custom —
+        // but as a safe-area bar it gets the system's glass background and
+        // keyboard avoidance instead of a hand-drawn `.bar` strip.
+        .safeAreaBar(edge: .bottom) { composer }
         .errorAlert($vm.error)
     }
 
@@ -197,8 +200,6 @@ struct MeetingChatView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider().overlay(Theme.separator) }
     }
 
     // MARK: - Empty / disabled states

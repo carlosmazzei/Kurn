@@ -21,7 +21,27 @@ struct MeetingDetailView: View {
     /// shows here as in-progress with live progress, instead of a stale badge.
     @Environment(TranscriptionViewModel.self) private var sharedTxVM
 
-    enum Tab: Hashable { case recordings, transcript, summary, chat }
+    enum Tab: Hashable, CaseIterable {
+        case recordings, transcript, summary, chat
+
+        var systemImage: String {
+            switch self {
+            case .recordings: return "mic"
+            case .transcript: return "text.alignleft"
+            case .summary: return "sparkles"
+            case .chat: return "bubble.left.and.text.bubble.right"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .recordings: return NSLocalizedString("tab.recordings", comment: "Recordings tab")
+            case .transcript: return NSLocalizedString("tab.transcript", comment: "Transcript tab")
+            case .summary: return NSLocalizedString("tab.summary", comment: "Summary tab")
+            case .chat: return NSLocalizedString("tab.chat", comment: "Chat tab")
+            }
+        }
+    }
 
     @State var player = AudioPlayerService()
     /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
@@ -54,12 +74,14 @@ struct MeetingDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            sectionPicker
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             Divider().overlay(Theme.separator)
             tabContent
-            tabBar
         }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("")
+        .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
         .onDisappear { player.stop() }
@@ -320,38 +342,22 @@ struct MeetingDetailView: View {
             .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    // MARK: - Tab bar
+    // MARK: - Section picker
 
-    private var tabBar: some View {
-        HStack(spacing: 0) {
-            tabButton(.recordings, icon: "mic", label: NSLocalizedString("tab.recordings", comment: ""))
-            tabButton(.transcript, icon: "text.alignleft", label: NSLocalizedString("tab.transcript", comment: ""))
-            tabButton(.summary, icon: "sparkles", label: NSLocalizedString("tab.summary", comment: ""))
-            tabButton(.chat, icon: "bubble.left.and.text.bubble.right", label: NSLocalizedString("tab.chat", comment: ""))
-        }
-        .padding(.top, 6)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider().overlay(Theme.separator) }
-    }
-
-    private func tabButton(_ value: Tab, icon: String, label: String) -> some View {
-        let active = tab == value
-        return Button { tab = value } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon).font(.system(size: 18))
-                Text(label).font(.system(size: 11, weight: active ? .semibold : .regular))
-            }
-            .foregroundStyle(active ? Theme.accent : Theme.textTertiary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .overlay(alignment: .top) {
-                if active {
-                    Capsule().fill(Theme.accent).frame(width: 20, height: 2.5)
-                }
+    /// The four sections are view modes of one meeting, not top-level
+    /// destinations, so they get a segmented control rather than a bottom bar —
+    /// which also leaves the bottom edge free for the Chat tab's composer.
+    private var sectionPicker: some View {
+        Picker(NSLocalizedString("detail.section", comment: "Meeting section"), selection: $tab) {
+            ForEach(Tab.allCases, id: \.self) { value in
+                Image(systemName: value.systemImage)
+                    .accessibilityLabel(value.title)
+                    .accessibilityIdentifier("tab.\(value)")
+                    .tag(value)
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("tab.\(value)")
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     // MARK: - Shared bits
@@ -391,6 +397,9 @@ struct MeetingDetailView: View {
                     : NSLocalizedString("meetings.favorite", comment: "Favorite")
             )
         }
+        // Keeps the favorite toggle in a glass group of its own, separate from
+        // the overflow menu.
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button { showingEdit = true } label: {

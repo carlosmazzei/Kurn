@@ -26,19 +26,22 @@ struct MeetingsListView: View {
     /// one clearly-relevant meeting doesn't drag in loosely-related ones.
     private static let semanticScoreMargin: Float = 0.06
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppSettings.self) private var settings
+    // Several of the members below are deliberately non-private: the toolbar
+    // content lives in `MeetingsListToolbar.swift`, and a `private` member is
+    // not visible to an extension declared in another file.
+    @Environment(\.modelContext) var modelContext
+    @Environment(AppSettings.self) var settings
     @Environment(RecordingAccessGate.self) private var accessGate
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
 
-    @State private var showingSettings = false
+    @State var showingSettings = false
     @State private var pendingDelete: Meeting?
     /// Pushed meeting detail (item-based so cards have no disclosure chevron).
     @State private var selectedMeeting: Meeting?
-    /// Set when the center record button creates a meeting to record into.
-    @State private var recordMeeting: Meeting?
+    /// Set when the toolbar's record button creates a meeting to record into.
+    @State var recordMeeting: Meeting?
     /// Set by the context-menu "Rename" action; presents `MeetingFormView`.
     @State private var editingMeeting: Meeting?
     /// Set by the context-menu "Share" action; presents `ActivityView`.
@@ -49,12 +52,12 @@ struct MeetingsListView: View {
     /// falls back to plain substring matching.
     @State private var semanticHits: [SemanticSearchService.Hit] = []
     /// Presents the library-wide "Ask" chat sheet.
-    @State private var showingAsk = false
+    @State var showingAsk = false
     private let semanticSearchService = SemanticSearchService()
-    @State private var filter = MeetingFilter()
-    @State private var selection: LibrarySelection = .allMeetings
-    @State private var showingSidebar = false
-    @State private var showingFilterBar = false
+    @State var filter = MeetingFilter()
+    @State var selection: LibrarySelection = .allMeetings
+    @State var showingSidebar = false
+    @State var showingFilterBar = false
     /// Set when the context-menu "Move to folder…" action is invoked; presents
     /// `FolderPickerView` against the chosen meeting.
     @State private var movingMeeting: Meeting?
@@ -63,7 +66,7 @@ struct MeetingsListView: View {
     @State private var taggingMeeting: Meeting?
     /// Set when a favorite/archive/create/delete persistence op fails, so the
     /// failure surfaces instead of being dropped silently.
-    @State private var saveError: AppError?
+    @State var saveError: AppError?
 
     private var isLocked: Bool {
         settings.requireAuthForRecordings && !accessGate.isUnlocked
@@ -82,8 +85,8 @@ struct MeetingsListView: View {
         return smartFolders.first(where: { $0.id == id })
     }
 
-    /// Title shown in the chip row reflecting the current `selection`.
-    private var selectionTitle: String {
+    /// Title shown in the toolbar's library button reflecting `selection`.
+    var selectionTitle: String {
         switch selection {
         case .bucket(let bucket): return bucket.displayName
         case .folder:
@@ -95,7 +98,7 @@ struct MeetingsListView: View {
         }
     }
 
-    private var selectionSystemImage: String {
+    var selectionSystemImage: String {
         switch selection {
         case .bucket(let bucket): return bucket.systemImage
         case .folder: return selectedFolder?.iconName ?? "folder"
@@ -207,17 +210,9 @@ struct MeetingsListView: View {
     }
 
     private var unlockedBody: some View {
-        ZStack(alignment: .bottom) {
         List {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Kurn")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                searchField
-                filterChips
-            }
-            .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
+            dateChips
+                .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
 
             if filtered.isEmpty {
                 emptyState.clearListRow()
@@ -320,17 +315,18 @@ struct MeetingsListView: View {
                     }
                 }
             }
-
-            // Spacer so the last card clears the floating bottom bar.
-            Color.clear.frame(height: 84).clearListRow()
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
-
-            bottomBar
-        }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("Kurn")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text(NSLocalizedString("meetings.search", comment: "Search recordings…"))
+        )
+        .textInputAutocapitalization(.never)
+        .toolbar { listToolbar }
         .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
         }
@@ -410,182 +406,22 @@ struct MeetingsListView: View {
 
 extension MeetingsListView {
 
-    var bottomBar: some View {
-        HStack(alignment: .center) {
-            bottomTab(icon: "square.grid.2x2.fill",
-                      label: NSLocalizedString("tab.meetings", comment: "Meetings"),
-                      active: true) {}
-                .accessibilityIdentifier("nav.meetings")
-            Spacer()
-            bottomTab(icon: "gearshape.fill",
-                      label: NSLocalizedString("settings.title", comment: "Settings"),
-                      active: false) { showingSettings = true }
-                .accessibilityIdentifier("nav.settings")
-        }
-        .padding(.horizontal, 56)
-        .padding(.top, 10)
-        .padding(.bottom, 4)
-        .background(alignment: .top) { Divider().overlay(Theme.separator) }
-        .background(.bar)
-        .overlay(alignment: .top) { recordButton.offset(y: -26) }
-    }
-
-    func bottomTab(icon: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 18))
-                Text(label).font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(active ? Theme.textPrimary : Theme.textTertiary)
-        }
-        .buttonStyle(.plain)
-    }
-
-    var recordButton: some View {
-        Button {
-            let viewModel = MeetingsViewModel(modelContext: modelContext)
-            let meeting = viewModel.createMeeting(title: "")
-            saveError = viewModel.error
-            recordMeeting = meeting
-        } label: {
-            ZStack {
-                Circle().fill(Theme.accent).frame(width: 56, height: 56)
-                Circle().fill(.white).frame(width: 22, height: 22)
-            }
-            .shadow(color: Theme.accent.opacity(0.55), radius: 16, y: 4)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(NSLocalizedString("meetings.new", comment: "New Meeting")))
-    }
-
-    var searchField: some View {
+    /// The one filter row that stays list content: the date range applies to
+    /// browsing as well as searching, so it doesn't belong in `.searchScopes`,
+    /// and four always-visible options would crowd the toolbar.
+    var dateChips: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.textTertiary)
-            TextField(
-                NSLocalizedString("meetings.search", comment: "Search recordings…"),
-                text: $searchText
-            )
-            .textInputAutocapitalization(.never)
-            if !searchText.isEmpty {
-                Button { searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.textTertiary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    var filterChips: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                sidebarTrigger
-                filterMenu
-                Spacer()
-                if settings.semanticSearchEnabled {
-                    askButton
-                }
-                sortMenu
-            }
-            HStack(spacing: 8) {
-                ForEach(MeetingDateFilter.allCases) { option in
-                    FilterChip(
-                        title: option.title,
-                        isSelected: filter.dateRange == option,
-                        tint: filter.dateRange == option ? Theme.accent : .primary
-                    ) {
-                        filter.dateRange = option
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    var askButton: some View {
-        Button { showingAsk = true } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "bubble.left.and.text.bubble.right")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(NSLocalizedString("meetings.ask", comment: "Ask"))
-                    .font(.system(size: 13, weight: .medium))
-            }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(Theme.accent.opacity(0.12), in: Capsule())
-            .foregroundStyle(Theme.accent)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("meetings.ask")
-    }
-
-    var filterMenu: some View {
-        Button { showingFilterBar = true } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 12, weight: .semibold))
-                if filter.isActive {
-                    Text("\(filter.activeCount)")
-                        .font(.system(size: 11, weight: .semibold))
+            ForEach(MeetingDateFilter.allCases) { option in
+                FilterChip(
+                    title: option.title,
+                    isSelected: filter.dateRange == option,
+                    tint: filter.dateRange == option ? Theme.accent : .primary
+                ) {
+                    filter.dateRange = option
                 }
             }
-            .foregroundStyle(filter.isActive ? Theme.accent : Theme.textSecondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Theme.fill, in: Capsule())
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(NSLocalizedString("filter.title", comment: "Filters"))
-    }
-
-    /// Button on the chip row that opens `FolderSidebarView`. The label
-    /// mirrors the active selection (built-in bucket icon or folder icon +
-    /// name) so the user always sees what they're looking at.
-    var sidebarTrigger: some View {
-        let isDefault = selection == .allMeetings
-        return Button { showingSidebar = true } label: {
-            HStack(spacing: 6) {
-                Image(systemName: selectionSystemImage)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(selectionTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .foregroundStyle(isDefault ? Theme.textSecondary : Theme.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Theme.fill, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
-        .accessibilityValue(selectionTitle)
-    }
-
-    var sortMenu: some View {
-        Menu {
-            Picker(
-                NSLocalizedString("meetings.sort", comment: "Sort"),
-                selection: Binding(
-                    get: { settings.meetingsSortOrder },
-                    set: { settings.meetingsSortOrder = $0 }
-                )
-            ) {
-                ForEach(MeetingsSortOrder.allCases) { order in
-                    Label(order.displayName, systemImage: order.systemImage).tag(order)
-                }
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.textSecondary)
-                .frame(width: 32, height: 32)
-                .background(Theme.fill, in: Circle())
-        }
-        .accessibilityLabel(NSLocalizedString("meetings.sort", comment: "Sort"))
     }
 
     var emptyState: some View {

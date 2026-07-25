@@ -2,6 +2,13 @@
 //  AudioChunkerTests.swift
 //  KurnTests
 //
+//  Tests that export real chunks take `tempFileTestLock`, like the other suites
+//  that touch the shared temporary directory. `AudioChunker` writes its chunks
+//  as `kurn_chunk_*` there, and `TempFileCleaner.forceCleanup()` — exercised by
+//  `TempFileCleanerTests` — deletes every file with that prefix regardless of
+//  age. Without the lock the two suites interleave, the cleaner sweeps chunks
+//  this suite is about to assert on, and the failure looks like an export bug.
+//
 
 import Foundation
 import Testing
@@ -23,12 +30,14 @@ struct AudioChunkerTests {
     }
 
     @Test func longAudioUnderSizeThresholdIsSplitByDuration() async throws {
-        let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let chunks = try await AudioChunker().chunk(url: url)
-        #expect(chunks.count > 1)
-        #expect(chunks.allSatisfy { $0.offset >= 0 })
+            let chunks = try await AudioChunker().chunk(url: url)
+            #expect(chunks.count > 1)
+            #expect(chunks.allSatisfy { $0.offset >= 0 })
+        }
     }
 
     @Test func cleanupOnlyRemovesFilesInsideTemporaryDirectory() async throws {
@@ -66,21 +75,23 @@ struct AudioChunkerTests {
     }
 
     @Test func chunkCleanupRemovesAllExportedTempFiles() async throws {
-        let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            let url = try AudioFixtures.m4aTone(hz: 0, seconds: 15 * 60)
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let chunker = AudioChunker()
-        let chunks = try await chunker.chunk(url: url)
-        #expect(chunks.count > 1)
+            let chunker = AudioChunker()
+            let chunks = try await chunker.chunk(url: url)
+            #expect(chunks.count > 1)
 
-        for chunk in chunks {
-            #expect(FileManager.default.fileExists(atPath: chunk.url.path))
-        }
+            for chunk in chunks {
+                #expect(FileManager.default.fileExists(atPath: chunk.url.path))
+            }
 
-        await chunker.cleanup(chunks)
+            await chunker.cleanup(chunks)
 
-        for chunk in chunks {
-            #expect(!FileManager.default.fileExists(atPath: chunk.url.path))
+            for chunk in chunks {
+                #expect(!FileManager.default.fileExists(atPath: chunk.url.path))
+            }
         }
     }
 }
