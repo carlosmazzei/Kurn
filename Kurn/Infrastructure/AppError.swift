@@ -29,6 +29,8 @@ enum AppError: LocalizedError, Identifiable {
     case logExportFailed(String)
     case embeddingUnavailable(String)
     case semanticIndexFailed(String)
+    case wikiGenerationFailed(String)
+    case wikiUnavailable
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
@@ -129,6 +131,16 @@ enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.semantic_index", comment: "Semantic indexing failed"),
                 detail
+            )
+        case .wikiGenerationFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.wiki_generation", comment: "Wiki generation failed"),
+                detail
+            )
+        case .wikiUnavailable:
+            return NSLocalizedString(
+                "error.wiki_unavailable",
+                comment: "Meeting wiki is not ready yet"
             )
         }
     }

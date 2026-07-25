@@ -57,6 +57,12 @@ struct SettingsView: View {
                 ) {
                     SemanticSearchSettingsView()
                 }
+                link(
+                    NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"),
+                    systemImage: "book"
+                ) {
+                    WikiSettingsView(keyRevision: keyRevision)
+                }
             } header: {
                 Text(NSLocalizedString("settings.group.intelligence", comment: "Intelligence group"))
             }
@@ -160,6 +166,15 @@ struct SettingsView: View {
     }
 
     /// One hub row: icon + title pushing a destination.
+    ///
+    /// The destination gets `downloads` injected here rather than relying on the
+    /// `.environment(downloads)` applied to the hub's `Form`. This view is the
+    /// root content of a `NavigationStack` (see `MeetingsListView`), so pushed
+    /// destinations are hosted by the stack and don't reliably inherit an
+    /// environment object installed inside the root — every other object the
+    /// screens read (`AppSettings`, the coordinators) comes from `KurnApp`, above
+    /// the stack, which is why only the three screens reading `downloads`
+    /// (Recording, Transcription, Storage) crashed on a missing object.
     private func link<Destination: View>(
         _ title: String,
         systemImage: String,
@@ -167,6 +182,7 @@ struct SettingsView: View {
     ) -> some View {
         NavigationLink {
             destination()
+                .environment(downloads)
         } label: {
             Label(title, systemImage: systemImage)
         }

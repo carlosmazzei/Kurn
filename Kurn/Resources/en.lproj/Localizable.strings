@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "On-device semantic search is unavailable: %@";
 "error.semantic_index" = "Could not build the semantic index: %@";
+"error.wiki_generation" = "Could not build the meeting wiki: %@";
+"error.wiki_unavailable" = "The meeting wiki isn't ready yet. Try again after it finishes generating.";
 "error.embedding_no_model" = "No on-device embedding model is available for this device.";
 "error.embedding_no_assets" = "The on-device language model could not be downloaded.";
 "error.provider_no_chat" = "This provider does not support chat.";
@@ -561,6 +563,7 @@
 "meetings.ask" = "Ask";
 "chat.error.empty_question" = "Please type a question.";
 "chat.thinking" = "Thinking…";
+"chat.untitled_meeting" = "Untitled meeting";
 "chat.starter.title" = "Ask about this meeting";
 "chat.starter.subtitle" = "Answers are grounded in the transcript, with timestamps you can tap.";
 "chat.placeholder" = "Ask a question…";
@@ -584,3 +587,11 @@
 "settings.group.system" = "System";
 "settings.pipeline_advanced" = "Advanced pipeline";
 "settings.version" = "Version";
+"settings.wiki_title" = "Meeting Wiki";
+"settings.wiki" = "Build meeting wiki";
+"settings.wiki_articles" = "Wiki articles";
+"settings.wiki_rebuild" = "Rebuild wiki";
+"settings.wiki_rebuilding" = "Rebuilding…";
+"settings.wiki_clear" = "Clear wiki";
+"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls.";
+"settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";

@@ -554,6 +554,8 @@
 /* Semantic search & chat */
 "error.embedding_unavailable" = "设备端语义搜索不可用：%@";
 "error.semantic_index" = "无法构建语义索引：%@";
+"error.wiki_generation" = "无法构建会议维基：%@";
+"error.wiki_unavailable" = "会议维基尚未准备好。请在生成完成后重试。";
 "error.embedding_no_model" = "此设备没有可用的设备端嵌入模型。";
 "error.embedding_no_assets" = "无法下载设备端语言模型。";
 "error.provider_no_chat" = "此提供方不支持聊天。";
@@ -561,6 +563,7 @@
 "meetings.ask" = "提问";
 "chat.error.empty_question" = "请输入问题。";
 "chat.thinking" = "思考中…";
+"chat.untitled_meeting" = "未命名会议";
 "chat.starter.title" = "询问这次会议";
 "chat.starter.subtitle" = "回答基于转录内容，并附有可点按的时间戳。";
 "chat.placeholder" = "输入问题…";
@@ -584,3 +587,11 @@
 "settings.group.system" = "系统";
 "settings.pipeline_advanced" = "高级流程";
 "settings.version" = "版本";
+"settings.wiki_title" = "会议维基";
+"settings.wiki" = "构建会议维基";
+"settings.wiki_articles" = "维基条目";
+"settings.wiki_rebuild" = "重建维基";
+"settings.wiki_rebuilding" = "正在重建…";
+"settings.wiki_clear" = "清除维基";
+"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。";
+"settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";

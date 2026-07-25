@@ -12,10 +12,18 @@ import Testing
 
 struct MeetingChatServiceTests {
 
-    private func hit(_ text: String, start: TimeInterval, speaker: String) -> SemanticSearchService.Hit {
+    private func hit(
+        _ text: String,
+        start: TimeInterval,
+        speaker: String,
+        meetingID: UUID = UUID(),
+        meetingTitle: String = "",
+        meetingDate: Date = .distantPast
+    ) -> SemanticSearchService.Hit {
         SemanticSearchService.Hit(
-            chunkID: UUID(), meetingID: UUID(), recordingID: UUID(),
-            text: text, start: start, end: start + 1, speakerLabel: speaker, score: 0.8
+            chunkID: UUID(), meetingID: meetingID, recordingID: UUID(),
+            text: text, start: start, end: start + 1, speakerLabel: speaker, score: 0.8,
+            meetingTitle: meetingTitle, meetingDate: meetingDate
         )
     }
 
@@ -32,17 +40,79 @@ struct MeetingChatServiceTests {
             hits: [
                 hit("We agreed to raise prices in Q3.", start: 72, speaker: "Speaker 1"),
                 hit("Marketing will announce it.", start: 130, speaker: "Speaker 2")
-            ]
+            ],
+            scope: .singleMeeting,
+            summaries: [:]
         )
         #expect(prompt.contains("What did we decide about pricing?"))
         #expect(prompt.contains("[1:12] Speaker 1: We agreed to raise prices in Q3."))
         #expect(prompt.contains("[2:10] Speaker 2: Marketing will announce it."))
+        // Single-meeting scope does not add meeting headers.
+        #expect(!prompt.contains("###"))
     }
 
     @Test func userPromptWithNoHitsTellsModelNothingMatched() {
-        let prompt = MeetingChatService.userPrompt(question: "Anything about budget?", hits: [])
+        let prompt = MeetingChatService.userPrompt(
+            question: "Anything about budget?", hits: [], scope: .singleMeeting, summaries: [:]
+        )
         #expect(prompt.contains("Anything about budget?"))
         #expect(prompt.localizedCaseInsensitiveContains("no transcript excerpts"))
+    }
+
+    // MARK: - Library scope (cross-meeting attribution)
+
+    @Test func libraryUserPromptGroupsAndAttributesByMeeting() {
+        let planning = UUID()
+        let retro = UUID()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let prompt = MeetingChatService.userPrompt(
+            question: "How did the budget evolve?",
+            hits: [
+                hit("We set the budget at 100k.", start: 30, speaker: "Ana",
+                    meetingID: planning, meetingTitle: "Q3 Planning", meetingDate: date),
+                hit("The budget was cut to 80k.", start: 45, speaker: "Bruno",
+                    meetingID: retro, meetingTitle: "Q3 Retro", meetingDate: date)
+            ],
+            scope: .library,
+            summaries: [:]
+        )
+        #expect(prompt.contains("### Q3 Planning"))
+        #expect(prompt.contains("### Q3 Retro"))
+        #expect(prompt.contains("[0:30] Ana: We set the budget at 100k."))
+        #expect(prompt.contains("[0:45] Bruno: The budget was cut to 80k."))
+    }
+
+    @Test func libraryUserPromptIncludesOverviewsForHitMeetings() {
+        let planning = UUID()
+        let prompt = MeetingChatService.userPrompt(
+            question: "What was decided?",
+            hits: [hit("We shipped v2.", start: 10, speaker: "Ana",
+                       meetingID: planning, meetingTitle: "Launch")],
+            scope: .library,
+            summaries: [planning: "- Shipped v2 on time\n- Deferred v3 scope"]
+        )
+        #expect(prompt.localizedCaseInsensitiveContains("Meeting overviews"))
+        #expect(prompt.contains("Shipped v2 on time"))
+    }
+
+    @Test func libraryUserPromptFallsBackToUntitledMeeting() {
+        let prompt = MeetingChatService.userPrompt(
+            question: "Any decisions?",
+            hits: [hit("Decision made.", start: 5, speaker: "Ana")],
+            scope: .library,
+            summaries: [:]
+        )
+        // Empty title resolves to the localized fallback rather than a bare "###".
+        #expect(!prompt.contains("### \n"))
+        #expect(!prompt.contains("### ["))
+    }
+
+    @Test func librarySystemPromptAsksForAttribution() {
+        let prompt = MeetingChatService.systemPrompt(for: .library)
+        #expect(prompt.localizedCaseInsensitiveContains("attribute"))
+        #expect(prompt.contains("[mm:ss]"))
+        // The single-meeting variant is unchanged.
+        #expect(MeetingChatService.systemPrompt(for: .singleMeeting) == MeetingChatService.systemPrompt)
     }
 
     // MARK: - Full-context path
