@@ -83,7 +83,7 @@ enum LLMHTTP {
     /// Output budget for chat replies. Smaller than a summary — a grounded
     /// answer over retrieved passages is short — but generous enough for a
     /// multi-paragraph explanation with quotes.
-    static let chatMaxOutputTokens = 2048
+    static let chatMaxOutputTokens = 4096
     /// Timeout for chat requests. Shorter than a summary (which can generate for
     /// minutes over a whole transcript); a RAG answer over a few passages is
     /// quick, and a snappier timeout keeps the chat UI responsive.
@@ -291,7 +291,13 @@ enum LLMHTTP {
 /// Chat Completions response shared by OpenAI and the OpenAI-compatible Groq API.
 struct ChatResponse: Decodable {
     struct Choice: Decodable {
-        struct Message: Decodable { let content: String }
+        struct Message: Decodable {
+            // Reasoning models can return `content: null` when the output-token
+            // budget is exhausted before visible text is produced. Refusals
+            // likewise arrive separately from normal content.
+            let content: String?
+            let refusal: String?
+        }
         let message: Message
         let finishReason: String?
 

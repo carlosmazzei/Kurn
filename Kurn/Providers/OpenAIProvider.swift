@@ -173,11 +173,20 @@ struct OpenAIProvider: LLMProvider {
         var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
         wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
         // No `response_format` here: chat replies are prose, not the summary JSON.
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": chatModel,
             "max_completion_tokens": LLMHTTP.chatMaxOutputTokens,
             "messages": wire
         ]
+        // GPT-5's completion budget includes hidden reasoning tokens. For a
+        // concise meeting answer, low effort prevents reasoning from consuming
+        // the entire budget and leaving `message.content` empty. Keep this
+        // OpenAI/GPT-5-specific so compatible vendors are not sent a parameter
+        // they may not implement.
+        if provider.id == AIProvider.openAI.id,
+           chatModel.lowercased().hasPrefix("gpt-5") {
+            body["reasoning_effort"] = "low"
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
@@ -186,7 +195,10 @@ struct OpenAIProvider: LLMProvider {
             from: data,
             as: ChatResponse.self,
             emptyMessage: "empty chat response"
-        ) { $0.choices.first?.message.content }
+        ) {
+            let message = $0.choices.first?.message
+            return message?.content ?? message?.refusal
+        }
     }
 
     // MARK: - HTTP helpers
