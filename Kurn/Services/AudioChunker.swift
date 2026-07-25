@@ -6,6 +6,12 @@
 //  upload to the Whisper API (which caps request size). Each chunk carries the
 //  time offset of its first sample so transcript timestamps can be corrected.
 //
+//  Exporting goes through `AVAssetExportSession.export(to:as:)`, which is async
+//  and throws. The older `exportAsynchronously` + `status`/`error` polling was
+//  deprecated in iOS 18, and its completion handler was the only reason this
+//  file needed a `@unchecked Sendable` box to carry the non-Sendable session
+//  across isolation under Swift 6.
+//
 
 import AVFoundation
 import Foundation
@@ -178,41 +184,17 @@ actor AudioChunker {
                 NSLocalizedString("error.export_session", comment: "Export session unavailable")
             )
         }
-        session.outputURL = outURL
-        session.outputFileType = .m4a
         session.timeRange = range
 
-        // AVAssetExportSession is not Sendable; box it so the completion handler
-        // captures only Sendable values under Swift 6 strict concurrency. The
-        // completion runs after export finishes, so reading status is safe.
-        let box = ExportBox(session)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            box.session.exportAsynchronously {
-                switch box.session.status {
-                case .completed:
-                    continuation.resume()
-                case .failed, .cancelled:
-                    continuation.resume(
-                        throwing: AppError.audioError(
-                            box.session.error?.localizedDescription
-                                ?? NSLocalizedString("error.export_failed", comment: "Export failed")
-                        )
-                    )
-                default:
-                    continuation.resume(
-                        throwing: AppError.audioError(
-                            NSLocalizedString("error.export_failed", comment: "Export failed")
-                        )
-                    )
-                }
-            }
+        do {
+            try await session.export(to: outURL, as: .m4a)
+        } catch is CancellationError {
+            // Let cooperative cancellation through rather than reporting it as an
+            // audio failure: the pipeline cancels chunking when the user stops a
+            // run, and that shouldn't surface an error alert.
+            throw CancellationError()
+        } catch {
+            throw AppError.audioError(error.localizedDescription)
         }
     }
-}
-
-/// Sendable wrapper so the export session can cross into the completion handler
-/// without tripping Swift 6 data-race checks.
-private final class ExportBox: @unchecked Sendable {
-    let session: AVAssetExportSession
-    init(_ session: AVAssetExportSession) { self.session = session }
 }
