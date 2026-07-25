@@ -259,6 +259,7 @@
 "tag.auto_suggest.empty" = "Keine Tags vorgeschlagen.";
 "tag.auto_suggest.error" = "Tags konnten nicht vorgeschlagen werden.";
 "tag.auto_suggest.disclaimer" = "KI-vorgeschlagene Tags können ungenau sein. Vor dem Anwenden prüfen.";
+"tag.auto_suggest.selection_hint" = "Wähle die Tags aus, die angewendet werden sollen.";
 "tag.suggested_new" = "neu";
 "tag.merge" = "Zusammenführen";
 "tag.merge_title" = "Tag zusammenführen";

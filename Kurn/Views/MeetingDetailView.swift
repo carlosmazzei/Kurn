@@ -111,7 +111,9 @@ struct MeetingDetailView: View {
             AutoTagConfirmView(
                 meeting: meeting,
                 suggestion: suggestion,
-                onApply: { applyAutoTagSuggestion(suggestion) }
+                onApply: { selectedSuggestion in
+                    applyAutoTagSuggestion(selectedSuggestion)
+                }
             )
         }
         .kurnDialog(

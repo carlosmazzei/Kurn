@@ -259,6 +259,7 @@
 "tag.auto_suggest.empty" = "Aucun tag suggéré.";
 "tag.auto_suggest.error" = "Impossible de suggérer des tags.";
 "tag.auto_suggest.disclaimer" = "Les tags suggérés par l'IA peuvent être inexacts. Vérifiez avant d'appliquer.";
+"tag.auto_suggest.selection_hint" = "Sélectionnez les tags à appliquer.";
 "tag.suggested_new" = "nouveau";
 "tag.merge" = "Fusionner";
 "tag.merge_title" = "Fusionner le tag";

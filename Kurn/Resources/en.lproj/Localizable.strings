@@ -259,6 +259,7 @@
 "tag.auto_suggest.empty" = "No tags suggested.";
 "tag.auto_suggest.error" = "Could not suggest tags.";
 "tag.auto_suggest.disclaimer" = "AI-suggested tags may be inaccurate. Review before applying.";
+"tag.auto_suggest.selection_hint" = "Select the tags you want to apply.";
 "tag.suggested_new" = "new";
 "tag.merge" = "Merge";
 "tag.merge_title" = "Merge Tag";

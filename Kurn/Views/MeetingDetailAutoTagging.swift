@@ -57,7 +57,13 @@ extension MeetingDetailView {
         for name in suggestion.newTagNames {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
-            if !allTags.contains(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+            if let existing = allTags.first(where: {
+                $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
+            }) {
+                if !meeting.tags.contains(where: { $0.id == existing.id }) {
+                    meeting.tags.append(existing)
+                }
+            } else {
                 let newTag = Kurn.Tag(name: trimmed)
                 modelContext.insert(newTag)
                 meeting.tags.append(newTag)
