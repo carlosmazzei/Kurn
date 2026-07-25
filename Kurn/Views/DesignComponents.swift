@@ -9,6 +9,73 @@
 
 import SwiftUI
 
+/// Compact wrapping layout for metadata and chips. Items move to the next line
+/// as a unit, so an icon never becomes separated from its label.
+struct FlowLayout: Layout {
+    var horizontalSpacing: CGFloat = 6
+    var verticalSpacing: CGFloat = 6
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let proposedWidth = proposal.width
+        let availableWidth = proposedWidth.flatMap { $0.isFinite ? $0 : nil } ?? .infinity
+        let result = layout(subviews: subviews, width: availableWidth)
+        let width = proposedWidth.flatMap { $0.isFinite ? $0 : nil } ?? result.width
+        return CGSize(width: width, height: result.height)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + verticalSpacing
+                rowHeight = 0
+            }
+            subview.place(
+                at: CGPoint(x: x, y: y),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(size)
+            )
+            x += size.width + horizontalSpacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
+
+    private func layout(subviews: Subviews, width: CGFloat) -> (width: CGFloat, height: CGFloat) {
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var contentWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + verticalSpacing
+                rowHeight = 0
+            }
+            contentWidth = max(contentWidth, x + size.width)
+            x += size.width + horizontalSpacing
+            rowHeight = max(rowHeight, size.height)
+        }
+
+        return (contentWidth, subviews.isEmpty ? 0 : y + rowHeight)
+    }
+}
+
 /// Small colored pill showing a transcription status (dot + label).
 struct StatusBadge: View {
     let status: TranscriptionStatus

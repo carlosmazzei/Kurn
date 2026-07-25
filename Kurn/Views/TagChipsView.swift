@@ -8,6 +8,24 @@
 
 import SwiftUI
 
+struct TagChip: View {
+    let tag: Tag
+
+    var body: some View {
+        Text(tag.name)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Color(hex: tag.colorHex))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Color(hex: tag.colorHex).opacity(0.12),
+                in: Capsule()
+            )
+    }
+}
+
 struct TagChipsView: View {
     let tags: [Tag]
     var maxVisible: Int?
@@ -23,22 +41,16 @@ struct TagChipsView: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        FlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
             ForEach(visibleTags) { tag in
-                Text(tag.name)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color(hex: tag.colorHex))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Color(hex: tag.colorHex).opacity(0.12),
-                        in: Capsule()
-                    )
+                TagChip(tag: tag)
             }
             if overflowCount > 0 {
                 Text("+\(overflowCount)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Theme.textTertiary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Theme.fill, in: Capsule())

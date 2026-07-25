@@ -191,6 +191,8 @@
 "meetings.unfavorite" = "取消收藏";
 "meetings.archive" = "归档";
 "meetings.unarchive" = "取消归档";
+"meetings.summary_count.one" = "%d 个摘要";
+"meetings.summary_count.other" = "%d 个摘要";
 "meetings.bucket" = "资料库";
 "meetings.bucket.all" = "全部";
 "meetings.bucket.inbox" = "收件箱";

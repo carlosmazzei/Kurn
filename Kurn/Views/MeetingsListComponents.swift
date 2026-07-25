@@ -68,82 +68,141 @@ struct MeetingCard: View {
     let preview: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                if meeting.isFavorite {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(Theme.warning)
-                        .font(.system(size: 13))
-                        .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    if meeting.isFavorite {
+                        Image(systemName: "star.fill")
+                            .foregroundStyle(Theme.warning)
+                            .font(.system(size: 13))
+                            .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
+                    }
+                    Text(meeting.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
                 }
-                Text(meeting.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                if !meeting.summaries.isEmpty {
-                    Image(systemName: "sparkles").foregroundStyle(Theme.info)
-                }
-                StatusBadge(status: meeting.aggregateStatus)
-            }
-            HStack(spacing: 6) {
-                Text(meeting.createdAt.meetingDisplay)
-                if meeting.totalDuration > 0 {
-                    Text("·")
-                    Text(meeting.totalDuration.clockDisplay)
-                }
-            }
-            .font(.system(size: 13))
-            .foregroundStyle(Theme.textSecondary)
 
-            metaChips
+                metadata
 
-            if !preview.isEmpty {
-                Text(preview)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(2)
+                if !preview.isEmpty {
+                    Text(preview)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(2)
+                }
+
+                classifiers
             }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.textTertiary)
+                .accessibilityHidden(true)
         }
         .kurnCard()
     }
 
-    /// Optional row of scannable chips: # speakers, # recordings, summary
-    /// template. Each chip only appears when it adds information (≥2 speakers,
-    /// >1 recording, template named).
     @ViewBuilder
-    private var metaChips: some View {
-        let speakerCount = meeting.speakers.count
-        let recordingCount = meeting.recordings.count
-        let templateName = meeting.latestSummary?.templateName ?? ""
-        let hasTags = !meeting.tags.isEmpty
-        if speakerCount >= 2 || recordingCount > 1 || !templateName.isEmpty || hasTags {
-            HStack(spacing: 6) {
-                if speakerCount >= 2 {
-                    metaChip(systemImage: "person.2.fill", text: "\(speakerCount)")
-                }
-                if recordingCount > 1 {
-                    metaChip(systemImage: "waveform", text: "\(recordingCount)")
-                }
-                if !templateName.isEmpty {
-                    metaChip(systemImage: "doc.text", text: templateName)
-                }
-                if hasTags {
-                    TagChipsView(tags: meeting.tags, maxVisible: 3)
-                }
-                Spacer(minLength: 0)
+    private var metadata: some View {
+        FlowLayout(horizontalSpacing: 10, verticalSpacing: 4) {
+            metadataItem(systemImage: "calendar", text: meeting.createdAt.meetingDisplay)
+            if meeting.totalDuration > 0 {
+                metadataItem(systemImage: "clock", text: meeting.totalDuration.clockDisplay)
+            }
+            metadataItem(
+                systemImage: transcriptionIcon,
+                text: meeting.aggregateStatus.displayName,
+                tint: transcriptionColor
+            )
+            if !meeting.summaries.isEmpty {
+                metadataItem(
+                    systemImage: "sparkles",
+                    text: summaryCountText,
+                    tint: Theme.info
+                )
             }
         }
     }
 
-    private func metaChip(systemImage: String, text: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage).font(.system(size: 10, weight: .semibold))
-            Text(text).font(.system(size: 11, weight: .medium))
+    @ViewBuilder
+    private var classifiers: some View {
+        let visibleTags = Array(meeting.tags.prefix(3))
+        let overflowCount = max(0, meeting.tags.count - visibleTags.count)
+        if meeting.folder != nil || !meeting.tags.isEmpty {
+            FlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+                if let folder = meeting.folder {
+                    folderChip(folder)
+                }
+                ForEach(visibleTags) { tag in
+                    TagChip(tag: tag)
+                }
+                if overflowCount > 0 {
+                    Text("+\(overflowCount)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.fill, in: Capsule())
+                }
+            }
         }
-        .foregroundStyle(Theme.textSecondary)
+    }
+
+    private func metadataItem(systemImage: String, text: String, tint: Color = Theme.textSecondary) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .medium))
+            Text(text)
+                .lineLimit(1)
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(tint)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func folderChip(_ folder: Folder) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: folder.iconName)
+                .font(.system(size: 10, weight: .semibold))
+            Text(folder.name)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(Color(hex: folder.colorHex))
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Theme.fill, in: Capsule())
+        .background(Color(hex: folder.colorHex).opacity(0.12), in: Capsule())
+    }
+
+    private var summaryCountText: String {
+        let count = meeting.summaries.count
+        let key = count == 1 ? "meetings.summary_count.one" : "meetings.summary_count.other"
+        return String(
+            format: NSLocalizedString(key, comment: "Number of summaries on a meeting card"),
+            count
+        )
+    }
+
+    private var transcriptionIcon: String {
+        switch meeting.aggregateStatus {
+        case .none: return "waveform.slash"
+        case .inProgress: return "waveform"
+        case .pending: return "pause.circle"
+        case .done: return "checkmark.circle"
+        case .failed: return "exclamationmark.circle"
+        }
+    }
+
+    private var transcriptionColor: Color {
+        switch meeting.aggregateStatus {
+        case .none: return Theme.textSecondary
+        case .inProgress, .pending: return Theme.warning
+        case .done: return Theme.success
+        case .failed: return Theme.accent
+        }
     }
 }
