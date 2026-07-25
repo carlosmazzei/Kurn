@@ -117,6 +117,46 @@ struct TranscriptFusionTests {
         #expect(segments.last?.text == "c")
     }
 
+    @Test func monolithicASRSpanPreservesDiarizedSpeakers() {
+        let turns = [
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 10),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 10, end: 20),
+            SpeakerTurn(speakerLabel: "Speaker 3", start: 20, end: 30)
+        ]
+        let text = (1...30).map(String.init).joined(separator: " ")
+        let span = TranscribedSpan(text: text, start: 0, end: 30, confidence: nil)
+
+        let segments = TranscriptFusion.segments(
+            spans: [span],
+            turns: turns,
+            maxSegmentDuration: 5
+        )
+
+        #expect(segments.map(\.speakerLabel) == ["Speaker 1", "Speaker 2", "Speaker 3"])
+        #expect(segments.map(\.text).joined(separator: " ") == text)
+        #expect(segments.map(\.startTime) == [0, 10, 20])
+        #expect(segments.map(\.endTime) == [10, 20, 30])
+    }
+
+    @Test func shortSpanStillUsesMajorityOverlap() {
+        let turns = [
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 6),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 6, end: 10)
+        ]
+        let span = TranscribedSpan(
+            text: "this remains a single utterance",
+            start: 0,
+            end: 10,
+            confidence: nil
+        )
+
+        let segments = TranscriptFusion.segments(spans: [span], turns: turns)
+
+        #expect(segments.count == 1)
+        #expect(segments.first?.speakerLabel == "Speaker 1")
+        #expect(segments.first?.text == span.text)
+    }
+
     // MARK: - Confidence
 
     @Test func confidenceIsAveragedAcrossMergedSpans() {

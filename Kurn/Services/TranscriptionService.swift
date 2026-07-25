@@ -52,7 +52,6 @@ struct TranscriptionService {
     private let fluidAudioDiarizer = FluidAudioDiarizer()
     private let diarizationPreprocessor = DiarizationPreprocessor()
     private let vadCompactor = VADAudioCompactor()
-    private let onDeviceChunker = AudioChunker()
 
     /// Transcribe one recording file and return diarized segments, driving each
     /// pipeline stage through the engine selected in `config`.
@@ -352,12 +351,12 @@ struct TranscriptionService {
                 }
             )
         case .appleSpeech:
-            raw = try await transcribeOnDeviceChunked(
+            raw = try await appleTranscriber.transcribe(
                 url: target,
                 language: language,
-                resume: resume,
-                onChunkCompleted: checkpointSink,
-                onPhase: onPhase
+                onProgress: { progress in
+                    onPhase(.transcribing(progress: progress, chunks: nil))
+                }
             )
         case .fluidAudioParakeet:
             raw = try await resolveTranscriber(engine).transcribe(
@@ -376,49 +375,6 @@ struct TranscriptionService {
             return TranscribedSpan(text: span.text, start: start, end: max(start, end), confidence: span.confidence)
         }
         return RawTranscript(spans: spans, language: raw.language)
-    }
-
-    /// Apple Speech over duration-based chunks instead of one recognition task
-    /// for the whole file — a single `SFSpeechRecognitionTask` over hours of
-    /// audio is unreliable, and per-chunk completion gives the checkpoint sink
-    /// durable progress to persist. Intra-chunk progress from the recognizer's
-    /// partial results is blended into the overall fraction.
-    private func transcribeOnDeviceChunked(
-        url: URL,
-        language: MeetingLanguage,
-        resume: ChunkedTranscriptionRunner.Progress?,
-        onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?,
-        onPhase: @escaping PhaseHandler
-    ) async throws -> RawTranscript {
-        let chunks = try await onDeviceChunker.chunkByDuration(url: url)
-        let total = chunks.count
-        defer {
-            // `defer` can't `await`, so the async chunk cleanup is fired as a
-            // detached step; `TempFileCleaner` sweeps anything left if it's lost.
-            let chunker = onDeviceChunker
-            Task { await chunker.cleanup(chunks) }
-        }
-
-        return try await ChunkedTranscriptionRunner.run(
-            chunks: chunks,
-            resume: resume,
-            transcribeChunk: { chunk, index in
-                try await appleTranscriber.transcribe(
-                    url: chunk.url,
-                    language: language,
-                    onProgress: { fraction in
-                        let clamped = min(1, max(0, fraction))
-                        let currentChunk = index + 1
-                        let overallProgress = (Double(index) + clamped) / Double(total)
-                        onPhase(.transcribing(progress: overallProgress, chunks: total > 1 ? ChunkProgress(completed: currentChunk, total: total) : nil))
-                    }
-                )
-            },
-            onChunkCompleted: onChunkCompleted,
-            onProgress: { progress, currentChunk, _ in
-                onPhase(.transcribing(progress: progress, chunks: total > 1 ? ChunkProgress(completed: currentChunk, total: total) : nil))
-            }
-        )
     }
 
     /// Dispatch to the chosen diarization engine. Both engines satisfy

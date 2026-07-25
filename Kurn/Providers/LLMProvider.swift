@@ -337,9 +337,26 @@ struct SummaryJSON: Decodable {
 extension SummaryJSON {
     /// Tolerant decode that strips accidental markdown code fences before parsing.
     static func parse(_ raw: String) throws -> SummaryJSON {
+        do {
+            return try JSONDecoder().decode(
+                SummaryJSON.self,
+                from: ModelJSON.objectData(from: raw)
+            )
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.decodingError(error.localizedDescription)
+        }
+    }
+}
+
+/// Extract a JSON object from model output while tolerating Markdown fences and
+/// explanatory prose. Structured-output APIs reduce these cases but do not
+/// eliminate them across all providers and model versions.
+enum ModelJSON {
+    static func objectData(from raw: String) throws -> Data {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.hasPrefix("```") {
-            // Drop the opening fence (``` or ```json) and the closing fence.
             if let firstNewline = text.firstIndex(of: "\n") {
                 text = String(text[text.index(after: firstNewline)...])
             }
@@ -348,28 +365,18 @@ extension SummaryJSON {
             }
             text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        // First attempt: decode the (de-fenced) text directly.
-        if let data = text.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode(SummaryJSON.self, from: data) {
-            return decoded
-        }
 
-        // Fallback: extract the outermost { ... } object in case the model wrote
-        // any prose around the JSON (more common with the Anthropic path).
+        if let data = text.data(using: .utf8),
+           (try? JSONSerialization.jsonObject(with: data)) is [String: Any] {
+            return data
+        }
         if let start = text.firstIndex(of: "{"),
            let end = text.lastIndex(of: "}"),
-           start < end {
-            let candidate = String(text[start...end])
-            if let data = candidate.data(using: .utf8) {
-                do {
-                    return try JSONDecoder().decode(SummaryJSON.self, from: data)
-                } catch {
-                    throw AppError.decodingError(error.localizedDescription)
-                }
-            }
+           start < end,
+           let data = String(text[start...end]).data(using: .utf8) {
+            return data
         }
-
-        throw AppError.decodingError("response did not contain valid JSON")
+        throw AppError.decodingError("response did not contain a JSON object")
     }
 }
 

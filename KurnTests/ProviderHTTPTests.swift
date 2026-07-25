@@ -191,6 +191,10 @@ struct ProviderHTTPTests {
         #expect(request.url?.absoluteString.contains("generateContent") == true)
         #expect(request.url?.query == nil)
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        let generationConfig = body?["generationConfig"] as? [String: Any]
+        #expect(generationConfig?["responseMimeType"] as? String == "application/json")
+        #expect(generationConfig?["responseJsonSchema"] != nil)
     }
 
     @Test func googleTruncatedSummaryThrowsSummaryTruncated() async {

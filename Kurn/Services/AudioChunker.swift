@@ -27,8 +27,16 @@ actor AudioChunker {
     /// Size above which a recording is chunked before upload (~20 MB).
     static let sizeThresholdBytes: Int64 = 20 * 1024 * 1024
 
-    /// Length of each exported chunk.
-    static let chunkDuration: TimeInterval = 600 // 10 minutes
+    /// Default length used for Whisper uploads.
+    static let defaultChunkDuration: TimeInterval = 600 // 10 minutes
+
+    /// Per-consumer duration cap. Apple Speech needs substantially shorter
+    /// recognition tasks than Whisper's upload path.
+    private let chunkDuration: TimeInterval
+
+    init(chunkDuration: TimeInterval = defaultChunkDuration) {
+        self.chunkDuration = chunkDuration
+    }
 
     /// Return the file split into chunks in the temporary directory. If the file
     /// is small enough, returns it unmodified as a single chunk at offset 0.
@@ -41,7 +49,7 @@ actor AudioChunker {
         let duration = (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atInfo.info("chunk: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", duration), privacy: .public)s")
         let fitsSize = Int64(size) <= Self.sizeThresholdBytes
-        let fitsDuration = duration.isFinite && duration <= Self.chunkDuration
+        let fitsDuration = duration.isFinite && duration <= chunkDuration
         if fitsSize, fitsDuration {
             AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes / \(String(format: "%.1f", duration), privacy: .public)s <= thresholds, single chunk")
             return [Chunk(url: url, offset: 0)]
@@ -59,10 +67,10 @@ actor AudioChunker {
         let asset = AVURLAsset(url: url)
         let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
         AppLog.transcription.atInfo.info("chunkByDuration: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", totalSeconds), privacy: .public)s")
-        guard totalSeconds.isFinite, totalSeconds > Self.chunkDuration else {
+        guard totalSeconds.isFinite, totalSeconds > chunkDuration else {
             return [Chunk(url: url, offset: 0)]
         }
-        AppLog.transcription.atDebug.debug("chunk: \(totalSeconds, privacy: .public)s > \(Self.chunkDuration, privacy: .public)s, splitting by duration…")
+        AppLog.transcription.atDebug.debug("chunk: \(totalSeconds, privacy: .public)s > \(self.chunkDuration, privacy: .public)s, splitting by duration…")
         return try await split(url: url, knownDuration: totalSeconds)
     }
 
@@ -94,7 +102,7 @@ actor AudioChunker {
         }
 
         while start < totalSeconds {
-            let length = min(Self.chunkDuration, totalSeconds - start)
+            let length = min(chunkDuration, totalSeconds - start)
             let outURL = tmpDir.appendingPathComponent(
                 "kurn_chunk_\(UUID().uuidString)_\(index).m4a"
             )

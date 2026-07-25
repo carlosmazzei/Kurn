@@ -23,6 +23,9 @@ enum TranscriptFusion {
         maxSegmentDuration: TimeInterval = defaultMaxSegmentDuration
     ) -> [TranscriptSegment] {
         guard !spans.isEmpty else { return [] }
+        let attributableSpans = spans.flatMap {
+            splitCoarseSpan($0, at: turns, maxSegmentDuration: maxSegmentDuration)
+        }
 
         var segments: [TranscriptSegment] = []
         var currentLabel: String?
@@ -52,7 +55,7 @@ enum TranscriptFusion {
             confidenceCount = 0
         }
 
-        for span in spans {
+        for span in attributableSpans {
             let label = speakerLabel(for: span, in: turns)
             let wouldExceed = currentLabel != nil
                 && (span.end - currentStart) > maxSegmentDuration
@@ -72,6 +75,58 @@ enum TranscriptFusion {
         flush()
 
         return segments
+    }
+
+    /// Some ASR engines only return one text result for the entire recording.
+    /// Giving that result to `speakerLabel(for:)` attributes every word to the
+    /// speaker with the greatest total overlap, discarding otherwise valid
+    /// diarization. For a long span crossing speaker changes, distribute its
+    /// words over the overlapping turns in time order. This is necessarily an
+    /// estimate until the ASR exposes word timestamps, but it preserves all
+    /// detected speakers and keeps the text in its original order.
+    private static func splitCoarseSpan(
+        _ span: TranscribedSpan,
+        at turns: [SpeakerTurn],
+        maxSegmentDuration: TimeInterval
+    ) -> [TranscribedSpan] {
+        guard span.end - span.start > maxSegmentDuration else { return [span] }
+
+        let overlaps = turns.compactMap { turn -> (turn: SpeakerTurn, duration: TimeInterval)? in
+            let start = max(span.start, turn.start)
+            let end = min(span.end, turn.end)
+            guard end > start else { return nil }
+            return (
+                SpeakerTurn(speakerLabel: turn.speakerLabel, start: start, end: end),
+                end - start
+            )
+        }
+        guard Set(overlaps.map { $0.turn.speakerLabel }).count > 1 else { return [span] }
+
+        let words = span.text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard words.count >= overlaps.count else { return [span] }
+        let totalDuration = overlaps.reduce(0) { $0 + $1.duration }
+        guard totalDuration > 0 else { return [span] }
+
+        var result: [TranscribedSpan] = []
+        var wordStart = 0
+        var elapsed: TimeInterval = 0
+        for (index, overlap) in overlaps.enumerated() {
+            elapsed += overlap.duration
+            let wordEnd = index == overlaps.count - 1
+                ? words.count
+                : max(wordStart + 1, min(words.count, Int((elapsed / totalDuration * Double(words.count)).rounded())))
+            guard wordEnd > wordStart else { continue }
+            result.append(
+                TranscribedSpan(
+                    text: words[wordStart..<wordEnd].joined(separator: " "),
+                    start: overlap.turn.start,
+                    end: overlap.turn.end,
+                    confidence: span.confidence
+                )
+            )
+            wordStart = wordEnd
+        }
+        return wordStart == words.count ? result : [span]
     }
 
     /// Pick the speaker who holds the most of the span's *duration*, falling
