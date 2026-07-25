@@ -21,84 +21,89 @@ actor FluidAudioDiarizer: Diarizing {
     // isolation boundary. `manager` is a `let` never exposed outside this actor,
     // so there's no real aliasing risk — `nonisolated(unsafe)` matches the same
     // pattern already used for `LockScreenRecordingController.activity`.
-    private nonisolated(unsafe) var manager = OfflineDiarizerManager(config: FluidAudioDiarizer.tunedConfig(minSpeakers: 0))
+    private nonisolated(unsafe) var manager = OfflineDiarizerManager(config: FluidAudioDiarizer.tunedConfig(speakerCount: 0))
     private var modelsReady = false
-    /// Speaker floor the current `manager` was built with. The manager bakes its
+    /// Speaker count the current `manager` was built with. The manager bakes its
     /// config at init (it has no per-call config), so a change here forces a
     /// rebuild + re-prepare.
-    private var currentMinSpeakers = 0
-    private let prepareTimeout: TimeInterval = 60
-    private let processTimeout: TimeInterval = 120
+    private var currentSpeakerCount = 0
+    /// First model preparation of a session also compiles the CoreML artifacts
+    /// (and may finish a download), which is far slower than a warm load.
+    private let prepareTimeout: TimeInterval = 300
 
-    /// Override of `OfflineDiarizerConfig.default` that swaps the VBx warm-start
-    /// priors. The community defaults (Fa=0.07, Fb=0.8) consistently collapse
-    /// multi-speaker AHC results into a single cluster on our recordings (the
-    /// VBx mixture weights go to ~1e-20 for everything but one), even when
-    /// segmentation and AHC both clearly find multiple speakers. The values
-    /// here lift `Fa` above the BUT-VBx literature defaults (DIHARD/AMI): Fa=0.6
-    /// gives the acoustic likelihood even more weight (so subtle x-vector
-    /// differences aren't flattened away), and Fb=11 makes the Dirichlet prior
-    /// far less concentrated so VBx preserves the cluster count it was given
-    /// instead of collapsing to one.
+    /// Override of `OfflineDiarizerConfig.default` for this app's audio.
     ///
-    /// NOTE on what is *not* tunable here: FluidAudio's offline VBx is a
-    /// variational-Bayes Dirichlet GMM, not the Brno HMM-VBx — there is no
-    /// `loop_p`/self-loop/transition term to lower. The init smoothing that
-    /// could keep the other components alive is hardcoded (`initSmoothing: 7.0`
-    /// in `VBxClustering`), not in the public config. And the AHC init is not
-    /// the bottleneck: it already yields ~59 clusters; VBx collapses *those* to
-    /// one. So `Fa` is the only auto-side lever, and clustering-side tuning can
-    /// only help when the *embeddings* are discriminative. On heavily-processed
-    /// far-field audio they collapse into one blob and no Fa/Fb/threshold value
-    /// recovers the speakers (feeding the original un-cleaned recording was tried
-    /// and made no difference). When that happens, either set `minSpeakers`
-    /// (forces a KMeans re-cluster, escaping the collapse) or use the heuristic
-    /// `SpeakerDiarizer` (pitch/timbre based), which the user can select.
+    /// The VBx warm-start priors are left at the community-1 defaults
+    /// (`Fa=0.07`, `Fb=0.8`) that FluidAudio benchmarks against. Earlier
+    /// versions of this file raised them steeply to fight VBx collapsing every
+    /// cluster into one speaker on far-field/single-mic audio; that traded one
+    /// failure for another (a diffuse Dirichlet prior makes VBx keep the
+    /// agglomerative init's cluster count, which is routinely dozens) and it
+    /// was working around a lever that never actually engaged — see
+    /// `speakerCount` below. Collapse is now handled after the fact by
+    /// `SpeakerClusterRefiner`, so the clustering stage can stay on the
+    /// upstream-tuned defaults.
     ///
-    /// - Parameter minSpeakers: when > 1, sets `clustering.minSpeakers`, which
-    ///   makes the pipeline re-cluster with KMeans to at least that many speakers
-    ///   whenever VBx collapses below it (which it does on far-field audio). When
-    ///   0/1 the diarizer auto-detects with no floor.
-    private static func tunedConfig(minSpeakers: Int) -> OfflineDiarizerConfig {
+    /// - Parameter speakerCount: when > 1, pins `clustering.numSpeakers`, which
+    ///   makes the pipeline re-cluster the raw embeddings with KMeans into
+    ///   exactly that many speakers. `0`/`1` leaves the count unconstrained.
+    ///
+    /// This deliberately sets `numSpeakers` rather than `minSpeakers`. FluidAudio
+    /// decides whether to apply a speaker-count constraint by comparing the
+    /// bounds against `VBxOutput.numClusters`, which it reports as the *input*
+    /// agglomerative cluster count, not the number of components VBx kept. That
+    /// count is large (tens) on any real meeting, so a `minSpeakers` floor of 2
+    /// or 3 is always already satisfied and the KMeans re-cluster never runs —
+    /// exactly the case it was meant to rescue. A maximum (which `numSpeakers`
+    /// implies) is the only bound that trips, and it re-clusters to the
+    /// requested count.
+    ///
+    /// `exposeChunkEmbeddings` is enabled only when the count is unconstrained,
+    /// because that is the one mode where the collapse rescue can run; the extra
+    /// payload is ~1–2 MB per hour of audio, so there is no reason to carry it
+    /// when it can't be used.
+    private static func tunedConfig(speakerCount: Int) -> OfflineDiarizerConfig {
         var config = OfflineDiarizerConfig.default
-        config.clustering.warmStartFa = 0.6
-        config.clustering.warmStartFb = 11
-        if minSpeakers > 1 {
-            config.clustering.minSpeakers = minSpeakers
+        if speakerCount > 1 {
+            config.clustering.numSpeakers = speakerCount
+        } else {
+            config.exposeChunkEmbeddings = true
         }
         return config
     }
 
-    /// Rebuild `manager` if the requested speaker floor differs from the one it
+    /// Rebuild `manager` if the requested speaker count differs from the one it
     /// was constructed with. Resets `modelsReady` so models re-prepare against
     /// the new config (cheap: weights are cached on disk, only recompiled).
-    private func ensureManager(minSpeakers: Int) {
-        guard minSpeakers != currentMinSpeakers else { return }
-        manager = OfflineDiarizerManager(config: Self.tunedConfig(minSpeakers: minSpeakers))
-        currentMinSpeakers = minSpeakers
+    private func ensureManager(speakerCount: Int) {
+        guard speakerCount != currentSpeakerCount else { return }
+        manager = OfflineDiarizerManager(config: Self.tunedConfig(speakerCount: speakerCount))
+        currentSpeakerCount = speakerCount
         modelsReady = false
     }
 
     func diarize(url: URL) async -> [SpeakerTurn] {
-        await diarize(url: url, minSpeakers: 0, onDownloadFailure: nil)
+        await diarize(url: url, speakerCount: 0, onDownloadFailure: nil)
     }
 
     func diarize(url: URL, onDownloadFailure: (@Sendable (String) -> Void)?) async -> [SpeakerTurn] {
-        await diarize(url: url, minSpeakers: 0, onDownloadFailure: onDownloadFailure)
+        await diarize(url: url, speakerCount: 0, onDownloadFailure: onDownloadFailure)
     }
 
+    /// - Parameter speakerCount: the exact number of speakers to force, or `0`
+    ///   to let the pipeline decide (and let the collapse rescue run).
     /// - Parameter onDownloadFailure: reported only for a model preparation
     ///   failure (the one case where re-consenting/redownloading could help).
     ///   Passed per call, not stored on the actor, so concurrent transcriptions
     ///   of different recordings can't have their warning handlers cross over.
     func diarize(
         url: URL,
-        minSpeakers: Int,
+        speakerCount: Int,
         onDownloadFailure: (@Sendable (String) -> Void)?
     ) async -> [SpeakerTurn] {
-        ensureManager(minSpeakers: minSpeakers)
-        if minSpeakers > 1 {
-            AppLog.transcription.atNotice.notice("FluidAudioDiarizer: minSpeakers=\(minSpeakers, privacy: .public) (forced KMeans re-cluster on VBx collapse)")
+        ensureManager(speakerCount: speakerCount)
+        if speakerCount > 1 {
+            AppLog.transcription.atNotice.notice("FluidAudioDiarizer: speakerCount=\(speakerCount, privacy: .public) (pinned, KMeans re-cluster)")
         }
         if !modelsReady {
             do {
@@ -112,10 +117,12 @@ actor FluidAudioDiarizer: Diarizing {
                 return [Self.fallbackTurn(for: url)]
             }
         }
+        let duration = Self.audioDuration(of: url)
         do {
-            return try await Self.withTimeout(seconds: processTimeout) {
+            let turns = try await Self.withTimeout(seconds: Self.processTimeout(forAudioDuration: duration)) {
                 try await self.processAndMapTurns(url: url)
             }
+            return turns.isEmpty ? [Self.fallbackTurn(for: url)] : turns
         } catch {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
@@ -140,7 +147,42 @@ actor FluidAudioDiarizer: Diarizing {
         let result = try await manager.process(url)
         let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
         AppLog.transcription.atInfo.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
-        return Self.turns(from: result.segments)
+
+        var turns = Self.turns(from: result.segments)
+        if uniqueIDs <= 1, let windows = Self.embeddingWindows(from: result.chunkEmbeddings) {
+            turns = Self.rescueCollapsedSpeakers(turns: turns, windows: windows)
+        }
+        let smoothed = SpeakerTurnSmoothing.smooth(turns)
+        AppLog.transcription.atInfo.info("FluidAudioDiarizer: smoothed turns \(turns.count, privacy: .public) -> \(smoothed.count, privacy: .public), speakers=\(Set(smoothed.map { $0.speakerLabel }).count, privacy: .public)")
+        return smoothed
+    }
+
+    /// Re-cluster the per-window speaker embeddings that VBx collapsed and
+    /// re-attribute the diarizer's own segment boundaries to the result. Keeps
+    /// `turns` unchanged when the embeddings genuinely hold a single voice.
+    private static func rescueCollapsedSpeakers(
+        turns: [SpeakerTurn],
+        windows: [SpeakerEmbeddingWindow]
+    ) -> [SpeakerTurn] {
+        guard let labels = SpeakerClusterRefiner.clusterLabels(for: windows) else {
+            AppLog.transcription.atInfo.info("FluidAudioDiarizer: single cluster confirmed by re-clustering \(windows.count, privacy: .public) windows")
+            return turns
+        }
+        let rescued = SpeakerClusterRefiner.reassign(turns: turns, windows: windows, labels: labels)
+        let speakers = Set(rescued.map { $0.speakerLabel }).count
+        AppLog.transcription.atNotice.notice("FluidAudioDiarizer: recovered \(speakers, privacy: .public) speakers from \(windows.count, privacy: .public) embedding windows after VBx collapse")
+        return rescued
+    }
+
+    private static func embeddingWindows(from chunks: [ChunkEmbedding]?) -> [SpeakerEmbeddingWindow]? {
+        guard let chunks, !chunks.isEmpty else { return nil }
+        return chunks.map {
+            SpeakerEmbeddingWindow(
+                start: $0.startTimeSeconds,
+                end: $0.endTimeSeconds,
+                embedding: $0.embedding256
+            )
+        }
     }
 
     /// Map FluidAudio's `speakerId` strings to the same "Speaker N" (1-indexed,
@@ -170,13 +212,27 @@ actor FluidAudioDiarizer: Diarizing {
     /// can't produce real turns — covering the full duration (instead of a
     /// zero-length range) keeps downstream speaker-label lookups meaningful.
     private static func fallbackTurn(for url: URL) -> SpeakerTurn {
-        let duration: TimeInterval
-        if let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 {
-            duration = Double(file.length) / file.processingFormat.sampleRate
-        } else {
-            duration = 0
+        SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, audioDuration(of: url)))
+    }
+
+    private static func audioDuration(of url: URL) -> TimeInterval {
+        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 else {
+            return 0
         }
-        return SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, duration))
+        return Double(file.length) / file.processingFormat.sampleRate
+    }
+
+    /// Processing budget scaled to the recording.
+    ///
+    /// This used to be a flat 120s, which a one-hour meeting can exceed on an
+    /// older device even when everything is working — and the timeout path
+    /// falls back to a single whole-clip turn, so the symptom was every long
+    /// recording silently coming back as one speaker. Diarization runs well
+    /// under real time on the ANE, so half of the recording's duration is a
+    /// generous budget; the floor keeps short clips from tripping on model
+    /// warm-up and the ceiling still bounds a genuinely stuck run.
+    static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
+        min(1800, max(180, duration * 0.5))
     }
 
     private static func withTimeout<T: Sendable>(
@@ -203,22 +259,26 @@ actor FluidAudioDiarizer: Diarizing {
 /// speaker turn so `TranscriptionService` keeps working until the package is added.
 actor FluidAudioDiarizer: Diarizing {
     func diarize(url: URL) async -> [SpeakerTurn] {
-        await diarize(url: url, minSpeakers: 0, onDownloadFailure: nil)
+        await diarize(url: url, speakerCount: 0, onDownloadFailure: nil)
     }
 
     func diarize(url: URL, onDownloadFailure: (@Sendable (String) -> Void)?) async -> [SpeakerTurn] {
-        await diarize(url: url, minSpeakers: 0, onDownloadFailure: onDownloadFailure)
+        await diarize(url: url, speakerCount: 0, onDownloadFailure: onDownloadFailure)
     }
 
     func diarize(
         url: URL,
-        minSpeakers: Int,
+        speakerCount: Int,
         onDownloadFailure: (@Sendable (String) -> Void)?
     ) async -> [SpeakerTurn] {
         let message = NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
         AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)
         return [Self.fallbackTurn(for: url)]
+    }
+
+    static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
+        min(1800, max(180, duration * 0.5))
     }
 
     private static func fallbackTurn(for url: URL) -> SpeakerTurn {

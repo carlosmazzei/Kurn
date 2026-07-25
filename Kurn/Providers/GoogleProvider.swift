@@ -37,10 +37,32 @@ struct GoogleProvider: LLMProvider {
 
         // Gemini has no dedicated system role here; fold it into the user turn.
         let combined = "\(systemPrompt)\n\n\(userPrompt)"
+        let summarySchema: [String: Any] = [
+            "type": "object",
+            "properties": [
+                "sections": [
+                    "type": "array",
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "title": ["type": "string"],
+                            "body": ["type": "string"],
+                            "items": [
+                                "type": "array",
+                                "items": ["type": "string"]
+                            ]
+                        ],
+                        "required": ["title"]
+                    ]
+                ]
+            ],
+            "required": ["sections"]
+        ]
         let body: [String: Any] = [
             "contents": [["role": "user", "parts": [["text": combined]]]],
             "generationConfig": [
                 "responseMimeType": "application/json",
+                "responseJsonSchema": summarySchema,
                 "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
             ]
         ]

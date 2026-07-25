@@ -2,14 +2,14 @@
 //  OnDeviceTranscriber.swift
 //  Kurn
 //
-//  SFSpeechRecognizer-based offline transcription. Runs entirely on-device
-//  (`requiresOnDeviceRecognition = true`) so it works with no network. Produces
-//  word-level spans with timestamps that the diarizer/segmenter later groups.
+//  Apple's long-form, fully on-device transcription path. SpeechAnalyzer and
+//  SpeechTranscriber are designed for meetings and distant/prerecorded audio;
+//  the older SFSpeechRecognizer API is intended for short-form dictation and
+//  can silently truncate longer files.
 //
 
 import AVFoundation
 import Foundation
-import os
 import Speech
 
 actor OnDeviceTranscriber: Transcribing {
@@ -23,144 +23,112 @@ actor OnDeviceTranscriber: Transcribing {
         }
     }
 
-    /// Transcribe an audio file fully offline.
-    /// - Parameters:
-    ///   - url: local .m4a file.
-    ///   - language: desired `MeetingLanguage`; auto-detect falls back to the
-    ///     device locale.
     func transcribe(
         url: URL,
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        let locale: Locale
-        if let id = language.localeIdentifier {
-            locale = Locale(identifier: id)
-        } else {
-            locale = Locale.current
-        }
-
-        AppLog.transcription.atDebug.debug("onDevice: locale=\(locale.identifier, privacy: .public)")
-        guard let recognizer = SFSpeechRecognizer(locale: locale) else {
-            AppLog.transcription.atError.error("onDevice: recognizer unavailable for locale")
+        let requestedLocale = Locale(
+            identifier: language.localeIdentifier ?? Locale.current.identifier
+        )
+        guard SpeechTranscriber.isAvailable,
+              let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
+            AppLog.transcription.atError.error(
+                "speechAnalyzer: unsupported locale \(requestedLocale.identifier, privacy: .public)"
+            )
             throw AppError.transcriptionFailed(
                 NSLocalizedString("error.recognizer_unavailable", comment: "Recognizer unavailable")
             )
         }
-        guard recognizer.isAvailable else {
-            AppLog.transcription.atError.error("onDevice: recognizer not available (offline/unsupported)")
-            throw AppError.transcriptionFailed(
-                NSLocalizedString("error.recognizer_offline", comment: "Recognizer offline")
+
+        AppLog.transcription.atNotice.notice(
+            "speechAnalyzer: locale=\(locale.identifier, privacy: .public)"
+        )
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            preset: .timeIndexedProgressiveTranscription
+        )
+
+        // The new Speech framework manages locale-specific model assets. If the
+        // selected locale isn't installed yet, download it before analysis.
+        do {
+            if let installation = try await AssetInventory.assetInstallationRequest(
+                supporting: [transcriber]
+            ) {
+                AppLog.transcription.atNotice.notice(
+                    "speechAnalyzer: installing locale assets"
+                )
+                try await installation.downloadAndInstall()
+            }
+        } catch {
+            AppLog.transcription.atError.error(
+                "speechAnalyzer: asset installation failed: \(error.localizedDescription, privacy: .public)"
             )
+            throw AppError.transcriptionFailed(error.localizedDescription)
         }
 
-        // Partial results let us turn the otherwise-opaque single-pass recognition
-        // into a determinate progress bar: each callback carries the timestamp of
-        // the latest recognized word, which divided by the clip duration is a
-        // believable fraction of work done. The final result still drives the
-        // returned spans, so enabling partials doesn't affect correctness.
-        let request = SFSpeechURLRecognitionRequest(url: url)
-        request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = true
-        request.addsPunctuation = true
-
-        // On-device recognition is roughly real-time or faster; allow a generous
-        // multiple of the clip length (with a floor) before treating a task that
-        // never reports a final result or error as stuck.
-        let durationSeconds = (try? await AVURLAsset(url: url).load(.duration))
-            .map(CMTimeGetSeconds) ?? 0
-        let timeout = max(60, durationSeconds * 4)
-        AppLog.transcription.atDebug.debug("onDevice: recognizing (clip=\(durationSeconds, privacy: .public)s, timeout=\(timeout, privacy: .public)s)")
-
-        // Show some movement immediately rather than starting at the empty bar.
+        let audioFile: AVAudioFile
+        do {
+            audioFile = try AVAudioFile(forReading: url)
+        } catch {
+            throw AppError.transcriptionFailed(error.localizedDescription)
+        }
+        let duration = Double(audioFile.length) / audioFile.processingFormat.sampleRate
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
         onProgress(0)
 
-        let spans: [TranscribedSpan] = try await withCheckedThrowingContinuation { continuation in
-            // Guard against the continuation being resumed more than once: the
-            // Speech API can deliver a final result and an error in some cases.
-            let box = ResumeBox()
-            box.task = recognizer.recognitionTask(with: request) { result, error in
-                if let error {
-                    if box.resumeIfNeeded() {
-                        continuation.resume(
-                            throwing: AppError.transcriptionFailed(error.localizedDescription)
-                        )
-                    }
-                    return
-                }
-                guard let result else { return }
-                if !result.isFinal {
-                    // Cap the partial-results fraction below 1 so the bar only
-                    // reaches 100% when the final result arrives.
-                    if durationSeconds > 0,
-                       let last = result.bestTranscription.segments.last {
-                        let lastEnd = last.timestamp + last.duration
-                        let fraction = min(0.99, max(0, lastEnd / durationSeconds))
-                        box.reportProgressIfBumped(fraction, sink: onProgress)
-                    }
-                    return
-                }
-                let segments = result.bestTranscription.segments
-                let mapped = segments.map { seg in
+        let resultTask = Task { () throws -> [TranscribedSpan] in
+            var spans: [TranscribedSpan] = []
+            for try await result in transcriber.results {
+                guard result.isFinal else { continue }
+                let text = String(result.text.characters)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+
+                let start = CMTimeGetSeconds(result.range.start)
+                let rangeDuration = CMTimeGetSeconds(result.range.duration)
+                guard start.isFinite, rangeDuration.isFinite else { continue }
+                spans.append(
                     TranscribedSpan(
-                        text: seg.substring,
-                        start: seg.timestamp,
-                        end: seg.timestamp + seg.duration,
-                        confidence: seg.confidence
+                        text: text,
+                        start: max(0, start),
+                        end: max(0, start + rangeDuration),
+                        confidence: nil
                     )
-                }
-                if box.resumeIfNeeded() {
-                    onProgress(1)
-                    continuation.resume(returning: mapped)
+                )
+                if duration > 0 {
+                    onProgress(min(0.99, max(0, (start + rangeDuration) / duration)))
                 }
             }
-            // Safety net: if the task ends without ever delivering a final result
-            // or an error, resume so the caller doesn't hang forever.
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                if box.resumeIfNeeded() {
-                    box.task?.cancel()
-                    continuation.resume(
-                        throwing: AppError.transcriptionFailed(
-                            NSLocalizedString(
-                                "error.recognizer_timeout",
-                                comment: "Recognition timed out"
-                            )
-                        )
-                    )
-                }
-            }
+            return spans
         }
 
-        return RawTranscript(spans: spans, language: locale.identifier)
-    }
-}
-
-/// Tiny actor-free helper to ensure a continuation is resumed exactly once.
-private final class ResumeBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var resumed = false
-    /// Last whole-percent fraction we forwarded to `onProgress`, used to throttle
-    /// the high-frequency partial-result callbacks down to at most one update per
-    /// percent so the UI doesn't churn for the main actor.
-    private var lastReportedPercent: Int = -1
-    /// The recognition task, held so the timeout safety net can cancel it
-    /// without capturing a non-Sendable value into the dispatch closure.
-    var task: SFSpeechRecognitionTask?
-    func resumeIfNeeded() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        if resumed { return false }
-        resumed = true
-        return true
-    }
-
-    /// Forward `fraction` only when it has advanced by at least one whole percent.
-    func reportProgressIfBumped(_ fraction: Double, sink: @Sendable (Double) -> Void) {
-        let percent = Int((fraction * 100).rounded(.down))
-        lock.lock()
-        let shouldEmit = percent > lastReportedPercent
-        if shouldEmit { lastReportedPercent = percent }
-        lock.unlock()
-        if shouldEmit { sink(fraction) }
+        do {
+            _ = try await analyzer.analyzeSequence(from: audioFile)
+            try await analyzer.finalizeAndFinishThroughEndOfInput()
+            let spans = try await resultTask.value.sorted { $0.start < $1.start }
+            guard !spans.isEmpty else {
+                throw AppError.transcriptionFailed(
+                    NSLocalizedString("error.no_speech_detected", comment: "No speech detected")
+                )
+            }
+            onProgress(1)
+            let covered = spans.reduce(0) { $0 + max(0, $1.end - $1.start) }
+            AppLog.transcription.atNotice.notice(
+                "speechAnalyzer: complete spans=\(spans.count, privacy: .public) covered=\(String(format: "%.1f", covered), privacy: .public)s"
+            )
+            return RawTranscript(spans: spans, language: locale.identifier)
+        } catch let appError as AppError {
+            resultTask.cancel()
+            await analyzer.cancelAndFinishNow()
+            throw appError
+        } catch {
+            resultTask.cancel()
+            await analyzer.cancelAndFinishNow()
+            AppLog.transcription.atError.error(
+                "speechAnalyzer: transcription failed: \(error.localizedDescription, privacy: .public)"
+            )
+            throw AppError.transcriptionFailed(error.localizedDescription)
+        }
     }
 }

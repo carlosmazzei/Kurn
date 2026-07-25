@@ -173,30 +173,35 @@ struct TranscriptionSettingsView: View {
             )
             .disabled(downloads.isDownloading)
 
-            // Minimum-speakers floor for the neural (FluidAudio) engine. On
-            // far-field/single-mic audio its VBx step collapses everything into
-            // one speaker; a non-zero floor forces a KMeans re-cluster to at
-            // least this many. Hidden for the heuristic engine, which auto-detects.
+            // Pinned speaker count for the neural (FluidAudio) engine. On
+            // far-field/single-mic audio its clustering step collapses everyone
+            // into one speaker; pinning the count re-clusters the raw speaker
+            // embeddings into exactly that many. Left at Auto, the engine
+            // decides and the app re-clusters on its own if it collapsed.
+            // Hidden for the heuristic engine, which auto-detects.
             if settings.diarizationEngine == .fluidAudio {
                 Stepper(
                     value: Binding(
-                        get: { settings.fluidAudioMinSpeakers },
-                        set: { settings.fluidAudioMinSpeakers = $0 }
+                        get: { settings.fluidAudioSpeakerCount },
+                        set: { settings.fluidAudioSpeakerCount = $0 }
                     ),
                     in: 0...10
                 ) {
                     HStack {
-                        Text(NSLocalizedString("settings.diarization_min_speakers", comment: "Minimum speakers"))
+                        Text(NSLocalizedString("settings.diarization_speaker_count", comment: "Number of speakers"))
                         Spacer()
                         Text(
-                            settings.fluidAudioMinSpeakers == 0
-                                ? NSLocalizedString("settings.diarization_min_speakers_auto", comment: "Auto")
-                                : "\(settings.fluidAudioMinSpeakers)"
+                            settings.fluidAudioSpeakerCount == 0
+                                ? NSLocalizedString("settings.diarization_speaker_count_auto", comment: "Auto")
+                                : "\(settings.fluidAudioSpeakerCount)"
                         )
                         .foregroundStyle(.secondary)
                     }
                 }
                 .disabled(downloads.isDownloading)
+                Text(NSLocalizedString("settings.diarization_speaker_count_footer", comment: "Speaker count help"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if downloads.downloadingModel == .diarization || downloads.downloadingModel == .vad {

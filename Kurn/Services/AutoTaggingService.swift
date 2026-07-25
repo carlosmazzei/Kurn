@@ -45,9 +45,13 @@ struct AutoTaggingService: Sendable {
             transcript: trimmed,
             availableTags: availableTags
         )
-        let raw = try await llm.summarize(systemPrompt: systemPrompt, userPrompt: prompt)
-        let text = raw.sections.map { $0.body }.joined(separator: "\n")
-        return parseSuggestion(text: text, availableTags: availableTags)
+        // Tags have their own JSON contract; `summarize` is intentionally not
+        // used because it decodes the different `{sections: [...]}` contract.
+        let text = try await llm.chat(
+            systemPrompt: systemPrompt,
+            messages: [ChatMessage(role: .user, content: prompt)]
+        )
+        return try Self.parseSuggestion(text: text, availableTags: availableTags)
     }
 
     private let systemPrompt = """
@@ -78,22 +82,27 @@ struct AutoTaggingService: Sendable {
         """
     }
 
-    private func parseSuggestion(text: String, availableTags: [TagInput]) -> Suggestion {
-        guard let data = text.data(using: .utf8) else {
-            return Suggestion(tagIDs: [], newTagNames: [])
-        }
+    static func parseSuggestion(text: String, availableTags: [TagInput]) throws -> Suggestion {
         struct Wire: Decodable {
-            let existing: [String]
-            let new: [String]
+            let existing: [String]?
+            let new: [String]?
         }
-        guard let wire = try? JSONDecoder().decode(Wire.self, from: data) else {
-            return Suggestion(tagIDs: [], newTagNames: [])
+        let wire: Wire
+        do {
+            wire = try JSONDecoder().decode(
+                Wire.self,
+                from: ModelJSON.objectData(from: text)
+            )
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.decodingError(error.localizedDescription)
         }
         let availableIDs = Set(availableTags.map(\.id))
-        let existingIDs = wire.existing
+        let existingIDs = (wire.existing ?? [])
             .compactMap { UUID(uuidString: $0) }
             .filter { availableIDs.contains($0) }
-        let newNames = wire.new
+        let newNames = (wire.new ?? [])
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return Suggestion(tagIDs: existingIDs, newTagNames: newNames)

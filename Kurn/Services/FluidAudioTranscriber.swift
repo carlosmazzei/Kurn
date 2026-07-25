@@ -3,11 +3,9 @@
 //  Kurn
 //
 //  On-device multilingual transcription via FluidAudio's batch ASR (Parakeet TDT
-//  v3). Unlike Apple's `SFSpeechRecognizer` — which requires a fixed locale and
-//  cannot detect the spoken language — this engine detects the language from the
-//  audio itself, so a meeting recorded in English on a pt-BR device still
-//  transcribes in English. Used for the post-recording transcript when the
-//  meeting language is "Auto"; pinned languages stay on `OnDeviceTranscriber`.
+//  v3). Unlike Apple's `SFSpeechRecognizer`, this engine supports multilingual
+//  recognition: Auto lets the model choose, while an explicitly selected
+//  language is forwarded as a decoder hint.
 //
 //
 
@@ -19,10 +17,9 @@ import FluidAudio
 
 actor FluidAudioTranscriber: Transcribing {
 
-    /// Transcribe an audio file fully on-device with automatic language
-    /// detection. `language` is accepted for parity with `OnDeviceTranscriber`;
-    /// the multilingual model detects the language from the audio, so no locale
-    /// is forced.
+    /// Transcribe an audio file fully on-device. Auto leaves language selection
+    /// to the multilingual model; a supported pinned language is passed to
+    /// FluidAudio's decoder so it does not drift into another language.
     func transcribe(
         url: URL,
         language: MeetingLanguage,
@@ -61,12 +58,20 @@ actor FluidAudioTranscriber: Transcribing {
         }
         defer { progressTask?.cancel() }
 
-        AppLog.transcription.atDebug.debug("fluidAudio: transcribing (auto language detection)")
+        let fluidLanguage = language.whisperCode.flatMap(Language.init(rawValue:))
+        let languageDescription = fluidLanguage?.rawValue ?? "auto"
+        AppLog.transcription.atDebug.debug(
+            "fluidAudio: transcribing language=\(languageDescription, privacy: .public)"
+        )
         let text: String
         do {
             var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
             try await ResourceGuard.requireTranscriptionHeadroom()
-            let result = try await manager.transcribe(url, decoderState: &decoderState)
+            let result = try await manager.transcribe(
+                url,
+                decoderState: &decoderState,
+                language: fluidLanguage
+            )
             try await ResourceGuard.requireTranscriptionHeadroom()
             text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch let appError as AppError {

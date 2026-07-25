@@ -191,6 +191,10 @@ struct ProviderHTTPTests {
         #expect(request.url?.absoluteString.contains("generateContent") == true)
         #expect(request.url?.query == nil)
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        let generationConfig = body?["generationConfig"] as? [String: Any]
+        #expect(generationConfig?["responseMimeType"] as? String == "application/json")
+        #expect(generationConfig?["responseJsonSchema"] != nil)
     }
 
     @Test func googleTruncatedSummaryThrowsSummaryTruncated() async {
@@ -376,6 +380,40 @@ struct ProviderHTTPTests {
         #expect(messages?.first?["role"] == "system")
         #expect(messages?.last?["content"] == "What did we decide?")
         #expect(body?["max_completion_tokens"] as? Int == LLMHTTP.chatMaxOutputTokens)
+        #expect(body?["reasoning_effort"] == nil)
+    }
+
+    @Test func openAIGPT5ChatUsesLowReasoningEffort() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["choices": [["message": ["content": "Resposta."]]]])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", model: "gpt-5.4", session: MockURLProtocol.session())
+
+        _ = try await provider.chat(
+            systemPrompt: "ground",
+            messages: [ChatMessage(role: .user, content: "O que foi decidido?")]
+        )
+
+        let request = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        #expect(body?["reasoning_effort"] as? String == "low")
+        #expect(body?["max_completion_tokens"] as? Int == 4096)
+    }
+
+    @Test func openAIChatReturnsRefusalWhenContentIsNull() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "choices": [["message": ["content": NSNull(), "refusal": "I cannot answer that."]]]
+            ])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        let reply = try await provider.chat(
+            systemPrompt: "ground",
+            messages: [ChatMessage(role: .user, content: "question")]
+        )
+
+        #expect(reply == "I cannot answer that.")
     }
 
     @Test func anthropicChatUsesSystemFieldAndReturnsText() async throws {

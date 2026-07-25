@@ -65,6 +65,12 @@ enum ChunkedTranscriptionRunner {
             try Task.checkCancellation()
             let chunk = chunks[index]
             let result = try await transcribeChunk(chunk, index)
+            let coveredDuration = result.spans.reduce(0) {
+                $0 + max(0, $1.end - $1.start)
+            }
+            AppLog.transcription.atNotice.notice(
+                "chunked: result \(index + 1, privacy: .public)/\(chunks.count, privacy: .public) spans=\(result.spans.count, privacy: .public) covered=\(String(format: "%.1f", coveredDuration), privacy: .public)s"
+            )
             if state.detectedLanguage.isEmpty {
                 state.detectedLanguage = result.language
             }

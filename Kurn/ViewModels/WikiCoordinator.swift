@@ -126,7 +126,11 @@ final class WikiCoordinator {
     /// Delete every wiki article (Settings → Clear wiki).
     func clearWiki() {
         let all = (try? modelContext.fetch(FetchDescriptor<WikiArticle>())) ?? []
-        for article in all { modelContext.delete(article) }
+        for article in all {
+            article.meeting?.wikiArticle = nil
+            article.meeting = nil
+            modelContext.delete(article)
+        }
         persist()
     }
 
@@ -175,8 +179,10 @@ final class WikiCoordinator {
         SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Replace a meeting's article wholesale (delete old, insert new), so a
-    /// rebuild never leaves a stale one behind.
+    /// Replace a meeting's article contents. Keep the existing model instance
+    /// when present because `Meeting.wikiArticle` is a one-to-one relationship;
+    /// deleting and inserting a second article for the same meeting in one
+    /// context turn can trip SwiftData's relationship target check.
     private func replaceArticle(
         of meeting: Meeting,
         markdown: String,
@@ -185,7 +191,17 @@ final class WikiCoordinator {
         title: String,
         date: Date
     ) {
-        if let existing = meeting.wikiArticle { modelContext.delete(existing) }
+        if let existing = meeting.wikiArticle {
+            existing.bodyMarkdown = markdown
+            existing.meetingTitleSnapshot = title
+            existing.meetingDate = date
+            existing.sourceContentHash = hash
+            existing.generatorModelIdentifier = generator
+            existing.updatedAt = Date()
+            persist()
+            return
+        }
+
         let article = WikiArticle(
             meeting: meeting,
             bodyMarkdown: markdown,

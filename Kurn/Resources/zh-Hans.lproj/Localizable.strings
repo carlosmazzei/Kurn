@@ -477,8 +477,9 @@
 "settings.delete_all.confirm" = "删除所有会议和录音？";
 "settings.delete_all.message" = "这将永久删除所有会议、转录内容和音频文件，此操作无法撤销。";
 "settings.diarization_engine" = "说话人分离引擎";
-"settings.diarization_min_speakers" = "最少发言人数";
-"settings.diarization_min_speakers_auto" = "自动";
+"settings.diarization_speaker_count" = "发言人数";
+"settings.diarization_speaker_count_auto" = "自动";
+"settings.diarization_speaker_count_footer" = "如果你知道会议有多少人参加，请在此设置。选择“自动”时由引擎判断；若引擎把所有人合并成了一位发言人，Kurn 会自行重新聚类音频。";
 "settings.diarization_preprocessing" = "说话人分离音频清理";
 "settings.on_device_auto_language" = "设备端语言检测（自动）";
 "settings.live_transcription" = "实时转录预览";
