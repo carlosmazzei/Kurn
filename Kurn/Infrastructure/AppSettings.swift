@@ -35,7 +35,9 @@ final class AppSettings {
         static let lastSummaryTemplate = "settings.lastSummaryTemplate"
         static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
         static let diarizationEngine = "settings.diarizationEngine"
-        static let fluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
+        static let fluidAudioSpeakerCount = "settings.fluidAudioSpeakerCount"
+        /// Superseded by `fluidAudioSpeakerCount`; read once at init to migrate.
+        static let legacyFluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
         static let diarizationPreprocessingEnabled = "settings.diarizationPreprocessingEnabled"
         static let transcriptionEngine = "settings.transcriptionEngine"
         static let preprocessingEngine = "settings.preprocessingEngine"
@@ -176,14 +178,20 @@ final class AppSettings {
         didSet { defaults.set(diarizationEngine.rawValue, forKey: Keys.diarizationEngine) }
     }
 
-    /// Minimum number of speakers to force on the FluidAudio (neural) diarizer.
-    /// `0` means auto-detect (no constraint). On far-field/single-mic audio the
-    /// neural pipeline's VBx step collapses every cluster into one speaker; a
-    /// non-zero floor here makes FluidAudio re-cluster with KMeans to at least
-    /// this many speakers instead of reporting a single one. Ignored by the
-    /// heuristic engine, which auto-detects from pitch/timbre.
-    var fluidAudioMinSpeakers: Int {
-        didSet { defaults.set(fluidAudioMinSpeakers, forKey: Keys.fluidAudioMinSpeakers) }
+    /// Exact number of speakers to pin on the FluidAudio (neural) diarizer.
+    /// `0` means "let it decide". On far-field/single-mic audio the neural
+    /// pipeline's VBx step collapses every cluster into one speaker; pinning a
+    /// count makes FluidAudio re-cluster the raw speaker embeddings with KMeans
+    /// into exactly that many speakers instead. Ignored by the heuristic
+    /// engine, which auto-detects from pitch/timbre.
+    ///
+    /// This replaced a *minimum* speaker setting, which could not work: the
+    /// library only applies a speaker-count constraint when the count it
+    /// detected falls outside the bounds, and the count it compares is the
+    /// pre-clustering estimate (tens, on any real meeting), so a floor of 2 or 3
+    /// was always already satisfied. See `FluidAudioDiarizer.tunedConfig`.
+    var fluidAudioSpeakerCount: Int {
+        didSet { defaults.set(fluidAudioSpeakerCount, forKey: Keys.fluidAudioSpeakerCount) }
     }
 
     /// When on, the diarization stage runs a dedicated lighter cleanup
@@ -227,7 +235,7 @@ final class AppSettings {
             transcription: transcriptionEngine,
             transcriptionProvider: transcriptionProvider,
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
-            fluidAudioMinSpeakers: fluidAudioMinSpeakers,
+            fluidAudioSpeakerCount: fluidAudioSpeakerCount,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled
         )
     }
@@ -485,7 +493,14 @@ final class AppSettings {
         diarizationEngine = DiarizationEngine(
             rawValue: defaults.string(forKey: Keys.diarizationEngine) ?? ""
         ) ?? .heuristic
-        fluidAudioMinSpeakers = defaults.integer(forKey: Keys.fluidAudioMinSpeakers)
+        // Migration: the old key held a *minimum* speaker count that never
+        // engaged (see `fluidAudioSpeakerCount`). Carry the number over as the
+        // pinned count — it is the count the user believed they were asking for.
+        if let pinned = defaults.object(forKey: Keys.fluidAudioSpeakerCount) as? Int {
+            fluidAudioSpeakerCount = pinned
+        } else {
+            fluidAudioSpeakerCount = defaults.integer(forKey: Keys.legacyFluidAudioMinSpeakers)
+        }
         // `object(forKey:)` so an absent key defaults to `true` rather than
         // `false` (which is what `defaults.bool(forKey:)` would return).
         diarizationPreprocessingEnabled = defaults.object(forKey: Keys.diarizationPreprocessingEnabled) as? Bool ?? true

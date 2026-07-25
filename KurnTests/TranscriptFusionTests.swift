@@ -33,6 +33,39 @@ struct TranscriptFusionTests {
         #expect(TranscriptFusion.speakerLabel(for: nearSecond, in: turns) == "Speaker 2")
     }
 
+    @Test func spanStraddlingAHandoverGoesToTheSpeakerHoldingMostOfIt() {
+        let turns = [
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 10),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 10, end: 20)
+        ]
+        // 2.0s with Speaker 1 against 0.5s with Speaker 2, then the mirror case.
+        let mostlyFirst = TranscribedSpan(text: "x", start: 8.0, end: 10.5, confidence: nil)
+        #expect(TranscriptFusion.speakerLabel(for: mostlyFirst, in: turns) == "Speaker 1")
+        let mostlySecond = TranscribedSpan(text: "x", start: 9.5, end: 12.0, confidence: nil)
+        #expect(TranscriptFusion.speakerLabel(for: mostlySecond, in: turns) == "Speaker 2")
+    }
+
+    @Test func aSliverTurnUnderTheMidpointDoesNotStealTheSpan() {
+        // The failure a midpoint test produces: a 0.2s turn happens to contain
+        // the span's midpoint and takes the whole utterance with it.
+        let turns = [
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 4.9),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 4.9, end: 5.1),
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 5.1, end: 10)
+        ]
+        let span = TranscribedSpan(text: "a whole sentence", start: 0, end: 10, confidence: nil)
+        #expect(TranscriptFusion.speakerLabel(for: span, in: turns) == "Speaker 1")
+    }
+
+    @Test func spanOverlappingNothingStillFallsBackToNearest() {
+        let turns = [
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 4),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 30, end: 40)
+        ]
+        let span = TranscribedSpan(text: "x", start: 28, end: 29, confidence: nil)
+        #expect(TranscriptFusion.speakerLabel(for: span, in: turns) == "Speaker 2")
+    }
+
     @Test func emptyTurnsFallBackToSpeakerOne() {
         let span = TranscribedSpan(text: "hi", start: 0, end: 1, confidence: nil)
         #expect(TranscriptFusion.speakerLabel(for: span, in: []) == "Speaker 1")

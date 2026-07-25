@@ -337,12 +337,20 @@ actor DiarizationPreprocessor {
     private static let targetPeakDBFS: Float = -3.0
     private static let fftFrameSize: Int = 512
     private static let fftHopSize: Int = 256
-    /// Boll 1979 oversubtraction factor; > 1 trades a little signal loss for
-    /// more aggressive noise removal, which helps embeddings on far-field audio.
-    private static let subtractionAlpha: Float = 2.0
+    /// Boll 1979 oversubtraction factor. Lowered from 2.0: the speaker-embedding
+    /// models this stage feeds are trained on natural, noisy speech and read
+    /// voice *timbre*, so the residual distortion heavy oversubtraction leaves
+    /// behind costs more discriminative power than the extra noise removal
+    /// buys — it flattens voices toward each other, which is exactly the
+    /// failure the clustering stage then has to recover from. 1.5 still removes
+    /// the stationary bed without scrubbing the formant structure.
+    private static let subtractionAlpha: Float = 1.5
     /// Spectral floor as a fraction of the noise estimate; prevents the
-    /// musical-noise artifacts that come from clamping bins to zero.
-    private static let subtractionBeta: Float = 0.05
+    /// musical-noise artifacts that come from clamping bins to zero. Raised
+    /// alongside `subtractionAlpha` — a higher floor leaves a little natural
+    /// broadband noise in place instead of punching holes in the spectrum for
+    /// the embedding model to trip over.
+    private static let subtractionBeta: Float = 0.10
 
     /// See `AudioPreprocessor.scheduleForOfflineRender` for why this uses the
     /// completion-handler overload instead of the `async` one.

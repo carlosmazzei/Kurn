@@ -477,8 +477,9 @@
 "settings.delete_all.confirm" = "Eliminare tutte le riunioni e le registrazioni?";
 "settings.delete_all.message" = "Questo rimuove permanentemente ogni riunione, trascrizione e file audio. Non è possibile annullare l'operazione.";
 "settings.diarization_engine" = "Motore di Diarizzazione";
-"settings.diarization_min_speakers" = "Numero Minimo di Speaker";
-"settings.diarization_min_speakers_auto" = "Automatico";
+"settings.diarization_speaker_count" = "Numero di Speaker";
+"settings.diarization_speaker_count_auto" = "Automatico";
+"settings.diarization_speaker_count_footer" = "Impostalo quando sai quante persone hanno partecipato alla riunione. In automatico decide il motore, e Kurn raggruppa di nuovo l'audio da solo se il motore ha unito tutti in un unico speaker.";
 "settings.diarization_preprocessing" = "Pulizia Audio per Diarizzazione";
 "settings.on_device_auto_language" = "Rileva Lingua sul Dispositivo (Auto)";
 "settings.live_transcription" = "Anteprima Trascrizione in Tempo Reale";

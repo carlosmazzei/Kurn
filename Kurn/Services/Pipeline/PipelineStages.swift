@@ -74,10 +74,12 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// Whisper model requested from `transcriptionProvider` (e.g. `whisper-1`,
     /// `whisper-large-v3`). Ignored by the on-device engines.
     var transcriptionModel: String = "whisper-1"
-    /// Floor on the FluidAudio diarizer's speaker count (`0` = auto-detect). Only
-    /// the `.fluidAudio` engine reads it, to break its VBx single-speaker collapse
-    /// by re-clustering with KMeans to at least this many speakers.
-    var fluidAudioMinSpeakers: Int = 0
+    /// Exact number of speakers to pin on the FluidAudio diarizer (`0` = let it
+    /// decide). Only the `.fluidAudio` engine reads it; a pinned count makes the
+    /// pipeline re-cluster the raw speaker embeddings with KMeans instead of
+    /// trusting its VBx step, which collapses to a single speaker on
+    /// far-field/single-mic audio.
+    var fluidAudioSpeakerCount: Int = 0
     /// When true, the diarization stage runs a dedicated lighter cleanup on the
     /// original recording (`DiarizationPreprocessor`) and feeds the resulting
     /// WAV to both diarizer engines. When false, diarization uses the original

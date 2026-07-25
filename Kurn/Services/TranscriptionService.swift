@@ -171,7 +171,7 @@ struct TranscriptionService {
                 engine: config.diarization,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 regions: regions,
-                minSpeakers: config.fluidAudioMinSpeakers,
+                speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning
             )
             raw = try await rawTranscript
@@ -196,7 +196,7 @@ struct TranscriptionService {
                 engine: config.diarization,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 regions: regions,
-                minSpeakers: config.fluidAudioMinSpeakers,
+                speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning
             )
         }
@@ -442,7 +442,7 @@ struct TranscriptionService {
         engine: DiarizationEngine,
         diarizationPreprocessingEnabled: Bool,
         regions: [SpeechRegion],
-        minSpeakers: Int,
+        speakerCount: Int,
         onWarning: DiarizationWarningHandler?
     ) async throws -> [SpeakerTurn] {
         let started = Date()
@@ -482,7 +482,7 @@ struct TranscriptionService {
             return turns
         case .fluidAudio:
             let turns = await fluidAudioDiarizer.diarize(
-                url: diarURL, minSpeakers: minSpeakers, onDownloadFailure: onWarning
+                url: diarURL, speakerCount: speakerCount, onDownloadFailure: onWarning
             )
             try await ResourceGuard.requireTranscriptionHeadroom()
             let speakers = Set(turns.map { $0.speakerLabel }).count

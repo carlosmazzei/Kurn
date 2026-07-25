@@ -236,13 +236,50 @@ stage (enums in `Models/Enums.swift`) are:
    long recording can push peak memory past the jetsam limit. Diarization reads
    its own cleaned copy (`DiarizationPreprocessor`, minimal DSP preserving
    natural timbre) rather than the ASR-tuned one, unless
-   `diarizationPreprocessingEnabled` is off. `fluidAudioMinSpeakers` forces the
-   `.fluidAudio` diarizer to re-cluster with KMeans to at least that many
-   speakers, working around its VBx step collapsing far-field/single-mic audio
-   into one cluster; the heuristic engine ignores it.
+   `diarizationPreprocessingEnabled` is off. See "Diarization accuracy" below
+   for how the `.fluidAudio` engine's speaker count is controlled and repaired.
 5. **Fuse** transcript spans with speaker turns into `[TranscriptSegment]`
-   via the pure, unit-tested `Pipeline/TranscriptFusion.swift` (merges
-   consecutive same-speaker spans, capped at 30s).
+   via the pure, unit-tested `Pipeline/TranscriptFusion.swift`. A span is
+   attributed to the speaker holding the most of its *duration* (not the
+   speaker whose turn contains its midpoint — a sub-second turn under the
+   midpoint would otherwise take the whole utterance), then consecutive
+   same-speaker spans are merged, capped at 30s.
+
+#### Diarization accuracy
+
+The neural (`.fluidAudio`) diarizer's weak point is the speaker count, not the
+segment boundaries — its VBx clustering step routinely drives every mixture
+weight but one to ~1e-20 on far-field/single-mic audio, so the whole meeting
+comes back as one speaker. Four things address that, all outside FluidAudio:
+
+- **`AppSettings.fluidAudioSpeakerCount`** pins an exact count
+  (`clustering.numSpeakers`), which makes the library re-cluster the raw
+  embeddings with KMeans. It deliberately does *not* set `minSpeakers`: FluidAudio
+  decides whether to apply a constraint by comparing the bounds against the
+  *pre-clustering* estimate (tens, on any real meeting), so a floor is always
+  already satisfied and never engages. Only an upper bound trips.
+- **`Pipeline/SpeakerClusterRefiner.swift`** is the automatic rescue used when
+  the count is left on Auto. `OfflineDiarizerConfig.exposeChunkEmbeddings` hands
+  back the per-window speaker embeddings VBx clustered, so a collapse can be
+  undone with no CoreML re-run: re-cluster them (average-linkage AHC, speaker
+  count chosen by silhouette), keep the diarizer's own segment boundaries, and
+  re-attribute them by overlap-weighted vote. A split is only accepted when the
+  cluster centroids are at least `minSpeakerSeparation` apart — the same
+  same-speaker calibration FluidAudio's own agglomerative step uses — so a
+  genuinely single-speaker recording is left alone.
+- **`Pipeline/SpeakerTurnSmoothing.swift`** runs on every FluidAudio result:
+  merge same-speaker turns across short gaps, absorb sub-second turns into
+  their neighbours (the mid-sentence flip), drop speakers with negligible total
+  speech. It never returns an empty result for a non-empty input.
+- **`FluidAudioDiarizer.processTimeout(forAudioDuration:)`** scales the
+  processing budget to the recording. A flat timeout falls back to a single
+  whole-clip turn, which reads as "diarization is inaccurate" rather than as
+  the timeout it is.
+
+VBx's warm-start priors are left at FluidAudio's community-1 defaults. Raising
+them to fight the collapse (an earlier attempt) just trades it for the opposite
+failure, since a diffuse prior makes VBx keep the agglomerative init's cluster
+count.
 
 Every stage call is preceded by `ResourceGuard.requireTranscriptionHeadroom()`
 (`Infrastructure/ResourceGuard.swift`, 750MB disk floor), which throws
