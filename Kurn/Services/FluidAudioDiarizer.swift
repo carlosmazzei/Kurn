@@ -208,33 +208,6 @@ actor FluidAudioDiarizer: Diarizing {
         return turns
     }
 
-    /// A single speaker turn spanning the whole clip, used whenever diarization
-    /// can't produce real turns — covering the full duration (instead of a
-    /// zero-length range) keeps downstream speaker-label lookups meaningful.
-    private static func fallbackTurn(for url: URL) -> SpeakerTurn {
-        SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, audioDuration(of: url)))
-    }
-
-    private static func audioDuration(of url: URL) -> TimeInterval {
-        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 else {
-            return 0
-        }
-        return Double(file.length) / file.processingFormat.sampleRate
-    }
-
-    /// Processing budget scaled to the recording.
-    ///
-    /// This used to be a flat 120s, which a one-hour meeting can exceed on an
-    /// older device even when everything is working — and the timeout path
-    /// falls back to a single whole-clip turn, so the symptom was every long
-    /// recording silently coming back as one speaker. Diarization runs well
-    /// under real time on the ANE, so half of the recording's duration is a
-    /// generous budget; the floor keeps short clips from tripping on model
-    /// warm-up and the ceiling still bounds a genuinely stuck run.
-    static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
-        min(1800, max(180, duration * 0.5))
-    }
-
     private static func withTimeout<T: Sendable>(
         seconds: TimeInterval,
         operation: @escaping @Sendable () async throws -> T
@@ -276,20 +249,41 @@ actor FluidAudioDiarizer: Diarizing {
         onDownloadFailure?(message)
         return [Self.fallbackTurn(for: url)]
     }
-
-    static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
-        min(1800, max(180, duration * 0.5))
-    }
-
-    private static func fallbackTurn(for url: URL) -> SpeakerTurn {
-        let duration: TimeInterval
-        if let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 {
-            duration = Double(file.length) / file.processingFormat.sampleRate
-        } else {
-            duration = 0
-        }
-        return SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, duration))
-    }
 }
 
 #endif
+
+// MARK: - Shared helpers
+//
+// Outside the `#if canImport(FluidAudio)` split: both build configurations need
+// the same fallback turn and the same processing budget, and keeping one copy
+// stops the two branches drifting apart.
+
+extension FluidAudioDiarizer {
+    /// A single speaker turn spanning the whole clip, used whenever diarization
+    /// can't produce real turns — covering the full duration (instead of a
+    /// zero-length range) keeps downstream speaker-label lookups meaningful.
+    fileprivate static func fallbackTurn(for url: URL) -> SpeakerTurn {
+        SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, audioDuration(of: url)))
+    }
+
+    fileprivate static func audioDuration(of url: URL) -> TimeInterval {
+        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 else {
+            return 0
+        }
+        return Double(file.length) / file.processingFormat.sampleRate
+    }
+
+    /// Processing budget scaled to the recording.
+    ///
+    /// This used to be a flat 120s, which a one-hour meeting can exceed on an
+    /// older device even when everything is working — and the timeout path
+    /// falls back to a single whole-clip turn, so the symptom was every long
+    /// recording silently coming back as one speaker. Diarization runs well
+    /// under real time on the ANE, so half of the recording's duration is a
+    /// generous budget; the floor keeps short clips from tripping on model
+    /// warm-up and the ceiling still bounds a genuinely stuck run.
+    static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
+        min(1800, max(180, duration * 0.5))
+    }
+}

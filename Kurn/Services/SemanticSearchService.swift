@@ -55,6 +55,10 @@ struct SemanticSearchService {
         var meetingTitle: String = ""
         /// Owning meeting's creation date.
         var meetingDate: Date = .distantPast
+
+        /// One `[mm:ss] Speaker: text` prompt line — the citation format every
+        /// chat prompt instructs the model to reproduce in its answer.
+        var promptLine: String { "[\(start.clockDisplay)] \(speakerLabel): \(text)" }
     }
 
     /// Embed `query` once and return the top `limit` candidates whose cosine

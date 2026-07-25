@@ -55,15 +55,6 @@ extension LLMProvider {
             NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
         )
     }
-
-    /// Default for vendors without a chat path wired here (e.g. the unused
-    /// standalone Groq client — the factory routes Groq through `OpenAIProvider`).
-    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
-        throw AppError.apiError(
-            statusCode: 0,
-            message: NSLocalizedString("error.provider_no_chat", comment: "Provider has no chat")
-        )
-    }
 }
 
 // MARK: - Shared HTTP helpers
@@ -117,6 +108,32 @@ enum LLMHTTP {
     /// Fail fast with `AppError.noAPIKey` when a provider has no configured key.
     static func requireAPIKey(_ key: String, provider: AIProvider) throws {
         guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
+    }
+
+    /// Build a `POST <base URL>/<path>` request carrying a JSON body — the shape
+    /// every vendor's summary and chat call shares. `fallbackURL` is used when the
+    /// user-configured base URL can't be parsed into components, and `headers`
+    /// carries the vendor's auth style (`Authorization: Bearer`, `x-api-key`,
+    /// `x-goog-api-key`) on top of the JSON `Content-Type` set here.
+    static func jsonRequest(
+        provider: AIProvider,
+        path: String,
+        fallbackURL: String,
+        timeout: TimeInterval,
+        headers: [String: String],
+        body: [String: Any]
+    ) throws -> URLRequest {
+        let url = endpoint(baseURLString: provider.baseURLString, path: path)
+            ?? URL(string: fallbackURL)!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = timeout
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (field, value) in headers {
+            request.setValue(value, forHTTPHeaderField: field)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
     }
 
     /// Decode a summary response, extract its text content, and parse the shared

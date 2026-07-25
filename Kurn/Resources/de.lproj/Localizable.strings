@@ -17,7 +17,6 @@
 "error.recognizer_offline" = "Die Spracherkennung auf dem Gerät ist noch nicht bereit. Versuchen Sie es gleich erneut.";
 "error.export_session" = "Audio konnte nicht für den Upload vorbereitet werden.";
 "error.export_failed" = "Audioexport fehlgeschlagen.";
-"error.anthropic_no_transcribe" = "Anthropic bietet keine Transkription an. Verwenden Sie das Gerät oder OpenAI Whisper.";
 "error.no_transcript" = "Es gibt noch kein Transkript zum Zusammenfassen.";
 "error.speech_permission" = "Für die Transkription auf dem Gerät ist die Berechtigung zur Spracherkennung erforderlich.";
 "error.model_download_required" = "Für %@ ist ein einmaliger Modell-Download erforderlich.";
@@ -560,7 +559,6 @@
 "error.wiki_unavailable" = "Das Meeting-Wiki ist noch nicht bereit. Versuche es erneut, sobald es fertig generiert ist.";
 "error.embedding_no_model" = "Für dieses Gerät ist kein Embedding-Modell verfügbar.";
 "error.embedding_no_assets" = "Das Sprachmodell konnte nicht auf das Gerät geladen werden.";
-"error.provider_no_chat" = "Dieser Anbieter unterstützt keinen Chat.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Fragen";
 "chat.error.empty_question" = "Bitte gib eine Frage ein.";
