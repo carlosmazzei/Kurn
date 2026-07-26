@@ -171,6 +171,37 @@ struct RecordingCompactor: Sendable {
         outputSampleRate: Double,
         expectedDuration: TimeInterval
     ) async throws -> Bool {
+        // `write` must return before anything reads `destination`: it owns the
+        // `AVAudioFile`, and an AAC container is only finalized when that object
+        // deallocates. Verifying while it is still alive reads a half-written
+        // file and rejects every compaction.
+        let renderedFrames = try await write(
+            from: source,
+            to: destination,
+            outputSampleRate: outputSampleRate
+        )
+
+        // Check the render before the encoder's padding can blur the numbers: a
+        // truncated render (source sample table ending early, a write that
+        // failed) shows up here as a large frame shortfall.
+        let expectedFrames = expectedDuration * outputSampleRate
+        guard expectedFrames > 0,
+              Double(renderedFrames) >= expectedFrames - Self.renderedFrameTolerance(expectedFrames) else {
+            AppLog.recorder.atError.error("compact: render came up short (\(renderedFrames, privacy: .public) of ~\(Int(expectedFrames), privacy: .public) frames); discarding")
+            return false
+        }
+
+        return verify(destination, against: expectedDuration)
+    }
+
+    /// Render `source` into a new AAC file at `destination`, returning the frames
+    /// written. Scoped as its own function so the `AVAudioFile` is released — and
+    /// the container finalized — by the time it returns.
+    private func write(
+        from source: URL,
+        to destination: URL,
+        outputSampleRate: Double
+    ) async throws -> AVAudioFramePosition {
         let failure = AppError.audioError(
             NSLocalizedString("error.audio_compaction", comment: "Recording could not be compacted")
         )
@@ -178,14 +209,11 @@ struct RecordingCompactor: Sendable {
             throw failure
         }
 
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: outputSampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: targetBitRate,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-        let outFile = try AVAudioFile(forWriting: destination, settings: settings)
+        let outFile = try Self.openForWriting(
+            destination,
+            sampleRate: outputSampleRate,
+            bitRate: targetBitRate
+        )
 
         // No DSP chain: compaction must not alter the audio beyond the resample
         // and re-encode. In particular it must not apply the ASR cleanup chain —
@@ -196,22 +224,42 @@ struct RecordingCompactor: Sendable {
             logLabel: "compact"
         )
 
-        let renderedFrames = try await renderer.render(url: source) { buffer in
+        return try await renderer.render(url: source) { buffer in
             try Task.checkCancellation()
             try outFile.write(from: buffer)
         }
+    }
 
-        // Verify the render itself before the encoder's padding can blur the
-        // numbers: a truncated render (source sample table ending early, a write
-        // that failed) shows up here as a large frame shortfall.
-        let expectedFrames = expectedDuration * outputSampleRate
-        guard expectedFrames > 0,
-              Double(renderedFrames) >= expectedFrames - Self.renderedFrameTolerance(expectedFrames) else {
-            AppLog.recorder.atError.error("compact: render came up short (\(renderedFrames, privacy: .public) of ~\(Int(expectedFrames), privacy: .public) frames); discarding")
-            return false
+    /// Open the output file, falling back to the codec's own bit rate if it
+    /// rejects the requested one.
+    ///
+    /// AAC's valid bit rates depend on the sample rate, and a recording captured
+    /// over a narrowband Bluetooth route is re-encoded at 16kHz — where the
+    /// encoder refuses a rate it accepts happily at 24kHz, throwing out of
+    /// `AVAudioFile`'s initializer. `AudioRecorderService.beginEngine` carries the
+    /// same fallback for the same reason. The codec's own choice for a low sample
+    /// rate is at or below what we asked for, so the size win survives.
+    private static func openForWriting(
+        _ url: URL,
+        sampleRate: Double,
+        bitRate: Int
+    ) throws -> AVAudioFile {
+        var settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: bitRate,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        do {
+            return try AVAudioFile(forWriting: url, settings: settings)
+        } catch {
+            AppLog.recorder.atInfo.info("compact: encoder rejected \(bitRate, privacy: .public)bps at \(sampleRate, privacy: .public)Hz; letting the codec choose")
+            // The failed attempt can leave a stub behind.
+            try? FileManager.default.removeItem(at: url)
+            settings.removeValue(forKey: AVEncoderBitRateKey)
+            return try AVAudioFile(forWriting: url, settings: settings)
         }
-
-        return verify(destination, against: expectedDuration)
     }
 
     /// How many frames a render may come up short by and still be accepted. The
