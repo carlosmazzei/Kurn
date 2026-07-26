@@ -42,15 +42,18 @@ final class AudioRecorderService: NSObject {
     /// anyway (`AudioPreprocessor`, `DiarizationPreprocessor`, `VADAudioLoader`,
     /// `WhisperCppTranscriber`, and the ASR frameworks internally). Storing the
     /// mic's native rate therefore spent bits on a band nothing reads.
-    static let storageSampleRate: Double = 24_000
+    /// `nonisolated` because this type is `@MainActor`, which its statics would
+    /// otherwise inherit — and the engine setup (`beginEngine`) and
+    /// `RecordingCompactor` both read these from outside the main actor.
+    nonisolated static let storageSampleRate: Double = 24_000
     /// Recordings are always mono: diarization and ASR both downmix, and the
     /// second channel of a stereo external mic doubles the file for nothing.
-    static let storageChannelCount: AVAudioChannelCount = 1
+    nonisolated static let storageChannelCount: AVAudioChannelCount = 1
 
     /// The format buffers are converted to before being encoded. Non-nil for
     /// every sample rate/channel pair we pass, but `AVAudioFormat`'s initializer
     /// is failable, so callers treat `nil` as a setup failure.
-    static var storageProcessingFormat: AVAudioFormat? {
+    nonisolated static var storageProcessingFormat: AVAudioFormat? {
         AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: storageSampleRate,

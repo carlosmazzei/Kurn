@@ -121,16 +121,15 @@ final class RecordingSink: @unchecked Sendable {
             return nil
         }
 
-        var supplied = false
+        let input = ConverterInput(buffer)
         var error: NSError?
         let status = converter.convert(to: output, error: &error) { _, outStatus in
-            if supplied {
+            guard let next = input.take() else {
                 outStatus.pointee = .noDataNow
                 return nil
             }
-            supplied = true
             outStatus.pointee = .haveData
-            return buffer
+            return next
         }
 
         switch status {
@@ -160,6 +159,27 @@ final class RecordingSink: @unchecked Sendable {
         }
         guard status == .haveData || status == .endOfStream else { return nil }
         return output
+    }
+
+    /// Hands one buffer to `AVAudioConverter`'s input block, then reports the
+    /// input as dry.
+    ///
+    /// `AVAudioConverterInputBlock` is `@Sendable`, so a captured `var` flag and
+    /// a captured `AVAudioPCMBuffer` both trip Swift 6's concurrency checks even
+    /// though `convert(to:error:withInputFrom:)` invokes the block synchronously,
+    /// on this thread, before it returns. Boxing the state keeps the checker
+    /// satisfied without pretending the buffer itself is `Sendable`.
+    private final class ConverterInput: @unchecked Sendable {
+        private var buffer: AVAudioPCMBuffer?
+
+        init(_ buffer: AVAudioPCMBuffer) {
+            self.buffer = buffer
+        }
+
+        func take() -> AVAudioPCMBuffer? {
+            defer { buffer = nil }
+            return buffer
+        }
     }
 
     /// Map a buffer's RMS energy to a perceptual 0...1 with a −50 dBFS floor,
