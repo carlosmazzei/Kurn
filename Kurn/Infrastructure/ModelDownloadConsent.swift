@@ -19,6 +19,9 @@ enum ModelSet: Sendable, Equatable {
     case onDeviceASR
     case diarization
     case vad
+    /// whisper.cpp GGML weights. Carries the variant because, unlike the
+    /// FluidAudio sets, the user chooses which weight file to download.
+    case whisperCppASR(WhisperCppModel)
 }
 
 enum ModelDownloadPhase: Sendable, Equatable {
@@ -38,6 +41,13 @@ struct ModelDownloadConsent {
         onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
     ) async throws {
         try await ResourceGuard.requireModelDownloadHeadroom()
+        // Handled before the FluidAudio branch below: whisper.cpp brings its own
+        // downloader, so this set must work in a build without FluidAudio linked.
+        if case .whisperCppASR(let model) = set {
+            try await WhisperCppModelDownloader.download(model, onProgress: onProgress)
+            try await ResourceGuard.requireModelDownloadHeadroom()
+            return
+        }
         #if canImport(FluidAudio)
         do {
             onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
@@ -73,6 +83,9 @@ struct ModelDownloadConsent {
                 // Silero VAD CoreML model; `VadManager`'s initializer downloads
                 // and loads it on first use.
                 _ = try await VadManager(progressHandler: progressHandler(onProgress))
+            case .whisperCppASR:
+                // Unreachable — returned above, before this branch.
+                break
             }
             onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
             try await ResourceGuard.requireModelDownloadHeadroom()

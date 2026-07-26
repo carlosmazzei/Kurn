@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 2AA9E4B62FECAAE50067BF88 /* FluidAudio */; };
+		2AB0000000000000000000A1 /* whisper in Frameworks */ = {isa = PBXBuildFile; productRef = 2AB0000000000000000000A2 /* whisper */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA1000000000000000000162 /* Kurn/Infrastructure/RecordingActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */; };
 		AA3000000000000000000131 /* KurnWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA30000000000000000000A1 /* KurnWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -123,6 +124,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */,
+				2AB0000000000000000000A1 /* whisper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -348,6 +350,7 @@
 			mainGroup = AA0000000000000000000001;
 			packageReferences = (
 				2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				2AB0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/WhisperCpp" */,
 			);
 			productRefGroup = AA0000000000000000000002 /* Products */;
 			projectDirPath = "";
@@ -871,6 +874,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		2AB0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/WhisperCpp" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/WhisperCpp;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -887,6 +897,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */;
 			productName = FluidAudio;
+		};
+		2AB0000000000000000000A2 /* whisper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = whisper;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

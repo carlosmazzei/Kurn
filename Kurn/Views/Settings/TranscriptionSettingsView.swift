@@ -79,6 +79,26 @@ struct TranscriptionSettingsView: View {
                 )
             }
 
+            // Which GGML weight file the on-device Whisper engine loads. Each
+            // variant is a separate download, so switching can trigger one.
+            if settings.transcriptionEngine == .whisperCpp {
+                Picker(
+                    NSLocalizedString("settings.whisper_cpp.model", comment: "Whisper model size"),
+                    selection: Binding(
+                        get: { settings.whisperCppModel },
+                        set: { downloads.selectWhisperCppModel($0, settings: settings) }
+                    )
+                ) {
+                    ForEach(WhisperCppModel.allCases) { model in
+                        Text(verbatim: "\(model.displayName) · \(Self.sizeLabel(model))").tag(model)
+                    }
+                }
+                .disabled(downloads.isDownloading)
+                Text(NSLocalizedString("settings.whisper_cpp.model_footer", comment: "Whisper model size help"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             Picker(
                 NSLocalizedString("settings.default_language", comment: "Default language"),
                 selection: Binding(
@@ -91,7 +111,7 @@ struct TranscriptionSettingsView: View {
                 }
             }
 
-            if downloads.downloadingModel == .onDeviceASR {
+            if downloads.downloadingModel == .onDeviceASR || Self.isDownloadingWhisperCpp(downloads) {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress)
             }
         } header: {
@@ -107,6 +127,17 @@ struct TranscriptionSettingsView: View {
                 Text(NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon"))
             }
         }
+    }
+
+    /// Approximate download size, so the cost of a variant is visible before
+    /// picking it.
+    private static func sizeLabel(_ model: WhisperCppModel) -> String {
+        ByteCountFormatter.string(fromByteCount: model.approximateBytes, countStyle: .file)
+    }
+
+    private static func isDownloadingWhisperCpp(_ downloads: ModelDownloadController) -> Bool {
+        if case .whisperCppASR = downloads.downloadingModel { return true }
+        return false
     }
 
     // MARK: - Advanced stages

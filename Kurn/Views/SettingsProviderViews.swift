@@ -395,7 +395,43 @@ struct ModelDownloadAlerts: ViewModifier {
                 onConfirm: { downloads.confirmVAD(settings: settings) },
                 onCancel: { downloads.cancelVAD() }
             )
+            .modelDownloadDialog(
+                isPresented: $downloads.showingWhisperCppConsent,
+                // The shared message names FluidAudio; whisper.cpp weights come
+                // from elsewhere and are much larger, so it gets its own text.
+                messageKey: "settings.model_download.message_whisper_cpp",
+                onConfirm: { downloads.confirmWhisperCpp(settings: settings) },
+                onCancel: { downloads.cancelWhisperCpp() }
+            )
+            // Picking the engine has to also pick a size, since the size picker
+            // only appears once whisper.cpp *is* the selected engine — i.e. after
+            // the download it would otherwise have chosen for the user.
+            .confirmationDialog(
+                NSLocalizedString("settings.whisper_cpp.choose_model", comment: "Choose a Whisper model"),
+                isPresented: $downloads.showingWhisperCppModelChoice,
+                titleVisibility: .visible
+            ) {
+                ForEach(WhisperCppModel.allCases) { model in
+                    Button(Self.choiceLabel(for: model)) {
+                        downloads.chooseWhisperCppModel(model, settings: settings)
+                    }
+                }
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {
+                    downloads.cancelWhisperCpp()
+                }
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message_whisper_cpp", comment: ""))
+            }
             .errorAlert($downloads.error)
+    }
+
+    /// Size to download, or a note that it's already on disk — so the cost of
+    /// each option is visible before the user commits to one.
+    private static func choiceLabel(for model: WhisperCppModel) -> String {
+        let detail = WhisperCppModelDownloader.isInstalled(model)
+            ? NSLocalizedString("settings.models.installed", comment: "Already downloaded")
+            : ByteCountFormatter.string(fromByteCount: model.approximateBytes, countStyle: .file)
+        return "\(model.displayName) · \(detail)"
     }
 }
 
@@ -448,6 +484,7 @@ struct ModelDownloadProgressRow: View {
 private extension View {
     func modelDownloadDialog(
         isPresented: Binding<Bool>,
+        messageKey: String = "settings.model_download.message",
         onConfirm: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) -> some View {
@@ -456,7 +493,7 @@ private extension View {
             iconSystemName: "arrow.down.circle.fill",
             iconTint: Theme.info,
             title: NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-            message: NSLocalizedString("settings.model_download.message", comment: ""),
+            message: NSLocalizedString(messageKey, comment: ""),
             primaryTitle: NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"),
             primaryAction: onConfirm,
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),

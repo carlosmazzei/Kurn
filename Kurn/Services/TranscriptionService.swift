@@ -48,6 +48,7 @@ struct TranscriptionService {
     private let appleTranscriber = OnDeviceTranscriber()
     private let fluidAudioTranscriber = FluidAudioTranscriber()
     private let whisperTranscriber = WhisperTranscriber()
+    private let whisperCppTranscriber = WhisperCppTranscriber()
     private let heuristicDiarizer = SpeakerDiarizer()
     private let fluidAudioDiarizer = FluidAudioDiarizer()
     private let diarizationPreprocessor = DiarizationPreprocessor()
@@ -160,6 +161,7 @@ struct TranscriptionService {
                 engine: config.transcription,
                 transcriptionProvider: config.transcriptionProvider,
                 transcriptionModel: config.transcriptionModel,
+                whisperCppModel: config.whisperCppModel,
                 language: resolvedLanguage,
                 checkpoint: checkpoint,
                 onPhase: onPhase,
@@ -185,6 +187,7 @@ struct TranscriptionService {
                 engine: config.transcription,
                 transcriptionProvider: config.transcriptionProvider,
                 transcriptionModel: config.transcriptionModel,
+                whisperCppModel: config.whisperCppModel,
                 language: resolvedLanguage,
                 checkpoint: checkpoint,
                 onPhase: onPhase,
@@ -254,6 +257,7 @@ struct TranscriptionService {
         case .appleSpeech: return appleTranscriber
         case .fluidAudioParakeet: return fluidAudioTranscriber
         case .whisperAPI: return whisperTranscriber
+        case .whisperCpp: return whisperCppTranscriber
         }
     }
 
@@ -285,6 +289,7 @@ struct TranscriptionService {
         engine: TranscriptionEngine,
         transcriptionProvider: AIProvider = .openAI,
         transcriptionModel: String = "whisper-1",
+        whisperCppModel: WhisperCppModel = .default,
         language: MeetingLanguage,
         checkpoint: TranscriptionCheckpoint? = nil,
         onPhase: @escaping PhaseHandler,
@@ -311,9 +316,17 @@ struct TranscriptionService {
         }
 
         let compacted = compaction != nil
-        // Only the cloud (Whisper) engine is provider-scoped; on-device engines
-        // carry no provider identity in their checkpoint.
-        let checkpointProviderID = engine == .whisperAPI ? transcriptionProvider.id : nil
+        // Identity of the engine's swappable back-end, so a checkpoint written
+        // by one is never resumed by another: the cloud provider for
+        // `.whisperAPI`, the weight file for `.whisperCpp` (resuming a
+        // small-model run with the large model would splice two transcripts of
+        // different quality). The remaining engines have no such axis.
+        let checkpointProviderID: String?
+        switch engine {
+        case .whisperAPI: checkpointProviderID = transcriptionProvider.id
+        case .whisperCpp: checkpointProviderID = "whispercpp:\(whisperCppModel.rawValue)"
+        case .appleSpeech, .fluidAudioParakeet: checkpointProviderID = nil
+        }
         let resume = checkpoint.flatMap { cp -> ChunkedTranscriptionRunner.Progress? in
             if cp.matches(engine: engine, language: language, compacted: compacted, providerID: checkpointProviderID) {
                 AppLog.transcription.atNotice.notice("transcribe: checkpoint matches engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) chunks=\(cp.totalChunks, privacy: .public)/\(cp.completedChunks, privacy: .public)")
@@ -356,6 +369,17 @@ struct TranscriptionService {
                 language: language,
                 onProgress: { progress in
                     onPhase(.transcribing(progress: progress, chunks: nil))
+                }
+            )
+        case .whisperCpp:
+            raw = try await whisperCppTranscriber.transcribeResumable(
+                url: target,
+                language: language,
+                model: whisperCppModel,
+                resume: resume,
+                onChunkCompleted: checkpointSink,
+                onProgress: { progress, completed, total in
+                    onPhase(.transcribing(progress: progress, chunks: total > 0 ? ChunkProgress(completed: completed, total: total) : nil))
                 }
             )
         case .fluidAudioParakeet:

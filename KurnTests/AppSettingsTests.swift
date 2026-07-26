@@ -27,6 +27,7 @@ struct AppSettingsTests {
         "settings.vadEngine", "settings.languageDetectionEngine",
         "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
         "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
+        "settings.whisperCppModel", "settings.whisperCppModelsConsented",
         "settings.logLevel", "settings.meetingsSortOrder", "settings.hideLiveActivityMeetingTitle",
         AppSettingsKeys.diagnosticReportsConsented, "settings.usageStats"
     ]
@@ -71,6 +72,28 @@ struct AppSettingsTests {
     @Test func freshSettingsUseAlwaysAvailablePipeline() {
         withScopedDefaults { settings in
             #expect(settings.pipelineConfiguration == PipelineConfiguration())
+        }
+    }
+
+    @Test func pipelineConfigurationCarriesTheSelectedWhisperCppModel() {
+        withScopedDefaults { settings in
+            #expect(settings.whisperCppModel == .small)
+            settings.transcriptionEngine = .whisperCpp
+            settings.whisperCppModel = .largeTurbo
+
+            let config = settings.pipelineConfiguration
+            #expect(config.transcription == .whisperCpp)
+            #expect(config.whisperCppModel == .largeTurbo)
+        }
+    }
+
+    /// Selecting whisper.cpp must not be mistaken for needing FluidAudio's
+    /// batch ASR model — the two have separate consent flags and downloads.
+    @Test func whisperCppDoesNotRequestTheFluidAudioModel() {
+        withScopedDefaults { settings in
+            settings.transcriptionEngine = .whisperCpp
+            settings.fluidAudioBatchASRModelsConsented = true
+            #expect(settings.usesFluidAudioModel == false)
         }
     }
 

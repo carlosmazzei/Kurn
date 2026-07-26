@@ -22,6 +22,8 @@
 "error.model_download_required" = "Se requiere una descarga única del modelo para %@.";
 "error.model_download_failed" = "Error al descargar el modelo: %@";
 "error.model_download_timeout" = "El modelo local agotó el tiempo de espera. Comprueba tu conexión e inténtalo de nuevo.";
+"error.whisper_cpp_load_failed" = "No se pudo cargar el modelo Whisper local. Elimínalo en Almacenamiento y descárgalo de nuevo.";
+"error.whisper_cpp_failed" = "Falló la transcripción Whisper en el dispositivo.";
 "error.resource_unavailable" = "No se puede continuar: %@";
 "error.resource_low_storage" = "libera al menos %@ de almacenamiento antes de continuar. Disponible ahora: %@.";
 "error.resource_disk_full" = "el dispositivo se quedó sin almacenamiento disponible.";
@@ -41,6 +43,7 @@
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingüe)";
 "transcription.whisper" = "API de Whisper";
+"transcription.whisper_cpp" = "Whisper (en el dispositivo)";
 "preprocessing.standard" = "Limpieza estándar";
 "preprocessing.none" = "Ninguna";
 "vad.energy" = "Umbral de energía";
@@ -489,6 +492,14 @@
 "settings.model_download.preparing" = "Preparando modelo…";
 "settings.model_download.compiling" = "Compilando modelo…";
 "settings.fluid_audio.package_missing" = "Añade el paquete Swift de FluidAudio al target de Kurn antes de usar esta función.";
+"settings.model_download.message_whisper_cpp" = "Este motor descarga un modelo de Whisper para que la transcripción se ejecute por completo en este dispositivo. El modelo se conserva y no hacen falta más descargas. Se recomienda Wi-Fi.";
+"settings.whisper_cpp.package_missing" = "Añade el paquete Swift whisper.cpp al target de Kurn antes de usar esta función.";
+"settings.whisper_cpp.model" = "Modelo de Whisper";
+"settings.whisper_cpp.model_footer" = "Los modelos más grandes transcriben con mayor precisión, pero descargan más datos y son más lentos. Cada uno se descarga por separado y puede eliminarse en Almacenamiento.";
+"settings.whisper_cpp.choose_model" = "Elige un Modelo de Whisper";
+"whisper_cpp.model.base" = "Base";
+"whisper_cpp.model.small" = "Small";
+"whisper_cpp.model.large_turbo" = "Large v3 Turbo";
 "settings.models" = "Modelos en el Dispositivo";
 "settings.models_footer" = "Los modelos se descargan bajo demanda y se guardan en caché en el dispositivo. Elimina uno para liberar espacio; se descargará de nuevo la próxima vez que actives la función.";
 
@@ -497,16 +508,18 @@
 "settings.acknowledgements" = "Agradecimientos";
 "settings.sponsor" = "Patrocinar Kurn";
 "settings.appstore_status" = "Kurn aún no está en la App Store. Cuando el total de patrocinios en GitHub Sponsors llegue a 100 $, se enviará a la App Store y seguirá siendo gratis para descargar.";
-"ack.intro" = "El reconocimiento de voz en el dispositivo, la diarización de hablantes y la detección de actividad de voz funcionan gracias a Fluid Inference. Kurn usa el paquete FluidAudio y descarga bajo demanda los modelos de aprendizaje automático que se indican a continuación. Cada componente se usa bajo su propia licencia.";
+"ack.intro" = "El reconocimiento de voz en el dispositivo, la diarización de hablantes y la detección de actividad de voz funcionan gracias a Fluid Inference y whisper.cpp. Kurn usa los paquetes indicados a continuación y descarga bajo demanda sus modelos de aprendizaje automático. Cada componente se usa bajo su propia licencia.";
 "ack.packages" = "Paquetes Swift";
 "ack.models" = "Modelos de Aprendizaje Automático";
-"ack.footer" = "Los modelos se descargan bajo demanda a través de FluidAudio y no vienen incluidos en la app. Toca un elemento para abrir su proyecto y la licencia completa. La NVIDIA Open Model License que cubre Sortformer tiene sus propios términos.";
+"ack.footer" = "Los modelos se descargan bajo demanda y no vienen incluidos en la app. Toca un elemento para abrir su proyecto y la licencia completa. La NVIDIA Open Model License que cubre Sortformer tiene sus propios términos.";
 "settings.models.none" = "No hay modelos descargados";
 "settings.models.live" = "Transcripción en Vivo";
 "settings.models.on_device_language" = "Detección de Idioma en el Dispositivo";
 "settings.models.diarization" = "Diarización de Hablantes";
 "settings.models.vad" = "Detección de Actividad de Voz";
 "settings.models.other" = "Otros Modelos de FluidAudio";
+"settings.models.whisper_cpp" = "Whisper en el Dispositivo";
+"settings.models.installed" = "Instalado";
 "settings.models.delete" = "Eliminar Modelo";
 "settings.models.delete_confirm" = "¿Eliminar este modelo?";
 "settings.models.delete_message" = "Se eliminará de este dispositivo. Puedes volver a descargarlo más adelante reactivando la función.";

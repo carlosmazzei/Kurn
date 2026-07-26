@@ -14,6 +14,12 @@ struct TranscriptionLanguageSupportTests {
         }
     }
 
+    @Test func whisperCppSupportsEveryLanguage() {
+        for language in MeetingLanguage.allCases {
+            #expect(TranscriptionLanguageSupport.isSupported(language, by: .whisperCpp))
+        }
+    }
+
     @Test func autoDetectIsSupportedByEveryEngine() {
         for engine in TranscriptionEngine.allCases {
             #expect(TranscriptionLanguageSupport.isSupported(.autoDetect, by: engine))
