@@ -50,7 +50,7 @@ struct RecordingSettingsView: View {
                 )
                 .disabled(downloads.isDownloading)
                 if downloads.downloadingModel == .liveTranscriptionASR {
-                    ModelDownloadProgressRow()
+                    ModelDownloadProgressRow(progress: downloads.downloadProgress)
                 }
                 Toggle(
                     NSLocalizedString("settings.require_auth_for_recordings", comment: "Require authentication for recordings"),

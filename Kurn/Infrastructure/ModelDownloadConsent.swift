@@ -21,32 +21,60 @@ enum ModelSet: Sendable, Equatable {
     case vad
 }
 
+enum ModelDownloadPhase: Sendable, Equatable {
+    case preparing
+    case downloading
+    case compiling
+}
+
+struct ModelDownloadStatus: Sendable, Equatable {
+    var fractionCompleted: Double
+    var phase: ModelDownloadPhase
+}
+
 struct ModelDownloadConsent {
-    static func download(_ set: ModelSet) async throws {
+    static func download(
+        _ set: ModelSet,
+        onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
+    ) async throws {
         try await ResourceGuard.requireModelDownloadHeadroom()
         #if canImport(FluidAudio)
         do {
+            onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
             switch set {
             case .liveTranscriptionASR:
                 // The live preview picks a streaming model per meeting language at
                 // record time (English-only EOU vs. multilingual), so warm both
                 // now — the recording path must never block on a missing model.
-                let englishEngine = StreamingModelVariant.parakeetEou160ms.createManager()
-                try await englishEngine.loadModels()
+                let englishEngine = StreamingEouAsrManager(chunkSize: .ms160)
+                try await englishEngine.loadModels(progressHandler: scaledProgress(
+                    from: 0,
+                    to: 0.5,
+                    onProgress: onProgress
+                ))
                 let multilingualEngine = FluidAudioMultilingualStreamingManager()
-                try await multilingualEngine.loadModels()
+                try await multilingualEngine.loadModels(progressHandler: scaledProgress(
+                    from: 0.5,
+                    to: 1,
+                    onProgress: onProgress
+                ))
             case .onDeviceASR:
                 // Multilingual on-device batch ASR (Parakeet TDT v3) used for the
                 // post-recording transcript when the meeting language is "Auto".
-                _ = try await AsrModels.downloadAndLoad(version: .v3)
+                _ = try await AsrModels.downloadAndLoad(
+                    version: .v3,
+                    progressHandler: progressHandler(onProgress)
+                )
             case .diarization:
-                let manager = OfflineDiarizerManager()
-                try await manager.prepareModels()
+                _ = try await OfflineDiarizerModels.load(
+                    progressHandler: progressHandler(onProgress)
+                )
             case .vad:
                 // Silero VAD CoreML model; `VadManager`'s initializer downloads
                 // and loads it on first use.
-                _ = try await VadManager()
+                _ = try await VadManager(progressHandler: progressHandler(onProgress))
             }
+            onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
             try await ResourceGuard.requireModelDownloadHeadroom()
         } catch let appError as AppError {
             throw appError
@@ -60,4 +88,33 @@ struct ModelDownloadConsent {
         )
         #endif
     }
+
+    #if canImport(FluidAudio)
+    private static func progressHandler(
+        _ onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
+    ) -> ProgressHandler {
+        scaledProgress(from: 0, to: 1, onProgress: onProgress)
+    }
+
+    private static func scaledProgress(
+        from lowerBound: Double,
+        to upperBound: Double,
+        onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
+    ) -> ProgressHandler {
+        { progress in
+            let fraction = min(1, max(0, progress.fractionCompleted))
+            let scaled = lowerBound + fraction * (upperBound - lowerBound)
+            let phase: ModelDownloadPhase
+            switch progress.phase {
+            case .listing:
+                phase = .preparing
+            case .downloading:
+                phase = .downloading
+            case .compiling:
+                phase = .compiling
+            }
+            onProgress(ModelDownloadStatus(fractionCompleted: scaled, phase: phase))
+        }
+    }
+    #endif
 }
