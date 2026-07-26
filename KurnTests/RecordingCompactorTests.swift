@@ -235,8 +235,15 @@ struct RecordingCompactorTests {
         try await tempFileTestLock.run {
             let fileName = "kurn-test-\(UUID().uuidString).m4a"
             let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
-            // 16 kHz, as a narrowband Bluetooth route would have produced.
-            _ = try AudioFixtures.m4aTone(seconds: 2.0, sampleRate: 16_000, at: url)
+            // 16 kHz, as a narrowband Bluetooth route would have produced. The
+            // codec picks the bit rate: at this sample rate it rejects the
+            // fixture's usual 64 kbps outright.
+            _ = try AudioFixtures.m4aTone(
+                seconds: 2.0,
+                sampleRate: 16_000,
+                bitRate: nil,
+                at: url
+            )
             defer { AudioFileStore.delete(fileName: fileName) }
 
             let compactor = RecordingCompactor(targetBitRate: AudioQuality.low.bitRate)

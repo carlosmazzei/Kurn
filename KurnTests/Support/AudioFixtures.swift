@@ -26,20 +26,27 @@ enum AudioFixtures {
     }
 
     /// Write a mono AAC .m4a sine tone (or silence when `hz == 0`).
+    ///
+    /// Pass `bitRate: nil` to let the codec pick. AAC's valid bit rates depend on
+    /// the sample rate — the 64 kbps default is fine at 44.1 kHz but is rejected
+    /// outright at 16 kHz, which throws out of `AVAudioFile`'s initializer.
     @discardableResult
     static func m4aTone(
         hz: Double = 440,
         seconds: Double = 1.0,
         sampleRate: Double = 44_100,
         amplitude: Float = 0.5,
+        bitRate: Int? = 64_000,
         at url: URL? = nil
     ) throws -> URL {
-        let settings: [String: Any] = [
+        var settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: sampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 64_000
+            AVNumberOfChannelsKey: 1
         ]
+        if let bitRate {
+            settings[AVEncoderBitRateKey] = bitRate
+        }
         return try write(
             segments: [(hz, seconds)],
             sampleRate: sampleRate,
