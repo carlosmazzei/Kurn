@@ -150,8 +150,10 @@ final class RecordingCompactionViewModel {
                 // stop rather than failing candidate after candidate.
                 error = failure
                 break
-            } catch {
-                error = .audioError(error.localizedDescription)
+            } catch let failure {
+                // Bound explicitly: `catch`'s implicit `error` would shadow this
+                // type's own `error` property.
+                error = .audioError(failure.localizedDescription)
                 break
             }
             byFileName[candidate.fileName]?.refreshFileSize()
