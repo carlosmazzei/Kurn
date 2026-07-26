@@ -486,6 +486,8 @@
 "settings.model_download.message" = "Esta función descarga un modelo local de FluidAudio la primera vez que la uses. El modelo queda en caché después y no hacen falta más descargas.";
 "settings.model_download.allow" = "Permitir y Descargar";
 "settings.model_download.downloading" = "Descargando modelo…";
+"settings.model_download.preparing" = "Preparando modelo…";
+"settings.model_download.compiling" = "Compilando modelo…";
 "settings.fluid_audio.package_missing" = "Añade el paquete Swift de FluidAudio al target de Kurn antes de usar esta función.";
 "settings.models" = "Modelos en el Dispositivo";
 "settings.models_footer" = "Los modelos se descargan bajo demanda y se guardan en caché en el dispositivo. Elimina uno para liberar espacio; se descargará de nuevo la próxima vez que actives la función.";

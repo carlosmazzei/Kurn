@@ -42,8 +42,15 @@ actor FluidAudioMultilingualStreamingManager: StreamingAsrManager {
     var displayName: String { "Nemotron Multilingual 0.6B (\(chunkMs)ms)" }
 
     func loadModels() async throws {
+        try await loadModels(progressHandler: nil)
+    }
+
+    func loadModels(progressHandler: ProgressHandler?) async throws {
         let directory = try await StreamingNemotronMultilingualAsrManager.downloadVariant(
-            languageCode: "auto", chunkMs: chunkMs)
+            languageCode: "auto",
+            chunkMs: chunkMs,
+            progressHandler: progressHandler
+        )
         try await manager.loadModels(from: directory)
         await manager.setPartialCallback { [weak self] text in
             Task { await self?.handlePartial(text) }

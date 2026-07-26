@@ -409,15 +409,38 @@ extension View {
     }
 }
 
-/// Indeterminate download indicator shown while a FluidAudio model set is being
-/// fetched. FluidAudio's high-level download API doesn't expose byte progress,
-/// so this is intentionally indeterminate.
+/// Download indicator backed by FluidAudio's byte-level progress reporting.
 struct ModelDownloadProgressRow: View {
+    let progress: ModelDownloadStatus?
+
     var body: some View {
-        HStack {
-            ProgressView()
-            Text(NSLocalizedString("settings.model_download.downloading", comment: "Downloading model"))
-                .foregroundStyle(Theme.textSecondary)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(phaseLabel)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                if let progress {
+                    Text(progress.fractionCompleted, format: .percent.precision(.fractionLength(0)))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            if let progress {
+                ProgressView(value: progress.fractionCompleted)
+            } else {
+                ProgressView()
+            }
+        }
+    }
+
+    private var phaseLabel: String {
+        switch progress?.phase {
+        case .preparing:
+            NSLocalizedString("settings.model_download.preparing", comment: "Preparing model")
+        case .compiling:
+            NSLocalizedString("settings.model_download.compiling", comment: "Compiling model")
+        case .downloading, nil:
+            NSLocalizedString("settings.model_download.downloading", comment: "Downloading model")
         }
     }
 }

@@ -92,7 +92,7 @@ struct TranscriptionSettingsView: View {
             }
 
             if downloads.downloadingModel == .onDeviceASR {
-                ModelDownloadProgressRow()
+                ModelDownloadProgressRow(progress: downloads.downloadProgress)
             }
         } header: {
             Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
@@ -205,7 +205,7 @@ struct TranscriptionSettingsView: View {
             }
 
             if downloads.downloadingModel == .diarization || downloads.downloadingModel == .vad {
-                ModelDownloadProgressRow()
+                ModelDownloadProgressRow(progress: downloads.downloadProgress)
             }
         } header: {
             Text(NSLocalizedString("settings.pipeline_advanced", comment: "Advanced pipeline"))
