@@ -63,17 +63,16 @@ actor FluidAudioTranscriber: Transcribing {
         AppLog.transcription.atDebug.debug(
             "fluidAudio: transcribing language=\(languageDescription, privacy: .public)"
         )
-        let text: String
+        let result: ASRResult
         do {
             var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
             try await ResourceGuard.requireTranscriptionHeadroom()
-            let result = try await manager.transcribe(
+            result = try await manager.transcribe(
                 url,
                 decoderState: &decoderState,
                 language: fluidLanguage
             )
             try await ResourceGuard.requireTranscriptionHeadroom()
-            text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch let appError as AppError {
             throw appError
         } catch {
@@ -82,19 +81,25 @@ actor FluidAudioTranscriber: Transcribing {
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
 
+        let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return RawTranscript(spans: [], language: "")
         }
 
-        // The clip duration bounds the single span so downstream diarization
-        // fusion has a sensible time range to attribute it to.
-        //
-        // TODO: once the ASRResult per-token/word timing API is confirmed on
-        // macOS, split into timed spans for finer speaker attribution. The full
-        // text as one span keeps this compiling and correct for single-speaker
-        // recordings; multi-speaker clips get coarser attribution until then.
-        let span = TranscribedSpan(text: text, start: 0, end: duration, confidence: nil)
-        return RawTranscript(spans: [span], language: "")
+        // FluidAudio 0.15.5 exposes token timings. Aggregate its SentencePiece
+        // tokens into words so diarization can assign each word to the speaker
+        // active at that point. Older/cached results without timings retain the
+        // full-clip fallback.
+        let words = result.tokenTimings.map(buildWordTimings(from:)) ?? []
+        let timedWords = words.map {
+            TimedWord(text: $0.word, start: $0.startTime, end: $0.endTime)
+        }
+        let spans = TimedWordSpanBuilder.spans(
+            from: timedWords,
+            fallbackText: text,
+            duration: duration
+        )
+        return RawTranscript(spans: spans, language: "")
     }
 }
 

@@ -486,6 +486,8 @@
 "settings.model_download.message" = "Diese Funktion lädt beim ersten Verwenden ein Gerätemodell von FluidAudio herunter. Das Modell wird danach zwischengespeichert, weitere Downloads sind nicht nötig.";
 "settings.model_download.allow" = "Erlauben und herunterladen";
 "settings.model_download.downloading" = "Modell wird heruntergeladen…";
+"settings.model_download.preparing" = "Modell wird vorbereitet…";
+"settings.model_download.compiling" = "Modell wird kompiliert…";
 "settings.fluid_audio.package_missing" = "Fügen Sie dem Kurn-Target das FluidAudio-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
 "settings.models" = "Modelle auf dem Gerät";
 "settings.models_footer" = "Modelle werden bei Bedarf heruntergeladen und auf dem Gerät zwischengespeichert. Löschen Sie eines, um Speicherplatz freizugeben; es wird beim nächsten Aktivieren der Funktion erneut heruntergeladen.";

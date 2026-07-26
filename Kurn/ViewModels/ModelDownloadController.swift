@@ -27,6 +27,9 @@ final class ModelDownloadController {
     /// section can surface a progress indicator.
     var downloadingModel: ModelSet?
 
+    /// Byte-level progress and current FluidAudio download phase.
+    var downloadProgress: ModelDownloadStatus?
+
     /// Downloaded model entries, refreshed when Storage appears and after any
     /// download or deletion.
     var installedModels: [ModelStore.InstalledModel] = []
@@ -193,13 +196,19 @@ final class ModelDownloadController {
         cleanup: @escaping @MainActor () -> Void = {}
     ) {
         downloadingModel = set
+        downloadProgress = ModelDownloadStatus(fractionCompleted: 0, phase: .preparing)
         Task {
             let background = BackgroundActivity()
             background.begin(name: "ai.kurn.modelDownload")
             defer { background.end() }
             do {
                 let before = ModelStore.snapshot()
-                try await ModelDownloadConsent.download(set)
+                try await ModelDownloadConsent.download(set) { [weak self] status in
+                    Task { @MainActor [weak self] in
+                        guard self?.downloadingModel == set else { return }
+                        self?.downloadProgress = status
+                    }
+                }
                 ModelStore.recordDownload(for: group, before: before)
                 onSuccess()
             } catch let appError as AppError {
@@ -209,6 +218,7 @@ final class ModelDownloadController {
             }
             cleanup()
             downloadingModel = nil
+            downloadProgress = nil
             refreshInstalledModels()
         }
     }

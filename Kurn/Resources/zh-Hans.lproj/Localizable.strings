@@ -486,6 +486,8 @@
 "settings.model_download.message" = "此功能会在您首次使用时从 FluidAudio 下载一个设备端模型。之后该模型会被缓存，无需再次下载。";
 "settings.model_download.allow" = "允许并下载";
 "settings.model_download.downloading" = "正在下载模型…";
+"settings.model_download.preparing" = "正在准备模型…";
+"settings.model_download.compiling" = "正在编译模型…";
 "settings.fluid_audio.package_missing" = "使用此功能前，请先将 FluidAudio Swift 包添加到 Kurn target 中。";
 "settings.models" = "设备端模型";
 "settings.models_footer" = "模型会按需下载并缓存在设备上。删除某个模型可释放空间；下次启用相应功能时会重新下载。";

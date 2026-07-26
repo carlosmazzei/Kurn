@@ -25,6 +25,21 @@ import FluidAudio
 actor FluidAudioModelStore {
     static let shared = FluidAudioModelStore()
 
+    /// FluidAudio 0.15.5's long-form profile for multilingual meeting audio.
+    ///
+    /// The package default keeps `melChunkContext` enabled to protect English
+    /// chunk boundaries, but its v3 guidance recommends disabling that prepend
+    /// for multilingual long-form audio because it can pull the decoder toward
+    /// its English prior. Dual-decode arbitration probes the available chunking
+    /// strategies once per file and commits to the best result; meeting
+    /// transcription prioritizes that quality gain over its modest overhead.
+    static let transcriptionConfig = ASRConfig(
+        parallelChunkConcurrency: 4,
+        streamingEnabled: true,
+        melChunkContext: false,
+        dualDecodeArbitration: true
+    )
+
     private var manager: AsrManager?
     /// In-flight load, so concurrent callers await one load instead of racing to
     /// start several (e.g. language detection and transcription firing together).
@@ -42,7 +57,7 @@ actor FluidAudioModelStore {
         let task = Task<AsrManager, Error> {
             try await ResourceGuard.requireModelDownloadHeadroom()
             let models = try await AsrModels.downloadAndLoad(version: .v3)
-            return AsrManager(config: .default, models: models)
+            return AsrManager(config: Self.transcriptionConfig, models: models)
         }
         loadTask = task
         do {

@@ -14,6 +14,17 @@ import Testing
 
 struct RecognitionPipelineTests {
 
+    #if canImport(FluidAudio)
+    @Test func fluidAudioUsesMultilingualLongFormConfiguration() {
+        let config = FluidAudioModelStore.transcriptionConfig
+
+        #expect(config.parallelChunkConcurrency == 4)
+        #expect(config.streamingEnabled)
+        #expect(config.melChunkContext == false)
+        #expect(config.dualDecodeArbitration)
+    }
+    #endif
+
     // MARK: - Legacy settings migration
 
     @Test func whisperModeMigratesToWhisperEngine() {
