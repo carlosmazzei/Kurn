@@ -60,19 +60,30 @@ struct RecognitionPipelineTests {
     @Test func storageModeMapsOnDeviceEnginesToOnDevice() {
         #expect(TranscriptionEngine.appleSpeech.storageMode == .onDevice)
         #expect(TranscriptionEngine.fluidAudioParakeet.storageMode == .onDevice)
+        #expect(TranscriptionEngine.whisperCpp.storageMode == .onDevice)
         #expect(TranscriptionEngine.whisperAPI.storageMode == .whisperAPI)
     }
 
-    @Test func requiredModelSetOnlyForFluidAudioEngines() {
-        #expect(TranscriptionEngine.appleSpeech.requiredModelSet == nil)
-        #expect(TranscriptionEngine.whisperAPI.requiredModelSet == nil)
-        #expect(TranscriptionEngine.fluidAudioParakeet.requiredModelSet == .onDeviceASR)
+    @Test func requiredModelSetOnlyForDownloadedEngines() {
+        let model = WhisperCppModel.default
+        #expect(TranscriptionEngine.appleSpeech.requiredModelSet(whisperCppModel: model) == nil)
+        #expect(TranscriptionEngine.whisperAPI.requiredModelSet(whisperCppModel: model) == nil)
+        #expect(TranscriptionEngine.fluidAudioParakeet.requiredModelSet(whisperCppModel: model) == .onDeviceASR)
         #expect(LanguageDetectionEngine.byTranscriber.requiredModelSet == nil)
         #expect(LanguageDetectionEngine.fluidAudioLID.requiredModelSet == .onDeviceASR)
         #expect(DiarizationEngine.heuristic.requiredModelSet == nil)
         #expect(DiarizationEngine.fluidAudio.requiredModelSet == .diarization)
         #expect(VADEngine.energyThreshold.requiredModelSet == nil)
         #expect(VADEngine.fluidAudio.requiredModelSet == .vad)
+    }
+
+    /// The whisper.cpp set carries its variant, so the engine reports whichever
+    /// weight file is currently selected rather than a fixed one.
+    @Test func whisperCppRequiresTheSelectedModelVariant() {
+        for model in WhisperCppModel.allCases {
+            #expect(TranscriptionEngine.whisperCpp.requiredModelSet(whisperCppModel: model) == .whisperCppASR(model))
+        }
+        #expect(TranscriptionEngine.whisperCpp.requiredModelSet(whisperCppModel: .base) != .whisperCppASR(.largeTurbo))
     }
 
     // MARK: - Language code mapping
@@ -129,6 +140,7 @@ struct RecognitionPipelineTests {
         #expect(config.languageDetection == .byTranscriber)
         #expect(config.diarization == .heuristic)
         #expect(config.transcription == .appleSpeech)
+        #expect(config.whisperCppModel == .small)
     }
 
     // MARK: - VAD audio compaction (timeline remap + region normalization)

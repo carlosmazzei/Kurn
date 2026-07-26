@@ -22,6 +22,8 @@
 "error.model_download_required" = "Für %@ ist ein einmaliger Modell-Download erforderlich.";
 "error.model_download_failed" = "Modell-Download fehlgeschlagen: %@";
 "error.model_download_timeout" = "Zeitlimit für das Gerätemodell überschritten. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.";
+"error.whisper_cpp_load_failed" = "Das Whisper-Modell auf dem Gerät konnte nicht geladen werden. Löschen Sie es unter Speicher und laden Sie es erneut.";
+"error.whisper_cpp_failed" = "Die Whisper-Transkription auf dem Gerät ist fehlgeschlagen.";
 "error.resource_unavailable" = "Fortsetzen nicht möglich: %@";
 "error.resource_low_storage" = "geben Sie mindestens %@ Speicherplatz frei, bevor Sie fortfahren. Aktuell verfügbar: %@.";
 "error.resource_disk_full" = "auf dem Gerät ist kein Speicherplatz mehr verfügbar.";
@@ -41,6 +43,7 @@
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (mehrsprachig)";
 "transcription.whisper" = "Whisper API";
+"transcription.whisper_cpp" = "Whisper (auf dem Gerät)";
 "preprocessing.standard" = "Standardbereinigung";
 "preprocessing.none" = "Keine";
 "vad.energy" = "Energieschwelle";
@@ -489,6 +492,13 @@
 "settings.model_download.preparing" = "Modell wird vorbereitet…";
 "settings.model_download.compiling" = "Modell wird kompiliert…";
 "settings.fluid_audio.package_missing" = "Fügen Sie dem Kurn-Target das FluidAudio-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
+"settings.model_download.message_whisper_cpp" = "Diese Engine lädt ein Whisper-Modell, damit die Transkription vollständig auf diesem Gerät läuft. Das Modell bleibt danach erhalten, weitere Downloads sind nicht nötig. WLAN wird empfohlen.";
+"settings.whisper_cpp.package_missing" = "Fügen Sie dem Kurn-Target das whisper.cpp-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
+"settings.whisper_cpp.model" = "Whisper-Modell";
+"settings.whisper_cpp.model_footer" = "Größere Modelle transkribieren genauer, laden aber mehr Daten und arbeiten langsamer. Jedes wird einzeln geladen und kann unter Speicher gelöscht werden.";
+"whisper_cpp.model.base" = "Base";
+"whisper_cpp.model.small" = "Small";
+"whisper_cpp.model.large_turbo" = "Large v3 Turbo";
 "settings.models" = "Modelle auf dem Gerät";
 "settings.models_footer" = "Modelle werden bei Bedarf heruntergeladen und auf dem Gerät zwischengespeichert. Löschen Sie eines, um Speicherplatz freizugeben; es wird beim nächsten Aktivieren der Funktion erneut heruntergeladen.";
 
@@ -497,16 +507,17 @@
 "settings.acknowledgements" = "Danksagungen";
 "settings.sponsor" = "Kurn unterstützen";
 "settings.appstore_status" = "Kurn ist noch nicht im App Store. Sobald die gesamten Zuwendungen über GitHub Sponsors 100 $ erreichen, wird die App im App Store eingereicht und bleibt kostenlos zum Download.";
-"ack.intro" = "Spracherkennung auf dem Gerät, Sprecher-Diarisierung und Sprachaktivitätserkennung werden von Fluid Inference bereitgestellt. Kurn verwendet das FluidAudio-Paket und lädt die unten aufgeführten Machine-Learning-Modelle bei Bedarf herunter. Jede Komponente wird unter ihrer eigenen Lizenz verwendet.";
+"ack.intro" = "Spracherkennung auf dem Gerät, Sprecher-Diarisierung und Sprachaktivitätserkennung werden von Fluid Inference und whisper.cpp bereitgestellt. Kurn verwendet die unten aufgeführten Pakete und lädt deren Machine-Learning-Modelle bei Bedarf herunter. Jede Komponente wird unter ihrer eigenen Lizenz verwendet.";
 "ack.packages" = "Swift-Pakete";
 "ack.models" = "Machine-Learning-Modelle";
-"ack.footer" = "Modelle werden bei Bedarf über FluidAudio heruntergeladen und sind nicht in der App enthalten. Tippen Sie auf einen Eintrag, um dessen Projekt und vollständige Lizenz zu öffnen. Die NVIDIA Open Model License für Sortformer hat eigene Bedingungen.";
+"ack.footer" = "Modelle werden bei Bedarf heruntergeladen und sind nicht in der App enthalten. Tippen Sie auf einen Eintrag, um dessen Projekt und vollständige Lizenz zu öffnen. Die NVIDIA Open Model License für Sortformer hat eigene Bedingungen.";
 "settings.models.none" = "Keine Modelle heruntergeladen";
 "settings.models.live" = "Live-Transkription";
 "settings.models.on_device_language" = "Spracherkennung auf dem Gerät";
 "settings.models.diarization" = "Sprecher-Diarisierung";
 "settings.models.vad" = "Sprachaktivitätserkennung";
 "settings.models.other" = "Weitere FluidAudio-Modelle";
+"settings.models.whisper_cpp" = "Whisper auf dem Gerät";
 "settings.models.delete" = "Modell löschen";
 "settings.models.delete_confirm" = "Dieses Modell löschen?";
 "settings.models.delete_message" = "Es wird von diesem Gerät entfernt. Sie können es später erneut herunterladen, indem Sie die Funktion wieder aktivieren.";

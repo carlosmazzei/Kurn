@@ -395,6 +395,14 @@ struct ModelDownloadAlerts: ViewModifier {
                 onConfirm: { downloads.confirmVAD(settings: settings) },
                 onCancel: { downloads.cancelVAD() }
             )
+            .modelDownloadDialog(
+                isPresented: $downloads.showingWhisperCppConsent,
+                // The shared message names FluidAudio; whisper.cpp weights come
+                // from elsewhere and are much larger, so it gets its own text.
+                messageKey: "settings.model_download.message_whisper_cpp",
+                onConfirm: { downloads.confirmWhisperCpp(settings: settings) },
+                onCancel: { downloads.cancelWhisperCpp() }
+            )
             .errorAlert($downloads.error)
     }
 }
@@ -448,6 +456,7 @@ struct ModelDownloadProgressRow: View {
 private extension View {
     func modelDownloadDialog(
         isPresented: Binding<Bool>,
+        messageKey: String = "settings.model_download.message",
         onConfirm: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) -> some View {
@@ -456,7 +465,7 @@ private extension View {
             iconSystemName: "arrow.down.circle.fill",
             iconTint: Theme.info,
             title: NSLocalizedString("settings.model_download.title", comment: "One-time model download"),
-            message: NSLocalizedString("settings.model_download.message", comment: ""),
+            message: NSLocalizedString(messageKey, comment: ""),
             primaryTitle: NSLocalizedString("settings.model_download.allow", comment: "Allow and Download"),
             primaryAction: onConfirm,
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),

@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  Open-source attribution screen reached from Settings → Acknowledgements.
-//  Mirrors THIRD_PARTY_NOTICES.md so the license credits required by the
-//  bundled FluidAudio package and the on-demand CoreML models are also
+//  Mirrors THIRD_PARTY_NOTICES.md so the license credits required by the linked
+//  packages (FluidAudio, whisper.cpp) and the on-demand models are also
 //  available inside the app.
 //
 
@@ -26,6 +26,11 @@ struct AcknowledgementsView: View {
             name: "FluidAudio",
             license: "Apache License 2.0",
             urlString: "https://github.com/FluidInference/FluidAudio"
+        ),
+        Credit(
+            name: "whisper.cpp",
+            license: "MIT License",
+            urlString: "https://github.com/ggml-org/whisper.cpp"
         )
     ]
 
@@ -54,6 +59,11 @@ struct AcknowledgementsView: View {
             name: "Silero VAD",
             license: "MIT License",
             urlString: "https://github.com/snakers4/silero-vad"
+        ),
+        Credit(
+            name: "OpenAI Whisper (GGML)",
+            license: "MIT License",
+            urlString: "https://huggingface.co/ggerganov/whisper.cpp"
         )
     ]
 

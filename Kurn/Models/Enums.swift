@@ -342,6 +342,10 @@ enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identifiable 
     case fluidAudioParakeet
     /// OpenAI Whisper cloud API (chunked upload). Requires an OpenAI API key.
     case whisperAPI
+    /// Whisper running fully on device through whisper.cpp. Same language
+    /// coverage as `.whisperAPI` with nothing leaving the phone, at the cost of
+    /// a one-time GGML weight download (see `WhisperCppModel`).
+    case whisperCpp
 
     var id: String { rawValue }
 
@@ -350,15 +354,21 @@ enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identifiable 
         case .appleSpeech: return NSLocalizedString("transcription.apple_speech", comment: "Apple Speech")
         case .fluidAudioParakeet: return NSLocalizedString("transcription.fluid_parakeet", comment: "FluidAudio multilingual")
         case .whisperAPI: return NSLocalizedString("transcription.whisper", comment: "Whisper API")
+        case .whisperCpp: return NSLocalizedString("transcription.whisper_cpp", comment: "Whisper on-device")
         }
     }
 
-    /// FluidAudio model family that must be downloaded before this engine runs,
-    /// or `nil` when it needs no download.
-    var requiredModelSet: ModelSet? {
+    /// Model family that must be downloaded before this engine runs, or `nil`
+    /// when it needs no download.
+    ///
+    /// Unlike the other stage enums this is a function, because whisper.cpp has
+    /// a variant axis: the set has to name *which* weight file to fetch, and a
+    /// defaulted parameter would let a caller silently download the wrong one.
+    func requiredModelSet(whisperCppModel: WhisperCppModel) -> ModelSet? {
         switch self {
         case .appleSpeech, .whisperAPI: return nil
         case .fluidAudioParakeet: return .onDeviceASR
+        case .whisperCpp: return .whisperCppASR(whisperCppModel)
         }
     }
 
@@ -366,7 +376,7 @@ enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identifiable 
     /// field stays valid without a SwiftData migration.
     var storageMode: TranscriptionMode {
         switch self {
-        case .appleSpeech, .fluidAudioParakeet: return .onDevice
+        case .appleSpeech, .fluidAudioParakeet, .whisperCpp: return .onDevice
         case .whisperAPI: return .whisperAPI
         }
     }

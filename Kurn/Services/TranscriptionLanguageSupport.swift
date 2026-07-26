@@ -16,8 +16,9 @@ enum TranscriptionLanguageSupport {
     static func isSupported(_ language: MeetingLanguage, by engine: TranscriptionEngine) -> Bool {
         guard let code = language.whisperCode else { return true }
         switch engine {
-        case .whisperAPI:
-            // Whisper's cloud API is the source of our language table.
+        case .whisperAPI, .whisperCpp:
+            // Whisper's cloud API is the source of our language table, and
+            // whisper.cpp runs the same models, so both cover all of it.
             return true
         case .fluidAudioParakeet:
             return fluidAudioCodes.contains(code)

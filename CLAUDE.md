@@ -14,10 +14,14 @@ directly (see "Navigation chrome" below); the watchOS companion still targets
 watchOS 10.0. There is no `#available` fallback for pre-26 iOS — the floor is the
 deployment target.
 
-There is no Swift Package or `Package.swift` — the project is an Xcode project
-(`Kurn.xcodeproj`) with three targets: `Kurn` (app), `KurnWatch` (watchOS companion),
-and `KurnLiveActivityExtension` (widget/Live Activity). Tests live in `KurnTests`
-(Swift Testing, not XCTest).
+The project is an Xcode project (`Kurn.xcodeproj`) with three targets: `Kurn`
+(app), `KurnWatch` (watchOS companion), and `KurnLiveActivityExtension`
+(widget/Live Activity). Tests live in `KurnTests` (Swift Testing, not XCTest).
+There is no root `Package.swift`; the one package manifest in the repo is
+`Packages/WhisperCpp/Package.swift`, a local package whose only target is a
+`.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework release
+asset (see "On-device Whisper (whisper.cpp)" below). The only remote package is
+FluidAudio.
 
 ## Commands
 
@@ -213,13 +217,13 @@ always-available, no-download engines so a fresh install works offline.
 enum to it — engines are never spun up per call. The concrete choices per
 stage (enums in `Models/Enums.swift`) are:
 
-| Stage | `AppSettings` property | Default (no download) | Alternative (FluidAudio, model download) |
+| Stage | `AppSettings` property | Default (no download) | Alternative (model download) |
 | --- | --- | --- | --- |
 | Preprocessing | `preprocessingEngine` | `.standardDSP` (`AudioPreprocessor`) | `.none` (passthrough — not FluidAudio, just skips cleanup) |
 | VAD | `vadEngine` | `.energyThreshold` (`Pipeline/EnergyVAD.swift`) | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD) |
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber) | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`) |
 | Diarization | `diarizationEngine` | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) | `.fluidAudio` (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) |
-| Transcription | `transcriptionEngine` | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale) | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language) or `.whisperAPI` (cloud) |
+| Transcription | `transcriptionEngine` | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale) | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud) |
 
 `TranscriptionService.transcribe` drives the stages in order:
 
@@ -293,6 +297,47 @@ same cleaner backs the manual "Free up space" action in Settings.
 Progress is reported via a `@Sendable` `PhaseHandler` (`TranscriptionPhase`); the
 receiver must hop to the main actor itself.
 
+#### On-device Whisper (whisper.cpp)
+
+`.whisperCpp` is Whisper's accuracy and language coverage with nothing leaving
+the device. It is the one engine whose dependency is a **binary**: the app links
+whisper.cpp's official prebuilt XCFramework through the local
+`Packages/WhisperCpp` package (`.binaryTarget(url:checksum:)`, so nothing large
+lands in git). Bumping the version means bumping the URL *and* the checksum
+(`swift package compute-checksum` on the release zip). Everything that touches
+the library is guarded by `#if canImport(whisper)` with a throwing `#else` stub —
+the same pattern the FluidAudio files use, and required because `KurnTests`
+doesn't link the package.
+
+Three things are deliberately *not* parallel to the FluidAudio stack:
+
+- **Its own downloader.** GGML weights come straight from HuggingFace
+  (`Services/WhisperCppModelDownloader.swift`, a `URLSessionDownloadTask` bridged
+  to async/await), because whisper.cpp ships no downloader of its own. This is
+  the app's only direct model download. The files land in
+  `Application Support/WhisperCpp/Models/<variant>/`, excluded from iCloud
+  backup, and `ModelStore.ModelGroup.whisperCpp.root` points there rather than at
+  FluidAudio's cache — the snapshot-diff folder discovery is skipped for this
+  group since the app names the folders itself.
+- **A variant axis.** `WhisperCppModel` (`Models/WhisperCppModel.swift`) offers
+  base/small/large-v3-turbo, all q5-quantized, defaulting to `.small`. Because
+  the model set has to say *which* file to fetch, `ModelSet` gained a payload
+  (`.whisperCppASR(WhisperCppModel)`) and `TranscriptionEngine.requiredModelSet`
+  is a function rather than a property. Switching variants re-runs the consent +
+  download flow, and the variant is folded into the transcription checkpoint's
+  `providerID` so a resume can't splice two models' output together.
+- **Chunked, not single-pass.** `whisper_full` takes the whole clip as one
+  `[Float]`, so the transcriber reuses `AudioChunker` +
+  `ChunkedTranscriptionRunner` at 5-minute chunks (the cloud engine uses 10).
+  That caps resident samples at ~19 MB instead of ~460 MB for a two-hour meeting,
+  and brings resumable checkpoints and per-chunk cancellation with it. Audio is
+  decoded to whisper's required 16 kHz mono float by the existing
+  `VADAudioLoader.monoSamples`. `whisper_full` blocks, so the context lives on a
+  private serial `DispatchQueue` and never occupies a cooperative thread.
+
+Like the FluidAudio engines it can't run from the background (Metal is
+unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too.
+
 #### FluidAudio on-device models and download consent
 
 The FluidAudio-backed engines above (and the live transcription preview below)
@@ -301,8 +346,10 @@ never fetches models for a feature the user hasn't opted into:
 
 - `Infrastructure/ModelDownloadConsent.swift` is the single place that
   triggers a download, one `ModelSet` case (`.liveTranscriptionASR`,
-  `.onDeviceASR`, `.diarization`, `.vad`) at a time, gated behind a matching
-  `AppSettings.fluidAudio*Consented` flag the user sets in Settings. Each
+  `.onDeviceASR`, `.diarization`, `.vad`, plus `.whisperCppASR`) at a time, gated
+  behind a matching `AppSettings.*Consented` flag the user sets in Settings.
+  `.whisperCppASR` is handled *before* the `#if canImport(FluidAudio)` branch so
+  it still works in a build without FluidAudio linked. Each
   engine's `requiredModelSet` (on the `TranscriptionEngine`/`VADEngine`/
   `DiarizationEngine`/`LanguageDetectionEngine` enums) says which set it needs.
 - `Services/FluidAudioModelStore.swift` (`actor`, `.shared`) caches the loaded

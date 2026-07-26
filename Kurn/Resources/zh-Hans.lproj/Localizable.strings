@@ -22,6 +22,8 @@
 "error.model_download_required" = "%@ 需要一次性下载模型。";
 "error.model_download_failed" = "模型下载失败：%@";
 "error.model_download_timeout" = "设备端模型超时。请检查网络连接后重试。";
+"error.whisper_cpp_load_failed" = "无法加载设备端 Whisper 模型。请在“存储”中删除后重新下载。";
+"error.whisper_cpp_failed" = "设备端 Whisper 转写失败。";
 "error.resource_unavailable" = "无法继续：%@";
 "error.resource_low_storage" = "请在继续前释放至少 %@ 的存储空间。当前可用：%@。";
 "error.resource_disk_full" = "设备存储空间已满。";
@@ -41,6 +43,7 @@
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio（多语言）";
 "transcription.whisper" = "Whisper API";
+"transcription.whisper_cpp" = "Whisper（设备端）";
 "preprocessing.standard" = "标准清理";
 "preprocessing.none" = "无";
 "vad.energy" = "能量阈值";
@@ -489,6 +492,13 @@
 "settings.model_download.preparing" = "正在准备模型…";
 "settings.model_download.compiling" = "正在编译模型…";
 "settings.fluid_audio.package_missing" = "使用此功能前，请先将 FluidAudio Swift 包添加到 Kurn target 中。";
+"settings.model_download.message_whisper_cpp" = "此引擎会下载一个 Whisper 模型，使转写完全在本设备上运行。模型下载后会保留，无需再次下载。建议使用 Wi-Fi。";
+"settings.whisper_cpp.package_missing" = "使用此功能前，请先将 whisper.cpp Swift 包添加到 Kurn target 中。";
+"settings.whisper_cpp.model" = "Whisper 模型";
+"settings.whisper_cpp.model_footer" = "模型越大转写越准确，但下载数据更多、速度更慢。每个模型单独下载，可在“存储”中删除。";
+"whisper_cpp.model.base" = "Base";
+"whisper_cpp.model.small" = "Small";
+"whisper_cpp.model.large_turbo" = "Large v3 Turbo";
 "settings.models" = "设备端模型";
 "settings.models_footer" = "模型会按需下载并缓存在设备上。删除某个模型可释放空间；下次启用相应功能时会重新下载。";
 
@@ -497,16 +507,17 @@
 "settings.acknowledgements" = "致谢";
 "settings.sponsor" = "赞助 Kurn";
 "settings.appstore_status" = "Kurn 尚未上架 App Store。一旦通过 GitHub Sponsors 累计获得 100 美元赞助，就会提交至 App Store，并将保持免费下载。";
-"ack.intro" = "设备端语音识别、说话人分离和语音活动检测均由 Fluid Inference 提供支持。Kurn 使用 FluidAudio 包，并按需下载以下机器学习模型。每个组件均在各自的许可协议下使用。";
+"ack.intro" = "设备端语音识别、说话人分离和语音活动检测由 Fluid Inference 与 whisper.cpp 提供支持。Kurn 使用下列软件包，并按需下载其机器学习模型。每个组件均在各自的许可协议下使用。";
 "ack.packages" = "Swift 包";
 "ack.models" = "机器学习模型";
-"ack.footer" = "模型通过 FluidAudio 按需下载，并未内置于应用中。点击某一项可打开其项目页面及完整许可协议。涵盖 Sortformer 的 NVIDIA Open Model License 有其自身条款。";
+"ack.footer" = "模型按需下载，并未内置于应用中。点击某一项可打开其项目页面及完整许可协议。涵盖 Sortformer 的 NVIDIA Open Model License 有其自身条款。";
 "settings.models.none" = "尚未下载任何模型";
 "settings.models.live" = "实时转录";
 "settings.models.on_device_language" = "设备端语言检测";
 "settings.models.diarization" = "说话人分离";
 "settings.models.vad" = "语音活动检测";
 "settings.models.other" = "其他 FluidAudio 模型";
+"settings.models.whisper_cpp" = "设备端 Whisper";
 "settings.models.delete" = "删除模型";
 "settings.models.delete_confirm" = "删除此模型？";
 "settings.models.delete_message" = "它将从此设备上移除。您可以稍后重新启用该功能以再次下载。";

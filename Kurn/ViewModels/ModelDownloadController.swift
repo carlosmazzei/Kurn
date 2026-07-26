@@ -48,6 +48,7 @@ final class ModelDownloadController {
     var showingBatchASRConsent = false
     var showingDiarizationConsent = false
     var showingVADConsent = false
+    var showingWhisperCppConsent = false
 
     // MARK: - Choices awaiting a download
 
@@ -58,6 +59,11 @@ final class ModelDownloadController {
     var pendingLanguageDetectionEngine: LanguageDetectionEngine?
     var pendingDiarizationEngine: DiarizationEngine?
     var pendingVADEngine: VADEngine?
+
+    /// whisper.cpp weight file awaiting its download. Set both when the engine
+    /// itself is picked (using the currently selected variant) and when the user
+    /// switches variants, since either can require a fetch.
+    var pendingWhisperCppModel: WhisperCppModel?
 
     /// True while any set is downloading. Controls across every Settings screen
     /// disable on this so two screens can't start competing downloads.
@@ -83,12 +89,35 @@ final class ModelDownloadController {
                 settings.transcriptionProviderID = first.id
             }
         }
-        if engine.requiredModelSet == .onDeviceASR && !settings.fluidAudioBatchASRModelsConsented {
+        let required = engine.requiredModelSet(whisperCppModel: settings.whisperCppModel)
+        switch required {
+        case .onDeviceASR where !settings.fluidAudioBatchASRModelsConsented:
             pendingTranscriptionEngine = engine
             showingBatchASRConsent = true
-        } else {
+        case .whisperCppASR(let model) where needsWhisperCppDownload(model, settings: settings):
+            pendingTranscriptionEngine = engine
+            pendingWhisperCppModel = model
+            showingWhisperCppConsent = true
+        default:
             settings.transcriptionEngine = engine
         }
+    }
+
+    /// Apply a whisper.cpp variant choice, downloading its weights first when
+    /// they aren't on disk yet.
+    func selectWhisperCppModel(_ model: WhisperCppModel, settings: AppSettings) {
+        if needsWhisperCppDownload(model, settings: settings) {
+            pendingWhisperCppModel = model
+            showingWhisperCppConsent = true
+        } else {
+            settings.whisperCppModel = model
+        }
+    }
+
+    /// Consent alone isn't enough: each variant is a separate file, and Storage
+    /// lets the user delete one while the consent flag stays set.
+    private func needsWhisperCppDownload(_ model: WhisperCppModel, settings: AppSettings) -> Bool {
+        !settings.whisperCppModelsConsented || !WhisperCppModelDownloader.isInstalled(model)
     }
 
     /// Apply a language-detection choice, intercepting the FluidAudio detector
@@ -186,6 +215,27 @@ final class ModelDownloadController {
         pendingVADEngine = nil
     }
 
+    func confirmWhisperCpp(settings: AppSettings) {
+        guard let model = pendingWhisperCppModel else { return }
+        download(.whisperCppASR(model), recordingAs: .whisperCpp) { [self] in
+            settings.whisperCppModelsConsented = true
+            settings.whisperCppModel = model
+            // Set only when the engine picker (rather than the variant picker)
+            // started this download.
+            if let engine = pendingTranscriptionEngine {
+                settings.transcriptionEngine = engine
+            }
+        } cleanup: { [self] in
+            pendingTranscriptionEngine = nil
+            pendingWhisperCppModel = nil
+        }
+    }
+
+    func cancelWhisperCpp() {
+        pendingTranscriptionEngine = nil
+        pendingWhisperCppModel = nil
+    }
+
     /// The shared download body: mark the set as in flight, keep a finite
     /// background window so the download isn't aborted the moment Settings
     /// leaves the foreground, then apply `onSuccess` only if it actually landed.
@@ -263,6 +313,11 @@ final class ModelDownloadController {
         case .vad:
             settings.fluidAudioVADModelsConsented = false
             settings.vadEngine = .energyThreshold
+        case .whisperCpp:
+            settings.whisperCppModelsConsented = false
+            if settings.transcriptionEngine == .whisperCpp {
+                settings.transcriptionEngine = .appleSpeech
+            }
         }
         pendingModelDeletion = nil
         refreshInstalledModels()

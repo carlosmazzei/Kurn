@@ -136,10 +136,13 @@ enum TranscriptionScheduler {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    /// Whether any configured stage needs a FluidAudio CoreML model, which
-    /// cannot be compiled from the background.
+    /// Whether any configured stage needs on-device GPU/ANE work that the system
+    /// does not allow a backgrounded app to do — CoreML model compilation for the
+    /// FluidAudio stages, Metal command submission for whisper.cpp. Scheduling a
+    /// `BGProcessingTask` for these would burn the window on a guaranteed failure.
     private static func pipelineUsesCoreML(_ config: PipelineConfiguration) -> Bool {
         config.transcription == .fluidAudioParakeet
+            || config.transcription == .whisperCpp
             || config.vad == .fluidAudio
             || config.diarization == .fluidAudio
             || config.languageDetection == .fluidAudioLID

@@ -22,6 +22,8 @@
 "error.model_download_required" = "É necessário um download único de modelo para %@.";
 "error.model_download_failed" = "Falha no download do modelo: %@";
 "error.model_download_timeout" = "O modelo local expirou. Verifique sua conexão e tente novamente.";
+"error.whisper_cpp_load_failed" = "Não foi possível carregar o modelo Whisper local. Exclua-o em Armazenamento e baixe novamente.";
+"error.whisper_cpp_failed" = "A transcrição Whisper no dispositivo falhou.";
 "error.resource_unavailable" = "Não é possível continuar: %@";
 "error.resource_low_storage" = "libere ao menos %@ de armazenamento antes de continuar. Disponível agora: %@.";
 "error.resource_disk_full" = "o dispositivo está sem armazenamento disponível.";
@@ -41,6 +43,7 @@
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilíngue)";
 "transcription.whisper" = "API Whisper";
+"transcription.whisper_cpp" = "Whisper (no dispositivo)";
 "preprocessing.standard" = "Limpeza padrão";
 "preprocessing.none" = "Nenhuma";
 "vad.energy" = "Limiar de energia";
@@ -489,6 +492,13 @@
 "settings.model_download.preparing" = "Preparando modelo…";
 "settings.model_download.compiling" = "Compilando modelo…";
 "settings.fluid_audio.package_missing" = "Adicione o pacote Swift FluidAudio ao target Kurn antes de usar este recurso.";
+"settings.model_download.message_whisper_cpp" = "Este mecanismo baixa um modelo Whisper para que a transcrição funcione inteiramente neste dispositivo. O modelo fica salvo e não são necessários novos downloads. Recomenda-se usar Wi-Fi.";
+"settings.whisper_cpp.package_missing" = "Adicione o pacote Swift whisper.cpp ao target Kurn antes de usar este recurso.";
+"settings.whisper_cpp.model" = "Modelo Whisper";
+"settings.whisper_cpp.model_footer" = "Modelos maiores transcrevem com mais precisão, mas baixam mais dados e são mais lentos. Cada um é baixado separadamente e pode ser excluído em Armazenamento.";
+"whisper_cpp.model.base" = "Base";
+"whisper_cpp.model.small" = "Small";
+"whisper_cpp.model.large_turbo" = "Large v3 Turbo";
 "settings.models" = "Modelos no Dispositivo";
 "settings.models_footer" = "Os modelos são baixados sob demanda e ficam em cache no dispositivo. Exclua um para liberar espaço; ele será baixado novamente na próxima vez que você ativar o recurso.";
 
@@ -497,16 +507,17 @@
 "settings.acknowledgements" = "Agradecimentos";
 "settings.sponsor" = "Patrocinar o Kurn";
 "settings.appstore_status" = "O Kurn ainda não está na App Store. Quando o total de patrocínios via GitHub Sponsors atingir US$ 100, o app será enviado à App Store e continuará gratuito para baixar.";
-"ack.intro" = "O reconhecimento de fala no dispositivo, a diarização de participantes e a detecção de atividade de voz são powered by Fluid Inference. O Kurn usa o pacote FluidAudio e baixa sob demanda os modelos de machine learning abaixo. Cada componente é usado sob sua própria licença.";
+"ack.intro" = "O reconhecimento de fala no dispositivo, a diarização de participantes e a detecção de atividade de voz são fornecidos por Fluid Inference e whisper.cpp. O Kurn usa os pacotes abaixo e baixa sob demanda os modelos de machine learning deles. Cada componente é usado sob sua própria licença.";
 "ack.packages" = "Pacotes Swift";
 "ack.models" = "Modelos de Machine Learning";
-"ack.footer" = "Os modelos são baixados sob demanda pelo FluidAudio e não fazem parte do app. Toque em um item para abrir o projeto e a licença completa. A NVIDIA Open Model License que cobre o Sortformer tem termos próprios.";
+"ack.footer" = "Os modelos são baixados sob demanda e não fazem parte do app. Toque em um item para abrir o projeto e a licença completa. A NVIDIA Open Model License que cobre o Sortformer tem termos próprios.";
 "settings.models.none" = "Nenhum modelo baixado";
 "settings.models.live" = "Transcrição ao Vivo";
 "settings.models.on_device_language" = "Detecção de Idioma no Dispositivo";
 "settings.models.diarization" = "Diarização de Locutores";
 "settings.models.vad" = "Detecção de Atividade de Voz";
 "settings.models.other" = "Outros Modelos FluidAudio";
+"settings.models.whisper_cpp" = "Whisper no Dispositivo";
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";

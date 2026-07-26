@@ -86,4 +86,7 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// recording directly; it never reuses the ASR-cleaned `.m4a` produced by
     /// `AudioPreprocessor`.
     var diarizationPreprocessingEnabled: Bool = true
+    /// GGML weight file the `.whisperCpp` engine loads. Ignored by every other
+    /// engine.
+    var whisperCppModel: WhisperCppModel = .default
 }

@@ -16,14 +16,25 @@ import Foundation
 
 enum ModelStore {
 
-    /// Groups of FluidAudio models that map to a user-facing feature.
+    /// Groups of downloaded models that map to a user-facing feature.
     enum ModelGroup: String, CaseIterable, Identifiable {
         case liveTranscription
         case onDeviceLanguage
         case diarization
         case vad
+        case whisperCpp
 
         var id: String { rawValue }
+
+        /// Directory the group's folders live under. Everything FluidAudio
+        /// downloads shares its cache; whisper.cpp keeps its own root so neither
+        /// downloader can see — or delete — the other's files.
+        var root: URL {
+            switch self {
+            case .whisperCpp: return WhisperCppModelDownloader.modelsDirectory
+            case .liveTranscription, .onDeviceLanguage, .diarization, .vad: return ModelStore.modelsDirectory
+            }
+        }
 
         /// Known historical/current cache folders. These are only a migration
         /// fallback; newly downloaded folders are discovered and persisted from
@@ -54,6 +65,10 @@ enum ModelStore {
                     "silero-vad",
                     "silero-vad-coreml"
                 ]
+            case .whisperCpp:
+                // Deterministic: the app names these folders itself, so unlike
+                // the FluidAudio groups there is nothing to discover.
+                return WhisperCppModel.allCases.map(\.folderName)
             }
         }
 
@@ -67,6 +82,8 @@ enum ModelStore {
                 return NSLocalizedString("settings.models.diarization", comment: "Diarization models")
             case .vad:
                 return NSLocalizedString("settings.models.vad", comment: "Voice activity detection model")
+            case .whisperCpp:
+                return NSLocalizedString("settings.models.whisper_cpp", comment: "On-device Whisper models")
             }
         }
     }
@@ -104,6 +121,9 @@ enum ModelStore {
     }
 
     static func recordDownload(for group: ModelGroup, before: Snapshot) {
+        // Only FluidAudio needs folder discovery — it renames its model repos
+        // between releases. `.whisperCpp` folders are named by this app.
+        guard group.root == modelsDirectory else { return }
         let after = snapshot()
         let changed = after.folders.compactMap { name, signature -> String? in
             before.folders[name] == signature ? nil : name
@@ -119,27 +139,29 @@ enum ModelStore {
     /// Total bytes used on disk by a group's model folders (0 if none present).
     static func sizeOnDisk(_ group: ModelGroup) -> Int64 {
         folders(for: group).reduce(Int64(0)) { running, folder in
-            running + directorySize(modelsDirectory.appendingPathComponent(folder, isDirectory: true))
+            running + directorySize(group.root.appendingPathComponent(folder, isDirectory: true))
         }
     }
 
     /// Whether any of the group's model folders exist on disk.
     static func isInstalled(_ group: ModelGroup) -> Bool {
         folders(for: group).contains { folder in
-            FileManager.default.fileExists(atPath: modelsDirectory.appendingPathComponent(folder).path)
+            FileManager.default.fileExists(atPath: group.root.appendingPathComponent(folder).path)
         }
     }
 
     /// Delete a group's model folders. Missing folders are ignored.
     static func delete(_ group: ModelGroup) {
-        delete(folders: folders(for: group))
+        delete(folders: folders(for: group), in: group.root)
         var registry = folderRegistry()
         registry[group.rawValue] = nil
         setFolderRegistry(registry)
     }
 
     static func delete(_ model: InstalledModel) {
-        delete(folders: model.folderNames)
+        // A `nil` group is the synthetic "other" entry, which only ever covers
+        // unclaimed folders in FluidAudio's cache.
+        delete(folders: model.folderNames, in: model.group?.root ?? modelsDirectory)
         if let group = model.group {
             var registry = folderRegistry()
             registry[group.rawValue] = nil
@@ -153,9 +175,12 @@ enum ModelStore {
         var models: [InstalledModel] = []
 
         for group in ModelGroup.allCases {
-            let groupFolders = folders(for: group).filter { topLevel.contains($0) }
+            let present = group.root == modelsDirectory
+                ? topLevel
+                : Set(topLevelFolderSignatures(in: group.root).keys)
+            let groupFolders = folders(for: group).filter { present.contains($0) }
             guard !groupFolders.isEmpty else { continue }
-            claimed.formUnion(groupFolders)
+            if group.root == modelsDirectory { claimed.formUnion(groupFolders) }
             models.append(
                 InstalledModel(
                     id: group.rawValue,
@@ -193,14 +218,14 @@ enum ModelStore {
 
     private static func existingFallbackFolders(for group: ModelGroup) -> [String] {
         group.fallbackFolderNames.filter {
-            FileManager.default.fileExists(atPath: modelsDirectory.appendingPathComponent($0).path)
+            FileManager.default.fileExists(atPath: group.root.appendingPathComponent($0).path)
         }
     }
 
-    private static func delete(folders: [String]) {
+    private static func delete(folders: [String], in root: URL) {
         let fm = FileManager.default
         for folder in folders {
-            try? fm.removeItem(at: modelsDirectory.appendingPathComponent(folder, isDirectory: true))
+            try? fm.removeItem(at: root.appendingPathComponent(folder, isDirectory: true))
         }
     }
 
@@ -212,10 +237,12 @@ enum ModelStore {
         UserDefaults.standard.set(registry, forKey: folderRegistryKey)
     }
 
-    private static func topLevelFolderSignatures() -> [String: FolderSignature] {
+    private static func topLevelFolderSignatures(
+        in root: URL = ModelStore.modelsDirectory
+    ) -> [String: FolderSignature] {
         let fm = FileManager.default
         guard let urls = try? fm.contentsOfDirectory(
-            at: modelsDirectory,
+            at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else { return [:] }

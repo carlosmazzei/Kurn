@@ -31,11 +31,41 @@ Citation, as requested by the project:
 
 Speech features in Kurn are **Powered by Fluid Inference**.
 
+### whisper.cpp
+
+- Project: https://github.com/ggml-org/whisper.cpp
+- Author: Georgi Gerganov and the ggml.ai contributors
+- License: MIT License
+
+Linked as the project's official prebuilt XCFramework, and used for the
+on-device Whisper transcription engine.
+
+> Copyright (c) 2023-2024 The ggml authors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of
+> this software and associated documentation files (the "Software"), to deal in
+> the Software without restriction, including without limitation the rights to
+> use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+> of the Software, and to permit persons to whom the Software is furnished to do
+> so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
 ## Machine-learning models
 
-Kurn downloads these CoreML models on demand (with the user's consent) through
-FluidAudio. They are not bundled in the app binary; each is fetched from its
-upstream distribution and cached on device.
+Kurn downloads these models on demand (with the user's consent) — the CoreML ones
+through FluidAudio, the GGML Whisper weights directly. They are not bundled in
+the app binary; each is fetched from its upstream distribution and cached on
+device.
 
 ### Automatic speech recognition — Parakeet TDT (v2 / v3)
 
@@ -53,6 +83,14 @@ upstream distribution and cached on device.
 
 - Project: https://github.com/snakers4/silero-vad
 - License: MIT License
+
+### Automatic speech recognition — OpenAI Whisper (GGML)
+
+- Origin: OpenAI Whisper, converted to GGML format by the whisper.cpp project
+- Distribution: https://huggingface.co/ggerganov/whisper.cpp
+- Used for: on-device Whisper transcription (`base`, `small`, `large-v3-turbo`,
+  q5-quantized; downloaded only when the user selects the engine)
+- License: MIT License (OpenAI Whisper model weights)
 
 ---
 

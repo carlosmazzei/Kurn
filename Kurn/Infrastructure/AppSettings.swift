@@ -47,6 +47,8 @@ final class AppSettings {
         static let fluidAudioBatchASRModelsConsented = "settings.fluidAudioBatchASRModelsConsented"
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
         static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
+        static let whisperCppModel = "settings.whisperCppModel"
+        static let whisperCppModelsConsented = "settings.whisperCppModelsConsented"
         static let logLevel = "settings.logLevel"
         static let requireAuthForRecordings = "settings.requireAuthForRecordings"
         static let hideLiveActivityMeetingTitle = "settings.hideLiveActivityMeetingTitle"
@@ -209,6 +211,12 @@ final class AppSettings {
         didSet { defaults.set(transcriptionEngine.rawValue, forKey: Keys.transcriptionEngine) }
     }
 
+    /// GGML weight file the on-device Whisper (whisper.cpp) engine runs. Only
+    /// meaningful when `transcriptionEngine` is `.whisperCpp`.
+    var whisperCppModel: WhisperCppModel {
+        didSet { defaults.set(whisperCppModel.rawValue, forKey: Keys.whisperCppModel) }
+    }
+
     /// Offline audio-cleanup engine applied before the transcription path.
     var preprocessingEngine: PreprocessingEngine {
         didSet { defaults.set(preprocessingEngine.rawValue, forKey: Keys.preprocessingEngine) }
@@ -236,7 +244,8 @@ final class AppSettings {
             transcriptionProvider: transcriptionProvider,
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
             fluidAudioSpeakerCount: fluidAudioSpeakerCount,
-            diarizationPreprocessingEnabled: diarizationPreprocessingEnabled
+            diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
+            whisperCppModel: whisperCppModel
         )
     }
 
@@ -246,7 +255,7 @@ final class AppSettings {
     /// is only loaded for users who will actually use it, and never downloaded
     /// without consent. See `FluidAudioModelStore.prewarm()`.
     var usesFluidAudioModel: Bool {
-        let needsOnDeviceASR = transcriptionEngine.requiredModelSet == .onDeviceASR
+        let needsOnDeviceASR = transcriptionEngine.requiredModelSet(whisperCppModel: whisperCppModel) == .onDeviceASR
             || languageDetectionEngine.requiredModelSet == .onDeviceASR
         return needsOnDeviceASR && fluidAudioBatchASRModelsConsented
     }
@@ -275,6 +284,13 @@ final class AppSettings {
     /// model (used by the FluidAudio voice-activity-detection engine).
     var fluidAudioVADModelsConsented: Bool {
         didSet { defaults.set(fluidAudioVADModelsConsented, forKey: Keys.fluidAudioVADModelsConsented) }
+    }
+
+    /// Whether the user has consented to downloading whisper.cpp's GGML weights
+    /// for the on-device Whisper engine. Which variant is downloaded is a
+    /// separate choice (`whisperCppModel`).
+    var whisperCppModelsConsented: Bool {
+        didSet { defaults.set(whisperCppModelsConsented, forKey: Keys.whisperCppModelsConsented) }
     }
 
     /// Whether the user has opted in to on-device MetricKit diagnostic reports
@@ -486,6 +502,7 @@ final class AppSettings {
         fluidAudioBatchASRModelsConsented = batchASRConsented
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
         fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
+        whisperCppModelsConsented = defaults.bool(forKey: Keys.whisperCppModelsConsented)
         diagnosticReportsConsented = defaults.bool(forKey: AppSettingsKeys.diagnosticReportsConsented)
         // Transcription engine: prefer the stored value; otherwise migrate the
         // legacy `defaultMode` + on-device-multilingual pairing into the new
@@ -502,6 +519,7 @@ final class AppSettings {
         preprocessingEngine = defaults.enumValue(forKey: Keys.preprocessingEngine, default: .standardDSP)
         vadEngine = defaults.enumValue(forKey: Keys.vadEngine, default: .energyThreshold)
         languageDetectionEngine = defaults.enumValue(forKey: Keys.languageDetectionEngine, default: .byTranscriber)
+        whisperCppModel = defaults.enumValue(forKey: Keys.whisperCppModel, default: WhisperCppModel.default)
         // Fall back to the environment-derived default (set on `AppLog` at
         // launch) when the user hasn't chosen a level yet.
         let resolvedLogLevel = defaults.enumValue(forKey: Keys.logLevel, default: AppLog.minimumLevel)
