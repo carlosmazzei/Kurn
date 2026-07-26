@@ -619,3 +619,28 @@
 "detail.wiki.view" = "Ver wiki";
 "detail.wiki.title" = "Wiki de la reunión";
 "detail.wiki.updated" = "Actualizada el %@";
+
+/* Documentos generados */
+"navigation.meetings" = "Reuniones";
+"documents.title" = "Documentos";
+"documents.new" = "Nuevo documento";
+"documents.empty.title" = "Aún no hay documentos";
+"documents.empty.subtitle" = "Genera un documento a partir de transcripciones, etiquetas o carpetas seleccionadas.";
+"documents.prompt.title" = "Instrucciones";
+"documents.prompt.placeholder" = "Ejemplo: Crea un informe del proyecto con decisiones, riesgos y próximos pasos…";
+"documents.source.title" = "Fuentes";
+"documents.source.transcripts" = "Transcripciones";
+"documents.source.tags" = "Etiquetas";
+"documents.source.folders" = "Carpetas";
+"documents.source.count" = "%d transcripciones incluidas";
+"documents.source.empty" = "No hay fuentes";
+"documents.source.empty.subtitle" = "Primero transcribe una reunión u organízala con etiquetas y carpetas.";
+"documents.generate" = "Generar";
+"documents.generating.progress" = "Generando parte %1$d de %2$d…";
+"documents.delete.confirm" = "¿Eliminar documento?";
+"documents.details" = "Detalles del documento";
+"documents.generated_at" = "Generado";
+"documents.error.empty_prompt" = "Introduce las instrucciones del documento.";
+"documents.error.no_transcripts" = "Selecciona al menos una fuente con una transcripción.";
+"documents.error.empty_response" = "El proveedor de IA devolvió un documento vacío.";
+"error.document_generation" = "No se pudo generar el documento: %@";

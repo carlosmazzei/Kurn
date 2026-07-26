@@ -619,3 +619,28 @@
 "detail.wiki.view" = "Wiki anzeigen";
 "detail.wiki.title" = "Meeting-Wiki";
 "detail.wiki.updated" = "Aktualisiert am %@";
+
+/* Generierte Dokumente */
+"navigation.meetings" = "Meetings";
+"documents.title" = "Dokumente";
+"documents.new" = "Neues Dokument";
+"documents.empty.title" = "Noch keine Dokumente";
+"documents.empty.subtitle" = "Erstelle ein Dokument aus ausgewählten Transkripten, Tags oder Ordnern.";
+"documents.prompt.title" = "Anweisungen";
+"documents.prompt.placeholder" = "Beispiel: Erstelle einen Projektbericht mit Entscheidungen, Risiken und nächsten Schritten…";
+"documents.source.title" = "Quellen";
+"documents.source.transcripts" = "Transkripte";
+"documents.source.tags" = "Tags";
+"documents.source.folders" = "Ordner";
+"documents.source.count" = "%d Transkripte enthalten";
+"documents.source.empty" = "Keine Quellen";
+"documents.source.empty.subtitle" = "Transkribiere zuerst ein Meeting oder organisiere es mit Tags und Ordnern.";
+"documents.generate" = "Erstellen";
+"documents.generating.progress" = "Teil %1$d von %2$d wird erstellt…";
+"documents.delete.confirm" = "Dokument löschen?";
+"documents.details" = "Dokumentdetails";
+"documents.generated_at" = "Erstellt";
+"documents.error.empty_prompt" = "Gib Anweisungen für das Dokument ein.";
+"documents.error.no_transcripts" = "Wähle mindestens eine Quelle mit einem Transkript.";
+"documents.error.empty_response" = "Der KI-Anbieter hat ein leeres Dokument zurückgegeben.";
+"error.document_generation" = "Dokument konnte nicht erstellt werden: %@";

@@ -619,3 +619,28 @@
 "detail.wiki.view" = "View wiki";
 "detail.wiki.title" = "Meeting Wiki";
 "detail.wiki.updated" = "Updated %@";
+
+/* Generated documents */
+"navigation.meetings" = "Meetings";
+"documents.title" = "Documents";
+"documents.new" = "New Document";
+"documents.empty.title" = "No Documents Yet";
+"documents.empty.subtitle" = "Generate a document from selected transcripts, tags, or folders.";
+"documents.prompt.title" = "Instructions";
+"documents.prompt.placeholder" = "For example: Create a project status report with decisions, risks, and next steps…";
+"documents.source.title" = "Sources";
+"documents.source.transcripts" = "Transcripts";
+"documents.source.tags" = "Tags";
+"documents.source.folders" = "Folders";
+"documents.source.count" = "%d transcripts included";
+"documents.source.empty" = "No Sources";
+"documents.source.empty.subtitle" = "Transcribe a meeting or organize it with tags and folders first.";
+"documents.generate" = "Generate";
+"documents.generating.progress" = "Generating part %1$d of %2$d…";
+"documents.delete.confirm" = "Delete document?";
+"documents.details" = "Document details";
+"documents.generated_at" = "Generated";
+"documents.error.empty_prompt" = "Enter instructions for the document.";
+"documents.error.no_transcripts" = "Select at least one source containing a transcript.";
+"documents.error.empty_response" = "The AI provider returned an empty document.";
+"error.document_generation" = "Could not generate the document: %@";

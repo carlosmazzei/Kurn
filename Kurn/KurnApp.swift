@@ -68,7 +68,8 @@ struct KurnApp: App {
             Tag.self,
             SmartFolder.self,
             SemanticChunk.self,
-            WikiArticle.self
+            WikiArticle.self,
+            GeneratedDocument.self
         ])
         #if DEBUG
         // App Store screenshot automation (fastlane `snapshot` + KurnUITests):
