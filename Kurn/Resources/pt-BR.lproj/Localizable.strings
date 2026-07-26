@@ -191,6 +191,8 @@
 "meetings.unfavorite" = "Desfavoritar";
 "meetings.archive" = "Arquivar";
 "meetings.unarchive" = "Desarquivar";
+"meetings.summary_count.one" = "%d resumo";
+"meetings.summary_count.other" = "%d resumos";
 "meetings.bucket" = "Biblioteca";
 "meetings.bucket.all" = "Todas";
 "meetings.bucket.inbox" = "Caixa de Entrada";
