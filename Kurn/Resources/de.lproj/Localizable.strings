@@ -609,3 +609,6 @@
 "settings.wiki_clear" = "Wiki löschen";
 "settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt.";
 "settings.wiki_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um das Meeting-Wiki zu erstellen.";
+"detail.wiki.view" = "Wiki anzeigen";
+"detail.wiki.title" = "Meeting-Wiki";
+"detail.wiki.updated" = "Aktualisiert am %@";

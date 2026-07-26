@@ -4,11 +4,10 @@
 //
 //  A persisted, LLM-generated "wiki" of one meeting: dense, structured,
 //  timestamped notes condensed from the whole transcript (decisions, action
-//  items, key facts, numbers, names). Unlike a `Summary`, it's not user-facing —
-//  it exists to be fed into the library-wide chat's synthesis path, where a
-//  handful of condensed articles fit the model's context in a way whole
-//  transcripts never could, so questions that span or aggregate across meetings
-//  can actually be answered.
+//  items, key facts, numbers, names). It primarily feeds the library-wide chat's
+//  synthesis path, where a handful of condensed articles fit the model's context
+//  in a way whole transcripts never could, and is also available read-only from
+//  its meeting's detail screen for transparency.
 //
 //  Like `SemanticChunk`, it lives in the one app SwiftData store, so its text is
 //  encrypted at rest by `ModelStoreProtection` (`.completeUnlessOpen`). One

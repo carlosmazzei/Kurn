@@ -609,3 +609,6 @@
 "settings.wiki_clear" = "Effacer le wiki";
 "settings.wiki_footer" = "Utilise votre fournisseur d'IA de résumé pour créer un article condensé par réunion, afin que la fonction « Demander » de la bibliothèque réponde aux questions qui couvrent ou comparent plusieurs réunions. Désactivé par défaut — effectue des appels au cloud.";
 "settings.wiki_needs_key" = "Ajoutez une clé d'API pour votre fournisseur de résumé afin de créer le wiki des réunions.";
+"detail.wiki.view" = "Voir le wiki";
+"detail.wiki.title" = "Wiki de la réunion";
+"detail.wiki.updated" = "Mis à jour le %@";
