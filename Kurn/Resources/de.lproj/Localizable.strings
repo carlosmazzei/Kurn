@@ -496,6 +496,7 @@
 "settings.whisper_cpp.package_missing" = "Fügen Sie dem Kurn-Target das whisper.cpp-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
 "settings.whisper_cpp.model" = "Whisper-Modell";
 "settings.whisper_cpp.model_footer" = "Größere Modelle transkribieren genauer, laden aber mehr Daten und arbeiten langsamer. Jedes wird einzeln geladen und kann unter Speicher gelöscht werden.";
+"settings.whisper_cpp.choose_model" = "Whisper-Modell wählen";
 "whisper_cpp.model.base" = "Base";
 "whisper_cpp.model.small" = "Small";
 "whisper_cpp.model.large_turbo" = "Large v3 Turbo";
@@ -518,6 +519,7 @@
 "settings.models.vad" = "Sprachaktivitätserkennung";
 "settings.models.other" = "Weitere FluidAudio-Modelle";
 "settings.models.whisper_cpp" = "Whisper auf dem Gerät";
+"settings.models.installed" = "Installiert";
 "settings.models.delete" = "Modell löschen";
 "settings.models.delete_confirm" = "Dieses Modell löschen?";
 "settings.models.delete_message" = "Es wird von diesem Gerät entfernt. Sie können es später erneut herunterladen, indem Sie die Funktion wieder aktivieren.";

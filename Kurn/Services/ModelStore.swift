@@ -86,6 +86,21 @@ enum ModelStore {
                 return NSLocalizedString("settings.models.whisper_cpp", comment: "On-device Whisper models")
             }
         }
+
+        /// Whether each folder in the group is a model the user can keep or
+        /// delete on its own. whisper.cpp's size variants are independent —
+        /// keeping `small` and dropping `large-v3-turbo` is a reasonable thing
+        /// to want — whereas FluidAudio's folders are parts of one feature that
+        /// only work together, so those stay a single row.
+        var listsFoldersSeparately: Bool { self == .whisperCpp }
+
+        /// Name for one folder when the group lists its folders separately.
+        func displayName(forFolder folder: String) -> String {
+            guard let model = WhisperCppModel.allCases.first(where: { $0.folderName == folder }) else {
+                return displayName
+            }
+            return "\(displayName) · \(model.displayName)"
+        }
     }
 
     struct InstalledModel: Identifiable, Equatable {
@@ -181,15 +196,30 @@ enum ModelStore {
             let groupFolders = folders(for: group).filter { present.contains($0) }
             guard !groupFolders.isEmpty else { continue }
             if group.root == modelsDirectory { claimed.formUnion(groupFolders) }
-            models.append(
-                InstalledModel(
-                    id: group.rawValue,
-                    group: group,
-                    displayName: group.displayName,
-                    folderNames: groupFolders.sorted(),
-                    size: sizeOnDisk(group)
+            guard group.listsFoldersSeparately else {
+                models.append(
+                    InstalledModel(
+                        id: group.rawValue,
+                        group: group,
+                        displayName: group.displayName,
+                        folderNames: groupFolders.sorted(),
+                        size: sizeOnDisk(group)
+                    )
                 )
-            )
+                continue
+            }
+            // One row per folder, each independently deletable.
+            for folder in groupFolders.sorted() {
+                models.append(
+                    InstalledModel(
+                        id: "\(group.rawValue).\(folder)",
+                        group: group,
+                        displayName: group.displayName(forFolder: folder),
+                        folderNames: [folder],
+                        size: directorySize(group.root.appendingPathComponent(folder, isDirectory: true))
+                    )
+                )
+            }
         }
 
         let otherFolders = topLevel.subtracting(claimed).sorted()

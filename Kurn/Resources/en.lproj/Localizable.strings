@@ -496,6 +496,7 @@
 "settings.whisper_cpp.package_missing" = "Add the whisper.cpp Swift package to the Kurn target before using this feature.";
 "settings.whisper_cpp.model" = "Whisper Model";
 "settings.whisper_cpp.model_footer" = "Larger models transcribe more accurately but download more data and run slower. Each one is downloaded separately and can be deleted under Storage.";
+"settings.whisper_cpp.choose_model" = "Choose a Whisper Model";
 "whisper_cpp.model.base" = "Base";
 "whisper_cpp.model.small" = "Small";
 "whisper_cpp.model.large_turbo" = "Large v3 Turbo";
@@ -518,6 +519,7 @@
 "settings.models.vad" = "Voice Activity Detection";
 "settings.models.other" = "Other FluidAudio Models";
 "settings.models.whisper_cpp" = "On-Device Whisper";
+"settings.models.installed" = "Installed";
 "settings.models.delete" = "Delete Model";
 "settings.models.delete_confirm" = "Delete this model?";
 "settings.models.delete_message" = "It will be removed from this device. You can download it again later by re-enabling the feature.";

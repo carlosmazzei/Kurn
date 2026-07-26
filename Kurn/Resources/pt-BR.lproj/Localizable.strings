@@ -496,6 +496,7 @@
 "settings.whisper_cpp.package_missing" = "Adicione o pacote Swift whisper.cpp ao target Kurn antes de usar este recurso.";
 "settings.whisper_cpp.model" = "Modelo Whisper";
 "settings.whisper_cpp.model_footer" = "Modelos maiores transcrevem com mais precisão, mas baixam mais dados e são mais lentos. Cada um é baixado separadamente e pode ser excluído em Armazenamento.";
+"settings.whisper_cpp.choose_model" = "Escolha um Modelo Whisper";
 "whisper_cpp.model.base" = "Base";
 "whisper_cpp.model.small" = "Small";
 "whisper_cpp.model.large_turbo" = "Large v3 Turbo";
@@ -518,6 +519,7 @@
 "settings.models.vad" = "Detecção de Atividade de Voz";
 "settings.models.other" = "Outros Modelos FluidAudio";
 "settings.models.whisper_cpp" = "Whisper no Dispositivo";
+"settings.models.installed" = "Instalado";
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";

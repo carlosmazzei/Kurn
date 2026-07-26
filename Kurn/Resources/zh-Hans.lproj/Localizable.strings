@@ -496,6 +496,7 @@
 "settings.whisper_cpp.package_missing" = "使用此功能前，请先将 whisper.cpp Swift 包添加到 Kurn target 中。";
 "settings.whisper_cpp.model" = "Whisper 模型";
 "settings.whisper_cpp.model_footer" = "模型越大转写越准确，但下载数据更多、速度更慢。每个模型单独下载，可在“存储”中删除。";
+"settings.whisper_cpp.choose_model" = "选择 Whisper 模型";
 "whisper_cpp.model.base" = "Base";
 "whisper_cpp.model.small" = "Small";
 "whisper_cpp.model.large_turbo" = "Large v3 Turbo";
@@ -518,6 +519,7 @@
 "settings.models.vad" = "语音活动检测";
 "settings.models.other" = "其他 FluidAudio 模型";
 "settings.models.whisper_cpp" = "设备端 Whisper";
+"settings.models.installed" = "已安装";
 "settings.models.delete" = "删除模型";
 "settings.models.delete_confirm" = "删除此模型？";
 "settings.models.delete_message" = "它将从此设备上移除。您可以稍后重新启用该功能以再次下载。";

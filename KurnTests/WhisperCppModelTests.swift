@@ -99,6 +99,70 @@ struct WhisperCppModelTests {
         #expect(fallbacks == Set(WhisperCppModel.allCases.map(\.folderName)))
     }
 
+    /// Size variants are independently useful, so Storage has to list them one
+    /// per row — keeping `small` while dropping `large-v3-turbo` is a reasonable
+    /// thing to want. FluidAudio's folders are parts of one feature and stay
+    /// grouped.
+    @Test func onlyTheWhisperGroupListsItsFoldersSeparately() {
+        #expect(ModelStore.ModelGroup.whisperCpp.listsFoldersSeparately)
+        for group in ModelStore.ModelGroup.allCases where group != .whisperCpp {
+            #expect(group.listsFoldersSeparately == false)
+        }
+    }
+
+    @Test func eachVariantFolderGetsItsOwnRowName() {
+        let group = ModelStore.ModelGroup.whisperCpp
+        let names = WhisperCppModel.allCases.map { group.displayName(forFolder: $0.folderName) }
+        #expect(Set(names).count == names.count)
+        for (model, name) in zip(WhisperCppModel.allCases, names) {
+            #expect(name.contains(model.displayName))
+        }
+        // An unrecognized folder falls back to the group name rather than
+        // producing a row labelled with a raw directory name.
+        #expect(group.displayName(forFolder: "ggml-nonexistent") == group.displayName)
+    }
+
+    /// The bug this covers: every installed variant collapsed into a single
+    /// Storage row, so there was no way to delete just one of them.
+    @Test func installedVariantsAreListedAndDeletedIndividually() throws {
+        let fm = FileManager.default
+        let root = WhisperCppModelDownloader.modelsDirectory
+        let installed: [WhisperCppModel] = [.base, .largeTurbo]
+        // Only run against a clean slate, so a real download on the simulator
+        // can't make this flaky.
+        try #require(WhisperCppModel.allCases.allSatisfy { !fm.fileExists(atPath: WhisperCppModelDownloader.directory(for: $0).path) })
+        defer {
+            for model in installed {
+                try? fm.removeItem(at: WhisperCppModelDownloader.directory(for: model))
+            }
+        }
+
+        for model in installed {
+            let folder = WhisperCppModelDownloader.directory(for: model)
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data(repeating: 0, count: 2048).write(to: folder.appendingPathComponent(model.fileName))
+        }
+
+        let rows = ModelStore.installedModels().filter { $0.group == .whisperCpp }
+        #expect(rows.count == installed.count)
+        #expect(Set(rows.flatMap(\.folderNames)) == Set(installed.map(\.folderName)))
+        // One folder per row is what makes the delete button surgical.
+        #expect(rows.allSatisfy { $0.folderNames.count == 1 })
+        #expect(rows.allSatisfy { $0.size > 0 })
+        // The variant that was not written must not appear.
+        #expect(!rows.contains { $0.folderNames.contains(WhisperCppModel.small.folderName) })
+
+        guard let base = rows.first(where: { $0.folderNames == [WhisperCppModel.base.folderName] }) else {
+            Issue.record("no row for the base variant")
+            return
+        }
+        ModelStore.delete(base)
+        #expect(!fm.fileExists(atPath: WhisperCppModelDownloader.directory(for: .base).path))
+        // Deleting one variant must leave the others on disk.
+        #expect(fm.fileExists(atPath: WhisperCppModelDownloader.directory(for: .largeTurbo).path))
+        #expect(ModelStore.installedModels().filter { $0.group == .whisperCpp }.count == 1)
+    }
+
     /// Nothing is installed on a clean simulator, so this also proves
     /// `isInstalled` doesn't throw or report a false positive for a missing file.
     @Test func uninstalledModelsReportNotInstalled() {

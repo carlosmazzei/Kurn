@@ -326,6 +326,22 @@ Three things are deliberately *not* parallel to the FluidAudio stack:
   is a function rather than a property. Switching variants re-runs the consent +
   download flow, and the variant is folded into the transcription checkpoint's
   `providerID` so a resume can't splice two models' output together.
+
+  The variant axis forces two departures from the FluidAudio consent UI, both in
+  `ModelDownloadController`. First, selecting the engine can't use the plain
+  yes/no consent dialog: the size picker only renders once whisper.cpp *is* the
+  selected engine, i.e. after the download it would otherwise have picked for
+  the user. `showingWhisperCppModelChoice` breaks that circle with a
+  `confirmationDialog` listing every variant and its size, so choosing a size
+  and consenting are one step. (`showingWhisperCppConsent` remains for the size
+  picker's own path, where the variant is already chosen.) Second, the download
+  gate keys on the file being present, not on `whisperCppModelsConsented` —
+  each variant is a separate file and Storage deletes them individually, which a
+  single consent flag can't express. That individual deletion is why Storage
+  lists one row per installed variant
+  (`ModelStore.ModelGroup.listsFoldersSeparately`, the only group that does), and
+  why `deleteModel` clears consent and reverts the engine only when the *last*
+  variant is gone, re-pointing `whisperCppModel` at a surviving one otherwise.
 - **Chunked, not single-pass.** `whisper_full` takes the whole clip as one
   `[Float]`, so the transcriber reuses `AudioChunker` +
   `ChunkedTranscriptionRunner` at 5-minute chunks (the cloud engine uses 10).

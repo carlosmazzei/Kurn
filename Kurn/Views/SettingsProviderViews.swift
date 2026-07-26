@@ -403,7 +403,35 @@ struct ModelDownloadAlerts: ViewModifier {
                 onConfirm: { downloads.confirmWhisperCpp(settings: settings) },
                 onCancel: { downloads.cancelWhisperCpp() }
             )
+            // Picking the engine has to also pick a size, since the size picker
+            // only appears once whisper.cpp *is* the selected engine — i.e. after
+            // the download it would otherwise have chosen for the user.
+            .confirmationDialog(
+                NSLocalizedString("settings.whisper_cpp.choose_model", comment: "Choose a Whisper model"),
+                isPresented: $downloads.showingWhisperCppModelChoice,
+                titleVisibility: .visible
+            ) {
+                ForEach(WhisperCppModel.allCases) { model in
+                    Button(Self.choiceLabel(for: model)) {
+                        downloads.chooseWhisperCppModel(model, settings: settings)
+                    }
+                }
+                Button(NSLocalizedString("common.cancel", comment: "Cancel"), role: .cancel) {
+                    downloads.cancelWhisperCpp()
+                }
+            } message: {
+                Text(NSLocalizedString("settings.model_download.message_whisper_cpp", comment: ""))
+            }
             .errorAlert($downloads.error)
+    }
+
+    /// Size to download, or a note that it's already on disk — so the cost of
+    /// each option is visible before the user commits to one.
+    private static func choiceLabel(for model: WhisperCppModel) -> String {
+        let detail = WhisperCppModelDownloader.isInstalled(model)
+            ? NSLocalizedString("settings.models.installed", comment: "Already downloaded")
+            : ByteCountFormatter.string(fromByteCount: model.approximateBytes, countStyle: .file)
+        return "\(model.displayName) · \(detail)"
     }
 }
 
