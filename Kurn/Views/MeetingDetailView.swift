@@ -50,6 +50,10 @@ struct MeetingDetailView: View {
 
     @State private var showingRecorder = false
     @State private var showingEdit = false
+    /// Presents the generated article without adding a fifth item to the compact
+    /// meeting section picker. The wiki is supporting material rather than a
+    /// primary workflow, so it lives in the overflow menu.
+    @State private var showingWiki = false
     @State var showingTemplatePicker = false
     @State var shareItem: ShareItem?
     @State var showingShareSelection = false
@@ -90,6 +94,11 @@ struct MeetingDetailView: View {
         }
         .sheet(isPresented: $showingEdit) {
             NavigationStack { MeetingFormView(meeting: meeting) }
+        }
+        .sheet(isPresented: $showingWiki) {
+            if let article = meeting.wikiArticle {
+                NavigationStack { MeetingWikiView(article: article) }
+            }
         }
         .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
         .sheet(isPresented: $showingShareSelection) {
@@ -409,6 +418,14 @@ struct MeetingDetailView: View {
                 }
                 Button { showingShareSelection = true } label: {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
+                }
+                if meeting.wikiArticle != nil {
+                    Button { showingWiki = true } label: {
+                        Label(
+                            NSLocalizedString("detail.wiki.view", comment: "View meeting wiki"),
+                            systemImage: "book.pages"
+                        )
+                    }
                 }
                 Button {
                     meeting.archivedAt = meeting.isArchived ? nil : Date()
