@@ -268,4 +268,34 @@ struct ModelTests {
         #expect(recording.transcriptionStatusRaw == TranscriptionStatus.done.rawValue)
         #expect(recording.transcriptionModeRaw == TranscriptionMode.whisperAPI.rawValue)
     }
+
+    /// `0` is the "not measured yet" sentinel that lets the field be added
+    /// without a SwiftData migration plan, so it has to stay the default.
+    @Test func fileSizeDefaultsToUnknown() {
+        #expect(Recording(fileName: "a.m4a", duration: 1).fileSize == 0)
+    }
+
+    @Test func fileSizePersistsThroughTheStore() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Sized")
+        context.insert(meeting)
+        context.insert(Recording(meeting: meeting, fileName: "a.m4a", duration: 60, fileSize: 720_000))
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<Recording>())
+        #expect(fetched.first?.fileSize == 720_000)
+    }
+
+    @Test func effectiveBitRateIsDerivedFromSizeAndDuration() {
+        // 60s at 48 kbps is 360_000 bytes.
+        let recording = Recording(fileName: "a.m4a", duration: 60, fileSize: 360_000)
+        #expect(recording.effectiveBitRate == 48_000)
+    }
+
+    @Test(arguments: [(0.0, Int64(360_000)), (60.0, Int64(0))])
+    func effectiveBitRateIsUnknownWithoutBothInputs(duration: TimeInterval, fileSize: Int64) {
+        let recording = Recording(fileName: "a.m4a", duration: duration, fileSize: fileSize)
+        #expect(recording.effectiveBitRate == nil)
+    }
 }

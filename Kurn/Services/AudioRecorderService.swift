@@ -13,6 +13,12 @@
 //  Recording stays fully offline — buffers are written straight to a Documents
 //  .m4a and survive connectivity loss.
 //
+//  The stored format is deliberately NOT the microphone's native format: every
+//  buffer is resampled to `storageSampleRate` mono before it reaches the file
+//  (see `RecordingSink`). See that constant for why, and note the knock-on
+//  benefit in `recoverEngineIfNeeded` — with the file format decoupled from the
+//  input, a mid-recording route change no longer invalidates the open file.
+//
 
 import AVFoundation
 import Foundation
@@ -28,12 +34,37 @@ final class AudioRecorderService: NSObject {
         case paused
     }
 
+    /// Sample rate every recording is stored at, regardless of what the
+    /// microphone route negotiates (typically 48kHz built-in, 16kHz Bluetooth
+    /// HFP). Speech occupies roughly 80Hz–8kHz, so 24kHz mono — a 12kHz band —
+    /// is transparent for voice even at the 2x playback `AudioPlayerService`
+    /// offers, while every machine consumer of the audio resamples to 16kHz
+    /// anyway (`AudioPreprocessor`, `DiarizationPreprocessor`, `VADAudioLoader`,
+    /// `WhisperCppTranscriber`, and the ASR frameworks internally). Storing the
+    /// mic's native rate therefore spent bits on a band nothing reads.
+    static let storageSampleRate: Double = 24_000
+    /// Recordings are always mono: diarization and ASR both downmix, and the
+    /// second channel of a stereo external mic doubles the file for nothing.
+    static let storageChannelCount: AVAudioChannelCount = 1
+
+    /// The format buffers are converted to before being encoded. Non-nil for
+    /// every sample rate/channel pair we pass, but `AVAudioFormat`'s initializer
+    /// is failable, so callers treat `nil` as a setup failure.
+    static var storageProcessingFormat: AVAudioFormat? {
+        AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: storageSampleRate,
+            channels: storageChannelCount,
+            interleaved: false
+        )
+    }
+
     private(set) var state: State = .idle
     /// Preferred built-in mic pickup pattern. Set before `start`. Defaults to
     /// whole-room (omnidirectional) capture.
     var micPickup: MicPickup = .wholeRoom
     /// AAC encoder bit rate (bits/sec) for the output file. Set before `start`.
-    var audioBitRate: Int = 64_000
+    var audioBitRate: Int = AudioQuality.standard.bitRate
     /// When true, always select the iPhone's built-in microphone even if an
     /// external (e.g. Bluetooth) input is connected, and skip offering a
     /// choice. Set before `start`. Mirrors `AppSettings.alwaysUseBuiltInMic`.
@@ -58,9 +89,9 @@ final class AudioRecorderService: NSObject {
     /// main-actor object directly.
     @ObservationIgnored private nonisolated let sink = RecordingSink()
     @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
-    /// Input format the tap (and the output file) were created with, so the
-    /// engine-stall recovery can tell an in-place restart (same format) from a
-    /// format change the current file can't absorb.
+    /// Input format the tap was created with, so the engine-stall recovery can
+    /// tell a plain restart (same format) from one that needs the tap and the
+    /// sink's converter rebuilt for a new input format.
     @ObservationIgnored private nonisolated(unsafe) var tapFormat: AVAudioFormat?
     /// True while `start` is asynchronously spinning up the engine, to block
     /// re-entrant start attempts during that window.
@@ -279,24 +310,34 @@ final class AudioRecorderService: NSObject {
             )
         }
 
-        // Derive AAC .m4a settings from the live input format so the encoder
-        // matches the buffers the tap delivers.
-        var settings = format.settings
-        settings[AVFormatIDKey] = Int(kAudioFormatMPEG4AAC)
-        settings[AVEncoderBitRateKey] = bitRate
-        settings[AVEncoderAudioQualityKey] = AVAudioQuality.high.rawValue
+        // Encode at the fixed speech format rather than the mic's native one, so
+        // the file size tracks the bit rate alone and a route change can't
+        // invalidate the open file.
+        guard let storageFormat = Self.storageProcessingFormat else {
+            AppLog.recorder.atError.error("beginEngine: could not build the storage format")
+            throw AppError.audioError(
+                NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
+            )
+        }
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: Self.storageSampleRate,
+            AVNumberOfChannelsKey: Int(Self.storageChannelCount),
+            AVEncoderBitRateKey: bitRate,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
 
-        // Some routes (e.g. Bluetooth HFP hearing aids/headsets negotiating a
-        // narrowband 16kHz mono link) report a sample rate whose AAC encoder
-        // can't honor an explicit bit rate as high as the user's chosen
-        // quality — AudioConverterSetProperty rejects it and AVAudioFile's
-        // init throws. Retry once letting the codec pick its own bit rate for
-        // that sample rate rather than failing the recording outright.
+        // Kept from when the encoder saw the mic's native rate: some routes
+        // (e.g. Bluetooth HFP hearing aids negotiating a narrowband link) had a
+        // sample rate whose AAC encoder rejected an explicit bit rate this high,
+        // throwing out of AVAudioFile's init. The fixed 24kHz mono format above
+        // should never trip that, but failing a whole recording over an encoder
+        // property is not worth the saved lines.
         let file: AVAudioFile
         do {
             file = try AVAudioFile(forWriting: url, settings: settings)
         } catch {
-            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public) at sampleRate=\(format.sampleRate, privacy: .public); retrying without explicit bit rate: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public); retrying without explicit bit rate: \(error.localizedDescription, privacy: .public)")
             var fallbackSettings = settings
             fallbackSettings.removeValue(forKey: AVEncoderBitRateKey)
             do {
@@ -306,7 +347,14 @@ final class AudioRecorderService: NSObject {
                 throw error
             }
         }
-        sink.open(file, onBuffer: onAudioBuffer)
+
+        guard let converter = Self.makeConverter(from: format, to: storageFormat) else {
+            AppLog.recorder.atError.error("beginEngine: could not build a converter from \(format.sampleRate, privacy: .public)Hz/\(format.channelCount, privacy: .public)ch")
+            throw AppError.audioError(
+                NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
+            )
+        }
+        sink.open(file, converter: converter, targetFormat: storageFormat, onBuffer: onAudioBuffer)
 
         // Install the tap from a `nonisolated` context so its block does NOT
         // inherit this type's `@MainActor` isolation. The tap runs on
@@ -328,6 +376,22 @@ final class AudioRecorderService: NSObject {
                 NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
             )
         }
+    }
+
+    /// Build the resampler that takes tap buffers to the stored format. Uses the
+    /// highest-quality sample rate conversion (this runs on a fraction of a
+    /// core for mono speech) and downmixes rather than dropping channels, so a
+    /// stereo external mic keeps both sides' content.
+    private nonisolated static func makeConverter(
+        from input: AVAudioFormat,
+        to output: AVAudioFormat
+    ) -> AVAudioConverter? {
+        guard let converter = AVAudioConverter(from: input, to: output) else { return nil }
+        converter.sampleRateConverterQuality = AVAudioQuality.high.rawValue
+        if input.channelCount > output.channelCount {
+            converter.downmix = true
+        }
+        return converter
     }
 
     /// Install the input tap. Declared `nonisolated` so the block it creates is
@@ -598,11 +662,14 @@ final class AudioRecorderService: NSObject {
 
     /// Restart an engine that stopped mid-recording. When the input format is
     /// unchanged (the common case: the system bounced the engine around a
-    /// lock/unlock) the existing tap and output file are still valid, so a
-    /// plain restart resumes capture seamlessly. When the format DID change,
-    /// the current `.m4a` cannot accept the new buffers — fall back to pausing
-    /// with a visible banner so the user resumes deliberately (resume restarts
-    /// the engine) instead of silently losing everything after this moment.
+    /// lock/unlock) the existing tap is still valid and a plain restart resumes
+    /// capture seamlessly. When the format DID change, the output file is still
+    /// valid — it is written at a fixed format, not the input's — so the tap and
+    /// the sink's converter are rebuilt for the new input and recording
+    /// continues into the same `.m4a`. Only if that rebuild fails do we fall
+    /// back to pausing with a visible banner, so the user resumes deliberately
+    /// (resume restarts the engine) instead of silently losing everything after
+    /// this moment.
     private func recoverEngineIfNeeded(reason: String) {
         guard state == .recording, !engine.isRunning else { return }
         AppLog.recorder.atError.error("engine stopped mid-recording (\(reason, privacy: .public)); attempting restart")
@@ -612,18 +679,26 @@ final class AudioRecorderService: NSObject {
             $0.sampleRate == current.sampleRate && $0.channelCount == current.channelCount
         } ?? false
 
-        if formatUnchanged {
-            try? AVAudioSession.sharedInstance().setActive(true)
-            engine.prepare()
-            do {
-                try engine.start()
-                AppLog.recorder.atNotice.notice("engine restarted in place after \(reason, privacy: .public)")
+        if !formatUnchanged {
+            AppLog.recorder.atNotice.notice("input format changed to \(current.sampleRate, privacy: .public)Hz/\(current.channelCount, privacy: .public)ch; rebuilding the tap")
+            if !rebuildTapForCurrentInput(current) {
+                pause()
+                routeChangeMessage = NSLocalizedString(
+                    "recorder.engine_stalled",
+                    comment: "Recording paused because the system stopped the audio engine"
+                )
                 return
-            } catch {
-                AppLog.recorder.atError.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
             }
-        } else {
-            AppLog.recorder.atError.error("input format changed (\(current.sampleRate, privacy: .public)Hz/\(current.channelCount, privacy: .public)ch); cannot restart in place")
+        }
+
+        try? AVAudioSession.sharedInstance().setActive(true)
+        engine.prepare()
+        do {
+            try engine.start()
+            AppLog.recorder.atNotice.notice("engine restarted in place after \(reason, privacy: .public)")
+            return
+        } catch {
+            AppLog.recorder.atError.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
         }
 
         pause()
@@ -631,6 +706,27 @@ final class AudioRecorderService: NSObject {
             "recorder.engine_stalled",
             comment: "Recording paused because the system stopped the audio engine"
         )
+    }
+
+    /// Re-point the tap and the sink's converter at a new input format, keeping
+    /// the open output file. Returns false if either could not be rebuilt, in
+    /// which case the caller pauses rather than capturing nothing.
+    private func rebuildTapForCurrentInput(_ format: AVAudioFormat) -> Bool {
+        guard format.sampleRate > 0, format.channelCount > 0 else { return false }
+        guard let targetFormat = sink.currentTargetFormat,
+              let converter = Self.makeConverter(from: format, to: targetFormat) else {
+            AppLog.recorder.atError.error("rebuildTap: could not build a converter for the new input format")
+            return false
+        }
+        if tapInstalled {
+            engine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        sink.replaceConverter(converter)
+        Self.installTap(on: engine.inputNode, format: format, sink: sink)
+        tapInstalled = true
+        tapFormat = format
+        return true
     }
 
     @objc private nonisolated func handleRouteChange(_ note: Notification) {
@@ -650,72 +746,5 @@ final class AudioRecorderService: NSObject {
                 )
             }
         }
-    }
-}
-
-/// Thread-safe owner of the recording file and the latest input level. The audio
-/// tap runs on a real-time render thread; routing all file/level access through
-/// this lock-guarded box keeps it off the main actor and free of data races.
-private final class RecordingSink: @unchecked Sendable {
-    private let lock = NSLock()
-    private var file: AVAudioFile?
-    private var paused = true
-    private var level: Float = 0
-    private var onBuffer: ((AVAudioPCMBuffer) -> Void)?
-
-    func open(_ file: AVAudioFile, onBuffer: ((AVAudioPCMBuffer) -> Void)?) {
-        lock.lock(); defer { lock.unlock() }
-        self.file = file
-        self.onBuffer = onBuffer
-        paused = false
-        level = 0
-    }
-
-    func setPaused(_ value: Bool) {
-        lock.lock(); defer { lock.unlock() }
-        paused = value
-        if value { level = 0 }
-    }
-
-    func close() {
-        lock.lock(); defer { lock.unlock() }
-        file = nil
-        onBuffer = nil
-        paused = true
-        level = 0
-    }
-
-    var currentLevel: Float {
-        lock.lock(); defer { lock.unlock() }
-        return level
-    }
-
-    func write(_ buffer: AVAudioPCMBuffer) {
-        lock.lock()
-        guard !paused, let file else { lock.unlock(); return }
-        try? file.write(from: buffer)
-        level = Self.level(of: buffer)
-        let callback = onBuffer
-        lock.unlock()
-        callback?(buffer)
-    }
-
-    /// Map a buffer's RMS energy to a perceptual 0...1 with a −50 dBFS floor,
-    /// matching the metering curve the UI was tuned against.
-    private static func level(of buffer: AVAudioPCMBuffer) -> Float {
-        guard let channels = buffer.floatChannelData else { return 0 }
-        let frames = Int(buffer.frameLength)
-        guard frames > 0 else { return 0 }
-        var sum: Float = 0
-        let samples = channels[0]
-        for i in 0..<frames {
-            let sample = samples[i]
-            sum += sample * sample
-        }
-        let rms = (sum / Float(frames)).squareRoot()
-        let db = 20 * log10(max(rms, 1e-7))
-        let floor: Float = -50
-        let clamped = max(floor, db)
-        return (clamped - floor) / (-floor)
     }
 }

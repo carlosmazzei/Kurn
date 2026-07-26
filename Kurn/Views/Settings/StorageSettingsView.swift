@@ -2,23 +2,35 @@
 //  StorageSettingsView.swift
 //  Kurn
 //
-//  What Kurn is using on disk: recorded audio, reclaimable temp files, and the
+//  What Kurn is using on disk: recorded audio (with the largest meetings called
+//  out), reclaimable temp files, the one-shot recording compaction, and the
 //  downloaded FluidAudio model groups. Deleting a model group frees its space
 //  and turns the matching feature off so it can be re-downloaded on demand.
 //
+//  The compaction and largest-meetings sections live in
+//  `StorageSettingsSections.swift` as an extension, so several members here are
+//  non-private — an extension in another file cannot see `private` ones.
+//
 
+import SwiftData
 import SwiftUI
 
 struct StorageSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelDownloadController.self) private var downloads
+    @Environment(\.modelContext) private var modelContext
 
     @State private var storageText = "—"
+    /// Free space on the volume, for context next to what Kurn is using.
+    @State private var freeSpaceText = "—"
     /// Current estimate of temp files that can be removed by the manual cleanup.
     @State private var cacheCleanupPreview: (files: Int, bytes: Int64) = (0, 0)
     /// Result of the temp-file cleanup (files count + bytes) to show in an alert.
     @State private var cacheCleanupResult: (files: Int, bytes: Int64)?
     @State private var showingClearCacheConfirm = false
+    /// Created lazily in `.task` because it needs the environment's model context.
+    @State var compaction: RecordingCompactionViewModel?
+    @State var showingCompactConfirm = false
 
     var body: some View {
         Form {
@@ -26,6 +38,10 @@ struct StorageSettingsView: View {
                 LabeledContent(
                     NSLocalizedString("settings.audio_usage", comment: "Audio usage"),
                     value: storageText
+                )
+                LabeledContent(
+                    NSLocalizedString("settings.free_space", comment: "Free space"),
+                    value: freeSpaceText
                 )
                 Button {
                     Task { @MainActor in
@@ -50,14 +66,56 @@ struct StorageSettingsView: View {
                 }
             }
 
+            compactionSection
+            largestMeetingsSection
             modelsSection
         }
         .navigationTitle(NSLocalizedString("settings.storage", comment: "Storage"))
         .task {
+            if compaction == nil {
+                compaction = RecordingCompactionViewModel(modelContext: modelContext)
+            }
+            compaction?.refresh(targetBitRate: settings.audioQuality.bitRate)
             refreshStorage()
             cacheCleanupPreview = await loadCacheCleanupPreview()
             downloads.refreshInstalledModels()
         }
+        .errorAlert(Binding(
+            get: { compaction?.error },
+            set: { compaction?.error = $0 }
+        ))
+        .kurnDialog(
+            isPresented: $showingCompactConfirm,
+            iconSystemName: "arrow.down.circle.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.compact.confirm", comment: "Compact recordings"),
+            message: String(
+                format: NSLocalizedString("settings.compact.message", comment: "Compaction is irreversible"),
+                compaction?.candidateCount ?? 0,
+                AudioFileStore.formattedSize(compaction?.estimatedSavings ?? 0)
+            ),
+            primaryTitle: NSLocalizedString("settings.compact", comment: "Compact recordings"),
+            primaryRole: .destructive,
+            primaryAction: {
+                compaction?.start(targetBitRate: settings.audioQuality.bitRate)
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
+            isPresented: Binding(
+                get: { compaction?.completedSavings != nil },
+                set: { if !$0 { compaction?.completedSavings = nil } }
+            ),
+            iconSystemName: "checkmark.circle.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.compact.done", comment: "Recordings compacted"),
+            message: String(
+                format: NSLocalizedString("settings.compact.result", comment: "Compaction result"),
+                AudioFileStore.formattedSize(compaction?.completedSavings ?? 0)
+            ),
+            primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
+            primaryAction: { refreshStorage() }
+        )
         .kurnDialog(
             isPresented: Binding(
                 get: { downloads.pendingModelDeletion != nil },
@@ -154,8 +212,9 @@ struct StorageSettingsView: View {
         }
     }
 
-    private func refreshStorage() {
+    func refreshStorage() {
         storageText = AudioFileStore.formattedSize(AudioFileStore.totalAudioBytes())
+        freeSpaceText = AudioFileStore.formattedSize(ResourceGuard.availableStorageBytes() ?? 0)
     }
 
     private func loadCacheCleanupPreview() async -> (files: Int, bytes: Int64) {

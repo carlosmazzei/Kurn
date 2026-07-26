@@ -21,75 +21,24 @@ import os
 
 actor AudioPreprocessor: AudioPreprocessing {
 
+    /// Sample rate the cleaned copy is rendered at — what Speech and Whisper
+    /// prefer, and the rate every downstream engine works in.
+    private static let targetSampleRate: Double = 16_000
+
     /// Render the cleaned, mono 16 kHz copy to the temporary directory and return
     /// its URL. The caller owns the file and should `cleanup` it when done.
     func process(url: URL) async throws -> URL {
         try await ResourceGuard.requireTranscriptionHeadroom()
         let started = Date()
         AppLog.transcription.atDebug.debug("preprocess: open \(url.lastPathComponent, privacy: .public)")
-        let inputFile = try AVAudioFile(forReading: url)
-        let inputFormat = inputFile.processingFormat
-        let totalInputFrames = inputFile.length
-        AppLog.transcription.atDebug.debug("preprocess: input sampleRate=\(inputFormat.sampleRate, privacy: .public) channels=\(inputFormat.channelCount, privacy: .public) frames=\(totalInputFrames, privacy: .public)")
-        guard totalInputFrames > 0, inputFormat.sampleRate > 0 else {
-            AppLog.transcription.atError.error("preprocess: invalid input (no frames or zero sample rate)")
-            throw AppError.audioError(
-                NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
-            )
-        }
 
-        let engine = AVAudioEngine()
-        let player = AVAudioPlayerNode()
-
-        // EQ: high-pass + presence boost.
-        let eq = AVAudioUnitEQ(numberOfBands: 2)
-        let highPass = eq.bands[0]
-        highPass.filterType = .highPass
-        highPass.frequency = 80
-        highPass.bypass = false
-        let presence = eq.bands[1]
-        presence.filterType = .parametric
-        presence.frequency = 2500
-        presence.bandwidth = 1.0
-        presence.gain = 4
-        presence.bypass = false
-        eq.globalGain = 0
-
-        let dynamics = AVAudioUnitEffect(audioComponentDescription: Self.effect(kAudioUnitSubType_DynamicsProcessor))
-        let limiter = AVAudioUnitEffect(audioComponentDescription: Self.effect(kAudioUnitSubType_PeakLimiter))
-
-        engine.attach(player)
-        engine.attach(eq)
-        engine.attach(dynamics)
-        engine.attach(limiter)
-
-        engine.connect(player, to: eq, format: inputFormat)
-        engine.connect(eq, to: dynamics, format: inputFormat)
-        engine.connect(dynamics, to: limiter, format: inputFormat)
-        engine.connect(limiter, to: engine.mainMixerNode, format: inputFormat)
-
+        let failure = AppError.audioError(
+            NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
+        )
         // Render to mono 16 kHz; the engine resamples on the output path.
-        guard let outputFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: 16_000,
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw AppError.audioError(
-                NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
-            )
+        guard let outputFormat = OfflineAudioRenderer.monoFormat(sampleRate: Self.targetSampleRate) else {
+            throw failure
         }
-        let maxFrames: AVAudioFrameCount = 4096
-        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
-
-        try engine.start()
-        // Audio units are initialized by `start()`, so set parameters afterwards.
-        Self.configureDynamics(dynamics.audioUnit)
-        Self.configureLimiter(limiter.audioUnit)
-        // Schedule the file for offline rendering. See `scheduleForOfflineRender`
-        // for why we must NOT use the async overload here.
-        Self.scheduleForOfflineRender(inputFile, on: player)
-        player.play()
 
         let outURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("kurn_clean_\(UUID().uuidString).m4a")
@@ -101,73 +50,43 @@ actor AudioPreprocessor: AudioPreprocessing {
 
         let outSettings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 16_000.0,
+            AVSampleRateKey: Self.targetSampleRate,
             AVNumberOfChannelsKey: 1,
             AVEncoderBitRateKey: 32_000,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
         let outFile = try AVAudioFile(forWriting: outURL, settings: outSettings)
 
-        guard let renderBuffer = AVAudioPCMBuffer(
-            pcmFormat: engine.manualRenderingFormat,
-            frameCapacity: maxFrames
-        ) else {
-            engine.stop()
-            throw AppError.audioError(
-                NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
-            )
-        }
+        // Effects are held here so `afterStart` can reach their audio units:
+        // `engine.start()` is what initializes them, so parameters can only be
+        // set once the renderer has started.
+        let dynamics = AVAudioUnitEffect(audioComponentDescription: Self.effect(kAudioUnitSubType_DynamicsProcessor))
+        let limiter = AVAudioUnitEffect(audioComponentDescription: Self.effect(kAudioUnitSubType_PeakLimiter))
 
-        // Cap on output frames given the resample ratio (safety against runaway).
-        let ratio = outputFormat.sampleRate / inputFormat.sampleRate
-        let expectedOutFrames = AVAudioFramePosition(Double(totalInputFrames) * ratio)
-        AppLog.transcription.atDebug.debug("preprocess: rendering ~\(expectedOutFrames, privacy: .public) frames @16kHz")
+        let renderer = OfflineAudioRenderer(
+            outputFormat: outputFormat,
+            buildChain: { engine, player, inputFormat in
+                Self.buildChain(
+                    engine: engine,
+                    player: player,
+                    inputFormat: inputFormat,
+                    dynamics: dynamics,
+                    limiter: limiter
+                )
+            },
+            afterStart: { _ in
+                Self.configureDynamics(dynamics.audioUnit)
+                Self.configureLimiter(limiter.audioUnit)
+            },
+            failure: failure,
+            logLabel: "preprocess"
+        )
 
         let renderStart = Date()
-        var lastLoggedProgress = 0.0
-        var resourceCheckCounter = 0
-        renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
-            if resourceCheckCounter.isMultiple(of: 128) {
-                try await ResourceGuard.requireTranscriptionHeadroom()
-            }
-            resourceCheckCounter += 1
-            let remaining = expectedOutFrames - engine.manualRenderingSampleTime
-            let framesToRender = AVAudioFrameCount(min(Int64(maxFrames), remaining))
-            let status: AVAudioEngineManualRenderingStatus
-            do {
-                status = try engine.renderOffline(framesToRender, to: renderBuffer)
-            } catch {
-                try ResourceGuard.rethrowIfResourceFailure(error)
-                throw error
-            }
-            switch status {
-            case .success:
-                do {
-                    try outFile.write(from: renderBuffer)
-                } catch {
-                    try ResourceGuard.rethrowIfResourceFailure(error)
-                    throw error
-                }
-            case .insufficientDataFromInputNode:
-                // Source exhausted — we're done.
-                AppLog.transcription.atDebug.debug("preprocess: input exhausted at \(engine.manualRenderingSampleTime, privacy: .public) frames")
-                break renderLoop
-            case .cannotDoInCurrentContext, .error:
-                AppLog.transcription.atError.error("preprocess: render stopped early (status=\(status.rawValue, privacy: .public)) at \(engine.manualRenderingSampleTime, privacy: .public) frames")
-                break renderLoop
-            @unknown default:
-                break renderLoop
-            }
-            // Log progress at ~25% increments so a slow/stuck render is visible.
-            let progress = Double(engine.manualRenderingSampleTime) / Double(max(1, expectedOutFrames))
-            if progress - lastLoggedProgress >= 0.25 {
-                lastLoggedProgress = progress
-                AppLog.transcription.atDebug.debug("preprocess: render progress \(Int(progress * 100), privacy: .public)%")
-            }
+        try await renderer.render(url: url) { buffer in
+            try outFile.write(from: buffer)
         }
 
-        player.stop()
-        engine.stop()
         try await ResourceGuard.requireTranscriptionHeadroom()
         success = true
         AppLog.transcription.atInfo.info("preprocess: done in \(Date().timeIntervalSince(renderStart), privacy: .public)s (total \(Date().timeIntervalSince(started), privacy: .public)s) -> \(outURL.lastPathComponent, privacy: .public)")
@@ -181,20 +100,39 @@ actor AudioPreprocessor: AudioPreprocessing {
         try? FileManager.default.removeItem(at: url)
     }
 
-    /// Schedule a file for offline rendering without awaiting.
-    ///
-    /// The `async` overload of `scheduleFile` only returns once the file has
-    /// finished *playing*, but in offline manual-rendering mode the audio is
-    /// consumed solely by the `renderOffline` loop — awaiting it deadlocks (the
-    /// loop is never reached, so playback never completes). We deliberately use
-    /// the completion-handler overload instead. Keeping this in a synchronous
-    /// helper also avoids the compiler's "consider using the asynchronous
-    /// alternative" warning that fires when it is called from an `async` context.
-    private static func scheduleForOfflineRender(_ file: AVAudioFile, on player: AVAudioPlayerNode) {
-        player.scheduleFile(file, at: nil, completionHandler: nil)
-    }
-
     // MARK: - Unit configuration
+
+    /// Wire high-pass + presence EQ → dynamics → limiter between the player and
+    /// the main mixer, all at the source format (the mixer resamples on output).
+    private static func buildChain(
+        engine: AVAudioEngine,
+        player: AVAudioPlayerNode,
+        inputFormat: AVAudioFormat,
+        dynamics: AVAudioUnitEffect,
+        limiter: AVAudioUnitEffect
+    ) {
+        let eq = AVAudioUnitEQ(numberOfBands: 2)
+        let highPass = eq.bands[0]
+        highPass.filterType = .highPass
+        highPass.frequency = 80
+        highPass.bypass = false
+        let presence = eq.bands[1]
+        presence.filterType = .parametric
+        presence.frequency = 2500
+        presence.bandwidth = 1.0
+        presence.gain = 4
+        presence.bypass = false
+        eq.globalGain = 0
+
+        engine.attach(eq)
+        engine.attach(dynamics)
+        engine.attach(limiter)
+
+        engine.connect(player, to: eq, format: inputFormat)
+        engine.connect(eq, to: dynamics, format: inputFormat)
+        engine.connect(dynamics, to: limiter, format: inputFormat)
+        engine.connect(limiter, to: engine.mainMixerNode, format: inputFormat)
+    }
 
     private static func effect(_ subType: OSType) -> AudioComponentDescription {
         AudioComponentDescription(

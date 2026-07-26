@@ -25,6 +25,12 @@ final class Recording {
     /// Cleared on success; kept on failure/interruption so the next attempt
     /// resumes from the last completed chunk instead of starting over.
     var transcriptionCheckpointData: Data?
+    /// Size of the backing file in bytes, cached so storage UI and the recording
+    /// compactor can rank meetings without stat-ing every file. `0` means
+    /// "unknown" — rows created before this field existed, refreshed lazily by
+    /// `RecordingRecovery`. The default value is also what lets SwiftData migrate
+    /// the store lightly instead of needing a migration plan.
+    var fileSize: Int64 = 0
 
     @Relationship(deleteRule: .cascade, inverse: \Transcript.recording)
     var transcript: Transcript?
@@ -36,7 +42,8 @@ final class Recording {
         duration: TimeInterval,
         recordedAt: Date = Date(),
         transcriptionStatus: TranscriptionStatus = .none,
-        transcriptionMode: TranscriptionMode = .onDevice
+        transcriptionMode: TranscriptionMode = .onDevice,
+        fileSize: Int64 = 0
     ) {
         self.id = id
         self.meeting = meeting
@@ -45,6 +52,7 @@ final class Recording {
         self.recordedAt = recordedAt
         self.transcriptionStatusRaw = transcriptionStatus.rawValue
         self.transcriptionModeRaw = transcriptionMode.rawValue
+        self.fileSize = fileSize
     }
 
     var transcriptionStatus: TranscriptionStatus {
@@ -72,5 +80,21 @@ final class Recording {
     /// preferred and any pre-migration leftover in Documents is still found.
     var fileURL: URL {
         AudioFileStore.resolveURL(fileName: fileName)
+    }
+
+    /// Re-read the backing file's size from disk. Cheap (one `stat`), so callers
+    /// that just wrote or replaced the file should always call it rather than
+    /// computing the expected size.
+    func refreshFileSize() {
+        fileSize = AudioFileStore.byteSize(fileName: fileName)
+    }
+
+    /// Bit rate the file is actually stored at, or `nil` when either input is
+    /// unknown. Used to decide whether re-encoding a recording would gain
+    /// anything, so it deliberately reports the *file's* rate (which includes
+    /// container overhead) rather than the encoder setting it was made with.
+    var effectiveBitRate: Int? {
+        guard fileSize > 0, duration > 0 else { return nil }
+        return Int(Double(fileSize) * 8 / duration)
     }
 }

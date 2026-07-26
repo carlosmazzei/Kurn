@@ -32,4 +32,20 @@ struct AudioFileStoreTests {
         let value = AudioFileStore.formattedSize(0)
         #expect(!value.contains("-"))
     }
+
+    /// Callers treat 0 as "unknown", so a missing file must report 0 rather
+    /// than trapping — `RecordingRecovery`'s backfill relies on that.
+    @Test func byteSizeOfMissingFileIsZero() {
+        #expect(AudioFileStore.byteSize(fileName: "does-not-exist-\(UUID().uuidString).m4a") == 0)
+    }
+
+    @Test func byteSizeReportsTheBytesOnDisk() throws {
+        let fileName = "kurn-test-\(UUID().uuidString).m4a"
+        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+        let payload = Data(repeating: 0x41, count: 4096)
+        try payload.write(to: url)
+        defer { AudioFileStore.delete(fileName: fileName) }
+
+        #expect(AudioFileStore.byteSize(fileName: fileName) == Int64(payload.count))
+    }
 }

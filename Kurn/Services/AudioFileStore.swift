@@ -68,6 +68,14 @@ enum AudioFileStore {
         return total
     }
 
+    /// Size in bytes of a single stored recording, resolved the same way
+    /// `resolveURL` does. Returns 0 when the file is missing or unreadable.
+    static func byteSize(fileName: String) -> Int64 {
+        let url = resolveURL(fileName: fileName)
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        return Int64(size)
+    }
+
     /// Delete a single audio file by name from whichever directory holds it.
     /// Missing files are ignored.
     static func delete(fileName: String) {
