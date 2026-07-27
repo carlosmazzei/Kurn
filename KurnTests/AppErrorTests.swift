@@ -51,4 +51,12 @@ struct AppErrorTests {
         let error = AppError.resourceUnavailable("free storage")
         #expect(error.errorDescription?.contains("free storage") == true)
     }
+
+    @Test func logCodeClassifiesErrorsWithoutIncludingDetails() {
+        let error = AppError.apiError(statusCode: 400, message: "sensitive provider response")
+        #expect(error.logCode == "provider_api")
+        #expect(!error.logCode.contains("sensitive"))
+        #expect(AppError.generationTruncated.logCode == "generation_truncated")
+        #expect(AppError.documentGenerationFailed("private detail").logCode == "document_generation")
+    }
 }

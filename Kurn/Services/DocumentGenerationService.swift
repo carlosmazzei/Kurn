@@ -27,10 +27,18 @@ struct DocumentGenerationService {
         prompt: String,
         provider: AIProvider,
         model: String,
+        runID: String = String(UUID().uuidString.prefix(8)),
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> GeneratedDocumentResult {
+        let startedAt = Date()
         let instruction = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        AppLog.generation.atNotice.notice(
+            "document: start run=\(runID, privacy: .public) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) sources=\(sources.count, privacy: .public) promptChars=\(instruction.count, privacy: .public)"
+        )
         guard !instruction.isEmpty else {
+            AppLog.generation.atError.error(
+                "document: failed run=\(runID, privacy: .public) stage=validation code=empty_prompt"
+            )
             throw AppError.documentGenerationFailed(
                 NSLocalizedString("documents.error.empty_prompt", comment: "Empty document prompt")
             )
@@ -38,34 +46,61 @@ struct DocumentGenerationService {
 
         let context = Self.render(sources)
         guard !context.isEmpty else {
+            AppLog.generation.atError.error(
+                "document: failed run=\(runID, privacy: .public) stage=validation code=no_transcripts"
+            )
             throw AppError.documentGenerationFailed(
                 NSLocalizedString("documents.error.no_transcripts", comment: "No selected transcripts")
             )
         }
 
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let llm: LLMProvider
+        do {
+            llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        } catch {
+            AppLog.generation.atError.error(
+                "document: failed run=\(runID, privacy: .public) stage=provider code=\(Self.errorCode(error), privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
+            )
+            throw error
+        }
+
         let markdown: String
         if context.count <= SummaryService.maxSinglePassChars {
-            markdown = try await llm.chat(
+            AppLog.generation.atNotice.notice(
+                "document: strategy run=\(runID, privacy: .public) path=single contextChars=\(context.count, privacy: .public)"
+            )
+            markdown = try await requestText(
+                llm: llm,
                 systemPrompt: Self.systemPrompt,
-                messages: [.init(role: .user, content: Self.finalPrompt(instruction: instruction, context: context))],
-                options: .document
+                message: Self.finalPrompt(instruction: instruction, context: context),
+                stage: "single",
+                runID: runID
             )
         } else {
+            AppLog.generation.atNotice.notice(
+                "document: strategy run=\(runID, privacy: .public) path=staged contextChars=\(context.count, privacy: .public)"
+            )
             markdown = try await generateLongDocument(
                 sources: sources,
                 instruction: instruction,
                 llm: llm,
+                runID: runID,
                 onProgress: onProgress
             )
         }
 
         let clean = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else {
+            AppLog.generation.atError.error(
+                "document: failed run=\(runID, privacy: .public) stage=output code=empty_response elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
+            )
             throw AppError.documentGenerationFailed(
                 NSLocalizedString("documents.error.empty_response", comment: "Empty generated document")
             )
         }
+        AppLog.generation.atNotice.notice(
+            "document: complete run=\(runID, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s outputChars=\(clean.count, privacy: .public)"
+        )
         return GeneratedDocumentResult(
             title: Self.extractTitle(from: clean, fallbackPrompt: instruction),
             markdown: clean
@@ -76,48 +111,88 @@ struct DocumentGenerationService {
         sources: [DocumentTranscriptSource],
         instruction: String,
         llm: LLMProvider,
+        runID: String,
         onProgress: (@Sendable (Int, Int) -> Void)?
     ) async throws -> String {
         let blocks = Self.renderBlocks(sources, maxChars: SummaryService.mapBlockChars)
         let total = blocks.count + 1
+        AppLog.generation.atNotice.notice(
+            "document: staged run=\(runID, privacy: .public) blocks=\(blocks.count, privacy: .public)"
+        )
         var notes: [String] = []
         for (index, block) in blocks.enumerated() {
             try Task.checkCancellation()
             onProgress?(index + 1, total)
-            let response = try await llm.chat(
+            let response = try await requestText(
+                llm: llm,
                 systemPrompt: Self.extractionSystemPrompt,
-                messages: [
-                    .init(
-                        role: .user,
-                        content: """
-                        User's document request:
-                        \(instruction)
+                message: """
+                User's document request:
+                \(instruction)
 
-                        Source part \(index + 1) of \(blocks.count):
-                        \(block)
-                        """
-                    )
-                ],
-                options: .document
+                Source part \(index + 1) of \(blocks.count):
+                \(block)
+                """,
+                stage: "map_\(index + 1)_of_\(blocks.count)",
+                runID: runID
             )
             notes.append("## Source part \(index + 1)\n\n\(response)")
         }
 
         try Task.checkCancellation()
         onProgress?(total, total)
-        return try await llm.chat(
+        return try await requestText(
+            llm: llm,
             systemPrompt: Self.systemPrompt,
-            messages: [
-                .init(
-                    role: .user,
-                    content: Self.finalPrompt(
-                        instruction: instruction,
-                        context: notes.joined(separator: "\n\n")
-                    )
-                )
-            ],
-            options: .document
+            message: Self.finalPrompt(
+                instruction: instruction,
+                context: notes.joined(separator: "\n\n")
+            ),
+            stage: "reduce",
+            runID: runID
         )
+    }
+
+    private func requestText(
+        llm: LLMProvider,
+        systemPrompt: String,
+        message: String,
+        stage: String,
+        runID: String
+    ) async throws -> String {
+        let startedAt = Date()
+        AppLog.generation.atInfo.info(
+            "document: request run=\(runID, privacy: .public) stage=\(stage, privacy: .public) inputChars=\(message.count, privacy: .public) maxOutputTokens=\(TextGenerationOptions.document.maxOutputTokens, privacy: .public)"
+        )
+        do {
+            let response = try await llm.chat(
+                systemPrompt: systemPrompt,
+                messages: [.init(role: .user, content: message)],
+                options: .document
+            )
+            AppLog.generation.atInfo.info(
+                "document: response run=\(runID, privacy: .public) stage=\(stage, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s outputChars=\(response.count, privacy: .public)"
+            )
+            return response
+        } catch is CancellationError {
+            AppLog.generation.atNotice.notice(
+                "document: cancelled run=\(runID, privacy: .public) stage=\(stage, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
+            )
+            throw CancellationError()
+        } catch {
+            AppLog.generation.atError.error(
+                "document: failed run=\(runID, privacy: .public) stage=\(stage, privacy: .public) code=\(Self.errorCode(error), privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
+            )
+            throw error
+        }
+    }
+
+    private static func duration(since date: Date) -> String {
+        String(format: "%.3f", Date().timeIntervalSince(date))
+    }
+
+    private static func errorCode(_ error: Error) -> String {
+        (error as? AppError)?.logCode ?? "unexpected"
     }
 
     static func render(_ sources: [DocumentTranscriptSource]) -> String {
