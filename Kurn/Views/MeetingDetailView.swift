@@ -175,11 +175,12 @@ struct MeetingDetailView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(meeting.title)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(2)
+        // The real transcribed language once one exists; otherwise the
+        // pre-transcription hint (Settings default or per-meeting override),
+        // so this always shows something and quietly upgrades once
+        // transcription lands on the language that actually counts.
+        let displayLanguage = meeting.transcribedLanguage ?? meeting.language
+        return VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 Text(meeting.createdAt.meetingDisplay)
                 metaDot
@@ -188,6 +189,8 @@ struct MeetingDetailView: View {
                     metaDot
                     Text(meeting.totalDuration.clockDisplay)
                 }
+                metaDot
+                Text(displayLanguage.displayName)
             }
             .font(.system(size: 13))
             .foregroundStyle(Theme.textSecondary)
@@ -197,6 +200,7 @@ struct MeetingDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
+        .padding(.top, 12)
         .padding(.bottom, 14)
     }
 

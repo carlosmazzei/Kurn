@@ -106,6 +106,18 @@ final class Meeting {
         set { languageRaw = newValue.rawValue }
     }
 
+    /// The language actually detected in this meeting's own transcript(s) —
+    /// distinct from `language`, which is only the pre-transcription hint.
+    /// `nil` when nothing transcribed yet resolves to a recognized language.
+    var transcribedLanguage: MeetingLanguage? {
+        for recording in recordings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
+            guard let raw = recording.transcript?.language, !raw.isEmpty else { continue }
+            let detected = MeetingLanguage(detectedCode: raw)
+            if detected != .autoDetect { return detected }
+        }
+        return nil
+    }
+
     /// Sum of all recording durations.
     var totalDuration: TimeInterval {
         recordings.reduce(0) { $0 + $1.duration }

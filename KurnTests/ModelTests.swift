@@ -91,6 +91,39 @@ struct ModelTests {
         #expect(meeting.hasAnyTranscript == true)
     }
 
+    @Test func transcribedLanguagePrefersRealDetectedLanguageOverEmptyOrUnrecognized() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Standup")
+        context.insert(meeting)
+        #expect(meeting.transcribedLanguage == nil)
+
+        // FluidAudio reports no language at all (""); an earlier recording
+        // with that must be skipped in favor of a later one that has a real
+        // value — BCP-47 from on-device, a bare Whisper code, or (OpenAI's
+        // verbose_json format) a full English word.
+        let silent = Recording(meeting: meeting, fileName: "a.m4a", duration: 10, recordedAt: Date(timeIntervalSince1970: 0))
+        context.insert(silent)
+        let silentTranscript = Transcript(recording: silent, language: "")
+        context.insert(silentTranscript)
+        silent.transcript = silentTranscript
+        #expect(meeting.transcribedLanguage == nil)
+
+        let onDevice = Recording(meeting: meeting, fileName: "b.m4a", duration: 10, recordedAt: Date(timeIntervalSince1970: 1))
+        context.insert(onDevice)
+        let onDeviceTranscript = Transcript(recording: onDevice, language: "en-US")
+        context.insert(onDeviceTranscript)
+        onDevice.transcript = onDeviceTranscript
+        #expect(meeting.transcribedLanguage == .english)
+
+        let whisperCpp = Recording(meeting: meeting, fileName: "c.m4a", duration: 10, recordedAt: Date(timeIntervalSince1970: -1))
+        context.insert(whisperCpp)
+        let whisperCppTranscript = Transcript(recording: whisperCpp, language: "pt")
+        context.insert(whisperCppTranscript)
+        whisperCpp.transcript = whisperCppTranscript
+        // Chronologically first recording with a real language wins.
+        #expect(meeting.transcribedLanguage == .portuguese)
+    }
+
     // Re-transcription replaces a recording's transcript. The relationship must
     // be detached before the old transcript is deleted, otherwise establishing
     // the new transcript's inverse traps with "relationship already has a value
