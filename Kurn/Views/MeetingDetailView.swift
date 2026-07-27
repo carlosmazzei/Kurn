@@ -319,7 +319,7 @@ struct MeetingDetailView: View {
 
     @ViewBuilder
     private var transcriptTab: some View {
-        let transcribed = sortedRecordings.filter { $0.transcript != nil }
+        let transcribed = sortedRecordings.filter { $0.transcript?.segments.isEmpty == false }
         VStack(alignment: .leading, spacing: 12) {
             ForEach(sortedRecordings, id: \.id) { recording in
                 if let warning = txVM?.diarizationWarnings[recording.id] {
@@ -327,11 +327,7 @@ struct MeetingDetailView: View {
                 }
             }
             if transcribed.isEmpty {
-                placeholder(
-                    icon: "text.alignleft",
-                    title: NSLocalizedString("detail.transcript.empty.title", comment: ""),
-                    subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
-                )
+                transcriptEmptyPlaceholder
             } else {
                 TranscriptTab(
                     meeting: meeting,
@@ -341,6 +337,34 @@ struct MeetingDetailView: View {
                     onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } }
                 )
             }
+        }
+    }
+
+    /// Which empty-state copy to show when no recording has a real (non-empty)
+    /// transcript: distinguishes "never attempted", "failed" (so a stale or
+    /// zero-segment transcript from a previous run never leaves the tab stuck
+    /// blank instead of reverting here), and "done but no speech detected" (a
+    /// legitimately silent recording, not a failure).
+    @ViewBuilder
+    private var transcriptEmptyPlaceholder: some View {
+        if sortedRecordings.contains(where: { $0.transcriptionStatus == .failed }) {
+            placeholder(
+                icon: "exclamationmark.triangle",
+                title: NSLocalizedString("detail.transcript.failed.title", comment: ""),
+                subtitle: NSLocalizedString("detail.transcript.failed.subtitle", comment: "")
+            )
+        } else if sortedRecordings.contains(where: { $0.transcriptionStatus == .done && $0.transcript?.segments.isEmpty != false }) {
+            placeholder(
+                icon: "waveform.slash",
+                title: NSLocalizedString("detail.transcript.no_speech.title", comment: ""),
+                subtitle: NSLocalizedString("detail.transcript.no_speech.subtitle", comment: "")
+            )
+        } else {
+            placeholder(
+                icon: "text.alignleft",
+                title: NSLocalizedString("detail.transcript.empty.title", comment: ""),
+                subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
+            )
         }
     }
 

@@ -143,7 +143,7 @@ final class Meeting {
     }
 
     var hasAnyTranscript: Bool {
-        recordings.contains { $0.transcript != nil }
+        recordings.contains { $0.transcript?.segments.isEmpty == false }
     }
 
     /// The whole meeting transcript as one prompt-ready string of

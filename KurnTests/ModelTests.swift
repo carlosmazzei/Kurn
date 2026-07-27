@@ -73,7 +73,19 @@ struct ModelTests {
         context.insert(recording)
         #expect(meeting.hasAnyTranscript == false)
 
-        let transcript = Transcript(recording: recording)
+        // An attached but empty transcript (e.g. a silent recording, or a
+        // pipeline bug that produced no spans) must not count as "has content" —
+        // otherwise the UI can't tell it apart from a real transcript.
+        let emptyTranscript = Transcript(recording: recording)
+        context.insert(emptyTranscript)
+        recording.transcript = emptyTranscript
+        #expect(meeting.hasAnyTranscript == false)
+
+        recording.transcript = nil
+        let transcript = Transcript(
+            recording: recording,
+            segments: [TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Hello team")]
+        )
         context.insert(transcript)
         recording.transcript = transcript
         #expect(meeting.hasAnyTranscript == true)

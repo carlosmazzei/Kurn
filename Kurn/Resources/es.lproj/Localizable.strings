@@ -283,6 +283,7 @@
 /* Común */
 "common.delete" = "Eliminar";
 "common.cancel" = "Cancelar";
+"common.refresh" = "Actualizar";
 "common.save" = "Guardar";
 "common.ok" = "OK";
 "common.error" = "Error";
@@ -356,6 +357,10 @@
 "detail.retranscribe_all.confirm.message" = "Esto sustituye todas las transcripciones actuales por nuevas a partir del audio original, en orden. No se puede deshacer.";
 "detail.transcript.empty.title" = "Todavía no hay transcripción";
 "detail.transcript.empty.subtitle" = "Transcribe una grabación para ver aquí la conversación.";
+"detail.transcript.failed.title" = "La transcripción falló";
+"detail.transcript.failed.subtitle" = "Vuelve a intentarlo desde la pestaña Grabaciones.";
+"detail.transcript.no_speech.title" = "No se detectó voz";
+"detail.transcript.no_speech.subtitle" = "Esta grabación no contenía voz detectable.";
 "detail.summary.empty.title" = "Todavía no hay resumen";
 "detail.section" = "Sección";
 "tab.recordings" = "Grabaciones";
@@ -452,6 +457,8 @@
 "settings.log_level_footer" = "Controla el nivel de detalle que la app escribe en el registro del sistema (Console.app, subsistema ai.kurn.app). Desactivado inhabilita el registro por completo; Detallado incluye trazas de alta frecuencia útiles para reportar un problema.";
 "settings.export_logs" = "Exportar Registros";
 "settings.export_logs_footer" = "Comparte las últimas 24 horas de los registros de la app como un archivo de texto, para soporte o reportes de errores.";
+"settings.view_logs" = "Ver Registros Recientes";
+"settings.view_logs.empty" = "No hay entradas de registro en las últimas 24 horas";
 "settings.diagnostic_reports" = "Informes de Diagnóstico";
 "settings.diagnostic_reports_footer" = "Cuando está activado, los informes de fallos y bloqueos capturados en este dispositivo se guardan aquí. Nunca se envía nada automáticamente a ningún lugar — los informes solo salen del dispositivo si tocas Compartir en uno.";
 "settings.diagnostic_reports.consent_title" = "Activar Informes de Diagnóstico";
