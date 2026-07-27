@@ -214,13 +214,22 @@ actor AudioChunker {
     /// Passthrough needs the output container to accept the source's codec, so
     /// this asks AVFoundation rather than assuming, and keeps the old preset as
     /// the fallback for anything it can't copy.
+    ///
+    /// `determineCompatibility` is bridged only in its completion-handler form —
+    /// there is no `async` overload to await — so it is wrapped here. The handler
+    /// reports a plain `Bool` with no error channel, hence the non-throwing
+    /// continuation.
     private static func preferredPreset(for asset: AVURLAsset) async -> String {
-        let compatible = try? await AVAssetExportSession.determineCompatibility(
-            ofExportPreset: AVAssetExportPresetPassthrough,
-            with: asset,
-            outputFileType: .m4a
-        )
-        guard compatible == true else {
+        let compatible = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            AVAssetExportSession.determineCompatibility(
+                ofExportPreset: AVAssetExportPresetPassthrough,
+                with: asset,
+                outputFileType: .m4a
+            ) { isCompatible in
+                continuation.resume(returning: isCompatible)
+            }
+        }
+        guard compatible else {
             AppLog.transcription.atNotice.notice("chunk: passthrough unavailable for this asset, re-encoding with the M4A preset")
             return AVAssetExportPresetAppleM4A
         }
