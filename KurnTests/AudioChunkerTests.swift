@@ -10,11 +10,34 @@
 //  this suite is about to assert on, and the failure looks like an export bug.
 //
 
+import AVFoundation
 import Foundation
 import Testing
 @testable import Kurn
 
 struct AudioChunkerTests {
+
+    /// 16 kHz mono audio — the shape the pipeline actually chunks, since
+    /// `AudioPreprocessor` renders to 16 kHz mono before this runs. The codec
+    /// picks the bit rate: AAC rejects the fixture's usual 64 kbps at this
+    /// sample rate.
+    private static func lowRateFixture(seconds: Double = fixtureSeconds) throws -> URL {
+        try AudioFixtures.m4aTone(seconds: seconds, sampleRate: 16_000, bitRate: nil)
+    }
+
+    /// Long enough that per-chunk MP4 container overhead is a small share of a
+    /// chunk — otherwise the byte-ratio assertion below measures the container
+    /// rather than the audio. Three chunks, and about a second to run.
+    private static let fixtureSeconds: Double = 30
+    private static let fixtureChunkDuration: TimeInterval = 10
+
+    private static func byteSize(_ url: URL) -> Int64 {
+        Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+    }
+
+    private static func duration(_ url: URL) async -> TimeInterval {
+        (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
+    }
 
     @Test func chunkReturnsOriginalFileUnmodifiedWhenUnderThresholds() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).m4a")
@@ -72,6 +95,81 @@ struct AudioChunkerTests {
     @Test func cleanupWithEmptyListDoesNothing() async {
         // Should be a safe no-op (e.g. when transcription bailed before chunking).
         await AudioChunker().cleanup([])
+    }
+
+    // MARK: - Chunks slice rather than re-encode
+    //
+    // These three pin what the older assertions (counts, offsets, file existence)
+    // could not see: chunking used a fixed export preset whose format had nothing
+    // to do with the source, so it silently resampled 16 kHz mono audio up and
+    // multiplied every chunk's size.
+
+    /// A chunk must carry the source's own format. The fixed `AppleM4A` preset
+    /// resamples up instead, which is the whole bug.
+    @Test func chunksKeepTheSourceSampleRateAndChannelCount() async throws {
+        try await tempFileTestLock.run {
+            let url = try Self.lowRateFixture()
+            defer { try? FileManager.default.removeItem(at: url) }
+
+            let chunker = AudioChunker(chunkDuration: Self.fixtureChunkDuration)
+            let chunks = try await chunker.chunkByDuration(url: url)
+            #expect(chunks.count > 1)
+
+            for chunk in chunks {
+                let file = try AVAudioFile(forReading: chunk.url)
+                #expect(file.fileFormat.sampleRate == 16_000)
+                #expect(file.fileFormat.channelCount == 1)
+            }
+            await chunker.cleanup(chunks)
+        }
+    }
+
+    /// Slicing must not cost bytes. Copying compressed samples adds only per-chunk
+    /// container overhead; re-encoding with the fixed preset overshoots this by
+    /// several times, and every one of those bytes is uploaded to Whisper.
+    @Test func chunksTogetherAreNotBiggerThanTheSource() async throws {
+        try await tempFileTestLock.run {
+            let url = try Self.lowRateFixture()
+            defer { try? FileManager.default.removeItem(at: url) }
+            let sourceBytes = Self.byteSize(url)
+            #expect(sourceBytes > 0)
+
+            let chunker = AudioChunker(chunkDuration: Self.fixtureChunkDuration)
+            let chunks = try await chunker.chunkByDuration(url: url)
+            #expect(chunks.count > 1)
+
+            let totalBytes = chunks.reduce(Int64(0)) { $0 + Self.byteSize($1.url) }
+            #expect(totalBytes <= Int64(Double(sourceBytes) * 1.5))
+            await chunker.cleanup(chunks)
+        }
+    }
+
+    /// No audio may be dropped on the way through. This also bounds the
+    /// frame-boundary slop a passthrough export introduces: chunks are cut at AAC
+    /// frame boundaries, so the total can differ slightly from the source without
+    /// anything being lost.
+    @Test func chunksTogetherCoverTheWholeSource() async throws {
+        try await tempFileTestLock.run {
+            let url = try Self.lowRateFixture()
+            defer { try? FileManager.default.removeItem(at: url) }
+            let sourceDuration = await Self.duration(url)
+            #expect(sourceDuration > 0)
+
+            let chunker = AudioChunker(chunkDuration: Self.fixtureChunkDuration)
+            let chunks = try await chunker.chunkByDuration(url: url)
+            #expect(chunks.count > 1)
+
+            var total: TimeInterval = 0
+            for chunk in chunks {
+                total += await Self.duration(chunk.url)
+            }
+            // Strong on the low side — dropped audio is the failure that matters.
+            // The upper bound is only a sanity check: each chunk file carries its
+            // own AAC priming/padding, so a small overshoot is expected.
+            #expect(total >= sourceDuration - 0.3)
+            #expect(total <= sourceDuration + 1.0)
+            await chunker.cleanup(chunks)
+        }
     }
 
     @Test func chunkCleanupRemovesAllExportedTempFiles() async throws {

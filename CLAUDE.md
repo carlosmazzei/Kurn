@@ -409,6 +409,21 @@ Three things are deliberately *not* parallel to the FluidAudio stack:
   `VADAudioLoader.monoSamples`. `whisper_full` blocks, so the context lives on a
   private serial `DispatchQueue` and never occupies a cooperative thread.
 
+`AudioChunker` **slices, it does not re-encode**: the export runs with
+`AVAssetExportPresetPassthrough`, so a chunk inherits the source's format —
+16 kHz mono, since `AudioPreprocessor` has already rendered it there. The fixed
+`AVAssetExportPresetAppleM4A` it used to use carries the preset's own sample rate
+and bit rate, unrelated to the source, so it re-encoded that cleaned audio *up*,
+inflating every cloud upload and temp file and spending a lossy generation for
+detail nothing downstream reads back. `preferredPreset` asks
+`AVAssetExportSession.determineCompatibility` rather than assuming, and keeps the
+old preset as the fallback. Two consequences to preserve: a passthrough export
+cuts on compressed-frame boundaries, so `Chunk.offset` stays the *requested*
+start (a running sum of measured durations folds that slop in once per chunk and
+drifts forward), and `AudioChunkerTests` asserts the chunks keep the source's
+format and size — the older assertions only covered counts and offsets, which is
+why the inflation went unnoticed.
+
 Like the FluidAudio engines it can't run from the background (Metal is
 unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too.
 
