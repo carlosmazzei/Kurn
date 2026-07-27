@@ -153,7 +153,11 @@ struct OpenAIProvider: LLMProvider {
 
     // MARK: - Chat (Chat Completions, plain text)
 
-    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+    func chat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) async throws -> String {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
@@ -161,7 +165,7 @@ struct OpenAIProvider: LLMProvider {
         // No `response_format` here: chat replies are prose, not the summary JSON.
         var body: [String: Any] = [
             "model": chatModel,
-            "max_completion_tokens": LLMHTTP.chatMaxOutputTokens,
+            "max_completion_tokens": options.maxOutputTokens,
             "messages": wire
         ]
         // GPT-5's completion budget includes hidden reasoning tokens. For a
@@ -173,18 +177,20 @@ struct OpenAIProvider: LLMProvider {
            chatModel.lowercased().hasPrefix("gpt-5") {
             body["reasoning_effort"] = "low"
         }
-        let request = try makeRequest(timeout: LLMHTTP.chatTimeout, body: body)
+        let request = try makeRequest(timeout: options.timeout, body: body)
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
 
         return try LLMHTTP.textResult(
             from: data,
             as: ChatResponse.self,
-            emptyMessage: "empty chat response"
-        ) {
-            let message = $0.choices.first?.message
-            return message?.content ?? message?.refusal
-        }
+            emptyMessage: "empty chat response",
+            isTruncated: { $0.isTruncated },
+            extractContent: {
+                let message = $0.choices.first?.message
+                return message?.content ?? message?.refusal
+            }
+        )
     }
 
     // MARK: - HTTP helpers

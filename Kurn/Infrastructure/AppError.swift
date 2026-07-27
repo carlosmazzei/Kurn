@@ -26,6 +26,7 @@ enum AppError: LocalizedError, Identifiable {
     case authenticationNotAvailable
     case autoTaggingFailed(String)
     case summaryTruncated
+    case generationTruncated
     case logExportFailed(String)
     case embeddingUnavailable(String)
     case semanticIndexFailed(String)
@@ -117,6 +118,11 @@ enum AppError: LocalizedError, Identifiable {
             return NSLocalizedString(
                 "error.summary_truncated",
                 comment: "Summary generation hit the model's output limit"
+            )
+        case .generationTruncated:
+            return NSLocalizedString(
+                "error.generation_truncated",
+                comment: "Text generation hit the model's output limit"
             )
         case .logExportFailed(let detail):
             return String(

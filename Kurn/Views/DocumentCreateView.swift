@@ -19,6 +19,7 @@ struct DocumentCreateView: View {
     @State private var selectedIDs: Set<UUID> = []
     @State private var prompt = ""
     @State private var viewModel: DocumentGenerationViewModel
+    @FocusState private var isPromptFocused: Bool
 
     let onCreated: (GeneratedDocument) -> Void
 
@@ -51,6 +52,7 @@ struct DocumentCreateView: View {
         Form {
             Section(NSLocalizedString("documents.prompt.title", comment: "Document instructions")) {
                 TextEditor(text: $prompt)
+                    .focused($isPromptFocused)
                     .frame(minHeight: 120)
                     .overlay(alignment: .topLeading) {
                         if prompt.isEmpty {
@@ -73,7 +75,10 @@ struct DocumentCreateView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: sourceKind) { _, _ in selectedIDs.removeAll() }
+                .onChange(of: sourceKind) { _, _ in
+                    selectedIDs.removeAll()
+                    isPromptFocused = false
+                }
 
                 sourceRows
             } header: {
@@ -91,7 +96,11 @@ struct DocumentCreateView: View {
                     )
                 }
             }
+            .simultaneousGesture(
+                TapGesture().onEnded { isPromptFocused = false }
+            )
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(NSLocalizedString("documents.new", comment: "New document"))
         .navigationBarTitleDisplayMode(.inline)
         .interactiveDismissDisabled(viewModel.isGenerating)
@@ -111,6 +120,12 @@ struct DocumentCreateView: View {
                     }
                 }
                 .disabled(!canGenerate)
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button(NSLocalizedString("common.done", comment: "Done")) {
+                    isPromptFocused = false
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -202,6 +217,7 @@ struct DocumentCreateView: View {
         icon: String
     ) -> some View {
         Button {
+            isPromptFocused = false
             if !selectedIDs.insert(id).inserted {
                 selectedIDs.remove(id)
             }
@@ -227,6 +243,7 @@ struct DocumentCreateView: View {
     }
 
     private func generate() async {
+        isPromptFocused = false
         let document = await viewModel.generate(
             meetings: resolvedSources.meetings,
             prompt: prompt,

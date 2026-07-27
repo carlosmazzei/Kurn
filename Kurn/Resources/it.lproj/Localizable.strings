@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "Questo dispositivo non ha un codice o dati biometrici configurati. Imposta un codice del dispositivo, oppure apri le Impostazioni per disattivare l'autenticazione per le registrazioni.";
 "error.auto_tagging" = "Impossibile suggerire tag: %@";
 "error.summary_truncated" = "Il riassunto è stato troncato perché ha raggiunto il limite di output del modello. Prova un modello con meno sezioni o uno con un limite di output più ampio.";
+"error.generation_truncated" = "La risposta ha raggiunto il limite di output del modello. Prova una richiesta più breve o seleziona meno trascrizioni.";
 "error.log_export" = "Impossibile esportare i log: %@";
 "detail.summarizing.progress" = "Riassunto della parte %1$d di %2$d…";
 

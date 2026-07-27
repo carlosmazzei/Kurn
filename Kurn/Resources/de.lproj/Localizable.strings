@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "Für dieses Gerät sind weder Code noch Biometrie konfiguriert. Legen Sie einen Gerätecode fest oder öffnen Sie die Einstellungen, um die Authentifizierung für Aufnahmen zu deaktivieren.";
 "error.auto_tagging" = "Tags konnten nicht vorgeschlagen werden: %@";
 "error.summary_truncated" = "Die Zusammenfassung wurde abgeschnitten, weil das Ausgabelimit des Modells erreicht wurde. Versuchen Sie eine Vorlage mit weniger Abschnitten oder ein Modell mit größerem Ausgabelimit.";
+"error.generation_truncated" = "Die Antwort hat das Ausgabelimit des Modells erreicht. Verwenden Sie eine kürzere Anfrage oder wählen Sie weniger Transkripte aus.";
 "error.log_export" = "Protokolle konnten nicht exportiert werden: %@";
 "detail.summarizing.progress" = "Teil %1$d von %2$d wird zusammengefasst…";
 

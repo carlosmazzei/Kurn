@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "此设备未设置密码或生物识别。请设置设备密码，或前往设置关闭录音身份验证。";
 "error.auto_tagging" = "无法推荐标签：%@";
 "error.summary_truncated" = "由于达到模型的输出上限，摘要被截断。请尝试使用分节较少的模板，或使用输出上限更大的模型。";
+"error.generation_truncated" = "响应已达到模型的输出上限。请尝试缩短请求或选择更少的转录。";
 "error.log_export" = "无法导出日志：%@";
 "detail.summarizing.progress" = "正在总结第 %1$d 部分，共 %2$d 部分…";
 

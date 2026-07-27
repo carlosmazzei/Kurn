@@ -74,7 +74,11 @@ struct GoogleProvider: LLMProvider {
 
     // MARK: - Chat (generateContent, plain text)
 
-    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+    func chat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) async throws -> String {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         // Gemini has no dedicated system role here; fold the system prompt into
@@ -93,10 +97,10 @@ struct GoogleProvider: LLMProvider {
         }
         // No `responseMimeType: application/json`: chat replies are prose.
         let request = try makeRequest(
-            timeout: LLMHTTP.chatTimeout,
+            timeout: options.timeout,
             body: [
                 "contents": contents,
-                "generationConfig": ["maxOutputTokens": LLMHTTP.chatMaxOutputTokens]
+                "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
             ]
         )
 
@@ -106,6 +110,7 @@ struct GoogleProvider: LLMProvider {
             from: data,
             as: GeminiResponse.self,
             emptyMessage: "empty Gemini response",
+            isTruncated: { $0.candidates?.first?.finishReason == "MAX_TOKENS" },
             extractContent: { Self.text(from: $0) }
         )
     }

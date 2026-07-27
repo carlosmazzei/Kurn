@@ -48,7 +48,8 @@ struct DocumentGenerationService {
         if context.count <= SummaryService.maxSinglePassChars {
             markdown = try await llm.chat(
                 systemPrompt: Self.systemPrompt,
-                messages: [.init(role: .user, content: Self.finalPrompt(instruction: instruction, context: context))]
+                messages: [.init(role: .user, content: Self.finalPrompt(instruction: instruction, context: context))],
+                options: .document
             )
         } else {
             markdown = try await generateLongDocument(
@@ -96,7 +97,8 @@ struct DocumentGenerationService {
                         \(block)
                         """
                     )
-                ]
+                ],
+                options: .document
             )
             notes.append("## Source part \(index + 1)\n\n\(response)")
         }
@@ -113,7 +115,8 @@ struct DocumentGenerationService {
                         context: notes.joined(separator: "\n\n")
                     )
                 )
-            ]
+            ],
+            options: .document
         )
     }
 

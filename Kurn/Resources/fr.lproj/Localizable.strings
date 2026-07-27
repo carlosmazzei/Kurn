@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "Cet appareil n'a ni code ni biométrie configurés. Définissez un code d'accès, ou ouvrez Réglages pour désactiver l'authentification des enregistrements.";
 "error.auto_tagging" = "Impossible de suggérer des tags : %@";
 "error.summary_truncated" = "Le résumé a été tronqué car il a atteint la limite de sortie du modèle. Essayez un modèle avec moins de sections ou un modèle avec une limite de sortie plus élevée.";
+"error.generation_truncated" = "La réponse a atteint la limite de sortie du modèle. Essayez une demande plus courte ou sélectionnez moins de transcriptions.";
 "error.log_export" = "Impossible d'exporter les journaux : %@";
 "detail.summarizing.progress" = "Résumé de la partie %1$d sur %2$d…";
 

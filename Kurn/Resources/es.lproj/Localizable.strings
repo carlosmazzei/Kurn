@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "Este dispositivo no tiene un código ni datos biométricos configurados. Configura un código de dispositivo o abre Ajustes para desactivar la autenticación de grabaciones.";
 "error.auto_tagging" = "No se pudieron sugerir etiquetas: %@";
 "error.summary_truncated" = "El resumen se cortó porque alcanzó el límite de salida del modelo. Prueba una plantilla con menos secciones o un modelo con un límite de salida mayor.";
+"error.generation_truncated" = "La respuesta alcanzó el límite de salida del modelo. Prueba una solicitud más corta o selecciona menos transcripciones.";
 "error.log_export" = "No se pudieron exportar los registros: %@";
 "detail.summarizing.progress" = "Resumiendo parte %1$d de %2$d…";
 

@@ -39,6 +39,7 @@ struct AppErrorTests {
             .modelDownloadRequired("diarization"),
             .modelDownloadFailed("network unavailable"),
             .resourceUnavailable("low memory"),
+            .generationTruncated,
             .logExportFailed("no logs available")
         ]
         for error in cases {
