@@ -257,12 +257,17 @@ enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     /// supported `MeetingLanguage`, or `.autoDetect` when it isn't one we
     /// pin. Checks the full lowercased code first — needed for 3-letter
     /// Whisper codes like "yue"/"haw" — then falls back to the 2-letter
-    /// prefix for region-qualified codes like "zh-Hans" or "pt-BR".
+    /// prefix for region-qualified codes like "zh-Hans" or "pt-BR", then to
+    /// a raw-value match, since some providers (e.g. OpenAI's `verbose_json`
+    /// response) report a full English language name like "portuguese"
+    /// rather than a code, and that's exactly what each case's rawValue is.
     init(detectedCode code: String) {
         let normalized = code.lowercased()
         if let match = Self.byCode[normalized] {
             self = match
         } else if let match = Self.byCode[String(normalized.prefix(2))] {
+            self = match
+        } else if let match = MeetingLanguage(rawValue: normalized) {
             self = match
         } else {
             self = .autoDetect

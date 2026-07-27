@@ -35,6 +35,11 @@ struct DiagnosticsSettingsView: View {
                 } label: {
                     Label(NSLocalizedString("settings.export_logs", comment: "Export logs"), systemImage: "square.and.arrow.up")
                 }
+                NavigationLink {
+                    LogEntriesListView()
+                } label: {
+                    Label(NSLocalizedString("settings.view_logs", comment: "View recent logs"), systemImage: "doc.text.magnifyingglass")
+                }
                 Toggle(
                     NSLocalizedString("settings.diagnostic_reports", comment: "Diagnostic reports"),
                     isOn: Binding(

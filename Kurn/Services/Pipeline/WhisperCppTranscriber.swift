@@ -262,10 +262,13 @@ private final class WhisperContext: @unchecked Sendable {
         body: (whisper_full_params) -> Int32
     ) -> Int32 {
         guard let language else {
-            // A null language means auto-detect.
+            // A null language means auto-detect. whisper.cpp already
+            // auto-detects language as part of the normal transcription pass
+            // when `language` is nil — `detect_language` is a detect-only
+            // switch that makes `whisper_full` return before transcribing.
             var scoped = params
             scoped.language = nil
-            scoped.detect_language = true
+            scoped.detect_language = false
             return body(scoped)
         }
         return language.withCString { pointer in

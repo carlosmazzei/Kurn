@@ -99,6 +99,10 @@ struct RecognitionPipelineTests {
         ("zh-Hans", MeetingLanguage.chinese),
         ("ru", MeetingLanguage.russian),
         ("yue", MeetingLanguage.cantonese),
+        // OpenAI's verbose_json transcription response reports a full
+        // English language name rather than a code.
+        ("portuguese", MeetingLanguage.portuguese),
+        ("english", MeetingLanguage.english),
         ("xx", MeetingLanguage.autoDetect)
     ])
     func detectedCodeMapsToLanguage(code: String, expected: MeetingLanguage) {

@@ -283,6 +283,7 @@
 /* Common */
 "common.delete" = "Delete";
 "common.cancel" = "Cancel";
+"common.refresh" = "Refresh";
 "common.save" = "Save";
 "common.ok" = "OK";
 "common.error" = "Error";
@@ -356,6 +357,10 @@
 "detail.retranscribe_all.confirm.message" = "This replaces all existing transcripts with new ones from the original audio, in order. This can't be undone.";
 "detail.transcript.empty.title" = "No transcript yet";
 "detail.transcript.empty.subtitle" = "Transcribe a recording to see the conversation here.";
+"detail.transcript.failed.title" = "Transcription failed";
+"detail.transcript.failed.subtitle" = "Retry from the Recordings tab.";
+"detail.transcript.no_speech.title" = "No speech detected";
+"detail.transcript.no_speech.subtitle" = "This recording didn't contain any detectable speech.";
 "detail.summary.empty.title" = "No summary yet";
 "detail.section" = "Section";
 "tab.recordings" = "Recordings";
@@ -452,6 +457,8 @@
 "settings.log_level_footer" = "Controls how much detail the app writes to the system log (Console.app, subsystem ai.kurn.app). Off disables logging entirely; Verbose includes high-frequency traces useful when reporting a bug.";
 "settings.export_logs" = "Export Logs";
 "settings.export_logs_footer" = "Shares the last 24 hours of the app's own log entries as a text file, for support or bug reports.";
+"settings.view_logs" = "View Recent Logs";
+"settings.view_logs.empty" = "No log entries in the last 24 hours";
 "settings.diagnostic_reports" = "Diagnostic Reports";
 "settings.diagnostic_reports_footer" = "When on, crash and freeze reports captured on this device are saved here. Nothing is ever sent anywhere automatically — reports only leave the device if you tap Share on one.";
 "settings.diagnostic_reports.consent_title" = "Enable Diagnostic Reports";

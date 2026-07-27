@@ -283,6 +283,7 @@
 /* 通用 */
 "common.delete" = "删除";
 "common.cancel" = "取消";
+"common.refresh" = "刷新";
 "common.save" = "保存";
 "common.ok" = "好";
 "common.error" = "错误";
@@ -356,6 +357,10 @@
 "detail.retranscribe_all.confirm.message" = "这将依次用根据原始音频重新生成的转录内容替换所有现有转录，此操作无法撤销。";
 "detail.transcript.empty.title" = "暂无转录内容";
 "detail.transcript.empty.subtitle" = "转录一段录音即可在此查看对话内容。";
+"detail.transcript.failed.title" = "转录失败";
+"detail.transcript.failed.subtitle" = "请在「录音」标签页重试。";
+"detail.transcript.no_speech.title" = "未检测到语音";
+"detail.transcript.no_speech.subtitle" = "此录音未包含可检测到的语音。";
 "detail.summary.empty.title" = "暂无摘要";
 "detail.section" = "板块";
 "tab.recordings" = "录音";
@@ -452,6 +457,8 @@
 "settings.log_level_footer" = "控制应用写入系统日志（Console.app，子系统 ai.kurn.app）的详细程度。「关闭」将完全禁用日志；「详尽」包含高频跟踪信息，适用于报告问题时使用。";
 "settings.export_logs" = "导出日志";
 "settings.export_logs_footer" = "将应用最近 24 小时的日志记录以文本文件形式分享，用于支持或错误报告。";
+"settings.view_logs" = "查看最近日志";
+"settings.view_logs.empty" = "过去24小时内没有日志条目";
 "settings.diagnostic_reports" = "诊断报告";
 "settings.diagnostic_reports_footer" = "开启后，在本设备上捕获的崩溃和卡死报告将保存在这里。不会自动发送到任何地方——只有当你点击某条报告的「分享」时，报告才会离开设备。";
 "settings.diagnostic_reports.consent_title" = "启用诊断报告";

@@ -283,6 +283,7 @@
 /* Comune */
 "common.delete" = "Elimina";
 "common.cancel" = "Annulla";
+"common.refresh" = "Aggiorna";
 "common.save" = "Salva";
 "common.ok" = "OK";
 "common.error" = "Errore";
@@ -356,6 +357,10 @@
 "detail.retranscribe_all.confirm.message" = "Questo sostituisce tutte le trascrizioni esistenti con nuove, ottenute dall'audio originale, in ordine. Non è possibile annullare l'operazione.";
 "detail.transcript.empty.title" = "Ancora nessuna trascrizione";
 "detail.transcript.empty.subtitle" = "Trascrivi una registrazione per vedere qui la conversazione.";
+"detail.transcript.failed.title" = "Trascrizione non riuscita";
+"detail.transcript.failed.subtitle" = "Riprova dalla scheda Registrazioni.";
+"detail.transcript.no_speech.title" = "Nessun parlato rilevato";
+"detail.transcript.no_speech.subtitle" = "Questa registrazione non conteneva parlato rilevabile.";
 "detail.summary.empty.title" = "Ancora nessun riassunto";
 "detail.section" = "Sezione";
 "tab.recordings" = "Registrazioni";
@@ -452,6 +457,8 @@
 "settings.log_level_footer" = "Controlla il livello di dettaglio scritto dall'app nel log di sistema (Console.app, sottosistema ai.kurn.app). Disattivato disabilita completamente la registrazione; Dettagliato include tracce ad alta frequenza utili per segnalare un problema.";
 "settings.export_logs" = "Esporta Log";
 "settings.export_logs_footer" = "Condivide le ultime 24 ore dei log dell'app come file di testo, per supporto o segnalazioni di bug.";
+"settings.view_logs" = "Visualizza registri recenti";
+"settings.view_logs.empty" = "Nessuna voce di registro nelle ultime 24 ore";
 "settings.diagnostic_reports" = "Rapporti di Diagnostica";
 "settings.diagnostic_reports_footer" = "Quando attivo, i rapporti di crash e blocco catturati su questo dispositivo vengono salvati qui. Nulla viene mai inviato automaticamente altrove — i rapporti lasciano il dispositivo solo se tocchi Condividi su uno di essi.";
 "settings.diagnostic_reports.consent_title" = "Attiva Rapporti di Diagnostica";
