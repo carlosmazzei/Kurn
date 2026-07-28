@@ -30,6 +30,7 @@ extension MeetingsListView {
         if settings.semanticSearchEnabled {
             ToolbarItem(placement: .bottomBar) { askButton }
         }
+        ToolbarItem(placement: .bottomBar) { documentsButton }
         // Everything above shares one glass capsule; the flexible spacer pushes
         // the record button to the trailing edge *and* gives it its own.
         ToolbarSpacer(.flexible, placement: .bottomBar)
@@ -102,6 +103,16 @@ extension MeetingsListView {
             )
         }
         .accessibilityIdentifier("meetings.ask")
+    }
+
+    var documentsButton: some View {
+        Button { showingDocuments = true } label: {
+            Label(
+                NSLocalizedString("documents.title", comment: "Documents"),
+                systemImage: "doc.text"
+            )
+        }
+        .accessibilityIdentifier("navigation.documents")
     }
 
     // MARK: - Navigation bar

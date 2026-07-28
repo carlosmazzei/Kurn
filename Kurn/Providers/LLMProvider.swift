@@ -29,6 +29,23 @@ struct ChatMessage: Sendable, Equatable {
     }
 }
 
+/// Request budget for free-form text generation. Interactive chat stays
+/// responsive, while document generation gets the same room and timeout as a
+/// full meeting summary.
+struct TextGenerationOptions: Sendable, Equatable {
+    let maxOutputTokens: Int
+    let timeout: TimeInterval
+
+    static let chat = Self(
+        maxOutputTokens: LLMHTTP.chatMaxOutputTokens,
+        timeout: LLMHTTP.chatTimeout
+    )
+    static let document = Self(
+        maxOutputTokens: LLMHTTP.documentMaxOutputTokens,
+        timeout: LLMHTTP.summaryTimeout
+    )
+}
+
 protocol LLMProvider: Sendable {
     /// Vendor this provider represents.
     var provider: AIProvider { get }
@@ -45,7 +62,11 @@ protocol LLMProvider: Sendable {
     /// plain text (no JSON-section contract), so it backs the "chat with your
     /// meetings" feature. `systemPrompt` carries the grounding instructions;
     /// `messages` are the user/assistant turns in order.
-    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String
+    func chat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) async throws -> String
 }
 
 extension LLMProvider {
@@ -54,6 +75,10 @@ extension LLMProvider {
         throw AppError.transcriptionFailed(
             NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
         )
+    }
+
+    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+        try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
     }
 }
 
@@ -75,6 +100,9 @@ enum LLMHTTP {
     /// answer over retrieved passages is short — but generous enough for a
     /// multi-paragraph explanation with quotes.
     static let chatMaxOutputTokens = 4096
+    /// Documents are longer than interactive replies and reasoning models may
+    /// consume part of this budget before emitting visible text.
+    static let documentMaxOutputTokens = 8192
     /// Timeout for chat requests. Shorter than a summary (which can generate for
     /// minutes over a whole transcript); a RAG answer over a few passages is
     /// quick, and a snappier timeout keeps the chat UI responsive.
@@ -177,10 +205,14 @@ enum LLMHTTP {
         from data: Data,
         as type: T.Type,
         emptyMessage: String,
+        isTruncated: (T) -> Bool = { _ in false },
         extractContent: (T) -> String?
     ) throws -> String {
         do {
             let decoded = try JSONDecoder().decode(type, from: data)
+            guard !isTruncated(decoded) else {
+                throw AppError.generationTruncated
+            }
             guard let content = extractContent(decoded)?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                   !content.isEmpty else {

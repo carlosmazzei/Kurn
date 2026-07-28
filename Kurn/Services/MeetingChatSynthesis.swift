@@ -166,22 +166,7 @@ extension MeetingChatService {
     /// never splitting an article. An article larger than `maxChars` becomes its
     /// own oversized block rather than being cut.
     static func packArticles(_ rendered: [String], maxChars: Int) -> [String] {
-        var blocks: [String] = []
-        var current: [String] = []
-        var count = 0
-        for article in rendered {
-            let added = current.isEmpty ? article.count : article.count + 2 // "\n\n"
-            if !current.isEmpty && count + added > maxChars {
-                blocks.append(current.joined(separator: "\n\n"))
-                current = [article]
-                count = article.count
-            } else {
-                current.append(article)
-                count += added
-            }
-        }
-        if !current.isEmpty { blocks.append(current.joined(separator: "\n\n")) }
-        return blocks
+        SummaryService.packWholeItems(rendered, maxChars: maxChars)
     }
 
     // MARK: - Prompts

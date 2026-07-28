@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "此设备未设置密码或生物识别。请设置设备密码，或前往设置关闭录音身份验证。";
 "error.auto_tagging" = "无法推荐标签：%@";
 "error.summary_truncated" = "由于达到模型的输出上限，摘要被截断。请尝试使用分节较少的模板，或使用输出上限更大的模型。";
+"error.generation_truncated" = "响应已达到模型的输出上限。请尝试缩短请求或选择更少的转录。";
 "error.log_export" = "无法导出日志：%@";
 "detail.summarizing.progress" = "正在总结第 %1$d 部分，共 %2$d 部分…";
 
@@ -619,3 +620,28 @@
 "detail.wiki.view" = "查看维基";
 "detail.wiki.title" = "会议维基";
 "detail.wiki.updated" = "更新于 %@";
+
+/* 生成的文档 */
+"navigation.meetings" = "会议";
+"documents.title" = "文档";
+"documents.new" = "新建文档";
+"documents.empty.title" = "暂无文档";
+"documents.empty.subtitle" = "从选定的转写、标签或文件夹生成文档。";
+"documents.prompt.title" = "说明";
+"documents.prompt.placeholder" = "例如：创建包含决策、风险和后续步骤的项目状态报告…";
+"documents.source.title" = "来源";
+"documents.source.transcripts" = "转写";
+"documents.source.tags" = "标签";
+"documents.source.folders" = "文件夹";
+"documents.source.count" = "包含 %d 个转写";
+"documents.source.empty" = "没有来源";
+"documents.source.empty.subtitle" = "请先转写会议，或使用标签和文件夹整理会议。";
+"documents.generate" = "生成";
+"documents.generating.progress" = "正在生成第 %1$d 部分，共 %2$d 部分…";
+"documents.delete.confirm" = "删除文档？";
+"documents.details" = "文档详情";
+"documents.generated_at" = "生成时间";
+"documents.error.empty_prompt" = "请输入文档说明。";
+"documents.error.no_transcripts" = "请至少选择一个包含转写的来源。";
+"documents.error.empty_response" = "AI 提供商返回了空文档。";
+"error.document_generation" = "无法生成文档：%@";

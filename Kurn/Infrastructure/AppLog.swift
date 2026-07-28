@@ -96,6 +96,7 @@ enum AppLog {
     private static let recorderLogger = Logger(subsystem: subsystem, category: "Recorder")
     private static let recorderUILogger = Logger(subsystem: subsystem, category: "RecorderUI")
     private static let transcriptionLogger = Logger(subsystem: subsystem, category: "Transcription")
+    private static let generationLogger = Logger(subsystem: subsystem, category: "Generation")
     private static let uiLogger = Logger(subsystem: subsystem, category: "UI")
     private static let persistenceLogger = Logger(subsystem: subsystem, category: "Persistence")
 
@@ -105,6 +106,8 @@ enum AppLog {
     static let recorderUI = CategoryLogger(recorderUILogger)
     /// Transcription pipeline (preprocessing, chunking, engines, fusion, summary).
     static let transcription = CategoryLogger(transcriptionLogger)
+    /// LLM-backed document, summary, chat, and knowledge generation.
+    static let generation = CategoryLogger(generationLogger)
     /// User-facing UI actions and sheet lifecycle.
     static let ui = CategoryLogger(uiLogger)
     /// SwiftData persistence and model migrations.

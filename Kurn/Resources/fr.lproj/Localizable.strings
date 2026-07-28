@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "Cet appareil n'a ni code ni biométrie configurés. Définissez un code d'accès, ou ouvrez Réglages pour désactiver l'authentification des enregistrements.";
 "error.auto_tagging" = "Impossible de suggérer des tags : %@";
 "error.summary_truncated" = "Le résumé a été tronqué car il a atteint la limite de sortie du modèle. Essayez un modèle avec moins de sections ou un modèle avec une limite de sortie plus élevée.";
+"error.generation_truncated" = "La réponse a atteint la limite de sortie du modèle. Essayez une demande plus courte ou sélectionnez moins de transcriptions.";
 "error.log_export" = "Impossible d'exporter les journaux : %@";
 "detail.summarizing.progress" = "Résumé de la partie %1$d sur %2$d…";
 
@@ -619,3 +620,28 @@
 "detail.wiki.view" = "Voir le wiki";
 "detail.wiki.title" = "Wiki de la réunion";
 "detail.wiki.updated" = "Mis à jour le %@";
+
+/* Documents générés */
+"navigation.meetings" = "Réunions";
+"documents.title" = "Documents";
+"documents.new" = "Nouveau document";
+"documents.empty.title" = "Aucun document";
+"documents.empty.subtitle" = "Générez un document à partir de transcriptions, tags ou dossiers sélectionnés.";
+"documents.prompt.title" = "Instructions";
+"documents.prompt.placeholder" = "Exemple : Créez un rapport de projet avec les décisions, risques et prochaines étapes…";
+"documents.source.title" = "Sources";
+"documents.source.transcripts" = "Transcriptions";
+"documents.source.tags" = "Tags";
+"documents.source.folders" = "Dossiers";
+"documents.source.count" = "%d transcriptions incluses";
+"documents.source.empty" = "Aucune source";
+"documents.source.empty.subtitle" = "Transcrivez d'abord une réunion ou organisez-la avec des tags et dossiers.";
+"documents.generate" = "Générer";
+"documents.generating.progress" = "Génération de la partie %1$d sur %2$d…";
+"documents.delete.confirm" = "Supprimer le document ?";
+"documents.details" = "Détails du document";
+"documents.generated_at" = "Généré";
+"documents.error.empty_prompt" = "Saisissez les instructions du document.";
+"documents.error.no_transcripts" = "Sélectionnez au moins une source contenant une transcription.";
+"documents.error.empty_response" = "Le fournisseur d'IA a renvoyé un document vide.";
+"error.document_generation" = "Impossible de générer le document : %@";

@@ -545,6 +545,7 @@
 "error.authentication_not_available" = "Questo dispositivo non ha un codice o dati biometrici configurati. Imposta un codice del dispositivo, oppure apri le Impostazioni per disattivare l'autenticazione per le registrazioni.";
 "error.auto_tagging" = "Impossibile suggerire tag: %@";
 "error.summary_truncated" = "Il riassunto è stato troncato perché ha raggiunto il limite di output del modello. Prova un modello con meno sezioni o uno con un limite di output più ampio.";
+"error.generation_truncated" = "La risposta ha raggiunto il limite di output del modello. Prova una richiesta più breve o seleziona meno trascrizioni.";
 "error.log_export" = "Impossibile esportare i log: %@";
 "detail.summarizing.progress" = "Riassunto della parte %1$d di %2$d…";
 
@@ -619,3 +620,28 @@
 "detail.wiki.view" = "Visualizza wiki";
 "detail.wiki.title" = "Wiki della riunione";
 "detail.wiki.updated" = "Aggiornata il %@";
+
+/* Documenti generati */
+"navigation.meetings" = "Riunioni";
+"documents.title" = "Documenti";
+"documents.new" = "Nuovo documento";
+"documents.empty.title" = "Nessun documento";
+"documents.empty.subtitle" = "Genera un documento da trascrizioni, tag o cartelle selezionate.";
+"documents.prompt.title" = "Istruzioni";
+"documents.prompt.placeholder" = "Esempio: Crea un rapporto di progetto con decisioni, rischi e prossimi passi…";
+"documents.source.title" = "Fonti";
+"documents.source.transcripts" = "Trascrizioni";
+"documents.source.tags" = "Tag";
+"documents.source.folders" = "Cartelle";
+"documents.source.count" = "%d trascrizioni incluse";
+"documents.source.empty" = "Nessuna fonte";
+"documents.source.empty.subtitle" = "Prima trascrivi una riunione o organizzala con tag e cartelle.";
+"documents.generate" = "Genera";
+"documents.generating.progress" = "Generazione parte %1$d di %2$d…";
+"documents.delete.confirm" = "Eliminare il documento?";
+"documents.details" = "Dettagli del documento";
+"documents.generated_at" = "Generato";
+"documents.error.empty_prompt" = "Inserisci le istruzioni per il documento.";
+"documents.error.no_transcripts" = "Seleziona almeno una fonte contenente una trascrizione.";
+"documents.error.empty_response" = "Il provider IA ha restituito un documento vuoto.";
+"error.document_generation" = "Impossibile generare il documento: %@";

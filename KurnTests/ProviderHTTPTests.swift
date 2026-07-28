@@ -400,6 +400,48 @@ struct ProviderHTTPTests {
         #expect(body?["max_completion_tokens"] as? Int == 4096)
     }
 
+    @Test func openAIDocumentGenerationUsesLongOutputBudget() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["choices": [["message": ["content": "# Document"]]]])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", model: "gpt-5.4", session: MockURLProtocol.session())
+
+        _ = try await provider.chat(
+            systemPrompt: "ground",
+            messages: [ChatMessage(role: .user, content: "Create a document")],
+            options: .document
+        )
+
+        let request = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        #expect(body?["max_completion_tokens"] as? Int == 8192)
+        #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
+    }
+
+    @Test func truncatedChatResponseThrowsSpecificError() async {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "choices": [[
+                    "message": ["content": NSNull()],
+                    "finish_reason": "length"
+                ]]
+            ])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        do {
+            _ = try await provider.chat(
+                systemPrompt: "s",
+                messages: [ChatMessage(role: .user, content: "q")]
+            )
+            Issue.record("Expected generationTruncated")
+        } catch AppError.generationTruncated {
+            // Expected.
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
     @Test func openAIChatReturnsRefusalWhenContentIsNull() async throws {
         MockURLProtocol.enqueue([
             MockURLProtocol.json([

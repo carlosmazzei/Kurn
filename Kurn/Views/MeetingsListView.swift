@@ -53,6 +53,8 @@ struct MeetingsListView: View {
     @State private var semanticHits: [SemanticSearchService.Hit] = []
     /// Presents the library-wide "Ask" chat sheet.
     @State var showingAsk = false
+    /// Pushes the generated-document library from the shared bottom toolbar.
+    @State var showingDocuments = false
     private let semanticSearchService = SemanticSearchService()
     @State var filter = MeetingFilter()
     @State var selection: LibrarySelection = .allMeetings
@@ -329,6 +331,9 @@ struct MeetingsListView: View {
         .toolbar { listToolbar }
         .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
+        }
+        .navigationDestination(isPresented: $showingDocuments) {
+            DocumentsListView()
         }
         .sheet(item: $editingMeeting) { meeting in
             NavigationStack { MeetingFormView(meeting: meeting) }

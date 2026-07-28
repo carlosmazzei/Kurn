@@ -58,7 +58,11 @@ struct AnthropicProvider: LLMProvider {
 
     // MARK: - Chat (Messages API, plain text)
 
-    func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
+    func chat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) async throws -> String {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         // Anthropic takes the system prompt as a top-level field; the message
@@ -67,10 +71,10 @@ struct AnthropicProvider: LLMProvider {
             .filter { $0.role != .system }
             .map { ["role": $0.role.rawValue, "content": $0.content] }
         let request = try makeRequest(
-            timeout: LLMHTTP.chatTimeout,
+            timeout: options.timeout,
             body: [
                 "model": model,
-                "max_tokens": LLMHTTP.chatMaxOutputTokens,
+                "max_tokens": options.maxOutputTokens,
                 "system": systemPrompt,
                 "messages": wire
             ]
@@ -82,6 +86,7 @@ struct AnthropicProvider: LLMProvider {
             from: data,
             as: MessagesResponse.self,
             emptyMessage: "empty Anthropic response",
+            isTruncated: { $0.stopReason == "max_tokens" },
             extractContent: { Self.text(from: $0) }
         )
     }

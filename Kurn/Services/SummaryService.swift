@@ -177,6 +177,30 @@ struct SummaryService {
         return blocks
     }
 
+    /// Greedily pack complete rendered units into bounded blocks. Units are
+    /// never split: callers that can produce one oversized unit should split it
+    /// first while preserving whatever header/context that unit requires.
+    static func packWholeItems(_ items: [String], maxChars: Int) -> [String] {
+        var blocks: [String] = []
+        var current: [String] = []
+        var currentCount = 0
+        for item in items {
+            let added = current.isEmpty ? item.count : item.count + 2
+            if !current.isEmpty && currentCount + added > maxChars {
+                blocks.append(current.joined(separator: "\n\n"))
+                current = [item]
+                currentCount = item.count
+            } else {
+                current.append(item)
+                currentCount += added
+            }
+        }
+        if !current.isEmpty {
+            blocks.append(current.joined(separator: "\n\n"))
+        }
+        return blocks
+    }
+
     /// Render summary sections back into markdown text for the reduce prompt.
     static func markdownText(from sections: [SummarySection]) -> String {
         sections.map { section in

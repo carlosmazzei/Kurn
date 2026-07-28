@@ -26,14 +26,47 @@ enum AppError: LocalizedError, Identifiable {
     case authenticationNotAvailable
     case autoTaggingFailed(String)
     case summaryTruncated
+    case generationTruncated
     case logExportFailed(String)
     case embeddingUnavailable(String)
     case semanticIndexFailed(String)
     case wikiGenerationFailed(String)
     case wikiUnavailable
+    case documentGenerationFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
+
+    /// Content-free identifier safe to include in diagnostic logs. Provider
+    /// messages and user data remain available to the UI but are never copied
+    /// into this value.
+    var logCode: String {
+        switch self {
+        case .noAPIKey: return "missing_api_key"
+        case .networkError: return "network"
+        case .apiError: return "provider_api"
+        case .transcriptionFailed: return "transcription"
+        case .audioError: return "audio"
+        case .decodingError: return "decoding"
+        case .permissionDenied: return "permission"
+        case .persistenceFailed: return "persistence"
+        case .modelDownloadRequired: return "model_download_required"
+        case .modelDownloadFailed: return "model_download"
+        case .resourceUnavailable: return "resource"
+        case .authenticationRequired: return "authentication_required"
+        case .authenticationFailed: return "authentication"
+        case .authenticationNotAvailable: return "authentication_unavailable"
+        case .autoTaggingFailed: return "auto_tagging"
+        case .summaryTruncated: return "summary_truncated"
+        case .generationTruncated: return "generation_truncated"
+        case .logExportFailed: return "log_export"
+        case .embeddingUnavailable: return "embedding"
+        case .semanticIndexFailed: return "semantic_index"
+        case .wikiGenerationFailed: return "wiki_generation"
+        case .wikiUnavailable: return "wiki_unavailable"
+        case .documentGenerationFailed: return "document_generation"
+        }
+    }
 
     var errorDescription: String? {
         switch self {
@@ -117,6 +150,11 @@ enum AppError: LocalizedError, Identifiable {
                 "error.summary_truncated",
                 comment: "Summary generation hit the model's output limit"
             )
+        case .generationTruncated:
+            return NSLocalizedString(
+                "error.generation_truncated",
+                comment: "Text generation hit the model's output limit"
+            )
         case .logExportFailed(let detail):
             return String(
                 format: NSLocalizedString("error.log_export", comment: "Log export failure"),
@@ -141,6 +179,11 @@ enum AppError: LocalizedError, Identifiable {
             return NSLocalizedString(
                 "error.wiki_unavailable",
                 comment: "Meeting wiki is not ready yet"
+            )
+        case .documentGenerationFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.document_generation", comment: "Document generation failed"),
+                detail
             )
         }
     }
