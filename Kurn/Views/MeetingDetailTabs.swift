@@ -15,6 +15,10 @@ struct TranscriptTab: View {
     let meeting: Meeting
     let recordings: [Recording]
     let player: AudioPlayerService
+    /// Computed by the parent from the meeting's *full* recordings list (not
+    /// just `recordings` above, which is filtered to transcribed segments) —
+    /// the offset accounts for every earlier recording, transcribed or not.
+    let offsetFor: (Recording) -> TimeInterval
     let onSeek: (Recording, TimeInterval) -> Void
     let onRenameCommit: () -> Void
 
@@ -49,7 +53,7 @@ struct TranscriptTab: View {
                     segments: segments,
                     speakers: meeting.speakers,
                     activeTime: player.loadedFileName == recording.fileName ? player.currentTime : nil,
-                    offset: meeting.startOffset(of: recording),
+                    offset: offsetFor(recording),
                     onSeek: { time in onSeek(recording, time) }
                 )
             }
@@ -98,6 +102,7 @@ struct SummaryTab: View {
     /// Currently selected summary's id; falls back to the newest when nil or
     /// no longer present (e.g. it was just deleted).
     let selectedSummaryID: UUID?
+    let hasAnyTranscript: Bool
     let onGenerate: () -> Void
     let onCancel: () -> Void
     let onSelectSummary: (Summary) -> Void
@@ -126,7 +131,7 @@ struct SummaryTab: View {
         } else if isSummarizing {
             summaryProgressPanel
                 .padding(.top, 24)
-        } else if meeting.hasAnyTranscript {
+        } else if hasAnyTranscript {
             summaryEmptyState(canGenerate: true)
         } else {
             summaryEmptyState(canGenerate: false)
