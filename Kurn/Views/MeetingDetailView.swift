@@ -189,11 +189,12 @@ struct MeetingDetailView: View {
                     metaDot
                     Text(meeting.totalDuration.clockDisplay)
                 }
-                metaDot
-                Text(displayLanguage.displayName)
             }
             .font(.system(size: 13))
             .foregroundStyle(Theme.textSecondary)
+            Text(displayLanguage.displayName)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.textSecondary)
             if !meeting.tags.isEmpty {
                 TagChipsView(tags: meeting.tags)
             }
