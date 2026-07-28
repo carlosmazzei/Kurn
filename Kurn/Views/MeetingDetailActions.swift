@@ -11,8 +11,30 @@ import SwiftUI
 
 extension MeetingDetailView {
 
+    // `meeting.recordings` itself is not used here: SwiftData doesn't refresh
+    // the in-memory relationship array on this already-on-screen `Meeting`
+    // when a `Recording` sets its inverse from the child side (as the recorder
+    // sheet does), so a segment just added wouldn't show up until the meeting
+    // was refetched. `queriedRecordings` is a `@Query` instead, which re-runs
+    // against the store on every context save.
     var sortedRecordings: [Recording] {
-        meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }
+        queriedRecordings
+    }
+
+    var totalDuration: TimeInterval {
+        sortedRecordings.reduce(0) { $0 + $1.duration }
+    }
+
+    var hasAnyTranscript: Bool {
+        sortedRecordings.contains { $0.transcript?.segments.isEmpty == false }
+    }
+
+    /// Mirrors `Meeting.startOffset(of:)`, sourced from `sortedRecordings`
+    /// (the live `@Query`) instead of `meeting.recordings`.
+    func startOffset(of recording: Recording) -> TimeInterval {
+        sortedRecordings
+            .prefix { $0.id != recording.id }
+            .reduce(0) { $0 + $1.duration }
     }
 
     /// The summary currently shown in the Summary tab — used both for

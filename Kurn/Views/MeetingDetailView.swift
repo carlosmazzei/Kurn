@@ -13,6 +13,10 @@ import SwiftUI
 
 struct MeetingDetailView: View {
     @Bindable var meeting: Meeting
+    /// Scoped to this meeting so the recordings list refreshes on every
+    /// context save — see `sortedRecordings` in `MeetingDetailActions.swift`
+    /// for why `meeting.recordings` itself isn't used.
+    @Query private var queriedRecordings: [Recording]
 
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
@@ -74,6 +78,15 @@ struct MeetingDetailView: View {
     @State var autoTagSuggestion: AutoTaggingService.Suggestion?
     /// Auto-tagging failure surfaced to the user.
     @State var autoTagError: AppError?
+
+    init(meeting: Meeting) {
+        self.meeting = meeting
+        let meetingID = meeting.id
+        _queriedRecordings = Query(
+            filter: #Predicate<Recording> { $0.meeting?.id == meetingID },
+            sort: \Recording.recordedAt
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -184,10 +197,10 @@ struct MeetingDetailView: View {
             HStack(spacing: 8) {
                 Text(meeting.createdAt.meetingDisplay)
                 metaDot
-                Text(String(format: NSLocalizedString("detail.segment_count", comment: ""), meeting.recordings.count))
-                if meeting.totalDuration > 0 {
+                Text(String(format: NSLocalizedString("detail.segment_count", comment: ""), sortedRecordings.count))
+                if totalDuration > 0 {
                     metaDot
-                    Text(meeting.totalDuration.clockDisplay)
+                    Text(totalDuration.clockDisplay)
                 }
             }
             .font(.system(size: 13))
@@ -229,6 +242,7 @@ struct MeetingDetailView: View {
                     isCancellingSummary: txVM?.isCancellingSummary == true,
                     summaryProgress: txVM?.summaryProgress,
                     selectedSummaryID: selectedSummaryID,
+                    hasAnyTranscript: hasAnyTranscript,
                     onGenerate: { generateSummary() },
                     onCancel: { cancelSummary() },
                     onSelectSummary: { selectedSummaryID = $0.id },
@@ -250,14 +264,14 @@ struct MeetingDetailView: View {
     private func jumpToCitation(_ hit: SemanticSearchService.Hit) {
         guard let recording = sortedRecordings.first(where: { $0.id == hit.recordingID }) else { return }
         tab = .transcript
-        seek(recording, to: max(0, hit.start - meeting.startOffset(of: recording)))
+        seek(recording, to: max(0, hit.start - startOffset(of: recording)))
     }
 
     /// Tap on a `[mm:ss]` cited in a full-context answer: find the recording
     /// whose span contains that absolute meeting time and seek into it.
     private func jumpToTime(_ absolute: TimeInterval) {
         for recording in sortedRecordings {
-            let offset = meeting.startOffset(of: recording)
+            let offset = startOffset(of: recording)
             if absolute >= offset && absolute <= offset + recording.duration {
                 tab = .transcript
                 seek(recording, to: max(0, absolute - offset))
@@ -338,6 +352,7 @@ struct MeetingDetailView: View {
                     meeting: meeting,
                     recordings: transcribed,
                     player: player,
+                    offsetFor: { startOffset(of: $0) },
                     onSeek: { rec, time in seek(rec, to: time) },
                     onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } }
                 )
@@ -467,7 +482,7 @@ struct MeetingDetailView: View {
                         systemImage: meeting.isArchived ? "tray.and.arrow.up" : "archivebox"
                     )
                 }
-                if meeting.hasAnyTranscript {
+                if hasAnyTranscript {
                     Button { pendingRetranscribeAll = true } label: {
                         Label(NSLocalizedString("detail.retranscribe_all", comment: "Re-transcribe all"), systemImage: "arrow.clockwise")
                     }
