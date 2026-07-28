@@ -16,7 +16,7 @@ struct MeetingDetailView: View {
     /// Scoped to this meeting so the recordings list refreshes on every
     /// context save — see `sortedRecordings` in `MeetingDetailActions.swift`
     /// for why `meeting.recordings` itself isn't used.
-    @Query private var queriedRecordings: [Recording]
+    @Query var queriedRecordings: [Recording]
 
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
