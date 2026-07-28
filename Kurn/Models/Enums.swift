@@ -264,6 +264,12 @@ enum LibrarySelection: Hashable, Sendable {
 }
 
 /// Recording audio quality, mapped to the encoder bit rate.
+///
+/// Every tier records at the same speech-optimized sample rate (see
+/// `AudioRecorderService.storageSampleRate`), so the tiers differ only in bit
+/// rate. That pairing is what makes even the lowest tier clean: the encoder
+/// spends its budget on a 12kHz band instead of spreading it over the mic's
+/// full 24kHz, which is what used to make the low tier sound artefacted.
 enum AudioQuality: String, Codable, Sendable, CaseIterable, Identifiable {
     case high
     case standard
@@ -279,13 +285,21 @@ enum AudioQuality: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// AAC bit rate (bits per second) for the recorder.
+    /// AAC bit rate (bits per second) for the recorder. Tuned for mono speech at
+    /// `AudioRecorderService.storageSampleRate` — 48 kbps is transparent for
+    /// voice there, so `.standard` is the default and `.high` is headroom.
     var bitRate: Int {
         switch self {
-        case .high: return 128_000
-        case .standard: return 64_000
+        case .high: return 64_000
+        case .standard: return 48_000
         case .low: return 32_000
         }
+    }
+
+    /// Approximate bytes one hour of recording occupies at this tier. Constant
+    /// bit rate makes this exact enough to show in Settings.
+    var approximateBytesPerHour: Int64 {
+        Int64(bitRate) / 8 * 3600
     }
 }
 

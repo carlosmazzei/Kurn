@@ -282,11 +282,13 @@ final class RecorderViewModel {
 
         // Setting `meeting` establishes the relationship; SwiftData maintains the
         // inverse `meeting.recordings`, so we don't append manually.
+        // `recorder.stop()` has already closed the file, so its size is final.
         let recording = Recording(
             meeting: meeting,
             fileName: result.fileName,
             duration: result.duration,
-            transcriptionMode: defaultMode
+            transcriptionMode: defaultMode,
+            fileSize: AudioFileStore.byteSize(fileName: result.fileName)
         )
         modelContext.insert(recording)
         do {

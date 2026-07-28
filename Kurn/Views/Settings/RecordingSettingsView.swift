@@ -34,6 +34,13 @@ struct RecordingSettingsView: View {
                 ) {
                     ForEach(AudioQuality.allCases) { Text($0.displayName).tag($0) }
                 }
+                LabeledContent(
+                    NSLocalizedString("settings.audio_quality.usage", comment: "Storage per hour"),
+                    value: String(
+                        format: NSLocalizedString("settings.audio_quality.per_hour", comment: "Size per hour of recording"),
+                        AudioFileStore.formattedSize(settings.audioQuality.approximateBytesPerHour)
+                    )
+                )
                 Toggle(
                     NSLocalizedString("settings.always_use_built_in_mic", comment: "Always use iPhone microphone"),
                     isOn: Binding(
@@ -68,6 +75,7 @@ struct RecordingSettingsView: View {
                 )
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
+                    Text(NSLocalizedString("settings.audio_quality_footer", comment: "Explains that every tier preserves speech"))
                     Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
                     Text(NSLocalizedString("settings.always_use_built_in_mic_footer", comment: "Explains forcing the iPhone mic vs. being asked"))
                     Text(NSLocalizedString("settings.require_auth_for_recordings_footer", comment: "Explains authentication and at-rest encryption"))

@@ -151,6 +151,64 @@ root:
   computing counts/durations/status/tag/speaker breakdowns for a folder or any
   `[Meeting]`, rendered by `Views/FolderAnalyticsView.swift`.
 
+### Audio storage format
+
+Recordings are **always stored as mono AAC at
+`AudioRecorderService.storageSampleRate` (24 kHz)**, never at the microphone's
+native format. The recorder used to derive its encoder settings from
+`inputNode.outputFormat`, which meant a 48 kHz file spending bits on a 24 kHz
+band that nothing reads back: every machine consumer resamples to 16 kHz
+(`AudioPreprocessor`, `DiarizationPreprocessor`, `VADAudioLoader`,
+`SpeakerDiarizer`, `WhisperCppTranscriber`, and Apple Speech / FluidAudio
+internally), and the only full-fidelity consumer is `AudioPlayerService`, for
+which 24 kHz mono is transparent. Audio is never exported — `MeetingExport`
+produces Markdown only.
+
+Three things follow from the fixed format:
+
+- **`RecordingSink`** (`Services/RecordingSink.swift`, split out of the recorder)
+  owns an `AVAudioConverter` and resamples every tap buffer on its way to the
+  file. `AVAudioFile.write(from:)` requires buffers in the file's
+  `processingFormat`, so this is not optional — the sample-rate conversion needs
+  `convert(to:error:withInputFrom:)`, not the frame-count-preserving overload.
+  The converted buffer is also what `onAudioBuffer` hands the live-transcription
+  preview.
+- **`AudioQuality`** (`Models/Enums.swift`) is now bit rate only — 64/48/32 kbps,
+  defaulting to `.standard` — because the sample rate is no longer a free
+  variable. The pairing is what makes the low tier clean: 32 kbps over a 12 kHz
+  band is fine, over 24 kHz it artefacts. `approximateBytesPerHour` backs the
+  Settings row.
+- **A mid-recording input format change no longer invalidates the file.**
+  `recoverEngineIfNeeded` rebuilds the tap and the sink's converter for the new
+  input and keeps writing to the same `.m4a`; pausing with the
+  `recorder.engine_stalled` banner is now only the fallback when that fails.
+
+`Recording.fileSize` caches each file's byte count (`0` = not measured yet, which
+is also what lets the field be added without a SwiftData migration plan).
+`RecordingRecovery` backfills it during the launch/foreground sweep it already
+runs, and `Recording.effectiveBitRate` derives the stored rate from it.
+
+`RecordingCompactor` (`Services/RecordingCompactor.swift`) re-encodes
+already-transcribed recordings down to the current quality, for libraries
+recorded before the fixed format. It is user-triggered from Settings → Storage
+via `RecordingCompactionViewModel`, never automatic, and is the app's only
+destructive operation that isn't an explicit delete — so: only
+`transcriptionStatus == .done` recordings (anything else is still going to be
+read by the pipeline, and a checkpointed resume would be corrupted), only files
+more than `minimumExcessRatio` above the target, never upsampling, no DSP chain
+(the diarizer reads this file and depends on natural timbre), and a re-encode to
+`kurn_compact_*` in the temp directory that is verified (frames rendered, then
+decodable and long enough) and `RecordingProtection`-stamped before
+`replaceItemAt` swaps it in. Any failure leaves the original untouched.
+
+`OfflineAudioRenderer` (`Services/Pipeline/OfflineAudioRenderer.swift`) is the
+shared offline manual-rendering loop behind `AudioPreprocessor`,
+`DiarizationPreprocessor` and the compactor. Reading the app's own AAC files
+**must** go through an `AVAudioEngine` player-node render — `AVAudioFile.read`
+and `AVAudioConverter` both fail on them with a generic "erro 0" on device.
+`VADAudioLoader.monoSamples` keeps its own copy of the loop because it is
+synchronous; keep the two in sync.
+
 ### Secure local storage for recordings
 
 Audio files live in `Documents/Recordings/` (not `Documents/` itself) with
@@ -290,9 +348,9 @@ Every stage call is preceded by `ResourceGuard.requireTranscriptionHeadroom()`
 `AppError.resourceUnavailable` rather than let the pipeline run out of disk
 mid-transcription; `TempFileCleaner.cleanupOrphanedTempFiles()` runs at the
 start of every `transcribe` call to sweep temp files (`kurn_clean_`,
-`kurn_vad_`, `kurn_diar_`, `kurn_chunk_` prefixes, plus stale Whisper upload
-spool files) older than an hour that earlier interrupted runs left behind; the
-same cleaner backs the manual "Free up space" action in Settings.
+`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_` prefixes, plus stale
+Whisper upload spool files) older than an hour that earlier interrupted runs left
+behind; the same cleaner backs the manual "Free up space" action in Settings.
 
 Progress is reported via a `@Sendable` `PhaseHandler` (`TranscriptionPhase`); the
 receiver must hop to the main actor itself.
@@ -350,6 +408,21 @@ Three things are deliberately *not* parallel to the FluidAudio stack:
   decoded to whisper's required 16 kHz mono float by the existing
   `VADAudioLoader.monoSamples`. `whisper_full` blocks, so the context lives on a
   private serial `DispatchQueue` and never occupies a cooperative thread.
+
+`AudioChunker` **slices, it does not re-encode**: the export runs with
+`AVAssetExportPresetPassthrough`, so a chunk inherits the source's format —
+16 kHz mono, since `AudioPreprocessor` has already rendered it there. The fixed
+`AVAssetExportPresetAppleM4A` it used to use carries the preset's own sample rate
+and bit rate, unrelated to the source, so it re-encoded that cleaned audio *up*,
+inflating every cloud upload and temp file and spending a lossy generation for
+detail nothing downstream reads back. `preferredPreset` asks
+`AVAssetExportSession.determineCompatibility` rather than assuming, and keeps the
+old preset as the fallback. Two consequences to preserve: a passthrough export
+cuts on compressed-frame boundaries, so `Chunk.offset` stays the *requested*
+start (a running sum of measured durations folds that slop in once per chunk and
+drifts forward), and `AudioChunkerTests` asserts the chunks keep the source's
+format and size — the older assertions only covered counts and offsets, which is
+why the inflation went unnoticed.
 
 Like the FluidAudio engines it can't run from the background (Metal is
 unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too.

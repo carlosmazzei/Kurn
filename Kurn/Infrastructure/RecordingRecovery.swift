@@ -88,31 +88,47 @@ enum RecordingRecovery {
     }
 
     private static func recoverOrphanedAudioFiles(context: ModelContext) {
-        guard let knownFileNames = try? context.fetch(FetchDescriptor<Recording>()).map(\.fileName) else {
-            return
-        }
-        let known = Set(knownFileNames)
+        guard let existing = try? context.fetch(FetchDescriptor<Recording>()) else { return }
+        let known = Set(existing.map(\.fileName))
+
+        // Rows created before `Recording.fileSize` existed carry 0. Backfilling
+        // here rather than in a migration keeps it free: this sweep already runs
+        // at launch and on every foreground activation.
+        var changedAny = backfillFileSizes(in: existing)
 
         guard let items = try? FileManager.default.contentsOfDirectory(
             at: AudioFileStore.recordingsDirectoryURL,
             includingPropertiesForKeys: nil
         ) else { return }
 
-        var recoveredAny = false
         for url in items where url.pathExtension.lowercased() == "m4a" {
             let fileName = url.lastPathComponent
             guard !known.contains(fileName) else { continue }
             if recover(fileName: fileName, at: url, context: context) {
-                recoveredAny = true
+                changedAny = true
             }
         }
 
-        guard recoveredAny else { return }
+        guard changedAny else { return }
         do {
             try context.save()
         } catch {
             AppLog.recorder.atError.error("recovery: failed to save recovered recordings: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Stat the backing file of every recording whose cached size is still
+    /// unknown. Returns whether anything changed, so the caller only saves when
+    /// there is something to save.
+    private static func backfillFileSizes(in recordings: [Recording]) -> Bool {
+        var changed = false
+        for recording in recordings where recording.fileSize == 0 {
+            let size = AudioFileStore.byteSize(fileName: recording.fileName)
+            guard size > 0 else { continue }
+            recording.fileSize = size
+            changed = true
+        }
+        return changed
     }
 
     /// Unreadable orphans at or above this size are kept on disk instead of
@@ -150,7 +166,12 @@ enum RecordingRecovery {
             AudioFileStore.delete(fileName: fileName)
             return false
         }
-        let recording = Recording(meeting: meeting, fileName: fileName, duration: duration)
+        let recording = Recording(
+            meeting: meeting,
+            fileName: fileName,
+            duration: duration,
+            fileSize: AudioFileStore.byteSize(fileName: fileName)
+        )
         context.insert(recording)
         AppLog.recorder.atNotice.notice(
             "recovery: reattached orphaned recording \(fileName, privacy: .public) duration=\(duration, privacy: .public)s"

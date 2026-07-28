@@ -110,6 +110,39 @@ struct EnumsTests {
         }
     }
 
+    // MARK: - AudioQuality
+
+    @Test func audioQualityIdMatchesRawValue() {
+        for quality in AudioQuality.allCases {
+            #expect(quality.id == quality.rawValue)
+        }
+    }
+
+    /// The tiers must stay ordered high → low, and stay inside the range that is
+    /// transparent for mono speech at the recorder's fixed storage sample rate.
+    /// A tier above ~64 kbps there would be spending bits nothing can hear.
+    @Test func audioQualityBitRatesDescendAndStayInSpeechRange() {
+        #expect(AudioQuality.high.bitRate > AudioQuality.standard.bitRate)
+        #expect(AudioQuality.standard.bitRate > AudioQuality.low.bitRate)
+        for quality in AudioQuality.allCases {
+            #expect(quality.bitRate >= 32_000)
+            #expect(quality.bitRate <= 64_000)
+        }
+    }
+
+    @Test(arguments: AudioQuality.allCases)
+    func audioQualityBytesPerHourMatchesItsBitRate(quality: AudioQuality) {
+        #expect(quality.approximateBytesPerHour == Int64(quality.bitRate) / 8 * 3600)
+    }
+
+    /// Sanity-check the number shown in Settings: the default tier has to land
+    /// well under the ~58 MB/hour the app used to write at 128 kbps.
+    @Test func defaultQualityCostsAboutTwentyMegabytesPerHour() {
+        let megabytes = Double(AudioQuality.standard.approximateBytesPerHour) / 1_000_000
+        #expect(megabytes > 20)
+        #expect(megabytes < 23)
+    }
+
     // MARK: - TranscriptSegment
 
     @Test func transcriptSegmentDurationIsClampedToZero() {

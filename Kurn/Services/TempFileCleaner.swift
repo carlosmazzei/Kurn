@@ -3,9 +3,10 @@
 //  Kurn
 //
 //  Removes temporary files created by the transcription pipeline (preprocessing,
-//  VAD compaction, diarization, chunking, and Whisper upload bodies). Kept
-//  separate from `TranscriptionService` so the cleanup logic can be invoked
-//  both automatically at transcription start and manually from Settings.
+//  VAD compaction, diarization, chunking, and Whisper upload bodies) plus the
+//  in-flight files of an interrupted recording compaction. Kept separate from
+//  `TranscriptionService` so the cleanup logic can be invoked both automatically
+//  at transcription start and manually from Settings.
 //
 
 import Foundation
@@ -17,7 +18,8 @@ enum TempFileCleaner {
         "kurn_clean_",
         "kurn_vad_",
         "kurn_diar_",
-        "kurn_chunk_"
+        "kurn_chunk_",
+        "kurn_compact_"
     ]
 
     /// Sweep old temporary files left behind by killed/crashed transcriptions.

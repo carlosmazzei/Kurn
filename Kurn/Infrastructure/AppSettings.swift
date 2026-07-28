@@ -467,7 +467,10 @@ final class AppSettings {
         let resolvedDefaultLanguage = defaults.enumValue(forKey: Keys.defaultLanguage, default: MeetingLanguage.autoDetect)
         defaultLanguage = resolvedDefaultLanguage
         micPickup = defaults.enumValue(forKey: Keys.micPickup, default: .wholeRoom)
-        audioQuality = defaults.enumValue(forKey: Keys.audioQuality, default: .high)
+        // `.standard` (48 kbps mono at the recorder's fixed 24kHz) is transparent
+        // for speech, so it is the default rather than `.high`. Users who already
+        // picked a tier keep it — they still gain from the fixed sample rate.
+        audioQuality = defaults.enumValue(forKey: Keys.audioQuality, default: .standard)
         alwaysUseBuiltInMic = defaults.bool(forKey: Keys.alwaysUseBuiltInMic)
         meetingsSortOrder = defaults.enumValue(forKey: Keys.meetingsSortOrder, default: .dateNewest)
         autoTaggingEnabled = defaults.bool(forKey: Keys.autoTaggingEnabled, default: false)

@@ -77,97 +77,42 @@ actor DiarizationPreprocessor {
     /// and `VADAudioLoader` because `AVAudioFile.read` / `AVAudioConverter`
     /// silently fail on the app's compressed AAC `.m4a` files.
     private func decodeHighPassedMonoSamples(url: URL) async throws -> [Float] {
-        let inputFile = try AVAudioFile(forReading: url)
-        let inputFormat = inputFile.processingFormat
-        let totalInputFrames = inputFile.length
-        guard totalInputFrames > 0, inputFormat.sampleRate > 0 else {
-            throw AppError.audioError(
-                NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
-            )
-        }
-        guard let outputFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Self.targetSampleRate,
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw AppError.audioError(
-                NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
-            )
+        let failure = AppError.audioError(
+            NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
+        )
+        guard let outputFormat = OfflineAudioRenderer.monoFormat(sampleRate: Self.targetSampleRate) else {
+            throw failure
         }
 
-        let engine = AVAudioEngine()
-        let player = AVAudioPlayerNode()
-        let eq = AVAudioUnitEQ(numberOfBands: 1)
-        let highPass = eq.bands[0]
-        highPass.filterType = .highPass
-        highPass.frequency = 80
-        highPass.bandwidth = 0.5
-        highPass.bypass = false
-        eq.globalGain = 0
+        let renderer = OfflineAudioRenderer(
+            outputFormat: outputFormat,
+            buildChain: { engine, player, inputFormat in
+                let eq = AVAudioUnitEQ(numberOfBands: 1)
+                let highPass = eq.bands[0]
+                highPass.filterType = .highPass
+                highPass.frequency = 80
+                highPass.bandwidth = 0.5
+                highPass.bypass = false
+                eq.globalGain = 0
 
-        engine.attach(player)
-        engine.attach(eq)
-        engine.connect(player, to: eq, format: inputFormat)
-        // The main mixer resamples + downmixes to the manual-rendering format
-        // (mono @ targetSampleRate), so the EQ → mixer connection keeps the
-        // source's own format.
-        engine.connect(eq, to: engine.mainMixerNode, format: inputFormat)
+                engine.attach(eq)
+                engine.connect(player, to: eq, format: inputFormat)
+                // The main mixer resamples + downmixes to the manual-rendering
+                // format (mono @ targetSampleRate), so the EQ → mixer connection
+                // keeps the source's own format.
+                engine.connect(eq, to: engine.mainMixerNode, format: inputFormat)
+            },
+            failure: failure,
+            logLabel: "diarPreprocess"
+        )
 
-        let maxFrames: AVAudioFrameCount = 4096
-        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
-        try engine.start()
-        Self.scheduleForOfflineRender(inputFile, on: player)
-        player.play()
-
-        guard let renderBuffer = AVAudioPCMBuffer(
-            pcmFormat: engine.manualRenderingFormat,
-            frameCapacity: maxFrames
-        ) else {
-            engine.stop()
-            throw AppError.audioError(
-                NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
-            )
-        }
-
-        let ratio = outputFormat.sampleRate / inputFormat.sampleRate
-        let expectedOutFrames = AVAudioFramePosition(Double(totalInputFrames) * ratio)
         var samples: [Float] = []
-        samples.reserveCapacity(Int(max(0, expectedOutFrames)))
-
-        var resourceCheckCounter = 0
-        renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
-            if resourceCheckCounter.isMultiple(of: 128) {
-                try await ResourceGuard.requireTranscriptionHeadroom()
-            }
-            resourceCheckCounter += 1
-            let remaining = expectedOutFrames - engine.manualRenderingSampleTime
-            let framesToRender = AVAudioFrameCount(min(Int64(maxFrames), remaining))
-            let status: AVAudioEngineManualRenderingStatus
-            do {
-                status = try engine.renderOffline(framesToRender, to: renderBuffer)
-            } catch {
-                try ResourceGuard.rethrowIfResourceFailure(error)
-                throw error
-            }
-            switch status {
-            case .success:
-                if let channel = renderBuffer.floatChannelData, renderBuffer.frameLength > 0 {
-                    samples.append(
-                        contentsOf: UnsafeBufferPointer(
-                            start: channel[0],
-                            count: Int(renderBuffer.frameLength)
-                        )
-                    )
-                }
-            case .insufficientDataFromInputNode, .cannotDoInCurrentContext, .error:
-                break renderLoop
-            @unknown default:
-                break renderLoop
-            }
+        try await renderer.render(url: url) { buffer in
+            guard let channel = buffer.floatChannelData, buffer.frameLength > 0 else { return }
+            samples.append(
+                contentsOf: UnsafeBufferPointer(start: channel[0], count: Int(buffer.frameLength))
+            )
         }
-        player.stop()
-        engine.stop()
         return samples
     }
 
@@ -351,12 +296,6 @@ actor DiarizationPreprocessor {
     /// broadband noise in place instead of punching holes in the spectrum for
     /// the embedding model to trip over.
     private static let subtractionBeta: Float = 0.10
-
-    /// See `AudioPreprocessor.scheduleForOfflineRender` for why this uses the
-    /// completion-handler overload instead of the `async` one.
-    private static func scheduleForOfflineRender(_ file: AVAudioFile, on player: AVAudioPlayerNode) {
-        player.scheduleFile(file, at: nil, completionHandler: nil)
-    }
 }
 
 // MARK: - STFT helper

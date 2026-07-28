@@ -6,6 +6,14 @@
 //  upload to the Whisper API (which caps request size). Each chunk carries the
 //  time offset of its first sample so transcript timestamps can be corrected.
 //
+//  Chunking **slices**, it does not re-encode: the export runs with
+//  `AVAssetExportPresetPassthrough`, so a chunk inherits whatever format the
+//  source has. That matters because the audio reaching this type has already
+//  been rendered down to 16kHz mono at 32kbps by `AudioPreprocessor`, and the
+//  fixed `AVAssetExportPresetAppleM4A` would re-encode it *up* to the preset's
+//  own settings — inflating every cloud upload and temp file, and spending a
+//  lossy generation, for detail no consumer reads back. See `preferredPreset`.
+//
 //  Exporting goes through `AVAssetExportSession.export(to:as:)`, which is async
 //  and throws. The older `exportAsynchronously` + `status`/`error` polling was
 //  deprecated in iOS 18, and its completion handler was the only reason this
@@ -58,10 +66,10 @@ actor AudioChunker {
         return try await split(url: url, knownDuration: duration)
     }
 
-    /// Split by duration regardless of file size. Used by the on-device Speech
-    /// engine, where the constraint is the length a single recognition task can
-    /// reliably handle (a 2h file in one `SFSpeechRecognitionTask` is fragile),
-    /// not an upload size cap. Files no longer than one chunk come back whole.
+    /// Split by duration regardless of file size. Used by `WhisperCppTranscriber`,
+    /// where the constraint is resident memory rather than an upload size cap:
+    /// `whisper_full` takes the whole clip as one `[Float]`, so a two-hour file
+    /// would be ~460MB of samples. Files no longer than one chunk come back whole.
     func chunkByDuration(url: URL) async throws -> [Chunk] {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let asset = AVURLAsset(url: url)
@@ -90,6 +98,8 @@ actor AudioChunker {
             return [Chunk(url: url, offset: 0)]
         }
 
+        let preset = await Self.preferredPreset(for: asset)
+
         var chunks: [Chunk] = []
         var completed = false
         var start: TimeInterval = 0
@@ -115,7 +125,12 @@ actor AudioChunker {
             )
             let chunkSize: Int
             do {
-                chunkSize = try await exportRetryingIfEmpty(asset: asset, to: outURL, range: range)
+                chunkSize = try await exportRetryingIfEmpty(
+                    asset: asset,
+                    to: outURL,
+                    range: range,
+                    preset: preset
+                )
             } catch {
                 // Remove the partially-written file for the failed chunk so it
                 // doesn't become an orphan when the caller's defer cleans up the
@@ -127,8 +142,18 @@ actor AudioChunker {
             // readable with the device locked so a background Whisper run can
             // keep feeding uploads; they're deleted when the run finishes.
             RecordingProtection.applyInFlight(to: outURL)
-            let chunkDuration = (try? await AVURLAsset(url: outURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
-            AppLog.transcription.atInfo.info("chunk: exported \(index + 1, privacy: .public) offset=\(String(format: "%.1f", start), privacy: .public)s length=\(String(format: "%.1f", length), privacy: .public)s duration=\(String(format: "%.1f", chunkDuration), privacy: .public)s size=\(chunkSize, privacy: .public) bytes in \(Date().timeIntervalSince(chunkStart), privacy: .public)s")
+            // Named apart from `self.chunkDuration`: with a passthrough export the
+            // two genuinely differ, so the shadowing this used to do would hide a
+            // real distinction.
+            let actualDuration = (try? await AVURLAsset(url: outURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
+            AppLog.transcription.atInfo.info("chunk: exported \(index + 1, privacy: .public) offset=\(String(format: "%.1f", start), privacy: .public)s length=\(String(format: "%.1f", length), privacy: .public)s duration=\(String(format: "%.1f", actualDuration), privacy: .public)s size=\(chunkSize, privacy: .public) bytes in \(Date().timeIntervalSince(chunkStart), privacy: .public)s")
+            // Offset is the *requested* start, deliberately — not a running sum of
+            // `actualDuration`. A passthrough export cuts on compressed-frame
+            // boundaries, so a chunk's content can begin up to one AAC frame
+            // (1024 samples, ~64ms at 16kHz) before `start`. That makes `start`
+            // wrong by a bounded, non-cumulative amount, while summing measured
+            // durations would fold the same slop in once per chunk and drift
+            // forward across the whole meeting.
             chunks.append(Chunk(url: outURL, offset: start))
             start += length
             index += 1
@@ -162,11 +187,12 @@ actor AudioChunker {
     private func exportRetryingIfEmpty(
         asset: AVURLAsset,
         to outURL: URL,
-        range: CMTimeRange
+        range: CMTimeRange,
+        preset: String
     ) async throws -> Int {
         for attempt in 0..<2 {
             try? FileManager.default.removeItem(at: outURL)
-            try await export(asset: asset, to: outURL, range: range)
+            try await export(asset: asset, to: outURL, range: range, preset: preset)
             let size = (try? outURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             if size > 0 {
                 return size
@@ -179,14 +205,47 @@ actor AudioChunker {
         )
     }
 
+    /// Prefer passthrough: chunking should slice the file, not re-encode it.
+    /// `AVAssetExportPresetAppleM4A`'s sample rate, channel count and bit rate
+    /// belong to the preset, not to the source, so it would re-encode the 16kHz
+    /// mono 32kbps cleaned file up to them — inflating every upload and temp file,
+    /// and burning a lossy generation, for detail nothing downstream reads back.
+    ///
+    /// Passthrough needs the output container to accept the source's codec, so
+    /// this asks AVFoundation rather than assuming, and keeps the old preset as
+    /// the fallback for anything it can't copy.
+    ///
+    /// `determineCompatibility` is bridged only in its completion-handler form —
+    /// there is no `async` overload to await — so it is wrapped here. The handler
+    /// reports a plain `Bool` with no error channel, hence the non-throwing
+    /// continuation.
+    private static func preferredPreset(for asset: AVURLAsset) async -> String {
+        let compatible = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            AVAssetExportSession.determineCompatibility(
+                ofExportPreset: AVAssetExportPresetPassthrough,
+                with: asset,
+                outputFileType: .m4a
+            ) { isCompatible in
+                continuation.resume(returning: isCompatible)
+            }
+        }
+        guard compatible else {
+            AppLog.transcription.atNotice.notice("chunk: passthrough unavailable for this asset, re-encoding with the M4A preset")
+            return AVAssetExportPresetAppleM4A
+        }
+        AppLog.transcription.atDebug.debug("chunk: exporting with passthrough (no re-encode)")
+        return AVAssetExportPresetPassthrough
+    }
+
     private func export(
         asset: AVURLAsset,
         to outURL: URL,
-        range: CMTimeRange
+        range: CMTimeRange,
+        preset: String
     ) async throws {
         guard let session = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetAppleM4A
+            presetName: preset
         ) else {
             throw AppError.audioError(
                 NSLocalizedString("error.export_session", comment: "Export session unavailable")
