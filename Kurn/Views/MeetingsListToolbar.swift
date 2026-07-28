@@ -58,7 +58,7 @@ extension MeetingsListView {
     /// surface through `saveError` rather than being dropped.
     func startRecording() {
         let viewModel = MeetingsViewModel(modelContext: modelContext)
-        let meeting = viewModel.createMeeting(title: "")
+        let meeting = viewModel.createMeeting(title: "", language: settings.defaultLanguage)
         saveError = viewModel.error
         recordMeeting = meeting
     }
