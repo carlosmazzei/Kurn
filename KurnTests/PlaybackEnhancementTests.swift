@@ -90,7 +90,7 @@ struct PlaybackEnhancementTests {
         try await tempFileTestLock.run {
             let fileName = try Self.seedRecordingFile(amplitude: 0.2)
             defer { AudioFileStore.delete(fileName: fileName) }
-            _ = try await PlaybackEnhancementRenderer().render(fileName: fileName)
+            try Self.seedEnhancedFile(fileName: fileName)
 
             let names = (try? FileManager.default.contentsOfDirectory(
                 at: AudioFileStore.recordingsDirectoryURL,
@@ -108,7 +108,7 @@ struct PlaybackEnhancementTests {
     @Test func deletingTheRecordingRemovesTheEnhancedCopy() async throws {
         try await tempFileTestLock.run {
             let fileName = try Self.seedRecordingFile(amplitude: 0.2)
-            _ = try await PlaybackEnhancementRenderer().render(fileName: fileName)
+            try Self.seedEnhancedFile(fileName: fileName)
             #expect(AudioFileStore.hasEnhancedAudio(fileName: fileName))
 
             AudioFileStore.delete(fileName: fileName)
@@ -123,7 +123,7 @@ struct PlaybackEnhancementTests {
         try await tempFileTestLock.run {
             let fileName = try Self.seedRecordingFile(amplitude: 0.2)
             defer { AudioFileStore.delete(fileName: fileName) }
-            _ = try await PlaybackEnhancementRenderer().render(fileName: fileName)
+            try Self.seedEnhancedFile(fileName: fileName)
 
             AudioFileStore.deleteEnhancedAudio(fileName: fileName)
             #expect(!AudioFileStore.hasEnhancedAudio(fileName: fileName))
@@ -166,10 +166,19 @@ struct PlaybackEnhancementTests {
 
     // MARK: - Helpers
 
+    /// Put a file where an enhanced copy would live, without running the
+    /// renderer. The lifecycle tests are about which directory a file sits in and
+    /// what removes it — rendering real audio for them would couple them to the
+    /// DSP and cost two offline render passes each.
+    private static func seedEnhancedFile(fileName: String) throws {
+        AudioFileStore.ensureEnhancedDirectory()
+        try Data([0x00, 0x01]).write(to: AudioFileStore.enhancedURL(fileName: fileName))
+    }
+
     private static func seedRecordingFile(amplitude: Float) throws -> String {
         let fileName = "kurn-test-\(UUID().uuidString).m4a"
         let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
-        try AudioFixtures.m4aTone(seconds: 2.0, amplitude: amplitude, at: url)
+        try AudioFixtures.m4aTone(seconds: 1.2, amplitude: amplitude, at: url)
         return fileName
     }
 
