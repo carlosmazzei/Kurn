@@ -74,7 +74,11 @@ final class AudioPlayerService: NSObject {
         enhanced: Bool = false
     ) throws {
         if loadedFileName == fileName, isPlayingEnhanced == enhanced, player != nil { return }
-        stop()
+        // Not `stop()`: that hands the audio session back to whatever was playing
+        // before, and this is about to take it again. Switching recordings — or
+        // flipping to the enhanced copy mid-listen — would otherwise let a paused
+        // music app resume for the length of the swap.
+        teardown(deactivatingSession: false)
 
         // Resolve through the shared store, which prefers the protected
         // `Documents/Recordings/` directory (where the recorder writes) and only
@@ -177,6 +181,10 @@ final class AudioPlayerService: NSObject {
     }
 
     func stop() {
+        teardown(deactivatingSession: true)
+    }
+
+    private func teardown(deactivatingSession: Bool) {
         player?.stop()
         player = nil
         isPlaying = false
@@ -189,6 +197,7 @@ final class AudioPlayerService: NSObject {
         wasPlayingBeforeInterruption = false
         stopTimer()
         nowPlaying.deactivate()
+        guard deactivatingSession else { return }
         // Hand the route back so whatever was playing before (music, a podcast)
         // can resume. Leaving the session active holds it for the whole app
         // lifetime, since nothing else deactivates it.
