@@ -149,6 +149,20 @@ struct TranscriptionService {
         // and relative loudness that speaker embeddings rely on. When off,
         // diarization uses the original recording directly; it never reuses the
         // ASR chain's AGC + compression + AAC re-encode output.
+        // The diarizer that will actually run. `.fluidAudio` without consent
+        // steps back to the heuristic rather than downloading a model the user
+        // never asked for, or failing and returning one turn for the meeting.
+        let diarizationEngine = config.effectiveDiarization
+        if config.diarizationFellBack {
+            AppLog.transcription.atNotice.notice("transcribe: diarization falling back to \(diarizationEngine.rawValue, privacy: .public); FluidAudio models are not consented to")
+            onDiarizationWarning?(
+                NSLocalizedString(
+                    "warning.diarization_models_not_downloaded",
+                    comment: "Speaker separation is using the basic engine"
+                )
+            )
+        }
+
         onPhase(.transcribing(progress: nil))
         let txStart = Date()
         let raw: RawTranscript
@@ -169,7 +183,7 @@ struct TranscriptionService {
             )
             async let speakerTurns = diarize(
                 originalURL: fileURL,
-                engine: config.diarization,
+                engine: diarizationEngine,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
@@ -196,7 +210,7 @@ struct TranscriptionService {
             )
             turns = try await diarize(
                 originalURL: fileURL,
-                engine: config.diarization,
+                engine: diarizationEngine,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
                 diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,

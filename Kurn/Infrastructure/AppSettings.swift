@@ -260,6 +260,7 @@ final class AppSettings {
             vad: vadEngine,
             languageDetection: languageDetectionEngine,
             diarization: diarizationEngine,
+            diarizationConsented: fluidAudioDiarizationModelsConsented,
             transcription: transcriptionEngine,
             transcriptionProvider: transcriptionProvider,
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
@@ -511,7 +512,11 @@ final class AppSettings {
             ? false
             : defaults.bool(forKey: Keys.requireAuthForRecordings, default: true)
         hideLiveActivityMeetingTitle = defaults.bool(forKey: Keys.hideLiveActivityMeetingTitle, default: true)
-        diarizationEngine = defaults.enumValue(forKey: Keys.diarizationEngine, default: .heuristic)
+        // FluidAudio rather than the heuristic engine, which is what every user
+        // got who never opened Settings. `PipelineConfiguration.effectiveDiarization`
+        // steps back down to the heuristic until the models are consented to, so
+        // this default never triggers a download on its own.
+        diarizationEngine = defaults.enumValue(forKey: Keys.diarizationEngine, default: .fluidAudio)
         // Migration: the old key held a *minimum* speaker count that never
         // engaged (see `fluidAudioSpeakerCount`). Carry the number over as the
         // pinned count — it is the count the user believed they were asking for.

@@ -20,6 +20,8 @@ struct MeetingDetailView: View {
 
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
+    /// Only for the diarization-model prompt in the transcript's warning banner.
+    @Environment(ModelDownloadController.self) var downloads
     /// Shared, app-wide transcription coordinator (injected from `KurnApp`). Using
     /// the same instance the foreground resume pass uses means a run it restarted
     /// shows here as in-progress with live progress, instead of a stale badge.
@@ -104,6 +106,7 @@ struct MeetingDetailView: View {
         .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
+        .modelDownloadAlerts(downloads, settings: settings)
         .onDisappear { player.stop() }
         .task {
             if enhancement == nil {
@@ -400,12 +403,34 @@ struct MeetingDetailView: View {
     }
 
     private func diarizationWarningBanner(_ message: String) -> some View {
-        Label(message, systemImage: "exclamationmark.triangle.fill")
-            .font(.footnote)
-            .foregroundStyle(Theme.warning)
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        VStack(alignment: .leading, spacing: 10) {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote)
+                .foregroundStyle(Theme.warning)
+            // The consent prompt lives here, not only in Settings. The neural
+            // diarizer is the default, but it cannot download itself, and a user
+            // who never opens Settings would silently keep the fallback engine
+            // forever — the new default would reach nobody. This is the one
+            // moment they can see the difference it would make.
+            if settings.diarizationEngine == .fluidAudio,
+               !settings.fluidAudioDiarizationModelsConsented {
+                Button {
+                    downloads.selectDiarizationEngine(.fluidAudio, settings: settings)
+                } label: {
+                    Text(NSLocalizedString(
+                        "detail.download_diarization_models",
+                        comment: "Download the speaker separation models"
+                    ))
+                    .font(.footnote.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .disabled(downloads.isDownloading)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - Section picker

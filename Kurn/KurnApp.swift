@@ -38,6 +38,11 @@ struct KurnApp: App {
     /// on every background transition so a borrowed-unlocked device cannot
     /// expose meeting audio just by reopening the app.
     @State private var accessGate = RecordingAccessGate()
+    /// Owns the FluidAudio download state. App-level rather than owned by
+    /// Settings: the diarization models can now be offered from a meeting's
+    /// transcript, where the fallback to the heuristic engine is visible, and
+    /// two controllers each holding their own `isDownloading` would disagree.
+    @State private var downloads = ModelDownloadController()
     /// App-wide transcription coordinator, shared by both the foreground
     /// resume pass (below) and every meeting-detail screen (injected via the
     /// environment). One instance means a run started by the resumer is visible
@@ -154,6 +159,7 @@ struct KurnApp: App {
                 ContentView()
                     .environment(settings)
                     .environment(accessGate)
+                    .environment(downloads)
                     .environment(transcription)
                     .environment(semanticIndex)
                     .environment(wiki)

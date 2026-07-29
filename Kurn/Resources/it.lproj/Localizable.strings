@@ -351,6 +351,8 @@
 "detail.playback_speed" = "Velocità riproduzione";
 "detail.skip_backward" = "Indietro di 15 secondi";
 "detail.skip_forward" = "Avanti di 15 secondi";
+"detail.download_diarization_models" = "Scarica i modelli dei parlanti";
+"warning.diarization_models_not_downloaded" = "La separazione dei parlanti usa il motore di base. Scarica i modelli neurali per parlanti più precisi.";
 "detail.add_segment" = "Aggiungi segmento";
 "detail.retranscribe" = "Ritrascrivi";
 "detail.retranscribe.confirm.title" = "Ritrascrivere questa registrazione?";
