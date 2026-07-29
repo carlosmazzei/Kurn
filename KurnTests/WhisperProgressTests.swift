@@ -40,4 +40,16 @@ struct WhisperProgressTests {
         #expect(WhisperTranscriber.estimatedProgress(completedChunks: 4, totalChunks: 4, elapsed: 0) == 1)
         #expect(WhisperTranscriber.estimatedProgress(completedChunks: 6, totalChunks: 4, elapsed: 0) == 1)
     }
+
+    @Test func postTranscriptionWorkHasDistinctUserFacingPhases() {
+        let phases: [PostTranscriptionPhase] = [
+            .generatingTitle,
+            .indexing,
+            .generatingWiki
+        ]
+        let names = phases.map(\.displayName)
+
+        #expect(names.allSatisfy { !$0.isEmpty })
+        #expect(Set(names).count == phases.count)
+    }
 }

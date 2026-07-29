@@ -310,6 +310,9 @@
 "phase.transcribing_progress" = "Transcrevendo… %d%%";
 "phase.transcribing_chunk_progress" = "Transcrevendo… %d%% (chunk %d de %d)";
 "phase.finalizing" = "Finalizando…";
+"post_phase.generating_title" = "Gerando título…";
+"post_phase.indexing" = "Indexando transcrição…";
+"post_phase.generating_wiki" = "Gerando wiki…";
 
 /* Formulário de reunião */
 "form.title_section" = "Título";

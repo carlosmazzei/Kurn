@@ -310,6 +310,9 @@
 "phase.transcribing_progress" = "Wird transkribiert… %d%%";
 "phase.transcribing_chunk_progress" = "Wird transkribiert… %d%% (Abschnitt %d von %d)";
 "phase.finalizing" = "Wird abgeschlossen…";
+"post_phase.generating_title" = "Titel wird erstellt…";
+"post_phase.indexing" = "Transkript wird indexiert…";
+"post_phase.generating_wiki" = "Wiki wird erstellt…";
 
 /* Meeting-Formular */
 "form.title_section" = "Titel";
