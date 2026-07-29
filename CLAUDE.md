@@ -287,7 +287,19 @@ stage (enums in `Models/Enums.swift`) are:
 
 1. **Preprocess** audio with the selected engine (`AudioPreprocessor` or a
    passthrough); on any failure it falls back to the original file so
-   transcription never breaks.
+   transcription never breaks. `AudioPreprocessor` runs **two passes**: the first
+   renders the EQ'd signal into a `SpeechLevelMeter`
+   (`Services/Pipeline/SpeechLevelMeter.swift`, O(1) memory) and the second applies
+   the chain with the makeup gain that measurement implies. The chain used to lift
+   every recording by a fixed +11 dB (a +8 dB makeup on top of the limiter's +3 dB
+   pre-gain), which drives an already-healthy recording into near-constant limiting
+   — and that distortion is the kind of artefact recent work finds *degrading*
+   modern ASR rather than helping it. The gain decision itself
+   (`SpeechLevel.makeupGainDB`) is pure and unit-tested: target speech at -20 dBFS
+   RMS, never push the measured peak past -3 dBFS, clamp to 0…18 dB, never
+   attenuate. Because the level is measured *before* the dynamics stage pulls peaks
+   down, the peak bound is conservative by design — it errs quiet, and the limiter
+   (now pre-gain 0, safety only) catches the rest.
 2. **Detect language** (only surfaced as a phase when a real detector runs; the
    default no-op detector defers to the transcription engine).
 3. **Detect speech** (VAD) — drives both silence-gating of the transcription
