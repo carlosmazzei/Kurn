@@ -221,12 +221,11 @@ struct RecordingCompactorTests {
             #expect(newSize < originalSize)
             #expect(originalSize - newSize == saved)
 
-            let result = try AVAudioFile(forReading: AudioFileStore.resolveURL(fileName: fileName))
-            #expect(result.fileFormat.channelCount == 1)
-            #expect(result.fileFormat.sampleRate == AudioRecorderService.storageSampleRate)
-            let duration = Double(result.length) / result.processingFormat.sampleRate
-            #expect(duration > 2.5)
-            #expect(duration < 3.5)
+            let result = try await Self.format(of: AudioFileStore.resolveURL(fileName: fileName))
+            #expect(result.channels == 1)
+            #expect(result.sampleRate == AudioRecorderService.storageSampleRate)
+            #expect(result.duration > 2.5)
+            #expect(result.duration < 3.5)
         }
     }
 
@@ -251,8 +250,8 @@ struct RecordingCompactorTests {
             let compactor = RecordingCompactor(targetBitRate: AudioQuality.low.bitRate)
             _ = try await compactor.compact(fileName: fileName)
 
-            let result = try AVAudioFile(forReading: AudioFileStore.resolveURL(fileName: fileName))
-            #expect(result.fileFormat.sampleRate == 16_000)
+            let result = try await Self.format(of: AudioFileStore.resolveURL(fileName: fileName))
+            #expect(result.sampleRate == 16_000)
         }
     }
 
@@ -282,5 +281,28 @@ struct RecordingCompactorTests {
         let recordings = try context.fetch(FetchDescriptor<Recording>())
         let usage = RecordingCompactionViewModel.largestMeetings(from: recordings, limit: 2)
         #expect(usage.map(\.title) == ["M4", "M3"])
+    }
+
+    /// Read a compacted file's format *without* opening it with `AVAudioFile`.
+    ///
+    /// `ExtAudioFileOpenURL` is unreliable on the app's own AAC files — the same
+    /// reason `OfflineAudioRenderer` exists and the whole pipeline reads audio
+    /// through a player-node render instead. On a loaded CI runner it fails
+    /// intermittently with a generic OSStatus, which made this suite red for
+    /// reasons that had nothing to do with the compactor.
+    ///
+    /// The container's own format description answers everything these tests
+    /// actually ask — rate, channel count, length — without decoding a frame.
+    private static func format(
+        of url: URL
+    ) async throws -> (sampleRate: Double, channels: UInt32, duration: TimeInterval) {
+        let asset = AVURLAsset(url: url)
+        let duration = try await CMTimeGetSeconds(asset.load(.duration))
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first,
+              let description = try await track.load(.formatDescriptions).first,
+              let basic = CMAudioFormatDescriptionGetStreamBasicDescription(description) else {
+            throw AppError.audioError("No audio track in \(url.lastPathComponent)")
+        }
+        return (basic.pointee.mSampleRate, basic.pointee.mChannelsPerFrame, duration)
     }
 }
