@@ -358,7 +358,7 @@ stage (enums in `Models/Enums.swift`) are:
 | Preprocessing | `preprocessingEngine` | `.standardDSP` (`AudioPreprocessor`) | `.none` (passthrough — not FluidAudio, just skips cleanup) |
 | VAD | `vadEngine` | `.energyThreshold` (`Pipeline/EnergyVAD.swift`) | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD) |
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber) | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`) |
-| Diarization | `diarizationEngine` | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) | `.fluidAudio` (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) |
+| Diarization | `diarizationEngine` | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) is the no-download fallback |
 | Transcription | `transcriptionEngine` | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale) | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud) |
 
 `TranscriptionService.transcribe` drives the stages in order:
@@ -404,7 +404,70 @@ stage (enums in `Models/Enums.swift`) are:
    attributed to the speaker holding the most of its *duration* (not the
    speaker whose turn contains its midpoint — a sub-second turn under the
    midpoint would otherwise take the whole utterance), then consecutive
-   same-speaker spans are merged, capped at 30s.
+   same-speaker spans are merged, capped at 30s. `splitCoarseSpan` distributes a
+   long span's words across turns proportionally when it crosses a handover;
+   with word timestamps now available (below) it is the fallback, not the
+   normal path.
+
+#### Word timestamps
+
+Three engines report per-word timings and used to discard them; all four now
+feed `TimedWordSpanBuilder` (`Services/TranscriptionTypes.swift`), which
+FluidAudio already used. This is what lets `TranscriptFusion` place a speaker
+handover *inside* a sentence instead of estimating the split from turn
+durations (`splitCoarseSpan`, now the fallback).
+
+| Engine | Where the timings come from |
+| --- | --- |
+| Apple Speech | `audioTimeRange` per `AttributedString` run, which the `.timeIndexedProgressiveTranscription` preset attaches. `String(result.text.characters)` used to flatten it away |
+| whisper.cpp | `params.token_timestamps`, then `whisper_full_get_token_data`'s `t0`/`t1`; SentencePiece pieces are aggregated into words (a piece beginning with a space opens a new one) |
+| Cloud | `timestamp_granularities[]` = `segment` + `word`, returned as a **flat top-level array** that `OpenAIProvider` regroups under the segment each word's midpoint falls in |
+
+Two rules hold across all of them. **Missing timings are never an error** —
+each engine falls back to exactly the span it produced before. And Apple's
+timings are checked against the result's own range before being trusted:
+timings on a different timeline would read as a correct transcript with every
+word near zero, which nothing downstream could detect.
+
+`timestamp_granularities[]` is an OpenAI extension a compatible endpoint need
+not implement, so a `400`/`422` retries the upload once without it — losing word
+timings to an old endpoint is acceptable, losing the transcription is not.
+
+#### Where chunks are cut
+
+`ChunkBoundary` (bottom of `Services/AudioChunker.swift`) moves each nominal
+boundary to the nearest silence within 30 s, subject to a minimum chunk length,
+and leaves it alone when there is none. A fixed grid cut wherever 5 or 10
+minutes landed — mid-word far more often than not, and a boundary is also a
+decoder restart, which is the condition Whisper invents text over.
+
+The candidates come from `TranscriptionService`, because only it knows which
+timeline the engine will see: **not** the original one when VAD compaction ran,
+in which case the safe cuts are the gaps the compactor itself wrote
+(`CompactionResult.map`), not the original speech regions. The chooser is pure
+and must stay deterministic — a resumed transcription reuses its checkpoint only
+when the chunk plan comes out identical, so a boundary that wandered between
+runs would silently discard every completed chunk.
+
+#### Choosing the diarizer
+
+The default is `.fluidAudio`, and it is the only stage default that needs a
+download. `.heuristic` — three scalars and one greedy nearest-centroid pass, one
+speaker per VAD region — was what every user got who never opened Settings.
+
+Flipping the default alone would have been worse than leaving it, because
+FluidAudio downloads its models on first use: without consent that either
+fetches a model for a feature the user never chose, or fails and returns one
+turn for the whole meeting. So the selection is a **pair**:
+`PipelineConfiguration.effectiveDiarization` reads `diarization` together with
+`diarizationConsented` and steps back to `.heuristic` until the models are
+consented to, with `diarizationFellBack` saying that it did.
+
+That report is the other half. A user who never opens Settings never consents,
+so without it "the default is now neural" would describe a setting rather than a
+behaviour — which is why the transcript's diarization warning banner
+(`MeetingDetailView`) carries the download action, and why
+`ModelDownloadController` moved from `SettingsView` to `KurnApp`.
 
 #### Diarization accuracy
 
@@ -460,7 +523,12 @@ both Whisper engines run their spans through
   written without spaces fall back to per-character units.
 
 Surviving spans are stamped with the confidence their log-probability implies
-(`exp(avgLogProb)`), which is what finally fills `TranscribedSpan.confidence`.
+(`exp(avgLogProb)`), which is what finally fills `TranscribedSpan.confidence`. A
+surviving segment carrying word timings is emitted **one span per word** rather
+than one per segment (`TranscriptQualityFilter.ScoredSpan.words`); the words ride
+with their segment through the filter rather than being judged separately,
+because the quality signals are per segment and a hallucinated sentence's words
+are exactly as invented as the sentence.
 whisper.cpp's own temperature-fallback thresholds (`logprob_thold`,
 `no_speech_thold`, `entropy_thold`) are set from the same constants, so its retry
 and this post-filter judge a segment by one set of numbers.
@@ -766,10 +834,11 @@ the summary or transcription provider pointing at one without a key.
 `ModelDownloadController` (`ViewModels/`, `@MainActor @Observable`) owns the
 FluidAudio download machinery — which `ModelSet` is in flight, the per-feature
 consent dialogs, the engine choices deferred until a download succeeds, and the
-installed-model list. It lives in the environment rather than in `@State`
-because Transcription, Recording and Storage are now separate screens that all
-read `isDownloading` and all can start a download. Screens that can trigger one
-attach `.modelDownloadAlerts(_:settings:)`.
+installed-model list. It is created in `KurnApp` and injected app-wide: the
+Transcription, Recording and Storage screens all read `isDownloading` and can
+all start a download, and so can the diarization prompt on a meeting's
+transcript — two controllers would each track a download the other knew nothing
+about. Screens that can trigger one attach `.modelDownloadAlerts(_:settings:)`.
 
 ### Navigation chrome (Liquid Glass)
 
