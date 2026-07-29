@@ -219,6 +219,13 @@ private final class WhisperContext: @unchecked Sendable {
         params.no_context = true
         params.single_segment = false
         params.suppress_blank = true
+        // whisper.cpp runs its own temperature fallback against these, retrying a
+        // window that decoded badly before giving up on it. They already default
+        // to these values; setting them from the filter's constants keeps the
+        // retry and the post-filter judging a segment by the same numbers.
+        params.logprob_thold = Float(TranscriptQualityFilter.minimumAverageLogProb)
+        params.no_speech_thold = Float(TranscriptQualityFilter.maximumNoSpeechProb)
+        params.entropy_thold = Float(TranscriptQualityFilter.maximumCompressionRatio)
 
         let user = Unmanaged.passUnretained(callbacks).toOpaque()
         params.progress_callback_user_data = user
@@ -280,7 +287,7 @@ private final class WhisperContext: @unchecked Sendable {
     }
 
     private func spans() -> [TranscribedSpan] {
-        var spans: [TranscribedSpan] = []
+        var scored: [TranscriptQualityFilter.ScoredSpan] = []
         for index in 0..<whisper_full_n_segments(context) {
             guard let raw = whisper_full_get_segment_text(context, index) else { continue }
             let text = String(cString: raw).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -288,11 +295,48 @@ private final class WhisperContext: @unchecked Sendable {
             // whisper reports segment bounds in centiseconds.
             let start = Double(whisper_full_get_segment_t0(context, index)) / 100
             let end = Double(whisper_full_get_segment_t1(context, index)) / 100
-            spans.append(
-                TranscribedSpan(text: text, start: start, end: max(start, end), confidence: nil)
+            scored.append(
+                TranscriptQualityFilter.ScoredSpan(
+                    span: TranscribedSpan(
+                        text: text,
+                        start: start,
+                        end: max(start, end),
+                        confidence: nil
+                    ),
+                    quality: quality(ofSegment: index)
+                )
             )
         }
-        return spans
+        return TranscriptQualityFilter.keeping(scored, engine: "whisperCpp")
+    }
+
+    /// The decoder's confidence in one segment.
+    ///
+    /// There is no local equivalent of the cloud's `compression_ratio`, so that
+    /// field stays `nil` and the filter's own repetition test is what catches a
+    /// loop here.
+    private func quality(ofSegment index: Int32) -> SpanQuality {
+        let noSpeech = Double(whisper_full_get_segment_no_speech_prob(context, index))
+
+        // Whisper's `avg_logprob` is the mean over *text* tokens. Timestamp
+        // tokens (id >= `whisper_token_beg`) are near-certain by construction and
+        // would flatter the average towards zero if they were counted.
+        let firstTimestampToken = whisper_token_beg(context)
+        var total = 0.0
+        var count = 0
+        for token in 0..<whisper_full_n_tokens(context, index) {
+            guard whisper_full_get_token_id(context, index, token) < firstTimestampToken else { continue }
+            let probability = Double(whisper_full_get_token_p(context, index, token))
+            guard probability.isFinite else { continue }
+            total += log(max(probability, 1e-10))
+            count += 1
+        }
+
+        return SpanQuality(
+            averageLogProb: count > 0 ? total / Double(count) : nil,
+            noSpeechProb: noSpeech.isFinite ? noSpeech : nil,
+            compressionRatio: nil
+        )
     }
 
     private func detectedLanguage() -> String {
