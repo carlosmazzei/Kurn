@@ -506,6 +506,8 @@
 "settings.diarization_speaker_count_auto" = "Automatisch";
 "settings.diarization_speaker_count_footer" = "Lege den Wert fest, wenn du weißt, wie viele Personen an der Besprechung teilgenommen haben. Auf Automatisch entscheidet die Engine, und Kurn gruppiert das Audio selbst neu, falls die Engine alle zu einem Sprecher zusammengefasst hat.";
 "settings.diarization_preprocessing" = "Audiobereinigung für Diarisierung";
+"settings.diarization_dereverb" = "Enthallung (experimentell)";
+"settings.diarization_dereverb_footer" = "Entfernt den Raumhall aus dem Audio, das die Sprechertrennung auswertet. Kann helfen, wenn das Telefon auf dem Besprechungstisch liegt, kostet aber Rechenzeit, und der Nutzen wurde für deine Aufnahmen noch nicht gemessen.";
 "settings.on_device_auto_language" = "Sprache auf dem Gerät erkennen (Auto)";
 "settings.live_transcription" = "Live-Transkriptionsvorschau";
 "settings.model_download.title" = "Einmaliger Modell-Download";

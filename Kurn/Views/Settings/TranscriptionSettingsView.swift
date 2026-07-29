@@ -204,6 +204,24 @@ struct TranscriptionSettingsView: View {
             )
             .disabled(downloads.isDownloading)
 
+            // WPE dereverberation, nested under the cleanup it extends: it runs
+            // inside `DiarizationPreprocessor`, so it does nothing when that is
+            // off. Experimental, hence the explicit footer rather than a silent
+            // default.
+            if settings.diarizationPreprocessingEnabled {
+                Toggle(
+                    NSLocalizedString("settings.diarization_dereverb", comment: "Dereverberation"),
+                    isOn: Binding(
+                        get: { settings.diarizationDereverbEnabled },
+                        set: { settings.diarizationDereverbEnabled = $0 }
+                    )
+                )
+                .disabled(downloads.isDownloading)
+                Text(NSLocalizedString("settings.diarization_dereverb_footer", comment: "Dereverberation help"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             // Pinned speaker count for the neural (FluidAudio) engine. On
             // far-field/single-mic audio its clustering step collapses everyone
             // into one speaker; pinning the count re-clusters the raw speaker

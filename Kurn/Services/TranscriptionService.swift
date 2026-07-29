@@ -171,6 +171,7 @@ struct TranscriptionService {
                 originalURL: fileURL,
                 engine: config.diarization,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
+                diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning
@@ -197,6 +198,7 @@ struct TranscriptionService {
                 originalURL: fileURL,
                 engine: config.diarization,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
+                diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning
@@ -421,6 +423,7 @@ struct TranscriptionService {
         originalURL: URL,
         engine: DiarizationEngine,
         diarizationPreprocessingEnabled: Bool,
+        diarizationDereverbEnabled: Bool,
         regions: [SpeechRegion],
         speakerCount: Int,
         onWarning: DiarizationWarningHandler?
@@ -434,7 +437,10 @@ struct TranscriptionService {
         let cleanupURL: URL?
         if diarizationPreprocessingEnabled {
             do {
-                diarURL = try await diarizationPreprocessor.process(url: originalURL)
+                diarURL = try await diarizationPreprocessor.process(
+                    url: originalURL,
+                    dereverberate: diarizationDereverbEnabled
+                )
                 cleanupURL = diarURL
                 AppLog.transcription.atInfo.info("diarize: using preprocessed input \(diarURL.lastPathComponent, privacy: .public)")
             } catch {

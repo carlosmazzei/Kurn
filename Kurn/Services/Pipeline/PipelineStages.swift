@@ -86,6 +86,12 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// recording directly; it never reuses the ASR-cleaned `.m4a` produced by
     /// `AudioPreprocessor`.
     var diarizationPreprocessingEnabled: Bool = true
+    /// When true, the diarization cleanup additionally runs WPE dereverberation
+    /// before its noise reduction. Off by default: it is the standard far-field
+    /// front end in the DIHARD/CHiME evaluations and is linear (so it cannot
+    /// distort the timbre speaker embeddings read), but its benefit on this app's
+    /// material has not been measured, and it costs real processing time.
+    var diarizationDereverbEnabled: Bool = false
     /// GGML weight file the `.whisperCpp` engine loads. Ignored by every other
     /// engine.
     var whisperCppModel: WhisperCppModel = .default
