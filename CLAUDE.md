@@ -87,6 +87,44 @@ lints, and runs the full test suite on a macOS runner:
   build stops at the first error), so expect several rounds. State plainly that
   results are pending/observed from CI rather than asserting local success.
 
+### Measuring accuracy (WER / DER)
+
+`KurnTests/Support/Evaluation/` implements the two standard metrics, so an
+accuracy claim can be *measured* instead of inferred from the literature —
+which is what every claim about this pipeline had been until it existed.
+
+- `WordErrorRate` — Levenshtein over normalized tokens, reporting
+  substitutions / insertions / deletions separately, because they mean different
+  things here: dropped speech (VAD gating, a quality filter, a chunk boundary)
+  is deletions, hallucination is insertions, mishearing is substitutions.
+  Two-row DP carrying the counts forward — a full backtrace matrix for an
+  hour-long meeting is ~320 MB.
+- `TextNormalizer` — for comparison only, never applied to a stored or displayed
+  transcript, which should keep its punctuation and case. Language-neutral
+  (NFKC, case fold, punctuation strip); unsegmented scripts fall back to
+  characters, which makes their rate a CER. Rates are comparable between runs on
+  the same material, not against published figures.
+- `DiarizationErrorRate` — NIST DER: missed + false alarm + confusion over
+  reference speech, scored under the label mapping that maximises agreement
+  (a diarizer's own labels are arbitrary) with a ±0.25 s collar around reference
+  boundaries. Confusion is reported apart from missed time because this app's
+  known failure — the clustering step collapsing to one speaker — is *all*
+  confusion and *no* missed time.
+- `RTTM` — reads and writes the annotation format the corpora and external
+  scorers use.
+
+The corpus cannot live in the repository: meeting recordings are the most
+private thing the app touches. `EvaluationDataset` reads `KURN_EVAL_DATA`
+instead, and `EvaluationHarnessTests` is skipped entirely when it is unset —
+which is how CI runs, so **a green run proves the metrics are correct and says
+nothing about accuracy on real speech**. With a directory set, it scores
+`<name>.reference.txt`/`.hypothesis.txt` pairs, `.rttm` pairs, and — the one
+that catches regressions, because it re-derives the result every run — the
+heuristic diarizer run over `<name>.m4a` against `<name>.reference.rttm`.
+
+Deliberately no pass/fail threshold: a budget invented here would have no
+provenance, and the first failure would just raise it.
+
 ## Architecture
 
 MVVM with `@Observable` `@MainActor` view models, value-type async services, and a
