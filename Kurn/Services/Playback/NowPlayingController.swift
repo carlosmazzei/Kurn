@@ -57,21 +57,21 @@ final class NowPlayingController {
         // better but *traps* if the system ever delivers a command off the main
         // thread, which is a crash on the Lock Screen in exchange for a return
         // value nothing acts on.
-        center.playCommand.addTarget { [weak self] _ in
+        _ = center.playCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.handlers?.play() }
             return .success
         }
-        center.pauseCommand.addTarget { [weak self] _ in
+        _ = center.pauseCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.handlers?.pause() }
             return .success
         }
-        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+        _ = center.togglePlayPauseCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.handlers?.toggle() }
             return .success
         }
 
         center.skipForwardCommand.preferredIntervals = [NSNumber(value: Self.skipInterval)]
-        center.skipForwardCommand.addTarget { [weak self] event in
+        _ = center.skipForwardCommand.addTarget { [weak self] event in
             // Read off the event before the hop: it is not `Sendable`, and the
             // system reuses it once the handler returns.
             let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? Self.skipInterval
@@ -79,13 +79,13 @@ final class NowPlayingController {
             return .success
         }
         center.skipBackwardCommand.preferredIntervals = [NSNumber(value: Self.skipInterval)]
-        center.skipBackwardCommand.addTarget { [weak self] event in
+        _ = center.skipBackwardCommand.addTarget { [weak self] event in
             let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? Self.skipInterval
             Task { @MainActor in self?.handlers?.skip(-interval) }
             return .success
         }
 
-        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+        _ = center.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let position = (event as? MPChangePlaybackPositionCommandEvent)?.positionTime else {
                 return .commandFailed
             }
@@ -107,9 +107,11 @@ final class NowPlayingController {
 
     func deactivate() {
         handlers = nil
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        // Only clear what we published. `stop()` runs on a player that was never
+        // loaded too, and `nowPlayingInfo` is process-wide.
         guard isActive else { return }
         isActive = false
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
 
         let center = MPRemoteCommandCenter.shared()
         center.playCommand.removeTarget(nil)
