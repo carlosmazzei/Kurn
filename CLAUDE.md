@@ -245,6 +245,54 @@ down the live `RecorderViewModel` and orphan its audio file;
 locks) by restarting in place, or pausing with a banner if the audio format
 changed.
 
+### Enhanced playback copies
+
+Playback can use a second, derived `.m4a` per recording — loudness-normalized,
+equalized and gently compressed — rendered offline by
+`Services/Enhancement/PlaybackEnhancementRenderer.swift` and generated **on
+demand**, the first time the user turns enhancement on for that recording.
+Doing it offline is what keeps `AudioPlayerService` on `AVAudioPlayer`: the
+player only picks which URL to open, so there is no realtime graph, no
+reimplemented seek and no interruption recovery.
+
+Two passes, because loudness cannot be known in advance. The first measures
+integrated loudness to ITU-R BS.1770-4 (`Services/Enhancement/LoudnessMeter.swift`)
+**at 48 kHz** — the only rate the standard's coefficients are valid at, so the
+measurement pass renders there rather than re-deriving them. The second applies
+the resulting gain *at the input*, ahead of the EQ and compressor, which is what
+makes the compressor's fixed threshold mean the same thing for every recording
+in the library. Tuning lives in `Services/Playback/PlaybackTuning.swift` as a
+pure value type so tests can assert it stays gentler than the ASR chain in
+`AudioPreprocessor` — different job, different ears.
+
+**Copies live in `Documents/Recordings/Enhanced/` under the same file name as
+the original, never beside it with a suffix.** Every existing sweep over the
+recordings directory is shallow, so a nested directory is invisible to all of
+them by construction. A suffixed copy would be worse than deleted:
+`RecordingRecovery` parses the meeting ID from the name prefix, so it would be
+adopted as a second `Recording` and shown in the library as a duplicate. The
+same choice means adding the directory to `AudioFileStore.delete(fileName:)`'s
+search list makes every existing deletion path drop the copy with the original,
+without any caller knowing the copy exists. `AudioFileStore.enhancedDirectoryPath`
+only computes a URL; `ensureEnhancedDirectory()` is the creating variant and is
+called only by the writer, because `delete` runs in a loop and creating plus
+re-stamping a directory on every iteration is filesystem work for nothing.
+
+`Recording.enhancedAudioVersion` (`0` = none) doubles as an existence and a
+staleness check against `PlaybackEnhancementRenderer.currentVersion`; bump that
+constant when the tuning changes and existing copies regenerate instead of being
+served. `AudioPlayerService.load(fileName:enhanced:)` keeps `loadedFileName`
+reporting the **logical** recording name — the whole UI keys row-to-player
+identity off `player.loadedFileName == recording.fileName`, so the variant must
+stay an internal detail of which URL to open.
+
+The neural denoise stage is optional and currently unbuilt: `SpeechEnhancer`
+reports no model and the renderer runs its DSP chain alone. The model is
+converted from DPDFNet's ONNX release by `Tools/dpdfnet/`, which needs macOS and
+`coremltools`. That absence is a supported configuration — denoising removes the
+noise *around* a quiet talker without making the talker louder, which is the
+compressor's and the normalization's job.
+
 `ModelStoreProtection` (`Infrastructure/ModelStoreProtection.swift`) applies
 the same `.completeUnlessOpen` file protection to the SwiftData store itself
 (`default.store` plus its `-shm`/`-wal` sidecars in Application Support),
