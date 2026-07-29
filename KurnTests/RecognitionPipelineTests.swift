@@ -137,14 +137,27 @@ struct RecognitionPipelineTests {
 
     // MARK: - Default configuration
 
-    @Test func defaultConfigurationUsesAlwaysAvailableEngines() {
+    /// A fresh install must still work with nothing downloaded. Diarization is
+    /// the one stage whose *choice* is now a model-backed engine, and the
+    /// property that replaces "every default is always-available" is that the
+    /// engine which actually runs still is, until the user consents. See
+    /// `DiarizationSelectionTests` for that pair on its own.
+    @Test func defaultConfigurationRunsWithNothingDownloaded() {
         let config = PipelineConfiguration()
         #expect(config.preprocessing == .standardDSP)
         #expect(config.vad == .energyThreshold)
         #expect(config.languageDetection == .byTranscriber)
-        #expect(config.diarization == .heuristic)
         #expect(config.transcription == .appleSpeech)
         #expect(config.whisperCppModel == .small)
+
+        #expect(config.diarization == .fluidAudio)
+        #expect(config.effectiveDiarization == .heuristic)
+        // `PreprocessingEngine` has no `requiredModelSet` at all — neither of its
+        // cases can need a download, which is why it never grew one.
+        #expect(config.vad.requiredModelSet == nil)
+        #expect(config.languageDetection.requiredModelSet == nil)
+        #expect(config.effectiveDiarization.requiredModelSet == nil)
+        #expect(config.transcription.requiredModelSet(whisperCppModel: config.whisperCppModel) == nil)
     }
 
     // MARK: - VAD audio compaction (timeline remap + region normalization)
