@@ -30,13 +30,29 @@ enum AudioFileStore {
 
     /// Directory holding the derived enhanced listening copies, nested inside the
     /// protected recordings directory so it inherits the same protection class.
+    /// **Computed only — this does not create or re-stamp anything.**
     ///
-    /// An enhanced copy keeps the *same file name* as the recording it came from —
+    /// An enhanced copy keeps the *same file name* as the recording it came from;
     /// the directory is what distinguishes them. That makes the mapping an
     /// identity rather than a name-parsing exercise, and keeps the copies out of
-    /// every shallow directory scan in the app. See
+    /// every shallow directory scan in the app — see
     /// `RecordingProtection.enhancedDirectoryName` for why that matters.
-    static var enhancedDirectoryURL: URL {
+    ///
+    /// Every read and delete path uses this rather than `ensureEnhancedDirectory`.
+    /// `recordingsDirectoryURL` creates the directory and re-applies its
+    /// protection attribute on *every* access, and `delete(fileName:)` runs in a
+    /// loop when a meeting goes away — doing that filesystem work for a path that
+    /// only needs to be computed is waste, and it puts concurrent attribute writes
+    /// on a directory other code is writing audio into.
+    static var enhancedDirectoryPath: URL {
+        documentsURL
+            .appendingPathComponent(RecordingProtection.directoryName, isDirectory: true)
+            .appendingPathComponent(RecordingProtection.enhancedDirectoryName, isDirectory: true)
+    }
+
+    /// Same directory, created and protection-stamped. Only the writer needs this.
+    @discardableResult
+    static func ensureEnhancedDirectory() -> URL {
         let parent = recordingsDirectoryURL
         if let url = try? RecordingProtection.ensureProtectedDirectory(
             named: RecordingProtection.enhancedDirectoryName,
@@ -44,15 +60,12 @@ enum AudioFileStore {
         ) {
             return url
         }
-        return parent.appendingPathComponent(
-            RecordingProtection.enhancedDirectoryName,
-            isDirectory: true
-        )
+        return enhancedDirectoryPath
     }
 
     /// Absolute URL of a recording's enhanced copy, whether or not it exists yet.
     static func enhancedURL(fileName: String) -> URL {
-        enhancedDirectoryURL.appendingPathComponent(fileName)
+        enhancedDirectoryPath.appendingPathComponent(fileName)
     }
 
     /// Whether an enhanced copy is present on disk for this recording.
@@ -117,7 +130,7 @@ enum AudioFileStore {
     /// the copy exists.
     static func delete(fileName: String) {
         let fm = FileManager.default
-        for directory in [recordingsDirectoryURL, enhancedDirectoryURL, documentsURL] {
+        for directory in [recordingsDirectoryURL, enhancedDirectoryPath, documentsURL] {
             let url = directory.appendingPathComponent(fileName)
             try? fm.removeItem(at: url)
         }
@@ -136,7 +149,7 @@ enum AudioFileStore {
     static func enhancedAudioBytes() -> Int64 {
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(
-            at: enhancedDirectoryURL,
+            at: enhancedDirectoryPath,
             includingPropertiesForKeys: [.fileSizeKey],
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
         ) else { return 0 }
@@ -152,7 +165,7 @@ enum AudioFileStore {
     static func deleteAllEnhancedAudio() {
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(
-            at: enhancedDirectoryURL,
+            at: enhancedDirectoryPath,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
         ) else { return }
