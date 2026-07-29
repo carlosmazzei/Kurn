@@ -92,6 +92,17 @@ device.
   q5-quantized; downloaded only when the user selects the engine)
 - License: MIT License (OpenAI Whisper model weights)
 
+### Speech enhancement — DPDFNet
+
+- Project: https://github.com/ceva-ip/DPDFNet
+- Paper: "DPDFNet: Boosting DeepFilterNet2 via Dual-Path RNN" (arXiv:2512.16420)
+- Used for: optional noise removal in the enhanced playback copy (`dpdfnet8`,
+  16 kHz variant, converted to Core ML by `Tools/dpdfnet/convert.py` and bundled
+  with the app)
+- License: Apache License 2.0, covering both source and pretrained weights
+- Note: not bundled until the conversion in `Tools/dpdfnet/` has been run. Record
+  the release tag and the ONNX SHA-256 here when the model is committed.
+
 ---
 
 This list is maintained on a best-effort basis. For the authoritative license
