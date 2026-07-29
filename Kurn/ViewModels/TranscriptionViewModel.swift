@@ -28,6 +28,10 @@ final class TranscriptionViewModel {
     private(set) var transcribingIDs: Set<UUID> = []
     /// Active pipeline phase per recording, so the UI can show the current stage.
     private(set) var phases: [UUID: TranscriptionPhase] = [:]
+    /// Best-effort work still running after a transcript has already been saved.
+    /// Kept separate from `phases` so the recording can honestly show `.done`
+    /// instead of holding the transcription bar at "Finalizing".
+    private(set) var postTranscriptionPhases: [UUID: PostTranscriptionPhase] = [:]
     private(set) var isSummarizing = false
     /// True after the user asks to cancel a summary while the provider request
     /// is still unwinding.
@@ -45,6 +49,17 @@ final class TranscriptionViewModel {
     /// Task handles for transcriptions started via `startTranscription`, so
     /// they can be cancelled (by the user or by the background window expiring).
     private var transcriptionTasks: [UUID: Task<Void, Never>] = [:]
+    /// Post-transcription work is intentionally unstructured relative to the
+    /// transcription task: pausing/stopping the audio pipeline no longer applies
+    /// after its transcript has been persisted.
+    private var postTranscriptionTasks: [UUID: Task<Void, Never>] = [:]
+    /// Identity guard preventing a cancelled task's deferred cleanup from
+    /// clearing a newer task registered for the same recording.
+    private var postTranscriptionRunIDs: [UUID: UUID] = [:]
+    /// Meeting associated with each post-processing task. Starting another
+    /// transcription for the same meeting cancels stale work based on the old
+    /// transcript, even when it belongs to a different recording.
+    private var postTranscriptionMeetingIDs: [UUID: UUID] = [:]
     /// Recordings being fully stopped (not just paused): on cancellation their
     /// checkpoint is cleared and status resets to `.none` instead of `.pending`.
     private var stoppingIDs: Set<UUID> = []
@@ -105,6 +120,10 @@ final class TranscriptionViewModel {
     /// The pipeline stage currently running for a recording, if any.
     func phase(for recording: Recording) -> TranscriptionPhase? {
         phases[recording.id]
+    }
+
+    func postTranscriptionPhase(for recording: Recording) -> PostTranscriptionPhase? {
+        postTranscriptionPhases[recording.id]
     }
 
     // MARK: - Transcription
@@ -181,6 +200,7 @@ final class TranscriptionViewModel {
         let recordingID = recording.id
         AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public)")
 
+        cancelPostTranscriptionWork(for: recording.meeting?.id)
         transcribingIDs.insert(recordingID)
         Self.globalActiveIDs.insert(recordingID)
         activeRecordings[recordingID] = recording
@@ -286,15 +306,8 @@ final class TranscriptionViewModel {
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
             appSettings?.recordTranscriptionEngineUsed(config.transcription)
             if let settings = appSettings {
-                await generateAITitle(for: recording.meeting, settings: settings)
+                startPostTranscriptionWork(for: recording, settings: settings)
             }
-            // Refresh the on-device semantic index so the new transcript is
-            // searchable and available to chat retrieval. Best-effort and gated
-            // on the feature toggle inside the coordinator.
-            await semanticIndexCoordinator?.indexIfEnabled(recording.meeting)
-            // Refresh the meeting's condensed wiki article for the library-wide
-            // chat's synthesis path. Opt-in and key-gated inside the coordinator.
-            await wikiCoordinator?.generateIfEnabled(recording.meeting)
         } catch is CancellationError {
             await drainEvents()
             finishCancelled(recording, id: recordingID)
@@ -318,6 +331,74 @@ final class TranscriptionViewModel {
             self.error = .transcriptionFailed(error.localizedDescription)
             AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Continue optional enrichment after the authoritative transcript has been
+    /// persisted and the transcription task has returned to the UI. Each step is
+    /// best-effort and exposes its own state; failures never mutate transcription
+    /// status and do not prevent later steps from being attempted.
+    private func startPostTranscriptionWork(for recording: Recording, settings: AppSettings) {
+        guard let meeting = recording.meeting else { return }
+        let recordingID = recording.id
+        let meetingID = meeting.id
+        let runID = UUID()
+
+        postTranscriptionTasks[recordingID]?.cancel()
+        postTranscriptionMeetingIDs[recordingID] = meetingID
+        postTranscriptionRunIDs[recordingID] = runID
+        postTranscriptionTasks[recordingID] = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.postTranscriptionRunIDs[recordingID] == runID {
+                    self.postTranscriptionPhases[recordingID] = nil
+                    self.postTranscriptionTasks[recordingID] = nil
+                    self.postTranscriptionMeetingIDs[recordingID] = nil
+                    self.postTranscriptionRunIDs[recordingID] = nil
+                }
+            }
+
+            if self.shouldGenerateAITitle(for: meeting, settings: settings) {
+                self.postTranscriptionPhases[recordingID] = .generatingTitle
+                await self.generateAITitle(for: meeting, settings: settings)
+            }
+            guard !Task.isCancelled else { return }
+
+            if settings.semanticSearchEnabled, let semanticIndexCoordinator = self.semanticIndexCoordinator {
+                self.postTranscriptionPhases[recordingID] = .indexing
+                await semanticIndexCoordinator.index(meeting)
+            }
+            guard !Task.isCancelled else { return }
+
+            if self.shouldGenerateWiki(settings: settings),
+               let wikiCoordinator = self.wikiCoordinator {
+                self.postTranscriptionPhases[recordingID] = .generatingWiki
+                await wikiCoordinator.generate(meeting)
+            }
+        }
+    }
+
+    /// Stop enrichment based on a now-stale transcript before re-transcribing any
+    /// recording in the same meeting.
+    private func cancelPostTranscriptionWork(for meetingID: UUID?) {
+        guard let meetingID else { return }
+        let staleRecordingIDs = postTranscriptionMeetingIDs.compactMap { recordingID, candidateMeetingID in
+            candidateMeetingID == meetingID ? recordingID : nil
+        }
+        for recordingID in staleRecordingIDs {
+            postTranscriptionTasks[recordingID]?.cancel()
+            postTranscriptionPhases[recordingID] = nil
+        }
+    }
+
+    private func shouldGenerateAITitle(for meeting: Meeting, settings: AppSettings) -> Bool {
+        meeting.aiTitle == nil
+            && meeting.hasAnyTranscript
+            && KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+    }
+
+    private func shouldGenerateWiki(settings: AppSettings) -> Bool {
+        settings.wikiEnabled
+            && KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
     }
 
     /// Settle a run that ended in cancellation. Which of the two cancellation
@@ -391,6 +472,7 @@ final class TranscriptionViewModel {
                 provider: provider,
                 model: model
             )
+            try Task.checkCancellation()
             meeting.aiTitle = title
             persist()
             AppLog.transcription.atNotice.notice("VM: AI title id=\(meeting.id, privacy: .public) \"\(title, privacy: .private)\"")

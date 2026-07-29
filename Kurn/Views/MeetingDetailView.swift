@@ -558,6 +558,7 @@ private struct RecordingSegmentRow: View {
         let isTranscribing = txVM?.isTranscribing(recording) == true
         let isCancelling = txVM?.isCancelling(recording) == true
         let phase = txVM?.phase(for: recording)
+        let postTranscriptionPhase = txVM?.postTranscriptionPhase(for: recording)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 Button { onTogglePlay() } label: {
@@ -676,6 +677,15 @@ private struct RecordingSegmentRow: View {
                 transcriptionProgressBar(phase: phase, isCancelling: isCancelling)
                 if let phase, !isCancelling {
                     Text(phase.displayName)
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            } else if let postTranscriptionPhase {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.small)
+                    Text(postTranscriptionPhase.displayName)
                         .font(.caption2)
                         .foregroundStyle(Theme.textTertiary)
                 }

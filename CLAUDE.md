@@ -889,10 +889,14 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   into short passages (absolute meeting timestamps + dominant speaker),
   `SemanticIndexService` embeds them off-main, and `SemanticIndexCoordinator`
   (`@MainActor`, app-wide, created in `KurnApp`) persists them as `SemanticChunk`
-  rows. Indexing is automatic on transcription completion and a low-priority
+  rows. Indexing is automatic after transcription completion and a low-priority
   launch/foreground **backfill** re-indexes meetings transcribed before the
   feature existed (or by an older embedder, tracked via `modelIdentifier`). Gated
-  by `AppSettings.semanticSearchEnabled` (on by default).
+  by `AppSettings.semanticSearchEnabled` (on by default). Title generation,
+  indexing, and optional wiki generation run as independent best-effort
+  post-transcription work: the recording is already `.done`, and the UI reports
+  each enrichment phase separately instead of holding the transcription bar at
+  "Finalizing".
 - **Search.** `SemanticSearchService` embeds the query once and ranks stored
   chunk vectors by cosine similarity (`vDSP` dot product on unit-normalized
   vectors). `MeetingsListView` runs a debounced hybrid pass: instant substring

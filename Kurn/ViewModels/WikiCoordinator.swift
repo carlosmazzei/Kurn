@@ -85,6 +85,7 @@ final class WikiCoordinator {
             let markdown = try await wikiService.generate(
                 transcriptText: text, meetingTitle: title, provider: provider, model: model
             )
+            try Task.checkCancellation()
             guard !markdown.isEmpty else { return }
             replaceArticle(
                 of: meeting, markdown: markdown, hash: hash,

@@ -99,6 +99,28 @@ enum TranscriptionPhase: Sendable, Equatable {
     }
 }
 
+/// Best-effort work that starts only after the transcript has been saved.
+///
+/// These phases are deliberately separate from `TranscriptionPhase`: a recording
+/// is already `.done` while they run, and a failure in any of them must not turn a
+/// successful transcription into a failed one.
+enum PostTranscriptionPhase: Sendable, Equatable {
+    case generatingTitle
+    case indexing
+    case generatingWiki
+
+    var displayName: String {
+        switch self {
+        case .generatingTitle:
+            return NSLocalizedString("post_phase.generating_title", comment: "Generating meeting title")
+        case .indexing:
+            return NSLocalizedString("post_phase.indexing", comment: "Indexing transcript")
+        case .generatingWiki:
+            return NSLocalizedString("post_phase.generating_wiki", comment: "Generating meeting wiki")
+        }
+    }
+}
+
 /// Chunk counter surfaced in the transcription progress UI.
 ///
 /// `completed` is the chunk currently being shown to the user: it is the index

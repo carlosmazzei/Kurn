@@ -310,6 +310,9 @@
 "phase.transcribing_progress" = "正在转录… %d%%";
 "phase.transcribing_chunk_progress" = "正在转录… %d%%（第 %d / %d 块）";
 "phase.finalizing" = "正在完成…";
+"post_phase.generating_title" = "正在生成标题…";
+"post_phase.indexing" = "正在索引转录…";
+"post_phase.generating_wiki" = "正在生成维基…";
 
 /* 会议表单 */
 "form.title_section" = "标题";
