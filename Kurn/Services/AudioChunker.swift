@@ -52,7 +52,10 @@ actor AudioChunker {
     /// highly-compressed recording (e.g. 45 min at ~11 MB) is still too long for
     /// a single API call, so we split it into 10-minute chunks even when the
     /// size is below the threshold.
-    func chunk(url: URL) async throws -> [Chunk] {
+    ///
+    /// `cutPoints` are times the caller would rather cut at — silences, on the
+    /// same timeline as the file. See `ChunkBoundary`.
+    func chunk(url: URL, cutPoints: [TimeInterval] = []) async throws -> [Chunk] {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let duration = (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atInfo.info("chunk: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", duration), privacy: .public)s")
@@ -63,14 +66,14 @@ actor AudioChunker {
             return [Chunk(url: url, offset: 0)]
         }
         AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes / \(String(format: "%.1f", duration), privacy: .public)s exceeds thresholds, splitting…")
-        return try await split(url: url, knownDuration: duration)
+        return try await split(url: url, knownDuration: duration, cutPoints: cutPoints)
     }
 
     /// Split by duration regardless of file size. Used by `WhisperCppTranscriber`,
     /// where the constraint is resident memory rather than an upload size cap:
     /// `whisper_full` takes the whole clip as one `[Float]`, so a two-hour file
     /// would be ~460MB of samples. Files no longer than one chunk come back whole.
-    func chunkByDuration(url: URL) async throws -> [Chunk] {
+    func chunkByDuration(url: URL, cutPoints: [TimeInterval] = []) async throws -> [Chunk] {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let asset = AVURLAsset(url: url)
         let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
@@ -79,10 +82,14 @@ actor AudioChunker {
             return [Chunk(url: url, offset: 0)]
         }
         AppLog.transcription.atDebug.debug("chunk: \(totalSeconds, privacy: .public)s > \(self.chunkDuration, privacy: .public)s, splitting by duration…")
-        return try await split(url: url, knownDuration: totalSeconds)
+        return try await split(url: url, knownDuration: totalSeconds, cutPoints: cutPoints)
     }
 
-    private func split(url: URL, knownDuration: TimeInterval) async throws -> [Chunk] {
+    private func split(
+        url: URL,
+        knownDuration: TimeInterval,
+        cutPoints: [TimeInterval] = []
+    ) async throws -> [Chunk] {
         let exportStart = Date()
         let asset = AVURLAsset(url: url)
         // AVAssetExportSession silently produces an empty file if the asset's
@@ -111,8 +118,23 @@ actor AudioChunker {
             }
         }
 
+        let candidates = cutPoints.filter { $0.isFinite && $0 > 0 && $0 < totalSeconds }.sorted()
+        if !candidates.isEmpty {
+            AppLog.transcription.atDebug.debug("chunk: \(candidates.count, privacy: .public) silence candidate(s) available for cutting")
+        }
+
         while start < totalSeconds {
-            let length = min(chunkDuration, totalSeconds - start)
+            let end = ChunkBoundary.end(
+                start: start,
+                nominalEnd: min(start + chunkDuration, totalSeconds),
+                total: totalSeconds,
+                candidates: candidates
+            )
+            let length = end - start
+            // Belt and braces: a non-positive length would loop forever. The
+            // boundary chooser cannot produce one, and this makes that a bug
+            // rather than a hang if it ever does.
+            guard length > 0 else { break }
             let outURL = tmpDir.appendingPathComponent(
                 "kurn_chunk_\(UUID().uuidString)_\(index).m4a"
             )
@@ -155,7 +177,7 @@ actor AudioChunker {
             // durations would fold the same slop in once per chunk and drift
             // forward across the whole meeting.
             chunks.append(Chunk(url: outURL, offset: start))
-            start += length
+            start = end
             index += 1
         }
 
@@ -263,5 +285,81 @@ actor AudioChunker {
         } catch {
             throw AppError.audioError(error.localizedDescription)
         }
+    }
+}
+
+/// Where to end a chunk, given where it would end on a fixed grid and the times
+/// the caller would rather cut at.
+///
+/// A fixed grid cuts wherever 5 or 10 minutes happens to land, which is mid-word
+/// far more often than not: the word is split, truncated or duplicated across
+/// the two requests, and nothing downstream can tell. It is also the worst place
+/// to cut for a different reason — a chunk boundary is a decoder restart, and a
+/// restart into the middle of an utterance is exactly the condition Whisper
+/// hallucinates over.
+///
+/// The app already knows where the silences are; it computes them for VAD and
+/// then chose chunk boundaries without consulting them. This does the
+/// consulting. It is pure, and it has to stay deterministic for the same input:
+/// a resumed transcription only reuses its checkpoint when the chunk plan comes
+/// out identical, so a boundary that wandered between runs would silently
+/// discard the work of every completed chunk.
+enum ChunkBoundary {
+
+    /// How far a boundary may move to reach a silence. Wide enough to find one
+    /// in a busy meeting, narrow enough that the memory and upload-size bounds
+    /// the chunk length exists to enforce still hold.
+    static let tolerance: TimeInterval = 30
+
+    /// A chunk shorter than this is not worth the per-chunk overhead, and near
+    /// the end of a file could produce a sliver.
+    static let minimumDuration: TimeInterval = 30
+
+    static func end(
+        start: TimeInterval,
+        nominalEnd: TimeInterval,
+        total: TimeInterval,
+        candidates: [TimeInterval],
+        tolerance: TimeInterval = tolerance
+    ) -> TimeInterval {
+        // The final chunk ends where the audio does; there is nothing to snap to
+        // and moving it would leave a tail unread.
+        guard nominalEnd < total else { return total }
+
+        let lower = max(start + minimumDuration, nominalEnd - tolerance)
+        let upper = min(total, nominalEnd + tolerance)
+        guard lower <= upper else { return nominalEnd }
+
+        // Closest to the nominal boundary, so the chunk length stays as close as
+        // possible to what the caller sized it for. `candidates` is sorted, so
+        // ties resolve to the earlier one and the plan is reproducible.
+        let best = candidates
+            .filter { $0 >= lower && $0 <= upper }
+            .min { abs($0 - nominalEnd) < abs($1 - nominalEnd) }
+        return best ?? nominalEnd
+    }
+
+    /// Times it is safe to cut at, from the speech regions the VAD already
+    /// produced: the middle of each silence between them.
+    ///
+    /// The midpoint rather than an edge because both edges belong to speech —
+    /// cutting at the end of one region clips the tail of a word, and at the
+    /// start of the next clips its onset.
+    static func cutPoints(betweenSpeechRegions regions: [SpeechRegion]) -> [TimeInterval] {
+        let sorted = regions.sorted { $0.start < $1.start }
+        var points: [TimeInterval] = []
+        for (previous, next) in zip(sorted, sorted.dropFirst()) where next.start > previous.end {
+            points.append((previous.end + next.start) / 2)
+        }
+        return points
+    }
+
+    /// Cut points on the **compacted** timeline, which is the one the engine sees
+    /// when VAD compaction ran. The compactor writes a fixed silent gap before
+    /// every region but the first, so each region's `compactedStart` has silence
+    /// immediately behind it — that is the whole set of safe cuts, and the
+    /// original-timeline points computed above would be meaningless here.
+    static func cutPoints(inCompactedTimeline map: [TimelineSegment]) -> [TimeInterval] {
+        map.dropFirst().map(\.compactedStart)
     }
 }
