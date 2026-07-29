@@ -245,6 +245,32 @@ down the live `RecorderViewModel` and orphan its audio file;
 locks) by restarting in place, or pausing with a banner if the audio format
 changed.
 
+### Playback
+
+`AudioPlayerService` (`@MainActor @Observable`, one per `MeetingDetailView`)
+wraps a single `AVAudioPlayer`, and owns two things beyond it.
+
+`Services/Playback/NowPlayingController.swift` publishes to
+`MPNowPlayingInfoCenter` and accepts `MPRemoteCommandCenter` commands
+(play/pause/toggle, ±15 s, scrub). This is not optional polish: the app declares
+`UIBackgroundModes: audio`, so without it playback continues when the screen
+locks with **no controls and no metadata** anywhere — Lock Screen, Control
+Centre, Dynamic Island, AirPods stem, CarPlay, Watch. Two rules hold it
+together: commands are registered on `load` and *removed* on `stop`, because the
+command centre is process-wide and a torn-down player must not keep answering
+it; and metadata is published only on state changes, never on the player's 0.1 s
+tick, because Now Playing extrapolates position from the rate.
+`NowPlayingController.info(...)` is split out as a pure builder so the metadata
+contract is testable without a Lock Screen.
+
+Audio-session events are handled the same way the recorder handles them — the
+player had none of this, so an incoming call left `isPlaying` true over a
+stopped player: interruption `.began` pauses and `.ended`+`.shouldResume`
+resumes, `.oldDeviceUnavailable` pauses (unplugging headphones must not dump a
+meeting into the speaker), the category mode is `.spokenAudio` rather than
+`.default`, and `stop()` deactivates the session with
+`.notifyOthersOnDeactivation` so whatever was playing before can resume.
+
 ### Enhanced playback copies
 
 Playback can use a second, derived `.m4a` per recording — loudness-normalized,
@@ -252,8 +278,8 @@ equalized and gently compressed — rendered offline by
 `Services/Enhancement/PlaybackEnhancementRenderer.swift` and generated **on
 demand**, the first time the user turns enhancement on for that recording.
 Doing it offline is what keeps `AudioPlayerService` on `AVAudioPlayer`: the
-player only picks which URL to open, so there is no realtime graph, no
-reimplemented seek and no interruption recovery.
+player only picks which URL to open, so there is no realtime graph and no
+reimplemented seek.
 
 Two passes, because loudness cannot be known in advance. The first measures
 integrated loudness to ITU-R BS.1770-4 (`Services/Enhancement/LoudnessMeter.swift`)
@@ -291,7 +317,11 @@ reports no model and the renderer runs its DSP chain alone. The model is
 converted from DPDFNet's ONNX release by `Tools/dpdfnet/`, which needs macOS and
 `coremltools`. That absence is a supported configuration — denoising removes the
 noise *around* a quiet talker without making the talker louder, which is the
-compressor's and the normalization's job.
+compressor's and the normalization's job. Nothing calls `SpeechEnhancer` yet, on
+purpose: a frame-by-frame model does not drop into the renderer's
+`AVAudioEngine` chain, so the decode/enhance/mix pass around it — and the dry/wet
+ratio that pass needs — lands with the inference loop, where it can be run
+against a real model instead of a stub that always returns `nil`.
 
 `ModelStoreProtection` (`Infrastructure/ModelStoreProtection.swift`) applies
 the same `.completeUnlessOpen` file protection to the SwiftData store itself
@@ -406,6 +436,34 @@ comes back as one speaker. Four things address that, all outside FluidAudio:
   processing budget to the recording. A flat timeout falls back to a single
   whole-clip turn, which reads as "diarization is inaccurate" rather than as
   the timeout it is.
+
+#### Whisper hallucination filtering
+
+Whisper's failure mode is not a wrong word, it is a fluent invention over
+silence, music or noise — often the same sentence looped — with nothing in the
+text to distinguish it from a real one. The decoder does report its doubt, so
+both Whisper engines run their spans through
+`Pipeline/TranscriptQualityFilter.swift` before returning:
+
+- **silence** — `no_speech_prob > 0.6` **and** `avg_logprob < -1.0`. The
+  conjunction is Whisper's own rule and matters in both directions: a confident
+  decode overrides a high no-speech probability, and a low log-probability alone
+  must not drop a quiet talker.
+- **compression** — `compression_ratio > 2.4`. Cloud only; the field arrives in
+  `verbose_json` (`WhisperVerboseResponse`, which modelled only start/end/text
+  before) and whisper.cpp has no equivalent.
+- **repetition** — found in the text instead, which is why the detector exists.
+  It is deliberately blind to *what* repeats (a phrase blocklist would need
+  maintaining in seven languages and still miss the next one): it looks for one
+  cycle of tokens covering most of the segment. The coverage floor is what keeps
+  a stutter inside a good sentence from taking the sentence with it, and scripts
+  written without spaces fall back to per-character units.
+
+Surviving spans are stamped with the confidence their log-probability implies
+(`exp(avgLogProb)`), which is what finally fills `TranscribedSpan.confidence`.
+whisper.cpp's own temperature-fallback thresholds (`logprob_thold`,
+`no_speech_thold`, `entropy_thold`) are set from the same constants, so its retry
+and this post-filter judge a segment by one set of numbers.
 
 VBx's warm-start priors are left at FluidAudio's community-1 defaults. Raising
 them to fight the collapse (an earlier attempt) just trades it for the opposite
