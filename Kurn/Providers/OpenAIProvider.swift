@@ -104,12 +104,27 @@ struct OpenAIProvider: LLMProvider {
             let decoded = try JSONDecoder().decode(WhisperVerboseResponse.self, from: data)
             let spans: [TranscribedSpan]
             if let segments = decoded.segments, !segments.isEmpty {
-                spans = segments.map {
-                    TranscribedSpan(text: $0.text.trimmingCharacters(in: .whitespaces),
-                                    start: $0.start,
-                                    end: $0.end,
-                                    confidence: nil)
-                }
+                // `verbose_json` carries the decoder's own confidence signals per
+                // segment; they are the only way to tell an invented sentence
+                // from a real one, since both read as fluent prose.
+                spans = TranscriptQualityFilter.keeping(
+                    segments.map {
+                        TranscriptQualityFilter.ScoredSpan(
+                            span: TranscribedSpan(
+                                text: $0.text.trimmingCharacters(in: .whitespaces),
+                                start: $0.start,
+                                end: $0.end,
+                                confidence: nil
+                            ),
+                            quality: SpanQuality(
+                                averageLogProb: $0.avgLogprob,
+                                noSpeechProb: $0.noSpeechProb,
+                                compressionRatio: $0.compressionRatio
+                            )
+                        )
+                    },
+                    engine: "whisperAPI"
+                )
             } else {
                 // Fallback: one span for the whole blob.
                 spans = [TranscribedSpan(text: decoded.text, start: 0, end: 0, confidence: nil)]
@@ -249,6 +264,20 @@ private struct WhisperVerboseResponse: Decodable {
         let start: TimeInterval
         let end: TimeInterval
         let text: String
+        /// Quality signals. Optional because OpenAI-compatible vendors are not
+        /// obliged to return them, and a missing one must not fail the decode of
+        /// an otherwise good response — `TranscriptQualityFilter` treats absence
+        /// as "no evidence" rather than as a failure.
+        let avgLogprob: Double?
+        let noSpeechProb: Double?
+        let compressionRatio: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case start, end, text
+            case avgLogprob = "avg_logprob"
+            case noSpeechProb = "no_speech_prob"
+            case compressionRatio = "compression_ratio"
+        }
     }
     let text: String
     let language: String?
