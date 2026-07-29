@@ -48,6 +48,9 @@ struct MeetingDetailView: View {
     }
 
     @State var player = AudioPlayerService()
+    /// Created lazily because it needs the model context. Non-private so the
+    /// actions extension in `MeetingDetailActions.swift` can reach it.
+    @State var enhancement: PlaybackEnhancementViewModel?
     /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
     var txVM: TranscriptionViewModel? { sharedTxVM }
     @State private var tab: Tab = .recordings
@@ -102,6 +105,12 @@ struct MeetingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
         .onDisappear { player.stop() }
+        .task {
+            if enhancement == nil {
+                enhancement = PlaybackEnhancementViewModel(modelContext: modelContext)
+            }
+        }
+        .errorAlert(Binding(get: { enhancement?.error }, set: { enhancement?.error = $0 }))
         .sheet(isPresented: $showingRecorder) {
             NavigationStack { RecorderView(meeting: meeting) }
         }
@@ -292,8 +301,10 @@ struct MeetingDetailView: View {
                     index: index,
                     player: player,
                     txVM: txVM,
+                    enhancement: enhancement,
                     pendingRetranscribe: $pendingRetranscribe,
                     onTogglePlay: { togglePlay(recording) },
+                    onToggleEnhancement: { toggleEnhancement(recording) },
                     onCancelTranscription: { cancelTranscription(recording) },
                     onStopTranscription: { stopTranscription(recording) },
                     onStartTranscription: { startTranscription(recording) }
@@ -509,8 +520,10 @@ private struct RecordingSegmentRow: View {
     let index: Int
     let player: AudioPlayerService
     let txVM: TranscriptionViewModel?
+    let enhancement: PlaybackEnhancementViewModel?
     @Binding var pendingRetranscribe: Recording?
     let onTogglePlay: () -> Void
+    let onToggleEnhancement: () -> Void
     let onCancelTranscription: () -> Void
     let onStopTranscription: () -> Void
     let onStartTranscription: () -> Void
@@ -651,8 +664,11 @@ private struct RecordingSegmentRow: View {
                     duration: player.duration > 0 ? player.duration : recording.duration,
                     isPlaying: player.isPlaying,
                     playbackRate: player.playbackRate,
+                    isEnhanced: player.isPlayingEnhanced,
+                    isEnhancing: enhancement?.isRendering(recording) == true,
                     onSeek: { player.seek(to: $0) },
-                    onCycleRate: { player.cycleRate() }
+                    onCycleRate: { player.cycleRate() },
+                    onToggleEnhancement: onToggleEnhancement
                 )
             }
         }
@@ -684,8 +700,11 @@ private struct SegmentPlaybackScrubber: View {
     let duration: TimeInterval
     let isPlaying: Bool
     let playbackRate: Float
+    let isEnhanced: Bool
+    let isEnhancing: Bool
     let onSeek: (TimeInterval) -> Void
     let onCycleRate: () -> Void
+    let onToggleEnhancement: () -> Void
 
     private var playableDuration: TimeInterval { max(duration, 0) }
     private var sliderUpperBound: TimeInterval { max(playableDuration, 1) }
@@ -733,6 +752,32 @@ private struct SegmentPlaybackScrubber: View {
                     .foregroundStyle(Theme.textTertiary)
                 Text("0:00")
                 Spacer(minLength: 8)
+                Button(action: onToggleEnhancement) {
+                    Group {
+                        if isEnhancing {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.5)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(isEnhanced ? Theme.accent : Theme.textTertiary)
+                        }
+                    }
+                    .frame(minWidth: 34)
+                    .padding(.vertical, 3)
+                    .background(Theme.fill, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(isEnhancing)
+                .accessibilityLabel(NSLocalizedString("detail.playback_enhancement", comment: "Enhanced audio"))
+                .accessibilityValue(
+                    isEnhancing
+                        ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
+                        : (isEnhanced
+                            ? NSLocalizedString("common.on", comment: "On")
+                            : NSLocalizedString("common.off", comment: "Off"))
+                )
                 Button(action: onCycleRate) {
                     Text(rateLabel)
                         .font(.system(size: 11, weight: .semibold))
@@ -750,7 +795,10 @@ private struct SegmentPlaybackScrubber: View {
             .foregroundStyle(Theme.textTertiary)
         }
         .padding(.leading, 46)
-        .accessibilityElement(children: .combine)
+        // `.contain` rather than `.combine`: combining flattens the children into
+        // one element, which makes the speed and enhancement buttons unreachable
+        // to VoiceOver.
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
         .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
     }

@@ -14,6 +14,7 @@
 "error.recorder_engine" = "Impossibile avviare il motore audio.";
 "error.audio_cleanup" = "Impossibile pulire l'audio per la trascrizione.";
 "error.audio_compaction" = "Impossibile compattare questa registrazione. È stata lasciata invariata.";
+"error.audio_enhancement" = "Impossibile creare l'audio migliorato di questa registrazione.";
 "error.recognizer_unavailable" = "Il riconoscimento vocale non è disponibile per questa lingua.";
 "error.recognizer_offline" = "Il riconoscimento vocale sul dispositivo non è pronto. Riprova tra poco.";
 "error.export_session" = "Impossibile preparare l'audio per il caricamento.";
@@ -508,6 +509,14 @@
 "settings.diarization_preprocessing" = "Pulizia Audio per Diarizzazione";
 "settings.diarization_dereverb" = "Dereverberazione (Sperimentale)";
 "settings.diarization_dereverb_footer" = "Rimuove l'eco della stanza dall'audio letto dalla separazione degli speaker. Può aiutare quando il telefono è appoggiato sul tavolo della riunione, ma aggiunge tempo di elaborazione e il vantaggio non è stato misurato sulle tue registrazioni.";
+"detail.playback_enhancement" = "Audio migliorato";
+"common.on" = "Attivo";
+"common.off" = "Disattivo";
+"detail.enhancing_audio" = "Miglioramento audio…";
+"settings.playback_enhancement" = "Riproduzione Migliorata";
+"settings.playback_enhancement_footer" = "Applica equalizzazione, controllo del livello e volume uniforme per sentire meglio chi parla piano. Crea un secondo file audio al primo utilizzo su una registrazione; la registrazione originale e la trascrizione non vengono mai modificate.";
+"settings.storage.enhanced_audio" = "Audio migliorato";
+"settings.storage.enhanced_audio_delete" = "Elimina Audio Migliorato";
 "settings.on_device_auto_language" = "Rileva Lingua sul Dispositivo (Auto)";
 "settings.live_transcription" = "Anteprima Trascrizione in Tempo Reale";
 "settings.model_download.title" = "Download del Modello (una tantum)";

@@ -21,6 +21,9 @@ final class AudioPlayerService: NSObject {
     /// Current playback speed multiplier (e.g. 0.5, 1.0, 1.5, 2.0). Persists
     /// across loads/seeks so the user's choice sticks for the session.
     private(set) var playbackRate: Float = 1.0
+    /// Whether the file currently open is the enhanced copy rather than the
+    /// original.
+    private(set) var isPlayingEnhanced = false
 
     /// Speeds the user can cycle through, mirroring WhatsApp's voice-note control.
     static let rateOptions: [Float] = [1.0, 1.5, 2.0, 0.5]
@@ -28,9 +31,19 @@ final class AudioPlayerService: NSObject {
     private var player: AVAudioPlayer?
     private var timer: Timer?
 
-    /// Load a recording. Reuses the existing player if the same file is loaded.
-    func load(fileName: String) throws {
-        if loadedFileName == fileName, player != nil { return }
+    /// Load a recording, optionally its enhanced listening copy.
+    ///
+    /// `loadedFileName` always reports the **logical** recording name, never the
+    /// physical file opened. The whole UI keys row-to-player identity off
+    /// `player.loadedFileName == recording.fileName`, so reporting the enhanced
+    /// copy's location here would make the scrubber vanish and the play/pause
+    /// button stop tracking — the variant is an internal detail of which URL to
+    /// open, not a different recording.
+    ///
+    /// Reuses the existing player only when both the recording *and* the variant
+    /// match; comparing the name alone would silently ignore a variant switch.
+    func load(fileName: String, enhanced: Bool = false) throws {
+        if loadedFileName == fileName, isPlayingEnhanced == enhanced, player != nil { return }
         stop()
 
         // Resolve through the shared store, which prefers the protected
@@ -38,7 +51,9 @@ final class AudioPlayerService: NSObject {
         // falls back to legacy `Documents/`. Building the path straight from
         // `documentsURL` misses every file in the protected subdirectory, so
         // playback failed with an OSStatus "operation could not be completed".
-        let url = AudioFileStore.resolveURL(fileName: fileName)
+        let url = enhanced
+            ? AudioFileStore.enhancedURL(fileName: fileName)
+            : AudioFileStore.resolveURL(fileName: fileName)
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
@@ -51,6 +66,7 @@ final class AudioPlayerService: NSObject {
             self.duration = player.duration
             self.currentTime = 0
             self.loadedFileName = fileName
+            self.isPlayingEnhanced = enhanced
         } catch {
             throw AppError.audioError(error.localizedDescription)
         }
@@ -99,6 +115,18 @@ final class AudioPlayerService: NSObject {
         currentTime = player.currentTime
     }
 
+    /// Switch between the original and the enhanced copy without losing the
+    /// listener's place. `load` goes through `stop()`, which resets position and
+    /// duration, so both are captured first and restored after.
+    func reload(enhanced: Bool) throws {
+        guard let fileName = loadedFileName, isPlayingEnhanced != enhanced else { return }
+        let position = currentTime
+        let wasPlaying = isPlaying
+        try load(fileName: fileName, enhanced: enhanced)
+        seek(to: position)
+        if wasPlaying { play() }
+    }
+
     func stop() {
         player?.stop()
         player = nil
@@ -106,6 +134,7 @@ final class AudioPlayerService: NSObject {
         currentTime = 0
         duration = 0
         loadedFileName = nil
+        isPlayingEnhanced = false
         stopTimer()
     }
 

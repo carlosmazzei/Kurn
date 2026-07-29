@@ -31,6 +31,18 @@ final class Recording {
     /// `RecordingRecovery`. The default value is also what lets SwiftData migrate
     /// the store lightly instead of needing a migration plan.
     var fileSize: Int64 = 0
+    /// Tuning revision of the enhanced listening copy on disk. `0` means there is
+    /// no copy; any other value that differs from
+    /// `PlaybackEnhancementRenderer.currentVersion` means the copy was rendered
+    /// with older settings and should be regenerated. One field answers both
+    /// "does it exist?" and "is it stale?".
+    ///
+    /// Defaulted, like `fileSize`, so SwiftData migrates the store lightly rather
+    /// than needing a migration plan.
+    var enhancedAudioVersion: Int = 0
+    /// Byte count of the enhanced copy, cached so the storage screen can total
+    /// them without stat-ing every file.
+    var enhancedFileSize: Int64 = 0
 
     @Relationship(deleteRule: .cascade, inverse: \Transcript.recording)
     var transcript: Transcript?
@@ -87,6 +99,25 @@ final class Recording {
     /// computing the expected size.
     func refreshFileSize() {
         fileSize = AudioFileStore.byteSize(fileName: fileName)
+    }
+
+    /// Absolute URL of the enhanced listening copy, whether or not it exists.
+    var enhancedFileURL: URL {
+        AudioFileStore.enhancedURL(fileName: fileName)
+    }
+
+    /// Whether a usable enhanced copy exists: rendered by the current tuning *and*
+    /// still on disk. The on-disk check matters because "Delete all data" and the
+    /// storage screen can remove the file without touching the row.
+    func hasEnhancedAudio(currentVersion: Int) -> Bool {
+        enhancedAudioVersion == currentVersion
+            && AudioFileStore.hasEnhancedAudio(fileName: fileName)
+    }
+
+    /// Forget the enhanced copy, after deleting it or finding it stale.
+    func clearEnhancedAudio() {
+        enhancedAudioVersion = 0
+        enhancedFileSize = 0
     }
 
     /// Bit rate the file is actually stored at, or `nil` when either input is

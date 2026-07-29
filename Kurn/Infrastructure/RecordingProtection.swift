@@ -20,6 +20,20 @@ enum RecordingProtection {
     /// once on the container and inherited by newly created files.
     static let directoryName = "Recordings"
 
+    /// Subdirectory of the recordings directory holding the derived, enhanced
+    /// listening copies.
+    ///
+    /// A nested directory rather than a filename suffix beside the originals, and
+    /// that is load-bearing: every existing sweep over the recordings directory
+    /// (`RecordingRecovery`'s orphan pass, `AudioFileStore.totalAudioBytes`, the
+    /// legacy migration below) uses a *shallow* `contentsOfDirectory`, so a
+    /// subdirectory is invisible to all of them by construction instead of each
+    /// one needing to learn an exclusion. Getting that wrong is not benign — the
+    /// orphan sweep parses the meeting ID from the name prefix, so a suffixed copy
+    /// would be adopted as a second `Recording` and show up in the library as a
+    /// duplicate.
+    static let enhancedDirectoryName = "Enhanced"
+
     /// Protection class applied to the recordings directory. `.completeUnlessOpen`
     /// is chosen over `.complete` so that an in-progress recording survives the
     /// screen locking mid-meeting — the file stays writable while it is open,
@@ -30,7 +44,14 @@ enum RecordingProtection {
     /// Returns the directory URL. Idempotent: safe to call on every launch.
     @discardableResult
     static func ensureProtectedDirectory(at parent: URL) throws -> URL {
-        let url = parent.appendingPathComponent(directoryName, isDirectory: true)
+        try ensureProtectedDirectory(named: directoryName, in: parent)
+    }
+
+    /// Same, for an arbitrary child directory — used for the enhanced-audio
+    /// subdirectory, which needs the identical protection class.
+    @discardableResult
+    static func ensureProtectedDirectory(named name: String, in parent: URL) throws -> URL {
+        let url = parent.appendingPathComponent(name, isDirectory: true)
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             try fm.createDirectory(

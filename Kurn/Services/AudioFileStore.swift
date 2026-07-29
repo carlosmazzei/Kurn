@@ -28,6 +28,38 @@ enum AudioFileStore {
         return documentsURL.appendingPathComponent(RecordingProtection.directoryName, isDirectory: true)
     }
 
+    /// Directory holding the derived enhanced listening copies, nested inside the
+    /// protected recordings directory so it inherits the same protection class.
+    ///
+    /// An enhanced copy keeps the *same file name* as the recording it came from —
+    /// the directory is what distinguishes them. That makes the mapping an
+    /// identity rather than a name-parsing exercise, and keeps the copies out of
+    /// every shallow directory scan in the app. See
+    /// `RecordingProtection.enhancedDirectoryName` for why that matters.
+    static var enhancedDirectoryURL: URL {
+        let parent = recordingsDirectoryURL
+        if let url = try? RecordingProtection.ensureProtectedDirectory(
+            named: RecordingProtection.enhancedDirectoryName,
+            in: parent
+        ) {
+            return url
+        }
+        return parent.appendingPathComponent(
+            RecordingProtection.enhancedDirectoryName,
+            isDirectory: true
+        )
+    }
+
+    /// Absolute URL of a recording's enhanced copy, whether or not it exists yet.
+    static func enhancedURL(fileName: String) -> URL {
+        enhancedDirectoryURL.appendingPathComponent(fileName)
+    }
+
+    /// Whether an enhanced copy is present on disk for this recording.
+    static func hasEnhancedAudio(fileName: String) -> Bool {
+        FileManager.default.fileExists(atPath: enhancedURL(fileName: fileName).path)
+    }
+
     /// Deterministic file name for a recording: `{meetingID}_{timestamp}.m4a`.
     static func fileName(meetingID: UUID, date: Date = Date()) -> String {
         "\(meetingID.uuidString)_\(date.fileTimestamp).m4a"
@@ -78,10 +110,53 @@ enum AudioFileStore {
 
     /// Delete a single audio file by name from whichever directory holds it.
     /// Missing files are ignored.
+    ///
+    /// The enhanced directory is in this list so that *every* caller — deleting a
+    /// meeting, deleting one recording, discarding a cancelled take — drops the
+    /// derived copy along with the original, without any of them having to know
+    /// the copy exists.
     static func delete(fileName: String) {
         let fm = FileManager.default
-        for directory in [recordingsDirectoryURL, documentsURL] {
+        for directory in [recordingsDirectoryURL, enhancedDirectoryURL, documentsURL] {
             let url = directory.appendingPathComponent(fileName)
+            try? fm.removeItem(at: url)
+        }
+    }
+
+    /// Delete only the enhanced copy, leaving the recording itself alone. Backs
+    /// the "reclaim space" action in Settings → Storage.
+    static func deleteEnhancedAudio(fileName: String) {
+        try? FileManager.default.removeItem(at: enhancedURL(fileName: fileName))
+    }
+
+    /// Total bytes used by the derived enhanced copies. Reported separately from
+    /// `totalAudioBytes()` — which counts only originals, since its scan is
+    /// shallow — so Settings can show what is reclaimable without conflating it
+    /// with the recordings themselves.
+    static func enhancedAudioBytes() -> Int64 {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(
+            at: enhancedDirectoryURL,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+        ) else { return 0 }
+        return items
+            .filter { $0.pathExtension.lowercased() == "m4a" }
+            .reduce(into: Int64(0)) { total, url in
+                total += Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            }
+    }
+
+    /// Remove every enhanced copy. They are derived, so this only costs the time
+    /// to regenerate them on the next listen.
+    static func deleteAllEnhancedAudio() {
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(
+            at: enhancedDirectoryURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+        ) else { return }
+        for url in items where url.pathExtension.lowercased() == "m4a" {
             try? fm.removeItem(at: url)
         }
     }
@@ -90,6 +165,7 @@ enum AudioFileStore {
     /// (used by "Delete All Data").
     static func deleteAllAudio() {
         let fm = FileManager.default
+        deleteAllEnhancedAudio()
         for directory in [recordingsDirectoryURL, documentsURL] {
             guard let items = try? fm.contentsOfDirectory(
                 at: directory,
