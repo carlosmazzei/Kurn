@@ -219,6 +219,10 @@ private final class WhisperContext: @unchecked Sendable {
         params.no_context = true
         params.single_segment = false
         params.suppress_blank = true
+        // Per-token bounds, which `words(inSegment:)` aggregates into words. The
+        // segment bounds alone put a whole sentence on one speaker, so a handover
+        // mid-sentence could only ever be estimated.
+        params.token_timestamps = true
         // whisper.cpp runs its own temperature fallback against these, retrying a
         // window that decoded badly before giving up on it. They already default
         // to these values; setting them from the filter's constants keeps the
@@ -303,7 +307,8 @@ private final class WhisperContext: @unchecked Sendable {
                         end: max(start, end),
                         confidence: nil
                     ),
-                    quality: quality(ofSegment: index)
+                    quality: quality(ofSegment: index),
+                    words: words(inSegment: index)
                 )
             )
         }
@@ -318,16 +323,15 @@ private final class WhisperContext: @unchecked Sendable {
     private func quality(ofSegment index: Int32) -> SpanQuality {
         let noSpeech = Double(whisper_full_get_segment_no_speech_prob(context, index))
 
-        // Whisper's `avg_logprob` is the mean over *text* tokens. Timestamp
-        // tokens (id >= `whisper_token_beg`) are near-certain by construction and
-        // would flatter the average towards zero if they were counted.
-        let firstTimestampToken = whisper_token_beg(context)
+        // Whisper's `avg_logprob` is the mean over *text* tokens. Everything from
+        // `whisper_token_eot` upwards is a control or timestamp token — near
+        // certain by construction, and counting them would flatter the average
+        // towards zero on every segment equally.
         var total = 0.0
         var count = 0
-        for token in 0..<whisper_full_n_tokens(context, index) {
-            guard whisper_full_get_token_id(context, index, token) < firstTimestampToken else { continue }
+        forEachTextToken(inSegment: index) { token, _ in
             let probability = Double(whisper_full_get_token_p(context, index, token))
-            guard probability.isFinite else { continue }
+            guard probability.isFinite else { return }
             total += log(max(probability, 1e-10))
             count += 1
         }
@@ -337,6 +341,51 @@ private final class WhisperContext: @unchecked Sendable {
             noSpeechProb: noSpeech.isFinite ? noSpeech : nil,
             compressionRatio: nil
         )
+    }
+
+    /// Word timings for one segment, aggregated from the model's sub-word tokens.
+    ///
+    /// Whisper emits SentencePiece pieces, not words: "orçamento" can arrive as
+    /// "or", "ça", "mento". A piece that begins with a space opens a new word and
+    /// every piece after it extends that word, which is the same rule the
+    /// tokenizer used to produce them. Sub-word timings are what
+    /// `TranscriptFusion` needs to place a speaker handover *inside* a sentence
+    /// rather than estimating where it fell.
+    private func words(inSegment index: Int32) -> [TimedWord] {
+        var words: [TimedWord] = []
+        forEachTextToken(inSegment: index) { token, _ in
+            guard let raw = whisper_full_get_token_text(context, index, token) else { return }
+            let piece = String(cString: raw)
+            let text = piece.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return }
+
+            // Token bounds are centiseconds from the start of this chunk, the
+            // same origin the segment bounds use, so the chunk runner's offset
+            // correction applies to both without further work.
+            let data = whisper_full_get_token_data(context, index, token)
+            let start = Double(data.t0) / 100
+            let end = Double(data.t1) / 100
+            guard start.isFinite, end.isFinite else { return }
+
+            if piece.first?.isWhitespace == true || words.isEmpty {
+                words.append(TimedWord(text: text, start: start, end: max(start, end)))
+            } else {
+                words[words.count - 1].text += text
+                words[words.count - 1].end = max(words[words.count - 1].end, end)
+            }
+        }
+        return words
+    }
+
+    /// Visit the tokens of a segment that carry text, skipping control and
+    /// timestamp tokens.
+    private func forEachTextToken(inSegment index: Int32, _ body: (Int32, whisper_token) -> Void) {
+        let firstSpecialToken = whisper_token_eot(context)
+        for token in 0..<whisper_full_n_tokens(context, index) {
+            let id = whisper_full_get_token_id(context, index, token)
+            guard id < firstSpecialToken else { continue }
+            body(token, id)
+        }
     }
 
     private func detectedLanguage() -> String {

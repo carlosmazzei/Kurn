@@ -73,6 +73,13 @@ enum TranscriptQualityFilter {
     struct ScoredSpan: Sendable {
         var span: TranscribedSpan
         var quality: SpanQuality
+        /// Word timings *inside* this segment, when the engine reports them.
+        ///
+        /// They ride along with the segment rather than being filtered in their
+        /// own right because the quality signals are per segment: a hallucinated
+        /// sentence has to be dropped whole, and its words carry no evidence of
+        /// their own. A surviving segment is then emitted one span per word.
+        var words: [TimedWord] = []
     }
 
     // MARK: - Decision
@@ -102,8 +109,14 @@ enum TranscriptQualityFilter {
 
     /// Filter `scored`, keeping the spans that survive and stamping each with the
     /// confidence its quality implies. `engine` only labels the log line.
+    ///
+    /// A survivor carrying word timings comes back as one span per word rather
+    /// than one per segment. That is what lets `TranscriptFusion` attribute a
+    /// handover mid-sentence to the right speaker instead of estimating the split
+    /// from turn durations.
     static func keeping(_ scored: [ScoredSpan], engine: String) -> [TranscribedSpan] {
         var kept: [TranscribedSpan] = []
+        var survivors = 0
         var rejections: [Rejection: Int] = [:]
 
         for item in scored {
@@ -114,9 +127,8 @@ enum TranscriptQualityFilter {
                 )
                 continue
             }
-            var span = item.span
-            span.confidence = item.quality.confidence
-            kept.append(span)
+            survivors += 1
+            kept.append(contentsOf: expand(item))
         }
 
         if !rejections.isEmpty {
@@ -125,10 +137,37 @@ enum TranscriptQualityFilter {
                 .map { "\($0.key.rawValue)=\($0.value)" }
                 .joined(separator: " ")
             AppLog.transcription.atNotice.notice(
-                "\(engine, privacy: .public): discarded \(scored.count - kept.count, privacy: .public)/\(scored.count, privacy: .public) low-quality span(s) [\(summary, privacy: .public)]"
+                "\(engine, privacy: .public): discarded \(scored.count - survivors, privacy: .public)/\(scored.count, privacy: .public) low-quality span(s) [\(summary, privacy: .public)]"
             )
         }
         return kept
+    }
+
+    /// One surviving segment as the spans it should contribute: its words when
+    /// the engine timed them, otherwise the segment itself. Either way the
+    /// segment's confidence is what gets stamped — a per-word confidence is not
+    /// something any of these engines reports.
+    private static func expand(_ item: ScoredSpan) -> [TranscribedSpan] {
+        let confidence = item.quality.confidence
+        // Empty `fallbackText` on purpose: the builder's own fallback is a span
+        // over `0...duration`, which for a segment starting at 14:32 would be
+        // wrong in a way nothing downstream could detect. When it finds no usable
+        // word, the segment span below is the correct answer.
+        let words = TimedWordSpanBuilder.spans(
+            from: item.words,
+            fallbackText: "",
+            duration: item.span.end
+        )
+        guard !words.isEmpty else {
+            var span = item.span
+            span.confidence = confidence
+            return [span]
+        }
+        return words.map {
+            var span = $0
+            span.confidence = confidence
+            return span
+        }
     }
 
     // MARK: - Repetition

@@ -52,6 +52,42 @@ struct OpenAIProvider: LLMProvider {
         let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "audio/transcriptions")
             ?? URL(string: "https://api.openai.com/v1/audio/transcriptions")!
         AppLog.transcription.atInfo.info("OpenAIProvider: transcribing \(audioData.count, privacy: .public) bytes via \(provider.displayName, privacy: .public) at \(url.absoluteString, privacy: .public), model=\(transcriptionModel, privacy: .public)")
+
+        do {
+            let data = try await send(
+                audioData: audioData,
+                fileName: fileName,
+                language: language,
+                url: url,
+                wordTimestamps: true
+            )
+            return try Self.transcript(from: data, provider: provider)
+        } catch let AppError.apiError(status, _) where status == 400 || status == 422 {
+            // `timestamp_granularities[]` is an OpenAI extension, and an
+            // OpenAI-*compatible* endpoint is under no obligation to know it.
+            // Rejecting the parameter must cost word timings, not the
+            // transcription — so drop it and ask once more. Only the two codes a
+            // vendor uses for "I don't know that parameter" retry: a 401 is a bad
+            // key and retrying it is just a second failure.
+            AppLog.transcription.atNotice.notice("OpenAIProvider: \(provider.displayName, privacy: .public) rejected word timestamps (HTTP \(status, privacy: .public)); retrying without them")
+            let data = try await send(
+                audioData: audioData,
+                fileName: fileName,
+                language: language,
+                url: url,
+                wordTimestamps: false
+            )
+            return try Self.transcript(from: data, provider: provider)
+        }
+    }
+
+    private func send(
+        audioData: Data,
+        fileName: String,
+        language: MeetingLanguage,
+        url: URL,
+        wordTimestamps: Bool
+    ) async throws -> Data {
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -73,6 +109,14 @@ struct OpenAIProvider: LLMProvider {
         if let code = language.whisperCode {
             fields.append(("language", code))
         }
+        if wordTimestamps {
+            // A repeated field name is how a multipart array is expressed.
+            // `segment` has to be asked for explicitly: naming any granularity
+            // replaces the default rather than adding to it, and the segment
+            // objects are where the quality signals live.
+            fields.append(("timestamp_granularities[]", "segment"))
+            fields.append(("timestamp_granularities[]", "word"))
+        }
 
         let body = multipartBody(
             boundary: boundary,
@@ -85,21 +129,21 @@ struct OpenAIProvider: LLMProvider {
             )
         )
 
-        let data: Data
         do {
             if usesBackgroundUploads {
-                let result = try await WhisperBackgroundUploader.shared.sendValidated(request, body: body)
-                data = result.0
-            } else {
-                request.httpBody = body
-                let result = try await LLMHTTP.sendValidated(request, session: session)
-                data = result.0
+                return try await WhisperBackgroundUploader.shared.sendValidated(request, body: body).0
             }
+            request.httpBody = body
+            return try await LLMHTTP.sendValidated(request, session: session).0
         } catch {
             AppLog.transcription.atError.error("OpenAIProvider: transcription request failed for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw error
         }
+    }
 
+    /// Decode one `verbose_json` body into spans. `static` so it is reachable
+    /// from tests with a captured response and no network.
+    static func transcript(from data: Data, provider: AIProvider) throws -> RawTranscript {
         do {
             let decoded = try JSONDecoder().decode(WhisperVerboseResponse.self, from: data)
             let spans: [TranscribedSpan]
@@ -107,20 +151,27 @@ struct OpenAIProvider: LLMProvider {
                 // `verbose_json` carries the decoder's own confidence signals per
                 // segment; they are the only way to tell an invented sentence
                 // from a real one, since both read as fluent prose.
+                //
+                // Words arrive in a flat top-level array, not inside the segments,
+                // so they are grouped back under the segment they fall in. Going
+                // straight from the flat array to spans would be simpler and would
+                // quietly bypass the filter — the words of a hallucinated segment
+                // are exactly as invented as the segment.
                 spans = TranscriptQualityFilter.keeping(
-                    segments.map {
+                    segments.map { segment in
                         TranscriptQualityFilter.ScoredSpan(
                             span: TranscribedSpan(
-                                text: $0.text.trimmingCharacters(in: .whitespaces),
-                                start: $0.start,
-                                end: $0.end,
+                                text: segment.text.trimmingCharacters(in: .whitespaces),
+                                start: segment.start,
+                                end: segment.end,
                                 confidence: nil
                             ),
                             quality: SpanQuality(
-                                averageLogProb: $0.avgLogprob,
-                                noSpeechProb: $0.noSpeechProb,
-                                compressionRatio: $0.compressionRatio
-                            )
+                                averageLogProb: segment.avgLogprob,
+                                noSpeechProb: segment.noSpeechProb,
+                                compressionRatio: segment.compressionRatio
+                            ),
+                            words: words(decoded.words, within: segment)
                         )
                     },
                     engine: "whisperAPI"
@@ -134,6 +185,21 @@ struct OpenAIProvider: LLMProvider {
         } catch {
             AppLog.transcription.atError.error("OpenAIProvider: failed to decode transcription response from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw AppError.decodingError(error.localizedDescription)
+        }
+    }
+
+    /// The words belonging to one segment, matched by midpoint so a word
+    /// straddling the boundary lands on one side rather than both.
+    private static func words(
+        _ words: [WhisperVerboseResponse.Word]?,
+        within segment: WhisperVerboseResponse.Segment
+    ) -> [TimedWord] {
+        guard let words, !words.isEmpty else { return [] }
+        return words.compactMap { word in
+            guard word.start.isFinite, word.end.isFinite, word.end >= word.start else { return nil }
+            let midpoint = (word.start + word.end) / 2
+            guard midpoint >= segment.start, midpoint <= segment.end else { return nil }
+            return TimedWord(text: word.word, start: word.start, end: word.end)
         }
     }
 
@@ -259,7 +325,13 @@ private struct MultipartFile {
     let mimeType: String
 }
 
-private struct WhisperVerboseResponse: Decodable {
+struct WhisperVerboseResponse: Decodable {
+    struct Word: Decodable {
+        let word: String
+        let start: TimeInterval
+        let end: TimeInterval
+    }
+
     struct Segment: Decodable {
         let start: TimeInterval
         let end: TimeInterval
@@ -282,6 +354,9 @@ private struct WhisperVerboseResponse: Decodable {
     let text: String
     let language: String?
     let segments: [Segment]?
+    /// Flat, whole-response list — the API does not nest words inside their
+    /// segment. Absent unless `timestamp_granularities[]=word` was accepted.
+    let words: [Word]?
 }
 
 private extension Data {

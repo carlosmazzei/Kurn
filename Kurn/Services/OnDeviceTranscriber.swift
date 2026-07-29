@@ -89,11 +89,12 @@ actor OnDeviceTranscriber: Transcribing {
                 let rangeDuration = CMTimeGetSeconds(result.range.duration)
                 guard start.isFinite, rangeDuration.isFinite else { continue }
                 spans.append(
-                    TranscribedSpan(
+                    contentsOf: Self.spans(
+                        words: Self.timedWords(in: result.text),
                         text: text,
-                        start: max(0, start),
-                        end: max(0, start + rangeDuration),
-                        confidence: nil
+                        resultStart: max(0, start),
+                        resultEnd: max(0, start + rangeDuration),
+                        duration: duration
                     )
                 )
                 if duration > 0 {
@@ -130,5 +131,61 @@ actor OnDeviceTranscriber: Transcribing {
             )
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
+    }
+
+    // MARK: - Word timings
+
+    /// One recognizer result as the spans it should contribute.
+    ///
+    /// Pure and `static` so the decision — *when* word timings are trustworthy —
+    /// can be tested without the Speech framework, a locale asset or a device.
+    ///
+    /// The timeline check is the point of it. `audioTimeRange` is documented on
+    /// the same timeline as `result.range`, and if a future SDK ever reported it
+    /// relative to the result instead, every word would land near zero: the
+    /// transcript would still read correctly, the timestamps would be silently
+    /// wrong, and speaker attribution would collapse onto whoever spoke first.
+    /// Rather than trust it, check that the words land where the result says they
+    /// should, and fall back to the result-level span when they don't.
+    static func spans(
+        words: [TimedWord],
+        text: String,
+        resultStart: TimeInterval,
+        resultEnd: TimeInterval,
+        duration: TimeInterval
+    ) -> [TranscribedSpan] {
+        let wholeResult = [
+            TranscribedSpan(text: text, start: resultStart, end: resultEnd, confidence: nil)
+        ]
+        guard let first = words.first, let last = words.last else { return wholeResult }
+
+        let tolerance: TimeInterval = 1
+        guard first.start >= resultStart - tolerance,
+              last.end <= resultEnd + tolerance else {
+            AppLog.transcription.atError.error(
+                "speechAnalyzer: word timings \(first.start, privacy: .public)…\(last.end, privacy: .public) fall outside result \(resultStart, privacy: .public)…\(resultEnd, privacy: .public); using the result span"
+            )
+            return wholeResult
+        }
+
+        let built = TimedWordSpanBuilder.spans(from: words, fallbackText: "", duration: duration)
+        return built.isEmpty ? wholeResult : built
+    }
+
+    /// Pull the per-run `audioTimeRange` the `.timeIndexedProgressiveTranscription`
+    /// preset attaches. Runs without one are skipped rather than guessed at.
+    private static func timedWords(in text: AttributedString) -> [TimedWord] {
+        var words: [TimedWord] = []
+        for run in text.runs {
+            guard let range = run.audioTimeRange else { continue }
+            let piece = String(text[run.range].characters)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !piece.isEmpty else { continue }
+            let start = CMTimeGetSeconds(range.start)
+            let end = CMTimeGetSeconds(range.end)
+            guard start.isFinite, end.isFinite, end > start else { continue }
+            words.append(TimedWord(text: piece, start: max(0, start), end: max(0, end)))
+        }
+        return words
     }
 }
