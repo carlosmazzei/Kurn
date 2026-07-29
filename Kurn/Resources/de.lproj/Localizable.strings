@@ -351,6 +351,8 @@
 "detail.playback_speed" = "Wiedergabegeschwindigkeit";
 "detail.skip_backward" = "15 Sekunden zurück";
 "detail.skip_forward" = "15 Sekunden vor";
+"detail.download_diarization_models" = "Sprechermodelle laden";
+"warning.diarization_models_not_downloaded" = "Die Sprechertrennung nutzt die einfache Engine. Lade die neuronalen Modelle für genauere Sprecher.";
 "detail.add_segment" = "Abschnitt hinzufügen";
 "detail.retranscribe" = "Neu transkribieren";
 "detail.retranscribe.confirm.title" = "Diese Aufnahme neu transkribieren?";

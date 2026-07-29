@@ -351,6 +351,8 @@
 "detail.playback_speed" = "Playback speed";
 "detail.skip_backward" = "Skip back 15 seconds";
 "detail.skip_forward" = "Skip forward 15 seconds";
+"detail.download_diarization_models" = "Download speaker models";
+"warning.diarization_models_not_downloaded" = "Speaker separation is using the basic engine. Download the neural models for more accurate speakers.";
 "detail.add_segment" = "Add segment";
 "detail.retranscribe" = "Re-transcribe";
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";

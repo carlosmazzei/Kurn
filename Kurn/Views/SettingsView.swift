@@ -21,10 +21,11 @@ struct SettingsView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
 
-    /// Owns the FluidAudio download state shared by the Transcription, Recording
-    /// and Storage screens — it has to outlive any one of them, so it's created
-    /// here and injected into the environment.
-    @State private var downloads = ModelDownloadController()
+    /// The FluidAudio download state shared by the Transcription, Recording and
+    /// Storage screens. Owned by `KurnApp` rather than here: the diarization
+    /// models are also offered from a meeting's transcript, and a second
+    /// controller would track a download this one knows nothing about.
+    @Environment(ModelDownloadController.self) private var downloads
 
     /// Bumped after editing an API key so provider-dependent rows re-read
     /// Keychain status. Passed down rather than re-derived so one counter drives

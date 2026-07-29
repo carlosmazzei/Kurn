@@ -351,6 +351,8 @@
 "detail.playback_speed" = "Vitesse de lecture";
 "detail.skip_backward" = "Reculer de 15 secondes";
 "detail.skip_forward" = "Avancer de 15 secondes";
+"detail.download_diarization_models" = "Télécharger les modèles";
+"warning.diarization_models_not_downloaded" = "La séparation des locuteurs utilise le moteur de base. Téléchargez les modèles neuronaux pour des locuteurs plus précis.";
 "detail.add_segment" = "Ajouter un segment";
 "detail.retranscribe" = "Retranscrire";
 "detail.retranscribe.confirm.title" = "Retranscrire cet enregistrement ?";
