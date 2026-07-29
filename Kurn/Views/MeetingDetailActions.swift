@@ -48,7 +48,12 @@ extension MeetingDetailView {
             if player.loadedFileName == recording.fileName {
                 player.togglePlayPause()
             } else {
-                try player.load(fileName: recording.fileName, enhanced: shouldUseEnhanced(recording))
+                try player.load(
+                    fileName: recording.fileName,
+                    title: meeting.title,
+                    subtitle: recording.recordedAt.formatted(date: .abbreviated, time: .shortened),
+                    enhanced: shouldUseEnhanced(recording)
+                )
                 player.play()
             }
         } catch let error as AppError {
@@ -97,7 +102,12 @@ extension MeetingDetailView {
     func seek(_ recording: Recording, to time: TimeInterval) {
         do {
             if player.loadedFileName != recording.fileName {
-                try player.load(fileName: recording.fileName, enhanced: shouldUseEnhanced(recording))
+                try player.load(
+                    fileName: recording.fileName,
+                    title: meeting.title,
+                    subtitle: recording.recordedAt.formatted(date: .abbreviated, time: .shortened),
+                    enhanced: shouldUseEnhanced(recording)
+                )
             }
             player.seek(to: time)
             player.play()

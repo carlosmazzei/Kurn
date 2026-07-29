@@ -113,12 +113,6 @@ struct PlaybackTuningTests {
         #expect(tuning.presence.frequency > 2500)
     }
 
-    @Test func mixKeepsSomeOfTheOriginal() {
-        let tuning = PlaybackTuning.listening
-        #expect(tuning.wetMix > 0.5 && tuning.wetMix < 1)
-        #expect(abs(tuning.wetMix + tuning.dryMix - 1) < 1e-6)
-    }
-
     @Test func targetIsThePodcastConvention() {
         #expect(PlaybackTuning.listening.targetLUFS == -16)
         #expect(PlaybackTuning.listening.highPassHz > 60 && PlaybackTuning.listening.highPassHz < 120)

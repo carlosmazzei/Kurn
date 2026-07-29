@@ -62,11 +62,11 @@ struct PlaybackTuning: Equatable, Sendable {
     /// convention, and the app is mono.
     var targetLUFS: Double
 
-    /// Proportion of the denoised signal in the final mix; the remainder is the
-    /// original. A little dry masks the artefacts a denoiser leaves behind and
-    /// puts back some natural room tone, which reads as more comfortable than a
-    /// perfectly scrubbed result.
-    var wetMix: Float
+    // NOTE: the dry/wet mix ratio belongs here too — a denoised signal wants a
+    // little of the original back to mask its artefacts and restore room tone —
+    // but it arrives with the denoiser, not before it. Carrying the number now
+    // would mean a tuning parameter, and a test asserting it, that no rendered
+    // sample is affected by. See `Services/Enhancement/SpeechEnhancer.swift`.
 
     static let listening = PlaybackTuning(
         highPassHz: 80,
@@ -81,9 +81,6 @@ struct PlaybackTuning: Equatable, Sendable {
         limiterPreGainDB: 0,
         limiterAttack: 0.004,
         limiterDecay: 0.060,
-        targetLUFS: -16,
-        wetMix: 0.85
+        targetLUFS: -16
     )
-
-    var dryMix: Float { 1 - wetMix }
 }
