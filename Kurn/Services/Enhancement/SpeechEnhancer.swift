@@ -16,7 +16,14 @@
 //     A DSP-only enhanced copy is already worth listening to.
 //
 //  So `SpeechEnhancer.shared.enhance` returning `nil` is a supported outcome, not
-//  an error path, and the renderer simply skips the mix stage when it happens.
+//  an error path.
+//
+//  Nothing calls this yet, deliberately. `PlaybackEnhancementRenderer` renders
+//  through an `AVAudioEngine` chain, and a frame-by-frame model does not drop
+//  into one — it needs its own decode/enhance/mix pass either side of it. Wiring
+//  that pass, along with the dry/wet ratio it needs (see `PlaybackTuning`),
+//  belongs in the same change as the inference loop, where it can be run against
+//  a real model instead of against a stub that always returns `nil`.
 //
 
 import Foundation

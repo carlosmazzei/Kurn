@@ -667,6 +667,7 @@ private struct RecordingSegmentRow: View {
                     isEnhanced: player.isPlayingEnhanced,
                     isEnhancing: enhancement?.isRendering(recording) == true,
                     onSeek: { player.seek(to: $0) },
+                    onSkip: { player.skip(by: $0) },
                     onCycleRate: { player.cycleRate() },
                     onToggleEnhancement: onToggleEnhancement
                 )
@@ -703,6 +704,7 @@ private struct SegmentPlaybackScrubber: View {
     let isEnhanced: Bool
     let isEnhancing: Bool
     let onSeek: (TimeInterval) -> Void
+    let onSkip: (TimeInterval) -> Void
     let onCycleRate: () -> Void
     let onToggleEnhancement: () -> Void
 
@@ -752,6 +754,26 @@ private struct SegmentPlaybackScrubber: View {
                     .foregroundStyle(Theme.textTertiary)
                 Text("0:00")
                 Spacer(minLength: 8)
+                Button { onSkip(-AudioPlayerService.skipInterval) } label: {
+                    Image(systemName: "gobackward.15")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(minWidth: 34)
+                        .padding(.vertical, 3)
+                        .background(Theme.fill, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("detail.skip_backward", comment: "Skip back 15 seconds"))
+                Button { onSkip(AudioPlayerService.skipInterval) } label: {
+                    Image(systemName: "goforward.15")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(minWidth: 34)
+                        .padding(.vertical, 3)
+                        .background(Theme.fill, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("detail.skip_forward", comment: "Skip forward 15 seconds"))
                 Button(action: onToggleEnhancement) {
                     Group {
                         if isEnhancing {

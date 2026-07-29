@@ -349,6 +349,8 @@
 "detail.recording_n" = "录音 %d";
 "detail.playback_position" = "播放位置";
 "detail.playback_speed" = "播放速度";
+"detail.skip_backward" = "后退 15 秒";
+"detail.skip_forward" = "前进 15 秒";
 "detail.add_segment" = "添加片段";
 "detail.retranscribe" = "重新转录";
 "detail.retranscribe.confirm.title" = "重新转录这段录音？";

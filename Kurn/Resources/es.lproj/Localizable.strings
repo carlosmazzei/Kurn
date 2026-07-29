@@ -349,6 +349,8 @@
 "detail.recording_n" = "Grabación %d";
 "detail.playback_position" = "Posición de reproducción";
 "detail.playback_speed" = "Velocidad de reproducción";
+"detail.skip_backward" = "Retroceder 15 segundos";
+"detail.skip_forward" = "Avanzar 15 segundos";
 "detail.add_segment" = "Añadir segmento";
 "detail.retranscribe" = "Retranscribir";
 "detail.retranscribe.confirm.title" = "¿Retranscribir esta grabación?";

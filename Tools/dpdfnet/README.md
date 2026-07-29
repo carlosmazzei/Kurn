@@ -18,8 +18,10 @@ fp16.
 
 - 16 kHz because that is the rate the model was trained at, and resampling the
   app's 24 kHz recordings to it is cheap. The wet signal is band-limited to
-  8 kHz as a result; the renderer mixes 15% of the original back in, which
-  returns the 8–12 kHz band about 16 dB down.
+  8 kHz as a result, which is why the plan is to mix ~15% of the original back
+  in: it returns the 8–12 kHz band about 16 dB down, and masks the artefacts a
+  denoiser leaves behind. That mix stage does not exist yet — it lands with the
+  inference loop, since neither can be heard without the other.
 - `dpdfnet8` rather than a smaller variant because generation is offline and
   one-time per recording, so the extra compute costs a few seconds once rather
   than anything sustained.

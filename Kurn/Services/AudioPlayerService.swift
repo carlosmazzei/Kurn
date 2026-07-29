@@ -5,6 +5,13 @@
 //  AVAudioPlayer wrapper for transcript-synced playback. Exposes observable
 //  position/duration and supports seeking to a segment timestamp.
 //
+//  Beyond the player itself this owns the two things that make playback behave
+//  like a media app rather than a sound effect: the system transport surfaces
+//  (`NowPlayingController`) and audio-session events. The recorder has handled
+//  interruptions and route changes since it was written; the player did not, so
+//  an incoming call left `isPlaying` true over a stopped `AVAudioPlayer` — the
+//  scrubber frozen, the button showing pause, and nothing resuming afterwards.
+//
 
 import AVFoundation
 import Foundation
@@ -28,8 +35,22 @@ final class AudioPlayerService: NSObject {
     /// Speeds the user can cycle through, mirroring WhatsApp's voice-note control.
     static let rateOptions: [Float] = [1.0, 1.5, 2.0, 0.5]
 
+    /// How far the skip controls move, in both the app and the Lock Screen.
+    static var skipInterval: TimeInterval { NowPlayingController.skipInterval }
+
     private var player: AVAudioPlayer?
     private var timer: Timer?
+    private let nowPlaying = NowPlayingController()
+    private var nowPlayingTitle: String?
+    private var nowPlayingSubtitle: String?
+    /// Whether playback was interrupted mid-play, so `.shouldResume` knows there
+    /// is something to resume.
+    private var wasPlayingBeforeInterruption = false
+
+    override init() {
+        super.init()
+        registerNotifications()
+    }
 
     /// Load a recording, optionally its enhanced listening copy.
     ///
@@ -42,7 +63,16 @@ final class AudioPlayerService: NSObject {
     ///
     /// Reuses the existing player only when both the recording *and* the variant
     /// match; comparing the name alone would silently ignore a variant switch.
-    func load(fileName: String, enhanced: Bool = false) throws {
+    ///
+    /// `title`/`subtitle` are what the Lock Screen, CarPlay and the Watch show.
+    /// They are optional so playback still works if a caller has nothing to say,
+    /// and are remembered across a `reload` into the other variant.
+    func load(
+        fileName: String,
+        title: String? = nil,
+        subtitle: String? = nil,
+        enhanced: Bool = false
+    ) throws {
         if loadedFileName == fileName, isPlayingEnhanced == enhanced, player != nil { return }
         stop()
 
@@ -55,7 +85,10 @@ final class AudioPlayerService: NSObject {
             ? AudioFileStore.enhancedURL(fileName: fileName)
             : AudioFileStore.resolveURL(fileName: fileName)
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            // `.spokenAudio` is what tells the system this is speech rather than
+            // music: it ducks other audio correctly, and CarPlay and AirPods
+            // apply their speech-tuned behaviour to it.
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
             try AVAudioSession.sharedInstance().setActive(true)
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = self
@@ -67,6 +100,10 @@ final class AudioPlayerService: NSObject {
             self.currentTime = 0
             self.loadedFileName = fileName
             self.isPlayingEnhanced = enhanced
+            if let title { nowPlayingTitle = title }
+            if let subtitle { nowPlayingSubtitle = subtitle }
+            nowPlaying.activate(handlers: makeHandlers())
+            publishNowPlaying()
         } catch {
             throw AppError.audioError(error.localizedDescription)
         }
@@ -78,12 +115,14 @@ final class AudioPlayerService: NSObject {
         player.rate = playbackRate
         isPlaying = true
         startTimer()
+        publishNowPlaying()
     }
 
     /// Set the playback speed, applying it live if a player is loaded.
     func setRate(_ rate: Float) {
         playbackRate = rate
         player?.rate = rate
+        publishNowPlaying()
     }
 
     /// Advance to the next speed in `rateOptions`, wrapping around. Used by the
@@ -98,6 +137,7 @@ final class AudioPlayerService: NSObject {
         player?.pause()
         isPlaying = false
         stopTimer()
+        publishNowPlaying()
     }
 
     func togglePlayPause() {
@@ -113,6 +153,13 @@ final class AudioPlayerService: NSObject {
         guard let player else { return }
         player.currentTime = max(0, min(time, player.duration))
         currentTime = player.currentTime
+        publishNowPlaying()
+    }
+
+    /// Jump by `interval` seconds, clamped to the file. Negative goes back.
+    func skip(by interval: TimeInterval) {
+        guard player != nil else { return }
+        seek(to: currentTime + interval)
     }
 
     /// Switch between the original and the enhanced copy without losing the
@@ -122,7 +169,9 @@ final class AudioPlayerService: NSObject {
         guard let fileName = loadedFileName, isPlayingEnhanced != enhanced else { return }
         let position = currentTime
         let wasPlaying = isPlaying
-        try load(fileName: fileName, enhanced: enhanced)
+        let title = nowPlayingTitle
+        let subtitle = nowPlayingSubtitle
+        try load(fileName: fileName, title: title, subtitle: subtitle, enhanced: enhanced)
         seek(to: position)
         if wasPlaying { play() }
     }
@@ -135,8 +184,107 @@ final class AudioPlayerService: NSObject {
         duration = 0
         loadedFileName = nil
         isPlayingEnhanced = false
+        nowPlayingTitle = nil
+        nowPlayingSubtitle = nil
+        wasPlayingBeforeInterruption = false
         stopTimer()
+        nowPlaying.deactivate()
+        // Hand the route back so whatever was playing before (music, a podcast)
+        // can resume. Leaving the session active holds it for the whole app
+        // lifetime, since nothing else deactivates it.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
+
+    // MARK: - System transport
+
+    private func makeHandlers() -> NowPlayingController.Handlers {
+        NowPlayingController.Handlers(
+            play: { [weak self] in self?.play() },
+            pause: { [weak self] in self?.pause() },
+            toggle: { [weak self] in self?.togglePlayPause() },
+            skip: { [weak self] interval in self?.skip(by: interval) },
+            seek: { [weak self] position in self?.seek(to: position) }
+        )
+    }
+
+    /// Push the state the system renders. Deliberately *not* called from the
+    /// 0.1 s tick — Now Playing extrapolates the position from the rate, so the
+    /// only moments that need publishing are the ones where that extrapolation
+    /// would go wrong.
+    private func publishNowPlaying() {
+        nowPlaying.update(
+            title: nowPlayingTitle,
+            subtitle: nowPlayingSubtitle,
+            duration: duration,
+            position: currentTime,
+            rate: isPlaying ? playbackRate : 0
+        )
+    }
+
+    // MARK: - Session events
+
+    private func registerNotifications() {
+        let center = NotificationCenter.default
+        center.addObserver(
+            self,
+            selector: #selector(handleInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        center.addObserver(
+            self,
+            selector: #selector(handleRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private nonisolated func handleInterruption(_ note: Notification) {
+        guard let info = note.userInfo,
+              let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+
+        switch type {
+        case .began:
+            // The system has already stopped the player. Without this the app's
+            // own state stays "playing" over silence.
+            Task { @MainActor in
+                self.wasPlayingBeforeInterruption = self.isPlaying
+                if self.isPlaying { self.pause() }
+            }
+        case .ended:
+            let shouldResume: Bool
+            if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt {
+                shouldResume = AVAudioSession.InterruptionOptions(rawValue: optRaw).contains(.shouldResume)
+            } else {
+                shouldResume = false
+            }
+            Task { @MainActor in
+                if self.wasPlayingBeforeInterruption, shouldResume, self.player != nil {
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                    self.play()
+                }
+                self.wasPlayingBeforeInterruption = false
+            }
+        @unknown default:
+            break
+        }
+    }
+
+    @objc private nonisolated func handleRouteChange(_ note: Notification) {
+        guard let info = note.userInfo,
+              let raw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
+        // Unplugging headphones or losing a Bluetooth device must not dump a
+        // meeting out of the speaker. This is the one route change that has to
+        // pause; the rest (a new device arriving, a category change) do not.
+        guard reason == .oldDeviceUnavailable else { return }
+        Task { @MainActor in
+            if self.isPlaying { self.pause() }
+        }
+    }
+
+    // MARK: - Timer
 
     private func startTimer() {
         stopTimer()
@@ -165,6 +313,7 @@ extension AudioPlayerService: AVAudioPlayerDelegate {
             self.isPlaying = false
             self.currentTime = 0
             self.stopTimer()
+            self.publishNowPlaying()
         }
     }
 }
