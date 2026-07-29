@@ -398,7 +398,8 @@ enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identifiable 
 
 /// Offline DSP cleanup engine applied before the transcription path.
 enum PreprocessingEngine: String, Codable, Sendable, CaseIterable, Identifiable {
-    /// Speech-tuned filter chain (high-pass, presence EQ, AGC/limiter, mono 16 kHz).
+    /// Speech-tuned filter chain (high-pass, presence EQ, measured makeup gain,
+    /// limiter, mono 16 kHz).
     case standardDSP
     /// No cleanup — feed the original recording straight to the engines.
     case none
