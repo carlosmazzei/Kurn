@@ -48,6 +48,17 @@ struct RecordingSettingsView: View {
                         set: { settings.alwaysUseBuiltInMic = $0 }
                     )
                 )
+
+                // Playback-side, unlike everything else in this section. It lives
+                // here because it is about listening to recordings, and the
+                // per-recording control is the pill in the player.
+                Toggle(
+                    NSLocalizedString("settings.playback_enhancement", comment: "Enhanced playback"),
+                    isOn: Binding(
+                        get: { settings.playbackEnhancementEnabled },
+                        set: { settings.playbackEnhancementEnabled = $0 }
+                    )
+                )
                 Toggle(
                     NSLocalizedString("settings.live_transcription", comment: "Live transcription"),
                     isOn: Binding(
@@ -78,6 +89,7 @@ struct RecordingSettingsView: View {
                     Text(NSLocalizedString("settings.audio_quality_footer", comment: "Explains that every tier preserves speech"))
                     Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
                     Text(NSLocalizedString("settings.always_use_built_in_mic_footer", comment: "Explains forcing the iPhone mic vs. being asked"))
+                    Text(NSLocalizedString("settings.playback_enhancement_footer", comment: "Explains the enhanced playback copy"))
                     Text(NSLocalizedString("settings.require_auth_for_recordings_footer", comment: "Explains authentication and at-rest encryption"))
                     Text(NSLocalizedString("settings.hide_live_activity_meeting_title_footer", comment: "Explains Live Activity title redaction"))
                 }

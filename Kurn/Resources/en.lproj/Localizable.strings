@@ -14,6 +14,7 @@
 "error.recorder_engine" = "The audio engine could not start.";
 "error.audio_cleanup" = "Could not clean up the audio for transcription.";
 "error.audio_compaction" = "Could not compact this recording. It was left unchanged.";
+"error.audio_enhancement" = "Could not create the enhanced audio for this recording.";
 "error.recognizer_unavailable" = "Speech recognition is not available for this language.";
 "error.recognizer_offline" = "On-device speech recognition is not ready. Try again shortly.";
 "error.export_session" = "Could not prepare the audio for upload.";
@@ -508,6 +509,14 @@
 "settings.diarization_preprocessing" = "Diarization Audio Cleanup";
 "settings.diarization_dereverb" = "Dereverberation (Experimental)";
 "settings.diarization_dereverb_footer" = "Removes room echo from the audio the speaker-separation step reads. Can help when the phone sits on a meeting-room table, but it adds processing time and its benefit has not been measured on your recordings.";
+"detail.playback_enhancement" = "Enhanced audio";
+"common.on" = "On";
+"common.off" = "Off";
+"detail.enhancing_audio" = "Enhancing audio…";
+"settings.playback_enhancement" = "Enhanced Playback";
+"settings.playback_enhancement_footer" = "Adds an equalizer, level control and consistent loudness to make quieter speakers easier to hear. It creates a second audio file the first time you use it on a recording; the original recording and the transcript are never changed.";
+"settings.storage.enhanced_audio" = "Enhanced audio";
+"settings.storage.enhanced_audio_delete" = "Delete Enhanced Audio";
 "settings.on_device_auto_language" = "Detect Language On-Device (Auto)";
 "settings.live_transcription" = "Live Transcription Preview";
 "settings.model_download.title" = "One-Time Model Download";

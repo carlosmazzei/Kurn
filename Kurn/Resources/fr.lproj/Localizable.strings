@@ -14,6 +14,7 @@
 "error.recorder_engine" = "Impossible de démarrer le moteur audio.";
 "error.audio_cleanup" = "Impossible de nettoyer l'audio pour la transcription.";
 "error.audio_compaction" = "Impossible de compacter cet enregistrement. Il est resté inchangé.";
+"error.audio_enhancement" = "Impossible de créer l'audio amélioré de cet enregistrement.";
 "error.recognizer_unavailable" = "La reconnaissance vocale n'est pas disponible pour cette langue.";
 "error.recognizer_offline" = "La reconnaissance vocale sur l'appareil n'est pas prête. Réessayez dans un instant.";
 "error.export_session" = "Impossible de préparer l'audio pour l'envoi.";
@@ -508,6 +509,14 @@
 "settings.diarization_preprocessing" = "Nettoyage audio pour la diarisation";
 "settings.diarization_dereverb" = "Déréverbération (expérimental)";
 "settings.diarization_dereverb_footer" = "Supprime l'écho de la pièce dans l'audio analysé par la séparation des intervenants. Utile quand le téléphone est posé sur la table de réunion, mais cela ajoute du temps de traitement et le gain n'a pas été mesuré sur vos enregistrements.";
+"detail.playback_enhancement" = "Audio amélioré";
+"common.on" = "Activé";
+"common.off" = "Désactivé";
+"detail.enhancing_audio" = "Amélioration en cours…";
+"settings.playback_enhancement" = "Lecture améliorée";
+"settings.playback_enhancement_footer" = "Applique une égalisation, un contrôle de niveau et un volume homogène pour mieux entendre les personnes qui parlent doucement. Un deuxième fichier audio est créé à la première utilisation sur un enregistrement ; l'enregistrement original et la transcription ne sont jamais modifiés.";
+"settings.storage.enhanced_audio" = "Audio amélioré";
+"settings.storage.enhanced_audio_delete" = "Supprimer l'audio amélioré";
 "settings.on_device_auto_language" = "Détecter la langue sur l'appareil (Auto)";
 "settings.live_transcription" = "Aperçu de transcription en direct";
 "settings.model_download.title" = "Téléchargement unique de modèle";

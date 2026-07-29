@@ -48,9 +48,45 @@ extension MeetingDetailView {
             if player.loadedFileName == recording.fileName {
                 player.togglePlayPause()
             } else {
-                try player.load(fileName: recording.fileName)
+                try player.load(fileName: recording.fileName, enhanced: shouldUseEnhanced(recording))
                 player.play()
             }
+        } catch let error as AppError {
+            txVM?.error = error
+        } catch {
+            txVM?.error = .audioError(error.localizedDescription)
+        }
+    }
+
+    /// Play the enhanced copy only when the user has asked for it *and* a copy
+    /// rendered by the current tuning is actually on disk. Falling back to the
+    /// original silently is the right failure: the recording still plays.
+    func shouldUseEnhanced(_ recording: Recording) -> Bool {
+        settings.playbackEnhancementEnabled && enhancement?.hasEnhancedAudio(recording) == true
+    }
+
+    /// Flip the enhanced/original variant for the recording being played,
+    /// rendering the copy first if this is the first time.
+    ///
+    /// The preference is written too, so the choice sticks for the next recording
+    /// instead of having to be made again for each one.
+    func toggleEnhancement(_ recording: Recording) {
+        guard let enhancement else { return }
+        let wantEnhanced = !player.isPlayingEnhanced
+        settings.playbackEnhancementEnabled = wantEnhanced
+
+        guard wantEnhanced else {
+            applyEnhancement(false)
+            return
+        }
+        enhancement.ensureEnhancedAudio(for: recording) {
+            applyEnhancement(true)
+        }
+    }
+
+    private func applyEnhancement(_ enhanced: Bool) {
+        do {
+            try player.reload(enhanced: enhanced)
         } catch let error as AppError {
             txVM?.error = error
         } catch {
@@ -61,7 +97,7 @@ extension MeetingDetailView {
     func seek(_ recording: Recording, to time: TimeInterval) {
         do {
             if player.loadedFileName != recording.fileName {
-                try player.load(fileName: recording.fileName)
+                try player.load(fileName: recording.fileName, enhanced: shouldUseEnhanced(recording))
             }
             player.seek(to: time)
             player.play()

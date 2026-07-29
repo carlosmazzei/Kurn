@@ -14,6 +14,7 @@
 "error.recorder_engine" = "Não foi possível iniciar o mecanismo de áudio.";
 "error.audio_cleanup" = "Não foi possível limpar o áudio para transcrição.";
 "error.audio_compaction" = "Não foi possível compactar esta gravação. Ela foi mantida como estava.";
+"error.audio_enhancement" = "Não foi possível criar o áudio realçado desta gravação.";
 "error.recognizer_unavailable" = "O reconhecimento de fala não está disponível para este idioma.";
 "error.recognizer_offline" = "O reconhecimento de fala no dispositivo não está pronto. Tente novamente em instantes.";
 "error.export_session" = "Não foi possível preparar o áudio para envio.";
@@ -508,6 +509,14 @@
 "settings.diarization_preprocessing" = "Limpeza de Áudio para Diarização";
 "settings.diarization_dereverb" = "Desreverberação (Experimental)";
 "settings.diarization_dereverb_footer" = "Remove o eco da sala do áudio que a separação de interlocutores analisa. Pode ajudar quando o celular fica sobre a mesa de reunião, mas acrescenta tempo de processamento e o ganho ainda não foi medido nas suas gravações.";
+"detail.playback_enhancement" = "Áudio realçado";
+"common.on" = "Ligado";
+"common.off" = "Desligado";
+"detail.enhancing_audio" = "Realçando áudio…";
+"settings.playback_enhancement" = "Reprodução Realçada";
+"settings.playback_enhancement_footer" = "Aplica equalização, controle de nível e volume consistente para facilitar ouvir quem fala mais baixo. Cria um segundo arquivo de áudio na primeira vez que você usa em uma gravação; a gravação original e a transcrição nunca são alteradas.";
+"settings.storage.enhanced_audio" = "Áudio realçado";
+"settings.storage.enhanced_audio_delete" = "Apagar Áudio Realçado";
 "settings.on_device_auto_language" = "Detectar Idioma no Dispositivo (Auto)";
 "settings.live_transcription" = "Prévia de Transcrição em Tempo Real";
 "settings.model_download.title" = "Download Único de Modelo";

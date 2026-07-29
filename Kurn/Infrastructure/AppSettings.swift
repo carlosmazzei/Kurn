@@ -40,6 +40,7 @@ final class AppSettings {
         static let legacyFluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
         static let diarizationPreprocessingEnabled = "settings.diarizationPreprocessingEnabled"
         static let diarizationDereverbEnabled = "settings.diarizationDereverbEnabled"
+        static let playbackEnhancementEnabled = "settings.playbackEnhancementEnabled"
         static let transcriptionEngine = "settings.transcriptionEngine"
         static let preprocessingEngine = "settings.preprocessingEngine"
         static let vadEngine = "settings.vadEngine"
@@ -214,6 +215,14 @@ final class AppSettings {
     /// processing time on a long recording.
     var diarizationDereverbEnabled: Bool {
         didSet { defaults.set(diarizationDereverbEnabled, forKey: Keys.diarizationDereverbEnabled) }
+    }
+
+    /// When on, playback prefers an enhanced copy of each recording — equalized,
+    /// level-controlled and loudness-normalized — generated on first use. Off by
+    /// default: it changes what the user hears relative to what was recorded, and
+    /// it costs a second audio file per recording.
+    var playbackEnhancementEnabled: Bool {
+        didSet { defaults.set(playbackEnhancementEnabled, forKey: Keys.playbackEnhancementEnabled) }
     }
 
     /// Engine that turns audio into text. Replaces the legacy `defaultMode` +
@@ -513,6 +522,7 @@ final class AppSettings {
         }
         diarizationPreprocessingEnabled = defaults.bool(forKey: Keys.diarizationPreprocessingEnabled, default: true)
         diarizationDereverbEnabled = defaults.bool(forKey: Keys.diarizationDereverbEnabled)
+        playbackEnhancementEnabled = defaults.bool(forKey: Keys.playbackEnhancementEnabled)
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         let batchASRConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)
         fluidAudioBatchASRModelsConsented = batchASRConsented

@@ -19,7 +19,8 @@ enum TempFileCleaner {
         "kurn_vad_",
         "kurn_diar_",
         "kurn_chunk_",
-        "kurn_compact_"
+        "kurn_compact_",
+        "kurn_enh_"
     ]
 
     /// Sweep old temporary files left behind by killed/crashed transcriptions.
