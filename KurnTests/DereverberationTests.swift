@@ -11,7 +11,6 @@
 //  which exists yet. It is why the feature ships behind an off-by-default flag.
 //
 
-import Accelerate
 import Foundation
 import Testing
 @testable import Kurn
@@ -72,36 +71,58 @@ struct DereverberationTests {
 
     // MARK: - Dereverberation
 
-    /// The test that actually measures dereverberation: a broadband burst is
-    /// convolved with a synthetic room impulse response, and the energy left
-    /// ringing *after* the burst ends must drop.
+    /// The test that measures dereverberation: a burst is fed through a room
+    /// model, and the energy left ringing *after* the burst ends must drop.
     ///
-    /// The excitation is noise rather than a tone on purpose. WPE assumes the
-    /// source is unpredictable from its own past while the reverberant tail is
-    /// not — a sustained sinusoid violates that (it is perfectly predictable),
-    /// and WPE would suppress the signal itself, so a tone would test the
-    /// opposite of what is intended.
+    /// The room is a recursive echo — `x[n] = s[n] + a·x[n−D]` — rather than a
+    /// convolution with a diffuse random tail, and that choice is the whole
+    /// point. It is exactly the model WPE claims to invert: in each subband the
+    /// observation satisfies `X(t) = S(t) + a'·X(t−2)`, so a correct
+    /// implementation should recover `a'` and cancel the tail. Testing against
+    /// the algorithm's own model is what makes a *strong* assertion meaningful
+    /// here.
+    ///
+    /// A diffuse white-noise tail, which looks more like a real room, is the
+    /// wrong probe for a unit test: for a random impulse response
+    /// `E[x(t)·x(t−Δ)*] = Σ h(τ)h(τ−Δ)* ≈ 0`, so there is no linear
+    /// predictability for *any* correct WPE to exploit. Real rooms are tractable
+    /// because real speech is strongly correlated within each subband, which
+    /// synthetic noise is not. So this test proves the implementation solves its
+    /// model; it does not predict how much the feature helps on real meetings —
+    /// that needs a DER harness and labelled recordings.
+    ///
+    /// The excitation stays noise so the *source* is unpredictable: a sustained
+    /// tone is predictable from its own past and WPE would suppress the signal
+    /// itself, testing the opposite of what is intended.
     @Test func removesTheReverberantTailOfABurst() {
         let sampleRate = 16_000
         let burstSamples = sampleRate
-        let totalSamples = sampleRate * 3
+        let totalSamples = sampleRate * 5 / 2
 
         var clean = STFTTests.noise(count: totalSamples, seed: 0x1234_5678_9ABC_DEF0)
         for i in burstSamples..<totalSamples { clean[i] = 0 }
 
-        let reverberant = Self.convolve(clean, with: Self.impulseResponse(sampleRate: sampleRate))
+        // One hop-aligned echo path with feedback: an exponential decay whose
+        // period matches the prediction delay the dereverberator uses.
+        let echoDelay = 512
+        let feedback: Float = 0.6
+        var reverberant = [Float](repeating: 0, count: totalSamples)
+        for n in 0..<totalSamples {
+            reverberant[n] = clean[n] + (n >= echoDelay ? feedback * reverberant[n - echoDelay] : 0)
+        }
+
         let dereverberated = WPEDereverberator().process(
             samples: reverberant,
             stft: STFT(frameSize: 512, hopSize: 256)
         )
 
-        // Well after the burst ends, so only the decaying tail is present.
-        let tail = (burstSamples + sampleRate / 10)..<(burstSamples + sampleRate / 2)
+        // Starts after the burst ends, so only the decaying tail is present.
+        let tail = (burstSamples + sampleRate / 20)..<(burstSamples + sampleRate / 3)
         let before = Self.rms(reverberant, tail)
         let after = Self.rms(dereverberated, tail)
 
         #expect(before > 0)
-        #expect(after < before * 0.7)
+        #expect(after < before * 0.5, "tail RMS \(before) -> \(after) (ratio \(after / before))")
     }
 
     /// The counterweight: an anechoic signal must survive essentially untouched.
@@ -139,37 +160,6 @@ struct DereverberationTests {
     }
 
     // MARK: - Helpers
-
-    /// Direct path plus an exponentially decaying diffuse tail — the shape of a
-    /// small room's response, deterministic so a failure reproduces.
-    private static func impulseResponse(sampleRate: Int, rt60: Float = 0.35) -> [Float] {
-        let count = Int(Float(sampleRate) * rt60)
-        let noise = STFTTests.noise(count: count, seed: 0xFEED_FACE_0000_1111, amplitude: 1.0)
-        // -60 dB over rt60 seconds.
-        let decay = -6.907 / (rt60 * Float(sampleRate))
-        var response = [Float](repeating: 0, count: count)
-        response[0] = 1
-        // The tail starts a few milliseconds in, leaving the direct path clean.
-        let tailStart = sampleRate / 400
-        for i in tailStart..<count {
-            response[i] = noise[i] * exp(decay * Float(i)) * 0.6
-        }
-        return response
-    }
-
-    private static func convolve(_ signal: [Float], with kernel: [Float]) -> [Float] {
-        let padded = [Float](repeating: 0, count: kernel.count - 1) + signal
-        let reversed = [Float](kernel.reversed())
-        var result = [Float](repeating: 0, count: signal.count)
-        vDSP_conv(
-            padded, 1,
-            reversed, 1,
-            &result, 1,
-            vDSP_Length(signal.count),
-            vDSP_Length(kernel.count)
-        )
-        return result
-    }
 
     private static func hermitianPositiveDefinite(size: Int) -> (re: [Float], im: [Float]) {
         // A = M Mᴴ + size·I is Hermitian positive-definite for any M.
