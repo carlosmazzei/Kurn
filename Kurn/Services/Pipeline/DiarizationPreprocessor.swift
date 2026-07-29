@@ -27,7 +27,7 @@ actor DiarizationPreprocessor {
     /// Render the diarization-friendly mono 16 kHz Float32 WAV copy to the
     /// temporary directory and return its URL. Caller owns the file and should
     /// `cleanup` it when done.
-    func process(url: URL) async throws -> URL {
+    func process(url: URL, dereverberate: Bool = false) async throws -> URL {
         try await ResourceGuard.requireTranscriptionHeadroom()
         let started = Date()
         AppLog.transcription.atDebug.debug("diarPreprocess: open \(url.lastPathComponent, privacy: .public)")
@@ -40,6 +40,19 @@ actor DiarizationPreprocessor {
             )
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
+
+        // Dereverberation runs *before* noise reduction on purpose: WPE's linear
+        // prediction model assumes the additive noise is small, and spectral
+        // subtraction ahead of it would distort the very structure it fits.
+        if dereverberate {
+            let dereverbStart = Date()
+            samples = WPEDereverberator().process(
+                samples: samples,
+                stft: STFT(frameSize: Self.fftFrameSize, hopSize: Self.fftHopSize)
+            )
+            AppLog.transcription.atInfo.info("diarPreprocess: dereverb done in \(Date().timeIntervalSince(dereverbStart), privacy: .public)s")
+            try await ResourceGuard.requireTranscriptionHeadroom()
+        }
 
         let denoiseStart = Date()
         samples = denoise(samples)
@@ -296,126 +309,4 @@ actor DiarizationPreprocessor {
     /// broadband noise in place instead of punching holes in the spectrum for
     /// the embedding model to trip over.
     private static let subtractionBeta: Float = 0.10
-}
-
-// MARK: - STFT helper
-
-/// Short-time Fourier transform with analysis-only Hann windowing. Sized for
-/// Hann at hop = N/2, where the overlap-add of windowed frames sums to ~1.0 so
-/// no synthesis window or output normalization is needed. DFT setups are
-/// allocated once and reused across all frames in one `process` call.
-private final class STFT {
-    let frameSize: Int
-    let halfFrame: Int
-    let hopSize: Int
-    private let forwardDFT: vDSP.DiscreteFourierTransform<Float>
-    private let inverseDFT: vDSP.DiscreteFourierTransform<Float>
-    private var window: [Float]
-    private var realIn: [Float]
-    private var imagIn: [Float]
-    private var realOut: [Float]
-    private var imagOut: [Float]
-    private var timeReal: [Float]
-    private var timeImag: [Float]
-
-    init(frameSize: Int, hopSize: Int) {
-        precondition(frameSize.nonzeroBitCount == 1, "frameSize must be a power of two")
-        self.frameSize = frameSize
-        self.halfFrame = frameSize / 2
-        self.hopSize = hopSize
-        guard let forward = try? vDSP.DiscreteFourierTransform(
-            previous: nil,
-            count: frameSize, direction: .forward, transformType: .complexComplex, ofType: Float.self
-        ), let inverse = try? vDSP.DiscreteFourierTransform(
-            previous: nil,
-            count: frameSize, direction: .inverse, transformType: .complexComplex, ofType: Float.self
-        ) else {
-            preconditionFailure("vDSP.DiscreteFourierTransform setup failed for frameSize=\(frameSize)")
-        }
-        self.forwardDFT = forward
-        self.inverseDFT = inverse
-        self.window = [Float](repeating: 0, count: frameSize)
-        vDSP_hann_window(&window, vDSP_Length(frameSize), Int32(vDSP_HANN_DENORM))
-        self.realIn = [Float](repeating: 0, count: frameSize)
-        self.imagIn = [Float](repeating: 0, count: frameSize)
-        self.realOut = [Float](repeating: 0, count: frameSize)
-        self.imagOut = [Float](repeating: 0, count: frameSize)
-        self.timeReal = [Float](repeating: 0, count: frameSize)
-        self.timeImag = [Float](repeating: 0, count: frameSize)
-    }
-
-    /// Magnitudes of bins `[0...halfFrame]` for the Hann-windowed frame at
-    /// `frameStart`. Caller must ensure `frameStart + frameSize <= samples.count`.
-    func magnitudes(samples: [Float], frameStart: Int) -> [Float] {
-        windowedFrame(samples: samples, frameStart: frameStart, into: &realIn)
-        for i in 0..<frameSize { imagIn[i] = 0 }
-        forwardDFT.transform(
-            inputReal: realIn, inputImaginary: imagIn,
-            outputReal: &realOut, outputImaginary: &imagOut
-        )
-        var mags = [Float](repeating: 0, count: halfFrame + 1)
-        for i in 0...halfFrame {
-            mags[i] = sqrt(realOut[i] * realOut[i] + imagOut[i] * imagOut[i])
-        }
-        return mags
-    }
-
-    /// Run the frame through STFT → spectral subtraction → iSTFT, returning
-    /// the resulting `frameSize` time-domain samples. Caller overlap-adds these
-    /// into the output buffer at `frameStart`.
-    func processFrame(
-        samples: [Float],
-        frameStart: Int,
-        noiseFloor: [Float],
-        alpha: Float,
-        beta: Float
-    ) -> [Float] {
-        windowedFrame(samples: samples, frameStart: frameStart, into: &realIn)
-        for i in 0..<frameSize { imagIn[i] = 0 }
-        forwardDFT.transform(
-            inputReal: realIn, inputImaginary: imagIn,
-            outputReal: &realOut, outputImaginary: &imagOut
-        )
-
-        for i in 0...halfFrame {
-            let mag = sqrt(realOut[i] * realOut[i] + imagOut[i] * imagOut[i])
-            let phase = atan2f(imagOut[i], realOut[i])
-            let subtracted = mag - alpha * noiseFloor[i]
-            let floor = beta * noiseFloor[i]
-            let newMag = max(subtracted, floor)
-            realOut[i] = newMag * cosf(phase)
-            imagOut[i] = newMag * sinf(phase)
-        }
-        // Hermitian-mirror to negative-frequency bins so the inverse DFT yields
-        // a real-valued signal. X[N-k] = conj(X[k]) for k = 1..N/2-1.
-        for bin in (halfFrame + 1)..<frameSize {
-            realOut[bin] = realOut[frameSize - bin]
-            imagOut[bin] = -imagOut[frameSize - bin]
-        }
-        inverseDFT.transform(
-            inputReal: realOut, inputImaginary: imagOut,
-            outputReal: &timeReal, outputImaginary: &timeImag
-        )
-        // vDSP DFT inverse is scaled by `count`; divide to undo.
-        var scale = 1.0 / Float(frameSize)
-        timeReal.withUnsafeMutableBufferPointer { ptr in
-            vDSP_vsmul(ptr.baseAddress!, 1, &scale, ptr.baseAddress!, 1, vDSP_Length(frameSize))
-        }
-        return timeReal
-    }
-
-    private func windowedFrame(samples: [Float], frameStart: Int, into output: inout [Float]) {
-        samples.withUnsafeBufferPointer { ptr in
-            window.withUnsafeBufferPointer { winPtr in
-                output.withUnsafeMutableBufferPointer { outPtr in
-                    vDSP_vmul(
-                        ptr.baseAddress!.advanced(by: frameStart), 1,
-                        winPtr.baseAddress!, 1,
-                        outPtr.baseAddress!, 1,
-                        vDSP_Length(frameSize)
-                    )
-                }
-            }
-        }
-    }
 }

@@ -310,8 +310,17 @@ stage (enums in `Models/Enums.swift`) are:
    long recording can push peak memory past the jetsam limit. Diarization reads
    its own cleaned copy (`DiarizationPreprocessor`, minimal DSP preserving
    natural timbre) rather than the ASR-tuned one, unless
-   `diarizationPreprocessingEnabled` is off. See "Diarization accuracy" below
-   for how the `.fluidAudio` engine's speaker count is controlled and repaired.
+   `diarizationPreprocessingEnabled` is off. `diarizationDereverbEnabled`
+   (off by default) additionally runs WPE dereverberation
+   (`Pipeline/Dereverberation.swift`) *before* that cleanup's noise reduction —
+   WPE's linear-prediction model assumes additive noise is small, so spectral
+   subtraction ahead of it would distort what it fits. WPE is the standard
+   far-field front end in the DIHARD/CHiME evaluations and is **linear**, so
+   unlike a neural denoiser it cannot distort the timbre speaker embeddings
+   read; it is off by default only because its benefit has not been measured on
+   this app's own material, and there is no DER harness yet to measure it with.
+   See "Diarization accuracy" below for how the `.fluidAudio` engine's speaker
+   count is controlled and repaired.
 5. **Fuse** transcript spans with speaker turns into `[TranscriptSegment]`
    via the pure, unit-tested `Pipeline/TranscriptFusion.swift`. A span is
    attributed to the speaker holding the most of its *duration* (not the

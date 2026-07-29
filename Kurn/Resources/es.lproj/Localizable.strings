@@ -506,6 +506,8 @@
 "settings.diarization_speaker_count_auto" = "Automático";
 "settings.diarization_speaker_count_footer" = "Indícalo cuando sepas cuántas personas participaron en la reunión. En automático decide el motor, y Kurn vuelve a agrupar el audio por su cuenta si el motor unió a todos en un solo hablante.";
 "settings.diarization_preprocessing" = "Limpieza de Audio para Diarización";
+"settings.diarization_dereverb" = "Desreverberación (Experimental)";
+"settings.diarization_dereverb_footer" = "Elimina el eco de la sala del audio que analiza la separación de hablantes. Puede ayudar cuando el teléfono está sobre la mesa de reunión, pero añade tiempo de procesamiento y su beneficio no se ha medido en tus grabaciones.";
 "settings.on_device_auto_language" = "Detectar Idioma en el Dispositivo (Auto)";
 "settings.live_transcription" = "Vista Previa de Transcripción en Vivo";
 "settings.model_download.title" = "Descarga Única de Modelo";

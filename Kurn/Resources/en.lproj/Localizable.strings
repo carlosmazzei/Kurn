@@ -506,6 +506,8 @@
 "settings.diarization_speaker_count_auto" = "Auto";
 "settings.diarization_speaker_count_footer" = "Set this when you know how many people are in the meeting. On Auto the engine decides, and Kurn re-clusters the audio itself if the engine merged everyone into one speaker.";
 "settings.diarization_preprocessing" = "Diarization Audio Cleanup";
+"settings.diarization_dereverb" = "Dereverberation (Experimental)";
+"settings.diarization_dereverb_footer" = "Removes room echo from the audio the speaker-separation step reads. Can help when the phone sits on a meeting-room table, but it adds processing time and its benefit has not been measured on your recordings.";
 "settings.on_device_auto_language" = "Detect Language On-Device (Auto)";
 "settings.live_transcription" = "Live Transcription Preview";
 "settings.model_download.title" = "One-Time Model Download";
