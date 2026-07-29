@@ -57,13 +57,14 @@ actor WhisperCppTranscriber: Transcribing {
         url: URL,
         language: MeetingLanguage,
         model: WhisperCppModel,
+        cutPoints: [TimeInterval] = [],
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         let context = try loadedContext(for: model)
 
-        let chunks = try await chunker.chunkByDuration(url: url)
+        let chunks = try await chunker.chunkByDuration(url: url, cutPoints: cutPoints)
         let total = chunks.count
         AppLog.transcription.atInfo.info(
             "whisperCpp: \(total, privacy: .public) chunk(s) with \(model.fileName, privacy: .public)"
@@ -443,6 +444,7 @@ actor WhisperCppTranscriber: Transcribing {
         url: URL,
         language: MeetingLanguage,
         model: WhisperCppModel,
+        cutPoints: [TimeInterval] = [],
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }

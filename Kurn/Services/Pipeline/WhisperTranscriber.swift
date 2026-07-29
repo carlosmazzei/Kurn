@@ -40,13 +40,14 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         provider transcriptionProvider: AIProvider,
         model: String,
+        cutPoints: [TimeInterval] = [],
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider(for: transcriptionProvider, model: model)
         let vendor = transcriptionProvider.displayName
-        let chunks = try await chunker.chunk(url: url)
+        let chunks = try await chunker.chunk(url: url, cutPoints: cutPoints)
         let total = chunks.count
         AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s) via \(vendor, privacy: .public)")
         defer { Task { await chunker.cleanup(chunks) } }

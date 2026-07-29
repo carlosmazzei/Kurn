@@ -318,6 +318,11 @@ struct TranscriptionService {
         }
 
         let compacted = compaction != nil
+        // Where a chunk may be cut, on the timeline the engine will actually
+        // see. Compaction rewrites that timeline, so the original speech regions
+        // do not describe it — the compactor's own map does.
+        let cutPoints = compaction.map { ChunkBoundary.cutPoints(inCompactedTimeline: $0.map) }
+            ?? ChunkBoundary.cutPoints(betweenSpeechRegions: regions)
         // Identity of the engine's swappable back-end, so a checkpoint written
         // by one is never resumed by another: the cloud provider for
         // `.whisperAPI`, the weight file for `.whisperCpp` (resuming a
@@ -359,6 +364,7 @@ struct TranscriptionService {
                 language: language,
                 provider: transcriptionProvider,
                 model: transcriptionModel,
+                cutPoints: cutPoints,
                 resume: resume,
                 onChunkCompleted: checkpointSink,
                 onProgress: { progress, completed, total in
@@ -378,6 +384,7 @@ struct TranscriptionService {
                 url: target,
                 language: language,
                 model: whisperCppModel,
+                cutPoints: cutPoints,
                 resume: resume,
                 onChunkCompleted: checkpointSink,
                 onProgress: { progress, completed, total in
