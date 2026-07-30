@@ -102,25 +102,48 @@ enum AudioFixtures {
         settings: [String: Any],
         to url: URL
     ) throws -> URL {
-        let file = try AVAudioFile(forWriting: url, settings: settings)
-        let format = file.processingFormat
-        for segment in segments {
-            let frameCount = AVAudioFrameCount(sampleRate * segment.seconds)
-            guard frameCount > 0,
-                  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount),
-                  let data = buffer.floatChannelData else {
-                throw AppError.audioError("Could not build tone buffer")
-            }
-            buffer.frameLength = frameCount
-            if segment.hz > 0 {
-                let omega = 2.0 * Double.pi * segment.hz
-                for i in 0..<Int(frameCount) {
-                    data[0][i] = Float(sin(omega * Double(i) / sampleRate)) * amplitude
+        // `AVAudioFile` has no `close()`. An MP4 container's `moov` atom is
+        // written when the *writer deallocates*, so a fixture handed to a test
+        // before that happens is a truncated file with no duration — which is
+        // what `RecordingCompactorTests` kept hitting on CI ("is not readable;
+        // leaving it alone", then `AVErrorFailedDependenciesKey=(Duration)`).
+        // The pool gives the release a known point instead of leaving it to ARC
+        // and the optimizer.
+        try autoreleasepool {
+            let file = try AVAudioFile(forWriting: url, settings: settings)
+            let format = file.processingFormat
+            for segment in segments {
+                let frameCount = AVAudioFrameCount(sampleRate * segment.seconds)
+                guard frameCount > 0,
+                      let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount),
+                      let data = buffer.floatChannelData else {
+                    throw AppError.audioError("Could not build tone buffer")
                 }
-            } else {
-                for i in 0..<Int(frameCount) { data[0][i] = 0 }
+                buffer.frameLength = frameCount
+                if segment.hz > 0 {
+                    let omega = 2.0 * Double.pi * segment.hz
+                    for i in 0..<Int(frameCount) {
+                        data[0][i] = Float(sin(omega * Double(i) / sampleRate)) * amplitude
+                    }
+                } else {
+                    for i in 0..<Int(frameCount) { data[0][i] = 0 }
+                }
+                try file.write(from: buffer)
             }
-            try file.write(from: buffer)
+        }
+
+        // And prove it. Opening is exactly the operation that fails on an
+        // unfinalized container, so a fixture that isn't ready fails here, by
+        // name, instead of surfacing three layers away as a test about
+        // something else entirely.
+        try autoreleasepool {
+            do {
+                _ = try AVAudioFile(forReading: url)
+            } catch {
+                throw AppError.audioError(
+                    "Fixture \(url.lastPathComponent) is not readable after writing: \(error.localizedDescription)"
+                )
+            }
         }
         return url
     }
