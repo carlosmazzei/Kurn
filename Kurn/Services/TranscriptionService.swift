@@ -30,6 +30,11 @@ struct TranscriptionService {
         var language: String
         /// Distinct speaker labels in first-appearance order.
         var speakerLabels: [String]
+        /// Speaker label → voiceprint, when the engine that ran produces them.
+        /// Empty for the heuristic diarizer, which has no embeddings — the
+        /// caller must treat an absent voiceprint as "unknown identity", never
+        /// as "different person".
+        var speakerVoiceprints: [String: [Float]] = [:]
     }
 
     /// Cap on a single fused segment's spoken duration before it's split.
@@ -166,7 +171,7 @@ struct TranscriptionService {
         onPhase(.transcribing(progress: nil))
         let txStart = Date()
         let raw: RawTranscript
-        let turns: [SpeakerTurn]
+        let diarization: DiarizationOutcome
         if config.transcription == .whisperAPI {
             AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
             async let rawTranscript = transcribeGated(
@@ -181,7 +186,7 @@ struct TranscriptionService {
                 onPhase: onPhase,
                 onCheckpoint: onCheckpoint
             )
-            async let speakerTurns = diarize(
+            async let speakerOutcome = diarize(
                 originalURL: fileURL,
                 engine: diarizationEngine,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
@@ -192,8 +197,8 @@ struct TranscriptionService {
             )
             raw = try await rawTranscript
             AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(raw.spans.count, privacy: .public) — waiting for diarization")
-            turns = try await speakerTurns
-            AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(turns.count, privacy: .public)")
+            diarization = try await speakerOutcome
+            AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(diarization.turns.count, privacy: .public)")
         } else {
             AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
             raw = try await transcribeGated(
@@ -208,7 +213,7 @@ struct TranscriptionService {
                 onPhase: onPhase,
                 onCheckpoint: onCheckpoint
             )
-            turns = try await diarize(
+            diarization = try await diarize(
                 originalURL: fileURL,
                 engine: diarizationEngine,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
@@ -219,6 +224,7 @@ struct TranscriptionService {
             )
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
+        let turns = diarization.turns
         // Distinct speakers in the raw diarizer turns, BEFORE fusion. Comparing
         // this against the post-fusion `speakers=` count below isolates whether a
         // collapse happens in the diarizer or in fusion: if `turnSpeakers` is
@@ -240,12 +246,17 @@ struct TranscriptionService {
         for segment in segments where !labels.contains(segment.speakerLabel) {
             labels.append(segment.speakerLabel)
         }
+        // Fusion never invents a label, so a voiceprint for one that did not
+        // survive belongs to a speaker with no text, and is dropped rather than
+        // persisted against nothing.
+        let voiceprints = diarization.voiceprints.filter { labels.contains($0.key) }
 
         AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public) [\(labels.joined(separator: ", "), privacy: .public)]")
         return Output(
             segments: segments,
             language: raw.language.isEmpty ? (resolvedLanguage.localeIdentifier ?? raw.language) : raw.language,
-            speakerLabels: labels
+            speakerLabels: labels,
+            speakerVoiceprints: voiceprints
         )
     }
 
@@ -448,7 +459,7 @@ struct TranscriptionService {
         regions: [SpeechRegion],
         speakerCount: Int,
         onWarning: DiarizationWarningHandler?
-    ) async throws -> [SpeakerTurn] {
+    ) async throws -> DiarizationOutcome {
         let started = Date()
         let originalSize = (try? originalURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let originalDuration = (try? await AVURLAsset(url: originalURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
@@ -486,15 +497,17 @@ struct TranscriptionService {
             let turns = await heuristicDiarizer.diarize(url: diarURL, speechRegions: regions)
             try await ResourceGuard.requireTranscriptionHeadroom()
             AppLog.transcription.atNotice.notice("diarize: complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
-            return turns
+            // No voiceprints: three scalars and one greedy clustering pass leave
+            // nothing behind that could identify a voice again later.
+            return DiarizationOutcome(turns: turns)
         case .fluidAudio:
-            let turns = await fluidAudioDiarizer.diarize(
+            let outcome = await fluidAudioDiarizer.outcome(
                 url: diarURL, speakerCount: speakerCount, onDownloadFailure: onWarning
             )
             try await ResourceGuard.requireTranscriptionHeadroom()
-            let speakers = Set(turns.map { $0.speakerLabel }).count
-            AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public) speakers=\(speakers, privacy: .public)")
-            return turns
+            let speakers = Set(outcome.turns.map { $0.speakerLabel }).count
+            AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(outcome.turns.count, privacy: .public) speakers=\(speakers, privacy: .public) voiceprints=\(outcome.voiceprints.count, privacy: .public)")
+            return outcome
         }
     }
 }

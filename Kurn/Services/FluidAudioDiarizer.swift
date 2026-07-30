@@ -12,6 +12,27 @@
 import AVFoundation
 import Foundation
 
+/// What the neural diarizer produces beyond the turns themselves.
+///
+/// The voiceprints are the reason this type exists. The model computes a speaker
+/// embedding per window and the diarizer used to drop every one of them on the
+/// way out, which left `"Speaker 2"` — a label reassigned in order of first
+/// appearance on every run — as the only identity a `Speaker` row could be keyed
+/// on. Carrying the centroid out is what lets a name the user typed follow the
+/// voice instead of the number.
+///
+/// Empty for the heuristic engine, which has no embeddings to give.
+struct DiarizationOutcome: Sendable {
+    var turns: [SpeakerTurn]
+    /// Speaker label → L2-normalized mean embedding.
+    var voiceprints: [String: [Float]]
+
+    init(turns: [SpeakerTurn], voiceprints: [String: [Float]] = [:]) {
+        self.turns = turns
+        self.voiceprints = voiceprints
+    }
+}
+
 #if canImport(FluidAudio)
 import FluidAudio
 
@@ -58,17 +79,19 @@ actor FluidAudioDiarizer: Diarizing {
     /// implies) is the only bound that trips, and it re-clusters to the
     /// requested count.
     ///
-    /// `exposeChunkEmbeddings` is enabled only when the count is unconstrained,
-    /// because that is the one mode where the collapse rescue can run; the extra
-    /// payload is ~1–2 MB per hour of audio, so there is no reason to carry it
-    /// when it can't be used.
+    /// `exposeChunkEmbeddings` is now on in **both** modes. It used to be gated
+    /// on an unconstrained count, because the collapse rescue was its only
+    /// consumer and that rescue can only run when the count is free. It has a
+    /// second consumer now: the per-speaker voiceprints that keep a user-typed
+    /// name attached to the right person across a re-transcription, which are
+    /// just as necessary when the speaker count is pinned. The payload is ~1–2 MB
+    /// per hour of audio and is transient — it never reaches disk.
     private static func tunedConfig(speakerCount: Int) -> OfflineDiarizerConfig {
         var config = OfflineDiarizerConfig.default
         if speakerCount > 1 {
             config.clustering.numSpeakers = speakerCount
-        } else {
-            config.exposeChunkEmbeddings = true
         }
+        config.exposeChunkEmbeddings = true
         return config
     }
 
@@ -101,6 +124,18 @@ actor FluidAudioDiarizer: Diarizing {
         speakerCount: Int,
         onDownloadFailure: (@Sendable (String) -> Void)?
     ) async -> [SpeakerTurn] {
+        await outcome(url: url, speakerCount: speakerCount, onDownloadFailure: onDownloadFailure).turns
+    }
+
+    /// The full result, including the voiceprints `Diarizing` has no room for.
+    /// `TranscriptionService` calls this actor directly rather than through the
+    /// protocol, so the richer return stays confined to the one engine that can
+    /// produce it.
+    func outcome(
+        url: URL,
+        speakerCount: Int,
+        onDownloadFailure: (@Sendable (String) -> Void)?
+    ) async -> DiarizationOutcome {
         ensureManager(speakerCount: speakerCount)
         if speakerCount > 1 {
             AppLog.transcription.atNotice.notice("FluidAudioDiarizer: speakerCount=\(speakerCount, privacy: .public) (pinned, KMeans re-cluster)")
@@ -114,21 +149,23 @@ actor FluidAudioDiarizer: Diarizing {
             } catch {
                 AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
                 onDownloadFailure?(error.localizedDescription)
-                return [Self.fallbackTurn(for: url)]
+                return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
             }
         }
         let duration = Self.audioDuration(of: url)
         do {
-            let turns = try await Self.withTimeout(seconds: Self.processTimeout(forAudioDuration: duration)) {
+            let outcome = try await Self.withTimeout(seconds: Self.processTimeout(forAudioDuration: duration)) {
                 try await self.processAndMapTurns(url: url)
             }
-            return turns.isEmpty ? [Self.fallbackTurn(for: url)] : turns
+            return outcome.turns.isEmpty
+                ? DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
+                : outcome
         } catch {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
             // which would mislead the user into re-consenting for no reason.
             AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
-            return [Self.fallbackTurn(for: url)]
+            return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
         }
     }
 
@@ -143,18 +180,28 @@ actor FluidAudioDiarizer: Diarizing {
     /// Same isolation reasoning as `prepareModels()`, and also keeps
     /// FluidAudio's own result type from having to satisfy `Sendable` — only
     /// the already-`Sendable` `[SpeakerTurn]` needs to cross the boundary.
-    private func processAndMapTurns(url: URL) async throws -> [SpeakerTurn] {
+    private func processAndMapTurns(url: URL) async throws -> DiarizationOutcome {
         let result = try await manager.process(url)
         let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
         AppLog.transcription.atInfo.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
 
         var turns = Self.turns(from: result.segments)
-        if uniqueIDs <= 1, let windows = Self.embeddingWindows(from: result.chunkEmbeddings) {
+        let windows = Self.embeddingWindows(from: result.chunkEmbeddings)
+        if uniqueIDs <= 1, let windows {
             turns = Self.rescueCollapsedSpeakers(turns: turns, windows: windows)
         }
         let smoothed = SpeakerTurnSmoothing.smooth(turns)
         AppLog.transcription.atInfo.info("FluidAudioDiarizer: smoothed turns \(turns.count, privacy: .public) -> \(smoothed.count, privacy: .public), speakers=\(Set(smoothed.map { $0.speakerLabel }).count, privacy: .public)")
-        return smoothed
+
+        // After smoothing and any rescue, so a voiceprint describes the speaker
+        // as finally reported rather than as first clustered.
+        let voiceprints = windows.map {
+            SpeakerVoiceprints.centroids(turns: smoothed, windows: $0)
+        } ?? [:]
+        if !voiceprints.isEmpty {
+            AppLog.transcription.atInfo.info("FluidAudioDiarizer: voiceprints for \(voiceprints.count, privacy: .public) speaker(s)")
+        }
+        return DiarizationOutcome(turns: smoothed, voiceprints: voiceprints)
     }
 
     /// Re-cluster the per-window speaker embeddings that VBx collapsed and
@@ -244,10 +291,18 @@ actor FluidAudioDiarizer: Diarizing {
         speakerCount: Int,
         onDownloadFailure: (@Sendable (String) -> Void)?
     ) async -> [SpeakerTurn] {
+        await outcome(url: url, speakerCount: speakerCount, onDownloadFailure: onDownloadFailure).turns
+    }
+
+    func outcome(
+        url: URL,
+        speakerCount: Int,
+        onDownloadFailure: (@Sendable (String) -> Void)?
+    ) async -> DiarizationOutcome {
         let message = NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
         AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)
-        return [Self.fallbackTurn(for: url)]
+        return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
     }
 }
 

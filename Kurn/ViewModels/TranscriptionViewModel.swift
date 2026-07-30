@@ -365,7 +365,7 @@ final class TranscriptionViewModel {
         // Clear the AI title so re-transcription regenerates it from the new transcript.
         recording.meeting?.aiTitle = nil
 
-        syncSpeakers(for: recording.meeting)
+        syncSpeakers(for: recording.meeting, voiceprints: output.speakerVoiceprints)
         persist()
     }
 
@@ -485,17 +485,35 @@ final class TranscriptionViewModel {
         }
     }
 
-    /// Reconcile the meeting's `Speaker` rows with the labels actually present
-    /// across all its recordings' current transcripts. Adds rows for new labels
-    /// and removes any whose label no longer appears in *any* transcript — so a
-    /// re-transcription that detects a different (e.g. smaller) set of speakers
-    /// doesn't leave stale chips/rows behind in the UI. Labels that survive keep
-    /// their existing row, preserving the user's renamed `name` and color.
+    /// Reconcile the meeting's `Speaker` rows with the labels present across all
+    /// its recordings' current transcripts, keeping each row attached to the
+    /// person it belongs to rather than to the label it happened to have.
+    ///
+    /// The label is not an identity. The diarizer hands out `"Speaker N"` in
+    /// order of first appearance, freshly on every run, so a re-transcription
+    /// routinely renames the same voice — and this method used to key rows on it
+    /// in the only two ways available, both wrong: deleting a row whose label
+    /// stopped appearing threw away the name the user typed, and keeping a row
+    /// under its old label would hand that name to whoever the diarizer now
+    /// calls Speaker 2.
+    ///
+    /// So the reconciliation is by voice when there is one. `voiceprints` maps
+    /// the *new* labels to the embeddings the neural diarizer produced;
+    /// `SpeakerIdentityMatcher` pairs them against the stored ones, and a
+    /// matched row is **relabelled in place**, keeping its id, name and colour.
+    ///
+    /// Where no voiceprint exists (the heuristic engine, or a transcript from
+    /// before this existed) identity genuinely cannot be recovered, and guessing
+    /// would be the error the matching exists to prevent. There the rule is only
+    /// the conservative half: a row the user has named is never deleted.
     ///
     /// Speakers are meeting-scoped but transcripts are per-recording, so the
     /// "still used" set is the union over every recording: re-transcribing one
     /// recording must not drop speakers another recording still references.
-    private func syncSpeakers(for meeting: Meeting?) {
+    /// Internal rather than private so the behaviour that used to lose a typed
+    /// name can be pinned by a test against a real `ModelContainer` — the bug is
+    /// in the SwiftData reconciliation itself, not in the pure matching above it.
+    func syncSpeakers(for meeting: Meeting?, voiceprints: [String: [Float]] = [:]) {
         guard let meeting else { return }
 
         // Labels still referenced by any recording's current transcript, in
@@ -508,30 +526,95 @@ final class TranscriptionViewModel {
             }
         }
 
-        // Drop speakers no longer referenced by any transcript.
-        let existingLabels = Set(meeting.speakers.map(\.label))
-        let deletedLabels = existingLabels.subtracting(usedLabels)
-        for speaker in meeting.speakers where !usedLabels.contains(speaker.label) {
-            modelContext.delete(speaker)
+        // Snapshot the labels before anything moves: the matching is keyed on
+        // what each row was called going in, and rows are relabelled below.
+        let rows = meeting.speakers.map { (speaker: $0, original: $0.label) }
+
+        // Which row is which person, by voice. Run over *every* row and *every*
+        // new label, not only the ones that appear or disappear: the common case
+        // is the label set staying the same while the assignment permutes, and
+        // matching only the leftovers would miss exactly that.
+        let matches = SpeakerIdentityMatcher.match(
+            existing: rows.compactMap { row -> SpeakerIdentityMatcher.Candidate? in
+                guard let voiceprint = row.speaker.voiceprint else { return nil }
+                return SpeakerIdentityMatcher.Candidate(label: row.original, voiceprint: voiceprint)
+            },
+            incoming: usedLabels.compactMap { label -> SpeakerIdentityMatcher.Candidate? in
+                guard let voiceprint = voiceprints[label] else { return nil }
+                return SpeakerIdentityMatcher.Candidate(label: label, voiceprint: voiceprint)
+            }
+        )
+
+        // Build the final label→row assignment before touching anything, so a
+        // permutation ("Speaker 1" and "Speaker 2" swapping) can be applied
+        // without the intermediate states colliding.
+        var assignment: [String: Speaker] = [:]
+        var placed: [Speaker] = []
+        func place(_ speaker: Speaker, as label: String) {
+            assignment[label] = speaker
+            placed.append(speaker)
+        }
+        func isPlaced(_ speaker: Speaker) -> Bool {
+            placed.contains { $0 === speaker }
         }
 
-        // Add rows for newly-appearing labels. `surviving` excludes the rows just
-        // marked for deletion (the delete isn't applied until save) so the color
-        // index reflects the speakers that will actually remain.
-        let survivingLabels = existingLabels.subtracting(deletedLabels)
-        var index = survivingLabels.count
+        // 1. Voice wins. It is the only evidence here that identifies a person.
+        for row in rows {
+            guard let matched = matches[row.original], assignment[matched] == nil else { continue }
+            place(row.speaker, as: matched)
+            if matched != row.original {
+                AppLog.transcription.atNotice.notice("VM: syncSpeakers \(row.original, privacy: .public) -> \(matched, privacy: .public) by voice")
+            }
+        }
+        // 2. Then the label, for rows no voiceprint could speak for — the old
+        // behaviour, and still right when nothing has been renumbered.
+        for row in rows where !isPlaced(row.speaker) {
+            guard usedLabels.contains(row.original), assignment[row.original] == nil else { continue }
+            place(row.speaker, as: row.original)
+        }
+        for (label, speaker) in assignment {
+            speaker.label = label
+        }
+
+        // 3. Rows with nowhere to go. An unnamed one holds nothing but a label
+        // that no longer means anything; a named one holds what the user typed,
+        // and losing that silently is the failure this method exists to prevent.
+        var keptNamed = 0
+        var removed = 0
+        for row in rows where !isPlaced(row.speaker) {
+            guard row.speaker.name.isEmpty else {
+                keptNamed += 1
+                continue
+            }
+            modelContext.delete(row.speaker)
+            removed += 1
+        }
+
+        // 4. Rows for labels nobody claimed. The color index counts the rows
+        // that will actually remain — deletes above aren't applied until save,
+        // so `meeting.speakers` can't be counted for this.
+        var index = assignment.count
         var addedLabels: [String] = []
-        for label in usedLabels where !meeting.speakers.contains(where: { $0.label == label }) {
+        for label in usedLabels where assignment[label] == nil {
             // Setting `meeting` establishes the relationship; SwiftData maintains
             // the inverse `meeting.speakers`.
             let speaker = Speaker(
                 meeting: meeting,
                 label: label,
-                color: Color.speakerHex(for: index)
+                color: Color.speakerHex(for: index),
+                voiceprintData: voiceprints[label].map(VectorData.encode)
             )
             modelContext.insert(speaker)
             addedLabels.append(label)
             index += 1
+        }
+
+        // 5. Refresh the voiceprint of every row this run covers: a speaker heard
+        // again is described better by the newer embedding than by the first one
+        // ever stored for them.
+        for (label, speaker) in assignment {
+            guard let vector = voiceprints[label] else { continue }
+            speaker.voiceprintData = VectorData.encode(vector)
         }
 
         // Final state the UI (filter chips + speaker list) will render, plus the
@@ -539,7 +622,7 @@ final class TranscriptionViewModel {
         // if `final` here is >1 the data layer is correct and any UI mismatch is a
         // view-refresh problem; if it's 1, the collapse happened upstream (see the
         // diarizer's `turnSpeakers`/`speakers` log lines).
-        AppLog.transcription.atNotice.notice("VM: syncSpeakers final=\(usedLabels.count, privacy: .public) [\(usedLabels.joined(separator: ", "), privacy: .public)] added=\(addedLabels.count, privacy: .public) removed=\(deletedLabels.count, privacy: .public)")
+        AppLog.transcription.atNotice.notice("VM: syncSpeakers final=\(usedLabels.count, privacy: .public) [\(usedLabels.joined(separator: ", "), privacy: .public)] added=\(addedLabels.count, privacy: .public) removed=\(removed, privacy: .public) byVoice=\(matches.count, privacy: .public) keptNamed=\(keptNamed, privacy: .public)")
     }
 
     // MARK: - Summary

@@ -24,7 +24,30 @@ struct TranscriptTab: View {
 
     @State private var selectedSpeaker: String?
 
-    private var sortedSpeakers: [Speaker] { meeting.speakers.sorted { $0.label < $1.label } }
+    /// Labels that actually say something in the transcripts on screen.
+    ///
+    /// `meeting.speakers` can outlive them: a row the user has named is kept
+    /// when a re-transcription stops producing its label, because deleting it
+    /// would throw away what they typed (see `syncSpeakers`). Keeping it is the
+    /// right call for the data and the wrong one for this view — it would render
+    /// as a chip that filters to nothing and a row in a list of people who are
+    /// not in the transcript.
+    private var spokenLabels: Set<String> {
+        var labels: Set<String> = []
+        for recording in recordings {
+            for segment in recording.transcript?.segments ?? [] {
+                labels.insert(segment.speakerLabel)
+            }
+        }
+        return labels
+    }
+
+    private var sortedSpeakers: [Speaker] {
+        let spoken = spokenLabels
+        return meeting.speakers
+            .filter { spoken.contains($0.label) }
+            .sorted { $0.label < $1.label }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
