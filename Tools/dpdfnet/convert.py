@@ -14,7 +14,7 @@ shapes here turns a silent failure into a printed fact.
 Usage:
 
     python3 -m venv .venv && source .venv/bin/activate
-    pip install coremltools onnx numpy
+    pip install coremltools onnx numpy onnxruntime onnx2pytorch "torch==2.7.0"
     python3 convert.py --onnx path/to/dpdfnet8_16khz.onnx
 
 Run `--inspect-only` first if you just want to see the graph.
@@ -23,13 +23,14 @@ Run `--inspect-only` first if you just want to see the graph.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import sys
 from pathlib import Path
 
 # Where the app expects the converted artifacts. Relative to the repo root.
-BUNDLE_DIR = Path("Kurn/Resources/Models")
+BUNDLE_DIR = Path(__file__).resolve().parents[2] / "Kurn/Resources/Models"
 # Must match SpeechEnhancerModelConfig.resourceName on the Swift side.
 CONFIG_NAME = "dpdfnet"
 
@@ -88,6 +89,125 @@ def pick(entries: list, *, exclude: str | None = None):
         else:
             state = (name, shape)
     return spectrum, state
+
+
+def prepare_pytorch_graph(model):
+    """Normalize ONNX details the maintained PyTorch bridge cannot import.
+
+    DPDFNet has constant-zero initial states on its intra-frame GRUs, batched
+    MatMul weights, and scalar Add constants. They are all ordinary ONNX, but
+    onnx2pytorch 0.5.3 either rejects or incorrectly folds those forms. This
+    rewrites only their representation, not their values or computation.
+    """
+    import numpy as np
+    import onnx
+    from onnx import helper, numpy_helper
+
+    graph = copy.deepcopy(model)
+    output_names = {value.name for value in graph.graph.output}
+
+    # onnx2pytorch turns node output names into PyTorch attribute names. Make
+    # intermediates valid identifiers while preserving the public interface.
+    renamed = {}
+    for index, node in enumerate(graph.graph.node):
+        for output_index, name in enumerate(node.output):
+            if name and name not in output_names:
+                renamed[name] = f"kurn_value_{index}_{output_index}"
+    for node in graph.graph.node:
+        node.input[:] = [renamed.get(name, name) for name in node.input]
+        node.output[:] = [renamed.get(name, name) for name in node.output]
+    for value in graph.graph.value_info:
+        value.name = renamed.get(value.name, value.name)
+
+    initializers = {tensor.name: tensor for tensor in graph.graph.initializer}
+    arrays = {
+        name: numpy_helper.to_array(tensor)
+        for name, tensor in initializers.items()
+    }
+    lifted = set()
+    nodes = []
+    for index, node in enumerate(graph.graph.node):
+        if node.op_type == "GRU" and len(node.input) > 5:
+            initial_name = node.input[5]
+            if initial_name in arrays and not np.count_nonzero(arrays[initial_name]):
+                node.input[5] = ""
+
+        lift_index = None
+        if node.op_type == "MatMul" and len(node.input) > 1:
+            weight = arrays.get(node.input[1])
+            if weight is not None and weight.ndim > 2:
+                lift_index = 1
+        elif node.op_type == "Add":
+            for input_index, name in enumerate(node.input):
+                value = arrays.get(name)
+                if value is not None and value.ndim != 1:
+                    lift_index = input_index
+                    break
+
+        if lift_index is not None:
+            initializer_name = node.input[lift_index]
+            constant_name = f"kurn_constant_{index}_{lift_index}"
+            tensor = copy.deepcopy(initializers[initializer_name])
+            tensor.name = constant_name
+            nodes.append(helper.make_node(
+                "Constant",
+                inputs=[],
+                outputs=[constant_name],
+                value=tensor,
+                name=f"KurnConstant{index}_{lift_index}",
+            ))
+            node.input[lift_index] = constant_name
+            lifted.add(initializer_name)
+        nodes.append(node)
+
+    del graph.graph.node[:]
+    graph.graph.node.extend(nodes)
+    kept = [
+        tensor for tensor in graph.graph.initializer
+        if tensor.name not in lifted
+    ]
+    del graph.graph.initializer[:]
+    graph.graph.initializer.extend(kept)
+    onnx.checker.check_model(graph)
+    return graph
+
+
+def pytorch_bridge(model, spectrum_shape: list, state_shape: list):
+    """Import ONNX through PyTorch and prove the bridge matches ONNX Runtime."""
+    import numpy as np
+    import onnxruntime as ort
+    import torch
+    from onnx2pytorch import ConvertModel
+
+    graph = prepare_pytorch_graph(model)
+    module = ConvertModel(graph, experimental=True).eval()
+    rng = np.random.default_rng(0xD0DF)
+    spectrum = rng.normal(0, 1, spectrum_shape).astype(np.float32)
+    state = np.zeros(state_shape, dtype=np.float32)
+
+    session = ort.InferenceSession(
+        model.SerializeToString(),
+        providers=["CPUExecutionProvider"],
+    )
+    expected = session.run(None, {
+        model.graph.input[0].name: spectrum,
+        model.graph.input[1].name: state,
+    })
+    with torch.no_grad():
+        actual = module(torch.from_numpy(spectrum), torch.from_numpy(state))
+    for reference, result in zip(expected, actual):
+        np.testing.assert_allclose(
+            result.detach().numpy(),
+            reference,
+            rtol=2e-5,
+            atol=2e-6,
+        )
+    print("PyTorch bridge parity: passed")
+    return torch.jit.trace(
+        module,
+        (torch.from_numpy(spectrum), torch.from_numpy(state)),
+        strict=False,
+    )
 
 
 def main() -> int:
@@ -163,8 +283,13 @@ def main() -> int:
 
     try:
         import coremltools as ct
+        import numpy as np
     except ImportError:
-        print("error: pip install coremltools", file=sys.stderr)
+        print(
+            "error: pip install coremltools onnx numpy onnxruntime "
+            "onnx2pytorch 'torch==2.7.0'",
+            file=sys.stderr,
+        )
         return 1
 
     out_dir = args.out or BUNDLE_DIR
@@ -172,12 +297,29 @@ def main() -> int:
     package_path = out_dir / f"{args.model_name}.mlpackage"
 
     print(f"Converting to {package_path} …")
+    traced = pytorch_bridge(model, spec_in[1], state_in[1])
     # fp16 weights, ML Program, iOS 16 floor. The recurrent state stays a plain
     # input/output pair rather than an iOS 18 `StateType`: more portable, and far
     # simpler to drive frame by frame from Swift.
     mlmodel = ct.convert(
-        model,
+        traced,
         convert_to="mlprogram",
+        inputs=[
+            ct.TensorType(
+                name=names["spectrumInput"],
+                shape=tuple(spec_in[1]),
+                dtype=np.float32,
+            ),
+            ct.TensorType(
+                name=names["stateInput"],
+                shape=tuple(state_in[1]),
+                dtype=np.float32,
+            ),
+        ],
+        outputs=[
+            ct.TensorType(name=names["spectrumOutput"], dtype=np.float32),
+            ct.TensorType(name=names["stateOutput"], dtype=np.float32),
+        ],
         minimum_deployment_target=ct.target.iOS16,
         compute_precision=ct.precision.FLOAT16,
     )

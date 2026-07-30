@@ -2,9 +2,9 @@
 //  PlaybackEnhancementRenderer.swift
 //  Kurn
 //
-//  Renders the enhanced listening copy of a recording: a second `.m4a` beside the
-//  original with loudness normalization, a speech EQ and a gentle compressor
-//  already baked in.
+//  Renders the enhanced listening copy of a recording in its protected derived
+//  directory, with neural denoising, loudness normalization, a speech EQ and a
+//  gentle compressor already baked in.
 //
 //  Doing this offline rather than in the player is what keeps the change small.
 //  `AudioPlayerService` stays on `AVAudioPlayer` and only picks which URL to open;
@@ -34,16 +34,17 @@ struct PlaybackEnhancementRenderer: Sendable {
     /// Bump when the tuning changes. Copies stamped with an older version are
     /// regenerated rather than served, so a tuning fix reaches recordings the user
     /// already enhanced.
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     /// Output rate. Matches `AudioRecorderService.storageSampleRate`, so the copy
     /// keeps the original's full bandwidth.
-    private static let outputSampleRate: Double = 24_000
+    static let outputSampleRate: Double = 24_000
     /// Higher than the ASR cleanup's 32 kbps: this copy is for ears, and it has
     /// already been through one lossy generation.
     private static let outputBitRate = 64_000
 
     var tuning: PlaybackTuning = .listening
+    var enhancer: SpeechEnhancer = .shared
 
     /// Render the enhanced copy for `fileName` and move it into the enhanced
     /// directory. Returns its size in bytes.
@@ -59,7 +60,16 @@ struct PlaybackEnhancementRenderer: Sendable {
             NSLocalizedString("error.audio_enhancement", comment: "Enhanced audio render failed")
         )
 
-        let loudness = try await measureLoudness(url: sourceURL, failure: failure)
+        let neuralURL = try await renderNeuralMix(
+            from: sourceURL,
+            failure: failure
+        )
+        defer {
+            if let neuralURL { try? FileManager.default.removeItem(at: neuralURL) }
+        }
+        let chainInputURL = neuralURL ?? sourceURL
+
+        let loudness = try await measureLoudness(url: chainInputURL, failure: failure)
         let gainDB = LoudnessMeter.gainDB(measured: loudness, target: tuning.targetLUFS)
         AppLog.recorder.atInfo.info("enhance: \(fileName, privacy: .public) measured=\(loudness ?? .nan, privacy: .public)LUFS gain=\(gainDB, privacy: .public)dB")
         try Task.checkCancellation()
@@ -72,7 +82,7 @@ struct PlaybackEnhancementRenderer: Sendable {
         }
 
         try await renderChain(
-            from: sourceURL,
+            from: chainInputURL,
             to: tempURL,
             inputGainDB: Float(gainDB),
             failure: failure

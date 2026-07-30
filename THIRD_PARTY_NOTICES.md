@@ -100,8 +100,10 @@ device.
   16 kHz variant, converted to Core ML by `Tools/dpdfnet/convert.py` and bundled
   with the app)
 - License: Apache License 2.0, covering both source and pretrained weights
-- Note: not bundled until the conversion in `Tools/dpdfnet/` has been run. Record
-  the release tag and the ONNX SHA-256 here when the model is committed.
+- Release: DPDFNet `v1.1.0`; weights downloaded from the official model
+  repository at revision `dd6818d00f50c836fed43a6243ebe49116de5964`
+- ONNX SHA-256:
+  `899d4f23f3ff86edbffa8c537e4bcbdc49da1b4e84e0ef390611e0604a3b26cb`
 
 ---
 

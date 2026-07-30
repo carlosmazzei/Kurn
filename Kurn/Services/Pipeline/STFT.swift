@@ -40,7 +40,11 @@ final class STFT {
     private var timeImag: [Float]
 
     init(frameSize: Int, hopSize: Int) {
-        precondition(frameSize.nonzeroBitCount == 1, "frameSize must be a power of two")
+        precondition(
+            Self.supportsDFTSize(frameSize),
+            "frameSize must be f·2ⁿ where f is 1, 3, 5, or 15"
+        )
+        precondition(hopSize > 0 && hopSize <= frameSize, "hopSize must be in 1...frameSize")
         self.frameSize = frameSize
         self.halfFrame = frameSize / 2
         self.hopSize = hopSize
@@ -63,6 +67,16 @@ final class STFT {
         self.imagOut = [Float](repeating: 0, count: frameSize)
         self.timeReal = [Float](repeating: 0, count: frameSize)
         self.timeImag = [Float](repeating: 0, count: frameSize)
+    }
+
+    /// Sizes accepted by vDSP's complex DFT setup: `f·2ⁿ` where
+    /// `f ∈ {1, 3, 5, 15}`. DPDFNet's 320-sample frame is `5·2⁶`.
+    private static func supportsDFTSize(_ count: Int) -> Bool {
+        guard count > 0 else { return false }
+        return [1, 3, 5, 15].contains { factor in
+            count.isMultiple(of: factor)
+                && (count / factor).nonzeroBitCount == 1
+        }
     }
 
     /// Number of whole frames `samples` yields at this frame/hop size.

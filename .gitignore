@@ -54,3 +54,4 @@ fastlane/README.md
 # Misc
 *.log
 *.tmp
+Tools/dpdfnet/.venv/

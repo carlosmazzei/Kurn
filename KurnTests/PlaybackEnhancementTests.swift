@@ -22,7 +22,7 @@ struct PlaybackEnhancementTests {
 
     @Test func rendersAMonoPlayableCopy() async throws {
         try await tempFileTestLock.run {
-            let fileName = try Self.seedRecordingFile(amplitude: 0.2)
+            let fileName = try Self.seedRenderSource(amplitude: 0.2)
             defer { AudioFileStore.delete(fileName: fileName) }
 
             let size = try await PlaybackEnhancementRenderer().render(fileName: fileName)
@@ -41,7 +41,7 @@ struct PlaybackEnhancementTests {
     /// between them and clipping.
     @Test func doesNotClipALoudRecording() async throws {
         try await tempFileTestLock.run {
-            let fileName = try Self.seedRecordingFile(amplitude: 0.9)
+            let fileName = try Self.seedRenderSource(amplitude: 0.9)
             defer { AudioFileStore.delete(fileName: fileName) }
 
             _ = try await PlaybackEnhancementRenderer().render(fileName: fileName)
@@ -54,7 +54,7 @@ struct PlaybackEnhancementTests {
     /// A quiet recording is what the feature exists for: it must come out louder.
     @Test func liftsAQuietRecording() async throws {
         try await tempFileTestLock.run {
-            let fileName = try Self.seedRecordingFile(amplitude: 0.02)
+            let fileName = try Self.seedRenderSource(amplitude: 0.02)
             defer { AudioFileStore.delete(fileName: fileName) }
 
             _ = try await PlaybackEnhancementRenderer().render(fileName: fileName)
@@ -66,7 +66,7 @@ struct PlaybackEnhancementTests {
 
     @Test func failedRenderLeavesNoTempFile() async throws {
         try await tempFileTestLock.run {
-            let fileName = "kurn-test-\(UUID().uuidString).m4a"
+            let fileName = "kurn-test-\(UUID().uuidString).caf"
             let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
             try Data([0x00, 0x01, 0x02]).write(to: url)
             defer { AudioFileStore.delete(fileName: fileName) }
@@ -177,6 +177,16 @@ struct PlaybackEnhancementTests {
 
     private static func seedRecordingFile(amplitude: Float) throws -> String {
         let fileName = "kurn-test-\(UUID().uuidString).m4a"
+        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+        try AudioFixtures.m4aTone(seconds: 1.2, amplitude: amplitude, at: url)
+        return fileName
+    }
+
+    /// Recovery tests deliberately sweep orphaned `.m4a` files. Renderer tests
+    /// take longer now that they include inference, so use an AAC-in-CAF fixture
+    /// that cannot be mistaken for an abandoned recording by a concurrent sweep.
+    private static func seedRenderSource(amplitude: Float) throws -> String {
+        let fileName = "kurn-test-\(UUID().uuidString).caf"
         let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
         try AudioFixtures.m4aTone(seconds: 1.2, amplitude: amplitude, at: url)
         return fileName

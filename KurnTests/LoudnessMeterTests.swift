@@ -116,5 +116,6 @@ struct PlaybackTuningTests {
     @Test func targetIsThePodcastConvention() {
         #expect(PlaybackTuning.listening.targetLUFS == -16)
         #expect(PlaybackTuning.listening.highPassHz > 60 && PlaybackTuning.listening.highPassHz < 120)
+        #expect(PlaybackTuning.listening.wetMix == 0.85)
     }
 }
