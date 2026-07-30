@@ -35,7 +35,7 @@ pretrained weights. Record the exact release tag and the ONNX file's SHA-256
 ```bash
 cd Tools/dpdfnet
 python3 -m venv .venv && source .venv/bin/activate
-pip install coremltools onnx numpy
+pip install coremltools onnx numpy onnxruntime onnx2pytorch "torch==2.7.0"
 
 # 1. Look at the graph first. Nothing is written.
 python3 convert.py --onnx ~/Downloads/dpdfnet8_16khz.onnx --inspect-only
@@ -43,6 +43,14 @@ python3 convert.py --onnx ~/Downloads/dpdfnet8_16khz.onnx --inspect-only
 # 2. Convert. Writes into Kurn/Resources/Models/.
 python3 convert.py --onnx ~/Downloads/dpdfnet8_16khz.onnx
 ```
+
+The release currently names this file `onnx/dpdfnet8.onnx` in the
+[official model repository](https://huggingface.co/Ceva-IP/DPDFNet); the local
+`_16khz` suffix above makes it harder to confuse with the separate 48 kHz
+variant. The converter bridges ONNX through PyTorch because current
+`coremltools` no longer has an ONNX frontend, and checks that bridge against
+ONNX Runtime before writing anything. Keep PyTorch at the maximum version the
+installed `coremltools` declares compatible (2.7.0 for coremltools 9).
 
 The script prints the ONNX graph's real inputs and outputs before touching
 anything, and guesses which tensor is the spectrum and which is the recurrent

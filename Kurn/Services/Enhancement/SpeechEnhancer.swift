@@ -16,18 +16,13 @@
 //     A DSP-only enhanced copy is already worth listening to.
 //
 //  So `SpeechEnhancer.shared.enhance` returning `nil` is a supported outcome, not
-//  an error path.
-//
-//  Nothing calls this yet, deliberately. `PlaybackEnhancementRenderer` renders
-//  through an `AVAudioEngine` chain, and a frame-by-frame model does not drop
-//  into one — it needs its own decode/enhance/mix pass either side of it. Wiring
-//  that pass, along with the dry/wet ratio it needs (see `PlaybackTuning`),
-//  belongs in the same change as the inference loop, where it can be run against
-//  a real model instead of against a stub that always returns `nil`.
+//  an error path. `PlaybackEnhancementRenderer` responds by running its existing
+//  DSP chain directly on the source.
 //
 
+import Accelerate
+import CoreML
 import Foundation
-import os
 
 /// Removes background noise from mono 16 kHz speech.
 protocol SpeechEnhancing: Sendable {
@@ -90,32 +85,250 @@ struct SpeechEnhancerModelConfig: Codable, Sendable, Equatable {
 actor SpeechEnhancer: SpeechEnhancing {
     static let shared = SpeechEnhancer()
 
+    private let bundle: Bundle
     private var resolved = false
     private var config: SpeechEnhancerModelConfig?
+    private var model: MLModel?
+    private var streams: [UUID: StreamState] = [:]
+
+    init(bundle: Bundle = .main) {
+        self.bundle = bundle
+    }
 
     /// Whether a model is installed. Lets the UI explain that enhancement is
     /// running DSP-only rather than silently doing less than the user expects.
     func isModelAvailable() -> Bool {
-        resolveConfig() != nil
+        resolveModel() != nil
     }
 
     func enhance(samples: [Float]) async -> [Float]? {
-        guard resolveConfig() != nil else { return nil }
-        // The inference loop is written once the conversion has produced a model
-        // and its config, because that is when the tensor shapes stop being
-        // assumptions. Until then this reports "no model" and the renderer runs
-        // its DSP chain alone, which is a good result rather than a broken one.
-        return nil
+        guard let streamID = beginStream() else { return nil }
+        let output = enhance(samples: samples, streamID: streamID, isFinal: true)
+        streams.removeValue(forKey: streamID)
+        return output
+    }
+
+    /// Starts a blockwise render. The renderer uses this instead of decoding a
+    /// whole recording into one `[Float]`; state and overlap carry across calls.
+    func beginStream() -> UUID? {
+        guard let config = resolveConfig(), let model = resolveModel() else { return nil }
+        guard Self.isValid(config: config) else {
+            AppLog.recorder.atError.error("enhance: invalid DPDFNet config")
+            return nil
+        }
+        do {
+            let streamID = UUID()
+            streams[streamID] = try StreamState(config: config, model: model)
+            return streamID
+        } catch {
+            AppLog.recorder.atError.error("enhance: could not initialize model tensors: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    /// Enhances one decoded block. Output includes one frame of leading latency;
+    /// `PlaybackEnhancementRenderer` removes it before the dry/wet sum.
+    func enhance(samples: [Float], streamID: UUID, isFinal: Bool) -> [Float]? {
+        guard var stream = streams.removeValue(forKey: streamID) else { return nil }
+        do {
+            let output = try stream.append(samples, isFinal: isFinal)
+            if !isFinal {
+                streams[streamID] = stream
+            }
+            return output
+        } catch {
+            AppLog.recorder.atError.error("enhance: inference failed, using DSP only: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    func endStream(_ streamID: UUID) {
+        streams.removeValue(forKey: streamID)
+    }
+
+    func latencyFrames(at sampleRate: Double) -> Int? {
+        guard let config = resolveConfig(), resolveModel() != nil else { return nil }
+        return Int((Double(config.frameSize) * sampleRate / config.sampleRate).rounded())
     }
 
     private func resolveConfig() -> SpeechEnhancerModelConfig? {
         if !resolved {
             resolved = true
-            config = SpeechEnhancerModelConfig.bundled()
+            config = SpeechEnhancerModelConfig.bundled(in: bundle)
             if config == nil {
-                AppLog.transcription.atNotice.notice("enhance: no speech-enhancement model installed, using DSP only")
+                AppLog.recorder.atNotice.notice("enhance: no speech-enhancement model installed, using DSP only")
             }
         }
         return config
     }
+
+    private func resolveModel() -> MLModel? {
+        guard model == nil, let config = resolveConfig() else { return model }
+        guard let url = bundle.url(forResource: config.modelName, withExtension: "mlmodelc") else {
+            AppLog.recorder.atNotice.notice("enhance: DPDFNet config is present but the compiled model is missing")
+            return nil
+        }
+        do {
+            let modelConfiguration = MLModelConfiguration()
+            modelConfiguration.computeUnits = .all
+            model = try MLModel(contentsOf: url, configuration: modelConfiguration)
+        } catch {
+            AppLog.recorder.atError.error("enhance: could not load DPDFNet: \(error.localizedDescription, privacy: .public)")
+        }
+        return model
+    }
+
+    private static func isValid(config: SpeechEnhancerModelConfig) -> Bool {
+        config.sampleRate > 0
+            && config.frameSize > 0
+            && config.hopSize > 0
+            && config.binCount == config.frameSize / 2 + 1
+            && config.stateSize > 0
+    }
+}
+
+private struct StreamState {
+    let config: SpeechEnhancerModelConfig
+    let model: MLModel
+    let stft: STFT
+    var spectrum: MLMultiArray
+    var recurrentState: MLMultiArray
+    var input: [Float] = []
+    var inputBase = 0
+    var nextFrameStart = 0
+    var receivedCount = 0
+    var alignedEmittedCount = 0
+    var latencyEmitted = false
+    var overlap: [Float]
+    var real: [Float]
+    var imaginary: [Float]
+
+    init(config: SpeechEnhancerModelConfig, model: MLModel) throws {
+        self.config = config
+        self.model = model
+        self.stft = STFT(frameSize: config.frameSize, hopSize: config.hopSize)
+        self.spectrum = try MLMultiArray(
+            shape: [1, 1, NSNumber(value: config.binCount), 2],
+            dataType: .float32
+        )
+        self.recurrentState = try MLMultiArray(
+            shape: [NSNumber(value: config.stateSize)],
+            dataType: .float32
+        )
+        self.overlap = [Float](repeating: 0, count: config.frameSize)
+        self.real = [Float](repeating: 0, count: config.binCount)
+        self.imaginary = [Float](repeating: 0, count: config.binCount)
+        recurrentState.dataPointer.initializeMemory(
+            as: Float.self,
+            repeating: 0,
+            count: config.stateSize
+        )
+    }
+
+    mutating func append(_ samples: [Float], isFinal: Bool) throws -> [Float] {
+        input.append(contentsOf: samples)
+        receivedCount += samples.count
+        var output: [Float] = []
+        if !latencyEmitted {
+            output.append(contentsOf: repeatElement(0, count: config.frameSize))
+            latencyEmitted = true
+        }
+
+        while shouldProcessFrame(isFinal: isFinal) {
+            let localStart = nextFrameStart - inputBase
+            let missing = localStart + config.frameSize - input.count
+            if missing > 0 {
+                input.append(contentsOf: repeatElement(0, count: missing))
+            }
+            try processFrame(localStart: localStart)
+            output.append(contentsOf: overlap.prefix(config.hopSize))
+            shiftOverlap()
+            nextFrameStart += config.hopSize
+            alignedEmittedCount += config.hopSize
+        }
+
+        if isFinal {
+            let excess = max(0, alignedEmittedCount - receivedCount)
+            if excess > 0 { output.removeLast(min(excess, output.count)) }
+        } else {
+            compactInputIfNeeded()
+        }
+        return output
+    }
+
+    private func shouldProcessFrame(isFinal: Bool) -> Bool {
+        if isFinal {
+            return nextFrameStart < receivedCount
+        }
+        return nextFrameStart + config.frameSize <= receivedCount
+    }
+
+    private mutating func processFrame(localStart: Int) throws {
+        stft.forward(
+            samples: input,
+            frameStart: localStart,
+            real: &real,
+            imag: &imaginary,
+            offset: 0
+        )
+        let values = spectrum.dataPointer.bindMemory(
+            to: Float.self,
+            capacity: config.binCount * 2
+        )
+        for bin in 0..<config.binCount {
+            values[bin * 2] = real[bin]
+            values[bin * 2 + 1] = imaginary[bin]
+        }
+
+        let provider = try MLDictionaryFeatureProvider(dictionary: [
+            config.spectrumInput: MLFeatureValue(multiArray: spectrum),
+            config.stateInput: MLFeatureValue(multiArray: recurrentState)
+        ])
+        let prediction = try model.prediction(from: provider)
+        guard let enhanced = prediction.featureValue(
+            for: config.spectrumOutput
+        )?.multiArrayValue,
+        let nextState = prediction.featureValue(
+            for: config.stateOutput
+        )?.multiArrayValue,
+        enhanced.count == config.binCount * 2,
+        nextState.count == config.stateSize else {
+            throw EnhancementInferenceError.invalidOutput
+        }
+
+        let enhancedValues = enhanced.dataPointer.bindMemory(
+            to: Float.self,
+            capacity: config.binCount * 2
+        )
+        for bin in 0..<config.binCount {
+            real[bin] = enhancedValues[bin * 2]
+            imaginary[bin] = enhancedValues[bin * 2 + 1]
+        }
+        recurrentState = nextState
+        let frame = stft.inverse(real: real, imag: imaginary, offset: 0)
+        for index in 0..<config.frameSize {
+            overlap[index] += frame[index]
+        }
+    }
+
+    private mutating func shiftOverlap() {
+        let remaining = config.frameSize - config.hopSize
+        for index in 0..<remaining {
+            overlap[index] = overlap[index + config.hopSize]
+        }
+        for index in remaining..<config.frameSize {
+            overlap[index] = 0
+        }
+    }
+
+    private mutating func compactInputIfNeeded() {
+        let consumed = nextFrameStart - inputBase
+        guard consumed >= 8_192 else { return }
+        input.removeFirst(consumed)
+        inputBase = nextFrameStart
+    }
+}
+
+private enum EnhancementInferenceError: Error {
+    case invalidOutput
 }

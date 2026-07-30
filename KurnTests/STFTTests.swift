@@ -61,6 +61,39 @@ struct STFTTests {
         #expect(stft.binCount == 257)
     }
 
+    /// vDSP accepts `f·2ⁿ` sizes, not only powers of two. DPDFNet was trained on
+    /// a 320-sample frame (`5·2⁶`), so padding it to 512 would change its input.
+    @Test func nonPowerOfTwoFrameRoundTrips() {
+        let stft = STFT(frameSize: 320, hopSize: 160)
+        let samples = Self.noise(count: 8_000)
+        let frames = stft.frameCount(forSampleCount: samples.count)
+        var real = [Float](repeating: 0, count: frames * stft.binCount)
+        var imaginary = [Float](repeating: 0, count: frames * stft.binCount)
+        var reconstructed = [Float](repeating: 0, count: samples.count)
+
+        for frameIndex in 0..<frames {
+            let offset = frameIndex * stft.binCount
+            stft.forward(
+                samples: samples,
+                frameStart: frameIndex * stft.hopSize,
+                real: &real,
+                imag: &imaginary,
+                offset: offset
+            )
+            let frame = stft.inverse(real: real, imag: imaginary, offset: offset)
+            let start = frameIndex * stft.hopSize
+            for sampleIndex in 0..<stft.frameSize {
+                reconstructed[start + sampleIndex] += frame[sampleIndex]
+            }
+        }
+
+        let interior = stft.frameSize..<(samples.count - stft.frameSize)
+        let maxError = interior.reduce(Float(0)) {
+            max($0, abs(reconstructed[$1] - samples[$1]))
+        }
+        #expect(maxError < 1e-4)
+    }
+
     /// Deterministic broadband noise. Seeded so a failure is reproducible.
     static func noise(count: Int, seed: UInt64 = 0xCAFE_BABE_DEAD_BEEF, amplitude: Float = 0.3) -> [Float] {
         var state = seed
