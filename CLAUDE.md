@@ -538,6 +538,42 @@ comes back as one speaker. Four things address that, all outside FluidAudio:
   whole-clip turn, which reads as "diarization is inaccurate" rather than as
   the timeout it is.
 
+#### Speaker identity
+
+`"Speaker 2"` identifies nobody: the diarizer hands those labels out in order of
+first appearance, freshly on every run, so a re-transcription routinely renames
+the same voice. `Speaker` rows carry a name the user typed, and keying them on
+the label was wrong in both available directions — deleting a row whose label
+stopped appearing threw the name away, and keeping it under the old label would
+hand that name to whoever the diarizer now calls Speaker 2.
+
+So identity is the voice. `FluidAudioDiarizer` returns a `DiarizationOutcome`
+(turns **plus** `voiceprints`) rather than turns alone; `SpeakerVoiceprints`
+averages the model's per-window embeddings into one L2-normalized vector per
+speaker, computed *after* smoothing and any collapse rescue so it describes the
+speaker as finally reported. `Speaker.voiceprintData` persists it through
+`VectorData`, in the store, never in a sidecar file.
+
+`TranscriptionViewModel.syncSpeakers` then reconciles as a total assignment
+rather than a diff: `SpeakerIdentityMatcher` matches **every** stored row
+against **every** new label (the common case is the label set staying the same
+while the assignment permutes — matching only what appeared or disappeared
+misses exactly that), voice wins, label identity fills the rest, and the whole
+mapping is applied at once so a swap has no colliding intermediate state. The
+same-voice threshold is `SpeakerClusterRefiner.minSpeakerSeparation`, inherited
+rather than invented.
+
+Where no voiceprint exists — the heuristic engine, or a transcript from before
+this — identity genuinely cannot be recovered, so only the conservative half
+applies: **a row the user has named is never deleted.** Preserved rows can then
+outlive their labels, which is why `MeetingDetailTabs` filters the chips and the
+speaker list to labels actually present in the transcript.
+
+Two limits worth knowing. Labels are produced per *recording* while `Speaker` is
+per *meeting*, so two recordings' "Speaker 1" are still conflated. And nothing
+crosses meetings — "Ana" in one has no relation to "Ana" in another; the stored
+voiceprint is the material a future change would use for that.
+
 #### Whisper hallucination filtering
 
 Whisper's failure mode is not a wrong word, it is a fluent invention over
