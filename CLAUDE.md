@@ -122,6 +122,12 @@ nothing about accuracy on real speech**. With a directory set, it scores
 that catches regressions, because it re-derives the result every run — the
 heuristic diarizer run over `<name>.m4a` against `<name>.reference.rttm`.
 
+`Tools/evaluation/` has the recipe for producing that material — getting the
+`.m4a` off the device (the app does not declare `UIFileSharingEnabled`, so Files
+and Finder cannot see recordings, and that should stay true), annotating turns in
+Audacity, and `prepare.py` to convert the app's Markdown export and the label
+track into the two file formats the harness reads.
+
 Deliberately no pass/fail threshold: a budget invented here would have no
 provenance, and the first failure would just raise it.
 
