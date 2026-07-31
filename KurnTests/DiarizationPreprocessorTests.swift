@@ -171,6 +171,13 @@ struct DiarizationPreprocessorTests {
         }
     }
 
+    @Test func slowDereverberationIsLimitedToShortRecordings() {
+        #expect(DiarizationPreprocessor.shouldDereverberate(requested: true, audioDuration: 60))
+        #expect(DiarizationPreprocessor.shouldDereverberate(requested: true, audioDuration: 300))
+        #expect(!DiarizationPreprocessor.shouldDereverberate(requested: true, audioDuration: 301))
+        #expect(!DiarizationPreprocessor.shouldDereverberate(requested: false, audioDuration: 60))
+    }
+
     // MARK: - Helpers
 
     private static func recentTempFiles(prefix: String, seconds: TimeInterval) -> Set<URL> {
