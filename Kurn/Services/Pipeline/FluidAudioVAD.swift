@@ -29,6 +29,11 @@ actor FluidAudioVAD: VoiceActivityDetecting {
             return try await Self.withTimeout(seconds: timeout) {
                 try await self.segment(url: url)
             }
+        } catch is CancellationError {
+            // The non-throwing protocol still requires a value. The pipeline's
+            // cancellation barrier immediately after VAD will discard it.
+            AppLog.transcription.atNotice.notice("FluidAudioVAD: cancelled")
+            return [Self.fallbackRegion(for: url)]
         } catch {
             AppLog.transcription.atError.error("FluidAudioVAD: failed, using whole-clip fallback: \(error.localizedDescription, privacy: .public)")
             return [Self.fallbackRegion(for: url)]

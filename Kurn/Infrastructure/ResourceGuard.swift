@@ -26,6 +26,11 @@ enum ResourceGuard {
     }
 
     static func requireHealthyResources(minimumFreeStorage: Int64) async throws {
+        // Several best-effort audio engines intentionally convert their own
+        // errors into usable fallback output. Cancellation is different: once
+        // the user taps Stop, every boundary between pipeline stages must abort
+        // even if the preceding engine swallowed `CancellationError`.
+        try Task.checkCancellation()
         try await requireNoMemoryPressure()
         try requireFreeStorage(atLeast: minimumFreeStorage)
     }

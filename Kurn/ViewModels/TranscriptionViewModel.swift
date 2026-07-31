@@ -159,6 +159,8 @@ final class TranscriptionViewModel {
     /// Progress up to the last completed chunk stays in the checkpoint and the
     /// recording is left `.pending`, so a later run resumes rather than restarts.
     func cancelTranscription(_ recording: Recording) {
+        let recordingID = recording.id
+        AppLog.transcription.atNotice.notice("VM: pause requested id=\(recordingID, privacy: .public) phase=\(self.phases[recordingID]?.displayName ?? "unknown", privacy: .public) taskFound=\(self.transcriptionTasks[recordingID] != nil, privacy: .public)")
         cancellingIDs.insert(recording.id)
         transcriptionTasks[recording.id]?.cancel()
     }
@@ -166,6 +168,8 @@ final class TranscriptionViewModel {
     /// Fully stop an in-flight transcription: cancels the task, clears any saved
     /// checkpoint, and resets status to `.none` so the user must start fresh.
     func stopTranscription(_ recording: Recording) {
+        let recordingID = recording.id
+        AppLog.transcription.atNotice.notice("VM: stop requested id=\(recordingID, privacy: .public) phase=\(self.phases[recordingID]?.displayName ?? "unknown", privacy: .public) taskFound=\(self.transcriptionTasks[recordingID] != nil, privacy: .public)")
         cancellingIDs.insert(recording.id)
         stoppingIDs.insert(recording.id)
         transcriptionTasks[recording.id]?.cancel()
