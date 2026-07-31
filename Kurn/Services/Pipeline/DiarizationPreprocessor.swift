@@ -66,6 +66,7 @@ actor DiarizationPreprocessor {
                     AppLog.transcription.atInfo.info("diarPreprocess: dereverb \(percent, privacy: .public)% file=\(fileName, privacy: .public) blocks=\(completed, privacy: .public)/\(total, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
                 }
             )
+            try Task.checkCancellation()
             AppLog.transcription.atInfo.info("diarPreprocess: dereverb done in \(Date().timeIntervalSince(dereverbStart), privacy: .public)s")
             try await ResourceGuard.requireTranscriptionHeadroom()
         }

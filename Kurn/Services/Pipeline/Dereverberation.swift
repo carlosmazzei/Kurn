@@ -78,15 +78,16 @@ struct WPEDereverberator: Sendable {
         let totalBlocks = (totalFrames + blockFrames - 1) / blockFrames
         var completedBlocks = 0
         while blockStart < totalFrames {
+            guard !Task.isCancelled else { return output }
             let blockEnd = min(blockStart + blockFrames, totalFrames)
-            processBlock(
+            guard processBlock(
                 samples: samples,
                 stft: stft,
                 contextStart: max(0, blockStart - context),
                 outputStart: blockStart,
                 outputEnd: blockEnd,
                 into: &output
-            )
+            ) else { return output }
             blockStart = blockEnd
             completedBlocks += 1
             onBlockCompleted?(completedBlocks, totalBlocks)
@@ -99,6 +100,9 @@ struct WPEDereverberator: Sendable {
     /// Frames in `contextStart..<outputStart` are transformed but never written
     /// back — they exist only so the first frames this block *does* emit have the
     /// history their predictor needs. The previous block already emitted them.
+    /// Returns `false` when the surrounding transcription task was cancelled.
+    /// Checking inside the frequency-bin loop keeps Stop responsive even when a
+    /// single 15-second WPE block takes a while on an older device.
     private func processBlock(
         samples: [Float],
         stft: STFT,
@@ -106,14 +110,15 @@ struct WPEDereverberator: Sendable {
         outputStart: Int,
         outputEnd: Int,
         into output: inout [Float]
-    ) {
+    ) -> Bool {
         let bins = stft.binCount
         let frames = outputEnd - contextStart
-        guard frames > 0 else { return }
+        guard frames > 0 else { return true }
 
         var real = [Float](repeating: 0, count: frames * bins)
         var imag = [Float](repeating: 0, count: frames * bins)
         for t in 0..<frames {
+            guard !Task.isCancelled else { return false }
             stft.forward(
                 samples: samples,
                 frameStart: (contextStart + t) * stft.hopSize,
@@ -125,6 +130,7 @@ struct WPEDereverberator: Sendable {
 
         let firstOutput = outputStart - contextStart
         for bin in 0..<bins {
+            guard !Task.isCancelled else { return false }
             dereverberate(
                 bin: bin,
                 bins: bins,
@@ -136,6 +142,7 @@ struct WPEDereverberator: Sendable {
         }
 
         for t in firstOutput..<frames {
+            guard !Task.isCancelled else { return false }
             let frame = stft.inverse(real: real, imag: imag, offset: t * bins)
             let start = (contextStart + t) * stft.hopSize
             frame.withUnsafeBufferPointer { src in
@@ -149,6 +156,7 @@ struct WPEDereverberator: Sendable {
                 }
             }
         }
+        return true
     }
 
     // MARK: - Per-bin
