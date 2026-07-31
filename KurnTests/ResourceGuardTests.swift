@@ -36,4 +36,20 @@ struct ResourceGuardTests {
             return
         }
     }
+
+    @Test func pipelineBoundaryRejectsAnAlreadyCancelledTask() async {
+        let stopped = await Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                try await ResourceGuard.requireHealthyResources(minimumFreeStorage: 0)
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }.value
+
+        #expect(stopped)
+    }
 }

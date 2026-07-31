@@ -127,6 +127,7 @@ struct TranscriptionService {
         }
         let detector = resolveLanguageDetector(config.languageDetection)
         let resolvedLanguage = await detector.detect(url: cleanedURL, hint: language)
+        try Task.checkCancellation()
         if resolvedLanguage != language {
             AppLog.transcription.atInfo.info("transcribe: language refined \(language.rawValue, privacy: .public) -> \(resolvedLanguage.rawValue, privacy: .public)")
         }
@@ -137,6 +138,7 @@ struct TranscriptionService {
         // audio fed to transcription.
         onPhase(.detectingSpeech)
         let regions = await resolveVAD(config.vad).detectSpeech(url: cleanedURL)
+        try Task.checkCancellation()
         AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
