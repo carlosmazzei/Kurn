@@ -30,8 +30,10 @@ actor DiarizationPreprocessor {
     func process(url: URL, dereverberate: Bool = false) async throws -> URL {
         try await ResourceGuard.requireTranscriptionHeadroom()
         let started = Date()
-        AppLog.transcription.atDebug.debug("diarPreprocess: open \(url.lastPathComponent, privacy: .public)")
+        let fileName = url.lastPathComponent
+        AppLog.transcription.atNotice.notice("diarPreprocess: started file=\(fileName, privacy: .public)")
 
+        let decodeStarted = Date()
         var samples = try await decodeHighPassedMonoSamples(url: url)
         guard samples.count >= Self.fftFrameSize else {
             AppLog.transcription.atError.error("diarPreprocess: too few samples after decode (\(samples.count, privacy: .public))")
@@ -39,6 +41,8 @@ actor DiarizationPreprocessor {
                 NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
             )
         }
+        let decodedDuration = Double(samples.count) / Self.targetSampleRate
+        AppLog.transcription.atInfo.info("diarPreprocess: decode complete file=\(fileName, privacy: .public) samples=\(samples.count, privacy: .public) audio=\(String(format: "%.1f", decodedDuration), privacy: .public)s elapsed=\(String(format: "%.1f", Date().timeIntervalSince(decodeStarted)), privacy: .public)s")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
         // Dereverberation runs *before* noise reduction on purpose: WPE's linear
@@ -55,13 +59,14 @@ actor DiarizationPreprocessor {
         }
 
         let denoiseStart = Date()
-        samples = denoise(samples)
-        AppLog.transcription.atDebug.debug("diarPreprocess: denoise done in \(Date().timeIntervalSince(denoiseStart), privacy: .public)s samples=\(samples.count, privacy: .public)")
+        samples = denoise(samples, fileName: fileName)
+        AppLog.transcription.atInfo.info("diarPreprocess: denoise complete file=\(fileName, privacy: .public) elapsed=\(String(format: "%.1f", Date().timeIntervalSince(denoiseStart)), privacy: .public)s samples=\(samples.count, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
         normalizePeakInPlace(&samples, targetDBFS: Self.targetPeakDBFS)
         try await ResourceGuard.requireTranscriptionHeadroom()
 
+        AppLog.transcription.atInfo.info("diarPreprocess: writing WAV file=\(fileName, privacy: .public)")
         var outURL: URL?
         let writtenURL = try writeWAV(samples: samples)
         outURL = writtenURL
@@ -69,7 +74,7 @@ actor DiarizationPreprocessor {
             if let url = outURL { cleanup(url) }
         }
 
-        AppLog.transcription.atInfo.info("diarPreprocess: done in \(Date().timeIntervalSince(started), privacy: .public)s -> \(writtenURL.lastPathComponent, privacy: .public)")
+        AppLog.transcription.atNotice.notice("diarPreprocess: complete file=\(fileName, privacy: .public) elapsed=\(String(format: "%.1f", Date().timeIntervalSince(started)), privacy: .public)s output=\(writtenURL.lastPathComponent, privacy: .public)")
         outURL = nil
         return writtenURL
     }
@@ -116,7 +121,7 @@ actor DiarizationPreprocessor {
                 engine.connect(eq, to: engine.mainMixerNode, format: inputFormat)
             },
             failure: failure,
-            logLabel: "diarPreprocess"
+            logLabel: "diarPreprocess[\(url.lastPathComponent)]"
         )
 
         var samples: [Float] = []
@@ -136,12 +141,13 @@ actor DiarizationPreprocessor {
     /// RMS), which approximates the spectral profile of a continuous fan / HVAC
     /// background. Each frame's magnitude is reduced by `α · noise[bin]`, with
     /// a floor of `β · noise[bin]` to prevent musical noise from over-subtraction.
-    private func denoise(_ samples: [Float]) -> [Float] {
+    private func denoise(_ samples: [Float], fileName: String) -> [Float] {
         let frameSize = Self.fftFrameSize
         let hopSize = Self.fftHopSize
         let stft = STFT(frameSize: frameSize, hopSize: hopSize)
         let frameCount = (samples.count - frameSize) / hopSize + 1
         guard frameCount > 0 else { return samples }
+        AppLog.transcription.atInfo.info("diarPreprocess: denoise analyzing file=\(fileName, privacy: .public) frames=\(frameCount, privacy: .public)")
 
         let rms = perFrameRMS(samples: samples, frameSize: frameSize, hopSize: hopSize, frameCount: frameCount)
         let quietCutoff = quietRMSCutoff(rms: rms)
@@ -150,8 +156,10 @@ actor DiarizationPreprocessor {
         )
         let totalNoise = noiseFloor.reduce(0, +)
         guard totalNoise > 0 else { return samples }
+        AppLog.transcription.atInfo.info("diarPreprocess: noise profile ready file=\(fileName, privacy: .public); applying spectral subtraction")
 
         var output = [Float](repeating: 0, count: samples.count)
+        let subtractionStarted = Date()
         for i in 0..<frameCount {
             let start = i * hopSize
             let cleaned = stft.processFrame(
@@ -170,6 +178,14 @@ actor DiarizationPreprocessor {
                         vDSP_Length(frameSize)
                     )
                 }
+            }
+            let completed = i + 1
+            let percent = completed * 100 / frameCount
+            let previousPercent = i * 100 / frameCount
+            if completed == frameCount || percent / 25 > previousPercent / 25 {
+                let elapsed = Date().timeIntervalSince(subtractionStarted)
+                let remaining = elapsed * Double(frameCount - completed) / Double(completed)
+                AppLog.transcription.atInfo.info("diarPreprocess: denoise \(percent, privacy: .public)% file=\(fileName, privacy: .public) frames=\(completed, privacy: .public)/\(frameCount, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
             }
         }
         return output

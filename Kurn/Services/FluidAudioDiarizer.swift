@@ -141,11 +141,14 @@ actor FluidAudioDiarizer: Diarizing {
             AppLog.transcription.atNotice.notice("FluidAudioDiarizer: speakerCount=\(speakerCount, privacy: .public) (pinned, KMeans re-cluster)")
         }
         if !modelsReady {
+            let preparationStarted = Date()
+            AppLog.transcription.atNotice.notice("FluidAudioDiarizer: preparing models file=\(url.lastPathComponent, privacy: .public) timeout=\(self.prepareTimeout, privacy: .public)s")
             do {
                 try await Self.withTimeout(seconds: prepareTimeout) {
                     try await self.prepareModels()
                 }
                 modelsReady = true
+                AppLog.transcription.atNotice.notice("FluidAudioDiarizer: models ready in \(Date().timeIntervalSince(preparationStarted), privacy: .public)s")
             } catch {
                 AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
                 onDownloadFailure?(error.localizedDescription)
@@ -153,8 +156,10 @@ actor FluidAudioDiarizer: Diarizing {
             }
         }
         let duration = Self.audioDuration(of: url)
+        let timeout = Self.processTimeout(forAudioDuration: duration)
+        AppLog.transcription.atNotice.notice("FluidAudioDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s timeout=\(String(format: "%.1f", timeout), privacy: .public)s")
         do {
-            let outcome = try await Self.withTimeout(seconds: Self.processTimeout(forAudioDuration: duration)) {
+            let outcome = try await Self.withTimeout(seconds: timeout) {
                 try await self.processAndMapTurns(url: url)
             }
             return outcome.turns.isEmpty
@@ -181,7 +186,26 @@ actor FluidAudioDiarizer: Diarizing {
     /// FluidAudio's own result type from having to satisfy `Sendable` — only
     /// the already-`Sendable` `[SpeakerTurn]` needs to cross the boundary.
     private func processAndMapTurns(url: URL) async throws -> DiarizationOutcome {
-        let result = try await manager.process(url)
+        let started = Date()
+        let fileName = url.lastPathComponent
+        let result = try await manager.process(url) { processed, total in
+            let safeTotal = max(1, total)
+            let safeProcessed = min(max(0, processed), safeTotal)
+            let percent = safeProcessed * 100 / safeTotal
+            let previousPercent = max(0, safeProcessed - 1) * 100 / safeTotal
+            let crossedDecile = percent / 10 > previousPercent / 10
+            guard safeProcessed == 1 || safeProcessed == safeTotal || crossedDecile else { return }
+
+            let elapsed = Date().timeIntervalSince(started)
+            let remaining = safeProcessed > 0
+                ? elapsed * Double(safeTotal - safeProcessed) / Double(safeProcessed)
+                : 0
+            if safeProcessed == safeTotal {
+                AppLog.transcription.atInfo.info("FluidAudioDiarizer: audio pass 100% file=\(fileName, privacy: .public) chunks=\(safeProcessed, privacy: .public)/\(safeTotal, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s; finalizing embeddings and clustering")
+            } else {
+                AppLog.transcription.atInfo.info("FluidAudioDiarizer: audio pass \(percent, privacy: .public)% file=\(fileName, privacy: .public) chunks=\(safeProcessed, privacy: .public)/\(safeTotal, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
+            }
+        }
         let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
         AppLog.transcription.atInfo.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
 

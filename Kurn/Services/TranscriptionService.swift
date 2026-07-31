@@ -463,11 +463,12 @@ struct TranscriptionService {
         let started = Date()
         let originalSize = (try? originalURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let originalDuration = (try? await AVURLAsset(url: originalURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
-        AppLog.transcription.atNotice.notice("diarize: start engine=\(engine.rawValue, privacy: .public) size=\(originalSize, privacy: .public) bytes duration=\(String(format: "%.1f", originalDuration), privacy: .public)s")
+        AppLog.transcription.atNotice.notice("diarize: start file=\(originalURL.lastPathComponent, privacy: .public) engine=\(engine.rawValue, privacy: .public) size=\(originalSize, privacy: .public) bytes duration=\(String(format: "%.1f", originalDuration), privacy: .public)s")
         try await ResourceGuard.requireTranscriptionHeadroom()
         let diarURL: URL
         let cleanupURL: URL?
         if diarizationPreprocessingEnabled {
+            AppLog.transcription.atInfo.info("diarize: preprocessing requested file=\(originalURL.lastPathComponent, privacy: .public) dereverb=\(diarizationDereverbEnabled, privacy: .public); shared preprocessor may queue concurrent recordings")
             do {
                 diarURL = try await diarizationPreprocessor.process(
                     url: originalURL,
