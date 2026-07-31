@@ -2,6 +2,14 @@
 //  SpeechEnhancerTests.swift
 //  KurnTests
 //
+//  The tests that render a real mix take `tempFileTestLock`, like every other
+//  suite that drives offline `AVAudioEngine` work over the shared temporary
+//  directory. Three chained renders per test is the heaviest thing in the
+//  suite, and running it unserialized alongside `RecordingCompactorTests`'
+//  export session is enough to fail that export with a bare
+//  `AVFoundationErrorDomain -11800` — a failure that reads as a compactor bug
+//  and is not one.
+//
 
 import AVFoundation
 import Foundation
@@ -67,32 +75,35 @@ struct SpeechEnhancerTests {
     /// only assertion that can catch a mistake in that arithmetic is measuring
     /// the result's lag against the source.
     @Test func theNeuralMixLandsAlignedWithTheSource() async throws {
-        let source = try Self.burstFixture()
-        defer { try? FileManager.default.removeItem(at: source) }
+        try await tempFileTestLock.run {
+            let source = try Self.burstFixture()
+            defer { try? FileManager.default.removeItem(at: source) }
 
-        let mixedURL = try await Self.renderNeuralMix(
-            from: source,
-            enhancer: InvertingEnhancer()
-        )
-        let mixed = try #require(mixedURL)
-        defer { try? FileManager.default.removeItem(at: mixed) }
+            let mixedURL = try await Self.renderNeuralMix(
+                from: source,
+                enhancer: InvertingEnhancer()
+            )
+            let mixed = try #require(mixedURL)
+            defer { try? FileManager.default.removeItem(at: mixed) }
 
-        let dry = try Self.samples(of: source)
-        let wet = try Self.samples(of: mixed)
-        let peak = Self.correlationPeak(reference: dry, signal: wet, maximum: 720)
+            let dry = try Self.samples(of: source)
+            let wet = try Self.samples(of: mixed)
+            let peak = Self.correlationPeak(reference: dry, signal: wet, maximum: 720)
 
-        // What this certifies is the arithmetic, not sub-millisecond alignment:
-        // the two resamplers in the path carry their own filter delay, which
-        // nothing compensates, so a handful of frames of residual is expected.
-        // The bound is set to clear that and still fail decisively on the
-        // mistake worth catching — a forgotten 16 kHz → 24 kHz conversion, 320
-        // frames where 480 are needed, is 160 frames out and audible at 6.7 ms.
-        #expect(abs(peak.lag) <= 64, "measured lag \(peak.lag) frames")
-        // And the wet is what came out, not the dry passing through: the
-        // enhancer inverts, so a correlation this negative can only be its
-        // output. Without this the tolerance for a short wet tail below would
-        // make an empty wet stream look perfectly aligned.
-        #expect(peak.correlation < -0.5 * peak.energy)
+            // What this certifies is the arithmetic, not sub-millisecond
+            // alignment: the two resamplers in the path carry their own filter
+            // delay, which nothing compensates, so a handful of frames of
+            // residual is expected. The bound is set to clear that and still
+            // fail decisively on the mistake worth catching — a forgotten
+            // 16 kHz → 24 kHz conversion, 320 frames where 480 are needed, is
+            // 160 frames out and audible at 6.7 ms.
+            #expect(abs(peak.lag) <= 64, "measured lag \(peak.lag) frames")
+            // And the wet is what came out, not the dry passing through: the
+            // enhancer inverts, so a correlation this negative can only be its
+            // output. Without this the tolerance for a short wet tail below
+            // would make an empty wet stream look perfectly aligned.
+            #expect(peak.correlation < -0.5 * peak.energy)
+        }
     }
 
     /// A wet stream that runs out early costs its tail, not the whole pass.
@@ -100,22 +111,24 @@ struct SpeechEnhancerTests {
     /// frames of shortfall is ordinary; reverting to DSP-only over it would
     /// discard the denoising with nothing but a log line to show for it.
     @Test func aShortWetTailKeepsTheNeuralMix() async throws {
-        let source = try Self.burstFixture()
-        defer { try? FileManager.default.removeItem(at: source) }
+        try await tempFileTestLock.run {
+            let source = try Self.burstFixture()
+            defer { try? FileManager.default.removeItem(at: source) }
 
-        // Far more than rounding: a third of a second, at the model's rate.
-        let mixedURL = try await Self.renderNeuralMix(
-            from: source,
-            enhancer: InvertingEnhancer(trimFinal: 5_000)
-        )
-        let mixed = try #require(mixedURL)
-        defer { try? FileManager.default.removeItem(at: mixed) }
+            // Far more than rounding: a third of a second, at the model's rate.
+            let mixedURL = try await Self.renderNeuralMix(
+                from: source,
+                enhancer: InvertingEnhancer(trimFinal: 5_000)
+            )
+            let mixed = try #require(mixedURL)
+            defer { try? FileManager.default.removeItem(at: mixed) }
 
-        // The output still covers the whole recording — the missing wet frames
-        // are dry, not absent.
-        let dryCount = try Self.samples(of: source).count
-        let mixedCount = try Self.samples(of: mixed).count
-        #expect(mixedCount > dryCount * 9 / 10)
+            // The output still covers the whole recording — the missing wet
+            // frames are dry, not absent.
+            let dryCount = try Self.samples(of: source).count
+            let mixedCount = try Self.samples(of: mixed).count
+            #expect(mixedCount > dryCount * 9 / 10)
+        }
     }
 
     // MARK: - Support
