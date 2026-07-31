@@ -168,7 +168,6 @@ extension PlaybackEnhancementRenderer {
                   let wet = wetBuffer.floatChannelData?[0] else {
                 return
             }
-            try wetFile.read(into: wetBuffer, frameCount: AVAudioFrameCount(count))
             // The wet stream is the source decoded to 16 kHz, enhanced, and
             // resampled back up — three passes that each round their frame
             // count, so it can end a few frames before the dry does. Mixing
@@ -176,6 +175,19 @@ extension PlaybackEnhancementRenderer {
             // tail; refusing the block throws away the whole neural pass and
             // silently reverts to DSP-only, which is a far worse trade for a
             // rounding difference.
+            //
+            // Reading only what remains is what makes that tolerance reachable:
+            // `AVAudioFile.read` past the end throws (as a bare
+            // `_GenericObjCError`) rather than returning zero frames, so asking
+            // for a full block and inspecting `frameLength` afterwards would
+            // never see the short read at all.
+            let remaining = max(0, Int(wetFile.length - wetFile.framePosition))
+            let wanted = min(count, remaining)
+            if wanted > 0 {
+                try wetFile.read(into: wetBuffer, frameCount: AVAudioFrameCount(wanted))
+            } else {
+                wetBuffer.frameLength = 0
+            }
             let available = min(count, Int(wetBuffer.frameLength))
             shortfall += count - available
             if available > 0 {
