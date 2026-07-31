@@ -721,10 +721,9 @@ private struct RecordingSegmentRow: View {
             ProgressView()
                 .progressViewStyle(.linear)
                 .tint(Theme.accent.opacity(0.5))
-        } else if phase == .diarizing {
-            // FluidAudio and its optional WPE preprocessing do not expose one
-            // continuous fraction. An indeterminate bar is more honest than
-            // leaving the completed transcription fraction parked at 100%.
+        } else if case .some(.diarizing(progress: nil)) = phase {
+            // Keep a truthful fallback for diarizers that cannot report a
+            // fraction instead of leaving transcription parked at 100%.
             ProgressView()
                 .progressViewStyle(.linear)
                 .tint(Theme.accent)

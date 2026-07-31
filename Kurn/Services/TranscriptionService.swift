@@ -11,6 +11,39 @@
 import AVFoundation
 import Foundation
 
+/// Thread-safe bridge between diarization's concurrent callbacks and the phase
+/// shown by the UI. Cloud transcription and diarization start together, but the
+/// UI must keep showing transcription until its result is complete. Progress is
+/// accumulated meanwhile and revealed atomically once Whisper finishes.
+final class DiarizationPhaseRelay: @unchecked Sendable {
+    private let lock = NSLock()
+    private var latestProgress = 0.0
+    private var isRevealed = false
+    private let onPhase: TranscriptionService.PhaseHandler
+
+    init(onPhase: @escaping TranscriptionService.PhaseHandler) {
+        self.onPhase = onPhase
+    }
+
+    func update(_ progress: Double) {
+        let phase: TranscriptionPhase? = lock.withLock {
+            let clampedProgress = min(1, max(0, progress))
+            guard clampedProgress > latestProgress else { return nil }
+            latestProgress = clampedProgress
+            return isRevealed ? .diarizing(progress: latestProgress) : nil
+        }
+        if let phase { onPhase(phase) }
+    }
+
+    func reveal() {
+        let progress = lock.withLock {
+            isRevealed = true
+            return latestProgress
+        }
+        onPhase(.diarizing(progress: progress))
+    }
+}
+
 struct TranscriptionService {
 
     /// Callback invoked as the pipeline advances through its stages. May be
@@ -176,6 +209,7 @@ struct TranscriptionService {
         let txStart = Date()
         let raw: RawTranscript
         let diarization: DiarizationOutcome
+        let diarizationProgress = DiarizationPhaseRelay(onPhase: onPhase)
         if config.transcription == .whisperAPI {
             AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
             async let rawTranscript = transcribeGated(
@@ -197,11 +231,12 @@ struct TranscriptionService {
                 diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
-                onWarning: onDiarizationWarning
+                onWarning: onDiarizationWarning,
+                onProgress: diarizationProgress.update
             )
             raw = try await rawTranscript
             AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(raw.spans.count, privacy: .public) — waiting for diarization")
-            onPhase(.diarizing)
+            diarizationProgress.reveal()
             diarization = try await speakerOutcome
             AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(diarization.turns.count, privacy: .public)")
         } else {
@@ -218,7 +253,7 @@ struct TranscriptionService {
                 onPhase: onPhase,
                 onCheckpoint: onCheckpoint
             )
-            onPhase(.diarizing)
+            diarizationProgress.reveal()
             diarization = try await diarize(
                 originalURL: fileURL,
                 engine: diarizationEngine,
@@ -226,7 +261,8 @@ struct TranscriptionService {
                 diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
-                onWarning: onDiarizationWarning
+                onWarning: onDiarizationWarning,
+                onProgress: diarizationProgress.update
             )
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
@@ -466,12 +502,14 @@ struct TranscriptionService {
         diarizationDereverbEnabled: Bool,
         regions: [SpeechRegion],
         speakerCount: Int,
-        onWarning: DiarizationWarningHandler?
+        onWarning: DiarizationWarningHandler?,
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> DiarizationOutcome {
         let started = Date()
         let originalSize = (try? originalURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let originalDuration = (try? await AVURLAsset(url: originalURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("diarize: start file=\(originalURL.lastPathComponent, privacy: .public) engine=\(engine.rawValue, privacy: .public) size=\(originalSize, privacy: .public) bytes duration=\(String(format: "%.1f", originalDuration), privacy: .public)s")
+        onProgress(0)
         try await ResourceGuard.requireTranscriptionHeadroom()
         let diarURL: URL
         let cleanupURL: URL?
@@ -480,7 +518,8 @@ struct TranscriptionService {
             do {
                 diarURL = try await diarizationPreprocessor.process(
                     url: originalURL,
-                    dereverberate: diarizationDereverbEnabled
+                    dereverberate: diarizationDereverbEnabled,
+                    onProgress: { onProgress(0.55 * $0) }
                 )
                 cleanupURL = diarURL
                 AppLog.transcription.atInfo.info("diarize: using preprocessed input \(diarURL.lastPathComponent, privacy: .public)")
@@ -498,6 +537,7 @@ struct TranscriptionService {
             cleanupURL = nil
             AppLog.transcription.atDebug.debug("diarize: preprocessor disabled, using original input")
         }
+        onProgress(0.55)
         defer {
             if let url = cleanupURL {
                 Task { [diarizationPreprocessor] in await diarizationPreprocessor.cleanup(url) }
@@ -507,20 +547,27 @@ struct TranscriptionService {
         try Task.checkCancellation()
         switch engine {
         case .heuristic:
+            onProgress(0.65)
             let turns = await heuristicDiarizer.diarize(url: diarURL, speechRegions: regions)
             try await ResourceGuard.requireTranscriptionHeadroom()
             AppLog.transcription.atNotice.notice("diarize: complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
+            onProgress(0.98)
             // No voiceprints: three scalars and one greedy clustering pass leave
             // nothing behind that could identify a voice again later.
             return DiarizationOutcome(turns: turns)
         case .fluidAudio:
+            onProgress(0.60)
             let outcome = await fluidAudioDiarizer.outcome(
-                url: diarURL, speakerCount: speakerCount, onDownloadFailure: onWarning
+                url: diarURL,
+                speakerCount: speakerCount,
+                onDownloadFailure: onWarning,
+                onProgress: { onProgress(0.60 + 0.36 * $0) }
             )
             try Task.checkCancellation()
             try await ResourceGuard.requireTranscriptionHeadroom()
             let speakers = Set(outcome.turns.map { $0.speakerLabel }).count
             AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(outcome.turns.count, privacy: .public) speakers=\(speakers, privacy: .public) voiceprints=\(outcome.voiceprints.count, privacy: .public)")
+            onProgress(0.98)
             return outcome
         }
     }

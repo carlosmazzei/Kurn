@@ -134,7 +134,8 @@ actor FluidAudioDiarizer: Diarizing {
     func outcome(
         url: URL,
         speakerCount: Int,
-        onDownloadFailure: (@Sendable (String) -> Void)?
+        onDownloadFailure: (@Sendable (String) -> Void)?,
+        onProgress: (@Sendable (Double) -> Void)? = nil
     ) async -> DiarizationOutcome {
         ensureManager(speakerCount: speakerCount)
         if speakerCount > 1 {
@@ -155,12 +156,13 @@ actor FluidAudioDiarizer: Diarizing {
                 return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
             }
         }
+        onProgress?(0)
         let duration = Self.audioDuration(of: url)
         let timeout = Self.processTimeout(forAudioDuration: duration)
         AppLog.transcription.atNotice.notice("FluidAudioDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s timeout=\(String(format: "%.1f", timeout), privacy: .public)s")
         do {
             let outcome = try await Self.withTimeout(seconds: timeout) {
-                try await self.processAndMapTurns(url: url)
+                try await self.processAndMapTurns(url: url, onProgress: onProgress)
             }
             return outcome.turns.isEmpty
                 ? DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
@@ -185,7 +187,10 @@ actor FluidAudioDiarizer: Diarizing {
     /// Same isolation reasoning as `prepareModels()`, and also keeps
     /// FluidAudio's own result type from having to satisfy `Sendable` — only
     /// the already-`Sendable` `[SpeakerTurn]` needs to cross the boundary.
-    private func processAndMapTurns(url: URL) async throws -> DiarizationOutcome {
+    private func processAndMapTurns(
+        url: URL,
+        onProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> DiarizationOutcome {
         let started = Date()
         let fileName = url.lastPathComponent
         let result = try await manager.process(url) { processed, total in
@@ -193,6 +198,9 @@ actor FluidAudioDiarizer: Diarizing {
             let safeProcessed = min(max(0, processed), safeTotal)
             let percent = safeProcessed * 100 / safeTotal
             let previousPercent = max(0, safeProcessed - 1) * 100 / safeTotal
+            if percent > previousPercent {
+                onProgress?(Double(safeProcessed) / Double(safeTotal))
+            }
             let crossedDecile = percent / 10 > previousPercent / 10
             guard safeProcessed == 1 || safeProcessed == safeTotal || crossedDecile else { return }
 
@@ -225,6 +233,7 @@ actor FluidAudioDiarizer: Diarizing {
         if !voiceprints.isEmpty {
             AppLog.transcription.atInfo.info("FluidAudioDiarizer: voiceprints for \(voiceprints.count, privacy: .public) speaker(s)")
         }
+        onProgress?(1)
         return DiarizationOutcome(turns: smoothed, voiceprints: voiceprints)
     }
 
@@ -321,11 +330,13 @@ actor FluidAudioDiarizer: Diarizing {
     func outcome(
         url: URL,
         speakerCount: Int,
-        onDownloadFailure: (@Sendable (String) -> Void)?
+        onDownloadFailure: (@Sendable (String) -> Void)?,
+        onProgress: (@Sendable (Double) -> Void)? = nil
     ) async -> DiarizationOutcome {
         let message = NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
         AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)
+        onProgress?(1)
         return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
     }
 }
