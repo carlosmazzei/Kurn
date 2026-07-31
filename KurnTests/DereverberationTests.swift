@@ -176,6 +176,23 @@ struct DereverberationTests {
         #expect(updates.map(\.completed) == Array(1...(updates.last?.total ?? 0)))
     }
 
+    @Test func exitsBeforeProcessingWhenTaskIsAlreadyCancelled() async {
+        let completedBlocks = await Task { () -> Int in
+            withUnsafeCurrentTask { $0?.cancel() }
+            let samples = STFTTests.noise(count: 16_000)
+            var count = 0
+            _ = WPEDereverberator().process(
+                samples: samples,
+                stft: STFT(frameSize: 512, hopSize: 256)
+            ) { _, _ in
+                count += 1
+            }
+            return count
+        }.value
+
+        #expect(completedBlocks == 0)
+    }
+
     // MARK: - Helpers
 
     private static func hermitianPositiveDefinite(size: Int) -> (re: [Float], im: [Float]) {

@@ -96,6 +96,8 @@ struct TranscriptionService {
         do {
             cleanedURL = try await preprocessor.process(url: fileURL)
             AppLog.transcription.atDebug.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s")
+        } catch is CancellationError {
+            throw CancellationError()
         } catch let appError as AppError {
             if case .resourceUnavailable = appError { throw appError }
             cleanedURL = fileURL
@@ -328,6 +330,8 @@ struct TranscriptionService {
         let compaction: CompactionResult?
         do {
             compaction = try await vadCompactor.compact(url: cleanedURL, regions: regions)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             try ResourceGuard.rethrowIfResourceFailure(error)
             AppLog.transcription.atError.error("transcribe: VAD compaction failed: \(error.localizedDescription, privacy: .public)")
@@ -478,6 +482,9 @@ struct TranscriptionService {
                 )
                 cleanupURL = diarURL
                 AppLog.transcription.atInfo.info("diarize: using preprocessed input \(diarURL.lastPathComponent, privacy: .public)")
+            } catch is CancellationError {
+                AppLog.transcription.atNotice.notice("diarize: preprocessing cancelled file=\(originalURL.lastPathComponent, privacy: .public)")
+                throw CancellationError()
             } catch {
                 try ResourceGuard.rethrowIfResourceFailure(error)
                 AppLog.transcription.atError.error("diarize: preprocess failed, falling back to original: \(error.localizedDescription, privacy: .public)")
@@ -495,6 +502,7 @@ struct TranscriptionService {
             }
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
+        try Task.checkCancellation()
         switch engine {
         case .heuristic:
             let turns = await heuristicDiarizer.diarize(url: diarURL, speechRegions: regions)
@@ -507,6 +515,7 @@ struct TranscriptionService {
             let outcome = await fluidAudioDiarizer.outcome(
                 url: diarURL, speakerCount: speakerCount, onDownloadFailure: onWarning
             )
+            try Task.checkCancellation()
             try await ResourceGuard.requireTranscriptionHeadroom()
             let speakers = Set(outcome.turns.map { $0.speakerLabel }).count
             AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(outcome.turns.count, privacy: .public) speakers=\(speakers, privacy: .public) voiceprints=\(outcome.voiceprints.count, privacy: .public)")
