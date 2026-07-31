@@ -64,13 +64,19 @@ struct WPEDereverberator: Sendable {
     ///
     /// Anything shorter than the delay-plus-taps history is returned untouched:
     /// there is nothing to predict from.
-    func process(samples: [Float], stft: STFT) -> [Float] {
+    func process(
+        samples: [Float],
+        stft: STFT,
+        onBlockCompleted: ((Int, Int) -> Void)? = nil
+    ) -> [Float] {
         let totalFrames = stft.frameCount(forSampleCount: samples.count)
         let context = delay + taps
         guard totalFrames > context, taps > 0, blockFrames > 0 else { return samples }
 
         var output = [Float](repeating: 0, count: samples.count)
         var blockStart = 0
+        let totalBlocks = (totalFrames + blockFrames - 1) / blockFrames
+        var completedBlocks = 0
         while blockStart < totalFrames {
             let blockEnd = min(blockStart + blockFrames, totalFrames)
             processBlock(
@@ -82,6 +88,8 @@ struct WPEDereverberator: Sendable {
                 into: &output
             )
             blockStart = blockEnd
+            completedBlocks += 1
+            onBlockCompleted?(completedBlocks, totalBlocks)
         }
         return output
     }

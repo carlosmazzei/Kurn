@@ -54,6 +54,10 @@ enum TranscriptionPhase: Sendable, Equatable {
     /// chunk number and total for long recordings so the UI can show both a bar
     /// and a "chunk X of Y" label.
     case transcribing(progress: Double?, chunks: ChunkProgress? = nil)
+    /// Assigning transcript spans to speakers. This is distinct from
+    /// transcription because the cloud transcript can already be at 100% while
+    /// the on-device diarizer is still preprocessing or analyzing a long file.
+    case diarizing
     case finalizing
 
     /// Short, user-facing description of the current stage.
@@ -78,6 +82,8 @@ enum TranscriptionPhase: Sendable, Equatable {
                 format: NSLocalizedString("phase.transcribing_progress", comment: "Transcribing with percent"),
                 percent
             )
+        case .diarizing:
+            return NSLocalizedString("phase.diarizing", comment: "Separating speakers")
         case .finalizing: return NSLocalizedString("phase.finalizing", comment: "Finalizing")
         }
     }
@@ -93,8 +99,9 @@ enum TranscriptionPhase: Sendable, Equatable {
         case .preprocessing: return 0.15
         case .detectingLanguage: return 0.22
         case .detectingSpeech: return 0.28
-        case .transcribing(let progress, _): return 0.30 + 0.62 * min(1, max(0, progress ?? 0))
-        case .finalizing: return 0.95
+        case .transcribing(let progress, _): return 0.30 + 0.55 * min(1, max(0, progress ?? 0))
+        case .diarizing: return 0.90
+        case .finalizing: return 0.97
         }
     }
 }

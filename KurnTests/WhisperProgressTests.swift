@@ -52,4 +52,13 @@ struct WhisperProgressTests {
         #expect(names.allSatisfy { !$0.isEmpty })
         #expect(Set(names).count == phases.count)
     }
+
+    @Test func diarizationHasAnHonestPhaseAfterCompletedTranscription() {
+        let completedTranscription = TranscriptionPhase.transcribing(progress: 1, chunks: nil)
+        let diarization = TranscriptionPhase.diarizing
+
+        #expect(diarization.displayName != completedTranscription.displayName)
+        #expect(diarization.fractionComplete > completedTranscription.fractionComplete)
+        #expect(diarization.fractionComplete < TranscriptionPhase.finalizing.fractionComplete)
+    }
 }

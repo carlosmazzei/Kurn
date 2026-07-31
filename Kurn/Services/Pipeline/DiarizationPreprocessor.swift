@@ -52,7 +52,19 @@ actor DiarizationPreprocessor {
             let dereverbStart = Date()
             samples = WPEDereverberator().process(
                 samples: samples,
-                stft: STFT(frameSize: Self.fftFrameSize, hopSize: Self.fftHopSize)
+                stft: STFT(frameSize: Self.fftFrameSize, hopSize: Self.fftHopSize),
+                onBlockCompleted: { completed, total in
+                    let percent = completed * 100 / max(1, total)
+                    let previousPercent = max(0, completed - 1) * 100 / max(1, total)
+                    let crossedDecile = percent / 10 > previousPercent / 10
+                    guard completed == 1 || completed == total || crossedDecile else { return }
+
+                    let elapsed = Date().timeIntervalSince(dereverbStart)
+                    let remaining = completed > 0
+                        ? elapsed * Double(total - completed) / Double(completed)
+                        : 0
+                    AppLog.transcription.atInfo.info("diarPreprocess: dereverb \(percent, privacy: .public)% file=\(fileName, privacy: .public) blocks=\(completed, privacy: .public)/\(total, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
+                }
             )
             AppLog.transcription.atInfo.info("diarPreprocess: dereverb done in \(Date().timeIntervalSince(dereverbStart), privacy: .public)s")
             try await ResourceGuard.requireTranscriptionHeadroom()

@@ -309,6 +309,7 @@
 "phase.transcribing" = "正在转录…";
 "phase.transcribing_progress" = "正在转录… %d%%";
 "phase.transcribing_chunk_progress" = "正在转录… %d%%（第 %d / %d 块）";
+"phase.diarizing" = "正在分离说话人…";
 "phase.finalizing" = "正在完成…";
 "post_phase.generating_title" = "正在生成标题…";
 "post_phase.indexing" = "正在索引转录…";

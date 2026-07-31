@@ -197,6 +197,7 @@ struct TranscriptionService {
             )
             raw = try await rawTranscript
             AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(raw.spans.count, privacy: .public) — waiting for diarization")
+            onPhase(.diarizing)
             diarization = try await speakerOutcome
             AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(diarization.turns.count, privacy: .public)")
         } else {
@@ -213,6 +214,7 @@ struct TranscriptionService {
                 onPhase: onPhase,
                 onCheckpoint: onCheckpoint
             )
+            onPhase(.diarizing)
             diarization = try await diarize(
                 originalURL: fileURL,
                 engine: diarizationEngine,
