@@ -27,14 +27,20 @@ actor DiarizationPreprocessor {
     /// Render the diarization-friendly mono 16 kHz Float32 WAV copy to the
     /// temporary directory and return its URL. Caller owns the file and should
     /// `cleanup` it when done.
-    func process(url: URL, dereverberate: Bool = false) async throws -> URL {
+    func process(
+        url: URL,
+        dereverberate: Bool = false,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> URL {
         try await ResourceGuard.requireTranscriptionHeadroom()
         let started = Date()
         let fileName = url.lastPathComponent
         AppLog.transcription.atNotice.notice("diarPreprocess: started file=\(fileName, privacy: .public)")
 
         let decodeStarted = Date()
-        var samples = try await decodeHighPassedMonoSamples(url: url)
+        var samples = try await decodeHighPassedMonoSamples(url: url) { progress in
+            onProgress?(0.15 * progress)
+        }
         guard samples.count >= Self.fftFrameSize else {
             AppLog.transcription.atError.error("diarPreprocess: too few samples after decode (\(samples.count, privacy: .public))")
             throw AppError.audioError(
@@ -61,6 +67,7 @@ actor DiarizationPreprocessor {
                 samples: samples,
                 stft: STFT(frameSize: Self.fftFrameSize, hopSize: Self.fftHopSize),
                 onBlockCompleted: { completed, total in
+                    onProgress?(0.15 + 0.35 * Double(completed) / Double(max(1, total)))
                     let percent = completed * 100 / max(1, total)
                     let previousPercent = max(0, completed - 1) * 100 / max(1, total)
                     let crossedDecile = percent / 10 > previousPercent / 10
@@ -79,16 +86,21 @@ actor DiarizationPreprocessor {
         }
 
         let denoiseStart = Date()
-        samples = denoise(samples, fileName: fileName)
+        let denoiseStartProgress = runDereverberation ? 0.50 : 0.15
+        samples = denoise(samples, fileName: fileName) { progress in
+            onProgress?(denoiseStartProgress + (0.90 - denoiseStartProgress) * progress)
+        }
         AppLog.transcription.atInfo.info("diarPreprocess: denoise complete file=\(fileName, privacy: .public) elapsed=\(String(format: "%.1f", Date().timeIntervalSince(denoiseStart)), privacy: .public)s samples=\(samples.count, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
         normalizePeakInPlace(&samples, targetDBFS: Self.targetPeakDBFS)
+        onProgress?(0.94)
         try await ResourceGuard.requireTranscriptionHeadroom()
 
         AppLog.transcription.atInfo.info("diarPreprocess: writing WAV file=\(fileName, privacy: .public)")
         var outURL: URL?
         let writtenURL = try writeWAV(samples: samples)
+        onProgress?(1)
         outURL = writtenURL
         defer {
             if let url = outURL { cleanup(url) }
@@ -114,7 +126,10 @@ actor DiarizationPreprocessor {
     /// reuses the same player-node offline-render path as `AudioPreprocessor`
     /// and `VADAudioLoader` because `AVAudioFile.read` / `AVAudioConverter`
     /// silently fail on the app's compressed AAC `.m4a` files.
-    private func decodeHighPassedMonoSamples(url: URL) async throws -> [Float] {
+    private func decodeHighPassedMonoSamples(
+        url: URL,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> [Float] {
         let failure = AppError.audioError(
             NSLocalizedString("error.audio_cleanup", comment: "Audio cleanup failed")
         )
@@ -145,7 +160,7 @@ actor DiarizationPreprocessor {
         )
 
         var samples: [Float] = []
-        try await renderer.render(url: url) { buffer in
+        try await renderer.render(url: url, onProgress: onProgress) { buffer in
             guard let channel = buffer.floatChannelData, buffer.frameLength > 0 else { return }
             samples.append(
                 contentsOf: UnsafeBufferPointer(start: channel[0], count: Int(buffer.frameLength))
@@ -161,7 +176,11 @@ actor DiarizationPreprocessor {
     /// RMS), which approximates the spectral profile of a continuous fan / HVAC
     /// background. Each frame's magnitude is reduced by `α · noise[bin]`, with
     /// a floor of `β · noise[bin]` to prevent musical noise from over-subtraction.
-    private func denoise(_ samples: [Float], fileName: String) -> [Float] {
+    private func denoise(
+        _ samples: [Float],
+        fileName: String,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) -> [Float] {
         let frameSize = Self.fftFrameSize
         let hopSize = Self.fftHopSize
         let stft = STFT(frameSize: frameSize, hopSize: hopSize)
@@ -202,6 +221,9 @@ actor DiarizationPreprocessor {
             let completed = i + 1
             let percent = completed * 100 / frameCount
             let previousPercent = i * 100 / frameCount
+            if percent > previousPercent {
+                onProgress?(Double(completed) / Double(frameCount))
+            }
             if completed == frameCount || percent / 25 > previousPercent / 25 {
                 let elapsed = Date().timeIntervalSince(subtractionStarted)
                 let remaining = elapsed * Double(frameCount - completed) / Double(completed)

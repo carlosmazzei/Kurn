@@ -77,6 +77,7 @@ struct OfflineAudioRenderer {
     func render(
         url: URL,
         isolation: isolated (any Actor)? = #isolation,
+        onProgress: ((Double) -> Void)? = nil,
         onBuffer: (AVAudioPCMBuffer) throws -> Void
     ) async throws -> AVAudioFramePosition {
         let inputFile = try AVAudioFile(forReading: url)
@@ -118,6 +119,7 @@ struct OfflineAudioRenderer {
 
         var resourceCheckCounter = 0
         var lastLoggedProgress = 0.0
+        var lastReportedPercent = -1
         renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
             if resourceCheckCounter.isMultiple(of: 128) {
                 try await ResourceGuard.requireTranscriptionHeadroom()
@@ -152,6 +154,11 @@ struct OfflineAudioRenderer {
             }
             // Log progress at ~25% increments so a slow/stuck render is visible.
             let progress = Double(engine.manualRenderingSampleTime) / Double(max(1, expectedOutFrames))
+            let reportedPercent = min(100, max(0, Int(progress * 100)))
+            if reportedPercent > lastReportedPercent {
+                lastReportedPercent = reportedPercent
+                onProgress?(Double(reportedPercent) / 100)
+            }
             if progress - lastLoggedProgress >= 0.25 {
                 lastLoggedProgress = progress
                 AppLog.transcription.atDebug.debug("\(self.logLabel, privacy: .public): render progress \(Int(progress * 100), privacy: .public)%")

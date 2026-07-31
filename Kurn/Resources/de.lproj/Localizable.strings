@@ -310,6 +310,7 @@
 "phase.transcribing_progress" = "Wird transkribiert… %d%%";
 "phase.transcribing_chunk_progress" = "Wird transkribiert… %d%% (Abschnitt %d von %d)";
 "phase.diarizing" = "Sprecher werden getrennt…";
+"phase.diarizing_progress" = "Sprecher werden getrennt… %d%%";
 "phase.finalizing" = "Wird abgeschlossen…";
 "post_phase.generating_title" = "Titel wird erstellt…";
 "post_phase.indexing" = "Transkript wird indexiert…";

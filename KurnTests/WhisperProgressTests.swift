@@ -55,10 +55,48 @@ struct WhisperProgressTests {
 
     @Test func diarizationHasAnHonestPhaseAfterCompletedTranscription() {
         let completedTranscription = TranscriptionPhase.transcribing(progress: 1, chunks: nil)
-        let diarization = TranscriptionPhase.diarizing
+        let earlyDiarization = TranscriptionPhase.diarizing(progress: 0.2)
+        let lateDiarization = TranscriptionPhase.diarizing(progress: 0.8)
 
-        #expect(diarization.displayName != completedTranscription.displayName)
-        #expect(diarization.fractionComplete > completedTranscription.fractionComplete)
-        #expect(diarization.fractionComplete < TranscriptionPhase.finalizing.fractionComplete)
+        #expect(earlyDiarization.displayName != completedTranscription.displayName)
+        #expect(earlyDiarization.displayName != lateDiarization.displayName)
+        #expect(earlyDiarization.fractionComplete > completedTranscription.fractionComplete)
+        #expect(lateDiarization.fractionComplete > earlyDiarization.fractionComplete)
+        #expect(lateDiarization.fractionComplete < TranscriptionPhase.finalizing.fractionComplete)
+    }
+
+    @Test func concurrentDiarizationProgressWaitsForTranscriptionAndNeverRegresses() {
+        let snapshots = PhaseSnapshots()
+        let relay = DiarizationPhaseRelay { snapshots.append($0) }
+
+        relay.update(0.2)
+        relay.update(0.6)
+        #expect(snapshots.values.isEmpty)
+
+        relay.reveal()
+        relay.update(0.4)
+        relay.update(0.8)
+
+        #expect(snapshots.diarizationProgress == [0.6, 0.8])
+    }
+}
+
+private final class PhaseSnapshots: @unchecked Sendable {
+    private let lock = NSLock()
+    private var phases: [TranscriptionPhase] = []
+
+    func append(_ phase: TranscriptionPhase) {
+        lock.withLock { phases.append(phase) }
+    }
+
+    var values: [TranscriptionPhase] {
+        lock.withLock { phases }
+    }
+
+    var diarizationProgress: [Double] {
+        values.compactMap { phase in
+            guard case .diarizing(let progress) = phase else { return nil }
+            return progress
+        }
     }
 }
