@@ -302,31 +302,47 @@ private struct StreamState {
             values[bin * 2 + 1] = imaginary[bin]
         }
 
-        let provider = try MLDictionaryFeatureProvider(dictionary: [
-            config.spectrumInput: MLFeatureValue(multiArray: spectrum),
-            config.stateInput: MLFeatureValue(multiArray: recurrentState)
-        ])
-        let prediction = try model.prediction(from: provider)
-        guard let enhanced = prediction.featureValue(
-            for: config.spectrumOutput
-        )?.multiArrayValue,
-        let nextState = prediction.featureValue(
-            for: config.stateOutput
-        )?.multiArrayValue,
-        enhanced.count == config.binCount * 2,
-        nextState.count == config.stateSize else {
-            throw EnhancementInferenceError.invalidOutput
-        }
+        // CoreML's prediction objects and feature providers own autoreleased
+        // IOSurface-backed buffers on the Neural Engine. A long recording runs
+        // tens of thousands of frames on one cooperative-pool thread, which has
+        // no useful outer autorelease-pool boundary. Without draining here the
+        // process eventually reaches the per-client IOSurface limit and CoreML
+        // raises an NSException. Copying the returned recurrent state into the
+        // existing input tensor also lets its output surface die with this pool.
+        try autoreleasepool {
+            let provider = try MLDictionaryFeatureProvider(dictionary: [
+                config.spectrumInput: MLFeatureValue(multiArray: spectrum),
+                config.stateInput: MLFeatureValue(multiArray: recurrentState)
+            ])
+            let prediction = try model.prediction(from: provider)
+            guard let enhanced = prediction.featureValue(
+                for: config.spectrumOutput
+            )?.multiArrayValue,
+            let nextState = prediction.featureValue(
+                for: config.stateOutput
+            )?.multiArrayValue,
+            enhanced.count == config.binCount * 2,
+            nextState.count == config.stateSize else {
+                throw EnhancementInferenceError.invalidOutput
+            }
 
-        let enhancedValues = enhanced.dataPointer.bindMemory(
-            to: Float.self,
-            capacity: config.binCount * 2
-        )
-        for bin in 0..<config.binCount {
-            real[bin] = enhancedValues[bin * 2]
-            imaginary[bin] = enhancedValues[bin * 2 + 1]
+            let enhancedValues = enhanced.dataPointer.bindMemory(
+                to: Float.self,
+                capacity: config.binCount * 2
+            )
+            for bin in 0..<config.binCount {
+                real[bin] = enhancedValues[bin * 2]
+                imaginary[bin] = enhancedValues[bin * 2 + 1]
+            }
+            let nextStateValues = nextState.dataPointer.bindMemory(
+                to: Float.self,
+                capacity: config.stateSize
+            )
+            recurrentState.dataPointer.assumingMemoryBound(to: Float.self).update(
+                from: nextStateValues,
+                count: config.stateSize
+            )
         }
-        recurrentState = nextState
         let frame = stft.inverse(real: real, imag: imaginary, offset: 0)
         for index in 0..<config.frameSize {
             overlap[index] += frame[index]
