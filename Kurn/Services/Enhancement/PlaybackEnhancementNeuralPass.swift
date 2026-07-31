@@ -95,7 +95,7 @@ extension PlaybackEnhancementRenderer {
     private static func enhancePCM(
         _ inputURL: URL,
         to outputURL: URL,
-        enhancer: SpeechEnhancer,
+        enhancer: any SpeechEnhancing,
         streamID: UUID,
         failure: AppError
     ) async throws {
@@ -154,6 +154,7 @@ extension PlaybackEnhancementRenderer {
             sampleRate: Self.outputSampleRate
         )
         var mixed = [Float](repeating: 0, count: 4_096)
+        var shortfall = 0
         let renderer = OfflineAudioRenderer(
             outputFormat: format,
             failure: failure,
@@ -168,24 +169,36 @@ extension PlaybackEnhancementRenderer {
                 return
             }
             try wetFile.read(into: wetBuffer, frameCount: AVAudioFrameCount(count))
-            guard Int(wetBuffer.frameLength) == count else {
-                throw NeuralPassError.shortWetStream
-            }
-            mixed.withUnsafeMutableBufferPointer { mixedPointer in
-                PlaybackMix.mixAligned(
-                    dry: UnsafePointer(dry),
-                    wet: UnsafePointer(wet),
-                    output: mixedPointer.baseAddress!,
-                    count: count,
-                    wetMix: tuning.wetMix
-                )
-            }
-            mixed.withUnsafeBufferPointer { mixedPointer in
-                dry.update(from: mixedPointer.baseAddress!, count: count)
+            // The wet stream is the source decoded to 16 kHz, enhanced, and
+            // resampled back up — three passes that each round their frame
+            // count, so it can end a few frames before the dry does. Mixing
+            // what exists and leaving the remainder dry costs an inaudible
+            // tail; refusing the block throws away the whole neural pass and
+            // silently reverts to DSP-only, which is a far worse trade for a
+            // rounding difference.
+            let available = min(count, Int(wetBuffer.frameLength))
+            shortfall += count - available
+            if available > 0 {
+                mixed.withUnsafeMutableBufferPointer { mixedPointer in
+                    PlaybackMix.mixAligned(
+                        dry: UnsafePointer(dry),
+                        wet: UnsafePointer(wet),
+                        output: mixedPointer.baseAddress!,
+                        count: available,
+                        wetMix: tuning.wetMix
+                    )
+                }
+                mixed.withUnsafeBufferPointer { mixedPointer in
+                    dry.update(from: mixedPointer.baseAddress!, count: available)
+                }
             }
             try outputFile?.write(from: dryBuffer)
         }
         outputFile = nil
+        if shortfall > 0 {
+            let seconds = Double(shortfall) / Self.outputSampleRate
+            AppLog.recorder.atNotice.notice("enhance: wet stream ended \(shortfall, privacy: .public) frames (\(seconds, privacy: .public)s) early; that tail is dry")
+        }
     }
 
     private static func makePCMFile(at url: URL, sampleRate: Double) throws -> AVAudioFile {
@@ -230,5 +243,4 @@ extension PlaybackEnhancementRenderer {
 
 private enum NeuralPassError: Error {
     case inferenceFailed
-    case shortWetStream
 }

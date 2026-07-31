@@ -44,7 +44,7 @@ struct PlaybackEnhancementRenderer: Sendable {
     private static let outputBitRate = 64_000
 
     var tuning: PlaybackTuning = .listening
-    var enhancer: SpeechEnhancer = .shared
+    var enhancer: any SpeechEnhancing = SpeechEnhancer.shared
 
     /// Render the enhanced copy for `fileName` and move it into the enhanced
     /// directory. Returns its size in bytes.

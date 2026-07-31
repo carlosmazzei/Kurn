@@ -356,16 +356,42 @@ reporting the **logical** recording name — the whole UI keys row-to-player
 identity off `player.loadedFileName == recording.fileName`, so the variant must
 stay an internal detail of which URL to open.
 
-The neural denoise stage is optional and currently unbuilt: `SpeechEnhancer`
-reports no model and the renderer runs its DSP chain alone. The model is
-converted from DPDFNet's ONNX release by `Tools/dpdfnet/`, which needs macOS and
-`coremltools`. That absence is a supported configuration — denoising removes the
-noise *around* a quiet talker without making the talker louder, which is the
-compressor's and the normalization's job. Nothing calls `SpeechEnhancer` yet, on
-purpose: a frame-by-frame model does not drop into the renderer's
-`AVAudioEngine` chain, so the decode/enhance/mix pass around it — and the dry/wet
-ratio that pass needs — lands with the inference loop, where it can be run
-against a real model instead of a stub that always returns `nil`.
+The chain is preceded by a neural denoise pass
+(`Services/Enhancement/PlaybackEnhancementNeuralPass.swift`) running DPDFNet,
+converted from its ONNX release by `Tools/dpdfnet/` (macOS + `coremltools`) and
+driven frame by frame by `SpeechEnhancer` over the existing `Pipeline/STFT.swift`.
+
+**Running with no model installed stays a supported configuration**, not a
+degraded one: `SpeechEnhancer` returns `nil`, `renderNeuralMix` returns `nil`,
+and the DSP chain renders the source directly. Denoising is the smaller half of
+making a far-table voice audible — it removes the noise *around* a quiet talker
+without making the talker louder, which is the compressor's and the loudness
+normalization's job.
+
+The model is 16 kHz, so the pass is **decode → enhance → resample → mix**, file
+backed at every step (Float32 `.caf` in the temp directory) so memory stays
+bounded by one 4096-frame block rather than the whole meeting. Four things about
+it are load bearing:
+
+- **The dry/wet sum** (`PlaybackTuning.wetMix`, 0.85) is not a hedge against the
+  model. It restores the 8–12 kHz band a 16 kHz model cannot represent, which is
+  otherwise simply gone from the enhanced copy.
+- **`latencyFrames` is the number a mistake in is audible.** The enhancer emits
+  one leading STFT frame before any real output; `PlaybackMix` removes it, and
+  summing dry against wet without doing so is a comb filter — the exact artefact
+  the mix exists to avoid. `SpeechEnhancing` carries the whole blockwise API for
+  this reason alone: `SpeechEnhancerTests` substitutes an enhancer that inverts
+  its input and cross-correlates the rendered result against the source, so a
+  wrong latency fails. Asserting `PlaybackMix` alone cannot — it is handed the
+  delay it then compensates.
+- **A short wet tail is tolerated, not fatal.** Three stages each round their
+  frame count, so the wet stream can end a few frames before the dry. Those
+  frames are left dry and logged; throwing would discard the entire neural pass
+  and silently revert to DSP-only over a rounding difference.
+- **`STFT` accepts the model's 320-sample frame** because
+  `vDSP.DiscreteFourierTransform` takes `f·2ⁿ` for `f ∈ {1,3,5,15}` and 320 =
+  5·2⁶. Do not zero-pad to 512 — that changes the framing to something the model
+  was not trained on.
 
 `ModelStoreProtection` (`Infrastructure/ModelStoreProtection.swift`) applies
 the same `.completeUnlessOpen` file protection to the SwiftData store itself
