@@ -25,10 +25,32 @@ import CoreML
 import Foundation
 
 /// Removes background noise from mono 16 kHz speech.
+///
+/// The blockwise half of this protocol is what the renderer actually calls, and
+/// it is here rather than on the concrete type so a test can substitute a known
+/// signal for the model's output. Without that seam the only assertable part of
+/// the neural pass is `PlaybackMix`'s pointer arithmetic — which is given the
+/// latency to compensate rather than deriving it, so it cannot catch a wrong
+/// `latencyFrames`, the one number a mistake in would comb-filter every
+/// enhanced copy.
 protocol SpeechEnhancing: Sendable {
     /// Enhanced samples, or `nil` when no model is available. Never throws: a
     /// missing or broken model degrades the render, it does not fail it.
     func enhance(samples: [Float]) async -> [Float]?
+
+    /// Opens a blockwise render. State and STFT overlap carry across the calls
+    /// made under the returned identifier; `nil` means no model.
+    func beginStream() async -> UUID?
+
+    /// Enhances one block of the stream. The first call also emits the leading
+    /// latency, which `latencyFrames(at:)` describes and the mix removes.
+    func enhance(samples: [Float], streamID: UUID, isFinal: Bool) async -> [Float]?
+
+    func endStream(_ streamID: UUID) async
+
+    /// Frames of leading silence the output carries, expressed at `sampleRate`
+    /// rather than the model's — the mix happens after the resample back up.
+    func latencyFrames(at sampleRate: Double) async -> Int?
 }
 
 /// Description of a converted model, emitted alongside the `.mlpackage` by
