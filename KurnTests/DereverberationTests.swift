@@ -159,6 +159,23 @@ struct DereverberationTests {
         #expect(processed.allSatisfy { $0.isFinite })
     }
 
+    @Test func reportsEveryCompletedProcessingBlock() {
+        let samples = STFTTests.noise(count: 16_000)
+        let stft = STFT(frameSize: 512, hopSize: 256)
+        var updates: [(completed: Int, total: Int)] = []
+        var dereverberator = WPEDereverberator()
+        dereverberator.blockFrames = 8
+
+        _ = dereverberator.process(samples: samples, stft: stft) { completed, total in
+            updates.append((completed, total))
+        }
+
+        #expect(updates.count > 1)
+        #expect(updates.first?.completed == 1)
+        #expect(updates.last?.completed == updates.last?.total)
+        #expect(updates.map(\.completed) == Array(1...(updates.last?.total ?? 0)))
+    }
+
     // MARK: - Helpers
 
     private static func hermitianPositiveDefinite(size: Int) -> (re: [Float], im: [Float]) {

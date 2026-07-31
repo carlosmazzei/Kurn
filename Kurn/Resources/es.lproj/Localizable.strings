@@ -309,6 +309,7 @@
 "phase.transcribing" = "Transcribiendo…";
 "phase.transcribing_progress" = "Transcribiendo… %d%%";
 "phase.transcribing_chunk_progress" = "Transcribiendo… %d%% (fragmento %d de %d)";
+"phase.diarizing" = "Separando hablantes…";
 "phase.finalizing" = "Finalizando…";
 "post_phase.generating_title" = "Generando título…";
 "post_phase.indexing" = "Indexando transcripción…";
