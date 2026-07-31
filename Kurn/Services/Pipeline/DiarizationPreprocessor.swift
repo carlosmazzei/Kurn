@@ -48,7 +48,14 @@ actor DiarizationPreprocessor {
         // Dereverberation runs *before* noise reduction on purpose: WPE's linear
         // prediction model assumes the additive noise is small, and spectral
         // subtraction ahead of it would distort the very structure it fits.
-        if dereverberate {
+        let runDereverberation = Self.shouldDereverberate(
+            requested: dereverberate,
+            audioDuration: decodedDuration
+        )
+        if dereverberate, !runDereverberation {
+            AppLog.transcription.atNotice.notice("diarPreprocess: dereverb skipped file=\(fileName, privacy: .public) audio=\(String(format: "%.1f", decodedDuration), privacy: .public)s exceeds limit=\(String(format: "%.1f", Self.maximumDereverberationDuration), privacy: .public)s; continuing with denoise")
+        }
+        if runDereverberation {
             let dereverbStart = Date()
             samples = WPEDereverberator().process(
                 samples: samples,
@@ -319,6 +326,17 @@ actor DiarizationPreprocessor {
     }
 
     // MARK: - Constants
+
+    /// The current scalar WPE implementation is slower than real time on an
+    /// iPhone (the observed 25-minute recording estimated ~38 minutes just for
+    /// this optional pass). Keep it available for short clips, but never let an
+    /// experimental enhancement block normal meeting diarization for tens of
+    /// minutes. Noise reduction and FluidAudio still run when WPE is skipped.
+    static let maximumDereverberationDuration: TimeInterval = 5 * 60
+
+    static func shouldDereverberate(requested: Bool, audioDuration: TimeInterval) -> Bool {
+        requested && audioDuration <= maximumDereverberationDuration
+    }
 
     private static let targetSampleRate: Double = 16_000
     private static let targetPeakDBFS: Float = -3.0

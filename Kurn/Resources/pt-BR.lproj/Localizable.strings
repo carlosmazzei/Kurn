@@ -516,7 +516,7 @@
 "settings.diarization_speaker_count_footer" = "Defina quando você souber quantas pessoas participaram da reunião. No modo automático o mecanismo decide, e o Kurn reagrupa o áudio por conta própria se o mecanismo tiver juntado todos em um único interlocutor.";
 "settings.diarization_preprocessing" = "Limpeza de Áudio para Diarização";
 "settings.diarization_dereverb" = "Desreverberação (Experimental)";
-"settings.diarization_dereverb_footer" = "Remove o eco da sala do áudio que a separação de interlocutores analisa. Pode ajudar quando o celular fica sobre a mesa de reunião, mas acrescenta tempo de processamento e o ganho ainda não foi medido nas suas gravações.";
+"settings.diarization_dereverb_footer" = "Remove o eco da sala em gravações curtas (até 5 minutos). Gravações maiores ignoram esta etapa experimental e lenta e seguem diretamente para a separação de interlocutores.";
 "detail.playback_enhancement" = "Áudio realçado";
 "common.on" = "Ligado";
 "common.off" = "Desligado";
