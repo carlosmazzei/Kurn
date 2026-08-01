@@ -1,3 +1,8 @@
+> Looking to compare pipeline configurations (cleanup on/off, diarizer, ASR
+> engine) instead of scoring one hypothesis at a time, or to run this
+> unattended in CI? That's `public_datasets/` — this file is specifically
+> about your own recordings, which cannot leave your machine.
+
 # Measuring accuracy on your own recordings
 
 Every accuracy claim about this app's pipeline — "Whisper's own thresholds",

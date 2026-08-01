@@ -54,3 +54,5 @@ fastlane/README.md
 # Misc
 *.log
 *.tmp
+__pycache__/
+*.pyc
