@@ -5,17 +5,12 @@
 //  Shared synthetic-audio generators. Replaces the per-file `makeToneFile`
 //  copies that used to live in AudioPreprocessorTests / RecordingRecoveryTests.
 //
-//  Three flavours:
+//  Two flavours:
 //   - `m4aTone` writes a lossy AAC .m4a, matching how the app records audio
 //     (used by the preprocessor / recovery / chunker tests).
 //   - `wav` writes lossless Linear PCM so silence is *exactly* silent and tones
 //     are clean — important for the DSP/diarization tests, where AAC encoder
 //     noise could otherwise blur silence gaps or timbre features.
-//   - `prerecordedM4A` copies an AAC file that ships with the test bundle, for
-//     the tests whose subject *is* reading and re-encoding an .m4a. Encoding
-//     the input on the simulator makes those tests depend on the AAC writer
-//     they are not testing, and an unfinalized container there is
-//     indistinguishable from the failure they look for.
 //
 
 import AVFoundation
@@ -23,34 +18,6 @@ import Foundation
 @testable import Kurn
 
 enum AudioFixtures {
-
-    /// The AAC files checked into `KurnTests/Support/Fixtures`, copied into the
-    /// test bundle by the synchronized `KurnTests` group.
-    enum Prerecorded: String {
-        /// 6 s mono sine at 44.1 kHz / 128 kbps — the shape the recorder
-        /// produced before the fixed 24 kHz storage format, i.e. worth
-        /// compacting.
-        case tone44kHz128kbps6s = "tone-44100-128kbps-6s"
-        /// 2 s mono sine at 16 kHz, as a narrowband Bluetooth route would have
-        /// produced: already below the storage rate.
-        case tone16kHz2s = "tone-16000-2s"
-    }
-
-    /// Copy a prerecorded fixture to `url`, replacing whatever is there.
-    @discardableResult
-    static func prerecordedM4A(_ fixture: Prerecorded, at url: URL) throws -> URL {
-        guard let source = Bundle(for: BundleToken.self)
-            .url(forResource: fixture.rawValue, withExtension: "m4a") else {
-            throw AppError.audioError("Fixture \(fixture.rawValue).m4a is missing from the test bundle")
-        }
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try? FileManager.default.removeItem(at: url)
-        try FileManager.default.copyItem(at: source, to: url)
-        return url
-    }
 
     /// A unique throwaway URL in the temporary directory.
     static func tempURL(ext: String = "m4a") -> URL {
@@ -158,7 +125,3 @@ enum AudioFixtures {
         return url
     }
 }
-
-/// Locates the test bundle: `Bundle(for:)` needs a class, and the suites are
-/// Swift Testing structs.
-private final class BundleToken {}
