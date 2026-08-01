@@ -10,10 +10,10 @@ Regenerate with:
 
 ```bash
 ffmpeg -f lavfi -i "sine=frequency=440:sample_rate=44100:duration=3.0" \
-  -ac 1 -c:a aac -b:a 64k tone-44100-64kbps-3s.m4a
+  -ac 1 -c:a aac -b:a 64k -movflags +faststart tone-44100-64kbps-3s.m4a
 
 ffmpeg -f lavfi -i "sine=frequency=440:sample_rate=16000:duration=2.0" \
-  -ac 1 -c:a aac tone-16000-2s.m4a
+  -ac 1 -c:a aac -movflags +faststart tone-16000-2s.m4a
 ```
 
 - `tone-44100-64kbps-3s.m4a` — the shape the recorder produced before the fixed
