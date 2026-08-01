@@ -27,9 +27,10 @@ enum AudioFixtures {
     /// The AAC files checked into `KurnTests/Support/Fixtures`, copied into the
     /// test bundle by the synchronized `KurnTests` group.
     enum Prerecorded: String {
-        /// 3 s mono sine at 44.1 kHz / 64 kbps — the shape the recorder produced
-        /// before the fixed 24 kHz storage format, i.e. worth compacting.
-        case tone44kHz64kbps3s = "tone-44100-64kbps-3s"
+        /// 6 s mono sine at 44.1 kHz / 128 kbps — the shape the recorder
+        /// produced before the fixed 24 kHz storage format, i.e. worth
+        /// compacting.
+        case tone44kHz128kbps6s = "tone-44100-128kbps-6s"
         /// 2 s mono sine at 16 kHz, as a narrowband Bluetooth route would have
         /// produced: already below the storage rate.
         case tone16kHz2s = "tone-16000-2s"
