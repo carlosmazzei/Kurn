@@ -18,6 +18,7 @@ import SwiftUI
 struct StorageSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelDownloadController.self) private var downloads
+    @Environment(PlaybackEnhancementViewModel.self) private var enhancement
     @Environment(\.modelContext) private var modelContext
 
     @State private var storageText = "—"
@@ -28,6 +29,9 @@ struct StorageSettingsView: View {
     /// Result of the temp-file cleanup (files count + bytes) to show in an alert.
     @State private var cacheCleanupResult: (files: Int, bytes: Int64)?
     @State private var showingClearCacheConfirm = false
+    /// Current size of derived enhanced copies that can be reclaimed.
+    @State private var enhancedAudioBytes: Int64 = 0
+    @State private var showingDeleteEnhancedConfirm = false
     /// Created lazily in `.task` because it needs the environment's model context.
     @State var compaction: RecordingCompactionViewModel?
     @State var showingCompactConfirm = false
@@ -43,6 +47,21 @@ struct StorageSettingsView: View {
                     NSLocalizedString("settings.free_space", comment: "Free space"),
                     value: freeSpaceText
                 )
+                if enhancedAudioBytes > 0 {
+                    Button {
+                        showingDeleteEnhancedConfirm = true
+                    } label: {
+                        HStack {
+                            Label(
+                                NSLocalizedString("settings.storage.enhanced_audio", comment: "Enhanced audio"),
+                                systemImage: "trash"
+                            )
+                            Spacer()
+                            Text(AudioFileStore.formattedSize(enhancedAudioBytes))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                }
                 Button {
                     Task { @MainActor in
                         cacheCleanupPreview = await loadCacheCleanupPreview()
@@ -78,11 +97,16 @@ struct StorageSettingsView: View {
             compaction?.refresh(targetBitRate: settings.audioQuality.bitRate)
             refreshStorage()
             cacheCleanupPreview = await loadCacheCleanupPreview()
+            enhancedAudioBytes = await loadEnhancedAudioBytes()
             downloads.refreshInstalledModels()
         }
         .errorAlert(Binding(
             get: { compaction?.error },
             set: { compaction?.error = $0 }
+        ))
+        .errorAlert(Binding(
+            get: { enhancement.error },
+            set: { enhancement.error = $0 }
         ))
         .kurnDialog(
             isPresented: $showingCompactConfirm,
@@ -98,6 +122,26 @@ struct StorageSettingsView: View {
             primaryRole: .destructive,
             primaryAction: {
                 compaction?.start(targetBitRate: settings.audioQuality.bitRate)
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
+        .kurnDialog(
+            isPresented: $showingDeleteEnhancedConfirm,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("settings.storage.enhanced_audio", comment: "Enhanced audio"),
+            message: NSLocalizedString(
+                "settings.storage.enhanced_audio_message",
+                comment: "Delete generated enhanced copies"
+            ),
+            primaryTitle: NSLocalizedString("settings.storage.enhanced_audio_delete", comment: "Delete Enhanced Audio"),
+            primaryRole: .destructive,
+            primaryAction: {
+                enhancement.deleteAllEnhancedAudio()
+                Task { @MainActor in
+                    enhancedAudioBytes = await loadEnhancedAudioBytes()
+                    refreshStorage()
+                }
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
@@ -220,6 +264,12 @@ struct StorageSettingsView: View {
     private func loadCacheCleanupPreview() async -> (files: Int, bytes: Int64) {
         await Task.detached(priority: .utility) {
             TempFileCleaner.reclaimableSpace()
+        }.value
+    }
+
+    private func loadEnhancedAudioBytes() async -> Int64 {
+        await Task.detached(priority: .utility) {
+            AudioFileStore.enhancedAudioBytes()
         }.value
     }
 }

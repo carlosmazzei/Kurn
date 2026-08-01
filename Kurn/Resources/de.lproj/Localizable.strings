@@ -525,6 +525,9 @@
 "detail.enhancing_audio_progress" = "Audio wird verbessert… %d%%";
 "settings.playback_enhancement" = "Verbesserte Wiedergabe";
 "settings.playback_enhancement_footer" = "Fügt Entzerrung, Pegelkontrolle und gleichmäßige Lautheit hinzu, damit leisere Sprecher besser zu hören sind. Beim ersten Einsatz für eine Aufnahme wird eine zweite Audiodatei erstellt; die Originalaufnahme und das Transkript bleiben unverändert.";
+"settings.storage.enhanced_audio" = "Verbessertes Audio";
+"settings.storage.enhanced_audio_delete" = "Verbessertes Audio löschen";
+"settings.storage.enhanced_audio_message" = "Alle erzeugten verbesserten Audiokopien löschen? Die Originalaufnahmen bleiben erhalten.";
 "settings.on_device_auto_language" = "Sprache auf dem Gerät erkennen (Auto)";
 "settings.live_transcription" = "Live-Transkriptionsvorschau";
 "settings.model_download.title" = "Einmaliger Modell-Download";
