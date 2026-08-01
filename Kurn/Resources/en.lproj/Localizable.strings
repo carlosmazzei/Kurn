@@ -522,6 +522,7 @@
 "common.on" = "On";
 "common.off" = "Off";
 "detail.enhancing_audio" = "Enhancing audio…";
+"detail.enhancing_audio_progress" = "Enhancing audio… %d%%";
 "settings.playback_enhancement" = "Enhanced Playback";
 "settings.playback_enhancement_footer" = "Adds an equalizer, level control and consistent loudness to make quieter speakers easier to hear. It creates a second audio file the first time you use it on a recording; the original recording and the transcript are never changed.";
 "settings.storage.enhanced_audio" = "Enhanced audio";

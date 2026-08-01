@@ -522,6 +522,7 @@
 "common.on" = "Attivo";
 "common.off" = "Disattivo";
 "detail.enhancing_audio" = "Miglioramento audio…";
+"detail.enhancing_audio_progress" = "Miglioramento audio… %d%%";
 "settings.playback_enhancement" = "Riproduzione Migliorata";
 "settings.playback_enhancement_footer" = "Applica equalizzazione, controllo del livello e volume uniforme per sentire meglio chi parla piano. Crea un secondo file audio al primo utilizzo su una registrazione; la registrazione originale e la trascrizione non vengono mai modificate.";
 "settings.storage.enhanced_audio" = "Audio migliorato";

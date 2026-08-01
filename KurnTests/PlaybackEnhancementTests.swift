@@ -24,9 +24,16 @@ struct PlaybackEnhancementTests {
         try await tempFileTestLock.run {
             let fileName = try Self.seedRenderSource(amplitude: 0.2)
             defer { AudioFileStore.delete(fileName: fileName) }
+            let progress = EnhancementProgressSnapshots()
 
-            let size = try await PlaybackEnhancementRenderer().render(fileName: fileName)
+            let size = try await PlaybackEnhancementRenderer().render(fileName: fileName) {
+                progress.append($0)
+            }
             #expect(size > 0)
+            #expect(progress.values.count > 5)
+            #expect(progress.values.first == 0)
+            #expect(progress.values.last == 1)
+            #expect(zip(progress.values, progress.values.dropFirst()).allSatisfy { $0 <= $1 })
 
             let url = AudioFileStore.enhancedURL(fileName: fileName)
             #expect(FileManager.default.fileExists(atPath: url.path))
@@ -227,5 +234,18 @@ struct PlaybackEnhancementTests {
             options: .skipsHiddenFiles
         ) else { return [] }
         return Set(files.filter { $0.lastPathComponent.hasPrefix(prefix) })
+    }
+}
+
+private final class EnhancementProgressSnapshots: @unchecked Sendable {
+    private let lock = NSLock()
+    private var snapshots: [Double] = []
+
+    func append(_ progress: Double) {
+        lock.withLock { snapshots.append(progress) }
+    }
+
+    var values: [Double] {
+        lock.withLock { snapshots }
     }
 }

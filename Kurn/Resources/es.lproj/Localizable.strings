@@ -522,6 +522,7 @@
 "common.on" = "Activado";
 "common.off" = "Desactivado";
 "detail.enhancing_audio" = "Mejorando audio…";
+"detail.enhancing_audio_progress" = "Mejorando audio… %d%%";
 "settings.playback_enhancement" = "Reproducción Mejorada";
 "settings.playback_enhancement_footer" = "Aplica ecualización, control de nivel y volumen uniforme para que se oiga mejor a quien habla bajo. Crea un segundo archivo de audio la primera vez que lo usas en una grabación; la grabación original y la transcripción nunca se modifican.";
 "settings.storage.enhanced_audio" = "Audio mejorado";

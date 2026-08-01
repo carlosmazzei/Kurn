@@ -12,11 +12,17 @@ import AVFoundation
 import Foundation
 
 extension PlaybackEnhancementRenderer {
-    func renderNeuralMix(from sourceURL: URL, failure: AppError) async throws -> URL? {
+    func renderNeuralMix(
+        from sourceURL: URL,
+        failure: AppError,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> URL? {
+        onProgress?(0)
         guard let streamID = await enhancer.beginStream(),
               let latencyFrames = await enhancer.latencyFrames(
                 at: Self.outputSampleRate
               ) else {
+            onProgress?(1)
             return nil
         }
 
@@ -37,35 +43,53 @@ extension PlaybackEnhancementRenderer {
                 sourceURL,
                 to: decodedURL,
                 sampleRate: 16_000,
-                failure: failure
+                stage: NeuralStage(
+                    failure: failure,
+                    logLabel: "enhance.neural.decode",
+                    onProgress: { onProgress?(0.10 * $0) }
+                )
             )
             try await Self.enhancePCM(
                 decodedURL,
                 to: wet16URL,
                 enhancer: enhancer,
                 streamID: streamID,
-                failure: failure
+                stage: NeuralStage(
+                    failure: failure,
+                    logLabel: "enhance.neural.inference",
+                    onProgress: { onProgress?(0.10 + 0.65 * $0) }
+                )
             )
             try await Self.decodePCM(
                 wet16URL,
                 to: wet24URL,
                 sampleRate: Self.outputSampleRate,
-                failure: failure
+                stage: NeuralStage(
+                    failure: failure,
+                    logLabel: "enhance.neural.resample",
+                    onProgress: { onProgress?(0.75 + 0.05 * $0) }
+                )
             )
             try await mixPCM(
                 dryURL: sourceURL,
                 wetURL: wet24URL,
                 to: mixedURL,
                 latencyFrames: latencyFrames,
-                failure: failure
+                stage: NeuralStage(
+                    failure: failure,
+                    logLabel: "enhance.neural.mix",
+                    onProgress: { onProgress?(0.80 + 0.20 * $0) }
+                )
             )
             keepMixed = true
+            onProgress?(1)
             return mixedURL
         } catch {
             await enhancer.endStream(streamID)
             if error is CancellationError { throw error }
             try ResourceGuard.rethrowIfResourceFailure(error)
             AppLog.recorder.atError.error("enhance: neural pre-pass failed, using DSP only: \(error.localizedDescription, privacy: .public)")
+            onProgress?(1)
             return nil
         }
     }
@@ -74,18 +98,18 @@ extension PlaybackEnhancementRenderer {
         _ sourceURL: URL,
         to outputURL: URL,
         sampleRate: Double,
-        failure: AppError
+        stage: NeuralStage
     ) async throws {
         guard let format = OfflineAudioRenderer.monoFormat(sampleRate: sampleRate) else {
-            throw failure
+            throw stage.failure
         }
         var outputFile: AVAudioFile? = try makePCMFile(at: outputURL, sampleRate: sampleRate)
         let renderer = OfflineAudioRenderer(
             outputFormat: format,
-            failure: failure,
-            logLabel: "enhance.neural.decode"
+            failure: stage.failure,
+            logLabel: stage.logLabel
         )
-        try await renderer.render(url: sourceURL) { buffer in
+        try await renderer.render(url: sourceURL, onProgress: stage.onProgress) { buffer in
             try Task.checkCancellation()
             try outputFile?.write(from: buffer)
         }
@@ -97,7 +121,7 @@ extension PlaybackEnhancementRenderer {
         to outputURL: URL,
         enhancer: any SpeechEnhancing,
         streamID: UUID,
-        failure: AppError
+        stage: NeuralStage
     ) async throws {
         let inputFile = try AVAudioFile(forReading: inputURL)
         var outputFile: AVAudioFile? = try makePCMFile(at: outputURL, sampleRate: 16_000)
@@ -106,9 +130,11 @@ extension PlaybackEnhancementRenderer {
             pcmFormat: inputFile.processingFormat,
             frameCapacity: blockFrames
         ) else {
-            throw failure
+            throw stage.failure
         }
 
+        let started = Date()
+        var lastReportedPercent = -1
         while inputFile.framePosition < inputFile.length {
             try Task.checkCancellation()
             try inputFile.read(into: buffer, frameCount: blockFrames)
@@ -124,7 +150,18 @@ extension PlaybackEnhancementRenderer {
             ) else {
                 throw NeuralPassError.inferenceFailed
             }
-            try write(enhanced, to: outputFile, failure: failure)
+            try write(enhanced, to: outputFile, failure: stage.failure)
+
+            let fraction = Double(inputFile.framePosition) / Double(max(1, inputFile.length))
+            let percent = min(100, max(0, Int(fraction * 100)))
+            guard percent > lastReportedPercent else { continue }
+            lastReportedPercent = percent
+            stage.onProgress?(Double(percent) / 100)
+            if percent == 1 || percent == 100 || percent / 10 > (percent - 1) / 10 {
+                let elapsed = Date().timeIntervalSince(started)
+                let remaining = percent > 0 ? elapsed * Double(100 - percent) / Double(percent) : 0
+                AppLog.recorder.atInfo.info("enhance.neural.inference: \(percent, privacy: .public)% elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
+            }
         }
         outputFile = nil
     }
@@ -134,12 +171,12 @@ extension PlaybackEnhancementRenderer {
         wetURL: URL,
         to outputURL: URL,
         latencyFrames: Int,
-        failure: AppError
+        stage: NeuralStage
     ) async throws {
         guard let format = OfflineAudioRenderer.monoFormat(
             sampleRate: Self.outputSampleRate
         ) else {
-            throw failure
+            throw stage.failure
         }
         let wetFile = try AVAudioFile(forReading: wetURL)
         wetFile.framePosition = min(AVAudioFramePosition(latencyFrames), wetFile.length)
@@ -147,7 +184,7 @@ extension PlaybackEnhancementRenderer {
             pcmFormat: format,
             frameCapacity: 4_096
         ) else {
-            throw failure
+            throw stage.failure
         }
         var outputFile: AVAudioFile? = try Self.makePCMFile(
             at: outputURL,
@@ -157,10 +194,10 @@ extension PlaybackEnhancementRenderer {
         var shortfall = 0
         let renderer = OfflineAudioRenderer(
             outputFormat: format,
-            failure: failure,
-            logLabel: "enhance.neural.mix"
+            failure: stage.failure,
+            logLabel: stage.logLabel
         )
-        try await renderer.render(url: dryURL) { dryBuffer in
+        try await renderer.render(url: dryURL, onProgress: stage.onProgress) { dryBuffer in
             try Task.checkCancellation()
             let count = Int(dryBuffer.frameLength)
             guard count > 0,
@@ -255,4 +292,10 @@ extension PlaybackEnhancementRenderer {
 
 private enum NeuralPassError: Error {
     case inferenceFailed
+}
+
+private struct NeuralStage {
+    let failure: AppError
+    let logLabel: String
+    let onProgress: (@Sendable (Double) -> Void)?
 }

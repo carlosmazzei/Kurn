@@ -51,8 +51,12 @@ struct PlaybackEnhancementRenderer: Sendable {
     ///
     /// Throws only for conditions that should abort the whole operation:
     /// cancellation, resource exhaustion, and a source that cannot be read.
-    func render(fileName: String) async throws -> Int64 {
+    func render(
+        fileName: String,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> Int64 {
         try await ResourceGuard.requireTranscriptionHeadroom()
+        onProgress?(0)
         let started = Date()
         let sourceURL = AudioFileStore.resolveURL(fileName: fileName)
 
@@ -62,14 +66,19 @@ struct PlaybackEnhancementRenderer: Sendable {
 
         let neuralURL = try await renderNeuralMix(
             from: sourceURL,
-            failure: failure
+            failure: failure,
+            onProgress: { onProgress?(0.85 * $0) }
         )
         defer {
             if let neuralURL { try? FileManager.default.removeItem(at: neuralURL) }
         }
         let chainInputURL = neuralURL ?? sourceURL
 
-        let loudness = try await measureLoudness(url: chainInputURL, failure: failure)
+        let loudness = try await measureLoudness(
+            url: chainInputURL,
+            failure: failure,
+            onProgress: { onProgress?(0.85 + 0.07 * $0) }
+        )
         let gainDB = LoudnessMeter.gainDB(measured: loudness, target: tuning.targetLUFS)
         AppLog.recorder.atInfo.info("enhance: \(fileName, privacy: .public) measured=\(loudness ?? .nan, privacy: .public)LUFS gain=\(gainDB, privacy: .public)dB")
         try Task.checkCancellation()
@@ -85,18 +94,24 @@ struct PlaybackEnhancementRenderer: Sendable {
             from: chainInputURL,
             to: tempURL,
             inputGainDB: Float(gainDB),
-            failure: failure
+            failure: failure,
+            onProgress: { onProgress?(0.92 + 0.07 * $0) }
         )
 
         let size = try install(tempURL: tempURL, fileName: fileName, failure: failure)
         moved = true
+        onProgress?(1)
         AppLog.recorder.atNotice.notice("enhance: \(fileName, privacy: .public) rendered in \(Date().timeIntervalSince(started), privacy: .public)s (\(size, privacy: .public) bytes)")
         return size
     }
 
     // MARK: - Pass 1: loudness
 
-    private func measureLoudness(url: URL, failure: AppError) async throws -> Double? {
+    private func measureLoudness(
+        url: URL,
+        failure: AppError,
+        onProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> Double? {
         guard let format = OfflineAudioRenderer.monoFormat(
             sampleRate: LoudnessMeter.requiredSampleRate
         ) else { throw failure }
@@ -108,7 +123,7 @@ struct PlaybackEnhancementRenderer: Sendable {
         )
 
         var meter = LoudnessMeter()
-        try await renderer.render(url: url) { buffer in
+        try await renderer.render(url: url, onProgress: onProgress) { buffer in
             try Task.checkCancellation()
             guard let channel = buffer.floatChannelData, buffer.frameLength > 0 else { return }
             meter.append(UnsafeBufferPointer(start: channel[0], count: Int(buffer.frameLength)))
@@ -122,7 +137,8 @@ struct PlaybackEnhancementRenderer: Sendable {
         from sourceURL: URL,
         to outURL: URL,
         inputGainDB: Float,
-        failure: AppError
+        failure: AppError,
+        onProgress: (@Sendable (Double) -> Void)?
     ) async throws {
         guard let outputFormat = OfflineAudioRenderer.monoFormat(sampleRate: Self.outputSampleRate) else {
             throw failure
@@ -164,7 +180,7 @@ struct PlaybackEnhancementRenderer: Sendable {
             logLabel: "enhance"
         )
 
-        try await renderer.render(url: sourceURL) { buffer in
+        try await renderer.render(url: sourceURL, onProgress: onProgress) { buffer in
             try Task.checkCancellation()
             try outFile.write(from: buffer)
         }
