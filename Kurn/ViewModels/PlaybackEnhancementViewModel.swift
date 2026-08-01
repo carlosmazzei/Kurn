@@ -89,18 +89,6 @@ final class PlaybackEnhancementViewModel {
         tasks[recording.id]?.cancel()
     }
 
-    /// Drop every enhanced copy and forget them on the rows that referenced them.
-    /// Backs the storage-reclaim action; the copies regenerate on next use.
-    func deleteAllEnhancedAudio() {
-        AudioFileStore.deleteAllEnhancedAudio()
-        let descriptor = FetchDescriptor<Recording>()
-        guard let recordings = try? modelContext.fetch(descriptor) else { return }
-        for recording in recordings where recording.enhancedAudioVersion != 0 {
-            recording.clearEnhancedAudio()
-        }
-        if let failure = modelContext.saveOrError() { error = failure }
-    }
-
     @discardableResult
     private func run(recordingID: UUID, fileName: String) async -> Bool {
         do {

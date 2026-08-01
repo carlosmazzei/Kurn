@@ -50,13 +50,6 @@ final class WikiCoordinator {
 
     // MARK: - Single meeting
 
-    /// Generate `meeting`'s article only when the feature is enabled and a key is
-    /// available. Called from the transcription success path.
-    func generateIfEnabled(_ meeting: Meeting?) async {
-        guard appSettings?.wikiEnabled ?? false, let meeting, hasProviderKey else { return }
-        await generate(meeting)
-    }
-
     /// Build (or rebuild) `meeting`'s wiki article. Skips the LLM call when the
     /// transcript and generator both match the existing article, so a redundant
     /// trigger is cheap. Best-effort: an offline/no-key/transient failure leaves

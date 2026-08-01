@@ -36,13 +36,6 @@ final class SemanticIndexCoordinator {
 
     // MARK: - Single meeting
 
-    /// Index `meeting` only when the feature is enabled. Called from the
-    /// transcription success path.
-    func indexIfEnabled(_ meeting: Meeting?) async {
-        guard appSettings?.semanticSearchEnabled ?? false, let meeting else { return }
-        await index(meeting)
-    }
-
     /// Rebuild `meeting`'s semantic chunks from its current transcripts. A no-op
     /// (clearing any stale chunks) when the meeting has no transcript text.
     func index(_ meeting: Meeting) async {

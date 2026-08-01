@@ -10,7 +10,7 @@
 //  `AudioPlayerService` stays on `AVAudioPlayer` and only picks which URL to open;
 //  no realtime graph, no ring buffers, no reimplemented seek, no interruption
 //  recovery. The cost is disk and a one-time wait, both of which the user controls
-//  — copies are generated on demand and deletable from Settings.
+//  — copies are generated on demand and removed with their recordings.
 //
 //  Two passes, because loudness cannot be known in advance. The first measures
 //  integrated loudness at 48 kHz (the only rate BS.1770's coefficients are valid
