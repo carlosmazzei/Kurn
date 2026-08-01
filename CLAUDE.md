@@ -703,7 +703,13 @@ toolbar would be the wrong control**:
   boundaries when adding code.
 - **Tests:** Swift Testing (`@Test`, `#expect`). Use
   `TestModelContainer.make()` for an in-memory `ModelContainer` when exercising real
-  SwiftData relationship behavior.
+  SwiftData relationship behavior. Synthetic audio comes from `AudioFixtures`
+  (`KurnTests/Support/`): `m4aTone`/`wav` encode a tone at run time, but a test
+  whose subject *is* reading or re-encoding an `.m4a` must use
+  `prerecordedM4A(_:at:)` — encoding AAC on a loaded simulator intermittently
+  leaves a container the reader rejects, indistinguishable from the failure such a
+  test looks for. The committed inputs and how to regenerate them live in
+  `KurnTests/Support/Fixtures/`.
 - **Git & PRs:** write all commit messages and pull request titles/descriptions in
   English, regardless of the language used in chat. (User-facing app strings are
   still localized per the localization convention above — this rule is only about
