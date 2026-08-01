@@ -354,6 +354,8 @@
 "detail.recording_n" = "录音 %d";
 "detail.playback_position" = "播放位置";
 "detail.playback_speed" = "播放速度";
+"detail.play_recording" = "播放录音";
+"detail.pause_recording" = "暂停录音";
 "detail.skip_backward" = "后退 15 秒";
 "detail.skip_forward" = "前进 15 秒";
 "detail.download_diarization_models" = "下载说话人模型";

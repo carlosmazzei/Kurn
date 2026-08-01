@@ -354,6 +354,8 @@
 "detail.recording_n" = "Aufnahme %d";
 "detail.playback_position" = "Wiedergabeposition";
 "detail.playback_speed" = "Wiedergabegeschwindigkeit";
+"detail.play_recording" = "Aufnahme abspielen";
+"detail.pause_recording" = "Wiedergabe pausieren";
 "detail.skip_backward" = "15 Sekunden zurück";
 "detail.skip_forward" = "15 Sekunden vor";
 "detail.download_diarization_models" = "Sprechermodelle laden";

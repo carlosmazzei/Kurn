@@ -354,6 +354,8 @@
 "detail.recording_n" = "Enregistrement %d";
 "detail.playback_position" = "Position de lecture";
 "detail.playback_speed" = "Vitesse de lecture";
+"detail.play_recording" = "Lire l’enregistrement";
+"detail.pause_recording" = "Mettre l’enregistrement en pause";
 "detail.skip_backward" = "Reculer de 15 secondes";
 "detail.skip_forward" = "Avancer de 15 secondes";
 "detail.download_diarization_models" = "Télécharger les modèles";

@@ -26,6 +26,9 @@ struct MeetingDetailView: View {
     /// the same instance the foreground resume pass uses means a run it restarted
     /// shows here as in-progress with live progress, instead of a stale badge.
     @Environment(TranscriptionViewModel.self) private var sharedTxVM
+    /// Shared by all detail screens so a long enhancement remains observable
+    /// across back-navigation instead of being orphaned with the old view.
+    @Environment(PlaybackEnhancementViewModel.self) var enhancement
 
     enum Tab: Hashable, CaseIterable {
         case recordings, transcript, summary, chat
@@ -50,9 +53,6 @@ struct MeetingDetailView: View {
     }
 
     @State var player = AudioPlayerService()
-    /// Created lazily because it needs the model context. Non-private so the
-    /// actions extension in `MeetingDetailActions.swift` can reach it.
-    @State var enhancement: PlaybackEnhancementViewModel?
     /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
     var txVM: TranscriptionViewModel? { sharedTxVM }
     @State private var tab: Tab = .recordings
@@ -108,12 +108,7 @@ struct MeetingDetailView: View {
         .toolbar { toolbarContent }
         .modelDownloadAlerts(downloads, settings: settings)
         .onDisappear { player.stop() }
-        .task {
-            if enhancement == nil {
-                enhancement = PlaybackEnhancementViewModel(modelContext: modelContext)
-            }
-        }
-        .errorAlert(Binding(get: { enhancement?.error }, set: { enhancement?.error = $0 }))
+        .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
         .sheet(isPresented: $showingRecorder) {
             NavigationStack { RecorderView(meeting: meeting) }
         }
@@ -545,7 +540,7 @@ private struct RecordingSegmentRow: View {
     let index: Int
     let player: AudioPlayerService
     let txVM: TranscriptionViewModel?
-    let enhancement: PlaybackEnhancementViewModel?
+    let enhancement: PlaybackEnhancementViewModel
     @Binding var pendingRetranscribe: Recording?
     let onTogglePlay: () -> Void
     let onToggleEnhancement: () -> Void
@@ -559,6 +554,8 @@ private struct RecordingSegmentRow: View {
         let isCancelling = txVM?.isCancelling(recording) == true
         let phase = txVM?.phase(for: recording)
         let postTranscriptionPhase = txVM?.postTranscriptionPhase(for: recording)
+        let enhancementProgress = enhancement.progress(for: recording)
+        let isEnhancing = enhancementProgress != nil
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 Button { onTogglePlay() } label: {
@@ -566,12 +563,26 @@ private struct RecordingSegmentRow: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(Theme.fill)
                             .frame(width: 34, height: 34)
-                        Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.textPrimary)
+                        if isEnhancing {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.textPrimary)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(isEnhancing)
+                .accessibilityLabel(
+                    isEnhancing
+                        ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
+                        : ((isLoaded && player.isPlaying)
+                            ? NSLocalizedString("detail.pause_recording", comment: "Pause recording")
+                            : NSLocalizedString("detail.play_recording", comment: "Play recording"))
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
@@ -690,6 +701,10 @@ private struct RecordingSegmentRow: View {
                         .foregroundStyle(Theme.textTertiary)
                 }
             }
+            if !isLoaded, let enhancementProgress {
+                EnhancementProgressView(progress: enhancementProgress)
+                    .padding(.leading, 46)
+            }
             // Show the scrubber whenever this recording is the loaded one — even
             // while transcription is still running, so playback started mid-
             // transcription still surfaces the slider and speed control.
@@ -700,7 +715,7 @@ private struct RecordingSegmentRow: View {
                     isPlaying: player.isPlaying,
                     playbackRate: player.playbackRate,
                     isEnhanced: player.isPlayingEnhanced,
-                    enhancementProgress: enhancement?.progress(for: recording),
+                    enhancementProgress: enhancementProgress,
                     onSeek: { player.seek(to: $0) },
                     onSkip: { player.skip(by: $0) },
                     onCycleRate: { player.cycleRate() },
@@ -859,23 +874,7 @@ private struct SegmentPlaybackScrubber: View {
             .foregroundStyle(Theme.textTertiary)
 
             if let enhancementProgress {
-                let percent = Int((min(1, max(0, enhancementProgress)) * 100).rounded())
-                ProgressView(value: enhancementProgress) {
-                    Text(
-                        String(
-                            format: NSLocalizedString(
-                                "detail.enhancing_audio_progress",
-                                comment: "Enhancing audio with percent"
-                            ),
-                            percent
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(Theme.textTertiary)
-                }
-                .progressViewStyle(.linear)
-                .tint(Theme.accent)
-                .animation(.easeInOut(duration: 0.25), value: enhancementProgress)
+                EnhancementProgressView(progress: enhancementProgress)
             }
         }
         .padding(.leading, 46)

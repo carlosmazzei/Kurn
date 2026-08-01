@@ -354,6 +354,8 @@
 "detail.recording_n" = "Registrazione %d";
 "detail.playback_position" = "Posizione riproduzione";
 "detail.playback_speed" = "Velocità riproduzione";
+"detail.play_recording" = "Riproduci registrazione";
+"detail.pause_recording" = "Metti in pausa la registrazione";
 "detail.skip_backward" = "Indietro di 15 secondi";
 "detail.skip_forward" = "Avanti di 15 secondi";
 "detail.download_diarization_models" = "Scarica i modelli dei parlanti";

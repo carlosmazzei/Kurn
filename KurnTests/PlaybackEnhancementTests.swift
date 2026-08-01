@@ -171,6 +171,37 @@ struct PlaybackEnhancementTests {
         #expect(recording.enhancedFileSize == 0)
     }
 
+    /// A detail screen can be destroyed and rebuilt while the app-wide
+    /// coordinator is still rendering. A repeated request must observe the
+    /// existing task and must not claim the copy is ready before it lands.
+    @MainActor
+    @Test func inFlightEnhancementRemainsBusyAcrossRepeatedRequests() async {
+        let context = ModelContext(TestModelContainer.make())
+        let recording = Recording(fileName: "in-flight.m4a", duration: 10)
+        context.insert(recording)
+        let viewModel = PlaybackEnhancementViewModel(
+            modelContext: context,
+            renderer: SuspendedEnhancementRenderer()
+        )
+
+        viewModel.ensureEnhancedAudio(for: recording)
+        #expect(viewModel.isEnhancing(recording))
+        #expect(viewModel.progress(for: recording) == 0)
+
+        var reportedReady = false
+        viewModel.ensureEnhancedAudio(for: recording) {
+            reportedReady = true
+        }
+        #expect(!reportedReady)
+
+        viewModel.cancel(recording)
+        for _ in 0..<20 where viewModel.isEnhancing(recording) {
+            await Task.yield()
+        }
+        #expect(!viewModel.isEnhancing(recording))
+        #expect(viewModel.progress(for: recording) == nil)
+    }
+
     // MARK: - Helpers
 
     /// Put a file where an enhanced copy would live, without running the
@@ -234,6 +265,17 @@ struct PlaybackEnhancementTests {
             options: .skipsHiddenFiles
         ) else { return [] }
         return Set(files.filter { $0.lastPathComponent.hasPrefix(prefix) })
+    }
+}
+
+private struct SuspendedEnhancementRenderer: PlaybackEnhancementRendering {
+    func render(
+        fileName: String,
+        onProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> Int64 {
+        onProgress?(0.25)
+        try await Task.sleep(nanoseconds: 60_000_000_000)
+        return 1
     }
 }
 
