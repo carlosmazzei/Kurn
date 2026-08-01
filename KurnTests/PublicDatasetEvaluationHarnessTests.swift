@@ -91,7 +91,8 @@ struct PublicDatasetEvaluationHarnessTests {
             }
         }
 
-        try #require(failures.isEmpty, "\(failures.count) pipeline run(s) failed:\n" + failures.joined(separator: "\n"))
+        let failureSummary = "\(failures.count) pipeline run(s) failed:\n\(failures.joined(separator: "\n"))"
+        try #require(failures.isEmpty, "\(failureSummary)")
         reportAggregate(rows)
         if let reportPath = PublicEvaluationDataset.reportPath {
             try writeCSV(rows, to: reportPath)
@@ -217,28 +218,36 @@ struct PublicDatasetEvaluationHarnessTests {
     private func writeCSV(_ rows: [Row], to path: String) throws {
         var lines = ["corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech"]
         for row in rows {
-            let wer = row.wer
-            let der = row.der
-            lines.append([
-                row.corpus,
-                row.name,
-                row.language,
-                row.configLabel,
-                wer.map { String(format: "%.4f", $0.rate * 100) } ?? "",
-                wer.map { "\($0.substitutions)" } ?? "",
-                wer.map { "\($0.insertions)" } ?? "",
-                wer.map { "\($0.deletions)" } ?? "",
-                wer.map { "\($0.referenceCount)" } ?? "",
-                der.map { String(format: "%.4f", $0.rate * 100) } ?? "",
-                der.map { String(format: "%.3f", $0.missed) } ?? "",
-                der.map { String(format: "%.3f", $0.falseAlarm) } ?? "",
-                der.map { String(format: "%.3f", $0.confusion) } ?? "",
-                der.map { String(format: "%.3f", $0.referenceSpeech) } ?? ""
-            ].joined(separator: ","))
+            lines.append(csvRow(for: row).joined(separator: ","))
         }
         try (lines.joined(separator: "\n") + "\n").write(
             toFile: path, atomically: true, encoding: .utf8
         )
         print("[pipeline-eval] wrote \(rows.count) row(s) to \(path)")
+    }
+
+    /// Split out of `writeCSV` — a single array literal mixing this many
+    /// `.map { ... } ?? ""` closures was too much for the type checker to
+    /// solve in one pass ("unable to type-check this expression in reasonable
+    /// time"). Building each field as its own statement keeps every
+    /// sub-expression small enough to infer on its own.
+    private func csvRow(for row: Row) -> [String] {
+        var fields = [row.corpus, row.name, row.language, row.configLabel]
+
+        let wer = row.wer
+        fields.append(wer.map { String(format: "%.4f", $0.rate * 100) } ?? "")
+        fields.append(wer.map { String($0.substitutions) } ?? "")
+        fields.append(wer.map { String($0.insertions) } ?? "")
+        fields.append(wer.map { String($0.deletions) } ?? "")
+        fields.append(wer.map { String($0.referenceCount) } ?? "")
+
+        let der = row.der
+        fields.append(der.map { String(format: "%.4f", $0.rate * 100) } ?? "")
+        fields.append(der.map { String(format: "%.3f", $0.missed) } ?? "")
+        fields.append(der.map { String(format: "%.3f", $0.falseAlarm) } ?? "")
+        fields.append(der.map { String(format: "%.3f", $0.confusion) } ?? "")
+        fields.append(der.map { String(format: "%.3f", $0.referenceSpeech) } ?? "")
+
+        return fields
     }
 }
