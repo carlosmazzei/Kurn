@@ -20,6 +20,14 @@ struct PlaybackEnhancementTests {
 
     // MARK: - Renderer
 
+    @Test func neuralEnhancementIsLimitedToShortRecordings() {
+        let limit = PlaybackEnhancementRenderer.maximumNeuralEnhancementDuration
+
+        #expect(PlaybackEnhancementRenderer.shouldRunNeuralEnhancement(audioDuration: limit))
+        #expect(!PlaybackEnhancementRenderer.shouldRunNeuralEnhancement(audioDuration: limit + 0.1))
+        #expect(PlaybackEnhancementRenderer.shouldRunNeuralEnhancement(audioDuration: .nan))
+    }
+
     @Test func rendersAMonoPlayableCopy() async throws {
         try await tempFileTestLock.run {
             let fileName = try Self.seedRenderSource(amplitude: 0.2)
