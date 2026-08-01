@@ -31,9 +31,8 @@ struct LoudnessMeter {
     static let requiredSampleRate: Double = 48_000
 
     /// BS.1770 measures over 400 ms blocks overlapping by 75%, i.e. a new block
-    /// every 100 ms. Blocks are accumulated as four consecutive 100 ms steps so
-    /// each sample is squared once rather than four times.
-    static let blockSeconds = 0.4
+    /// every 100 ms. Blocks are accumulated as four consecutive steps so each
+    /// sample is squared once rather than four times.
     static let stepSeconds = 0.1
     private static let stepsPerBlock = 4
 

@@ -136,32 +136,8 @@ enum AudioFileStore {
         }
     }
 
-    /// Delete only the enhanced copy, leaving the recording itself alone. Backs
-    /// the "reclaim space" action in Settings → Storage.
-    static func deleteEnhancedAudio(fileName: String) {
-        try? FileManager.default.removeItem(at: enhancedURL(fileName: fileName))
-    }
-
-    /// Total bytes used by the derived enhanced copies. Reported separately from
-    /// `totalAudioBytes()` — which counts only originals, since its scan is
-    /// shallow — so Settings can show what is reclaimable without conflating it
-    /// with the recordings themselves.
-    static func enhancedAudioBytes() -> Int64 {
-        let fm = FileManager.default
-        guard let items = try? fm.contentsOfDirectory(
-            at: enhancedDirectoryPath,
-            includingPropertiesForKeys: [.fileSizeKey],
-            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
-        ) else { return 0 }
-        return items
-            .filter { $0.pathExtension.lowercased() == "m4a" }
-            .reduce(into: Int64(0)) { total, url in
-                total += Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
-            }
-    }
-
-    /// Remove every enhanced copy. They are derived, so this only costs the time
-    /// to regenerate them on the next listen.
+    /// Remove every enhanced copy as part of deleting all audio. They are
+    /// derived, so this only costs the time to regenerate them on the next listen.
     static func deleteAllEnhancedAudio() {
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(
