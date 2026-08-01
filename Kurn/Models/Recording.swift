@@ -102,11 +102,17 @@ final class Recording {
     }
 
     /// Whether a usable enhanced copy exists: rendered by the current tuning *and*
-    /// still on disk. The on-disk check matters because "Delete all data" can
-    /// remove the file without touching the row.
+    /// still on disk. The on-disk check matters because "Delete all data" and the
+    /// storage screen can remove the file without touching the row.
     func hasEnhancedAudio(currentVersion: Int) -> Bool {
         enhancedAudioVersion == currentVersion
             && AudioFileStore.hasEnhancedAudio(fileName: fileName)
+    }
+
+    /// Forget the enhanced copy, after deleting it or finding it stale.
+    func clearEnhancedAudio() {
+        enhancedAudioVersion = 0
+        enhancedFileSize = 0
     }
 
     /// Bit rate the file is actually stored at, or `nil` when either input is

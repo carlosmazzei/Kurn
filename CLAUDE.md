@@ -347,6 +347,8 @@ without any caller knowing the copy exists. `AudioFileStore.enhancedDirectoryPat
 only computes a URL; `ensureEnhancedDirectory()` is the creating variant and is
 called only by the writer, because `delete` runs in a loop and creating plus
 re-stamping a directory on every iteration is filesystem work for nothing.
+The derived copies can also be reclaimed together from Settings → Storage;
+the original recordings and their transcripts remain untouched.
 
 `Recording.enhancedAudioVersion` (`0` = none) doubles as an existence and a
 staleness check against `PlaybackEnhancementRenderer.currentVersion`; bump that
