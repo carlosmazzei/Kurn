@@ -522,6 +522,7 @@
 "common.on" = "Ein";
 "common.off" = "Aus";
 "detail.enhancing_audio" = "Audio wird verbessert…";
+"detail.enhancing_audio_progress" = "Audio wird verbessert… %d%%";
 "settings.playback_enhancement" = "Verbesserte Wiedergabe";
 "settings.playback_enhancement_footer" = "Fügt Entzerrung, Pegelkontrolle und gleichmäßige Lautheit hinzu, damit leisere Sprecher besser zu hören sind. Beim ersten Einsatz für eine Aufnahme wird eine zweite Audiodatei erstellt; die Originalaufnahme und das Transkript bleiben unverändert.";
 "settings.storage.enhanced_audio" = "Verbessertes Audio";

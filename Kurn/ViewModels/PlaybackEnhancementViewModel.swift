@@ -6,10 +6,8 @@
 //
 //  Per-recording state is keyed by `UUID`, following `TranscriptionViewModel` —
 //  two recordings can be rendering at once and neither may see the other's
-//  progress or error. Progress is deliberately a membership set rather than a
-//  fraction: `OfflineAudioRenderer` reports no incremental progress, and showing
-//  an invented percentage that jumps to 100 would be worse than an honest
-//  indeterminate spinner.
+//  progress or error. The renderer reports a weighted fraction across its neural
+//  and DSP passes so a long recording never looks stuck in one opaque stage.
 //
 
 import Foundation
@@ -20,7 +18,7 @@ import SwiftData
 @Observable
 final class PlaybackEnhancementViewModel {
 
-    private(set) var renderingIDs: Set<UUID> = []
+    private(set) var progressByID: [UUID: Double] = [:]
     var error: AppError?
 
     private var tasks: [UUID: Task<Void, Never>] = [:]
@@ -31,8 +29,8 @@ final class PlaybackEnhancementViewModel {
         self.modelContext = modelContext
     }
 
-    func isRendering(_ recording: Recording) -> Bool {
-        renderingIDs.contains(recording.id)
+    func progress(for recording: Recording) -> Double? {
+        progressByID[recording.id]
     }
 
     /// Whether playback can use the enhanced copy right now.
@@ -57,11 +55,11 @@ final class PlaybackEnhancementViewModel {
 
         let id = recording.id
         let fileName = recording.fileName
-        renderingIDs.insert(id)
+        progressByID[id] = 0
         tasks[id] = Task { [weak self] in
             let succeeded = await self?.run(recordingID: id, fileName: fileName) ?? false
             self?.tasks[id] = nil
-            self?.renderingIDs.remove(id)
+            self?.progressByID.removeValue(forKey: id)
             if succeeded { onReady?() }
         }
     }
@@ -85,7 +83,16 @@ final class PlaybackEnhancementViewModel {
     @discardableResult
     private func run(recordingID: UUID, fileName: String) async -> Bool {
         do {
-            let size = try await renderer.render(fileName: fileName)
+            let size = try await renderer.render(fileName: fileName) { [weak self] progress in
+                Task { @MainActor [weak self] in
+                    guard let self, self.tasks[recordingID] != nil else { return }
+                    let clamped = min(1, max(0, progress))
+                    self.progressByID[recordingID] = max(
+                        self.progressByID[recordingID] ?? 0,
+                        clamped
+                    )
+                }
+            }
             // Re-fetch rather than holding the model across the suspension.
             guard let recording = recording(id: recordingID) else { return false }
             recording.enhancedAudioVersion = PlaybackEnhancementRenderer.currentVersion

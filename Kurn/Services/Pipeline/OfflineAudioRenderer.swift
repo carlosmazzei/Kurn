@@ -165,6 +165,10 @@ struct OfflineAudioRenderer {
             }
         }
 
+        if lastReportedPercent < 100 {
+            onProgress?(1)
+        }
+        AppLog.transcription.atDebug.debug("\(self.logLabel, privacy: .public): render progress 100%")
         return engine.manualRenderingSampleTime
     }
 

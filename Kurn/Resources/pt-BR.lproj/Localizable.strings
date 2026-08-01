@@ -522,6 +522,7 @@
 "common.on" = "Ligado";
 "common.off" = "Desligado";
 "detail.enhancing_audio" = "Realçando áudio…";
+"detail.enhancing_audio_progress" = "Realçando áudio… %d%%";
 "settings.playback_enhancement" = "Reprodução Realçada";
 "settings.playback_enhancement_footer" = "Aplica equalização, controle de nível e volume consistente para facilitar ouvir quem fala mais baixo. Cria um segundo arquivo de áudio na primeira vez que você usa em uma gravação; a gravação original e a transcrição nunca são alteradas.";
 "settings.storage.enhanced_audio" = "Áudio realçado";

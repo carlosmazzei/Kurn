@@ -700,7 +700,7 @@ private struct RecordingSegmentRow: View {
                     isPlaying: player.isPlaying,
                     playbackRate: player.playbackRate,
                     isEnhanced: player.isPlayingEnhanced,
-                    isEnhancing: enhancement?.isRendering(recording) == true,
+                    enhancementProgress: enhancement?.progress(for: recording),
                     onSeek: { player.seek(to: $0) },
                     onSkip: { player.skip(by: $0) },
                     onCycleRate: { player.cycleRate() },
@@ -743,7 +743,7 @@ private struct SegmentPlaybackScrubber: View {
     let isPlaying: Bool
     let playbackRate: Float
     let isEnhanced: Bool
-    let isEnhancing: Bool
+    let enhancementProgress: Double?
     let onSeek: (TimeInterval) -> Void
     let onSkip: (TimeInterval) -> Void
     let onCycleRate: () -> Void
@@ -754,6 +754,7 @@ private struct SegmentPlaybackScrubber: View {
     private var boundedCurrentTime: TimeInterval {
         min(max(currentTime, 0), sliderUpperBound)
     }
+    private var isEnhancing: Bool { enhancementProgress != nil }
 
     /// "1×", "1.5×", "0.5×" — `%g` drops trailing zeros and the decimal point.
     private var rateLabel: String {
@@ -856,6 +857,26 @@ private struct SegmentPlaybackScrubber: View {
             }
             .font(.system(size: 11))
             .foregroundStyle(Theme.textTertiary)
+
+            if let enhancementProgress {
+                let percent = Int((min(1, max(0, enhancementProgress)) * 100).rounded())
+                ProgressView(value: enhancementProgress) {
+                    Text(
+                        String(
+                            format: NSLocalizedString(
+                                "detail.enhancing_audio_progress",
+                                comment: "Enhancing audio with percent"
+                            ),
+                            percent
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textTertiary)
+                }
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+                .animation(.easeInOut(duration: 0.25), value: enhancementProgress)
+            }
         }
         .padding(.leading, 46)
         // `.contain` rather than `.combine`: combining flattens the children into

@@ -522,6 +522,7 @@
 "common.on" = "Activé";
 "common.off" = "Désactivé";
 "detail.enhancing_audio" = "Amélioration en cours…";
+"detail.enhancing_audio_progress" = "Amélioration en cours… %d%%";
 "settings.playback_enhancement" = "Lecture améliorée";
 "settings.playback_enhancement_footer" = "Applique une égalisation, un contrôle de niveau et un volume homogène pour mieux entendre les personnes qui parlent doucement. Un deuxième fichier audio est créé à la première utilisation sur un enregistrement ; l'enregistrement original et la transcription ne sont jamais modifiés.";
 "settings.storage.enhanced_audio" = "Audio amélioré";

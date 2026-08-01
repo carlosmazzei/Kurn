@@ -522,6 +522,7 @@
 "common.on" = "开启";
 "common.off" = "关闭";
 "detail.enhancing_audio" = "正在增强音频…";
+"detail.enhancing_audio_progress" = "正在增强音频… %d%%";
 "settings.playback_enhancement" = "增强播放";
 "settings.playback_enhancement_footer" = "加入均衡、电平控制和统一响度，让说话声较小的人更容易听清。首次对某段录音使用时会生成第二个音频文件；原始录音和转录内容不会被改动。";
 "settings.storage.enhanced_audio" = "增强音频";
