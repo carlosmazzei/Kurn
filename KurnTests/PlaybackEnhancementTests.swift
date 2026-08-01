@@ -132,7 +132,7 @@ struct PlaybackEnhancementTests {
             defer { AudioFileStore.delete(fileName: fileName) }
             try Self.seedEnhancedFile(fileName: fileName)
 
-            await MainActor.run {
+            try await MainActor.run {
                 let container = TestModelContainer.make()
                 let context = ModelContext(container)
                 let meeting = Meeting(title: "Test")
