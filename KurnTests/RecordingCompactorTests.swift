@@ -250,7 +250,12 @@ struct RecordingCompactorTests {
             let compactor = RecordingCompactor(targetBitRate: AudioQuality.low.bitRate)
             _ = try await compactor.compact(fileName: fileName)
 
-            let result = try await Self.format(of: AudioFileStore.resolveURL(fileName: fileName))
+            // This invariant only needs the stream description. Loading the
+            // asset duration here adds an unrelated AVFoundation dependency
+            // that intermittently fails on a busy CI simulator.
+            let result = try await Self.audioFormat(
+                of: AudioFileStore.resolveURL(fileName: fileName)
+            )
             #expect(result.sampleRate == 16_000)
         }
     }
@@ -291,18 +296,27 @@ struct RecordingCompactorTests {
     /// intermittently with a generic OSStatus, which made this suite red for
     /// reasons that had nothing to do with the compactor.
     ///
-    /// The container's own format description answers everything these tests
-    /// actually ask — rate, channel count, length — without decoding a frame.
+    /// The container's own format description answers rate and channel count
+    /// without decoding a frame. Duration is loaded separately only by the test
+    /// that actually verifies it.
     private static func format(
         of url: URL
     ) async throws -> (sampleRate: Double, channels: UInt32, duration: TimeInterval) {
+        let audioFormat = try await audioFormat(of: url)
         let asset = AVURLAsset(url: url)
         let duration = try await CMTimeGetSeconds(asset.load(.duration))
+        return (audioFormat.sampleRate, audioFormat.channels, duration)
+    }
+
+    private static func audioFormat(
+        of url: URL
+    ) async throws -> (sampleRate: Double, channels: UInt32) {
+        let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .audio).first,
               let description = try await track.load(.formatDescriptions).first,
               let basic = CMAudioFormatDescriptionGetStreamBasicDescription(description) else {
             throw AppError.audioError("No audio track in \(url.lastPathComponent)")
         }
-        return (basic.pointee.mSampleRate, basic.pointee.mChannelsPerFrame, duration)
+        return (basic.pointee.mSampleRate, basic.pointee.mChannelsPerFrame)
     }
 }
