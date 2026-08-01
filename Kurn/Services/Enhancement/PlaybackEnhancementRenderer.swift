@@ -34,7 +34,7 @@ struct PlaybackEnhancementRenderer: Sendable {
     /// Bump when the tuning changes. Copies stamped with an older version are
     /// regenerated rather than served, so a tuning fix reaches recordings the user
     /// already enhanced.
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     /// Output rate. Matches `AudioRecorderService.storageSampleRate`, so the copy
     /// keeps the original's full bandwidth.

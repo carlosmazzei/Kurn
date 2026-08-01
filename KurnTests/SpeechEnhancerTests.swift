@@ -63,6 +63,21 @@ struct SpeechEnhancerTests {
         #expect(result == nil)
     }
 
+    @Test func bundledGTCRNRunsAnAlignedFiniteStream() async throws {
+        let enhancer = SpeechEnhancer()
+        let samples = (0..<4_096).map { index in
+            Float(sin(2 * Double.pi * 440 * Double(index) / 16_000)) * 0.2
+        }
+
+        let modelAvailable = await enhancer.isModelAvailable()
+        #expect(modelAvailable)
+        let result = await enhancer.enhance(samples: samples)
+        let enhanced = try #require(result)
+        #expect(enhanced.count == samples.count)
+        let allFinite = enhanced.allSatisfy { $0.isFinite }
+        #expect(allFinite)
+    }
+
     // MARK: - End to end
 
     /// What the pure `PlaybackMix` test above cannot reach: it is handed the very
@@ -70,10 +85,10 @@ struct SpeechEnhancerTests {
     /// computed `latencyFrames` wrongly — and a wrong value comb-filters every
     /// enhanced copy, which is the one artefact the dry/wet mix exists to avoid.
     ///
-    /// Here the delay is produced by the pipeline itself: 24 kHz down to the
-    /// model's 16 kHz, through the enhancer's leading frame, and back up. The
-    /// only assertion that can catch a mistake in that arithmetic is measuring
-    /// the result's lag against the source.
+    /// Here alignment is produced by the pipeline itself: 24 kHz down to the
+    /// model's 16 kHz, through the enhancer, and back up. The only assertion
+    /// that can catch a mistake in that arithmetic is measuring the result's
+    /// lag against the source.
     @Test func theNeuralMixLandsAlignedWithTheSource() async throws {
         try await tempFileTestLock.run {
             let source = try Self.burstFixture()
@@ -95,8 +110,7 @@ struct SpeechEnhancerTests {
             // delay, which nothing compensates, so a handful of frames of
             // residual is expected. The bound is set to clear that and still
             // fail decisively on the mistake worth catching — a forgotten
-            // 16 kHz → 24 kHz conversion, 320 frames where 480 are needed, is
-            // 160 frames out and audible at 6.7 ms.
+            // model-rate → output-rate conversion would be clearly audible.
             #expect(abs(peak.lag) <= 64, "measured lag \(peak.lag) frames")
             // And the wet is what came out, not the dry passing through: the
             // enhancer inverts, so a correlation this negative can only be its
@@ -219,20 +233,16 @@ struct SpeechEnhancerTests {
 }
 
 /// Stands in for the model behind the same protocol the renderer uses, with the
-/// real `StreamState`'s emission contract: one leading frame of silence, then
-/// the samples.
+/// real `StreamState`'s emission contract: an aligned, equal-length stream.
 ///
 /// It inverts rather than passing through, because an identity enhancer is
 /// indistinguishable from no enhancement at all — and the mix now tolerates a
 /// wet stream that ends early, so an empty one would otherwise read as a
 /// perfectly aligned result.
 private actor InvertingEnhancer: SpeechEnhancing {
-    /// 20 ms at 16 kHz, the window both candidate models use.
-    static let frameSize = 320
     static let modelSampleRate = 16_000.0
 
     private let trimFinal: Int
-    private var primed: Set<UUID> = []
 
     init(trimFinal: Int = 0) {
         self.trimFinal = trimFinal
@@ -241,24 +251,17 @@ private actor InvertingEnhancer: SpeechEnhancing {
     func beginStream() -> UUID? { UUID() }
 
     func enhance(samples: [Float], streamID: UUID, isFinal: Bool) -> [Float]? {
-        var output: [Float] = []
-        if primed.insert(streamID).inserted {
-            output.append(contentsOf: repeatElement(0, count: Self.frameSize))
-        }
-        output.append(contentsOf: samples.map { -$0 })
+        var output = samples.map { -$0 }
         if isFinal {
-            primed.remove(streamID)
             output.removeLast(min(trimFinal, output.count))
         }
         return output
     }
 
-    func endStream(_ streamID: UUID) {
-        primed.remove(streamID)
-    }
+    func endStream(_ streamID: UUID) {}
 
     func latencyFrames(at sampleRate: Double) -> Int? {
-        Int((Double(Self.frameSize) * sampleRate / Self.modelSampleRate).rounded())
+        0
     }
 
     func enhance(samples: [Float]) -> [Float]? { samples.map { -$0 } }

@@ -357,9 +357,11 @@ identity off `player.loadedFileName == recording.fileName`, so the variant must
 stay an internal detail of which URL to open.
 
 The chain is preceded by a neural denoise pass
-(`Services/Enhancement/PlaybackEnhancementNeuralPass.swift`) running DPDFNet,
-converted from its ONNX release by `Tools/dpdfnet/` (macOS + `coremltools`) and
-driven frame by frame by `SpeechEnhancer` over the existing `Pipeline/STFT.swift`.
+(`Services/Enhancement/PlaybackEnhancementNeuralPass.swift`) running streaming
+GTCRN, converted from its official PyTorch checkpoint by `Tools/gtcrn/` (macOS +
+`coremltools`) and driven frame by frame by `SpeechEnhancer` over the existing
+`Pipeline/STFT.swift`. GTCRN is small enough to run over complete meetings, so
+there is no duration cutoff.
 
 **Running with no model installed stays a supported configuration**, not a
 degraded one: `SpeechEnhancer` returns `nil`, `renderNeuralMix` returns `nil`,
@@ -376,22 +378,19 @@ it are load bearing:
 - **The dry/wet sum** (`PlaybackTuning.wetMix`, 0.85) is not a hedge against the
   model. It restores the 8–12 kHz band a 16 kHz model cannot represent, which is
   otherwise simply gone from the enhanced copy.
-- **`latencyFrames` is the number a mistake in is audible.** The enhancer emits
-  one leading STFT frame before any real output; `PlaybackMix` removes it, and
-  summing dry against wet without doing so is a comb filter — the exact artefact
-  the mix exists to avoid. `SpeechEnhancing` carries the whole blockwise API for
-  this reason alone: `SpeechEnhancerTests` substitutes an enhancer that inverts
-  its input and cross-correlates the rendered result against the source, so a
-  wrong latency fails. Asserting `PlaybackMix` alone cannot — it is handed the
-  delay it then compensates.
+- **`latencyFrames` is the number a mistake in is audible.** GTCRN's online
+  overlap-add retains its first hop and flushes its final hop, so its file output
+  is already aligned and reports zero. `SpeechEnhancerTests` still substitutes
+  an enhancer that inverts its input and cross-correlates the rendered result
+  against the source, so an alignment regression fails end to end.
 - **A short wet tail is tolerated, not fatal.** Three stages each round their
   frame count, so the wet stream can end a few frames before the dry. Those
   frames are left dry and logged; throwing would discard the entire neural pass
   and silently revert to DSP-only over a rounding difference.
-- **`STFT` accepts the model's 320-sample frame** because
-  `vDSP.DiscreteFourierTransform` takes `f·2ⁿ` for `f ∈ {1,3,5,15}` and 320 =
-  5·2⁶. Do not zero-pad to 512 — that changes the framing to something the model
-  was not trained on.
+- **`STFT` uses GTCRN's exact framing:** a 512-sample square-root Hann analysis
+  and synthesis window with a 256-sample hop. The squared windows overlap-add to
+  one; using the diarization path's analysis-only Hann would amplitude-modulate
+  the enhanced stream.
 
 `ModelStoreProtection` (`Infrastructure/ModelStoreProtection.swift`) applies
 the same `.completeUnlessOpen` file protection to the SwiftData store itself
@@ -458,19 +457,9 @@ stage (enums in `Models/Enums.swift`) are:
    long recording can push peak memory past the jetsam limit. Diarization reads
    its own cleaned copy (`DiarizationPreprocessor`, minimal DSP preserving
    natural timbre) rather than the ASR-tuned one, unless
-   `diarizationPreprocessingEnabled` is off. `diarizationDereverbEnabled`
-   (off by default) additionally runs WPE dereverberation
-   (`Pipeline/Dereverberation.swift`) *before* that cleanup's noise reduction
-   for recordings up to five minutes. Longer recordings skip the current
-   slower-than-real-time WPE implementation and continue with noise reduction
-   plus diarization —
-   WPE's linear-prediction model assumes additive noise is small, so spectral
-   subtraction ahead of it would distort what it fits. WPE is the standard
-   far-field front end in the DIHARD/CHiME evaluations and is **linear**, so
-   unlike a neural denoiser it cannot distort the timbre speaker embeddings
-   read; it is off by default because its benefit has not been measured on this
-   app's own material, there is no DER harness yet to measure it with, and the
-   current scalar implementation is too slow for full-length meetings.
+   `diarizationPreprocessingEnabled` is off. That cleanup intentionally remains
+   limited to the fast high-pass, stationary spectral subtraction and peak
+   normalization stages, so cleanup does not block speaker separation.
    See "Diarization accuracy" below for how the `.fluidAudio` engine's speaker
    count is controlled and repaired.
 5. **Fuse** transcript spans with speaker turns into `[TranscriptSegment]`

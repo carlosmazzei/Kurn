@@ -2,27 +2,27 @@
 //  STFT.swift
 //  Kurn
 //
-//  Short-time Fourier transform with analysis-only Hann windowing, shared by the
-//  diarization front end.
+//  Short-time Fourier transform shared by the diarization cleanup and neural
+//  playback enhancer.
 //
-//  Sized for Hann at hop = N/2, where the overlap-add of windowed frames sums to
-//  ~1.0 so no synthesis window or output normalization is needed. DFT setups are
-//  allocated once and reused across every frame, and the scratch buffers are
-//  instance state — so an instance is single-threaded by construction, which is
-//  how both callers use it.
-//
-//  Extracted from `DiarizationPreprocessor`, where it started life private, once
-//  `Dereverberation` needed the same machinery. The spectral-subtraction helpers
-//  (`magnitudes`, `processFrame`) moved across unchanged; `forward` and `inverse`
-//  are new, because WPE needs the complex spectrum — `magnitudes` throws the
-//  phase away, and the inverse transform used to be welded to the subtraction
-//  step inside `processFrame`.
+//  DFT setups are allocated once and reused across every frame, and the scratch
+//  buffers are instance state — so an instance is single-threaded by
+//  construction, which is how both callers use it.
 //
 
 import Accelerate
 import Foundation
 
 final class STFT {
+    enum WindowMode {
+        /// Analysis-only Hann. At a 50% hop the overlap-added frames sum to one,
+        /// which is what the diarization spectral subtraction expects.
+        case analysisHann
+        /// Square-root Hann on both analysis and synthesis. GTCRN was trained
+        /// with this window, whose squared overlap also sums to one at 50% hop.
+        case squareRootHann
+    }
+
     let frameSize: Int
     let halfFrame: Int
     let hopSize: Int
@@ -31,6 +31,7 @@ final class STFT {
 
     private let forwardDFT: vDSP.DiscreteFourierTransform<Float>
     private let inverseDFT: vDSP.DiscreteFourierTransform<Float>
+    private let windowMode: WindowMode
     private var window: [Float]
     private var realIn: [Float]
     private var imagIn: [Float]
@@ -39,7 +40,7 @@ final class STFT {
     private var timeReal: [Float]
     private var timeImag: [Float]
 
-    init(frameSize: Int, hopSize: Int) {
+    init(frameSize: Int, hopSize: Int, windowMode: WindowMode = .analysisHann) {
         precondition(
             Self.supportsDFTSize(frameSize),
             "frameSize must be f·2ⁿ where f is 1, 3, 5, or 15"
@@ -48,6 +49,7 @@ final class STFT {
         self.frameSize = frameSize
         self.halfFrame = frameSize / 2
         self.hopSize = hopSize
+        self.windowMode = windowMode
         guard let forward = try? vDSP.DiscreteFourierTransform(
             previous: nil,
             count: frameSize, direction: .forward, transformType: .complexComplex, ofType: Float.self
@@ -61,6 +63,11 @@ final class STFT {
         self.inverseDFT = inverse
         self.window = [Float](repeating: 0, count: frameSize)
         vDSP_hann_window(&window, vDSP_Length(frameSize), Int32(vDSP_HANN_DENORM))
+        if windowMode == .squareRootHann {
+            for index in window.indices {
+                window[index] = sqrt(max(0, window[index]))
+            }
+        }
         self.realIn = [Float](repeating: 0, count: frameSize)
         self.imagIn = [Float](repeating: 0, count: frameSize)
         self.realOut = [Float](repeating: 0, count: frameSize)
@@ -70,7 +77,7 @@ final class STFT {
     }
 
     /// Sizes accepted by vDSP's complex DFT setup: `f·2ⁿ` where
-    /// `f ∈ {1, 3, 5, 15}`. DPDFNet's 320-sample frame is `5·2⁶`.
+    /// `f ∈ {1, 3, 5, 15}`.
     private static func supportsDFTSize(_ count: Int) -> Bool {
         guard count > 0 else { return false }
         return [1, 3, 5, 15].contains { factor in
@@ -193,6 +200,18 @@ final class STFT {
         var scale = 1.0 / Float(frameSize)
         timeReal.withUnsafeMutableBufferPointer { ptr in
             vDSP_vsmul(ptr.baseAddress!, 1, &scale, ptr.baseAddress!, 1, vDSP_Length(frameSize))
+        }
+        if windowMode == .squareRootHann {
+            timeReal.withUnsafeMutableBufferPointer { ptr in
+                window.withUnsafeBufferPointer { winPtr in
+                    vDSP_vmul(
+                        ptr.baseAddress!, 1,
+                        winPtr.baseAddress!, 1,
+                        ptr.baseAddress!, 1,
+                        vDSP_Length(frameSize)
+                    )
+                }
+            }
         }
         return timeReal
     }

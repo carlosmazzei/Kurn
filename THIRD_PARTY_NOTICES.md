@@ -92,18 +92,19 @@ device.
   q5-quantized; downloaded only when the user selects the engine)
 - License: MIT License (OpenAI Whisper model weights)
 
-### Speech enhancement — DPDFNet
+### Speech enhancement — GTCRN
 
-- Project: https://github.com/ceva-ip/DPDFNet
-- Paper: "DPDFNet: Boosting DeepFilterNet2 via Dual-Path RNN" (arXiv:2512.16420)
-- Used for: optional noise removal in the enhanced playback copy (`dpdfnet8`,
-  16 kHz variant, converted to Core ML by `Tools/dpdfnet/convert.py` and bundled
-  with the app)
-- License: Apache License 2.0, covering both source and pretrained weights
-- Release: DPDFNet `v1.1.0`; weights downloaded from the official model
-  repository at revision `dd6818d00f50c836fed43a6243ebe49116de5964`
-- ONNX SHA-256:
-  `899d4f23f3ff86edbffa8c537e4bcbdc49da1b4e84e0ef390611e0604a3b26cb`
+- Project: https://github.com/Xiaobin-Rong/gtcrn
+- Paper: "GTCRN: A Speech Enhancement Model Requiring Ultralow Computational
+  Resources" (ICASSP 2024)
+- Used for: streaming 16 kHz noise removal in the enhanced playback copy,
+  converted to Core ML by `Tools/gtcrn/convert.py` and bundled with the app
+- License: MIT, covering the source and checkpoints in the official repository
+- Source revision: `3862c44808dca492ea5a8a145d2dc2a1028d08c8`
+- DNS3 checkpoint SHA-256:
+  `250fa2820ea9947704a62dda8e642ba773a067719c5e4294ad95aeab23f06442`
+- Reference streaming ONNX SHA-256:
+  `b4718df6228e7bdf1a8a435cf98f838636eb2fd331acabf86ba87c5192ebcb87`
 
 ---
 

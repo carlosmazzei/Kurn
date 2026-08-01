@@ -516,8 +516,6 @@
 "settings.diarization_speaker_count_auto" = "Automatisch";
 "settings.diarization_speaker_count_footer" = "Lege den Wert fest, wenn du weißt, wie viele Personen an der Besprechung teilgenommen haben. Auf Automatisch entscheidet die Engine, und Kurn gruppiert das Audio selbst neu, falls die Engine alle zu einem Sprecher zusammengefasst hat.";
 "settings.diarization_preprocessing" = "Audiobereinigung für Diarisierung";
-"settings.diarization_dereverb" = "Enthallung (experimentell)";
-"settings.diarization_dereverb_footer" = "Entfernt Raumhall aus kurzen Aufnahmen (bis zu 5 Minuten). Längere Aufnahmen überspringen diesen langsamen experimentellen Schritt und fahren direkt mit der Sprechertrennung fort.";
 "detail.playback_enhancement" = "Verbessertes Audio";
 "common.on" = "Ein";
 "common.off" = "Aus";

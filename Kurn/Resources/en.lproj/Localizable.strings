@@ -516,8 +516,6 @@
 "settings.diarization_speaker_count_auto" = "Auto";
 "settings.diarization_speaker_count_footer" = "Set this when you know how many people are in the meeting. On Auto the engine decides, and Kurn re-clusters the audio itself if the engine merged everyone into one speaker.";
 "settings.diarization_preprocessing" = "Diarization Audio Cleanup";
-"settings.diarization_dereverb" = "Dereverberation (Experimental)";
-"settings.diarization_dereverb_footer" = "Removes room echo from short recordings (up to 5 minutes). Longer recordings skip this experimental, slow pass and continue directly to speaker separation.";
 "detail.playback_enhancement" = "Enhanced audio";
 "common.on" = "On";
 "common.off" = "Off";

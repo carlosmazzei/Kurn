@@ -9,7 +9,7 @@ import Accelerate
 import Foundation
 
 enum PlaybackMix {
-    /// DPDFNet cannot emit until one complete STFT frame has arrived.
+    /// Some streaming enhancers cannot emit until one complete STFT frame has arrived.
     static func mix(
         dry: [Float],
         delayedWet: [Float],

@@ -1,0 +1,43 @@
+{
+  "modelName": "GTCRN",
+  "sampleRate": 16000.0,
+  "frameSize": 512,
+  "hopSize": 256,
+  "binCount": 257,
+  "spectrumInput": "mix",
+  "spectrumOutput": "enh",
+  "states": [
+    {
+      "input": "conv_cache",
+      "output": "conv_cache_out",
+      "shape": [
+        2,
+        1,
+        16,
+        16,
+        33
+      ]
+    },
+    {
+      "input": "tra_cache",
+      "output": "tra_cache_out",
+      "shape": [
+        2,
+        3,
+        1,
+        1,
+        16
+      ]
+    },
+    {
+      "input": "inter_cache",
+      "output": "inter_cache_out",
+      "shape": [
+        2,
+        1,
+        33,
+        16
+      ]
+    }
+  ]
+}
