@@ -1,0 +1,62 @@
+{
+  "corpora": [
+    {
+      "id": "librispeech-en",
+      "kind": "huggingface_audio",
+      "language": "english",
+      "corpus_name": "LibriSpeech test-clean",
+      "license": "CC BY 4.0",
+      "enabled": true,
+      "requires_token": false,
+      "hf_dataset": "openslr/librispeech_asr",
+      "hf_config": "clean",
+      "hf_split": "test",
+      "text_column": "text",
+      "audio_column": "audio",
+      "audio_extension": "flac",
+      "sample_count": 12
+    },
+    {
+      "id": "common-voice-pt",
+      "kind": "huggingface_audio",
+      "language": "portuguese",
+      "corpus_name": "Mozilla Common Voice 17.0 (pt)",
+      "license": "CC0 1.0",
+      "enabled": true,
+      "requires_token": true,
+      "hf_dataset": "mozilla-foundation/common_voice_17_0",
+      "hf_config": "pt",
+      "hf_split": "test",
+      "text_column": "sentence",
+      "audio_column": "audio",
+      "audio_extension": "mp3",
+      "sample_count": 12
+    },
+    {
+      "id": "coraa-pt",
+      "kind": "huggingface_audio",
+      "language": "portuguese",
+      "corpus_name": "CORAA (pt) -- UNCONFIRMED, disabled by default",
+      "license": "confirm before enabling",
+      "enabled": false,
+      "requires_token": false,
+      "hf_dataset": "TODO-confirm-CORAA-huggingface-dataset-id",
+      "hf_config": null,
+      "hf_split": "test",
+      "text_column": "text",
+      "audio_column": "audio",
+      "audio_extension": "wav",
+      "sample_count": 12
+    },
+    {
+      "id": "ami-en",
+      "kind": "ami_rttm",
+      "language": "english",
+      "corpus_name": "AMI Meeting Corpus (Mix-Headset, first 5 min)",
+      "license": "CC BY 4.0 (AMI Corpus); MIT (pyannote/AMI-diarization-setup RTTM)",
+      "enabled": true,
+      "meeting_count": 2,
+      "clip_seconds": 300
+    }
+  ]
+}

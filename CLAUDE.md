@@ -131,6 +131,35 @@ track into the two file formats the harness reads.
 Deliberately no pass/fail threshold: a budget invented here would have no
 provenance, and the first failure would just raise it.
 
+### Pipeline evaluation matrix on public datasets
+
+The private-corpus harness above answers "is this accurate on *my* meetings",
+but never runs unattended — there is no corpus for CI to score against. It also
+scores one hypothesis at a time, so it cannot say whether audio cleanup or a
+given diarizer actually helps versus just asserting it does.
+`PublicDatasetEvaluationHarnessTests` (`KurnTests/`) is the other half: it runs
+the app's real pipeline — `TranscriptionService`, not a stand-in — once per
+configuration in `PipelineEvaluationMatrix` (preprocessing on/off x VAD x
+diarization x transcription engine, 24 on-device combinations, plus optional
+cloud Whisper/OpenAI/Groq entries when their API key secret is present) over
+public benchmark audio in English and Portuguese, scoring WER/DER against each.
+Public audio carries none of the private corpus's restrictions, so this suite
+is meant to run in CI on demand
+(`.github/workflows/pipeline-eval.yml`, `workflow_dispatch`) — the practice is
+to dispatch it after any change to a pipeline stage (preprocessing, VAD,
+diarization, an engine, `TranscriptFusion`, …) to see whether the change moved
+WER/DER, not just whether it still compiles.
+
+Skipped like the private harness — via `KURN_PUBLIC_EVAL_DATA`, read by
+`PublicEvaluationDataset` — but the corpus itself is fetched on demand rather
+than committed (still too large for git, just not private), from
+`Tools/evaluation/public_datasets/` (`manifest.json` + `fetch_all.py`; see its
+README for what each corpus needs, including the `HF_TOKEN`/`OPENAI_API_KEY`/
+`GROQ_API_KEY` secrets some entries are gated behind). Output is `[pipeline-eval]`
+lines: per-item WER/DER, then an aggregate table per (language, configuration)
+— the one to compare between runs — plus an optional CSV via
+`KURN_PUBLIC_EVAL_REPORT`. Same no-threshold philosophy as the private harness.
+
 ## Architecture
 
 MVVM with `@Observable` `@MainActor` view models, value-type async services, and a

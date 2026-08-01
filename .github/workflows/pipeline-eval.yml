@@ -1,0 +1,129 @@
+name: Pipeline evaluation (public datasets)
+
+# Runs the app's actual transcription/diarization pipeline against public
+# benchmark audio (English + Portuguese), across the full cleanup x VAD x
+# diarization x ASR-engine matrix in `PipelineEvaluationMatrix`, and scores
+# WER/DER against each. See Tools/evaluation/public_datasets/README.md.
+#
+# On demand only -- this is a measurement run, not a merge gate. Dispatch it
+# after a change to any pipeline stage (preprocessing, VAD, diarization,
+# transcription engines, TranscriptFusion, ...) to see whether it actually
+# moved WER/DER, not just whether it compiles.
+
+on:
+  workflow_dispatch:
+    inputs:
+      matrix:
+        description: "essential (4 configs, fast) or full (24+ configs)"
+        type: choice
+        options: [full, essential]
+        default: full
+      corpora:
+        description: "space-separated corpus ids to fetch (blank = every enabled corpus in manifest.json)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: macos-26
+    timeout-minutes: 300
+
+    env:
+      XCODE_PROJECT: Kurn.xcodeproj
+      XCODE_SCHEME: Kurn
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
+      DATASET_DIR: ${{ github.workspace }}/.kurn-eval-public
+      REPORT_PATH: ${{ github.workspace }}/.kurn-eval-public/report.csv
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Prepare simulator runtimes
+        run: |
+          sudo xcodebuild -runFirstLaunch
+          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
+            xcodebuild -downloadPlatform iOS
+          fi
+          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
+            xcodebuild -downloadPlatform watchOS
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dataset-fetch dependencies
+        run: python3 -m pip install -r Tools/evaluation/public_datasets/requirements.txt
+
+      # ffmpeg for the AMI fetch (clipping each meeting to its first N minutes).
+      - name: Install ffmpeg
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            brew install ffmpeg
+          fi
+
+      # Datasets change rarely; keyed on the manifest so an edit invalidates it.
+      - name: Cache public datasets
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DATASET_DIR }}
+          key: kurn-eval-public-${{ hashFiles('Tools/evaluation/public_datasets/manifest.json') }}
+
+      - name: Fetch public datasets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python3 Tools/evaluation/public_datasets/fetch_all.py \
+            --out "$DATASET_DIR" \
+            ${{ github.event.inputs.corpora != '' && format('--only {0}', github.event.inputs.corpora) || '' }}
+
+      - name: Build and test
+        env:
+          KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
+          KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
+          KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
+          # Optional and additive -- absent by default. A maintainer who wants
+          # cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
+          # secrets; PipelineEvaluationMatrix only adds those entries when the
+          # corresponding key is actually present. See public_datasets/README.md.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            test -only-testing:KurnTests/PublicDatasetEvaluationHarnessTests \
+            | tee "$RUNNER_TEMP/pipeline-eval.log"
+
+      - name: Publish report summary
+        if: always()
+        run: |
+          {
+            echo "## Pipeline evaluation report"
+            echo
+            echo '```'
+            grep '^\[pipeline-eval\]' "$RUNNER_TEMP/pipeline-eval.log" || echo "(no [pipeline-eval] lines found -- check the build/test log below)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-eval-report
+          path: |
+            ${{ env.REPORT_PATH }}
+            ${{ runner.temp }}/pipeline-eval.log
+          if-no-files-found: warn
+          retention-days: 90
