@@ -209,7 +209,7 @@ struct RecordingCompactorTests {
             // Prerecorded rather than encoded here: writing AAC on the simulator
             // intermittently leaves a container the reader rejects, which is
             // exactly the outcome this test treats as a compaction failure.
-            _ = try AudioFixtures.prerecordedM4A(.tone44kHz64kbps3s, at: url)
+            _ = try AudioFixtures.prerecordedM4A(.tone44kHz128kbps6s, at: url)
             defer { AudioFileStore.delete(fileName: fileName) }
 
             let originalSize = AudioFileStore.byteSize(fileName: fileName)
@@ -227,8 +227,8 @@ struct RecordingCompactorTests {
             #expect(result.fileFormat.channelCount == 1)
             #expect(result.fileFormat.sampleRate == AudioRecorderService.storageSampleRate)
             let duration = Double(result.length) / result.processingFormat.sampleRate
-            #expect(duration > 2.5)
-            #expect(duration < 3.5)
+            #expect(duration > 5.5)
+            #expect(duration < 6.5)
         }
     }
 
