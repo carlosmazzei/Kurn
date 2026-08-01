@@ -12,12 +12,33 @@ import AVFoundation
 import Foundation
 
 extension PlaybackEnhancementRenderer {
+    /// Frame-by-frame DPDFNet inference is intentionally reserved for short
+    /// clips. The model is recurrent, so its 10 ms windows cannot be batched or
+    /// processed in parallel; on current devices a long meeting can otherwise
+    /// spend many minutes here before playback can switch to the enhanced copy.
+    static let maximumNeuralEnhancementDuration: TimeInterval = 5 * 60
+
+    static func shouldRunNeuralEnhancement(audioDuration: TimeInterval) -> Bool {
+        guard audioDuration.isFinite, audioDuration > 0 else { return true }
+        return audioDuration <= maximumNeuralEnhancementDuration
+    }
+
     func renderNeuralMix(
         from sourceURL: URL,
         failure: AppError,
         onProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> URL? {
         onProgress?(0)
+        try Task.checkCancellation()
+        let asset = AVURLAsset(url: sourceURL)
+        if let duration = try? await asset.load(.duration) {
+            let seconds = CMTimeGetSeconds(duration)
+            if !Self.shouldRunNeuralEnhancement(audioDuration: seconds) {
+                AppLog.recorder.atNotice.notice("enhance: skipping neural pass for long recording duration=\(String(format: "%.1f", seconds), privacy: .public)s limit=\(String(format: "%.1f", Self.maximumNeuralEnhancementDuration), privacy: .public)s; using DSP enhancement")
+                onProgress?(1)
+                return nil
+            }
+        }
         guard let streamID = await enhancer.beginStream(),
               let latencyFrames = await enhancer.latencyFrames(
                 at: Self.outputSampleRate
