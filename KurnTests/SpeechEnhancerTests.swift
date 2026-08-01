@@ -20,7 +20,7 @@ struct SpeechEnhancerTests {
     @Test func dryWetRatioIsApplied() {
         let dry = [Float](repeating: 1, count: 64)
         let wet = [Float](repeating: -1, count: 64)
-        let mixed = PlaybackMix.mix(
+        let mixed = mixForTesting(
             dry: dry,
             delayedWet: wet,
             latencyFrames: 0,
@@ -39,13 +39,13 @@ struct SpeechEnhancerTests {
         }
         let delayedWet = [Float](repeating: 0, count: latency) + enhanced
 
-        let mixed = PlaybackMix.mix(
+        let mixed = mixForTesting(
             dry: enhanced,
             delayedWet: delayedWet,
             latencyFrames: latency,
             wetMix: 0.85
         )
-        let wetOnly = PlaybackMix.mix(
+        let wetOnly = mixForTesting(
             dry: enhanced,
             delayedWet: delayedWet,
             latencyFrames: latency,
@@ -230,6 +230,35 @@ struct SpeechEnhancerTests {
         }
         return CorrelationPeak(lag: bestLag, correlation: best, energy: energy)
     }
+}
+
+private func mixForTesting(
+    dry: [Float],
+    delayedWet: [Float],
+    latencyFrames: Int,
+    wetMix: Float
+) -> [Float] {
+    guard !dry.isEmpty else { return [] }
+    let latency = max(0, latencyFrames)
+    let wetCount = max(0, delayedWet.count - latency)
+    let count = min(dry.count, wetCount)
+    var output = dry
+    guard count > 0 else { return output }
+
+    dry.withUnsafeBufferPointer { dryPointer in
+        delayedWet.withUnsafeBufferPointer { wetPointer in
+            output.withUnsafeMutableBufferPointer { outputPointer in
+                PlaybackMix.mixAligned(
+                    dry: dryPointer.baseAddress!,
+                    wet: wetPointer.baseAddress!.advanced(by: latency),
+                    output: outputPointer.baseAddress!,
+                    count: count,
+                    wetMix: wetMix
+                )
+            }
+        }
+    }
+    return output
 }
 
 /// Stands in for the model behind the same protocol the renderer uses, with the

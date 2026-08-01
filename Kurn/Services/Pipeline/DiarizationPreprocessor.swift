@@ -148,7 +148,7 @@ actor DiarizationPreprocessor {
         let frameSize = Self.fftFrameSize
         let hopSize = Self.fftHopSize
         let stft = STFT(frameSize: frameSize, hopSize: hopSize)
-        let frameCount = (samples.count - frameSize) / hopSize + 1
+        let frameCount = stft.frameCount(forSampleCount: samples.count)
         guard frameCount > 0 else { return samples }
         AppLog.transcription.atInfo.info("diarPreprocess: denoise analyzing file=\(fileName, privacy: .public) frames=\(frameCount, privacy: .public)")
 

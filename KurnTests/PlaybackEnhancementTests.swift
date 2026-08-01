@@ -105,7 +105,6 @@ struct PlaybackEnhancementTests {
             ))?.map(\.lastPathComponent) ?? []
             // Exactly one `.m4a` for this recording is visible to a shallow scan.
             #expect(names.filter { $0 == fileName }.count == 1)
-            #expect(AudioFileStore.enhancedAudioBytes() > 0)
         }
     }
 
@@ -121,20 +120,6 @@ struct PlaybackEnhancementTests {
             AudioFileStore.delete(fileName: fileName)
             #expect(!AudioFileStore.hasEnhancedAudio(fileName: fileName))
             #expect(!FileManager.default.fileExists(
-                atPath: AudioFileStore.resolveURL(fileName: fileName).path
-            ))
-        }
-    }
-
-    @Test func deletingOnlyTheEnhancedCopyKeepsTheRecording() async throws {
-        try await tempFileTestLock.run {
-            let fileName = try Self.seedRecordingFile(amplitude: 0.2)
-            defer { AudioFileStore.delete(fileName: fileName) }
-            try Self.seedEnhancedFile(fileName: fileName)
-
-            AudioFileStore.deleteEnhancedAudio(fileName: fileName)
-            #expect(!AudioFileStore.hasEnhancedAudio(fileName: fileName))
-            #expect(FileManager.default.fileExists(
                 atPath: AudioFileStore.resolveURL(fileName: fileName).path
             ))
         }
@@ -156,8 +141,8 @@ struct PlaybackEnhancementTests {
         // Never rendered.
         #expect(!recording.hasEnhancedAudio(currentVersion: current))
 
-        // Stamped, but the file is gone — "Delete all data" and the storage screen
-        // can remove it without touching the row.
+        // Stamped, but the file is gone — "Delete all data" can remove it
+        // without touching the row.
         recording.enhancedAudioVersion = current
         #expect(!recording.hasEnhancedAudio(currentVersion: current))
 
@@ -165,10 +150,6 @@ struct PlaybackEnhancementTests {
         recording.enhancedAudioVersion = current - 1
         #expect(!recording.hasEnhancedAudio(currentVersion: current))
 
-        recording.enhancedFileSize = 123
-        recording.clearEnhancedAudio()
-        #expect(recording.enhancedAudioVersion == 0)
-        #expect(recording.enhancedFileSize == 0)
     }
 
     /// A detail screen can be destroyed and rebuilt while the app-wide
