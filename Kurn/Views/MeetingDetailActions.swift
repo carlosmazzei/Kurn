@@ -44,6 +44,10 @@ extension MeetingDetailView {
     }
 
     func togglePlay(_ recording: Recording) {
+        // Offline neural rendering is intentionally exclusive with starting a
+        // fresh player for the same file. The shared coordinator keeps this
+        // guard true even after leaving and reopening the detail screen.
+        guard !enhancement.isEnhancing(recording) else { return }
         do {
             if player.loadedFileName == recording.fileName {
                 player.togglePlayPause()
@@ -67,7 +71,7 @@ extension MeetingDetailView {
     /// rendered by the current tuning is actually on disk. Falling back to the
     /// original silently is the right failure: the recording still plays.
     func shouldUseEnhanced(_ recording: Recording) -> Bool {
-        settings.playbackEnhancementEnabled && enhancement?.hasEnhancedAudio(recording) == true
+        settings.playbackEnhancementEnabled && enhancement.hasEnhancedAudio(recording)
     }
 
     /// Flip the enhanced/original variant for the recording being played,
@@ -76,7 +80,6 @@ extension MeetingDetailView {
     /// The preference is written too, so the choice sticks for the next recording
     /// instead of having to be made again for each one.
     func toggleEnhancement(_ recording: Recording) {
-        guard let enhancement else { return }
         let wantEnhanced = !player.isPlayingEnhanced
         settings.playbackEnhancementEnabled = wantEnhanced
 
@@ -100,6 +103,7 @@ extension MeetingDetailView {
     }
 
     func seek(_ recording: Recording, to time: TimeInterval) {
+        guard !enhancement.isEnhancing(recording) else { return }
         do {
             if player.loadedFileName != recording.fileName {
                 try player.load(
@@ -183,6 +187,7 @@ extension MeetingDetailView {
 
     func deleteRecording(_ recording: Recording) {
         if player.loadedFileName == recording.fileName { player.stop() }
+        enhancement.cancel(recording)
         let viewModel = MeetingsViewModel(modelContext: modelContext)
         viewModel.deleteRecording(recording)
         if let failure = viewModel.error { txVM?.error = failure }

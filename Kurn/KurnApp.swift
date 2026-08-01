@@ -50,6 +50,10 @@ struct KurnApp: App {
     /// detail screen, instead of each screen owning a separate view model whose
     /// per-instance progress can't see a run another instance started.
     @State private var transcription: TranscriptionViewModel
+    /// App-wide playback-enhancement coordinator. Rendering often outlives a
+    /// meeting-detail screen, so keeping this at the app level preserves the
+    /// task and its progress when the user navigates back and reopens a meeting.
+    @State private var playbackEnhancement: PlaybackEnhancementViewModel
     /// App-wide semantic-index coordinator, shared by the transcription
     /// completion path and the launch/foreground backfill sweep. One instance so
     /// both operate on the same main context.
@@ -116,6 +120,9 @@ struct KurnApp: App {
         _transcription = State(
             initialValue: TranscriptionViewModel(modelContext: container.mainContext)
         )
+        _playbackEnhancement = State(
+            initialValue: PlaybackEnhancementViewModel(modelContext: container.mainContext)
+        )
         _semanticIndex = State(
             initialValue: SemanticIndexCoordinator(modelContext: container.mainContext)
         )
@@ -161,6 +168,7 @@ struct KurnApp: App {
                     .environment(accessGate)
                     .environment(downloads)
                     .environment(transcription)
+                    .environment(playbackEnhancement)
                     .environment(semanticIndex)
                     .environment(wiki)
                 // Covers meeting/transcript content in the app-switcher

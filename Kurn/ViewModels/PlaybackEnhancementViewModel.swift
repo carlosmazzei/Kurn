@@ -14,6 +14,15 @@ import Foundation
 import Observation
 import SwiftData
 
+protocol PlaybackEnhancementRendering: Sendable {
+    func render(
+        fileName: String,
+        onProgress: (@Sendable (Double) -> Void)?
+    ) async throws -> Int64
+}
+
+extension PlaybackEnhancementRenderer: PlaybackEnhancementRendering {}
+
 @MainActor
 @Observable
 final class PlaybackEnhancementViewModel {
@@ -23,14 +32,22 @@ final class PlaybackEnhancementViewModel {
 
     private var tasks: [UUID: Task<Void, Never>] = [:]
     private let modelContext: ModelContext
-    private let renderer = PlaybackEnhancementRenderer()
+    private let renderer: any PlaybackEnhancementRendering
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        renderer: any PlaybackEnhancementRendering = PlaybackEnhancementRenderer()
+    ) {
         self.modelContext = modelContext
+        self.renderer = renderer
     }
 
     func progress(for recording: Recording) -> Double? {
         progressByID[recording.id]
+    }
+
+    func isEnhancing(_ recording: Recording) -> Bool {
+        tasks[recording.id] != nil
     }
 
     /// Whether playback can use the enhanced copy right now.
@@ -46,10 +63,14 @@ final class PlaybackEnhancementViewModel {
     /// - Parameter onReady: run on success, so the caller can switch playback over
     ///   the moment the copy exists instead of making the user tap a second time.
     func ensureEnhancedAudio(for recording: Recording, onReady: (() -> Void)? = nil) {
-        guard !hasEnhancedAudio(recording), tasks[recording.id] == nil else {
+        if hasEnhancedAudio(recording) {
             onReady?()
             return
         }
+        // A second request must not announce readiness while the first render is
+        // still writing its temporary file. Apart from switching playback too
+        // early, that used to let a reconstructed detail screen race the render.
+        guard tasks[recording.id] == nil else { return }
         // Never compete with a live recording for disk and CPU.
         guard !RecordingCommandRouter.shared.hasActiveSession else { return }
 

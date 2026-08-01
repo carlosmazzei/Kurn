@@ -354,6 +354,8 @@
 "detail.recording_n" = "Recording %d";
 "detail.playback_position" = "Playback position";
 "detail.playback_speed" = "Playback speed";
+"detail.play_recording" = "Play recording";
+"detail.pause_recording" = "Pause recording";
 "detail.skip_backward" = "Skip back 15 seconds";
 "detail.skip_forward" = "Skip forward 15 seconds";
 "detail.download_diarization_models" = "Download speaker models";
