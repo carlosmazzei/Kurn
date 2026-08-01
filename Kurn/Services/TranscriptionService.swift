@@ -228,7 +228,6 @@ struct TranscriptionService {
                 originalURL: fileURL,
                 engine: diarizationEngine,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
-                diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning,
@@ -258,7 +257,6 @@ struct TranscriptionService {
                 originalURL: fileURL,
                 engine: diarizationEngine,
                 diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
-                diarizationDereverbEnabled: config.diarizationDereverbEnabled,
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning,
@@ -499,7 +497,6 @@ struct TranscriptionService {
         originalURL: URL,
         engine: DiarizationEngine,
         diarizationPreprocessingEnabled: Bool,
-        diarizationDereverbEnabled: Bool,
         regions: [SpeechRegion],
         speakerCount: Int,
         onWarning: DiarizationWarningHandler?,
@@ -514,11 +511,10 @@ struct TranscriptionService {
         let diarURL: URL
         let cleanupURL: URL?
         if diarizationPreprocessingEnabled {
-            AppLog.transcription.atInfo.info("diarize: preprocessing requested file=\(originalURL.lastPathComponent, privacy: .public) dereverb=\(diarizationDereverbEnabled, privacy: .public); shared preprocessor may queue concurrent recordings")
+            AppLog.transcription.atInfo.info("diarize: preprocessing requested file=\(originalURL.lastPathComponent, privacy: .public); shared preprocessor may queue concurrent recordings")
             do {
                 diarURL = try await diarizationPreprocessor.process(
                     url: originalURL,
-                    dereverberate: diarizationDereverbEnabled,
                     onProgress: { onProgress(0.55 * $0) }
                 )
                 cleanupURL = diarURL

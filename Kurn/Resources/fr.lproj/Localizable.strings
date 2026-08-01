@@ -516,8 +516,6 @@
 "settings.diarization_speaker_count_auto" = "Auto";
 "settings.diarization_speaker_count_footer" = "Renseignez-le lorsque vous savez combien de personnes ont participé à la réunion. En mode auto, le moteur décide, et Kurn regroupe lui-même l'audio si le moteur a fusionné tout le monde en un seul intervenant.";
 "settings.diarization_preprocessing" = "Nettoyage audio pour la diarisation";
-"settings.diarization_dereverb" = "Déréverbération (expérimental)";
-"settings.diarization_dereverb_footer" = "Supprime l'écho des enregistrements courts (jusqu'à 5 minutes). Les enregistrements plus longs ignorent cette étape expérimentale et lente et passent directement à la séparation des intervenants.";
 "detail.playback_enhancement" = "Audio amélioré";
 "common.on" = "Activé";
 "common.off" = "Désactivé";

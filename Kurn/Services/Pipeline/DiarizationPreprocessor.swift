@@ -29,7 +29,6 @@ actor DiarizationPreprocessor {
     /// `cleanup` it when done.
     func process(
         url: URL,
-        dereverberate: Bool = false,
         onProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> URL {
         try await ResourceGuard.requireTranscriptionHeadroom()
@@ -51,44 +50,9 @@ actor DiarizationPreprocessor {
         AppLog.transcription.atInfo.info("diarPreprocess: decode complete file=\(fileName, privacy: .public) samples=\(samples.count, privacy: .public) audio=\(String(format: "%.1f", decodedDuration), privacy: .public)s elapsed=\(String(format: "%.1f", Date().timeIntervalSince(decodeStarted)), privacy: .public)s")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
-        // Dereverberation runs *before* noise reduction on purpose: WPE's linear
-        // prediction model assumes the additive noise is small, and spectral
-        // subtraction ahead of it would distort the very structure it fits.
-        let runDereverberation = Self.shouldDereverberate(
-            requested: dereverberate,
-            audioDuration: decodedDuration
-        )
-        if dereverberate, !runDereverberation {
-            AppLog.transcription.atNotice.notice("diarPreprocess: dereverb skipped file=\(fileName, privacy: .public) audio=\(String(format: "%.1f", decodedDuration), privacy: .public)s exceeds limit=\(String(format: "%.1f", Self.maximumDereverberationDuration), privacy: .public)s; continuing with denoise")
-        }
-        if runDereverberation {
-            let dereverbStart = Date()
-            samples = WPEDereverberator().process(
-                samples: samples,
-                stft: STFT(frameSize: Self.fftFrameSize, hopSize: Self.fftHopSize),
-                onBlockCompleted: { completed, total in
-                    onProgress?(0.15 + 0.35 * Double(completed) / Double(max(1, total)))
-                    let percent = completed * 100 / max(1, total)
-                    let previousPercent = max(0, completed - 1) * 100 / max(1, total)
-                    let crossedDecile = percent / 10 > previousPercent / 10
-                    guard completed == 1 || completed == total || crossedDecile else { return }
-
-                    let elapsed = Date().timeIntervalSince(dereverbStart)
-                    let remaining = completed > 0
-                        ? elapsed * Double(total - completed) / Double(completed)
-                        : 0
-                    AppLog.transcription.atInfo.info("diarPreprocess: dereverb \(percent, privacy: .public)% file=\(fileName, privacy: .public) blocks=\(completed, privacy: .public)/\(total, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
-                }
-            )
-            try Task.checkCancellation()
-            AppLog.transcription.atInfo.info("diarPreprocess: dereverb done in \(Date().timeIntervalSince(dereverbStart), privacy: .public)s")
-            try await ResourceGuard.requireTranscriptionHeadroom()
-        }
-
         let denoiseStart = Date()
-        let denoiseStartProgress = runDereverberation ? 0.50 : 0.15
         samples = denoise(samples, fileName: fileName) { progress in
-            onProgress?(denoiseStartProgress + (0.90 - denoiseStartProgress) * progress)
+            onProgress?(0.15 + 0.75 * progress)
         }
         AppLog.transcription.atInfo.info("diarPreprocess: denoise complete file=\(fileName, privacy: .public) elapsed=\(String(format: "%.1f", Date().timeIntervalSince(denoiseStart)), privacy: .public)s samples=\(samples.count, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
@@ -348,17 +312,6 @@ actor DiarizationPreprocessor {
     }
 
     // MARK: - Constants
-
-    /// The current scalar WPE implementation is slower than real time on an
-    /// iPhone (the observed 25-minute recording estimated ~38 minutes just for
-    /// this optional pass). Keep it available for short clips, but never let an
-    /// experimental enhancement block normal meeting diarization for tens of
-    /// minutes. Noise reduction and FluidAudio still run when WPE is skipped.
-    static let maximumDereverberationDuration: TimeInterval = 5 * 60
-
-    static func shouldDereverberate(requested: Bool, audioDuration: TimeInterval) -> Bool {
-        requested && audioDuration <= maximumDereverberationDuration
-    }
 
     private static let targetSampleRate: Double = 16_000
     private static let targetPeakDBFS: Float = -3.0

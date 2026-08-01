@@ -39,7 +39,6 @@ final class AppSettings {
         /// Superseded by `fluidAudioSpeakerCount`; read once at init to migrate.
         static let legacyFluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
         static let diarizationPreprocessingEnabled = "settings.diarizationPreprocessingEnabled"
-        static let diarizationDereverbEnabled = "settings.diarizationDereverbEnabled"
         static let playbackEnhancementEnabled = "settings.playbackEnhancementEnabled"
         static let transcriptionEngine = "settings.transcriptionEngine"
         static let preprocessingEngine = "settings.preprocessingEngine"
@@ -207,16 +206,6 @@ final class AppSettings {
         didSet { defaults.set(diarizationPreprocessingEnabled, forKey: Keys.diarizationPreprocessingEnabled) }
     }
 
-    /// When on, the diarization cleanup additionally runs WPE dereverberation
-    /// before its noise reduction. Experimental and off by default: WPE is the
-    /// standard far-field front end in the DIHARD/CHiME evaluations and is linear
-    /// (so it cannot distort the timbre speaker embeddings read), but its benefit
-    /// on this app's own material has not been measured, and it costs real
-    /// processing time on a long recording.
-    var diarizationDereverbEnabled: Bool {
-        didSet { defaults.set(diarizationDereverbEnabled, forKey: Keys.diarizationDereverbEnabled) }
-    }
-
     /// When on, playback prefers an enhanced copy of each recording — equalized,
     /// level-controlled and loudness-normalized — generated on first use. Off by
     /// default: it changes what the user hears relative to what was recorded, and
@@ -266,7 +255,6 @@ final class AppSettings {
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
             fluidAudioSpeakerCount: fluidAudioSpeakerCount,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
-            diarizationDereverbEnabled: diarizationDereverbEnabled,
             whisperCppModel: whisperCppModel
         )
     }
@@ -526,7 +514,6 @@ final class AppSettings {
             fluidAudioSpeakerCount = defaults.integer(forKey: Keys.legacyFluidAudioMinSpeakers)
         }
         diarizationPreprocessingEnabled = defaults.bool(forKey: Keys.diarizationPreprocessingEnabled, default: true)
-        diarizationDereverbEnabled = defaults.bool(forKey: Keys.diarizationDereverbEnabled)
         playbackEnhancementEnabled = defaults.bool(forKey: Keys.playbackEnhancementEnabled)
         fluidAudioASRModelsConsented = defaults.bool(forKey: Keys.fluidAudioASRModelsConsented)
         let batchASRConsented = defaults.bool(forKey: Keys.fluidAudioBatchASRModelsConsented)

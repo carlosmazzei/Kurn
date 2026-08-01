@@ -9,8 +9,8 @@
 /* Begin PBXBuildFile section */
 		2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 2AA9E4B62FECAAE50067BF88 /* FluidAudio */; };
 		2AB0000000000000000000A1 /* whisper in Frameworks */ = {isa = PBXBuildFile; productRef = 2AB0000000000000000000A2 /* whisper */; };
-		2AC0000000000000000000A1 /* Kurn/Resources/Models/DPDFNet.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B1 /* Kurn/Resources/Models/DPDFNet.mlpackage */; };
-		2AC0000000000000000000A2 /* Kurn/Resources/Models/dpdfnet.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/dpdfnet.json */; };
+		2AC0000000000000000000A1 /* Kurn/Resources/Models/GTCRN.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */; };
+		2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA1000000000000000000162 /* Kurn/Infrastructure/RecordingActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */; };
 		AA3000000000000000000131 /* KurnWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA30000000000000000000A1 /* KurnWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -73,8 +73,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2AC0000000000000000000B1 /* Kurn/Resources/Models/DPDFNet.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = Kurn/Resources/Models/DPDFNet.mlpackage; sourceTree = SOURCE_ROOT; };
-		2AC0000000000000000000B2 /* Kurn/Resources/Models/dpdfnet.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Kurn/Resources/Models/dpdfnet.json; sourceTree = SOURCE_ROOT; };
+		2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = Kurn/Resources/Models/GTCRN.mlpackage; sourceTree = SOURCE_ROOT; };
+		2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Kurn/Resources/Models/gtcrn.json; sourceTree = SOURCE_ROOT; };
 		2AD3E59C300D5CA2003DA9A9 /* KurnUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA00000000000000000000A1 /* Kurn.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kurn.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KurnLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,8 +88,8 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Resources/Models/dpdfnet.json,
-				Resources/Models/DPDFNet.mlpackage,
+				Resources/Models/gtcrn.json,
+				Resources/Models/GTCRN.mlpackage,
 			);
 			target = AA00000000000000000000B1 /* Kurn */;
 		};
@@ -161,8 +161,8 @@
 		2A31B2142FF90D98006B88F7 /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
-				2AC0000000000000000000B1 /* Kurn/Resources/Models/DPDFNet.mlpackage */,
-				2AC0000000000000000000B2 /* Kurn/Resources/Models/dpdfnet.json */,
+				2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */,
+				2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */,
 				AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */,
 			);
 			name = "Recovered References";
@@ -385,8 +385,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2AC0000000000000000000A1 /* Kurn/Resources/Models/DPDFNet.mlpackage in Resources */,
-				2AC0000000000000000000A2 /* Kurn/Resources/Models/dpdfnet.json in Resources */,
+				2AC0000000000000000000A1 /* Kurn/Resources/Models/GTCRN.mlpackage in Resources */,
+				2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

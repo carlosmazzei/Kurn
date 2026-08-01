@@ -516,8 +516,6 @@
 "settings.diarization_speaker_count_auto" = "Automatico";
 "settings.diarization_speaker_count_footer" = "Impostalo quando sai quante persone hanno partecipato alla riunione. In automatico decide il motore, e Kurn raggruppa di nuovo l'audio da solo se il motore ha unito tutti in un unico speaker.";
 "settings.diarization_preprocessing" = "Pulizia Audio per Diarizzazione";
-"settings.diarization_dereverb" = "Dereverberazione (Sperimentale)";
-"settings.diarization_dereverb_footer" = "Rimuove l'eco dalle registrazioni brevi (fino a 5 minuti). Le registrazioni più lunghe saltano questo passaggio sperimentale e lento e continuano direttamente con la separazione degli speaker.";
 "detail.playback_enhancement" = "Audio migliorato";
 "common.on" = "Attivo";
 "common.off" = "Disattivo";

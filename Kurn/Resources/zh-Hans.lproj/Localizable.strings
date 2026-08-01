@@ -516,8 +516,6 @@
 "settings.diarization_speaker_count_auto" = "自动";
 "settings.diarization_speaker_count_footer" = "如果你知道会议有多少人参加，请在此设置。选择“自动”时由引擎判断；若引擎把所有人合并成了一位发言人，Kurn 会自行重新聚类音频。";
 "settings.diarization_preprocessing" = "说话人分离音频清理";
-"settings.diarization_dereverb" = "去混响（实验性）";
-"settings.diarization_dereverb_footer" = "去除短录音（最长 5 分钟）中的房间回声。较长录音会跳过这一缓慢的实验性步骤，直接继续说话人分离。";
 "detail.playback_enhancement" = "增强音频";
 "common.on" = "开启";
 "common.off" = "关闭";

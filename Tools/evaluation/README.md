@@ -6,7 +6,7 @@ from the literature, not measurement on this material. `KurnTests/Support/Evalua
 implements the two standard metrics so that can change. This is the recipe for
 feeding them.
 
-It is a **manual, occasional step**, like `Tools/dpdfnet/`. Nothing here runs in
+It is a **manual, occasional step**, like `Tools/gtcrn/`. Nothing here runs in
 CI: the harness is skipped unless `KURN_EVAL_DATA` is set, which is how CI runs,
 because the corpus **cannot be committed**. Meeting recordings are the most
 private thing this app touches — the reason every byte of them is encrypted at
