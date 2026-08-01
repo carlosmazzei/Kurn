@@ -206,7 +206,10 @@ struct RecordingCompactorTests {
             let fileName = "kurn-test-\(UUID().uuidString).m4a"
             let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
             // 44.1 kHz at 64 kbps, i.e. the shape the recorder used to produce.
-            _ = try AudioFixtures.m4aTone(seconds: 3.0, sampleRate: 44_100, at: url)
+            // Prerecorded rather than encoded here: writing AAC on the simulator
+            // intermittently leaves a container the reader rejects, which is
+            // exactly the outcome this test treats as a compaction failure.
+            _ = try AudioFixtures.prerecordedM4A(.tone44kHz64kbps3s, at: url)
             defer { AudioFileStore.delete(fileName: fileName) }
 
             let originalSize = AudioFileStore.byteSize(fileName: fileName)
@@ -235,15 +238,8 @@ struct RecordingCompactorTests {
         try await tempFileTestLock.run {
             let fileName = "kurn-test-\(UUID().uuidString).m4a"
             let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
-            // 16 kHz, as a narrowband Bluetooth route would have produced. The
-            // codec picks the bit rate: at this sample rate it rejects the
-            // fixture's usual 64 kbps outright.
-            _ = try AudioFixtures.m4aTone(
-                seconds: 2.0,
-                sampleRate: 16_000,
-                bitRate: nil,
-                at: url
-            )
+            // 16 kHz, as a narrowband Bluetooth route would have produced.
+            _ = try AudioFixtures.prerecordedM4A(.tone16kHz2s, at: url)
             defer { AudioFileStore.delete(fileName: fileName) }
 
             let compactor = RecordingCompactor(targetBitRate: AudioQuality.low.bitRate)
