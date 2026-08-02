@@ -104,14 +104,23 @@ enum PipelineEvaluationMatrix {
             for vad in VADEngine.allCases {
                 for diarization in DiarizationEngine.allCases {
                     for transcription in TranscriptionEngine.allCases where transcription != .whisperAPI {
-                        let models = transcription == .whisperCpp ? whisperCppModels : [nil]
-                        for model in models {
+                        if transcription == .whisperCpp {
+                            for model in whisperCppModels {
+                                entries.append(entry(
+                                    preprocessing: preprocessing,
+                                    vad: vad,
+                                    diarization: diarization,
+                                    transcription: transcription,
+                                    asr: .onDevice(model)
+                                ))
+                            }
+                        } else {
                             entries.append(entry(
                                 preprocessing: preprocessing,
                                 vad: vad,
                                 diarization: diarization,
                                 transcription: transcription,
-                                asr: .onDevice(model)
+                                asr: .onDevice(nil)
                             ))
                         }
                     }
