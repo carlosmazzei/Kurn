@@ -47,7 +47,7 @@
       "text_column": "reference",
       "audio_column": "audio",
       "audio_extension": "wav",
-      "sample_count": 8
+      "sample_count": 40
     },
     {
       "id": "coraa-pt",
@@ -63,7 +63,7 @@
       "text_column": "text",
       "audio_column": "audio",
       "audio_extension": "wav",
-      "sample_count": 8,
+      "sample_count": 40,
       "trust_remote_code": false
     },
     {

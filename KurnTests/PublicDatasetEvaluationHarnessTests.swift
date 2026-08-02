@@ -121,8 +121,15 @@ struct PublicDatasetEvaluationHarnessTests {
         }
 
         for (info, items) in corpora {
+            let corpusEntries = Self.entries(entries, for: items)
+            if corpusEntries.count < entries.count {
+                print(
+                    "[pipeline-eval] \(info.corpus): scored on WER only, so the diarization axis is "
+                    + "collapsed — \(entries.count) -> \(corpusEntries.count) configuration(s)"
+                )
+            }
             for item in items {
-                for entry in entries {
+                for entry in corpusEntries {
                     guard TranscriptionLanguageSupport.isSupported(item.language, by: entry.configuration.transcription) else {
                         print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(entry.configuration.transcription) does not support \(item.language)")
                         continue
@@ -186,6 +193,38 @@ struct PublicDatasetEvaluationHarnessTests {
     private static var isResuming: Bool {
         ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_RESUME"] == "1"
     }
+
+    /// Drops the diarization axis for a corpus that carries no reference RTTM.
+    ///
+    /// `TranscriptFusion.splitCoarseSpan` is word-preserving — it partitions a
+    /// span's words into contiguous ranges and returns the span untouched unless
+    /// the partition consumes every one — so the concatenated transcript is the
+    /// same word sequence no matter who the turns are attributed to. The
+    /// diarizer therefore **cannot** change WER, which the measurements confirm:
+    /// every WER in a Portuguese run appears exactly twice, once per diarizer,
+    /// without exception.
+    ///
+    /// So on a WER-only corpus that axis is not a comparison, it is the same
+    /// number computed twice at double the cost. Spending that budget on more
+    /// items instead is what makes the rate mean anything — a corpus of 16 short
+    /// utterances came to ~143 reference tokens, where one wrong word moves the
+    /// result by 0.7 points and two unrelated engines land on the same figure by
+    /// coincidence.
+    ///
+    /// Only collapsed when the whole corpus is WER-only; a mixed one keeps the
+    /// full matrix rather than deciding per item.
+    private static func entries(
+        _ entries: [PipelineEvaluationMatrix.Entry],
+        for items: [PublicEvaluationDataset.Item]
+    ) -> [PipelineEvaluationMatrix.Entry] {
+        guard !items.isEmpty, items.allSatisfy({ $0.referenceRTTM == nil }) else { return entries }
+        let collapsed = entries.filter { $0.configuration.diarization == diarizerForWEROnlyCorpora }
+        return collapsed.isEmpty ? entries : collapsed
+    }
+
+    /// Which diarizer the collapsed axis keeps. The app's own default, so a
+    /// WER-only run still exercises the configuration users actually get.
+    private static let diarizerForWEROnlyCorpora: DiarizationEngine = .fluidAudio
 
     /// Writes `OPENAI_API_KEY`/`GROQ_API_KEY` (when set) into the Keychain
     /// under the same account `ProviderFactory.whisperProvider` reads, exactly

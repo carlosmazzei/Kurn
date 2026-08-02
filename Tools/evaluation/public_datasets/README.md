@@ -37,8 +37,17 @@ reasoning behind it.
 | --- | --- | --- | --- | --- |
 | AMI Meeting Corpus (Mix-Headset) | English | **WER + DER** | yes, 4 meetings x 5 min | Four people around a table -- the only corpus whose overlap, crosstalk and far-field conditions look like what the app actually records, and the only one where text and speaker turns are scored on the same audio. Carries the most weight here on purpose. The four are drawn from four *different* meeting series (`EN2002`, `ES2004`, `IS1009`, `TS3003`), not four sessions of one: sessions `a`-`d` of a series are the same four people in the same room, so taking them would buy four times the audio and none of the speaker variety. |
 | LibriSpeech test-clean | English | WER | yes, 6 | One voice reading, clean. Kept small: it is the regression canary and the one number loosely comparable to the wider literature, not a description of real use. |
-| CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes, 8 | `inesc-id/camoes_SI` (`test` split). Interview speech, closer to conversation than read prompts. Ungated, `CC BY 4.0`. |
-| CORAA v1.1 (pt) | Portuguese | WER | yes, 8 | `Racoci/CORAA-v1.1` (`default` config, `test` split). Brazilian Portuguese spontaneous speech across five source projects. `CC BY-NC-ND 4.0`. |
+| CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes, 40 | `inesc-id/camoes_SI` (`test` split). Interview speech, closer to conversation than read prompts. Ungated, `CC BY 4.0`. |
+| CORAA v1.1 (pt) | Portuguese | WER | yes, 40 | `Racoci/CORAA-v1.1` (`default` config, `test` split). Brazilian Portuguese spontaneous speech across five source projects. `CC BY-NC-ND 4.0`. |
+
+**The Portuguese counts are high because the items are tiny.** Both corpora are
+distributed already segmented into single utterances of a few seconds, so an
+item carries roughly six to ten reference words. At 8 items each, a Portuguese
+run scored against ~143 tokens in total: one wrong word moved the rate by 0.7
+points, and two unrelated engines landed on identical figures by coincidence
+(45 errors out of 143, from completely different transcripts). Item count here
+buys statistical resolution, and it is cheap — these are seconds of audio, not
+the minutes AMI contributes.
 | VoxConverse | English | DER | **no**, 4 | `diarizers-community/voxconverse`, `CC BY 4.0`. **1 to 21 speakers per recording** -- by far the widest speaker-count range available freely, which is exactly the pipeline's known failure (VBx collapsing to one speaker, see `SpeakerClusterRefiner`). Off by default because its column layout is a community convention this repo has not yet confirmed against a real fetch; turn it on for a diarization-focused run. |
 | Common Voice 17.0 (pt) | Portuguese | WER | **no**, 12 | Broad accent coverage, but gated behind an `HF_TOKEN` (see below), so it is off by default to keep a fresh clone runnable with no credentials. |
 
