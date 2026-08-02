@@ -61,9 +61,15 @@ def main() -> None:
             failures.append(entry["id"])
 
     if failures:
-        raise SystemExit(f"failed to fetch: {', '.join(failures)}")
+        print(f"[fetch] failed to fetch: {', '.join(failures)}", file=sys.stderr, flush=True)
+        os._exit(1)
     print(f"[fetch] done -- corpora written under {args.out}", flush=True)
+    # The datasets/fsspec stack can leave non-daemon background threads (e.g.
+    # HTTP connection pools, file-system monitors) that prevent the interpreter
+    # from shutting down cleanly. For a batch fetch script there is no state to
+    # flush, so exit immediately.
+    os._exit(0)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
