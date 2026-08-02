@@ -64,10 +64,10 @@ SKIP_LINE = re.compile(r"^SKIP (?P<corpus>[^/]+)/(?P<item>\S+) \[(?P<label>[^\]]
 
 
 class Group:
-    """One (language, configuration) cell of the aggregate table."""
+    """One (section, configuration) cell of the aggregate table."""
 
-    def __init__(self, language: str, label: str) -> None:
-        self.language = language
+    def __init__(self, section: str, label: str) -> None:
+        self.section = section
         self.label = label
         self.corpora: set[str] = set()
         self.wer_errors = 0
@@ -130,14 +130,21 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(reader)
 
 
-def group_rows(rows: list[dict[str, str]]) -> dict[str, dict[str, Group]]:
-    """language -> configuration label -> Group, both insertion-ordered."""
+def group_rows(rows: list[dict[str, str]], per_corpus: bool) -> dict[str, dict[str, Group]]:
+    """section -> configuration label -> Group, both insertion-ordered.
+
+    A section is one language, or one (language, corpus) pair. Both grains are
+    rendered because micro-averaging weights by reference length: a language
+    total over LibriSpeech plus AMI is dominated by the meeting corpus, which
+    buries the read-speech number rather than reporting it.
+    """
     grouped: dict[str, dict[str, Group]] = {}
     for row in rows:
-        by_label = grouped.setdefault(row["language"], {})
+        section = f"{row['language']} / {row['corpus']}" if per_corpus else row["language"]
+        by_label = grouped.setdefault(section, {})
         group = by_label.get(row["configuration"])
         if group is None:
-            group = Group(row["language"], row["configuration"])
+            group = Group(section, row["configuration"])
             by_label[row["configuration"]] = group
         group.add(row)
     return grouped
@@ -236,7 +243,8 @@ def render(
     run_url: str | None,
     log: Path | None,
 ) -> str:
-    grouped = group_rows(rows)
+    grouped = group_rows(rows, per_corpus=False)
+    per_corpus = group_rows(rows, per_corpus=True)
 
     heading = f"### {date}"
     if commit:
@@ -265,6 +273,19 @@ def render(
         out.append(f"#### {language.capitalize()}")
         out.append("")
         out.extend(table(sorted(grouped[language].values(), key=sort_key)))
+        out.append("")
+
+    # Only worth printing when some language actually spans more than one
+    # corpus; otherwise it is the table above with a longer heading.
+    if len(per_corpus) > len(grouped):
+        out.append("<details><summary>Per corpus</summary>")
+        out.append("")
+        for section in sorted(per_corpus):
+            out.append(f"##### {section}")
+            out.append("")
+            out.extend(table(sorted(per_corpus[section].values(), key=sort_key)))
+            out.append("")
+        out.append("</details>")
         out.append("")
 
     if skips:

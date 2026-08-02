@@ -14,7 +14,7 @@
       "text_column": "text",
       "audio_column": "audio",
       "audio_extension": "flac",
-      "sample_count": 12
+      "sample_count": 6
     },
     {
       "id": "common-voice-pt",
@@ -47,7 +47,7 @@
       "text_column": "reference",
       "audio_column": "audio",
       "audio_extension": "wav",
-      "sample_count": 12
+      "sample_count": 8
     },
     {
       "id": "coraa-pt",
@@ -63,7 +63,7 @@
       "text_column": "text",
       "audio_column": "audio",
       "audio_extension": "wav",
-      "sample_count": 12,
+      "sample_count": 8,
       "trust_remote_code": false
     },
     {
@@ -71,10 +71,27 @@
       "kind": "ami_rttm",
       "language": "english",
       "corpus_name": "AMI Meeting Corpus (Mix-Headset, first 5 min)",
-      "license": "CC BY 4.0 (AMI Corpus); MIT (pyannote/AMI-diarization-setup RTTM)",
+      "license": "CC BY 4.0 (AMI Corpus, audio + manual annotation); MIT (pyannote/AMI-diarization-setup RTTM)",
       "enabled": true,
-      "meeting_count": 2,
+      "meeting_count": 4,
       "clip_seconds": 300
+    },
+    {
+      "id": "voxconverse-en",
+      "kind": "huggingface_diarization",
+      "language": "english",
+      "corpus_name": "VoxConverse (first 5 min)",
+      "license": "CC BY 4.0",
+      "enabled": false,
+      "requires_token": false,
+      "hf_dataset": "diarizers-community/voxconverse",
+      "hf_config": null,
+      "hf_split": "test",
+      "audio_column": "audio",
+      "audio_extension": "wav",
+      "sample_count": 4,
+      "clip_seconds": 300,
+      "trust_remote_code": false
     }
   ]
 }

@@ -34,7 +34,11 @@ pipeline stage moves WER or DER, that shows up in a pull request.
   and a LibriSpeech WER in a paper are not the same measurement.
 - **Every rate is micro-averaged over the corpus**: total errors divided by
   total reference, not the mean of the per-file rates. A short file with one
-  bad word cannot dominate.
+  bad word cannot dominate — but the corpus with the most speech does. That is
+  deliberate: AMI's meetings are weighted to dominate English, because the app
+  records meetings. It also means a language total mixes read speech with
+  meeting speech, which is why runs are reported **per corpus** as well;
+  read that grain when deciding anything.
 - **A missing row is a skip, not a 0%.** The harness skips a (language, engine)
   pair the engine cannot serve — Apple Speech is fixed to the device locale, so
   it is absent from every Portuguese table below. Skips are listed under each
@@ -71,6 +75,11 @@ every dispatch is worth a commit.
 **Partial coverage: Portuguese only, WER only.** The dispatch narrowed
 `corpora` to the two Portuguese sets, so neither LibriSpeech (English WER) nor
 AMI (English DER) ran. There is no English baseline and no DER figure yet.
+
+This entry also predates two changes and is not directly comparable to later
+runs: the corpus mix was rebalanced toward meeting audio afterwards, and the
+per-corpus aggregate did not exist yet, so the numbers below blend CAMOES and
+CORAA into one Portuguese total.
 
 - matrix: full, restricted to Portuguese — 16 configuration(s) × 24 item(s) =
   384 scored rows

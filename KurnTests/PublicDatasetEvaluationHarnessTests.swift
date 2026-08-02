@@ -237,16 +237,39 @@ struct PublicDatasetEvaluationHarnessTests {
         }
     }
 
-    /// Corpus-level rate per (language, configuration) — the table that answers
-    /// "which combination is best for English" / "...for Portuguese", weighted
-    /// by reference length rather than averaged per-file, same rationale as
-    /// `EvaluationHarnessTests.reportsWordErrorRate`.
+    /// The table that answers "which combination is best for English" /
+    /// "...for Portuguese", weighted by reference length rather than averaged
+    /// per-file, same rationale as `EvaluationHarnessTests.reportsWordErrorRate`.
+    ///
+    /// Reported twice, at two grains, because one language can span materially
+    /// different material: English is both LibriSpeech (one voice reading, clean)
+    /// and AMI (four people around a table). Micro-averaging weights by reference
+    /// length, so the meeting corpus dominates the language total and the
+    /// read-speech signal — the one number comparable to the wider literature —
+    /// disappears into it. The per-language line stays for continuity with runs
+    /// recorded before AMI had a transcript; the per-corpus line is the one to
+    /// read when deciding anything.
     private func reportAggregate(_ rows: [Row]) {
-        let byGroup = Dictionary(grouping: rows) { "\($0.language)|\($0.configLabel)" }
         print("[pipeline-eval] === aggregate WER/DER by language x configuration ===")
+        reportGroups(rows, keyedBy: { "\($0.language)|\($0.configLabel)" }, named: { $0.language })
+        print("[pipeline-eval] === aggregate WER/DER by corpus x configuration ===")
+        reportGroups(
+            rows,
+            keyedBy: { "\($0.language)|\($0.corpus)|\($0.configLabel)" },
+            named: { "\($0.language)/\($0.corpus)" }
+        )
+    }
+
+    private func reportGroups(
+        _ rows: [Row],
+        keyedBy key: (Row) -> String,
+        named name: (Row) -> String
+    ) {
+        let byGroup = Dictionary(grouping: rows, by: key)
         for key in byGroup.keys.sorted() {
             let group = byGroup[key] ?? []
-            guard let language = group.first?.language, let configLabel = group.first?.configLabel else { continue }
+            guard let first = group.first else { continue }
+            let (label, configLabel) = (name(first), first.configLabel)
 
             var parts: [String] = []
             let werGroup = group.compactMap(\.wer)
@@ -266,7 +289,7 @@ struct PublicDatasetEvaluationHarnessTests {
             }
 
             guard !parts.isEmpty else { continue }
-            print("[pipeline-eval] \(language) [\(configLabel)]: " + parts.joined(separator: ", "))
+            print("[pipeline-eval] \(label) [\(configLabel)]: " + parts.joined(separator: ", "))
         }
     }
 

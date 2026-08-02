@@ -23,8 +23,12 @@ def _scoring_description(entry: dict) -> str:
     kind = entry.get("kind")
     if kind == "huggingface_audio":
         return "WER"
-    if kind == "ami_rttm":
+    if kind == "huggingface_diarization":
         return "DER"
+    if kind == "ami_rttm":
+        # The transcript is best-effort (see fetch_ami.py); a meeting that loses
+        # it falls back to DER, so promise the metric that is always there.
+        return "DER (+WER when AMI's manual annotation is reachable)"
     return "unknown"
 
 
@@ -32,6 +36,10 @@ def _format_corpus(entry: dict) -> str:
     kind = entry.get("kind")
     if kind == "huggingface_audio":
         count = f"{entry.get('sample_count', '?')} sample(s)"
+    elif kind == "huggingface_diarization":
+        clip = entry.get("clip_seconds")
+        clip_note = f", {clip}s clips" if clip else ", full length"
+        count = f"{entry.get('sample_count', '?')} recording(s){clip_note}"
     elif kind == "ami_rttm":
         count = f"{entry.get('meeting_count', '?')} meeting(s), {entry.get('clip_seconds', '?')}s clips"
     else:
@@ -62,7 +70,7 @@ def print_summary(manifest: dict, token: str | None, only: list[str] | None) -> 
         total_items = 0
         for entry in enabled:
             print(f"[fetch]   fetch {_format_corpus(entry)}", flush=True)
-            if entry.get("kind") == "huggingface_audio":
+            if entry.get("kind") in ("huggingface_audio", "huggingface_diarization"):
                 total_items += int(entry.get("sample_count", 0))
             elif entry.get("kind") == "ami_rttm":
                 total_items += int(entry.get("meeting_count", 0))
@@ -103,6 +111,10 @@ def main() -> None:
                 from fetch_huggingface_audio_dataset import fetch as fetch_huggingface
 
                 fetch_huggingface(entry, out_dir, token=token)
+            elif entry["kind"] == "huggingface_diarization":
+                from fetch_huggingface_diarization_dataset import fetch as fetch_diarization
+
+                fetch_diarization(entry, out_dir, token=token)
             elif entry["kind"] == "ami_rttm":
                 from fetch_ami import fetch as fetch_ami
 

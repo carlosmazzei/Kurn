@@ -156,9 +156,26 @@ than committed (still too large for git, just not private), from
 `Tools/evaluation/public_datasets/` (`manifest.json` + `fetch_all.py`; see its
 README for what each corpus needs, including the `HF_TOKEN`/`OPENAI_API_KEY`/
 `GROQ_API_KEY` secrets some entries are gated behind). Output is `[pipeline-eval]`
-lines: per-item WER/DER, then an aggregate table per (language, configuration)
-— the one to compare between runs — plus an optional CSV via
-`KURN_PUBLIC_EVAL_REPORT`. Same no-threshold philosophy as the private harness.
+lines: per-item WER/DER, then aggregate tables per (language, configuration) and
+per (corpus, configuration) — the ones to compare between runs — plus an
+optional CSV via `KURN_PUBLIC_EVAL_REPORT`. Same no-threshold philosophy as the
+private harness.
+
+**The corpus mix is weighted toward meeting audio on purpose.** Rates are
+micro-averaged by reference length, so the corpus with the most speech decides
+the language number: AMI (four people around a table, `ami_rttm`, the only
+corpus scored on **both** WER and DER) is sized to dominate English, while
+LibriSpeech is kept small as a regression canary rather than a description of
+real use. AMI's lexical reference comes from AMI's own manual annotation zip —
+`fetch_ami.py` reads only `words/*.words.xml`, where each `<w>` carries its own
+`starttime`, so a time-ordered transcript needs no speaker mapping; it is
+best-effort and degrades to DER-only rather than risk a silently wrong
+reference. A second grain exists because a language total otherwise blends read
+speech with meeting speech. `huggingface_diarization` is the generic fetcher for
+the `diarizers-community` layout (`timestamps_start`/`timestamps_end`/`speakers`
+→ RTTM), which makes a DER corpus a manifest entry rather than a new script.
+Cost scales as audio-seconds × configurations, and the job yields no CSV at all
+if it hits its 360-minute ceiling — prefer per-corpus dispatches over one sweep.
 
 **Results are recorded in `docs/pipeline-evaluation.md`**, newest run first,
 and summarized in the README's "Accuracy And Evaluation" section. That file

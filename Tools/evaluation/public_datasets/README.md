@@ -35,18 +35,44 @@ reasoning behind it.
 
 | Corpus | Language | Gives | Enabled | Why |
 | --- | --- | --- | --- | --- |
-| LibriSpeech test-clean | English | WER | yes | Clean, single-speaker, the standard ASR sanity check. Ungated, no token needed. |
-| AMI Meeting Corpus (Mix-Headset) | English | DER only | yes | Real multi-speaker meeting audio -- the only corpus here whose overlap and crosstalk look like what the app actually records. Its lexical transcript is locked in AMI's NXT XML, which this tooling deliberately does not parse (see `fetch_ami.py`'s docstring), so it contributes diarization-only material. |
-| CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes | `inesc-id/camoes_SI` (`test` split). Interview speech, so closer to a real conversation than read prompts. Ungated. License is `CC BY 4.0`. |
-| CORAA v1.1 (pt) | Portuguese | WER | yes | `Racoci/CORAA-v1.1` (`default` config, `test` split) in Parquet format. Brazilian Portuguese spontaneous speech across five source projects. License is `CC BY-NC-ND 4.0`. |
-| Common Voice 17.0 (pt) | Portuguese | WER | **no** | Broad accent/speaker coverage, but gated behind an `HF_TOKEN` (see below), so it is off by default to keep a fresh clone runnable with no credentials. Flip `enabled` in `manifest.json` to use it. |
+| AMI Meeting Corpus (Mix-Headset) | English | **WER + DER** | yes, 4 meetings x 5 min | Four people around a table -- the only corpus whose overlap, crosstalk and far-field conditions look like what the app actually records, and the only one where text and speaker turns are scored on the same audio. Carries the most weight here on purpose. |
+| LibriSpeech test-clean | English | WER | yes, 6 | One voice reading, clean. Kept small: it is the regression canary and the one number loosely comparable to the wider literature, not a description of real use. |
+| CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes, 8 | `inesc-id/camoes_SI` (`test` split). Interview speech, closer to conversation than read prompts. Ungated, `CC BY 4.0`. |
+| CORAA v1.1 (pt) | Portuguese | WER | yes, 8 | `Racoci/CORAA-v1.1` (`default` config, `test` split). Brazilian Portuguese spontaneous speech across five source projects. `CC BY-NC-ND 4.0`. |
+| VoxConverse | English | DER | **no**, 4 | `diarizers-community/voxconverse`, `CC BY 4.0`. **1 to 21 speakers per recording** -- by far the widest speaker-count range available freely, which is exactly the pipeline's known failure (VBx collapsing to one speaker, see `SpeakerClusterRefiner`). Off by default because its column layout is a community convention this repo has not yet confirmed against a real fetch; turn it on for a diarization-focused run. |
+| Common Voice 17.0 (pt) | Portuguese | WER | **no**, 12 | Broad accent coverage, but gated behind an `HF_TOKEN` (see below), so it is off by default to keep a fresh clone runnable with no credentials. |
 
-**There is no Portuguese diarization corpus here.** A public, freely
-downloadable multi-speaker Portuguese corpus with turn-level annotation
-comparable to AMI was not identified. DER for Portuguese stays a known gap in
-this measurement, same honesty as `Tools/evaluation/README.md`'s own
-"comparable between runs, not against published figures" caveat -- better to
-say so than to fake it with a mismatched or synthetic substitute.
+### How the mix is weighted, and why
+
+Every rate is micro-averaged by reference length, so the corpus with the most
+speech decides the language number. That is the lever: AMI's four 5-minute
+meetings outweigh everything else in English by design, because the app records
+meetings, not audiobooks. Before this balance, 36 of 38 items were
+single-speaker and the benchmark mostly measured a case the app rarely meets.
+
+Because that also means a language total blends read speech with meeting
+speech, the harness prints the aggregate **twice** -- once per language, once
+per corpus -- and the corpus grain is the one to read when deciding anything.
+
+**There is still no Portuguese diarization corpus here.** The two candidates
+both fall short: NURC-SP's audio corpus is distributed already segmented into
+per-utterance clips, same shape as CORAA, so it carries no turn structure; and
+C-ORAL-BRASIL does have dialogues with speaker changes, but its alignment ships
+in WinPitch Pro format under `CC BY-NC-SA 4.0` and would need real conversion
+work. DER for Portuguese stays a known gap, same honesty as
+`Tools/evaluation/README.md`'s "comparable between runs, not against published
+figures" caveat -- better to say so than to fake it with a synthetic substitute.
+
+### Cost, which is the real constraint
+
+Run time scales as *audio-seconds x configurations*, and both sides grow fast:
+a `full` matrix with `whispercpp_models: all` is 40 configurations, so every
+extra minute of corpus audio costs roughly 40 minutes of runner time before
+diarization. Meeting audio is simultaneously the most representative material
+and the most expensive. Keep `sample_count` / `meeting_count` / `clip_seconds`
+small, and prefer several per-corpus dispatches (the `corpora` input) over one
+sweep of everything -- the job has a hard 360-minute ceiling and produces
+**no** CSV at all if it hits it.
 
 ## Setup
 
@@ -121,11 +147,12 @@ Locally, the same choice is `KURN_PUBLIC_EVAL_CLOUD_PROVIDERS` -- read by
 precise semantics live.
 
 Output is on `[pipeline-eval]` lines, same convention as the private harness's
-`[eval]` lines -- per-item WER/DER, then a `=== aggregate ===` table of
-corpus-level WER/DER per (language, configuration), which is the table to
-actually compare between runs. `KURN_PUBLIC_EVAL_REPORT` additionally writes
-every (item, configuration) row as CSV, for pulling into a spreadsheet or
-diffing between two runs.
+`[eval]` lines -- per-item WER/DER, then two `=== aggregate ===` tables: one per
+(language, configuration) and one per (corpus, configuration). Those are the
+tables to compare between runs, and the per-corpus one is the one to trust when
+a language spans material as different as read speech and meeting speech.
+`KURN_PUBLIC_EVAL_REPORT` additionally writes every (item, configuration) row as
+CSV, for pulling into a spreadsheet or diffing between two runs.
 
 ## Recording a run
 
