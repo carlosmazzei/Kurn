@@ -53,6 +53,45 @@ struct PublicDatasetEvaluationHarnessTests {
             : PipelineEvaluationMatrix.all
     }
 
+    private func printRunSummary(
+        corpora: [(info: PublicEvaluationDataset.CorpusInfo, items: [PublicEvaluationDataset.Item])],
+        entries: [PipelineEvaluationMatrix.Entry]
+    ) {
+        let mode = ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential" ? "essential" : "full"
+        let cloudProviders = PipelineEvaluationMatrix.cloudProvidersFromEnvironment()
+        let totalItems = corpora.reduce(0) { $0 + $1.items.count }
+
+        print("[pipeline-eval] === run summary ===")
+        print("[pipeline-eval] matrix: \(mode) (\(entries.count) configuration(s))")
+        print("[pipeline-eval]   preprocessing: \(PreprocessingEngine.allCases.map(\.rawValue).joined(separator: ", "))")
+        print("[pipeline-eval]   VAD: \(VADEngine.allCases.map(\.rawValue).joined(separator: ", "))")
+        print("[pipeline-eval]   diarization: \(DiarizationEngine.allCases.map(\.rawValue).joined(separator: ", "))")
+        print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { $0 != .whisperAPI }.map(\.rawValue).joined(separator: ", "))")
+        if cloudProviders.isEmpty {
+            print("[pipeline-eval]   cloud ASR providers: none")
+        } else {
+            print("[pipeline-eval]   cloud ASR providers: \(cloudProviders.map(\.displayName).joined(separator: ", "))")
+        }
+        print("[pipeline-eval] corpora:")
+        for (info, items) in corpora {
+            let scoring = scoringDescription(for: items)
+            let license = info.license.map { " [\($0)]" } ?? ""
+            print("[pipeline-eval]   - \(info.corpus) (\(info.language), \(items.count) item(s), \(scoring))\(license)")
+        }
+        print("[pipeline-eval] total: \(entries.count) configuration(s) x \(totalItems) item(s) = ~\(entries.count * totalItems) run(s)")
+    }
+
+    private func scoringDescription(for items: [PublicEvaluationDataset.Item]) -> String {
+        var parts: [String] = []
+        if items.contains(where: { $0.reference != nil }) {
+            parts.append("WER")
+        }
+        if items.contains(where: { $0.referenceRTTM != nil }) {
+            parts.append("DER")
+        }
+        return parts.isEmpty ? "no reference" : parts.joined(separator: "+")
+    }
+
     @Test func evaluatesPipelineMatrixAcrossPublicDatasets() async throws {
         let corpora = try PublicEvaluationDataset.corpora()
         try #require(
@@ -62,7 +101,7 @@ struct PublicDatasetEvaluationHarnessTests {
 
         seedCloudProviderKeysFromEnvironment()
         let entries = matrix
-        print("[pipeline-eval] \(entries.count) configuration(s) x \(corpora.reduce(0) { $0 + $1.items.count }) item(s)")
+        printRunSummary(corpora: corpora, entries: entries)
         try await prewarmModels(for: entries)
 
         let service = TranscriptionService()

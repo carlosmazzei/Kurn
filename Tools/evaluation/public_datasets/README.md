@@ -35,7 +35,7 @@ binary blobs.
 | LibriSpeech test-clean | English | WER | Clean, single-speaker, the standard ASR sanity check. Ungated, no token needed. |
 | AMI Meeting Corpus (Mix-Headset) | English | DER only | Real multi-speaker meeting audio -- the only corpus here whose overlap and crosstalk look like what the app actually records. Its lexical transcript is locked in AMI's NXT XML, which this tooling deliberately does not parse (see `fetch_ami.py`'s docstring), so it contributes diarization-only material. |
 | Common Voice 17.0 (pt) | Portuguese | WER | Gated (needs `HF_TOKEN`, see below) but broad accent/speaker coverage. |
-| CORAA (pt) | Portuguese | -- | **Disabled by default.** Its exact Hugging Face dataset id could not be confirmed from this tooling's development environment (no general internet access). Confirm the real `hf_dataset`/`hf_config` in `manifest.json`, flip `"enabled": true`, and it fetches the same way as Common Voice. |
+| CORAA v1.1 (pt) | Portuguese | WER | `Racoci/CORAA-v1.1` (`default` config, `test` split) in Parquet format. Brazilian Portuguese spontaneous speech across five source projects. License is `CC BY-NC-ND 4.0`. |
 
 **There is no Portuguese diarization corpus here.** A public, freely
 downloadable multi-speaker Portuguese corpus with turn-level annotation

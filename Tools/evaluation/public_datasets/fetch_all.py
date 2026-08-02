@@ -19,6 +19,60 @@ from pathlib import Path
 HERE = Path(__file__).parent
 
 
+def _scoring_description(entry: dict) -> str:
+    kind = entry.get("kind")
+    if kind == "huggingface_audio":
+        return "WER"
+    if kind == "ami_rttm":
+        return "DER"
+    return "unknown"
+
+
+def _format_corpus(entry: dict) -> str:
+    kind = entry.get("kind")
+    if kind == "huggingface_audio":
+        count = f"{entry.get('sample_count', '?')} sample(s)"
+    elif kind == "ami_rttm":
+        count = f"{entry.get('meeting_count', '?')} meeting(s), {entry.get('clip_seconds', '?')}s clips"
+    else:
+        count = "?"
+    token_note = " (requires HF_TOKEN)" if entry.get("requires_token") else ""
+    return f"{entry['id']}: {entry.get('corpus_name', entry['id'])} [{entry.get('language', '?')}] -> {_scoring_description(entry)} ({count}){token_note}"
+
+
+def print_summary(manifest: dict, token: str | None, only: list[str] | None) -> None:
+    enabled: list[dict] = []
+    skipped: list[tuple[dict, str]] = []
+    for entry in manifest["corpora"]:
+        if only and entry["id"] not in only:
+            skipped.append((entry, "not selected by --only"))
+            continue
+        if not entry.get("enabled", True):
+            skipped.append((entry, "disabled in manifest"))
+            continue
+        if entry.get("requires_token") and not token:
+            skipped.append((entry, "missing HF_TOKEN"))
+            continue
+        enabled.append(entry)
+
+    print("[fetch] summary", flush=True)
+    if not enabled:
+        print("[fetch]   no enabled corpora to fetch", flush=True)
+    else:
+        total_items = 0
+        for entry in enabled:
+            print(f"[fetch]   fetch {_format_corpus(entry)}", flush=True)
+            if entry.get("kind") == "huggingface_audio":
+                total_items += int(entry.get("sample_count", 0))
+            elif entry.get("kind") == "ami_rttm":
+                total_items += int(entry.get("meeting_count", 0))
+        print(f"[fetch]   {len(enabled)} corpus/corpora, ~{total_items} item(s) total", flush=True)
+    if skipped:
+        print("[fetch] skipped", flush=True)
+        for entry, reason in skipped:
+            print(f"[fetch]   {entry['id']}: {reason}", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--manifest", type=Path, default=HERE / "manifest.json")
@@ -28,6 +82,8 @@ def main() -> None:
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     token = os.environ.get("HF_TOKEN")
+
+    print_summary(manifest, token, args.only)
 
     failures: list[str] = []
     for entry in manifest["corpora"]:
