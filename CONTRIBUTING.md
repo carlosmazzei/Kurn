@@ -147,6 +147,29 @@ User-facing strings are localized through `NSLocalizedString`, with per-locale
 - Avoid network in tests. Provider tests should exercise request construction
   and response parsing, not real HTTP calls.
 
+### Measuring a pipeline change
+
+Tests tell you a pipeline change still compiles and still behaves. They do not
+tell you whether it made recognition better or worse — only a measurement does.
+
+If you change a stage of the recognition pipeline (preprocessing, VAD,
+diarization, a transcription engine, `TranscriptFusion`, …), dispatch the
+**Pipeline evaluation (public datasets)** workflow from the Actions tab. It runs
+the app's real pipeline over public benchmark corpora, once per configuration in
+`PipelineEvaluationMatrix`, and scores WER and DER against each. Nobody needs
+Xcode locally for it.
+
+If the numbers moved, record the run in
+[`docs/pipeline-evaluation.md`](docs/pipeline-evaluation.md) — the workflow's
+job summary hands you the Markdown to paste — and mention the before/after in
+your pull request. There is deliberately no pass/fail threshold, so a run is
+never a gate; it is evidence.
+
+See [`Tools/evaluation/public_datasets/README.md`](Tools/evaluation/public_datasets/README.md)
+for the corpora and how to run it locally, and
+[`Tools/evaluation/README.md`](Tools/evaluation/README.md) for measuring
+against your own recordings.
+
 ## Commits
 
 - Write commit messages in **English**, regardless of the language used to

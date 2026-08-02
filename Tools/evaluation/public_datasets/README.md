@@ -28,14 +28,18 @@ belongs in git history. Fetching on demand also means `manifest.json` can be
 edited (swap a dataset, change the sample count) without a code review of
 binary blobs.
 
-## What's fetched, and why these four
+## What's fetched, and why these
 
-| Corpus | Language | Gives | Why |
-| --- | --- | --- | --- |
-| LibriSpeech test-clean | English | WER | Clean, single-speaker, the standard ASR sanity check. Ungated, no token needed. |
-| AMI Meeting Corpus (Mix-Headset) | English | DER only | Real multi-speaker meeting audio -- the only corpus here whose overlap and crosstalk look like what the app actually records. Its lexical transcript is locked in AMI's NXT XML, which this tooling deliberately does not parse (see `fetch_ami.py`'s docstring), so it contributes diarization-only material. |
-| Common Voice 17.0 (pt) | Portuguese | WER | Gated (needs `HF_TOKEN`, see below) but broad accent/speaker coverage. |
-| CORAA v1.1 (pt) | Portuguese | WER | `Racoci/CORAA-v1.1` (`default` config, `test` split) in Parquet format. Brazilian Portuguese spontaneous speech across five source projects. License is `CC BY-NC-ND 4.0`. |
+`manifest.json` is the source of truth for what is enabled; this table is the
+reasoning behind it.
+
+| Corpus | Language | Gives | Enabled | Why |
+| --- | --- | --- | --- | --- |
+| LibriSpeech test-clean | English | WER | yes | Clean, single-speaker, the standard ASR sanity check. Ungated, no token needed. |
+| AMI Meeting Corpus (Mix-Headset) | English | DER only | yes | Real multi-speaker meeting audio -- the only corpus here whose overlap and crosstalk look like what the app actually records. Its lexical transcript is locked in AMI's NXT XML, which this tooling deliberately does not parse (see `fetch_ami.py`'s docstring), so it contributes diarization-only material. |
+| CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes | `inesc-id/camoes_SI` (`test` split). Interview speech, so closer to a real conversation than read prompts. Ungated. License is `CC BY 4.0`. |
+| CORAA v1.1 (pt) | Portuguese | WER | yes | `Racoci/CORAA-v1.1` (`default` config, `test` split) in Parquet format. Brazilian Portuguese spontaneous speech across five source projects. License is `CC BY-NC-ND 4.0`. |
+| Common Voice 17.0 (pt) | Portuguese | WER | **no** | Broad accent/speaker coverage, but gated behind an `HF_TOKEN` (see below), so it is off by default to keep a fresh clone runnable with no credentials. Flip `enabled` in `manifest.json` to use it. |
 
 **There is no Portuguese diarization corpus here.** A public, freely
 downloadable multi-speaker Portuguese corpus with turn-level annotation
@@ -84,11 +88,11 @@ xcodebuild -project Kurn.xcodeproj -scheme Kurn \
   test -only-testing:KurnTests/PublicDatasetEvaluationHarnessTests
 ```
 
-`KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 4-entry cleanup
-on/off x diarization heuristic/FluidAudio sweep (holding VAD and ASR engine at
-their zero-download defaults) instead of the full 24-entry matrix -- useful
-for a fast local check. Omit it, or set it to anything else, to run the full
-matrix.
+`KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 8-entry
+cleanup x VAD x diarization sweep against whisper.cpp only (`PipelineEvaluationMatrix.essential`),
+instead of the full 24-entry matrix -- useful for a fast local check. Omit it,
+or set it to anything else, to run the full matrix. Both counts assume a single
+whisper.cpp model; sweeping more multiplies them (see below).
 
 ### Including cloud Whisper (OpenAI, Groq)
 
@@ -112,6 +116,31 @@ corpus-level WER/DER per (language, configuration), which is the table to
 actually compare between runs. `KURN_PUBLIC_EVAL_REPORT` additionally writes
 every (item, configuration) row as CSV, for pulling into a spreadsheet or
 diffing between two runs.
+
+## Recording a run
+
+Both places the workflow writes to expire -- the job summary belongs to a run
+page, and the `pipeline-eval-report` artifact is deleted after 90 days. A run
+worth keeping goes into [`docs/pipeline-evaluation.md`](../../../docs/pipeline-evaluation.md),
+newest first, where it is in git and shows up in a diff when a later change
+moves it.
+
+`report_to_markdown.py` next to this directory turns the CSV into exactly the
+Markdown that file expects:
+
+```bash
+python3 ../report_to_markdown.py \
+  --csv ~/kurn-eval-public/report.csv \
+  --log pipeline-eval.log \
+  --commit "$(git rev-parse HEAD)" \
+  --run-url https://github.com/carlosmazzei/Kurn/actions/runs/<id>
+```
+
+The `pipeline-eval` workflow runs it for you and puts the result at the top of
+the job summary, alongside a copy in the artifact -- so recording a CI run is a
+paste and a commit. `--log` is optional and only supplies the run-summary
+header (matrix, engines, corpora, licenses); the rates come from the CSV either
+way.
 
 There is deliberately no pass/fail threshold, for the same reason
 `Tools/evaluation/README.md`'s harness has none.

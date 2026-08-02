@@ -160,6 +160,20 @@ lines: per-item WER/DER, then an aggregate table per (language, configuration)
 — the one to compare between runs — plus an optional CSV via
 `KURN_PUBLIC_EVAL_REPORT`. Same no-threshold philosophy as the private harness.
 
+**Results are recorded in `docs/pipeline-evaluation.md`**, newest run first,
+and summarized in the README's "Accuracy And Evaluation" section. That file
+exists because neither place the workflow writes to survives: the job summary
+belongs to a run page and the artifact is deleted after 90 days, so without it
+a measurement cannot be compared against one taken two months earlier — which
+is the only thing these numbers are good for. `Tools/evaluation/report_to_markdown.py`
+renders `report.csv` into exactly the Markdown that file expects (re-deriving
+the micro-average from the raw counts rather than scraping the already-rounded
+aggregate lines, and splitting the configuration label into one column per
+stage so the table survives the label format changing again), and the workflow
+runs it so the job summary hands a maintainer something paste-ready. Recording
+a run is deliberately a human step: a partial or noisy dispatch is not worth a
+commit.
+
 ## Architecture
 
 MVVM with `@Observable` `@MainActor` view models, value-type async services, and a

@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       matrix:
-        description: "essential (4 configs, fast) or full (24+ configs)"
+        description: "essential (8 configs, whisper.cpp only, fast) or full (24+ configs)"
         type: choice
         options: [full, essential]
         default: full
@@ -120,15 +120,36 @@ jobs:
             test -only-testing:KurnTests/PublicDatasetEvaluationHarnessTests \
             | tee "$RUNNER_TEMP/pipeline-eval.log"
 
+      # Renders the CSV as the Markdown that goes straight into
+      # docs/pipeline-evaluation.md, so recording a run is a paste and a
+      # commit. The raw log stays available underneath: the harness requires a
+      # failure-free run *before* it writes the CSV, so a run with any failure
+      # produces no CSV at all and the grep is the only report there is.
       - name: Publish report summary
         if: always()
         run: |
+          python3 Tools/evaluation/report_to_markdown.py \
+            --csv "$REPORT_PATH" \
+            --log "$RUNNER_TEMP/pipeline-eval.log" \
+            --commit "${{ github.sha }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --out "$RUNNER_TEMP/pipeline-evaluation.md" || true
           {
             echo "## Pipeline evaluation report"
+            echo
+            if [ -s "$RUNNER_TEMP/pipeline-evaluation.md" ]; then
+              cat "$RUNNER_TEMP/pipeline-evaluation.md"
+              echo
+              echo "Paste the above into \`docs/pipeline-evaluation.md\` to record this run."
+              echo
+            fi
+            echo "<details><summary>Raw <code>[pipeline-eval]</code> output</summary>"
             echo
             echo '```'
             grep '^\[pipeline-eval\]' "$RUNNER_TEMP/pipeline-eval.log" || echo "(no [pipeline-eval] lines found -- check the build/test log below)"
             echo '```'
+            echo
+            echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload report artifact
@@ -139,5 +160,6 @@ jobs:
           path: |
             ${{ env.REPORT_PATH }}
             ${{ runner.temp }}/pipeline-eval.log
+            ${{ runner.temp }}/pipeline-evaluation.md
           if-no-files-found: warn
           retention-days: 90

@@ -43,10 +43,11 @@ struct PublicDatasetEvaluationHarnessTests {
         var der: DiarizationErrorRate.Result?
     }
 
-    /// `KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 4-entry
-    /// cleanup×diarization sweep (VAD and ASR engine held at their zero-download
-    /// defaults) — useful for a fast local check before dispatching the full
-    /// 24-entry matrix in CI. Anything else, including unset, runs the full matrix.
+    /// `KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to
+    /// `PipelineEvaluationMatrix.essential` — the 8-entry cleanup×VAD×diarization
+    /// sweep against whisper.cpp only — useful for a fast local check before
+    /// dispatching the full 24-entry matrix in CI. Anything else, including
+    /// unset, runs the full matrix. Both counts assume one whisper.cpp model.
     private var matrix: [PipelineEvaluationMatrix.Entry] {
         ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential"
             ? PipelineEvaluationMatrix.essential

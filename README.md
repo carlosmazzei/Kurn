@@ -114,6 +114,30 @@ The full language lists, per-engine transcription support notes, and a guide
 for contributing a new UI language live in
 [`docs/supported-languages.md`](docs/supported-languages.md).
 
+## Accuracy And Evaluation
+
+Kurn's recognition accuracy is measured rather than asserted. `KurnTests/`
+implements word error rate and NIST diarization error rate, and the
+[pipeline evaluation workflow](.github/workflows/pipeline-eval.yml) runs the
+app's real pipeline over public benchmark audio once per configuration in the
+preprocessing × VAD × diarization × ASR-engine matrix, scoring each.
+
+Latest recorded results:
+
+| Language | Best measured configuration | WER | DER | Material |
+| --- | --- | --- | --- | --- |
+| Portuguese | no preprocessing + FluidAudio Parakeet | 28.57% | not measured | 24 items from CAMOES + CORAA, [2026-08-02](https://github.com/carlosmazzei/Kurn/actions/runs/30752932441) |
+| English | — | not measured | not measured | — |
+
+Two caveats travel with every number above: there is deliberately no pass/fail
+threshold, and the rates are comparable between runs over the same material —
+**not** against published figures for the same corpora, since the text
+normalization here is language-neutral by design.
+
+Every recorded run, the full per-configuration tables, and what the numbers do
+and do not mean live in
+[`docs/pipeline-evaluation.md`](docs/pipeline-evaluation.md).
+
 ## AI Summaries
 
 Kurn can generate a structured meeting summary from existing transcripts.
@@ -251,7 +275,13 @@ xcodebuild \
 ```
 
 CI is configured in `.github/workflows/swift.yml` and runs clean test on macOS
-with the `Kurn` scheme.
+with the `Kurn` scheme, on every push to `main` and every pull request
+targeting it.
+
+A second workflow, `.github/workflows/pipeline-eval.yml`, is a measurement run
+rather than a merge gate: it is dispatched on demand to score the recognition
+pipeline against public benchmark corpora. See
+[Accuracy And Evaluation](#accuracy-and-evaluation).
 
 ## Releasing
 
