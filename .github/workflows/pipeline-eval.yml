@@ -99,6 +99,12 @@ jobs:
       - name: Fetch public datasets
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          # The AMI fetch lists meeting IDs through the GitHub API, which is
+          # capped at 60 requests/hour per IP when unauthenticated -- and
+          # hosted runners share IPs, so that budget is often already spent
+          # and the listing 403s. `contents: read` is enough to read a public
+          # repository's contents.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 Tools/evaluation/public_datasets/fetch_all.py \
             --out "$DATASET_DIR" \

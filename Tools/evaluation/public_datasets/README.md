@@ -35,7 +35,7 @@ reasoning behind it.
 
 | Corpus | Language | Gives | Enabled | Why |
 | --- | --- | --- | --- | --- |
-| AMI Meeting Corpus (Mix-Headset) | English | **WER + DER** | yes, 4 meetings x 5 min | Four people around a table -- the only corpus whose overlap, crosstalk and far-field conditions look like what the app actually records, and the only one where text and speaker turns are scored on the same audio. Carries the most weight here on purpose. |
+| AMI Meeting Corpus (Mix-Headset) | English | **WER + DER** | yes, 4 meetings x 5 min | Four people around a table -- the only corpus whose overlap, crosstalk and far-field conditions look like what the app actually records, and the only one where text and speaker turns are scored on the same audio. Carries the most weight here on purpose. The four are drawn from four *different* meeting series (`EN2002`, `ES2004`, `IS1009`, `TS3003`), not four sessions of one: sessions `a`-`d` of a series are the same four people in the same room, so taking them would buy four times the audio and none of the speaker variety. |
 | LibriSpeech test-clean | English | WER | yes, 6 | One voice reading, clean. Kept small: it is the regression canary and the one number loosely comparable to the wider literature, not a description of real use. |
 | CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes, 8 | `inesc-id/camoes_SI` (`test` split). Interview speech, closer to conversation than read prompts. Ungated, `CC BY 4.0`. |
 | CORAA v1.1 (pt) | Portuguese | WER | yes, 8 | `Racoci/CORAA-v1.1` (`default` config, `test` split). Brazilian Portuguese spontaneous speech across five source projects. `CC BY-NC-ND 4.0`. |

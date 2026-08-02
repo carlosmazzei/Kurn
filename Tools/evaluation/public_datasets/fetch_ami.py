@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -62,9 +63,30 @@ MIN_WORDS_PER_SPEECH_SECOND = 0.3
 MAX_WORDS_PER_SPEECH_SECOND = 8.0
 MIN_WORDS = 20
 
+# The AMI test partition as published by pyannote/AMI-diarization-setup, verified
+# against the repository. Used only when the API listing is unavailable.
+FALLBACK_MEETING_IDS = (
+    "EN2002a", "EN2002b", "EN2002c", "EN2002d",
+    "ES2004a", "ES2004b", "ES2004c", "ES2004d",
+    "IS1009a", "IS1009b", "IS1009c", "IS1009d",
+    "TS3003a", "TS3003b", "TS3003c", "TS3003d",
+)
+
+# `EN2002a` -> `EN2002`: the sessions of one meeting series share a room and,
+# more to the point, the same four people.
+SERIES = re.compile(r"^(?P<series>.+?)(?P<session>[a-z])$")
+
 
 def fetch_json(url: str, timeout: int = 60):
-    request = urllib.request.Request(url, headers={"User-Agent": "kurn-eval-fetch"})
+    headers = {"User-Agent": "kurn-eval-fetch"}
+    # Unauthenticated GitHub API calls are capped at 60/hour *per IP*, and
+    # GitHub-hosted runners share IPs -- so that budget is routinely already
+    # spent by somebody else and the listing 403s. A token, which the workflow
+    # passes as `github.token`, raises it to 1000/hour for the repository.
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read())
 
@@ -93,6 +115,32 @@ def clip_rttm(text: str, clip_seconds: float) -> str:
         fields[4] = f"{end - start:.3f}"
         rows.append(" ".join(fields))
     return "\n".join(rows) + ("\n" if rows else "")
+
+
+def select_meetings(meeting_ids: list[str], count: int) -> list[str]:
+    """Pick `count` meetings, spreading across series before taking a second
+    session from any of them.
+
+    Plain `sorted(...)[:4]` returns `EN2002a`-`EN2002d`: four sessions of a
+    single meeting series, which is the same four people in the same room four
+    times over. Rotating through series instead yields four different groups --
+    roughly sixteen distinct speakers for the same audio budget, which is the
+    entire reason this corpus carries the weight it does.
+    """
+    by_series: dict[str, list[str]] = {}
+    for meeting_id in sorted(meeting_ids):
+        match = SERIES.match(meeting_id)
+        by_series.setdefault(match["series"] if match else meeting_id, []).append(meeting_id)
+
+    selected: list[str] = []
+    depth = 0
+    while len(selected) < count:
+        row = [sessions[depth] for sessions in by_series.values() if depth < len(sessions)]
+        if not row:
+            break
+        selected.extend(row)
+        depth += 1
+    return selected[:count]
 
 
 def speech_seconds(rttm_text: str) -> float:
@@ -219,21 +267,27 @@ def fetch(entry: dict, out_dir: Path) -> None:
     print(f"[fetch] ami: listing {GITHUB_API}", flush=True)
     try:
         entries = fetch_json(GITHUB_API)
-    except Exception as error:
-        raise SystemExit(
-            f"ami: could not list pyannote/AMI-diarization-setup's test RTTMs ({error}).\n"
-            "The repo may have moved or renamed only_words/rttms/test -- check GITHUB_API in this script."
-        ) from error
-
-    meeting_ids = sorted(
-        entry["name"][: -len(".rttm")] for entry in entries if entry["name"].endswith(".rttm")
-    )[:meeting_count]
-
-    if not meeting_ids:
-        raise SystemExit(
-            "ami: found no .rttm files under pyannote/AMI-diarization-setup's only_words/rttms/test. "
-            "The repo layout may have changed -- check GITHUB_API/RAW_BASE in this script."
+        meeting_ids = sorted(
+            entry["name"][: -len(".rttm")] for entry in entries if entry["name"].endswith(".rttm")
         )
+        if not meeting_ids:
+            raise ValueError("no .rttm files under only_words/rttms/test")
+    except Exception as error:  # noqa: BLE001 - listing is a convenience, not the corpus
+        # Discovering the IDs is preferred because a hardcoded list goes stale
+        # if the upstream partition changes. But losing the whole corpus to a
+        # shared-IP rate limit is far worse than one drifted ID: AMI is the only
+        # meeting-shaped material here, so degrade instead of failing.
+        print(
+            f"[fetch] ami: could not list the test RTTMs ({error}); "
+            f"falling back to the known AMI test-set meeting IDs. "
+            "Set GITHUB_TOKEN to use the authenticated API instead.",
+            file=sys.stderr,
+            flush=True,
+        )
+        meeting_ids = list(FALLBACK_MEETING_IDS)
+
+    meeting_ids = select_meetings(meeting_ids, meeting_count)
+    print(f"[fetch] ami: selected {', '.join(meeting_ids)}", flush=True)
 
     annotations_path = Path(tempfile.gettempdir()) / "ami_public_manual.zip"
     archive = download_annotations(annotations_path)
