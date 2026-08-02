@@ -22,7 +22,7 @@
       "language": "portuguese",
       "corpus_name": "Mozilla Common Voice 17.0 (pt)",
       "license": "CC0 1.0",
-      "enabled": true,
+      "enabled": false,
       "requires_token": true,
       "hf_dataset": "mozilla-foundation/common_voice_17_0",
       "hf_config": "pt",
@@ -30,6 +30,23 @@
       "text_column": "sentence",
       "audio_column": "audio",
       "audio_extension": "mp3",
+      "sample_count": 12,
+      "trust_remote_code": true
+    },
+    {
+      "id": "camoes-pt",
+      "kind": "huggingface_audio",
+      "language": "portuguese",
+      "corpus_name": "CAMOES Sociolinguistic Interviews (pt)",
+      "license": "CC BY 4.0",
+      "enabled": true,
+      "requires_token": false,
+      "hf_dataset": "inesc-id/camoes_SI",
+      "hf_config": null,
+      "hf_split": "test",
+      "text_column": "reference",
+      "audio_column": "audio",
+      "audio_extension": "wav",
       "sample_count": 12
     },
     {
