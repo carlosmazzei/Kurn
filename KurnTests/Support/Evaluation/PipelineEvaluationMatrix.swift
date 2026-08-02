@@ -40,11 +40,33 @@ enum PipelineEvaluationMatrix {
         var configuration: PipelineConfiguration
     }
 
-    /// The on-device 24 combinations plus, for each cloud provider found in
-    /// `cloudProvidersFromEnvironment()`, 8 more (preprocessing x VAD x
+    /// The on-device combinations, expanded for every whisper.cpp model in
+    /// `whisperCppModelsFromEnvironment()` when the transcription engine is
+    /// `.whisperCpp`, plus for each cloud provider found in
+    /// `cloudProvidersFromEnvironment()` 8 more (preprocessing x VAD x
     /// diarization) using `.whisperAPI` against that provider. Fixed order so
     /// successive runs are diffable.
-    static let all: [Entry] = build(cloudProviders: cloudProvidersFromEnvironment())
+    static let all: [Entry] = build(
+        whisperCppModels: whisperCppModelsFromEnvironment(),
+        cloudProviders: cloudProvidersFromEnvironment()
+    )
+
+    /// Whisper.cpp models to sweep when the transcription engine is
+    /// `.whisperCpp`. Defaults to `[.small]`; set
+    /// `KURN_PUBLIC_EVAL_WHISPERCPP_MODELS` to `all` or a comma-separated list
+    /// such as `base,small` to run more than one (the CI workflow passes this
+    /// as `TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS`).
+    static func whisperCppModelsFromEnvironment() -> [WhisperCppModel] {
+        let environment = ProcessInfo.processInfo.environment
+        guard let raw = environment["KURN_PUBLIC_EVAL_WHISPERCPP_MODELS"], !raw.isEmpty else {
+            return [.default]
+        }
+        let tokens = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        if tokens == ["all"] {
+            return WhisperCppModel.allCases
+        }
+        return WhisperCppModel.allCases.filter { tokens.contains($0.rawValue.lowercased()) }
+    }
 
     /// Cloud Whisper providers to add to the matrix, decided by which API key
     /// secret is present — never by hardcoding a provider as always-on. Can be
@@ -66,19 +88,32 @@ enum PipelineEvaluationMatrix {
         return providers
     }
 
-    private static func build(cloudProviders: [AIProvider]) -> [Entry] {
+    /// How a pipeline entry resolves its ASR: on-device engine with an optional
+    /// whisper.cpp model variant, or a cloud Whisper provider.
+    private enum ASRChoice {
+        case onDevice(WhisperCppModel?)
+        case cloud(AIProvider)
+    }
+
+    private static func build(
+        whisperCppModels: [WhisperCppModel],
+        cloudProviders: [AIProvider]
+    ) -> [Entry] {
         var entries: [Entry] = []
         for preprocessing in PreprocessingEngine.allCases {
             for vad in VADEngine.allCases {
                 for diarization in DiarizationEngine.allCases {
                     for transcription in TranscriptionEngine.allCases where transcription != .whisperAPI {
-                        entries.append(entry(
-                            preprocessing: preprocessing,
-                            vad: vad,
-                            diarization: diarization,
-                            transcription: transcription,
-                            provider: nil
-                        ))
+                        let models = transcription == .whisperCpp ? whisperCppModels : [nil]
+                        for model in models {
+                            entries.append(entry(
+                                preprocessing: preprocessing,
+                                vad: vad,
+                                diarization: diarization,
+                                transcription: transcription,
+                                asr: .onDevice(model)
+                            ))
+                        }
                     }
                     for provider in cloudProviders {
                         entries.append(entry(
@@ -86,7 +121,7 @@ enum PipelineEvaluationMatrix {
                             vad: vad,
                             diarization: diarization,
                             transcription: .whisperAPI,
-                            provider: provider
+                            asr: .cloud(provider)
                         ))
                     }
                 }
@@ -100,7 +135,7 @@ enum PipelineEvaluationMatrix {
         vad: VADEngine,
         diarization: DiarizationEngine,
         transcription: TranscriptionEngine,
-        provider: AIProvider?
+        asr: ASRChoice
     ) -> Entry {
         var configuration = PipelineConfiguration(
             preprocessing: preprocessing,
@@ -111,15 +146,22 @@ enum PipelineEvaluationMatrix {
             transcription: transcription,
             diarizationPreprocessingEnabled: true
         )
-        if let provider {
+
+        let asrLabel: String
+        switch asr {
+        case .onDevice(let model):
+            if let model { configuration.whisperCppModel = model }
+            let modelSuffix = model.map { "@\($0.rawValue)" } ?? ""
+            asrLabel = "\(transcription.rawValue)\(modelSuffix)"
+        case .cloud(let provider):
             configuration.transcriptionProvider = provider
             configuration.transcriptionModel = provider.defaultTranscriptionModel
+            asrLabel = "\(transcription.rawValue):\(provider.id)"
         }
 
         // "|"-separated, not ","-separated: the label is embedded as a single
         // CSV field by the harness report, and a comma inside it would
         // silently shift every column after it.
-        let asrLabel = provider.map { "\(transcription.rawValue):\($0.id)" } ?? transcription.rawValue
         let label = [
             "prep=\(preprocessing.rawValue)",
             "vad=\(vad.rawValue)",

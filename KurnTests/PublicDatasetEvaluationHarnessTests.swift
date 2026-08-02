@@ -61,12 +61,14 @@ struct PublicDatasetEvaluationHarnessTests {
         let cloudProviders = PipelineEvaluationMatrix.cloudProvidersFromEnvironment()
         let totalItems = corpora.reduce(0) { $0 + $1.items.count }
 
+        let whisperModels = PipelineEvaluationMatrix.whisperCppModelsFromEnvironment().map(\.rawValue).joined(separator: ", ")
         print("[pipeline-eval] === run summary ===")
         print("[pipeline-eval] matrix: \(mode) (\(entries.count) configuration(s))")
         print("[pipeline-eval]   preprocessing: \(PreprocessingEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   VAD: \(VADEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   diarization: \(DiarizationEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { $0 != .whisperAPI }.map(\.rawValue).joined(separator: ", "))")
+        print("[pipeline-eval]   whisper.cpp models: \(whisperModels)")
         if cloudProviders.isEmpty {
             print("[pipeline-eval]   cloud ASR providers: none")
         } else {

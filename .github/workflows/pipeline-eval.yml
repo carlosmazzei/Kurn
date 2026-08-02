@@ -26,6 +26,10 @@ on:
         description: "include cloud Whisper providers (OpenAI/Groq) in the matrix"
         type: boolean
         default: false
+      whispercpp_models:
+        description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
+        type: string
+        default: "small"
 
 permissions:
   contents: read
@@ -98,6 +102,7 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_INCLUDE_CLOUD: ${{ github.event.inputs.include_cloud }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
           # Optional and additive -- absent by default. A maintainer who wants
           # cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
           # secrets; PipelineEvaluationMatrix only adds those entries when the
