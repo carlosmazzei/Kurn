@@ -16,6 +16,7 @@
 "error.audio_compaction" = "无法压缩此录音，已保持原样。";
 "error.audio_enhancement" = "无法为此录音创建增强音频。";
 "error.recognizer_unavailable" = "此语言不支持语音识别。";
+"error.transcription_language_unsupported" = "%@ 不支持 %@。";
 "error.recognizer_offline" = "设备端语音识别尚未就绪，请稍后重试。";
 "error.export_session" = "无法准备用于上传的音频。";
 "error.export_failed" = "音频导出失败。";

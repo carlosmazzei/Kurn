@@ -16,6 +16,7 @@
 "error.audio_compaction" = "Não foi possível compactar esta gravação. Ela foi mantida como estava.";
 "error.audio_enhancement" = "Não foi possível criar o áudio realçado desta gravação.";
 "error.recognizer_unavailable" = "O reconhecimento de fala não está disponível para este idioma.";
+"error.transcription_language_unsupported" = "%@ não é compatível com %@.";
 "error.recognizer_offline" = "O reconhecimento de fala no dispositivo não está pronto. Tente novamente em instantes.";
 "error.export_session" = "Não foi possível preparar o áudio para envio.";
 "error.export_failed" = "Falha ao exportar o áudio.";

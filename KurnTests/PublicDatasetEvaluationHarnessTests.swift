@@ -72,6 +72,10 @@ struct PublicDatasetEvaluationHarnessTests {
         for (info, items) in corpora {
             for item in items {
                 for entry in entries {
+                    guard TranscriptionLanguageSupport.isSupported(item.language, by: entry.configuration.transcription) else {
+                        print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(entry.configuration.transcription) does not support \(item.language)")
+                        continue
+                    }
                     do {
                         let output = try await service.transcribe(
                             fileURL: item.audio,
@@ -82,6 +86,15 @@ struct PublicDatasetEvaluationHarnessTests {
                         let row = score(item: item, corpusLanguage: info.language, entry: entry, output: output)
                         report(row)
                         rows.append(row)
+                    } catch let error as AppError {
+                        if case .transcriptionLanguageUnsupported = error {
+                            let reason = error.localizedDescription ?? String(describing: error)
+                            print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(reason)")
+                            continue
+                        }
+                        let description = "\(item.corpusName)/\(item.name) [\(entry.label)]: \(error)"
+                        print("[pipeline-eval] FAILED \(description)")
+                        failures.append(description)
                     } catch {
                         let description = "\(item.corpusName)/\(item.name) [\(entry.label)]: \(error)"
                         print("[pipeline-eval] FAILED \(description)")
@@ -216,7 +229,9 @@ struct PublicDatasetEvaluationHarnessTests {
     // MARK: - CSV report
 
     private func writeCSV(_ rows: [Row], to path: String) throws {
-        var lines = ["corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech"]
+        let header = "corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,"
+            + "der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech"
+        var lines = [header]
         for row in rows {
             lines.append(csvRow(for: row).joined(separator: ","))
         }

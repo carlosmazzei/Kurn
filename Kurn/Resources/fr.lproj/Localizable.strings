@@ -16,6 +16,7 @@
 "error.audio_compaction" = "Impossible de compacter cet enregistrement. Il est resté inchangé.";
 "error.audio_enhancement" = "Impossible de créer l'audio amélioré de cet enregistrement.";
 "error.recognizer_unavailable" = "La reconnaissance vocale n'est pas disponible pour cette langue.";
+"error.transcription_language_unsupported" = "%@ n'est pas pris en charge par %@.";
 "error.recognizer_offline" = "La reconnaissance vocale sur l'appareil n'est pas prête. Réessayez dans un instant.";
 "error.export_session" = "Impossible de préparer l'audio pour l'envoi.";
 "error.export_failed" = "Échec de l'exportation audio.";

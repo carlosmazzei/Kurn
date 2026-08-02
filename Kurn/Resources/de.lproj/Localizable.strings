@@ -16,6 +16,7 @@
 "error.audio_compaction" = "Diese Aufnahme konnte nicht komprimiert werden. Sie bleibt unverändert.";
 "error.audio_enhancement" = "Das verbesserte Audio dieser Aufnahme konnte nicht erstellt werden.";
 "error.recognizer_unavailable" = "Spracherkennung ist für diese Sprache nicht verfügbar.";
+"error.transcription_language_unsupported" = "%@ wird von %@ nicht unterstützt.";
 "error.recognizer_offline" = "Die Spracherkennung auf dem Gerät ist noch nicht bereit. Versuchen Sie es gleich erneut.";
 "error.export_session" = "Audio konnte nicht für den Upload vorbereitet werden.";
 "error.export_failed" = "Audioexport fehlgeschlagen.";

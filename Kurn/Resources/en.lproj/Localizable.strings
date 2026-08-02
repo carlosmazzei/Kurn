@@ -16,6 +16,7 @@
 "error.audio_compaction" = "Could not compact this recording. It was left unchanged.";
 "error.audio_enhancement" = "Could not create the enhanced audio for this recording.";
 "error.recognizer_unavailable" = "Speech recognition is not available for this language.";
+"error.transcription_language_unsupported" = "%@ is not supported by %@.";
 "error.recognizer_offline" = "On-device speech recognition is not ready. Try again shortly.";
 "error.export_session" = "Could not prepare the audio for upload.";
 "error.export_failed" = "Audio export failed.";

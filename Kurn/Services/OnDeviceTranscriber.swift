@@ -36,9 +36,7 @@ actor OnDeviceTranscriber: Transcribing {
             AppLog.transcription.atError.error(
                 "speechAnalyzer: unsupported locale \(requestedLocale.identifier, privacy: .public)"
             )
-            throw AppError.transcriptionFailed(
-                NSLocalizedString("error.recognizer_unavailable", comment: "Recognizer unavailable")
-            )
+            throw AppError.transcriptionLanguageUnsupported(language, .appleSpeech)
         }
 
         AppLog.transcription.atNotice.notice(

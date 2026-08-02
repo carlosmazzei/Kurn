@@ -16,6 +16,7 @@
 "error.audio_compaction" = "Impossibile compattare questa registrazione. È stata lasciata invariata.";
 "error.audio_enhancement" = "Impossibile creare l'audio migliorato di questa registrazione.";
 "error.recognizer_unavailable" = "Il riconoscimento vocale non è disponibile per questa lingua.";
+"error.transcription_language_unsupported" = "%@ non è supportato da %@.";
 "error.recognizer_offline" = "Il riconoscimento vocale sul dispositivo non è pronto. Riprova tra poco.";
 "error.export_session" = "Impossibile preparare l'audio per il caricamento.";
 "error.export_failed" = "Esportazione audio non riuscita.";

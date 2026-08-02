@@ -14,6 +14,7 @@ enum AppError: LocalizedError, Identifiable {
     case networkError(URLError)
     case apiError(statusCode: Int, message: String)
     case transcriptionFailed(String)
+    case transcriptionLanguageUnsupported(MeetingLanguage, TranscriptionEngine)
     case audioError(String)
     case decodingError(String)
     case permissionDenied(String)
@@ -46,6 +47,7 @@ enum AppError: LocalizedError, Identifiable {
         case .networkError: return "network"
         case .apiError: return "provider_api"
         case .transcriptionFailed: return "transcription"
+        case .transcriptionLanguageUnsupported: return "transcription_language_unsupported"
         case .audioError: return "audio"
         case .decodingError: return "decoding"
         case .permissionDenied: return "permission"
@@ -89,6 +91,12 @@ enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.transcription", comment: "Transcription failure"),
                 detail
+            )
+        case .transcriptionLanguageUnsupported(let language, let engine):
+            return String(
+                format: NSLocalizedString("error.transcription_language_unsupported", comment: "Transcription language unsupported"),
+                language.displayName,
+                engine.displayName
             )
         case .audioError(let detail):
             return String(
