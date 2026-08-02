@@ -58,6 +58,7 @@ struct PublicDatasetEvaluationHarnessTests {
         entries: [PipelineEvaluationMatrix.Entry]
     ) {
         let mode = ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential" ? "essential" : "full"
+        let cloudMode = ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_CLOUD_PROVIDERS"] ?? "auto"
         let cloudProviders = PipelineEvaluationMatrix.cloudProvidersFromEnvironment()
         let totalItems = corpora.reduce(0) { $0 + $1.items.count }
 
@@ -69,6 +70,7 @@ struct PublicDatasetEvaluationHarnessTests {
         print("[pipeline-eval]   diarization: \(DiarizationEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { $0 != .whisperAPI }.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   whisper.cpp models: \(whisperModels)")
+        print("[pipeline-eval]   cloud mode: \(cloudMode)")
         if cloudProviders.isEmpty {
             print("[pipeline-eval]   cloud ASR providers: none")
         } else {

@@ -68,21 +68,27 @@ enum PipelineEvaluationMatrix {
         return WhisperCppModel.allCases.filter { tokens.contains($0.rawValue.lowercased()) }
     }
 
-    /// Cloud Whisper providers to add to the matrix, decided by which API key
-    /// secret is present — never by hardcoding a provider as always-on. Can be
-    /// forced off by setting `KURN_PUBLIC_EVAL_INCLUDE_CLOUD=false` (the CI
-    /// workflow passes this as `TEST_RUNNER_KURN_PUBLIC_EVAL_INCLUDE_CLOUD`).
+    /// Cloud Whisper providers to add to the matrix. Decided by the
+    /// `KURN_PUBLIC_EVAL_CLOUD_PROVIDERS` environment variable:
+    /// - `none` -> no cloud providers
+    /// - `openai`/`groq` -> only that provider (key must still be present)
+    /// - `both` or `auto` (default) -> every provider whose API key secret is
+    ///   present in the environment. This is never hardcoded as always-on.
+    ///
+    /// The CI workflow passes this as `TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS`.
     static func cloudProvidersFromEnvironment() -> [AIProvider] {
         let environment = ProcessInfo.processInfo.environment
-        if let raw = environment["KURN_PUBLIC_EVAL_INCLUDE_CLOUD"],
-           raw.lowercased() == "false" {
-            return []
-        }
+        let mode = environment["KURN_PUBLIC_EVAL_CLOUD_PROVIDERS"]?.lowercased() ?? "auto"
+        guard mode != "none" else { return [] }
+
+        let includeOpenAI = mode == "openai" || mode == "both" || mode == "auto"
+        let includeGroq = mode == "groq" || mode == "both" || mode == "auto"
+
         var providers: [AIProvider] = []
-        if let key = environment["OPENAI_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
+        if includeOpenAI, let key = environment["OPENAI_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
             providers.append(.openAI)
         }
-        if let key = environment["GROQ_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
+        if includeGroq, let key = environment["GROQ_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
             providers.append(.groq)
         }
         return providers

@@ -22,10 +22,11 @@ on:
         description: "space-separated corpus ids to fetch (blank = every enabled corpus in manifest.json)"
         type: string
         default: ""
-      include_cloud:
-        description: "include cloud Whisper providers (OpenAI/Groq) in the matrix"
-        type: boolean
-        default: false
+      cloud_providers:
+        description: "cloud Whisper providers to benchmark (none, openai, groq, both, auto)"
+        type: choice
+        options: [none, openai, groq, both, auto]
+        default: auto
       whispercpp_models:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
@@ -101,10 +102,10 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
-          TEST_RUNNER_KURN_PUBLIC_EVAL_INCLUDE_CLOUD: ${{ github.event.inputs.include_cloud }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
-          # Optional and additive -- absent by default. A maintainer who wants
-          # cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
+          # Optional and additive -- controlled by `cloud_providers`. A maintainer
+          # who wants cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
           # secrets; PipelineEvaluationMatrix only adds those entries when the
           # corresponding key is actually present. See public_datasets/README.md.
           TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
