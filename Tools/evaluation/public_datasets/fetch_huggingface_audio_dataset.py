@@ -4,6 +4,8 @@
 Writes `<name>.audio.<ext>` + `<name>.reference.txt` + `dataset.json` into the
 layout `PublicEvaluationDataset` (`KurnTests/Support/Evaluation/`) reads.
 
+Can be imported as a module (`fetch(...)`) or run as a script.
+
 Tolerates three audio shapes from the `datasets` streaming API:
 - `{"bytes": b"...", "path": "..."}` -> use bytes directly
 - `{"path": "https://..."}`          -> download raw encoded bytes
@@ -32,15 +34,11 @@ def slugify(text: str, limit: int = 40) -> str:
     return slug[:limit] or "item"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--manifest-entry", required=True, type=Path, help="JSON file with one manifest.json corpus entry")
-    parser.add_argument("--out", required=True, type=Path, help="output directory for this corpus")
-    parser.add_argument("--token", default=None, help="Hugging Face token, for gated datasets")
-    args = parser.parse_args()
+def fetch(entry: dict, out_dir: Path, token: str | None = None) -> None:
+    """Fetch one corpus entry into `out_dir`.
 
-    entry = json.loads(args.manifest_entry.read_text(encoding="utf-8"))
-
+    Raises `SystemExit` with an actionable message if the fetch fails.
+    """
     try:
         from datasets import Audio, load_dataset
     except ImportError as error:
@@ -49,7 +47,7 @@ def main() -> None:
             "(see Tools/evaluation/public_datasets/README.md)"
         ) from error
 
-    args.out.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     print(
         f"[fetch] {entry['id']}: loading {entry['hf_dataset']} ({entry.get('hf_config')}) split={entry['hf_split']}",
@@ -57,6 +55,8 @@ def main() -> None:
     )
 
     trust_remote_code = entry.get("trust_remote_code")
+    # Default to True so older/remote-code datasets keep working, but let the
+    # manifest override it (e.g. to False for pure Parquet corpora).
     if trust_remote_code is None:
         trust_remote_code = True
 
@@ -65,7 +65,7 @@ def main() -> None:
         entry.get("hf_config"),
         split=entry["hf_split"],
         streaming=True,
-        token=args.token,
+        token=token,
         trust_remote_code=trust_remote_code,
     )
     dataset = dataset.cast_column(entry["audio_column"], Audio(decode=False))
@@ -98,8 +98,8 @@ def main() -> None:
         name = f"{slugify(str(base))}-{len(written):04d}"
 
         actual_extension = extension or entry["audio_extension"]
-        (args.out / f"{name}.audio.{actual_extension}").write_bytes(raw)
-        (args.out / f"{name}.reference.txt").write_text(text + "\n", encoding="utf-8")
+        (out_dir / f"{name}.audio.{actual_extension}").write_bytes(raw)
+        (out_dir / f"{name}.reference.txt").write_text(text + "\n", encoding="utf-8")
         written.append(name)
         print(f"[fetch] {entry['id']}: wrote {name} ({len(raw)} bytes)", flush=True)
 
@@ -107,11 +107,11 @@ def main() -> None:
         raise SystemExit(
             f"{entry['id']}: fetched 0 usable rows out of {row_count} scanned.\n"
             "Check hf_dataset/hf_config/hf_split/text_column/audio_column in manifest.json, "
-            "and -- for a gated dataset -- that --token is a valid HF token whose account has "
+            "and -- for a gated dataset -- that a valid HF token is set and the account has "
             "accepted the dataset's terms on huggingface.co."
         )
 
-    (args.out / "dataset.json").write_text(
+    (out_dir / "dataset.json").write_text(
         json.dumps(
             {
                 "language": entry["language"],
@@ -123,7 +123,7 @@ def main() -> None:
         + "\n",
         encoding="utf-8",
     )
-    print(f"[fetch] {entry['id']}: wrote {len(written)} item(s) to {args.out}", flush=True)
+    print(f"[fetch] {entry['id']}: wrote {len(written)} item(s) to {out_dir}", flush=True)
 
 
 def extract_audio_bytes(audio, default_extension: str) -> tuple[bytes | None, str | None]:
@@ -205,6 +205,17 @@ def _encode_array_to_wav(array, sampling_rate: int) -> bytes | None:
     except Exception as error:
         print(f"[fetch] warning: could not encode audio array to WAV: {error}", file=sys.stderr, flush=True)
         return None
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--manifest-entry", required=True, type=Path, help="JSON file with one manifest.json corpus entry")
+    parser.add_argument("--out", required=True, type=Path, help="output directory for this corpus")
+    parser.add_argument("--token", default=None, help="Hugging Face token, for gated datasets")
+    args = parser.parse_args()
+
+    entry = json.loads(args.manifest_entry.read_text(encoding="utf-8"))
+    fetch(entry, args.out, token=args.token)
 
 
 if __name__ == "__main__":
