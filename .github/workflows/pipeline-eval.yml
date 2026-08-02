@@ -22,6 +22,10 @@ on:
         description: "space-separated corpus ids to fetch (blank = every enabled corpus in manifest.json)"
         type: string
         default: ""
+      include_cloud:
+        description: "include cloud Whisper providers (OpenAI/Groq) in the matrix"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -93,6 +97,7 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_INCLUDE_CLOUD: ${{ github.event.inputs.include_cloud }}
           # Optional and additive -- absent by default. A maintainer who wants
           # cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
           # secrets; PipelineEvaluationMatrix only adds those entries when the

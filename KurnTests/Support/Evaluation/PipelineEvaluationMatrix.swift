@@ -47,9 +47,15 @@ enum PipelineEvaluationMatrix {
     static let all: [Entry] = build(cloudProviders: cloudProvidersFromEnvironment())
 
     /// Cloud Whisper providers to add to the matrix, decided by which API key
-    /// secret is present — never by hardcoding a provider as always-on.
+    /// secret is present — never by hardcoding a provider as always-on. Can be
+    /// forced off by setting `KURN_PUBLIC_EVAL_INCLUDE_CLOUD=false` (the CI
+    /// workflow passes this as `TEST_RUNNER_KURN_PUBLIC_EVAL_INCLUDE_CLOUD`).
     static func cloudProvidersFromEnvironment() -> [AIProvider] {
         let environment = ProcessInfo.processInfo.environment
+        if let raw = environment["KURN_PUBLIC_EVAL_INCLUDE_CLOUD"],
+           raw.lowercased() == "false" {
+            return []
+        }
         var providers: [AIProvider] = []
         if let key = environment["OPENAI_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
             providers.append(.openAI)
