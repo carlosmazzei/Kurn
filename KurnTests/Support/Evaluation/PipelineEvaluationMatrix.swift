@@ -157,12 +157,14 @@ enum PipelineEvaluationMatrix {
     }
 
     /// A restricted subset for a quick smoke pass: cleanup on/off and
-    /// diarization on/off, holding VAD and transcription at their zero-download,
-    /// zero-cost defaults (never includes a cloud provider). Useful when only
-    /// the two axes named in the original request matter and the full matrix
-    /// would take too long (e.g. a fast local check before dispatching the full
-    /// CI matrix).
+    /// diarization on/off, holding VAD and transcription at their zero-cost,
+    /// on-device defaults (never includes a cloud provider). `whisperCpp` is used
+    /// instead of `appleSpeech` so the smoke pass is multilingual — Portuguese
+    /// corpora do not have a supported Apple Speech locale on the simulator, and
+    /// the goal is to exercise the preprocessing/diarization axes, not the ASR
+    /// vendor. Useful when only the two axes named in the original request matter
+    /// and the full matrix would take too long.
     static let essential: [Entry] = all.filter {
-        $0.configuration.vad == .energyThreshold && $0.configuration.transcription == .appleSpeech
+        $0.configuration.vad == .energyThreshold && $0.configuration.transcription == .whisperCpp
     }
 }

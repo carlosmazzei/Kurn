@@ -87,15 +87,18 @@ jobs:
 
       - name: Build and test
         env:
-          KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
-          KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
-          KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
+          # xcodebuild on Xcode 15.3+ only forwards environment variables to the
+          # test runner when they are prefixed with TEST_RUNNER_. The prefix is
+          # stripped before reaching ProcessInfo.processInfo.environment.
+          TEST_RUNNER_KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           # Optional and additive -- absent by default. A maintainer who wants
           # cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
           # secrets; PipelineEvaluationMatrix only adds those entries when the
           # corresponding key is actually present. See public_datasets/README.md.
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_RUNNER_GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           set -o pipefail
           xcodebuild \

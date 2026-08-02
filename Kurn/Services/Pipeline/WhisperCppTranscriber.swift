@@ -160,10 +160,18 @@ private final class WhisperContext: @unchecked Sendable {
 
     init(modelPath: String) throws {
         var params = whisper_context_default_params()
-        // Metal. On a device this is the difference between real-time-ish and
-        // unusably slow; ggml falls back to CPU on its own if it can't init.
+        // Metal on a device is the difference between real-time-ish and unusably
+        // slow. In the iOS Simulator ggml can still init a Metal backend, but
+        // the emulated GPU lacks the features whisper.cpp actually needs and the
+        // context crashes mid-inference; force CPU there so CI and local
+        // simulator runs can exercise the transcription path.
+        #if targetEnvironment(simulator)
+        params.use_gpu = false
+        params.flash_attn = false
+        #else
         params.use_gpu = true
         params.flash_attn = true
+        #endif
         guard let context = whisper_init_from_file_with_params(modelPath, params) else {
             throw AppError.transcriptionFailed(
                 NSLocalizedString("error.whisper_cpp_load_failed", comment: "whisper.cpp model failed to load")
