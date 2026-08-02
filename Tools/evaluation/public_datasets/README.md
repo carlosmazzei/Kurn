@@ -154,6 +154,31 @@ a language spans material as different as read speech and meeting speech.
 `KURN_PUBLIC_EVAL_REPORT` additionally writes every (item, configuration) row as
 CSV, for pulling into a spreadsheet or diffing between two runs.
 
+### The report is written as it goes, and can be resumed
+
+Rows are appended to the CSV the moment they are scored, not accumulated for one
+write at the end. That matters because the job has a hard 360-minute ceiling: a
+run that hits it, gets cancelled, or trips over a single broken cell used to
+produce **no** file at all and throw away hours of measurement. Now whatever was
+measured is already on disk, and a truncated report renders fine.
+
+The aggregate is likewise printed before the failure assertion rather than after
+it, so a run with one bad cell still reports everything else.
+
+That partial file is also a resume point. `resume: true` on the workflow (or
+`KURN_PUBLIC_EVAL_RESUME=1` locally) keeps the rows already present and runs only
+the missing cells, which is how a sweep too big for one job gets finished across
+two. It is opt-in on purpose: a row records no trace of the code that produced
+it, so reusing one is only sound while the pipeline is unchanged. Per-stage
+versions in the CSV are what would make that check automatic rather than a
+promise — until then, resume an interrupted run, not a run from before a change.
+
+Locally the report is just a file, so resuming means pointing at the same path.
+In CI it has to survive between dispatches: the report lives inside the cached
+dataset directory, but `actions/cache` does not re-save on a key that already
+exists, so the reliable route is to place the previous run's artifact copy at
+`REPORT_PATH` before the test step.
+
 ## Recording a run
 
 Both places the workflow writes to expire -- the job summary belongs to a run

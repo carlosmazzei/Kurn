@@ -174,8 +174,28 @@ reference. A second grain exists because a language total otherwise blends read
 speech with meeting speech. `huggingface_diarization` is the generic fetcher for
 the `diarizers-community` layout (`timestamps_start`/`timestamps_end`/`speakers`
 → RTTM), which makes a DER corpus a manifest entry rather than a new script.
-Cost scales as audio-seconds × configurations, and the job yields no CSV at all
-if it hits its 360-minute ceiling — prefer per-corpus dispatches over one sweep.
+Cost scales as audio-seconds × configurations — prefer per-corpus dispatches
+over one sweep.
+
+**The CSV is appended row by row as each cell is scored**, and the aggregate is
+printed before the failure assertion rather than after it. Both exist because
+the report used to be built in memory and written once, after the loop *and*
+after `#require(failures.isEmpty)`, so a run that hit the 360-minute ceiling, got
+cancelled, or tripped over one broken cell produced nothing at all. A truncated
+report is now a usable result and a resume point: `resume: true` (workflow) /
+`KURN_PUBLIC_EVAL_RESUME=1` keeps the rows already in the file and runs only the
+missing cells. Opt-in, because a row records nothing about the code that
+produced it — reusing one is sound only while the pipeline is unchanged, which
+per-stage versions in the CSV would make checkable instead of promised.
+
+Two axes are provably redundant and worth knowing before adding cells:
+`TranscriptFusion` is word-preserving (`splitCoarseSpan` returns the original
+span unless the partition consumes every word), so **the diarizer cannot change
+WER** — confirmed by Parakeet scoring identically across all four VAD × diarizer
+combinations. whisper.cpp does vary there, which cannot be the diarizer and is
+therefore its own decode non-determinism: roughly a 2-point noise floor that any
+WER comparison has to clear. DER is *not* symmetric, since it is scored on the
+fused segments whose boundaries come from the ASR spans.
 
 **Results are recorded in `docs/pipeline-evaluation.md`**, newest run first,
 and summarized in the README's "Accuracy And Evaluation" section. That file

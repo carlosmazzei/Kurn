@@ -110,14 +110,24 @@ struct PublicDatasetEvaluationHarnessTests {
         try await prewarmModels(for: entries)
 
         let service = TranscriptionService()
-        var rows: [Row] = []
         var failures: [String] = []
+
+        let writer = try PublicEvaluationDataset.reportPath.map {
+            try CSVReportWriter(path: $0, resuming: Self.isResuming)
+        }
+        var rows: [Row] = writer?.resumedRows ?? []
+        if let resumed = writer?.resumedRows, !resumed.isEmpty {
+            print("[pipeline-eval] resuming: reusing \(resumed.count) row(s) already in the report")
+        }
 
         for (info, items) in corpora {
             for item in items {
                 for entry in entries {
                     guard TranscriptionLanguageSupport.isSupported(item.language, by: entry.configuration.transcription) else {
                         print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(entry.configuration.transcription) does not support \(item.language)")
+                        continue
+                    }
+                    if writer?.alreadyHas(corpus: item.corpusName, name: item.name, configLabel: entry.label) == true {
                         continue
                     }
                     do {
@@ -130,6 +140,11 @@ struct PublicDatasetEvaluationHarnessTests {
                         let row = score(item: item, corpusLanguage: info.language, entry: entry, output: output)
                         report(row)
                         rows.append(row)
+                        // Appended and flushed here rather than accumulated for a
+                        // single write at the end: a run that hits the job's time
+                        // limit, or is cancelled, keeps everything it had already
+                        // measured instead of yielding nothing.
+                        writer?.append(csvRow(for: row))
                     } catch let error as AppError {
                         if case .transcriptionLanguageUnsupported = error {
                             let reason = error.localizedDescription ?? String(describing: error)
@@ -148,12 +163,28 @@ struct PublicDatasetEvaluationHarnessTests {
             }
         }
 
+        if let writer {
+            print("[pipeline-eval] wrote \(rows.count) row(s) to \(writer.path)")
+        }
+
+        // The aggregate is printed before the assertion, not after it: a run with
+        // one broken cell still measured everything else, and throwing first threw
+        // that away along with the table that explains what happened.
+        reportAggregate(rows)
+
         let failureSummary = "\(failures.count) pipeline run(s) failed:\n\(failures.joined(separator: "\n"))"
         try #require(failures.isEmpty, "\(failureSummary)")
-        reportAggregate(rows)
-        if let reportPath = PublicEvaluationDataset.reportPath {
-            try writeCSV(rows, to: reportPath)
-        }
+    }
+
+    /// `KURN_PUBLIC_EVAL_RESUME=1` keeps whatever rows the report already holds
+    /// and runs only the missing cells.
+    ///
+    /// Opt-in rather than automatic, because a row carries no record of the code
+    /// that produced it: reusing one is only sound while the pipeline is
+    /// unchanged, which the harness cannot yet check. Turning that into a safe
+    /// default is what per-stage versions in the CSV would buy.
+    private static var isResuming: Bool {
+        ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_RESUME"] == "1"
     }
 
     /// Writes `OPENAI_API_KEY`/`GROQ_API_KEY` (when set) into the Keychain
@@ -295,20 +326,86 @@ struct PublicDatasetEvaluationHarnessTests {
 
     // MARK: - CSV report
 
-    private func writeCSV(_ rows: [Row], to path: String) throws {
-        let header = "corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,"
+    /// Appends each scored row to the report as it is produced.
+    ///
+    /// The report used to be built in memory and written once, after the loop and
+    /// after the failure assertion — so a run that hit the job's 6-hour ceiling,
+    /// got cancelled, or tripped over a single broken cell produced **no** file at
+    /// all, and hours of measurement went with it. Appending as we go means the
+    /// file on disk is always everything measured so far.
+    ///
+    /// That also makes it a resume point: `resumedRows` reads back what a previous
+    /// attempt left behind so the next one can run only the missing cells.
+    private final class CSVReportWriter {
+        static let header = "corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,"
             + "der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech"
-        var lines = [header]
-        for row in rows {
-            lines.append(csvRow(for: row).joined(separator: ","))
+
+        let path: String
+        private let handle: FileHandle
+        private var done: Set<String> = []
+        private(set) var resumedRows: [Row] = []
+
+        init(path: String, resuming: Bool) throws {
+            self.path = path
+
+            let existing = resuming ? (try? String(contentsOfFile: path, encoding: .utf8)) : nil
+            if let existing, existing.hasPrefix(Self.header) {
+                (resumedRows, done) = Self.parse(existing)
+            } else {
+                // No usable prior report — start a fresh one. A file whose header
+                // does not match is from an older column layout; appending to it
+                // would interleave two shapes into one unparseable CSV.
+                try Self.header.appending("\n").write(toFile: path, atomically: true, encoding: .utf8)
+            }
+
+            handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+            try handle.seekToEnd()
         }
-        try (lines.joined(separator: "\n") + "\n").write(
-            toFile: path, atomically: true, encoding: .utf8
-        )
-        print("[pipeline-eval] wrote \(rows.count) row(s) to \(path)")
+
+        func alreadyHas(corpus: String, name: String, configLabel: String) -> Bool {
+            done.contains(Self.key(corpus, name, configLabel))
+        }
+
+        func append(_ fields: [String]) {
+            guard let data = (fields.joined(separator: ",") + "\n").data(using: .utf8) else { return }
+            // `FileHandle.write` goes straight to the descriptor, so the bytes
+            // survive the process being killed — which is the whole point.
+            try? handle.write(contentsOf: data)
+        }
+
+        private static func key(_ corpus: String, _ name: String, _ configLabel: String) -> String {
+            "\(corpus)|\(name)|\(configLabel)"
+        }
+
+        /// Rebuilds rows from a previous report. Only the fields the aggregate
+        /// needs are restored; a malformed line is dropped rather than guessed at.
+        private static func parse(_ text: String) -> ([Row], Set<String>) {
+            var rows: [Row] = []
+            var done: Set<String> = []
+            for line in text.split(separator: "\n").dropFirst() {
+                let f = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+                guard f.count == 14 else { continue }
+                let wer = f[8].isEmpty ? nil : WordErrorRate.Result(
+                    substitutions: Int(f[5]) ?? 0,
+                    insertions: Int(f[6]) ?? 0,
+                    deletions: Int(f[7]) ?? 0,
+                    referenceCount: Int(f[8]) ?? 0
+                )
+                let der = f[13].isEmpty ? nil : DiarizationErrorRate.Result(
+                    missed: Double(f[10]) ?? 0,
+                    falseAlarm: Double(f[11]) ?? 0,
+                    confusion: Double(f[12]) ?? 0,
+                    referenceSpeech: Double(f[13]) ?? 0,
+                    mapping: [:]
+                )
+                rows.append(Row(corpus: f[0], name: f[1], language: f[2], configLabel: f[3], wer: wer, der: der))
+                done.insert(key(f[0], f[1], f[3]))
+            }
+            return (rows, done)
+        }
     }
 
-    /// Split out of `writeCSV` — a single array literal mixing this many
+    /// Split out of the row writer — a single array literal mixing this many
     /// `.map { ... } ?? ""` closures was too much for the type checker to
     /// solve in one pass ("unable to type-check this expression in reasonable
     /// time"). Building each field as its own statement keeps every

@@ -31,6 +31,10 @@ on:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
         default: "small"
+      resume:
+        description: "reuse rows already in report.csv and run only the missing cells"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -110,6 +114,14 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
+          # The report is written row by row, so a cancelled or timed-out run
+          # leaves a usable partial file. `resume: true` picks that file up and
+          # runs only what is missing -- provided it survived, which means either
+          # the dataset cache restored it or it was placed here from a previous
+          # run's artifact. Reusing a row assumes the pipeline has not changed
+          # since it was measured; the harness cannot check that yet, which is
+          # why this is opt-in.
+          TEST_RUNNER_KURN_PUBLIC_EVAL_RESUME: ${{ github.event.inputs.resume == 'true' && '1' || '0' }}
           # Optional and additive -- controlled by `cloud_providers`. A maintainer
           # who wants cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
           # secrets; PipelineEvaluationMatrix only adds those entries when the
