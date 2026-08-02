@@ -105,10 +105,20 @@ into Settings by hand, since the harness seeds it into the same Keychain
 account `ProviderFactory` reads. Costs real API usage per call; keep
 `sample_count` in `manifest.json` small if you enable this.
 
-In CI, wire `secrets.OPENAI_API_KEY` / `secrets.GROQ_API_KEY` into the
-`pipeline-eval` workflow's env only if you want those entries in the matrix --
-they're absent by default, so the workflow costs nothing to third parties
-until a maintainer opts in.
+In CI, the `pipeline-eval` workflow wires `secrets.OPENAI_API_KEY` /
+`secrets.GROQ_API_KEY` into the test env unconditionally, and the
+`cloud_providers` dispatch input decides what to do with them:
+
+| `cloud_providers` | Effect |
+| --- | --- |
+| `auto` (default) | Include every provider whose key secret is actually present. A repository with neither secret set runs entirely on-device, so the workflow still costs third parties nothing. |
+| `none` | Force cloud off, even with keys configured. Use this when you only want the on-device matrix. |
+| `openai` / `groq` | Force exactly that one provider. |
+| `both` | Force both, regardless of what `auto` would have detected. |
+
+Locally, the same choice is `KURN_PUBLIC_EVAL_CLOUD_PROVIDERS` -- read by
+`PipelineEvaluationMatrix.cloudProvidersFromEnvironment()`, which is where the
+precise semantics live.
 
 Output is on `[pipeline-eval]` lines, same convention as the private harness's
 `[eval]` lines -- per-item WER/DER, then a `=== aggregate ===` table of

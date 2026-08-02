@@ -38,7 +38,13 @@ permissions:
 jobs:
   evaluate:
     runs-on: macos-26
-    timeout-minutes: 300
+    # 360 is the ceiling for GitHub-hosted runners, and a full sweep needs the
+    # headroom: `whispercpp_models: all` takes the on-device matrix to 40
+    # configurations, several of them against a model far slower than `small`,
+    # over corpora that include AMI's 5-minute clips. Running out of time is
+    # not a partial result -- `writeCSV` runs only after every item, so a job
+    # killed at the limit produces no CSV and no aggregate table at all.
+    timeout-minutes: 360
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj
