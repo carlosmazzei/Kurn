@@ -126,8 +126,8 @@ Latest recorded results:
 
 | Language | Best measured configuration | WER | DER | Material |
 | --- | --- | --- | --- | --- |
-| Portuguese | no preprocessing + FluidAudio Parakeet | 28.57% | not measured | 24 items from CAMOES + CORAA, [2026-08-02](https://github.com/carlosmazzei/Kurn/actions/runs/30752932441) |
-| English | — | not measured | not measured | — |
+| Portuguese | no preprocessing + FluidAudio Parakeet | 26.58% | not measured | 80 items from CAMOES + CORAA, [2026-08-03](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
+| English | standardDSP + FluidAudio Parakeet | 22.70% | 32.89% | AMI Meeting Corpus, 4 meetings, [2026-08-03](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
 
 Two caveats travel with every number above: there is deliberately no pass/fail
 threshold, and the rates are comparable between runs over the same material —
