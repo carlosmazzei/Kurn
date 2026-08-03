@@ -156,9 +156,60 @@ than committed (still too large for git, just not private), from
 `Tools/evaluation/public_datasets/` (`manifest.json` + `fetch_all.py`; see its
 README for what each corpus needs, including the `HF_TOKEN`/`OPENAI_API_KEY`/
 `GROQ_API_KEY` secrets some entries are gated behind). Output is `[pipeline-eval]`
-lines: per-item WER/DER, then an aggregate table per (language, configuration)
-— the one to compare between runs — plus an optional CSV via
-`KURN_PUBLIC_EVAL_REPORT`. Same no-threshold philosophy as the private harness.
+lines: per-item WER/DER, then aggregate tables per (language, configuration) and
+per (corpus, configuration) — the ones to compare between runs — plus an
+optional CSV via `KURN_PUBLIC_EVAL_REPORT`. Same no-threshold philosophy as the
+private harness.
+
+**The corpus mix is weighted toward meeting audio on purpose.** Rates are
+micro-averaged by reference length, so the corpus with the most speech decides
+the language number: AMI (four people around a table, `ami_rttm`, the only
+corpus scored on **both** WER and DER) is sized to dominate English, while
+LibriSpeech is kept small as a regression canary rather than a description of
+real use. AMI's lexical reference comes from AMI's own manual annotation zip —
+`fetch_ami.py` reads only `words/*.words.xml`, where each `<w>` carries its own
+`starttime`, so a time-ordered transcript needs no speaker mapping; it is
+best-effort and degrades to DER-only rather than risk a silently wrong
+reference. A second grain exists because a language total otherwise blends read
+speech with meeting speech. `huggingface_diarization` is the generic fetcher for
+the `diarizers-community` layout (`timestamps_start`/`timestamps_end`/`speakers`
+→ RTTM), which makes a DER corpus a manifest entry rather than a new script.
+Cost scales as audio-seconds × configurations — prefer per-corpus dispatches
+over one sweep.
+
+**The CSV is appended row by row as each cell is scored**, and the aggregate is
+printed before the failure assertion rather than after it. Both exist because
+the report used to be built in memory and written once, after the loop *and*
+after `#require(failures.isEmpty)`, so a run that hit the 360-minute ceiling, got
+cancelled, or tripped over one broken cell produced nothing at all. A truncated
+report is now a usable result and a resume point: `resume: true` (workflow) /
+`KURN_PUBLIC_EVAL_RESUME=1` keeps the rows already in the file and runs only the
+missing cells. Opt-in, because a row records nothing about the code that
+produced it — reusing one is sound only while the pipeline is unchanged, which
+per-stage versions in the CSV would make checkable instead of promised.
+
+Two axes are provably redundant and worth knowing before adding cells:
+`TranscriptFusion` is word-preserving (`splitCoarseSpan` returns the original
+span unless the partition consumes every word), so **the diarizer cannot change
+WER** — confirmed by Parakeet scoring identically across all four VAD × diarizer
+combinations. whisper.cpp does vary there, which cannot be the diarizer and is
+therefore its own decode non-determinism: roughly a 2-point noise floor that any
+WER comparison has to clear. DER is *not* symmetric, since it is scored on the
+fused segments whose boundaries come from the ASR spans.
+
+**Results are recorded in `docs/pipeline-evaluation.md`**, newest run first,
+and summarized in the README's "Accuracy And Evaluation" section. That file
+exists because neither place the workflow writes to survives: the job summary
+belongs to a run page and the artifact is deleted after 90 days, so without it
+a measurement cannot be compared against one taken two months earlier — which
+is the only thing these numbers are good for. `Tools/evaluation/report_to_markdown.py`
+renders `report.csv` into exactly the Markdown that file expects (re-deriving
+the micro-average from the raw counts rather than scraping the already-rounded
+aggregate lines, and splitting the configuration label into one column per
+stage so the table survives the label format changing again), and the workflow
+runs it so the job summary hands a maintainer something paste-ready. Recording
+a run is deliberately a human step: a partial or noisy dispatch is not worth a
+commit.
 
 ## Architecture
 

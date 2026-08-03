@@ -43,10 +43,11 @@ struct PublicDatasetEvaluationHarnessTests {
         var der: DiarizationErrorRate.Result?
     }
 
-    /// `KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 4-entry
-    /// cleanup×diarization sweep (VAD and ASR engine held at their zero-download
-    /// defaults) — useful for a fast local check before dispatching the full
-    /// 24-entry matrix in CI. Anything else, including unset, runs the full matrix.
+    /// `KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to
+    /// `PipelineEvaluationMatrix.essential` — the 8-entry cleanup×VAD×diarization
+    /// sweep against whisper.cpp only — useful for a fast local check before
+    /// dispatching the full 24-entry matrix in CI. Anything else, including
+    /// unset, runs the full matrix. Both counts assume one whisper.cpp model.
     private var matrix: [PipelineEvaluationMatrix.Entry] {
         ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential"
             ? PipelineEvaluationMatrix.essential
@@ -109,14 +110,31 @@ struct PublicDatasetEvaluationHarnessTests {
         try await prewarmModels(for: entries)
 
         let service = TranscriptionService()
-        var rows: [Row] = []
         var failures: [String] = []
 
+        let writer = try PublicEvaluationDataset.reportPath.map {
+            try CSVReportWriter(path: $0, resuming: Self.isResuming)
+        }
+        var rows: [Row] = writer?.resumedRows ?? []
+        if let resumed = writer?.resumedRows, !resumed.isEmpty {
+            print("[pipeline-eval] resuming: reusing \(resumed.count) row(s) already in the report")
+        }
+
         for (info, items) in corpora {
+            let corpusEntries = Self.entries(entries, for: items)
+            if corpusEntries.count < entries.count {
+                print(
+                    "[pipeline-eval] \(info.corpus): scored on WER only, so the diarization axis is "
+                    + "collapsed — \(entries.count) -> \(corpusEntries.count) configuration(s)"
+                )
+            }
             for item in items {
-                for entry in entries {
+                for entry in corpusEntries {
                     guard TranscriptionLanguageSupport.isSupported(item.language, by: entry.configuration.transcription) else {
                         print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(entry.configuration.transcription) does not support \(item.language)")
+                        continue
+                    }
+                    if writer?.alreadyHas(corpus: item.corpusName, name: item.name, configLabel: entry.label) == true {
                         continue
                     }
                     do {
@@ -129,6 +147,11 @@ struct PublicDatasetEvaluationHarnessTests {
                         let row = score(item: item, corpusLanguage: info.language, entry: entry, output: output)
                         report(row)
                         rows.append(row)
+                        // Appended and flushed here rather than accumulated for a
+                        // single write at the end: a run that hits the job's time
+                        // limit, or is cancelled, keeps everything it had already
+                        // measured instead of yielding nothing.
+                        writer?.append(csvRow(for: row))
                     } catch let error as AppError {
                         if case .transcriptionLanguageUnsupported = error {
                             let reason = error.localizedDescription ?? String(describing: error)
@@ -147,13 +170,61 @@ struct PublicDatasetEvaluationHarnessTests {
             }
         }
 
+        if let writer {
+            print("[pipeline-eval] wrote \(rows.count) row(s) to \(writer.path)")
+        }
+
+        // The aggregate is printed before the assertion, not after it: a run with
+        // one broken cell still measured everything else, and throwing first threw
+        // that away along with the table that explains what happened.
+        reportAggregate(rows)
+
         let failureSummary = "\(failures.count) pipeline run(s) failed:\n\(failures.joined(separator: "\n"))"
         try #require(failures.isEmpty, "\(failureSummary)")
-        reportAggregate(rows)
-        if let reportPath = PublicEvaluationDataset.reportPath {
-            try writeCSV(rows, to: reportPath)
-        }
     }
+
+    /// `KURN_PUBLIC_EVAL_RESUME=1` keeps whatever rows the report already holds
+    /// and runs only the missing cells.
+    ///
+    /// Opt-in rather than automatic, because a row carries no record of the code
+    /// that produced it: reusing one is only sound while the pipeline is
+    /// unchanged, which the harness cannot yet check. Turning that into a safe
+    /// default is what per-stage versions in the CSV would buy.
+    private static var isResuming: Bool {
+        ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_RESUME"] == "1"
+    }
+
+    /// Drops the diarization axis for a corpus that carries no reference RTTM.
+    ///
+    /// `TranscriptFusion.splitCoarseSpan` is word-preserving — it partitions a
+    /// span's words into contiguous ranges and returns the span untouched unless
+    /// the partition consumes every one — so the concatenated transcript is the
+    /// same word sequence no matter who the turns are attributed to. The
+    /// diarizer therefore **cannot** change WER, which the measurements confirm:
+    /// every WER in a Portuguese run appears exactly twice, once per diarizer,
+    /// without exception.
+    ///
+    /// So on a WER-only corpus that axis is not a comparison, it is the same
+    /// number computed twice at double the cost. Spending that budget on more
+    /// items instead is what makes the rate mean anything — a corpus of 16 short
+    /// utterances came to ~143 reference tokens, where one wrong word moves the
+    /// result by 0.7 points and two unrelated engines land on the same figure by
+    /// coincidence.
+    ///
+    /// Only collapsed when the whole corpus is WER-only; a mixed one keeps the
+    /// full matrix rather than deciding per item.
+    private static func entries(
+        _ entries: [PipelineEvaluationMatrix.Entry],
+        for items: [PublicEvaluationDataset.Item]
+    ) -> [PipelineEvaluationMatrix.Entry] {
+        guard !items.isEmpty, items.allSatisfy({ $0.referenceRTTM == nil }) else { return entries }
+        let collapsed = entries.filter { $0.configuration.diarization == diarizerForWEROnlyCorpora }
+        return collapsed.isEmpty ? entries : collapsed
+    }
+
+    /// Which diarizer the collapsed axis keeps. The app's own default, so a
+    /// WER-only run still exercises the configuration users actually get.
+    private static let diarizerForWEROnlyCorpora: DiarizationEngine = .fluidAudio
 
     /// Writes `OPENAI_API_KEY`/`GROQ_API_KEY` (when set) into the Keychain
     /// under the same account `ProviderFactory.whisperProvider` reads, exactly
@@ -236,16 +307,39 @@ struct PublicDatasetEvaluationHarnessTests {
         }
     }
 
-    /// Corpus-level rate per (language, configuration) — the table that answers
-    /// "which combination is best for English" / "...for Portuguese", weighted
-    /// by reference length rather than averaged per-file, same rationale as
-    /// `EvaluationHarnessTests.reportsWordErrorRate`.
+    /// The table that answers "which combination is best for English" /
+    /// "...for Portuguese", weighted by reference length rather than averaged
+    /// per-file, same rationale as `EvaluationHarnessTests.reportsWordErrorRate`.
+    ///
+    /// Reported twice, at two grains, because one language can span materially
+    /// different material: English is both LibriSpeech (one voice reading, clean)
+    /// and AMI (four people around a table). Micro-averaging weights by reference
+    /// length, so the meeting corpus dominates the language total and the
+    /// read-speech signal — the one number comparable to the wider literature —
+    /// disappears into it. The per-language line stays for continuity with runs
+    /// recorded before AMI had a transcript; the per-corpus line is the one to
+    /// read when deciding anything.
     private func reportAggregate(_ rows: [Row]) {
-        let byGroup = Dictionary(grouping: rows) { "\($0.language)|\($0.configLabel)" }
         print("[pipeline-eval] === aggregate WER/DER by language x configuration ===")
+        reportGroups(rows, keyedBy: { "\($0.language)|\($0.configLabel)" }, named: { $0.language })
+        print("[pipeline-eval] === aggregate WER/DER by corpus x configuration ===")
+        reportGroups(
+            rows,
+            keyedBy: { "\($0.language)|\($0.corpus)|\($0.configLabel)" },
+            named: { "\($0.language)/\($0.corpus)" }
+        )
+    }
+
+    private func reportGroups(
+        _ rows: [Row],
+        keyedBy key: (Row) -> String,
+        named name: (Row) -> String
+    ) {
+        let byGroup = Dictionary(grouping: rows, by: key)
         for key in byGroup.keys.sorted() {
             let group = byGroup[key] ?? []
-            guard let language = group.first?.language, let configLabel = group.first?.configLabel else { continue }
+            guard let first = group.first else { continue }
+            let (label, configLabel) = (name(first), first.configLabel)
 
             var parts: [String] = []
             let werGroup = group.compactMap(\.wer)
@@ -265,26 +359,92 @@ struct PublicDatasetEvaluationHarnessTests {
             }
 
             guard !parts.isEmpty else { continue }
-            print("[pipeline-eval] \(language) [\(configLabel)]: " + parts.joined(separator: ", "))
+            print("[pipeline-eval] \(label) [\(configLabel)]: " + parts.joined(separator: ", "))
         }
     }
 
     // MARK: - CSV report
 
-    private func writeCSV(_ rows: [Row], to path: String) throws {
-        let header = "corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,"
+    /// Appends each scored row to the report as it is produced.
+    ///
+    /// The report used to be built in memory and written once, after the loop and
+    /// after the failure assertion — so a run that hit the job's 6-hour ceiling,
+    /// got cancelled, or tripped over a single broken cell produced **no** file at
+    /// all, and hours of measurement went with it. Appending as we go means the
+    /// file on disk is always everything measured so far.
+    ///
+    /// That also makes it a resume point: `resumedRows` reads back what a previous
+    /// attempt left behind so the next one can run only the missing cells.
+    private final class CSVReportWriter {
+        static let header = "corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,"
             + "der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech"
-        var lines = [header]
-        for row in rows {
-            lines.append(csvRow(for: row).joined(separator: ","))
+
+        let path: String
+        private let handle: FileHandle
+        private var done: Set<String> = []
+        private(set) var resumedRows: [Row] = []
+
+        init(path: String, resuming: Bool) throws {
+            self.path = path
+
+            let existing = resuming ? (try? String(contentsOfFile: path, encoding: .utf8)) : nil
+            if let existing, existing.hasPrefix(Self.header) {
+                (resumedRows, done) = Self.parse(existing)
+            } else {
+                // No usable prior report — start a fresh one. A file whose header
+                // does not match is from an older column layout; appending to it
+                // would interleave two shapes into one unparseable CSV.
+                try Self.header.appending("\n").write(toFile: path, atomically: true, encoding: .utf8)
+            }
+
+            handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+            try handle.seekToEnd()
         }
-        try (lines.joined(separator: "\n") + "\n").write(
-            toFile: path, atomically: true, encoding: .utf8
-        )
-        print("[pipeline-eval] wrote \(rows.count) row(s) to \(path)")
+
+        func alreadyHas(corpus: String, name: String, configLabel: String) -> Bool {
+            done.contains(Self.key(corpus, name, configLabel))
+        }
+
+        func append(_ fields: [String]) {
+            guard let data = (fields.joined(separator: ",") + "\n").data(using: .utf8) else { return }
+            // `FileHandle.write` goes straight to the descriptor, so the bytes
+            // survive the process being killed — which is the whole point.
+            try? handle.write(contentsOf: data)
+        }
+
+        private static func key(_ corpus: String, _ name: String, _ configLabel: String) -> String {
+            "\(corpus)|\(name)|\(configLabel)"
+        }
+
+        /// Rebuilds rows from a previous report. Only the fields the aggregate
+        /// needs are restored; a malformed line is dropped rather than guessed at.
+        private static func parse(_ text: String) -> ([Row], Set<String>) {
+            var rows: [Row] = []
+            var done: Set<String> = []
+            for line in text.split(separator: "\n").dropFirst() {
+                let f = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+                guard f.count == 14 else { continue }
+                let wer = f[8].isEmpty ? nil : WordErrorRate.Result(
+                    substitutions: Int(f[5]) ?? 0,
+                    insertions: Int(f[6]) ?? 0,
+                    deletions: Int(f[7]) ?? 0,
+                    referenceCount: Int(f[8]) ?? 0
+                )
+                let der = f[13].isEmpty ? nil : DiarizationErrorRate.Result(
+                    missed: Double(f[10]) ?? 0,
+                    falseAlarm: Double(f[11]) ?? 0,
+                    confusion: Double(f[12]) ?? 0,
+                    referenceSpeech: Double(f[13]) ?? 0,
+                    mapping: [:]
+                )
+                rows.append(Row(corpus: f[0], name: f[1], language: f[2], configLabel: f[3], wer: wer, der: der))
+                done.insert(key(f[0], f[1], f[3]))
+            }
+            return (rows, done)
+        }
     }
 
-    /// Split out of `writeCSV` — a single array literal mixing this many
+    /// Split out of the row writer — a single array literal mixing this many
     /// `.map { ... } ?? ""` closures was too much for the type checker to
     /// solve in one pass ("unable to type-check this expression in reasonable
     /// time"). Building each field as its own statement keeps every

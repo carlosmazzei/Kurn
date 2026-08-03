@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       matrix:
-        description: "essential (4 configs, fast) or full (24+ configs)"
+        description: "essential (8 configs, whisper.cpp only, fast) or full (24+ configs)"
         type: choice
         options: [full, essential]
         default: full
@@ -31,6 +31,10 @@ on:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
         default: "small"
+      resume:
+        description: "reuse rows already in report.csv and run only the missing cells"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,7 +42,13 @@ permissions:
 jobs:
   evaluate:
     runs-on: macos-26
-    timeout-minutes: 300
+    # 360 is the ceiling for GitHub-hosted runners, and a full sweep needs the
+    # headroom: `whispercpp_models: all` takes the on-device matrix to 40
+    # configurations, several of them against a model far slower than `small`,
+    # over corpora that include AMI's 5-minute clips. Running out of time is
+    # not a partial result -- `writeCSV` runs only after every item, so a job
+    # killed at the limit produces no CSV and no aggregate table at all.
+    timeout-minutes: 360
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj
@@ -89,6 +99,12 @@ jobs:
       - name: Fetch public datasets
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          # The AMI fetch lists meeting IDs through the GitHub API, which is
+          # capped at 60 requests/hour per IP when unauthenticated -- and
+          # hosted runners share IPs, so that budget is often already spent
+          # and the listing 403s. `contents: read` is enough to read a public
+          # repository's contents.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 Tools/evaluation/public_datasets/fetch_all.py \
             --out "$DATASET_DIR" \
@@ -104,6 +120,14 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
+          # The report is written row by row, so a cancelled or timed-out run
+          # leaves a usable partial file. `resume: true` picks that file up and
+          # runs only what is missing -- provided it survived, which means either
+          # the dataset cache restored it or it was placed here from a previous
+          # run's artifact. Reusing a row assumes the pipeline has not changed
+          # since it was measured; the harness cannot check that yet, which is
+          # why this is opt-in.
+          TEST_RUNNER_KURN_PUBLIC_EVAL_RESUME: ${{ github.event.inputs.resume == 'true' && '1' || '0' }}
           # Optional and additive -- controlled by `cloud_providers`. A maintainer
           # who wants cloud Whisper (OpenAI/Groq) in the matrix wires these as repo
           # secrets; PipelineEvaluationMatrix only adds those entries when the
@@ -120,15 +144,36 @@ jobs:
             test -only-testing:KurnTests/PublicDatasetEvaluationHarnessTests \
             | tee "$RUNNER_TEMP/pipeline-eval.log"
 
+      # Renders the CSV as the Markdown that goes straight into
+      # docs/pipeline-evaluation.md, so recording a run is a paste and a
+      # commit. The raw log stays available underneath: the harness requires a
+      # failure-free run *before* it writes the CSV, so a run with any failure
+      # produces no CSV at all and the grep is the only report there is.
       - name: Publish report summary
         if: always()
         run: |
+          python3 Tools/evaluation/report_to_markdown.py \
+            --csv "$REPORT_PATH" \
+            --log "$RUNNER_TEMP/pipeline-eval.log" \
+            --commit "${{ github.sha }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --out "$RUNNER_TEMP/pipeline-evaluation.md" || true
           {
             echo "## Pipeline evaluation report"
+            echo
+            if [ -s "$RUNNER_TEMP/pipeline-evaluation.md" ]; then
+              cat "$RUNNER_TEMP/pipeline-evaluation.md"
+              echo
+              echo "Paste the above into \`docs/pipeline-evaluation.md\` to record this run."
+              echo
+            fi
+            echo "<details><summary>Raw <code>[pipeline-eval]</code> output</summary>"
             echo
             echo '```'
             grep '^\[pipeline-eval\]' "$RUNNER_TEMP/pipeline-eval.log" || echo "(no [pipeline-eval] lines found -- check the build/test log below)"
             echo '```'
+            echo
+            echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload report artifact
@@ -139,5 +184,6 @@ jobs:
           path: |
             ${{ env.REPORT_PATH }}
             ${{ runner.temp }}/pipeline-eval.log
+            ${{ runner.temp }}/pipeline-evaluation.md
           if-no-files-found: warn
           retention-days: 90

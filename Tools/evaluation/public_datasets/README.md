@@ -28,21 +28,60 @@ belongs in git history. Fetching on demand also means `manifest.json` can be
 edited (swap a dataset, change the sample count) without a code review of
 binary blobs.
 
-## What's fetched, and why these four
+## What's fetched, and why these
 
-| Corpus | Language | Gives | Why |
-| --- | --- | --- | --- |
-| LibriSpeech test-clean | English | WER | Clean, single-speaker, the standard ASR sanity check. Ungated, no token needed. |
-| AMI Meeting Corpus (Mix-Headset) | English | DER only | Real multi-speaker meeting audio -- the only corpus here whose overlap and crosstalk look like what the app actually records. Its lexical transcript is locked in AMI's NXT XML, which this tooling deliberately does not parse (see `fetch_ami.py`'s docstring), so it contributes diarization-only material. |
-| Common Voice 17.0 (pt) | Portuguese | WER | Gated (needs `HF_TOKEN`, see below) but broad accent/speaker coverage. |
-| CORAA v1.1 (pt) | Portuguese | WER | `Racoci/CORAA-v1.1` (`default` config, `test` split) in Parquet format. Brazilian Portuguese spontaneous speech across five source projects. License is `CC BY-NC-ND 4.0`. |
+`manifest.json` is the source of truth for what is enabled; this table is the
+reasoning behind it.
 
-**There is no Portuguese diarization corpus here.** A public, freely
-downloadable multi-speaker Portuguese corpus with turn-level annotation
-comparable to AMI was not identified. DER for Portuguese stays a known gap in
-this measurement, same honesty as `Tools/evaluation/README.md`'s own
-"comparable between runs, not against published figures" caveat -- better to
-say so than to fake it with a mismatched or synthetic substitute.
+| Corpus | Language | Gives | Enabled | Why |
+| --- | --- | --- | --- | --- |
+| AMI Meeting Corpus (Mix-Headset) | English | **WER + DER** | yes, 4 meetings x 5 min | Four people around a table -- the only corpus whose overlap, crosstalk and far-field conditions look like what the app actually records, and the only one where text and speaker turns are scored on the same audio. Carries the most weight here on purpose. The four are drawn from four *different* meeting series (`EN2002`, `ES2004`, `IS1009`, `TS3003`), not four sessions of one: sessions `a`-`d` of a series are the same four people in the same room, so taking them would buy four times the audio and none of the speaker variety. |
+| LibriSpeech test-clean | English | WER | yes, 6 | One voice reading, clean. Kept small: it is the regression canary and the one number loosely comparable to the wider literature, not a description of real use. |
+| CAMOES Sociolinguistic Interviews (pt) | Portuguese | WER | yes, 40 | `inesc-id/camoes_SI` (`test` split). Interview speech, closer to conversation than read prompts. Ungated, `CC BY 4.0`. |
+| CORAA v1.1 (pt) | Portuguese | WER | yes, 40 | `Racoci/CORAA-v1.1` (`default` config, `test` split). Brazilian Portuguese spontaneous speech across five source projects. `CC BY-NC-ND 4.0`. |
+
+**The Portuguese counts are high because the items are tiny.** Both corpora are
+distributed already segmented into single utterances of a few seconds, so an
+item carries roughly six to ten reference words. At 8 items each, a Portuguese
+run scored against ~143 tokens in total: one wrong word moved the rate by 0.7
+points, and two unrelated engines landed on identical figures by coincidence
+(45 errors out of 143, from completely different transcripts). Item count here
+buys statistical resolution, and it is cheap — these are seconds of audio, not
+the minutes AMI contributes.
+| VoxConverse | English | DER | **no**, 4 | `diarizers-community/voxconverse`, `CC BY 4.0`. **1 to 21 speakers per recording** -- by far the widest speaker-count range available freely, which is exactly the pipeline's known failure (VBx collapsing to one speaker, see `SpeakerClusterRefiner`). Off by default because its column layout is a community convention this repo has not yet confirmed against a real fetch; turn it on for a diarization-focused run. |
+| Common Voice 17.0 (pt) | Portuguese | WER | **no**, 12 | Broad accent coverage, but gated behind an `HF_TOKEN` (see below), so it is off by default to keep a fresh clone runnable with no credentials. |
+
+### How the mix is weighted, and why
+
+Every rate is micro-averaged by reference length, so the corpus with the most
+speech decides the language number. That is the lever: AMI's four 5-minute
+meetings outweigh everything else in English by design, because the app records
+meetings, not audiobooks. Before this balance, 36 of 38 items were
+single-speaker and the benchmark mostly measured a case the app rarely meets.
+
+Because that also means a language total blends read speech with meeting
+speech, the harness prints the aggregate **twice** -- once per language, once
+per corpus -- and the corpus grain is the one to read when deciding anything.
+
+**There is still no Portuguese diarization corpus here.** The two candidates
+both fall short: NURC-SP's audio corpus is distributed already segmented into
+per-utterance clips, same shape as CORAA, so it carries no turn structure; and
+C-ORAL-BRASIL does have dialogues with speaker changes, but its alignment ships
+in WinPitch Pro format under `CC BY-NC-SA 4.0` and would need real conversion
+work. DER for Portuguese stays a known gap, same honesty as
+`Tools/evaluation/README.md`'s "comparable between runs, not against published
+figures" caveat -- better to say so than to fake it with a synthetic substitute.
+
+### Cost, which is the real constraint
+
+Run time scales as *audio-seconds x configurations*, and both sides grow fast:
+a `full` matrix with `whispercpp_models: all` is 40 configurations, so every
+extra minute of corpus audio costs roughly 40 minutes of runner time before
+diarization. Meeting audio is simultaneously the most representative material
+and the most expensive. Keep `sample_count` / `meeting_count` / `clip_seconds`
+small, and prefer several per-corpus dispatches (the `corpora` input) over one
+sweep of everything -- the job has a hard 360-minute ceiling and produces
+**no** CSV at all if it hits it.
 
 ## Setup
 
@@ -84,11 +123,11 @@ xcodebuild -project Kurn.xcodeproj -scheme Kurn \
   test -only-testing:KurnTests/PublicDatasetEvaluationHarnessTests
 ```
 
-`KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 4-entry cleanup
-on/off x diarization heuristic/FluidAudio sweep (holding VAD and ASR engine at
-their zero-download defaults) instead of the full 24-entry matrix -- useful
-for a fast local check. Omit it, or set it to anything else, to run the full
-matrix.
+`KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 8-entry
+cleanup x VAD x diarization sweep against whisper.cpp only (`PipelineEvaluationMatrix.essential`),
+instead of the full 24-entry matrix -- useful for a fast local check. Omit it,
+or set it to anything else, to run the full matrix. Both counts assume a single
+whisper.cpp model; sweeping more multiplies them (see below).
 
 ### Including cloud Whisper (OpenAI, Groq)
 
@@ -101,17 +140,78 @@ into Settings by hand, since the harness seeds it into the same Keychain
 account `ProviderFactory` reads. Costs real API usage per call; keep
 `sample_count` in `manifest.json` small if you enable this.
 
-In CI, wire `secrets.OPENAI_API_KEY` / `secrets.GROQ_API_KEY` into the
-`pipeline-eval` workflow's env only if you want those entries in the matrix --
-they're absent by default, so the workflow costs nothing to third parties
-until a maintainer opts in.
+In CI, the `pipeline-eval` workflow wires `secrets.OPENAI_API_KEY` /
+`secrets.GROQ_API_KEY` into the test env unconditionally, and the
+`cloud_providers` dispatch input decides what to do with them:
+
+| `cloud_providers` | Effect |
+| --- | --- |
+| `auto` (default) | Include every provider whose key secret is actually present. A repository with neither secret set runs entirely on-device, so the workflow still costs third parties nothing. |
+| `none` | Force cloud off, even with keys configured. Use this when you only want the on-device matrix. |
+| `openai` / `groq` | Force exactly that one provider. |
+| `both` | Force both, regardless of what `auto` would have detected. |
+
+Locally, the same choice is `KURN_PUBLIC_EVAL_CLOUD_PROVIDERS` -- read by
+`PipelineEvaluationMatrix.cloudProvidersFromEnvironment()`, which is where the
+precise semantics live.
 
 Output is on `[pipeline-eval]` lines, same convention as the private harness's
-`[eval]` lines -- per-item WER/DER, then a `=== aggregate ===` table of
-corpus-level WER/DER per (language, configuration), which is the table to
-actually compare between runs. `KURN_PUBLIC_EVAL_REPORT` additionally writes
-every (item, configuration) row as CSV, for pulling into a spreadsheet or
-diffing between two runs.
+`[eval]` lines -- per-item WER/DER, then two `=== aggregate ===` tables: one per
+(language, configuration) and one per (corpus, configuration). Those are the
+tables to compare between runs, and the per-corpus one is the one to trust when
+a language spans material as different as read speech and meeting speech.
+`KURN_PUBLIC_EVAL_REPORT` additionally writes every (item, configuration) row as
+CSV, for pulling into a spreadsheet or diffing between two runs.
+
+### The report is written as it goes, and can be resumed
+
+Rows are appended to the CSV the moment they are scored, not accumulated for one
+write at the end. That matters because the job has a hard 360-minute ceiling: a
+run that hits it, gets cancelled, or trips over a single broken cell used to
+produce **no** file at all and throw away hours of measurement. Now whatever was
+measured is already on disk, and a truncated report renders fine.
+
+The aggregate is likewise printed before the failure assertion rather than after
+it, so a run with one bad cell still reports everything else.
+
+That partial file is also a resume point. `resume: true` on the workflow (or
+`KURN_PUBLIC_EVAL_RESUME=1` locally) keeps the rows already present and runs only
+the missing cells, which is how a sweep too big for one job gets finished across
+two. It is opt-in on purpose: a row records no trace of the code that produced
+it, so reusing one is only sound while the pipeline is unchanged. Per-stage
+versions in the CSV are what would make that check automatic rather than a
+promise — until then, resume an interrupted run, not a run from before a change.
+
+Locally the report is just a file, so resuming means pointing at the same path.
+In CI it has to survive between dispatches: the report lives inside the cached
+dataset directory, but `actions/cache` does not re-save on a key that already
+exists, so the reliable route is to place the previous run's artifact copy at
+`REPORT_PATH` before the test step.
+
+## Recording a run
+
+Both places the workflow writes to expire -- the job summary belongs to a run
+page, and the `pipeline-eval-report` artifact is deleted after 90 days. A run
+worth keeping goes into [`docs/pipeline-evaluation.md`](../../../docs/pipeline-evaluation.md),
+newest first, where it is in git and shows up in a diff when a later change
+moves it.
+
+`report_to_markdown.py` next to this directory turns the CSV into exactly the
+Markdown that file expects:
+
+```bash
+python3 ../report_to_markdown.py \
+  --csv ~/kurn-eval-public/report.csv \
+  --log pipeline-eval.log \
+  --commit "$(git rev-parse HEAD)" \
+  --run-url https://github.com/carlosmazzei/Kurn/actions/runs/<id>
+```
+
+The `pipeline-eval` workflow runs it for you and puts the result at the top of
+the job summary, alongside a copy in the artifact -- so recording a CI run is a
+paste and a commit. `--log` is optional and only supplies the run-summary
+header (matrix, engines, corpora, licenses); the rates come from the CSV either
+way.
 
 There is deliberately no pass/fail threshold, for the same reason
 `Tools/evaluation/README.md`'s harness has none.
