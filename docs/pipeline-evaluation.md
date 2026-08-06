@@ -87,6 +87,18 @@ normal network access can download the `pipeline-eval-report` artifact from
 the run above and regenerate this section byte-for-byte with
 `report_to_markdown.py` if the raw counts are wanted.
 
+To do that: download the `pipeline-eval-report` artifact (id `8856661838`,
+expires 2026-11-01) from the run above, unzip it into `report.csv` and
+`pipeline-eval.log`, and run:
+
+```bash
+python3 Tools/evaluation/report_to_markdown.py \
+  --csv report.csv --log pipeline-eval.log \
+  --commit 264458909649b699619d49e031cf70fe1f71c2d2 \
+  --run-url https://github.com/carlosmazzei/Kurn/actions/runs/30800039020 \
+  --date 2026-08-03
+```
+
 - matrix: full — 24 on-device configurations (whisper.cpp restricted to the
   `small` model, the workflow's default) + 8 more for `whisperAPI:groq`
   (`cloud_providers: auto` found only `GROQ_API_KEY`, not `OPENAI_API_KEY`),
