@@ -60,8 +60,10 @@ final class RecordingCommandRouter {
 
         switch url.path {
         case "/toggle":
+            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity toggle received")
             onTogglePause?()
         case "/stop":
+            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity stop received")
             onStop?()
         default:
             break
@@ -72,15 +74,25 @@ final class RecordingCommandRouter {
     /// recorder session is currently registered to handle it.
     @discardableResult
     func handleWatchCommand(_ command: WatchCommand) -> Bool {
+        AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Watch command received: \(command.rawValue, privacy: .public)")
         switch command {
         case .pause:
-            guard let onPause else { return false }
+            guard let onPause else {
+                AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch pause ignored, no active session")
+                return false
+            }
             onPause()
         case .resume:
-            guard let onResume else { return false }
+            guard let onResume else {
+                AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch resume ignored, no active session")
+                return false
+            }
             onResume()
         case .stop:
-            guard let onStop else { return false }
+            guard let onStop else {
+                AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch stop ignored, no active session")
+                return false
+            }
             onStop()
         }
         return true

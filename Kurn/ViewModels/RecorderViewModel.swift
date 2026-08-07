@@ -217,7 +217,10 @@ final class RecorderViewModel {
             )
             RecordingCommandRouter.shared.register(
                 onTogglePause: { [weak self] in self?.togglePause() },
-                onPause: { [weak self] in self?.recorder.pause() },
+                onPause: { [weak self] in
+                    AppLog.recorderUI.atNotice.notice("onPause: Watch-issued pause invoked directly")
+                    self?.recorder.pause(reason: .watchCommand)
+                },
                 onResume: { [weak self] in self?.recorder.resume() },
                 onStop: { [weak self] in self?.stopAndSave() }
             )
@@ -239,7 +242,7 @@ final class RecorderViewModel {
     func togglePause() {
         AppLog.recorderUI.atInfo.info("togglePause: state=\(String(describing: self.recorder.state), privacy: .public)")
         switch recorder.state {
-        case .recording: recorder.pause()
+        case .recording: recorder.pause(reason: .userToggle)
         case .paused: recorder.resume()
         case .idle: break
         }

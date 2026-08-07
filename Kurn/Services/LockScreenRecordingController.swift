@@ -29,7 +29,9 @@ final class LockScreenRecordingController {
         self.elapsed = elapsed
         self.isActive = true
 
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let activitiesEnabled = ActivityAuthorizationInfo().areActivitiesEnabled
+        AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: start requested, activitiesEnabled=\(activitiesEnabled, privacy: .public)")
+        guard activitiesEnabled else { return }
 
         Task {
             do {
@@ -43,7 +45,9 @@ final class LockScreenRecordingController {
                     content: content,
                     pushType: nil
                 )
+                AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: Live Activity started")
             } catch {
+                AppLog.recorderUI.atError.error("LockScreenRecordingController: Activity.request failed: \(error.localizedDescription, privacy: .public)")
                 activity = nil
             }
         }
@@ -54,6 +58,8 @@ final class LockScreenRecordingController {
 
         self.state = state
         self.elapsed = elapsed
+
+        AppLog.recorderUI.atDebug.debug("LockScreenRecordingController: update state=\(String(describing: state), privacy: .public)")
 
         let content = ActivityContent(
             state: contentState(state: state, elapsed: elapsed),
@@ -67,6 +73,8 @@ final class LockScreenRecordingController {
 
     func end() {
         guard isActive else { return }
+
+        AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: end")
 
         let finalContent = ActivityContent(
             state: contentState(state: .idle, elapsed: elapsed),

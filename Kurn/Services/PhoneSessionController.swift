@@ -120,9 +120,11 @@ extension PhoneSessionController: WCSessionDelegate {
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
         guard let raw = message[WatchSessionKey.command] as? String, let command = WatchCommand(rawValue: raw) else {
+            AppLog.recorderUI.atError.error("PhoneSessionController: received unrecognized Watch command")
             replyHandler([WatchSessionKey.ok: false, WatchSessionKey.error: WatchSessionReplyError.unknownCommand])
             return
         }
+        AppLog.recorderUI.atNotice.notice("PhoneSessionController: received Watch command \(raw, privacy: .public)")
         let reply = WatchCommandReplyHandler(reply: replyHandler)
         Task {
             let handled = await MainActor.run {
