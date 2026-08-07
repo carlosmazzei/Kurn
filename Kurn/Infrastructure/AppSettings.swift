@@ -58,6 +58,7 @@ final class AppSettings {
         static let usageStats = "settings.usageStats"
         static let semanticSearchEnabled = "settings.semanticSearchEnabled"
         static let wikiEnabled = "settings.wikiEnabled"
+        static let correctionEnabled = "settings.correctionEnabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -155,6 +156,15 @@ final class AppSettings {
     /// passages.
     var wikiEnabled: Bool {
         didSet { defaults.set(wikiEnabled, forKey: Keys.wikiEnabled) }
+    }
+
+    /// Whether the opt-in LLM transcription-correction stage runs after fusion,
+    /// fixing spelling, punctuation, and misheard words on low- (or unknown-)
+    /// confidence segments using the summary AI provider. Off by default — like
+    /// `wikiEnabled`, it makes cloud LLM calls per transcription and needs
+    /// explicit opt-in. See `LLMTranscriptCorrector`.
+    var correctionEnabled: Bool {
+        didSet { defaults.set(correctionEnabled, forKey: Keys.correctionEnabled) }
     }
 
     /// When on, the recordings UI requires Face ID / Touch ID / passcode once
@@ -255,7 +265,11 @@ final class AppSettings {
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
             fluidAudioSpeakerCount: fluidAudioSpeakerCount,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
-            whisperCppModel: whisperCppModel
+            whisperCppModel: whisperCppModel,
+            correction: correctionEnabled ? .llm : .none,
+            correctionProvider: aiProvider,
+            correctionModel: summaryModel(for: aiProvider),
+            correctionConsented: correctionEnabled && KeychainManager.shared.hasValue(for: aiProvider.keychainAccount)
         )
     }
 
@@ -489,6 +503,9 @@ final class AppSettings {
         // Off by default: wiki generation makes paid cloud LLM calls, so it is an
         // explicit opt-in.
         wikiEnabled = defaults.bool(forKey: Keys.wikiEnabled, default: false)
+        // Off by default: transcription correction makes paid cloud LLM calls,
+        // so it is an explicit opt-in, same as wiki generation.
+        correctionEnabled = defaults.bool(forKey: Keys.correctionEnabled, default: false)
         // Screenshot automation (fastlane `snapshot`) always forces this off so
         // the recordings lock screen never blocks an unattended UI test run.
         #if DEBUG

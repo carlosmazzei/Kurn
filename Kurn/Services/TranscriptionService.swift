@@ -91,6 +91,8 @@ struct TranscriptionService {
     private let fluidAudioDiarizer = FluidAudioDiarizer()
     private let diarizationPreprocessor = DiarizationPreprocessor()
     private let vadCompactor = VADAudioCompactor()
+    private let noOpCorrector = NoOpTranscriptCorrector()
+    private let llmCorrector = LLMTranscriptCorrector()
 
     /// Transcribe one recording file and return diarized segments, driving each
     /// pipeline stage through the engine selected in `config`.
@@ -282,8 +284,29 @@ struct TranscriptionService {
             maxSegmentDuration: maxSegmentDuration
         )
 
+        // 6. Optionally correct transcription errors (spelling, punctuation,
+        // homophones, obvious ASR mistakes) via the opt-in LLM stage, on the
+        // already-fused, speaker-attributed segments. `TranscriptCorrecting`
+        // conformers never throw and always return `segments.count` segments in
+        // order — on any failure this degrades to "no correction ran", never to
+        // a failed transcription.
+        let correctionEngine = config.effectiveCorrection
+        if correctionEngine != .none {
+            onPhase(.correcting(progress: nil))
+        }
+        let correctedSegments = await resolveCorrector(correctionEngine).correct(
+            segments: segments,
+            language: resolvedLanguage,
+            provider: config.correctionProvider,
+            model: config.correctionModel,
+            onProgress: { progress in
+                guard correctionEngine != .none else { return }
+                onPhase(.correcting(progress: progress))
+            }
+        )
+
         var labels: [String] = []
-        for segment in segments where !labels.contains(segment.speakerLabel) {
+        for segment in correctedSegments where !labels.contains(segment.speakerLabel) {
             labels.append(segment.speakerLabel)
         }
         // Fusion never invents a label, so a voiceprint for one that did not
@@ -291,9 +314,9 @@ struct TranscriptionService {
         // persisted against nothing.
         let voiceprints = diarization.voiceprints.filter { labels.contains($0.key) }
 
-        AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(segments.count, privacy: .public) speakers=\(labels.count, privacy: .public) [\(labels.joined(separator: ", "), privacy: .public)]")
+        AppLog.transcription.atNotice.notice("transcribe: complete in \(Date().timeIntervalSince(started), privacy: .public)s segments=\(correctedSegments.count, privacy: .public) speakers=\(labels.count, privacy: .public) [\(labels.joined(separator: ", "), privacy: .public)]")
         return Output(
-            segments: segments,
+            segments: correctedSegments,
             language: raw.language.isEmpty ? (resolvedLanguage.localeIdentifier ?? raw.language) : raw.language,
             speakerLabels: labels,
             speakerVoiceprints: voiceprints
@@ -333,6 +356,14 @@ struct TranscriptionService {
         switch engine {
         case .energyThreshold: return energyVAD
         case .fluidAudio: return fluidAudioVAD
+        }
+    }
+
+    /// Map a `CorrectionEngine` to its engine.
+    private func resolveCorrector(_ engine: CorrectionEngine) -> any TranscriptCorrecting {
+        switch engine {
+        case .none: return noOpCorrector
+        case .llm: return llmCorrector
         }
     }
 

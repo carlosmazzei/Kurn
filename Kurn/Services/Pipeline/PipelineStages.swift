@@ -59,6 +59,25 @@ protocol Transcribing: Sendable {
 
 // `Diarizing` is declared in TranscriptionTypes.swift and is reused unchanged.
 
+/// Opt-in LLM-based post-processing that corrects transcription errors
+/// (spelling, punctuation, homophones, obvious ASR mistakes) on already-fused,
+/// speaker-attributed segments. Implementations must never throw and must
+/// return exactly `segments.count` segments, in the same order, with every
+/// field except `text` unchanged — on any failure (missing key, network
+/// error, malformed reply, or a rewrite the guardrail rejects) the original
+/// segment's text is kept. Runs after `TranscriptFusion.segments`, never
+/// before: a pre-fusion hook risks perturbing `splitCoarseSpan`'s
+/// word-count-based proportional speaker-handover split.
+protocol TranscriptCorrecting: Sendable {
+    func correct(
+        segments: [TranscriptSegment],
+        language: MeetingLanguage,
+        provider: AIProvider,
+        model: String,
+        onProgress: @escaping @Sendable (Double) -> Void
+    ) async -> [TranscriptSegment]
+}
+
 /// One engine choice per pipeline stage. Built from `AppSettings` and passed to
 /// `TranscriptionService.transcribe`. Defaults match the always-available,
 /// no-download engines so a fresh install works offline with no model fetch.
@@ -92,6 +111,27 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// GGML weight file the `.whisperCpp` engine loads. Ignored by every other
     /// engine.
     var whisperCppModel: WhisperCppModel = .default
+    var correction: CorrectionEngine = .none
+    /// Provider used by the `.llm` correction engine — the app's single summary
+    /// provider (`AppSettings.aiProvider`), not a dedicated slot: there is
+    /// exactly one summary-shaped `LLMProvider` in this app (see
+    /// `ProviderFactory.summaryProvider`), reused for summaries/chat/wiki/
+    /// auto-tagging/titles, and correction follows that precedent.
+    var correctionProvider: AIProvider = .openAI
+    var correctionModel: String = ""
+    /// Whether the user opted in (Settings toggle) AND the correction provider
+    /// currently has a configured API key. Read together with `correction` by
+    /// `effectiveCorrection` — same fail-before-trying shape as
+    /// `effectiveDiarization`, except the gate is "is this usable right now"
+    /// (key present), not "has the user agreed to a model download" (this
+    /// stage has no local model).
+    var correctionConsented: Bool = false
+
+    /// The correction engine that will actually run.
+    var effectiveCorrection: CorrectionEngine {
+        guard correction == .llm, correctionConsented else { return .none }
+        return .llm
+    }
 
     /// The diarizer that will actually run.
     ///
