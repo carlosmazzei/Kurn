@@ -210,8 +210,20 @@ final class AudioRecorderService: NSObject {
         try await beginEngine(writingTo: url, bitRate: bitRate)
     }
 
-    func pause() {
-        AppLog.recorder.atInfo.info("pause: called state=\(String(describing: self.state), privacy: .public)")
+    /// Why `pause()` was invoked. Attached to the diagnostic log line so
+    /// Console / exported logs show WHY a recording paused — especially for
+    /// the automatic triggers that fire without any user interaction.
+    enum PauseReason: String {
+        case userToggle = "user toggled pause (in-app button or Live Activity pill)"
+        case watchCommand = "Watch app pause command"
+        case audioInterruption = "audio session interruption began"
+        case engineRecoveryFailed = "engine recovery failed (tap rebuild after format change)"
+        case engineRestartFailed = "engine recovery failed (engine.start() after rebuild)"
+        case routeChanged = "input route became unavailable (oldDeviceUnavailable)"
+    }
+
+    func pause(reason: PauseReason) {
+        AppLog.recorder.atNotice.notice("pause: called state=\(String(describing: self.state), privacy: .public) reason=\(reason.rawValue, privacy: .public)")
         guard state == .recording else { return }
         sink.setPaused(true)
         accumulateElapsed()
@@ -630,9 +642,12 @@ final class AudioRecorderService: NSObject {
 
         switch type {
         case .began:
+            let interruptionReason = (info[AVAudioSessionInterruptionReasonKey] as? UInt)
+                .flatMap { AVAudioSession.InterruptionReason(rawValue: $0) }
+            AppLog.recorder.atNotice.notice("handleInterruption: began reason=\(Self.interruptionReasonDescription(interruptionReason), privacy: .public)")
             Task { @MainActor in
                 self.wasRecordingBeforeInterruption = (self.state == .recording)
-                if self.state == .recording { self.pause() }
+                if self.state == .recording { self.pause(reason: .audioInterruption) }
             }
         case .ended:
             let shouldResume: Bool
@@ -641,12 +656,14 @@ final class AudioRecorderService: NSObject {
             } else {
                 shouldResume = false
             }
+            AppLog.recorder.atNotice.notice("handleInterruption: ended shouldResume=\(shouldResume, privacy: .public)")
             Task { @MainActor in
                 if self.wasRecordingBeforeInterruption,
                    shouldResume,
                    self.state == .paused {
                     try? AVAudioSession.sharedInstance().setActive(true)
                     self.resume()
+                    AppLog.recorder.atNotice.notice("handleInterruption: auto-resumed after interruption ended")
                 }
                 self.wasRecordingBeforeInterruption = false
             }
@@ -655,11 +672,25 @@ final class AudioRecorderService: NSObject {
         }
     }
 
+    /// Human-readable description of `AVAudioSessionInterruptionReasonKey`
+    /// (iOS 14.5+), used only for the diagnostic log line above.
+    private nonisolated static func interruptionReasonDescription(_ reason: AVAudioSession.InterruptionReason?) -> String {
+        guard let reason else { return "unknown" }
+        switch reason {
+        case .default: return "default"
+        case .appWasSuspended: return "appWasSuspended"
+        case .builtInMicMuted: return "builtInMicMuted"
+        @unknown default: return "unknown"
+        }
+    }
+
     @objc private nonisolated func handleEngineConfigurationChange(_ note: Notification) {
+        AppLog.recorder.atInfo.info("handleEngineConfigurationChange: notification received")
         Task { @MainActor in self.recoverEngineIfNeeded(reason: "configuration change") }
     }
 
     @objc private nonisolated func handleMediaServicesReset(_ note: Notification) {
+        AppLog.recorder.atInfo.info("handleMediaServicesReset: notification received")
         Task { @MainActor in self.recoverEngineIfNeeded(reason: "media services reset") }
     }
 
@@ -685,11 +716,12 @@ final class AudioRecorderService: NSObject {
         if !formatUnchanged {
             AppLog.recorder.atNotice.notice("input format changed to \(current.sampleRate, privacy: .public)Hz/\(current.channelCount, privacy: .public)ch; rebuilding the tap")
             if !rebuildTapForCurrentInput(current) {
-                pause()
+                pause(reason: .engineRecoveryFailed)
                 routeChangeMessage = NSLocalizedString(
                     "recorder.engine_stalled",
                     comment: "Recording paused because the system stopped the audio engine"
                 )
+                AppLog.recorder.atInfo.info("routeChangeMessage: \(self.routeChangeMessage ?? "nil", privacy: .public)")
                 return
             }
         }
@@ -704,11 +736,12 @@ final class AudioRecorderService: NSObject {
             AppLog.recorder.atError.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
         }
 
-        pause()
+        pause(reason: .engineRestartFailed)
         routeChangeMessage = NSLocalizedString(
             "recorder.engine_stalled",
             comment: "Recording paused because the system stopped the audio engine"
         )
+        AppLog.recorder.atInfo.info("routeChangeMessage: \(self.routeChangeMessage ?? "nil", privacy: .public)")
     }
 
     /// Re-point the tap and the sink's converter at a new input format, keeping
@@ -737,16 +770,21 @@ final class AudioRecorderService: NSObject {
               let raw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
 
+        let previousInputs = (info[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription)?
+            .inputs.map { $0.portName }.joined(separator: ",") ?? "unknown"
+        AppLog.recorder.atNotice.notice("handleRouteChange: reason=\(String(describing: reason), privacy: .public) previousInputs=\(previousInputs, privacy: .public)")
+
         // An "old device unavailable" reason means e.g. headphones were pulled.
         guard reason == .oldDeviceUnavailable else { return }
 
         Task { @MainActor in
             if self.state == .recording {
-                self.pause()
+                self.pause(reason: .routeChanged)
                 self.routeChangeMessage = NSLocalizedString(
                     "recorder.route_changed",
                     comment: "Recording paused after audio route change"
                 )
+                AppLog.recorder.atInfo.info("routeChangeMessage: \(self.routeChangeMessage ?? "nil", privacy: .public)")
             }
         }
     }
