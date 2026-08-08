@@ -34,8 +34,8 @@ on:
       correction:
         description: "add an LLM-correction twin of every configuration (on, off) -- needs correction_provider's key secret"
         type: choice
-        options: [off, on]
-        default: off
+        options: ["off", "on"]
+        default: "off"
       correction_provider:
         description: "provider for the LLM-correction twins (openai, groq) -- ignored when correction is off"
         type: choice
