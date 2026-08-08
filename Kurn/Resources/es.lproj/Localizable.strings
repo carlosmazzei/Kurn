@@ -42,6 +42,10 @@
 "diarization.heuristic" = "Heurístico";
 "diarization.fluid_audio" = "FluidAudio";
 
+/* Correction engines */
+"correction.none" = "Desactivado";
+"correction.llm" = "Corrección con IA";
+
 /* Motores del pipeline de reconocimiento */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingüe)";
@@ -313,6 +317,8 @@
 "phase.diarizing" = "Separando hablantes…";
 "phase.diarizing_progress" = "Separando hablantes… %d%%";
 "phase.finalizing" = "Finalizando…";
+"phase.correcting" = "Corrigiendo transcripción…";
+"phase.correcting_progress" = "Corrigiendo transcripción… %d%%";
 "post_phase.generating_title" = "Generando título…";
 "post_phase.indexing" = "Indexando transcripción…";
 "post_phase.generating_wiki" = "Generando wiki…";
@@ -656,6 +662,10 @@
 "settings.wiki_clear" = "Borrar wiki";
 "settings.wiki_footer" = "Usa tu proveedor de IA de resúmenes para crear un artículo condensado por reunión, para que la función \"Preguntar\" de la biblioteca responda preguntas que abarcan o comparan reuniones. Desactivado por defecto: hace llamadas a la nube.";
 "settings.wiki_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para crear la wiki de reuniones.";
+"settings.correction_title" = "Corrección con IA";
+"settings.correction" = "Corregir errores de transcripción";
+"settings.correction_footer" = "Usa tu proveedor de IA de resúmenes para corregir errores de ortografía, puntuación y palabras mal entendidas en las partes inciertas de la transcripción, después de transcribir. Desactivado de forma predeterminada: realiza llamadas en la nube y puede tardar más en finalizar.";
+"settings.correction_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para activar la corrección con IA.";
 "detail.wiki.view" = "Ver wiki";
 "detail.wiki.title" = "Wiki de la reunión";
 "detail.wiki.updated" = "Actualizada el %@";

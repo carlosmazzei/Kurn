@@ -49,9 +49,10 @@ struct PublicDatasetEvaluationHarnessTests {
     /// dispatching the full 24-entry matrix in CI. Anything else, including
     /// unset, runs the full matrix. Both counts assume one whisper.cpp model.
     private var matrix: [PipelineEvaluationMatrix.Entry] {
-        ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential"
+        let base = ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential"
             ? PipelineEvaluationMatrix.essential
             : PipelineEvaluationMatrix.all
+        return PipelineEvaluationMatrix.withCorrectionVariants(of: base)
     }
 
     private func printRunSummary(
@@ -76,6 +77,11 @@ struct PublicDatasetEvaluationHarnessTests {
             print("[pipeline-eval]   cloud ASR providers: none")
         } else {
             print("[pipeline-eval]   cloud ASR providers: \(cloudProviders.map(\.displayName).joined(separator: ", "))")
+        }
+        if let correctionProvider = PipelineEvaluationMatrix.correctionProviderFromEnvironment() {
+            print("[pipeline-eval]   LLM correction: on (\(correctionProvider.displayName))")
+        } else {
+            print("[pipeline-eval]   LLM correction: off")
         }
         print("[pipeline-eval] corpora:")
         for (info, items) in corpora {

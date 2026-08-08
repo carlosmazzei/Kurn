@@ -219,6 +219,53 @@ enum PipelineEvaluationMatrix {
         }
     }
 
+    /// Correction provider to pair with `.llm` correction variants. Decided by
+    /// `KURN_PUBLIC_EVAL_CORRECTION_PROVIDER` (default `openai`), and only
+    /// returned when `KURN_PUBLIC_EVAL_CORRECTION=on` AND that provider's key
+    /// secret is present in the environment — same rationale as
+    /// `cloudProvidersFromEnvironment`: a correction pass sends transcript
+    /// text to a third party and costs money per call, so it must never run
+    /// just because the matrix exists.
+    static func correctionProviderFromEnvironment() -> AIProvider? {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["KURN_PUBLIC_EVAL_CORRECTION"]?.lowercased() == "on" else { return nil }
+        let providerID = environment["KURN_PUBLIC_EVAL_CORRECTION_PROVIDER"]?.lowercased() ?? "openai"
+        switch providerID {
+        case "openai":
+            guard let key = environment["OPENAI_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            return .openAI
+        case "groq":
+            guard let key = environment["GROQ_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            return .groq
+        default:
+            return nil
+        }
+    }
+
+    /// Doubles `entries` with an LLM-correction twin of each (label suffixed
+    /// `|corr=llm:<providerID>`, mirroring the `|asr=...` suffix convention),
+    /// when `correctionProviderFromEnvironment()` returns a provider. A no-op
+    /// (returns `entries` unchanged) otherwise, so a normal run never pays for
+    /// this axis.
+    static func withCorrectionVariants(of entries: [Entry]) -> [Entry] {
+        guard let provider = correctionProviderFromEnvironment() else { return entries }
+        var result: [Entry] = []
+        result.reserveCapacity(entries.count * 2)
+        for entry in entries {
+            result.append(entry)
+            var corrected = entry.configuration
+            corrected.correction = .llm
+            corrected.correctionConsented = true
+            corrected.correctionProvider = provider
+            corrected.correctionModel = provider.defaultModel
+            result.append(Entry(
+                label: entry.label + "|corr=llm:\(provider.id)",
+                configuration: corrected
+            ))
+        }
+        return result
+    }
+
     /// A restricted subset for a quick smoke pass: cleanup on/off, VAD engine
     /// (energy-threshold vs FluidAudio Silero), and diarization on/off, holding
     /// transcription at `.whisperCpp` (never includes a cloud provider). `whisperCpp`

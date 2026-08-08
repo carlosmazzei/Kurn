@@ -42,6 +42,10 @@
 "diarization.heuristic" = "Euristico";
 "diarization.fluid_audio" = "FluidAudio";
 
+/* Correction engines */
+"correction.none" = "Disattivata";
+"correction.llm" = "Correzione IA";
+
 /* Motori della pipeline di riconoscimento */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingue)";
@@ -313,6 +317,8 @@
 "phase.diarizing" = "Separazione dei parlanti…";
 "phase.diarizing_progress" = "Separazione dei parlanti… %d%%";
 "phase.finalizing" = "Completamento…";
+"phase.correcting" = "Correzione della trascrizione…";
+"phase.correcting_progress" = "Correzione della trascrizione… %d%%";
 "post_phase.generating_title" = "Generazione del titolo…";
 "post_phase.indexing" = "Indicizzazione della trascrizione…";
 "post_phase.generating_wiki" = "Generazione della wiki…";
@@ -656,6 +662,10 @@
 "settings.wiki_clear" = "Cancella wiki";
 "settings.wiki_footer" = "Usa il tuo provider IA per i riassunti per creare un articolo condensato per riunione, così la funzione \"Chiedi\" della libreria può rispondere a domande che abbracciano o confrontano più riunioni. Disattivata per impostazione predefinita: effettua chiamate al cloud.";
 "settings.wiki_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per creare la wiki delle riunioni.";
+"settings.correction_title" = "Correzione IA";
+"settings.correction" = "Correggi errori di trascrizione";
+"settings.correction_footer" = "Utilizza il tuo provider IA dei riassunti per correggere ortografia, punteggiatura e parole fraintese nelle parti incerte della trascrizione, dopo la trascrizione. Disattivata per impostazione predefinita: effettua chiamate al cloud e può richiedere più tempo per completarsi.";
+"settings.correction_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per attivare la correzione IA.";
 "detail.wiki.view" = "Visualizza wiki";
 "detail.wiki.title" = "Wiki della riunione";
 "detail.wiki.updated" = "Aggiornata il %@";

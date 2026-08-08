@@ -42,6 +42,10 @@
 "diarization.heuristic" = "Heuristisch";
 "diarization.fluid_audio" = "FluidAudio";
 
+/* Correction engines */
+"correction.none" = "Aus";
+"correction.llm" = "KI-Korrektur";
+
 /* Engines der Erkennungspipeline */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (mehrsprachig)";
@@ -313,6 +317,8 @@
 "phase.diarizing" = "Sprecher werden getrennt…";
 "phase.diarizing_progress" = "Sprecher werden getrennt… %d%%";
 "phase.finalizing" = "Wird abgeschlossen…";
+"phase.correcting" = "Transkript wird korrigiert…";
+"phase.correcting_progress" = "Transkript wird korrigiert… %d %%";
 "post_phase.generating_title" = "Titel wird erstellt…";
 "post_phase.indexing" = "Transkript wird indexiert…";
 "post_phase.generating_wiki" = "Wiki wird erstellt…";
@@ -656,6 +662,10 @@
 "settings.wiki_clear" = "Wiki löschen";
 "settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt.";
 "settings.wiki_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um das Meeting-Wiki zu erstellen.";
+"settings.correction_title" = "KI-Korrektur";
+"settings.correction" = "Transkriptionsfehler korrigieren";
+"settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter, um Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren Teilen des Transkripts nach der Transkription zu korrigieren. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
+"settings.correction_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um die KI-Korrektur zu aktivieren.";
 "detail.wiki.view" = "Wiki anzeigen";
 "detail.wiki.title" = "Meeting-Wiki";
 "detail.wiki.updated" = "Aktualisiert am %@";

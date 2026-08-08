@@ -31,6 +31,16 @@ on:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
         default: "small"
+      correction:
+        description: "add an LLM-correction twin of every configuration (on, off) -- needs correction_provider's key secret"
+        type: choice
+        options: [off, on]
+        default: off
+      correction_provider:
+        description: "provider for the LLM-correction twins (openai, groq) -- ignored when correction is off"
+        type: choice
+        options: [openai, groq]
+        default: openai
       resume:
         description: "reuse rows already in report.csv and run only the missing cells"
         type: boolean
@@ -120,6 +130,8 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION: ${{ github.event.inputs.correction }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION_PROVIDER: ${{ github.event.inputs.correction_provider }}
           # The report is written row by row, so a cancelled or timed-out run
           # leaves a usable partial file. `resume: true` picks that file up and
           # runs only what is missing -- provided it survived, which means either
