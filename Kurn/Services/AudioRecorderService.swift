@@ -680,6 +680,7 @@ final class AudioRecorderService: NSObject {
         case .default: return "default"
         case .appWasSuspended: return "appWasSuspended"
         case .builtInMicMuted: return "builtInMicMuted"
+        case .routeDisconnected: return "routeDisconnected"
         @unknown default: return "unknown"
         }
     }
