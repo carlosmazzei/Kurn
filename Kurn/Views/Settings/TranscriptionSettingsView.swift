@@ -25,10 +25,20 @@ struct TranscriptionSettingsView: View {
 
     private var hasAnyTranscriptionProvider: Bool { !transcriptionProviders.isEmpty }
 
+    /// Recomputed whenever `keyRevision` bumps (the root counter shared with
+    /// `WikiSettingsView`, incremented on any provider key add/remove) — the
+    /// correction stage reuses the summary provider, so its toggle must react
+    /// to the same key changes.
+    private var hasSummaryProviderKey: Bool {
+        _ = keyRevision
+        return KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+    }
+
     var body: some View {
         Form {
             engineSection
             pipelineSection
+            correctionSection
         }
         .navigationTitle(NSLocalizedString("settings.transcription", comment: "Transcription"))
         .modelDownloadAlerts(downloads, settings: settings)
@@ -240,6 +250,28 @@ struct TranscriptionSettingsView: View {
             }
         } header: {
             Text(NSLocalizedString("settings.pipeline_advanced", comment: "Advanced pipeline"))
+        }
+    }
+
+    // MARK: - AI correction
+
+    @ViewBuilder
+    private var correctionSection: some View {
+        Section {
+            Toggle(
+                NSLocalizedString("settings.correction", comment: "AI transcription correction toggle"),
+                isOn: Binding(
+                    get: { settings.correctionEnabled && hasSummaryProviderKey },
+                    set: { settings.correctionEnabled = $0 }
+                )
+            )
+            .disabled(!hasSummaryProviderKey)
+        } header: {
+            Text(NSLocalizedString("settings.correction_title", comment: "AI transcription correction section title"))
+        } footer: {
+            Text(hasSummaryProviderKey
+                ? NSLocalizedString("settings.correction_footer", comment: "AI transcription correction footer")
+                : NSLocalizedString("settings.correction_needs_key", comment: "AI transcription correction needs an API key"))
         }
     }
 }

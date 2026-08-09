@@ -641,7 +641,8 @@ final class TranscriptionViewModel {
             placed.append(speaker)
         }
         func isPlaced(_ speaker: Speaker) -> Bool {
-            placed.contains { $0 === speaker }
+            let id = ObjectIdentifier(speaker)
+            return placed.contains { ObjectIdentifier($0) == id }
         }
 
         // 1. Voice wins. It is the only evidence here that identifies a person.

@@ -70,6 +70,140 @@ every dispatch is worth a commit.
 
 ## Runs
 
+### 2026-08-09 — `53db49c` ([essential+correction run](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction run](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299))
+
+**First measurement of the opt-in LLM transcript-correction stage**
+(`LLMTranscriptCorrector`, the `correction` input on `pipeline-eval.yml`).
+Confidence-gated on engines that report a decoder confidence (whisper.cpp,
+cloud Whisper) — only segments below `LLMTranscriptCorrector.lowConfidenceThreshold`
+(0.85) are sent for correction; ungated on engines that don't (FluidAudio
+Parakeet) — every non-empty segment is sent, since there's no signal to
+filter on. `TranscriptCorrectionGuardrail` rejects any rewrite that changes
+more than 35% of a segment's words. The stage runs after fusion, text-only,
+so it should never move DER — the tables below confirm that held in every
+row measured.
+
+- matrix: `essential` (8 whisper.cpp/small configurations) doubled to 16 by
+  `correction: on` — baseline row + corrected twin, same run, same items,
+  so the pair below is a same-run apples-to-apples comparison. Separately,
+  a `matrix: full` dispatch scoped to `transcription_engines: fluidAudioParakeet`
+  with `correction: only` (replaces each of the 8 configurations with its
+  corrected version, no baseline row) — compared here against the
+  `fluidAudioParakeet` baseline already recorded in the 2026-08-03 entry
+  below, since re-measuring an already-known baseline would just repeat
+  real OpenAI API spend for no new information.
+- corpora: same as 2026-08-03 — AMI Meeting Corpus (en, 4 meetings,
+  WER+DER), LibriSpeech test-clean (en, 6 items, WER), CAMOES (pt, 40
+  items, WER), CORAA (pt, 40 items, WER).
+- correction provider: OpenAI (`gpt-5.4`, the account's configured summary
+  model).
+- A third dispatch, `whisperAPI:groq` scoped (`correction: only`),
+  **failed** and is not included below: Groq's `whisper-large-v3` endpoint
+  returned `429: Rate limit reached … RPM: Limit 20, Used 20` for 41 of 376
+  rows before the harness's `#require(failures.isEmpty)` failed the run.
+  Root cause is structural, not a one-off: `PipelineEvaluationMatrix.build`'s
+  cloud-ASR loop sits inside the diarization loop, so the same
+  preprocessing×VAD×provider combination gets transcribed via the paid API
+  twice — once per diarization variant — even though diarization never
+  affects the transcription call. Groq is the one remaining confidence-gated
+  engine that hasn't been measured with correction; worth a retry once that
+  redundant call is fixed, or with a dispatch scoped small enough to stay
+  under 20 RPM.
+
+#### whisper.cpp/small — English by language (AMI + LibriSpeech, 10 files; AMI DER over 4)
+
+| Preprocessing | VAD | Diarization | WER (no correction) | WER (corrected) | ΔWER | DER |
+| --- | --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | 35.25% | 35.22% | −0.03 | 44.65% |
+| none | energyThreshold | heuristic | 37.75% | 37.86% | +0.11 | 81.58% |
+| none | fluidAudio | fluidAudio | 27.34% | 27.38% | +0.04 | 47.22% |
+| none | fluidAudio | heuristic | 29.26% | 29.30% | +0.04 | 75.37% |
+| standardDSP | energyThreshold | fluidAudio | 41.91% | 41.91% | 0.00 | 49.59% |
+| standardDSP | energyThreshold | heuristic | 44.89% | 45.05% | +0.16 | 89.04% |
+| standardDSP | fluidAudio | fluidAudio | 25.84% | 25.88% | +0.04 | 49.67% |
+| standardDSP | fluidAudio | heuristic | 27.65% | 27.69% | +0.04 | 72.22% |
+
+*DER is identical between the "no correction" and "corrected" runs in every
+row in this file — shown once per row rather than twice.*
+
+#### whisper.cpp/small — Portuguese by language (CAMOES + CORAA, 80 files)
+
+| Preprocessing | VAD | WER (no correction) | WER (corrected) | ΔWER |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 41.44% | 39.64% | **−1.80** |
+| none | fluidAudio | 40.84% | 40.99% | +0.15 |
+| standardDSP | energyThreshold | 40.54% | 40.24% | −0.30 |
+| standardDSP | fluidAudio | 40.99% | 40.99% | 0.00 |
+
+#### whisper.cpp/small — Portuguese by corpus
+
+`portuguese/camoes-pt` (40 items — spontaneous sociolinguistic interviews):
+
+| Preprocessing | VAD | WER (no correction) | WER (corrected) | ΔWER |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 58.76% | 57.30% | −1.46 |
+| none | fluidAudio | 57.66% | 58.03% | +0.37 |
+| standardDSP | energyThreshold | 54.38% | 53.65% | −0.73 |
+| standardDSP | fluidAudio | 54.74% | 56.20% | **+1.46** |
+
+`portuguese/coraa-pt` (40 items — short, pre-segmented clips):
+
+| Preprocessing | VAD | WER (no correction) | WER (corrected) | ΔWER |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 29.34% | 27.30% | **−2.04** |
+| none | fluidAudio | 29.08% | 29.08% | 0.00 |
+| standardDSP | energyThreshold | 30.87% | 30.87% | 0.00 |
+| standardDSP | fluidAudio | 31.38% | 30.36% | −1.02 |
+
+#### FluidAudio Parakeet — corrected-only vs. the 2026-08-03 baseline
+
+English by language (10 files; DER over 4):
+
+| Preprocessing | VAD | Diarization | WER (baseline) | WER (corrected) | ΔWER | DER |
+| --- | --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | 21.94% | 22.51% | +0.57 | 32.88% |
+| none | energyThreshold | heuristic | 23.50% | 24.23% | +0.73 | 67.19% |
+| none | fluidAudio | fluidAudio | 19.83% | 19.94% | +0.11 | 47.44% |
+| none | fluidAudio | heuristic | 21.24% | 21.89% | +0.65 | 73.33% |
+| standardDSP | energyThreshold | fluidAudio | 21.19% | 21.19% | 0.00 | 32.89% |
+| standardDSP | energyThreshold | heuristic | 22.70% | 23.43% | +0.73 | 67.76% |
+| standardDSP | fluidAudio | fluidAudio | 21.94% | 21.94% | 0.00 | 50.19% |
+| standardDSP | fluidAudio | heuristic | 23.50% | 23.92% | +0.42 | 69.34% |
+
+Portuguese by language (80 files):
+
+| Preprocessing | VAD | WER (baseline) | WER (corrected) | ΔWER |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 26.58% | 26.73% | +0.15 |
+| none | fluidAudio | 27.48% | 27.93% | +0.45 |
+| standardDSP | energyThreshold | 27.18% | 26.58% | −0.60 |
+| standardDSP | fluidAudio | 27.48% | 27.03% | −0.45 |
+
+What this run says:
+
+- **DER never moves, in either engine, in any configuration.** Confirms the
+  stage's design goal: it rewrites `.text` only, after fusion, and never
+  touches diarization or speaker attribution.
+- **English never improves with correction, in either engine.** whisper.cpp
+  is a wash (±0.16pp, noise); Parakeet is flat-to-worse in every single
+  configuration (up to +0.73pp). Whisper's own English decode already has
+  little left to fix, and Parakeet — with no confidence signal to gate on —
+  sends every segment through the LLM regardless, so an accepted rewrite is
+  pure downside risk with no accuracy left to gain back.
+- **Confidence gating is what makes Portuguese correction pay off.**
+  whisper.cpp (gated: only its weaker segments are sent) shows the only
+  genuinely useful deltas — CORAA −2.04pp and −1.02pp, CAMOES −1.46pp and
+  −0.73pp, never worse than +1.46pp. Parakeet (ungated: every segment is
+  sent) is a wash on the same material, ±0.5pp with no clear direction —
+  "correct everything" and "correct only what the decoder is unsure about"
+  are not the same feature in practice, even sharing the same guardrail and
+  prompt.
+- **Whisper via Groq is still unmeasured with correction** — see the rate
+  limit note above. It's the other confidence-gated engine, so the whisper.cpp
+  result above is a reasonable but unconfirmed prior for how it would behave.
+- **Sample sizes are the same as 2026-08-03** — treat the per-corpus swings
+  on CAMOES/CORAA (40 items each) as directional, not settled.
+
 ### 2026-08-03 — `2644589` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020))
 
 **First full-coverage run: English + Portuguese, WER and DER.** Both language

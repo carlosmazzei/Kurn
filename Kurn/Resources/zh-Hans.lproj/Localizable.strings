@@ -42,6 +42,10 @@
 "diarization.heuristic" = "启发式";
 "diarization.fluid_audio" = "FluidAudio";
 
+/* Correction engines */
+"correction.none" = "关闭";
+"correction.llm" = "AI 校正";
+
 /* 识别流水线引擎 */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio（多语言）";
@@ -313,6 +317,8 @@
 "phase.diarizing" = "正在分离说话人…";
 "phase.diarizing_progress" = "正在分离说话人… %d%%";
 "phase.finalizing" = "正在完成…";
+"phase.correcting" = "正在校正转录内容…";
+"phase.correcting_progress" = "正在校正转录内容… %d%%";
 "post_phase.generating_title" = "正在生成标题…";
 "post_phase.indexing" = "正在索引转录…";
 "post_phase.generating_wiki" = "正在生成维基…";
@@ -656,6 +662,10 @@
 "settings.wiki_clear" = "清除维基";
 "settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。";
 "settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";
+"settings.correction_title" = "AI 校正";
+"settings.correction" = "校正转录错误";
+"settings.correction_footer" = "转录完成后，使用你的摘要 AI 提供方修正转录中不确定部分的拼写、标点和听错的词语。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
+"settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
 "detail.wiki.view" = "查看维基";
 "detail.wiki.title" = "会议维基";
 "detail.wiki.updated" = "更新于 %@";

@@ -59,6 +59,10 @@ enum TranscriptionPhase: Sendable, Equatable {
     /// the on-device diarizer is still preprocessing or analyzing a long file.
     case diarizing(progress: Double?)
     case finalizing
+    /// Opt-in LLM correction pass over the fused transcript. Only emitted when
+    /// the `.llm` correction engine is actually running; the `.none` engine
+    /// never reports this phase and finalizing owns the tail as before.
+    case correcting(progress: Double?)
 
     /// Short, user-facing description of the current stage.
     var displayName: String {
@@ -91,6 +95,14 @@ enum TranscriptionPhase: Sendable, Equatable {
                 Int((min(1, max(0, progress)) * 100).rounded())
             )
         case .finalizing: return NSLocalizedString("phase.finalizing", comment: "Finalizing")
+        case .correcting(let progress):
+            guard let progress else {
+                return NSLocalizedString("phase.correcting", comment: "Correcting transcript")
+            }
+            return String(
+                format: NSLocalizedString("phase.correcting_progress", comment: "Correcting transcript with percent"),
+                Int((min(1, max(0, progress)) * 100).rounded())
+            )
         }
     }
 
@@ -107,7 +119,8 @@ enum TranscriptionPhase: Sendable, Equatable {
         case .detectingSpeech: return 0.28
         case .transcribing(let progress, _): return 0.30 + 0.55 * min(1, max(0, progress ?? 0))
         case .diarizing(let progress): return 0.86 + 0.10 * min(1, max(0, progress ?? 0))
-        case .finalizing: return 0.97
+        case .finalizing: return 0.95
+        case .correcting(let progress): return 0.95 + 0.05 * min(1, max(0, progress ?? 0))
         }
     }
 }
@@ -375,6 +388,24 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         switch self {
         case .heuristic: return nil
         case .fluidAudio: return .diarization
+        }
+    }
+}
+
+/// Opt-in LLM post-processing that corrects transcription errors (spelling,
+/// punctuation, homophones, obvious ASR mistakes) after fusion. Cloud-only —
+/// there is no on-device model for this stage, so unlike the other stage
+/// enums it has no `requiredModelSet`.
+enum CorrectionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
+    case none
+    case llm
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return NSLocalizedString("correction.none", comment: "No correction")
+        case .llm: return NSLocalizedString("correction.llm", comment: "AI correction")
         }
     }
 }

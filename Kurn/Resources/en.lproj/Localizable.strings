@@ -42,6 +42,10 @@
 "diarization.heuristic" = "Heuristic";
 "diarization.fluid_audio" = "FluidAudio";
 
+/* Correction engines */
+"correction.none" = "Off";
+"correction.llm" = "AI Correction";
+
 /* Recognition pipeline engines */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingual)";
@@ -313,6 +317,8 @@
 "phase.diarizing" = "Separating speakers…";
 "phase.diarizing_progress" = "Separating speakers… %d%%";
 "phase.finalizing" = "Finalizing…";
+"phase.correcting" = "Correcting transcript…";
+"phase.correcting_progress" = "Correcting transcript… %d%%";
 "post_phase.generating_title" = "Generating title…";
 "post_phase.indexing" = "Indexing transcript…";
 "post_phase.generating_wiki" = "Generating wiki…";
@@ -656,6 +662,10 @@
 "settings.wiki_clear" = "Clear wiki";
 "settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls.";
 "settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";
+"settings.correction_title" = "AI Correction";
+"settings.correction" = "Correct transcription errors";
+"settings.correction_footer" = "Uses your summary AI provider to fix spelling, punctuation, and misheard words on uncertain parts of the transcript after transcription. Off by default — it makes cloud calls and can take longer to finish.";
+"settings.correction_needs_key" = "Add an API key for your summary provider to enable AI correction.";
 "detail.wiki.view" = "View wiki";
 "detail.wiki.title" = "Meeting Wiki";
 "detail.wiki.updated" = "Updated %@";
