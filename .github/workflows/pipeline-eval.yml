@@ -91,7 +91,7 @@ jobs:
 
       # Datasets change rarely; keyed on the manifest so an edit invalidates it.
       - name: Cache public datasets
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.DATASET_DIR }}
           key: kurn-eval-public-${{ hashFiles('Tools/evaluation/public_datasets/manifest.json') }}
@@ -178,7 +178,7 @@ jobs:
 
       - name: Upload report artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pipeline-eval-report
           path: |
