@@ -510,12 +510,12 @@ final class AppSettings {
         // the recordings lock screen never blocks an unattended UI test run.
         #if DEBUG
         let screenshotRun = ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots")
-        #else
-        let screenshotRun = false
-        #endif
         requireAuthForRecordings = screenshotRun
             ? false
             : defaults.bool(forKey: Keys.requireAuthForRecordings, default: true)
+        #else
+        requireAuthForRecordings = defaults.bool(forKey: Keys.requireAuthForRecordings, default: true)
+        #endif
         hideLiveActivityMeetingTitle = defaults.bool(forKey: Keys.hideLiveActivityMeetingTitle, default: true)
         // FluidAudio rather than the heuristic engine, which is what every user
         // got who never opened Settings. `PipelineConfiguration.effectiveDiarization`
