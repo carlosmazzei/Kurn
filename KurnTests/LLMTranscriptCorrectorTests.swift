@@ -3,16 +3,18 @@
 //  KurnTests
 //
 //  Pure logic (eligibility, batching, JSON parsing, alignment) needs no
-//  network and is tested directly. `requestCorrections` is exercised once
-//  against a real `OpenAIProvider` over `MockURLProtocol` to verify the
-//  request/response shape, mirroring `ProviderHTTPTests`.
+//  network and is tested directly. `requestCorrections`'s network shape is
+//  exercised in `ProviderHTTPTests.swift` instead — that suite already owns
+//  every other `MockURLProtocol`-based test and is `@Suite(.serialized)`;
+//  `MockURLProtocol`'s stub queue is process-global, so two independently
+//  serialized suites both touching it can still race with each other, and a
+//  second suite here caused exactly that race.
 //
 
 import Foundation
 import Testing
 @testable import Kurn
 
-@Suite(.serialized)
 struct LLMTranscriptCorrectorTests {
 
     private func segment(
@@ -150,7 +152,11 @@ struct LLMTranscriptCorrectorTests {
 
     @Test func onlyLowOrUnknownConfidenceSegmentsAreEligibleForCorrection() {
         let confidentlyRight = segment(text: "already correct", confidence: 0.95)
-        let uncertain = segment(text: "unc3rtain wrd", confidence: 0.3)
+        // A guardrail-acceptable fix (2 of 6 words change, ratio 0.33 < 0.35 —
+        // same pair verified in TranscriptCorrectionGuardrailTests), so this
+        // test exercises eligibility gating, not the guardrail's own
+        // rejection path.
+        let uncertain = segment(text: "we ned to ship this fetur", confidence: 0.3)
         let noSignal = segment(text: "apple speech text", confidence: nil)
         let segments = [confidentlyRight, uncertain, noSignal]
 
@@ -162,11 +168,11 @@ struct LLMTranscriptCorrectorTests {
         // never sent) must not be applied even if somehow present.
         let corrections: [UUID: String] = [
             confidentlyRight.id: "tampered",
-            uncertain.id: "uncertain word"
+            uncertain.id: "we need to ship this feature"
         ]
         let result = LLMTranscriptCorrector.apply(corrections: corrections, to: segments)
         #expect(result[0].text == confidentlyRight.text) // untouched despite a correction key existing
-        #expect(result[1].text == "uncertain word")
+        #expect(result[1].text == "we need to ship this feature")
         #expect(result[2].text == noSignal.text)
     }
 
@@ -179,46 +185,5 @@ struct LLMTranscriptCorrectorTests {
         )
         #expect(result.map(\.id) == segments.map(\.id))
         #expect(result.map(\.text) == segments.map(\.text))
-    }
-
-    // MARK: - requestCorrections network shape
-
-    @Test func requestCorrectionsSendsIdsAndParsesReply() async throws {
-        let a = segment(text: "we ned to ship", confidence: 0.3)
-        let b = segment(text: "this is fine", confidence: 0.4)
-
-        let replyJSON = """
-        {"segments":[{"id":"\(a.id.uuidString)","text":"we need to ship"},{"id":"\(b.id.uuidString)","text":"this is fine"}]}
-        """
-        MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": replyJSON]]]])
-        ])
-        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
-
-        let corrections = await LLMTranscriptCorrector().requestCorrections(
-            for: [a, b], vocabulary: ["ship"], language: .english, llm: provider
-        )
-
-        #expect(corrections[a.id] == "we need to ship")
-        #expect(corrections[b.id] == "this is fine")
-
-        let request = try #require(MockURLProtocol.lastRequest)
-        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
-        let messages = body?["messages"] as? [[String: String]]
-        let userMessage = messages?.last?["content"] ?? ""
-        #expect(userMessage.contains(a.id.uuidString))
-        #expect(userMessage.contains(b.id.uuidString))
-        #expect(userMessage.contains("ship"))
-    }
-
-    @Test func requestCorrectionsFailsOpenOnTransportError() async {
-        MockURLProtocol.enqueue([.failure(URLError(.notConnectedToInternet))])
-        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
-        let a = segment(text: "hello", confidence: 0.3)
-
-        let corrections = await LLMTranscriptCorrector().requestCorrections(
-            for: [a], vocabulary: [], language: .autoDetect, llm: provider
-        )
-        #expect(corrections.isEmpty)
     }
 }

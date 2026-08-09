@@ -516,4 +516,45 @@ struct ProviderHTTPTests {
             _ = try await provider.chat(systemPrompt: "s", messages: [ChatMessage(role: .user, content: "q")])
         }
     }
+
+    // MARK: - LLMTranscriptCorrector.requestCorrections network shape
+
+    @Test func llmTranscriptCorrectorSendsIdsAndParsesReply() async throws {
+        let a = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 1, text: "we ned to ship", confidence: 0.3)
+        let b = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 1, endTime: 2, text: "this is fine", confidence: 0.4)
+
+        let replyJSON = """
+        {"segments":[{"id":"\(a.id.uuidString)","text":"we need to ship"},{"id":"\(b.id.uuidString)","text":"this is fine"}]}
+        """
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["choices": [["message": ["content": replyJSON]]]])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        let corrections = await LLMTranscriptCorrector().requestCorrections(
+            for: [a, b], vocabulary: ["ship"], language: .english, llm: provider
+        )
+
+        #expect(corrections[a.id] == "we need to ship")
+        #expect(corrections[b.id] == "this is fine")
+
+        let request = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        let messages = body?["messages"] as? [[String: String]]
+        let userMessage = messages?.last?["content"] ?? ""
+        #expect(userMessage.contains(a.id.uuidString))
+        #expect(userMessage.contains(b.id.uuidString))
+        #expect(userMessage.contains("ship"))
+    }
+
+    @Test func llmTranscriptCorrectorFailsOpenOnTransportError() async {
+        MockURLProtocol.enqueue([.failure(URLError(.notConnectedToInternet))])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+        let a = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 1, text: "hello", confidence: 0.3)
+
+        let corrections = await LLMTranscriptCorrector().requestCorrections(
+            for: [a], vocabulary: [], language: .autoDetect, llm: provider
+        )
+        #expect(corrections.isEmpty)
+    }
 }

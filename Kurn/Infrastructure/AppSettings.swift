@@ -268,7 +268,7 @@ final class AppSettings {
             whisperCppModel: whisperCppModel,
             correction: correctionEnabled ? .llm : .none,
             correctionProvider: aiProvider,
-            correctionModel: summaryModel(for: aiProvider),
+            correctionModel: correctionEnabled ? summaryModel(for: aiProvider) : "",
             correctionConsented: correctionEnabled && KeychainManager.shared.hasValue(for: aiProvider.keychainAccount)
         )
     }
