@@ -48,8 +48,29 @@ enum PipelineEvaluationMatrix {
     /// successive runs are diffable.
     static let all: [Entry] = build(
         whisperCppModels: whisperCppModelsFromEnvironment(),
-        cloudProviders: cloudProvidersFromEnvironment()
+        cloudProviders: cloudProvidersFromEnvironment(),
+        transcriptionEngines: transcriptionEnginesFromEnvironment()
     )
+
+    /// On-device transcription engines to sweep. Defaults to every on-device
+    /// engine (today's behavior). Set `KURN_PUBLIC_EVAL_ENGINES` to `none` to
+    /// exclude all on-device engines (useful when only a cloud provider via
+    /// `cloud_providers` is wanted) or to a comma-separated subset such as
+    /// `fluidAudioParakeet` to scope a dispatch to one engine — a full sweep
+    /// across every axis, doubled again by `correction`, is expensive (real
+    /// GitHub Actions minutes and real LLM API calls), so a targeted run
+    /// should not have to pay for engines nobody asked about.
+    static func transcriptionEnginesFromEnvironment() -> [TranscriptionEngine] {
+        let onDeviceEngines = TranscriptionEngine.allCases.filter { $0 != .whisperAPI }
+        let environment = ProcessInfo.processInfo.environment
+        guard let raw = environment["KURN_PUBLIC_EVAL_ENGINES"], !raw.isEmpty else {
+            return onDeviceEngines
+        }
+        let tokens = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        if tokens == ["none"] { return [] }
+        if tokens == ["all"] { return onDeviceEngines }
+        return onDeviceEngines.filter { tokens.contains($0.rawValue.lowercased()) }
+    }
 
     /// Whisper.cpp models to sweep when the transcription engine is
     /// `.whisperCpp`. Defaults to `[.small]`; set
@@ -103,13 +124,14 @@ enum PipelineEvaluationMatrix {
 
     private static func build(
         whisperCppModels: [WhisperCppModel],
-        cloudProviders: [AIProvider]
+        cloudProviders: [AIProvider],
+        transcriptionEngines: [TranscriptionEngine]
     ) -> [Entry] {
         var entries: [Entry] = []
         for preprocessing in PreprocessingEngine.allCases {
             for vad in VADEngine.allCases {
                 for diarization in DiarizationEngine.allCases {
-                    for transcription in TranscriptionEngine.allCases where transcription != .whisperAPI {
+                    for transcription in transcriptionEngines {
                         if transcription == .whisperCpp {
                             for model in whisperCppModels {
                                 entries.append(entry(
@@ -219,16 +241,38 @@ enum PipelineEvaluationMatrix {
         }
     }
 
+    /// How `withCorrectionVariants` should fold correction into the matrix,
+    /// decided by `KURN_PUBLIC_EVAL_CORRECTION`:
+    /// - `off` (default/anything else) → no correction axis.
+    /// - `on` → **pair**: every entry keeps its baseline row and gains a
+    ///   corrected twin (doubles the matrix) — the apples-to-apples
+    ///   baseline/corrected comparison when the baseline isn't already known.
+    /// - `only` → every entry is **replaced** by its corrected version, no
+    ///   baseline row. For a dispatch scoped to an engine/corpus whose
+    ///   uncorrected baseline is already recorded (e.g. in
+    ///   `docs/pipeline-evaluation.md`), re-measuring it would just spend the
+    ///   same CI time and real LLM API cost a second time for no new
+    ///   information.
+    enum CorrectionMode: Sendable { case off, pair, only }
+
+    static func correctionModeFromEnvironment() -> CorrectionMode {
+        switch ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_CORRECTION"]?.lowercased() {
+        case "on": return .pair
+        case "only": return .only
+        default: return .off
+        }
+    }
+
     /// Correction provider to pair with `.llm` correction variants. Decided by
     /// `KURN_PUBLIC_EVAL_CORRECTION_PROVIDER` (default `openai`), and only
-    /// returned when `KURN_PUBLIC_EVAL_CORRECTION=on` AND that provider's key
-    /// secret is present in the environment — same rationale as
-    /// `cloudProvidersFromEnvironment`: a correction pass sends transcript
+    /// returned when `correctionModeFromEnvironment()` isn't `.off` AND that
+    /// provider's key secret is present in the environment — same rationale
+    /// as `cloudProvidersFromEnvironment`: a correction pass sends transcript
     /// text to a third party and costs money per call, so it must never run
     /// just because the matrix exists.
     static func correctionProviderFromEnvironment() -> AIProvider? {
+        guard correctionModeFromEnvironment() != .off else { return nil }
         let environment = ProcessInfo.processInfo.environment
-        guard environment["KURN_PUBLIC_EVAL_CORRECTION"]?.lowercased() == "on" else { return nil }
         let providerID = environment["KURN_PUBLIC_EVAL_CORRECTION_PROVIDER"]?.lowercased() ?? "openai"
         switch providerID {
         case "openai":
@@ -242,28 +286,38 @@ enum PipelineEvaluationMatrix {
         }
     }
 
-    /// Doubles `entries` with an LLM-correction twin of each (label suffixed
-    /// `|corr=llm:<providerID>`, mirroring the `|asr=...` suffix convention),
-    /// when `correctionProviderFromEnvironment()` returns a provider. A no-op
-    /// (returns `entries` unchanged) otherwise, so a normal run never pays for
-    /// this axis.
+    /// Applies `correctionModeFromEnvironment()` to `entries`: pairs each
+    /// with a corrected twin (`.pair`), replaces each with its corrected
+    /// version (`.only`), or leaves `entries` unchanged (`.off`, or no
+    /// provider key present). Twin/replacement labels are suffixed
+    /// `|corr=llm:<providerID>`, mirroring the `|asr=...` suffix convention.
     static func withCorrectionVariants(of entries: [Entry]) -> [Entry] {
-        guard let provider = correctionProviderFromEnvironment() else { return entries }
-        var result: [Entry] = []
-        result.reserveCapacity(entries.count * 2)
-        for entry in entries {
-            result.append(entry)
-            var corrected = entry.configuration
-            corrected.correction = .llm
-            corrected.correctionConsented = true
-            corrected.correctionProvider = provider
-            corrected.correctionModel = provider.defaultModel
-            result.append(Entry(
-                label: entry.label + "|corr=llm:\(provider.id)",
-                configuration: corrected
-            ))
+        let mode = correctionModeFromEnvironment()
+        guard mode != .off, let provider = correctionProviderFromEnvironment() else { return entries }
+
+        func corrected(_ entry: Entry) -> Entry {
+            var configuration = entry.configuration
+            configuration.correction = .llm
+            configuration.correctionConsented = true
+            configuration.correctionProvider = provider
+            configuration.correctionModel = provider.defaultModel
+            return Entry(label: entry.label + "|corr=llm:\(provider.id)", configuration: configuration)
         }
-        return result
+
+        switch mode {
+        case .off:
+            return entries
+        case .pair:
+            var result: [Entry] = []
+            result.reserveCapacity(entries.count * 2)
+            for entry in entries {
+                result.append(entry)
+                result.append(corrected(entry))
+            }
+            return result
+        case .only:
+            return entries.map(corrected)
+        }
     }
 
     /// A restricted subset for a quick smoke pass: cleanup on/off, VAD engine

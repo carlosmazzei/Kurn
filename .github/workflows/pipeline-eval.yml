@@ -31,10 +31,14 @@ on:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
         default: "small"
+      transcription_engines:
+        description: "on-device engines to sweep: appleSpeech,fluidAudioParakeet,whisperCpp / none (only cloud_providers) / blank=all"
+        type: string
+        default: ""
       correction:
-        description: "add an LLM-correction twin of every configuration (on, off) -- needs correction_provider's key secret"
+        description: "off / on (pair: baseline + corrected twin) / only (replace with corrected, no baseline row -- use when the baseline is already recorded)"
         type: choice
-        options: ["off", "on"]
+        options: ["off", "on", "only"]
         default: "off"
       correction_provider:
         description: "provider for the LLM-correction twins (openai, groq) -- ignored when correction is off"
@@ -130,6 +134,7 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_ENGINES: ${{ github.event.inputs.transcription_engines }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION: ${{ github.event.inputs.correction }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION_PROVIDER: ${{ github.event.inputs.correction_provider }}
           # The report is written row by row, so a cancelled or timed-out run

@@ -79,7 +79,8 @@ struct PublicDatasetEvaluationHarnessTests {
             print("[pipeline-eval]   cloud ASR providers: \(cloudProviders.map(\.displayName).joined(separator: ", "))")
         }
         if let correctionProvider = PipelineEvaluationMatrix.correctionProviderFromEnvironment() {
-            print("[pipeline-eval]   LLM correction: on (\(correctionProvider.displayName))")
+            let mode = PipelineEvaluationMatrix.correctionModeFromEnvironment() == .only ? "only (no baseline row)" : "pair (baseline + corrected)"
+            print("[pipeline-eval]   LLM correction: \(mode) (\(correctionProvider.displayName))")
         } else {
             print("[pipeline-eval]   LLM correction: off")
         }
