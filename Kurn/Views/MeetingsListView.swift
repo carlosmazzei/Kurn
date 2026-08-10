@@ -198,16 +198,63 @@ struct MeetingsListView: View {
                 unlockedBody
             }
         }
-        // The recorder sheet is attached OUTSIDE the locked/unlocked branch on
-        // purpose: the gate locks on every background transition, and a sheet
-        // attached to `unlockedBody` would be torn down with it — destroying
-        // the live RecorderViewModel mid-recording (audio orphaned unfinalized,
-        // Live Activity stuck) and then auto-presenting a fresh recorder after
-        // re-auth because `recordMeeting` survives the swap. Out here the
-        // running recorder stays presented above the locked placeholder; the
-        // meeting list below still requires authentication.
+        // Every stateful sheet/push below is attached OUTSIDE the locked/
+        // unlocked branch on purpose: the gate locks on every background
+        // transition, and a modifier attached to `unlockedBody` would be torn
+        // down with it — destroying whatever it's presenting (e.g. the live
+        // RecorderViewModel mid-recording, or unsaved edits in a pushed
+        // Settings screen) and, for the ones driven by `@State` that survives
+        // the swap (like `showingSettings`), re-presenting a fresh view from
+        // scratch after re-auth instead of resuming where the user left off.
+        // Out here, whatever is presented stays presented above the locked
+        // placeholder; the meeting list below still requires authentication.
         .sheet(item: $recordMeeting) { meeting in
             NavigationStack { RecorderView(meeting: meeting) }
+        }
+        .navigationDestination(item: $selectedMeeting) { meeting in
+            MeetingDetailView(meeting: meeting)
+        }
+        .navigationDestination(isPresented: $showingDocuments) {
+            DocumentsListView()
+        }
+        .sheet(item: $editingMeeting) { meeting in
+            NavigationStack { MeetingFormView(meeting: meeting) }
+        }
+        .sheet(item: $shareItem) { item in
+            ActivityView(items: item.urls)
+        }
+        .sheet(item: $movingMeeting) { meeting in
+            FolderPickerView(meeting: meeting)
+        }
+        .sheet(item: $taggingMeeting) { meeting in
+            TagPickerView(meeting: meeting)
+        }
+        .sheet(isPresented: $showingSidebar) {
+            FolderSidebarView(selection: $selection)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingFilterBar) {
+            FilterBarView(filter: $filter)
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack { SettingsView() }
+        }
+        .sheet(isPresented: $showingAsk) {
+            NavigationStack {
+                MeetingChatView(meeting: nil, onJump: { hit in
+                    showingAsk = false
+                    if let meeting = meetings.first(where: { $0.id == hit.meetingID }) {
+                        selectedMeeting = meeting
+                    }
+                })
+                .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
+                    }
+                }
+            }
         }
     }
 
@@ -329,51 +376,6 @@ struct MeetingsListView: View {
         )
         .textInputAutocapitalization(.never)
         .toolbar { listToolbar }
-        .navigationDestination(item: $selectedMeeting) { meeting in
-            MeetingDetailView(meeting: meeting)
-        }
-        .navigationDestination(isPresented: $showingDocuments) {
-            DocumentsListView()
-        }
-        .sheet(item: $editingMeeting) { meeting in
-            NavigationStack { MeetingFormView(meeting: meeting) }
-        }
-        .sheet(item: $shareItem) { item in
-            ActivityView(items: item.urls)
-        }
-        .sheet(item: $movingMeeting) { meeting in
-            FolderPickerView(meeting: meeting)
-        }
-        .sheet(item: $taggingMeeting) { meeting in
-            TagPickerView(meeting: meeting)
-        }
-        .sheet(isPresented: $showingSidebar) {
-            FolderSidebarView(selection: $selection)
-                .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showingFilterBar) {
-            FilterBarView(filter: $filter)
-        }
-        .sheet(isPresented: $showingSettings) {
-            NavigationStack { SettingsView() }
-        }
-        .sheet(isPresented: $showingAsk) {
-            NavigationStack {
-                MeetingChatView(meeting: nil, onJump: { hit in
-                    showingAsk = false
-                    if let meeting = meetings.first(where: { $0.id == hit.meetingID }) {
-                        selectedMeeting = meeting
-                    }
-                })
-                .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
-                    }
-                }
-            }
-        }
         .task(id: searchText) { await runSemanticSearch() }
         .kurnDialog(
             isPresented: Binding(
