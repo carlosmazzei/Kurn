@@ -36,23 +36,13 @@ struct DocumentsListView: View {
                 documentLibrary
             }
         }
-        // Attached OUTSIDE the locked/unlocked branch, same reasoning as
-        // MeetingsListView: the gate re-locks on every background transition,
-        // and a modifier scoped to `documentLibrary` would be torn down with
-        // it — dropping the create sheet's draft and popping any pushed
-        // document detail back to the list on re-auth.
+        // Settings alone sits outside the locked/unlocked branch — it shows no
+        // document content, and LockedRecordingsView offers a button into it
+        // while locked. The document detail and create sheets stay inside
+        // `documentLibrary` so the gate's teardown keeps transcript-derived
+        // documents behind authentication.
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
-        }
-        .navigationDestination(item: $selectedDocument) { document in
-            DocumentDetailView(document: document)
-        }
-        .sheet(isPresented: $showingCreate) {
-            NavigationStack {
-                DocumentCreateView(modelContext: modelContext) { document in
-                    selectedDocument = document
-                }
-            }
         }
     }
 
@@ -89,6 +79,16 @@ struct DocumentsListView: View {
                     Label(NSLocalizedString("documents.new", comment: "New document"), systemImage: "plus")
                 }
                 .accessibilityIdentifier("documents.new")
+            }
+        }
+        .navigationDestination(item: $selectedDocument) { document in
+            DocumentDetailView(document: document)
+        }
+        .sheet(isPresented: $showingCreate) {
+            NavigationStack {
+                DocumentCreateView(modelContext: modelContext) { document in
+                    selectedDocument = document
+                }
             }
         }
         .kurnDialog(
