@@ -162,84 +162,90 @@ struct KurnApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ZStack {
-                ContentView()
-                    .environment(settings)
-                    .environment(accessGate)
-                    .environment(downloads)
-                    .environment(transcription)
-                    .environment(playbackEnhancement)
-                    .environment(semanticIndex)
-                    .environment(wiki)
-                // Covers meeting/transcript content in the app-switcher
-                // snapshot taken while the scene isn't active.
-                if scenePhase != .active {
-                    PrivacyCoverView()
+            ContentView()
+                .environment(settings)
+                .environment(accessGate)
+                .environment(downloads)
+                .environment(transcription)
+                .environment(playbackEnhancement)
+                .environment(semanticIndex)
+                .environment(wiki)
+                // Both the app-switcher privacy placeholder and the lock screen
+                // live in a window above everything this hierarchy presents.
+                // They used to be an in-hierarchy `ZStack` branch and a view
+                // swap inside `MeetingsListView` respectively, neither of which
+                // could cover a presented sheet — and the swap destroyed
+                // whatever it replaced.
+                .securityCover(
+                    gate: accessGate,
+                    settings: settings,
+                    downloads: downloads,
+                    modelContainer: modelContainer
+                )
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    transcription.appSettings = settings
+                    semanticIndex.appSettings = settings
+                    wiki.appSettings = settings
+                    transcription.semanticIndexCoordinator = semanticIndex
+                    transcription.wikiCoordinator = wiki
+                    // Lock the recordings gate whenever the app leaves the
+                    // foreground so the next time it comes back the user has
+                    // to authenticate again. Only `.background` triggers this:
+                    // `.inactive` also fires for transient interruptions (a
+                    // system alert, Control Center, the biometric prompt
+                    // itself), and demanding a fresh Face ID after every one of
+                    // those would be its own bug. Content is still not exposed
+                    // in the meantime — `.inactive` raises the privacy cover,
+                    // which is what the app-switcher snapshot captures.
+                    if phase == .background {
+                        accessGate.lock()
+                        #if canImport(BackgroundTasks)
+                        // Ask the system for a processing window to advance any
+                        // interrupted transcription while we're backgrounded.
+                        TranscriptionScheduler.scheduleIfWorkRemains(
+                            container: modelContainer, settings: settings
+                        )
+                        #endif
+                    }
+                    // Resume transcriptions interrupted by backgrounding or a
+                    // process death. `.pending` recordings carry a checkpoint,
+                    // so each continues from its last completed chunk.
+                    if phase == .active {
+                        // Reattach any orphaned recording (and end stuck Live
+                        // Activities) without waiting for the next cold launch.
+                        // No-op while a recorder session is live.
+                        RecordingRecovery.recoverOrphansOnActivate(modelContainer: modelContainer)
+                        // Sweep again on every activation, not just at launch: a
+                        // background relaunch while the device was locked can't
+                        // read the protected store, leaving recordings stuck at
+                        // `.inProgress` that only a later, unlocked pass can fix.
+                        // Runs genuinely in flight in this process are excluded.
+                        TranscriptionRecovery.sweepStaleTranscriptions(
+                            modelContainer: modelContainer,
+                            excluding: TranscriptionViewModel.activeTranscriptionIDs
+                        )
+                        transcription.resumePendingTranscriptions(settings: settings)
+                        // Backfill the on-device semantic index for meetings
+                        // transcribed before indexing existed (or by an older
+                        // embedder). Low-priority, cancellable, and a no-op when
+                        // the feature is off or everything is already indexed.
+                        Task(priority: .utility) { await semanticIndex.backfill() }
+                        // Backfill the LLM-generated wiki for meetings without an
+                        // up-to-date article. Opt-in, key-gated, and batch-limited
+                        // inside the coordinator, so this is a no-op unless the
+                        // user turned the feature on.
+                        Task(priority: .utility) { await wiki.backfill() }
+                    }
+                    // Pre-warm the FluidAudio ASR model while the app is in the
+                    // foreground. The one-time CoreML/ANE compilation costs tens
+                    // of seconds and fails outright if first attempted from the
+                    // background ("could not communicate with a helper
+                    // application"), so doing it here — gated to users who've
+                    // selected and consented to the on-device engine — keeps
+                    // later transcriptions fast and reliable.
+                    guard phase == .active, settings.usesFluidAudioModel else { return }
+                    prewarmFluidAudioModel()
                 }
-            }
-            .onChange(of: scenePhase, initial: true) { _, phase in
-                transcription.appSettings = settings
-                semanticIndex.appSettings = settings
-                wiki.appSettings = settings
-                transcription.semanticIndexCoordinator = semanticIndex
-                transcription.wikiCoordinator = wiki
-                // Lock the recordings gate whenever the app leaves the
-                // foreground so the next time it comes back the user has
-                // to authenticate again. Only `.background` triggers this —
-                // `.inactive` also fires for transient interruptions (a
-                // system alert, Control Center) while a recording's sheet is
-                // presented, and locking there would tear down that sheet
-                // (MeetingsListView swaps its whole unlocked branch for the
-                // locked placeholder), abandoning the in-progress recording.
-                if phase == .background {
-                    accessGate.lock()
-                    #if canImport(BackgroundTasks)
-                    // Ask the system for a processing window to advance any
-                    // interrupted transcription while we're backgrounded.
-                    TranscriptionScheduler.scheduleIfWorkRemains(
-                        container: modelContainer, settings: settings
-                    )
-                    #endif
-                }
-                // Resume transcriptions interrupted by backgrounding or a
-                // process death. `.pending` recordings carry a checkpoint, so
-                // each continues from its last completed chunk.
-                if phase == .active {
-                    // Reattach any orphaned recording (and end stuck Live
-                    // Activities) without waiting for the next cold launch.
-                    // No-op while a recorder session is live.
-                    RecordingRecovery.recoverOrphansOnActivate(modelContainer: modelContainer)
-                    // Sweep again on every activation, not just at launch: a
-                    // background relaunch while the device was locked can't
-                    // read the protected store, leaving recordings stuck at
-                    // `.inProgress` that only a later, unlocked pass can fix.
-                    // Runs genuinely in flight in this process are excluded.
-                    TranscriptionRecovery.sweepStaleTranscriptions(
-                        modelContainer: modelContainer,
-                        excluding: TranscriptionViewModel.activeTranscriptionIDs
-                    )
-                    transcription.resumePendingTranscriptions(settings: settings)
-                    // Backfill the on-device semantic index for meetings
-                    // transcribed before indexing existed (or by an older
-                    // embedder). Low-priority, cancellable, and a no-op when the
-                    // feature is off or everything is already indexed.
-                    Task(priority: .utility) { await semanticIndex.backfill() }
-                    // Backfill the LLM-generated wiki for meetings without an
-                    // up-to-date article. Opt-in, key-gated, and batch-limited
-                    // inside the coordinator, so this is a no-op unless the user
-                    // turned the feature on.
-                    Task(priority: .utility) { await wiki.backfill() }
-                }
-                // Pre-warm the FluidAudio ASR model while the app is in the
-                // foreground. The one-time CoreML/ANE compilation costs tens
-                // of seconds and fails outright if first attempted from the
-                // background ("could not communicate with a helper
-                // application"), so doing it here — gated to users who've
-                // selected and consented to the on-device engine — keeps
-                // later transcriptions fast and reliable.
-                guard phase == .active, settings.usesFluidAudioModel else { return }
-                prewarmFluidAudioModel()
-            }
         }
         .modelContainer(modelContainer)
     }

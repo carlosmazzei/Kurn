@@ -8,12 +8,13 @@
 
 import SwiftUI
 
-/// Full-screen overlay shown in place of the meetings list while the gate is
-/// locked. Triggers authentication automatically when it appears and offers a
-/// retry button when the user cancels the prompt or biometrics fail. When the
-/// device has no passcode/biometrics configured, a Settings button lets the user
-/// reach the in-app settings to disable the auth requirement instead of leaving
-/// them stranded.
+/// The lock screen, rendered by `SecurityCoverView` in the cover window that
+/// sits above the whole app. Offers a retry button when the user cancels the
+/// prompt or biometrics fail. When the device has no passcode/biometrics
+/// configured, a Settings button lets the user reach the in-app settings to
+/// disable the auth requirement instead of leaving them stranded — the cover
+/// presents that sheet itself, since nothing below the cover window is
+/// reachable. Triggering authentication is the cover's job, not this view's.
 struct LockedRecordingsView: View {
     let gate: RecordingAccessGate
     @Binding var showingSettings: Bool
