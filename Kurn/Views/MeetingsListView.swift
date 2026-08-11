@@ -198,63 +198,28 @@ struct MeetingsListView: View {
                 unlockedBody
             }
         }
-        // Every stateful sheet/push below is attached OUTSIDE the locked/
-        // unlocked branch on purpose: the gate locks on every background
-        // transition, and a modifier attached to `unlockedBody` would be torn
-        // down with it — destroying whatever it's presenting (e.g. the live
-        // RecorderViewModel mid-recording, or unsaved edits in a pushed
-        // Settings screen) and, for the ones driven by `@State` that survives
-        // the swap (like `showingSettings`), re-presenting a fresh view from
-        // scratch after re-auth instead of resuming where the user left off.
-        // Out here, whatever is presented stays presented above the locked
-        // placeholder; the meeting list below still requires authentication.
+        // Only these two are attached OUTSIDE the locked/unlocked branch. The
+        // gate locks on every background transition and swaps `unlockedBody`
+        // out, tearing down anything attached to it — which is the *desired*
+        // behaviour for every surface showing meeting-derived content, since
+        // that teardown is the only thing keeping a pushed transcript off the
+        // screen of a borrowed unlocked device (MeetingDetailView has no gate
+        // of its own). A surface belongs out here only when it shows no such
+        // content AND its teardown does real damage:
+        //
+        // - the recorder captures new audio rather than exposing existing
+        //   content, and losing its RecorderViewModel mid-recording orphans
+        //   the unfinalized audio file and strands the Live Activity;
+        // - Settings holds no meeting content — LockedRecordingsView itself
+        //   offers a button into it while locked — and its teardown discards
+        //   unsaved edits in pushed screens like the template editor, then
+        //   re-presents a fresh sheet at the Settings root after re-auth
+        //   because `showingSettings` survives the swap.
         .sheet(item: $recordMeeting) { meeting in
             NavigationStack { RecorderView(meeting: meeting) }
         }
-        .navigationDestination(item: $selectedMeeting) { meeting in
-            MeetingDetailView(meeting: meeting)
-        }
-        .navigationDestination(isPresented: $showingDocuments) {
-            DocumentsListView()
-        }
-        .sheet(item: $editingMeeting) { meeting in
-            NavigationStack { MeetingFormView(meeting: meeting) }
-        }
-        .sheet(item: $shareItem) { item in
-            ActivityView(items: item.urls)
-        }
-        .sheet(item: $movingMeeting) { meeting in
-            FolderPickerView(meeting: meeting)
-        }
-        .sheet(item: $taggingMeeting) { meeting in
-            TagPickerView(meeting: meeting)
-        }
-        .sheet(isPresented: $showingSidebar) {
-            FolderSidebarView(selection: $selection)
-                .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showingFilterBar) {
-            FilterBarView(filter: $filter)
-        }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
-        }
-        .sheet(isPresented: $showingAsk) {
-            NavigationStack {
-                MeetingChatView(meeting: nil, onJump: { hit in
-                    showingAsk = false
-                    if let meeting = meetings.first(where: { $0.id == hit.meetingID }) {
-                        selectedMeeting = meeting
-                    }
-                })
-                .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
-                    }
-                }
-            }
         }
     }
 
@@ -376,6 +341,53 @@ struct MeetingsListView: View {
         )
         .textInputAutocapitalization(.never)
         .toolbar { listToolbar }
+        // Attached here, inside the branch the gate swaps out, on purpose:
+        // every one of these shows meeting-derived content (a transcript, an
+        // exported transcript file, retrieved transcript excerpts) or is
+        // transient UI whose loss costs the user nothing. Being torn down when
+        // the app backgrounds is what keeps them behind authentication.
+        .navigationDestination(item: $selectedMeeting) { meeting in
+            MeetingDetailView(meeting: meeting)
+        }
+        .navigationDestination(isPresented: $showingDocuments) {
+            DocumentsListView()
+        }
+        .sheet(item: $editingMeeting) { meeting in
+            NavigationStack { MeetingFormView(meeting: meeting) }
+        }
+        .sheet(item: $shareItem) { item in
+            ActivityView(items: item.urls)
+        }
+        .sheet(item: $movingMeeting) { meeting in
+            FolderPickerView(meeting: meeting)
+        }
+        .sheet(item: $taggingMeeting) { meeting in
+            TagPickerView(meeting: meeting)
+        }
+        .sheet(isPresented: $showingSidebar) {
+            FolderSidebarView(selection: $selection)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingFilterBar) {
+            FilterBarView(filter: $filter)
+        }
+        .sheet(isPresented: $showingAsk) {
+            NavigationStack {
+                MeetingChatView(meeting: nil, onJump: { hit in
+                    showingAsk = false
+                    if let meeting = meetings.first(where: { $0.id == hit.meetingID }) {
+                        selectedMeeting = meeting
+                    }
+                })
+                .navigationTitle(NSLocalizedString("chat.ask.title", comment: "Ask across meetings"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(NSLocalizedString("common.done", comment: "Done")) { showingAsk = false }
+                    }
+                }
+            }
+        }
         .task(id: searchText) { await runSemanticSearch() }
         .kurnDialog(
             isPresented: Binding(
