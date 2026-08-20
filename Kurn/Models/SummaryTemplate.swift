@@ -24,6 +24,9 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
     var sections: [String]
     var isBuiltIn: Bool
     var createdAt: Date
+    /// Last edit time. Drives `TemplateSyncMerger`'s last-write-wins resolution
+    /// when the same template was edited on two devices before iCloud sync ran.
+    var updatedAt: Date
 
     /// Built-in names/descriptions are localized; custom templates use `name`.
     var displayName: String {
@@ -46,7 +49,8 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         instructions: String,
         sections: [String],
         isBuiltIn: Bool = false,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -55,6 +59,25 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         self.sections = sections
         self.isBuiltIn = isBuiltIn
         self.createdAt = createdAt
+        self.updatedAt = updatedAt ?? createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, iconName, instructions, sections, isBuiltIn, createdAt, updatedAt
+    }
+
+    /// Custom decode: `updatedAt` didn't exist before iCloud sync, so templates
+    /// already persisted in `UserDefaults` have no such key.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        iconName = try container.decode(String.self, forKey: .iconName)
+        instructions = try container.decode(String.self, forKey: .instructions)
+        sections = try container.decode([String].self, forKey: .sections)
+        isBuiltIn = try container.decode(Bool.self, forKey: .isBuiltIn)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
     }
 
     static func custom(

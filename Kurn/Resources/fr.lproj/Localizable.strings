@@ -405,6 +405,8 @@
 "settings.templates" = "Modèles de résumé";
 "settings.templates_footer" = "Les modèles définissent la façon dont une transcription est résumée. Choisissez-en un à chaque génération de résumé.";
 "settings.add_template" = "Ajouter un modèle";
+"settings.templates_sync" = "Synchroniser les modèles via iCloud";
+"settings.templates_sync_footer" = "Les modèles personnalisés que vous créez sont synchronisés via iCloud, afin d'être disponibles après un changement d'appareil. Les modèles intégrés restent toujours à jour d'eux-mêmes.";
 "settings.template_name" = "Nom";
 "settings.template_instructions" = "Instructions";
 "settings.template_instructions_footer" = "Décrivez l'objectif et le ton du résumé. Le modèle répond toujours dans la langue de la transcription.";

@@ -405,6 +405,8 @@
 "settings.templates" = "Modelos de Resumo";
 "settings.templates_footer" = "Os modelos definem como a transcrição é resumida. Escolha um a cada vez que gerar um resumo.";
 "settings.add_template" = "Adicionar Modelo";
+"settings.templates_sync" = "Sincronizar Modelos via iCloud";
+"settings.templates_sync_footer" = "Os modelos personalizados que você criar são sincronizados via iCloud, ficando disponíveis ao trocar de aparelho. Os modelos padrão do app já ficam sempre atualizados por conta própria.";
 "settings.template_name" = "Nome";
 "settings.template_instructions" = "Instruções";
 "settings.template_instructions_footer" = "Descreva o foco e o tom do resumo. O modelo sempre responde no idioma da transcrição.";

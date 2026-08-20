@@ -405,6 +405,8 @@
 "settings.templates" = "摘要模板";
 "settings.templates_footer" = "模板决定转录内容的总结方式。每次生成摘要时选择一个模板。";
 "settings.add_template" = "添加模板";
+"settings.templates_sync" = "通过 iCloud 同步模板";
+"settings.templates_sync_footer" = "你创建的自定义模板会通过 iCloud 同步，更换设备后依然可用。内置模板始终自行保持最新，无需同步。";
 "settings.template_name" = "名称";
 "settings.template_instructions" = "指示";
 "settings.template_instructions_footer" = "描述摘要的重点和语气，模型始终使用转录内容所用的语言回复。";

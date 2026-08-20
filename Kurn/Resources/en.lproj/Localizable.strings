@@ -405,6 +405,8 @@
 "settings.templates" = "Summary Templates";
 "settings.templates_footer" = "Templates shape how a transcript is summarized. Pick one each time you generate a summary.";
 "settings.add_template" = "Add Template";
+"settings.templates_sync" = "Sync Templates via iCloud";
+"settings.templates_sync_footer" = "Custom templates you create sync via iCloud, so they're available after switching devices. Built-in templates always stay up to date on their own.";
 "settings.template_name" = "Name";
 "settings.template_instructions" = "Instructions";
 "settings.template_instructions_footer" = "Describe the focus and tone for the summary. The model always replies in the transcript's language.";
