@@ -10,38 +10,18 @@ import SwiftUI
 
 struct DocumentsListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppSettings.self) private var settings
-    @Environment(RecordingAccessGate.self) private var accessGate
     @Query(sort: \GeneratedDocument.createdAt, order: .reverse)
     private var documents: [GeneratedDocument]
 
     @State private var showingCreate = false
-    @State private var showingSettings = false
     @State private var selectedDocument: GeneratedDocument?
     @State private var pendingDelete: GeneratedDocument?
     @State private var saveError: AppError?
 
-    private var isLocked: Bool {
-        settings.requireAuthForRecordings && !accessGate.isUnlocked
-    }
-
+    // This screen carried its own copy of the lock branch, with the same
+    // teardown problem as `MeetingsListView`. Authentication is now covered by
+    // the window-level `securityCover(…)` in `KurnApp`.
     var body: some View {
-        Group {
-            if isLocked {
-                LockedRecordingsView(gate: accessGate, showingSettings: $showingSettings)
-                    .background(Theme.background.ignoresSafeArea())
-                    .toolbar(.hidden, for: .navigationBar)
-                    .task { await accessGate.authenticate() }
-            } else {
-                documentLibrary
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            NavigationStack { SettingsView() }
-        }
-    }
-
-    private var documentLibrary: some View {
         List {
             if documents.isEmpty {
                 ContentUnavailableView(

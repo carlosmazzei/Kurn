@@ -351,18 +351,52 @@ the protected directory and falls back to `Documents/` for any
 not-yet-migrated leftovers.
 
 A separate access layer, `RecordingAccessGate`
-(`Services/RecordingAccessGate.swift`), guards the recordings UI behind
+(`Services/RecordingAccessGate.swift`), guards the app behind
 `LAContext.evaluatePolicy(.deviceOwnerAuthentication, ...)` (Face ID /
-Touch ID / passcode) once per foreground session. The gate is injected via
-the environment from `KurnApp` and re-locked on every
-`scenePhase == .background` transition. `MeetingsListView` swaps in a
-`LockedRecordingsView` overlay until the user authenticates. Disabling
+Touch ID / passcode) once per foreground session, re-locking on every
+`scenePhase == .background` transition. Disabling
 `AppSettings.requireAuthForRecordings` (Settings → Recording) turns off the
 prompt while leaving the on-disk encryption in place.
 
-The recorder sheet is presented outside the access gate's locked/unlocked
-branch, so backgrounding mid-recording (which re-locks the gate) can't tear
-down the live `RecorderViewModel` and orphan its audio file;
+**The lock is a window, not a view branch** — and that distinction is the
+whole design. It used to be `if isLocked { LockedRecordingsView } else { … }`
+inside `MeetingsListView` (and a second copy in `DocumentsListView`), which
+conflated "what is visible" with "what exists in the hierarchy": every
+`.sheet` attached to the unlocked branch was *destroyed* on lock. That made
+protecting content and preserving the user's work mutually exclusive, one
+sheet at a time — keeping the Settings sheet inside the branch discarded an
+in-progress template edit and reopened at the Settings root, while moving it
+out preserved the edit. Moving the *wrong* ones out (meeting detail, the Ask
+chat, share) silently removed the only thing keeping a pushed transcript off
+the screen of a borrowed unlocked device, since `MeetingDetailView` has no
+gate of its own.
+
+So the cover now lives above everything, in its own `UIWindow`:
+
+- `SecurityCoverState` (`Infrastructure/SecurityCoverState.swift`) is the pure,
+  unit-tested decision — `.hidden` / `.privacy` / `.locked` resolved from scene
+  phase plus gate state. A non-active scene always wins, so even a locked app
+  shows the neutral privacy cover mid-transition, which is what the
+  app-switcher photographs. Only `.locked` takes key window status, because
+  only it has controls and a keyboard to feed.
+- `SecurityCoverWindow` (`Infrastructure/SecurityCoverWindow.swift`) owns the
+  window at `UIWindow.Level.alert + 1` and the `securityCover(…)` modifier
+  `KurnApp` attaches. It hides rather than tears down, and learns its
+  `UIWindowScene` from a `didMoveToWindow` probe rather than guessing through
+  `connectedScenes`.
+- `SecurityCoverView` (`Views/SecurityCoverView.swift`) renders
+  `PrivacyCoverView` or `LockedRecordingsView` and hosts the Settings escape
+  hatch — required because a device with no passcode configured can never
+  authenticate, and nothing below the cover window is reachable. It re-injects
+  `AppSettings`, `ModelDownloadController` and the model container, since a
+  separate window's hosting controller inherits no environment.
+
+Two consequences worth keeping: sheet placement in `MeetingsListView` is no
+longer a security decision (nothing is torn down, so presentations go wherever
+reads best), and the cover closes a gap the old `PrivacyCoverView` `ZStack`
+sibling never could — a presented sheet renders *above* the root view, so the
+app-switcher snapshot used to capture the Ask chat's transcript excerpts.
+
 `RecordingRecovery` also no longer deletes unreadable orphans ≥1 MB outright.
 `AudioRecorderService` separately recovers from
 `AVAudioEngineConfigurationChange` (e.g. the engine bouncing when the device
@@ -1053,10 +1087,10 @@ toolbar would be the wrong control**:
   bar: they're view modes of one meeting rather than top-level destinations, and
   a bottom bar there would collide with the Chat tab's composer.
 - Do not reintroduce `.background(.bar)`, hand-drawn `Divider` bar tops, or
-  `.toolbar(.hidden, for: .navigationBar)` on a main screen. The one remaining
-  `.toolbar(.hidden,…)` is the locked-recordings branch of `MeetingsListView`,
-  which intentionally shows no toolbar (and therefore no record button) until
-  the user authenticates.
+  `.toolbar(.hidden, for: .navigationBar)` on a main screen. The lock screen
+  used to be the one exception; it no longer needs to be, because it is not in
+  the navigation hierarchy at all — it renders in the cover window above it
+  (see "Secure local storage for recordings"), so there is no toolbar to hide.
 - Accessibility identifiers used by `KurnUITests/ScreenshotUITests.swift`
   (`nav.settings`, `meetingCard`) must survive any further chrome rework.
 

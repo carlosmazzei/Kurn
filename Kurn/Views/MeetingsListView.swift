@@ -31,7 +31,6 @@ struct MeetingsListView: View {
     // not visible to an extension declared in another file.
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
-    @Environment(RecordingAccessGate.self) private var accessGate
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
@@ -69,10 +68,6 @@ struct MeetingsListView: View {
     /// Set when a favorite/archive/create/delete persistence op fails, so the
     /// failure surfaces instead of being dropped silently.
     @State var saveError: AppError?
-
-    private var isLocked: Bool {
-        settings.requireAuthForRecordings && !accessGate.isUnlocked
-    }
 
     /// The currently-selected folder, looked up through the dedicated `@Query`
     /// so renames and deletions reflect immediately in the chip title.
@@ -187,31 +182,14 @@ struct MeetingsListView: View {
         saveError = modelContext.saveOrError()
     }
 
+    // Authentication is not this view's concern any more. The gate used to be a
+    // branch here — `if isLocked { LockedRecordingsView } else { … }` — which
+    // destroyed every sheet attached to the unlocked branch on each background
+    // transition, so each new sheet became a choice between protecting content
+    // and preserving the user's work. The cover now lives in a window above the
+    // whole app (`securityCover(…)` in `KurnApp`), so presentations below can be
+    // attached wherever reads best.
     var body: some View {
-        Group {
-            if isLocked {
-                LockedRecordingsView(gate: accessGate, showingSettings: $showingSettings)
-                    .background(Theme.background.ignoresSafeArea())
-                    .toolbar(.hidden, for: .navigationBar)
-                    .task { await accessGate.authenticate() }
-            } else {
-                unlockedBody
-            }
-        }
-        // The recorder sheet is attached OUTSIDE the locked/unlocked branch on
-        // purpose: the gate locks on every background transition, and a sheet
-        // attached to `unlockedBody` would be torn down with it — destroying
-        // the live RecorderViewModel mid-recording (audio orphaned unfinalized,
-        // Live Activity stuck) and then auto-presenting a fresh recorder after
-        // re-auth because `recordMeeting` survives the swap. Out here the
-        // running recorder stays presented above the locked placeholder; the
-        // meeting list below still requires authentication.
-        .sheet(item: $recordMeeting) { meeting in
-            NavigationStack { RecorderView(meeting: meeting) }
-        }
-    }
-
-    private var unlockedBody: some View {
         List {
             dateChips
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
@@ -329,6 +307,12 @@ struct MeetingsListView: View {
         )
         .textInputAutocapitalization(.never)
         .toolbar { listToolbar }
+        .sheet(item: $recordMeeting) { meeting in
+            NavigationStack { RecorderView(meeting: meeting) }
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack { SettingsView() }
+        }
         .navigationDestination(item: $selectedMeeting) { meeting in
             MeetingDetailView(meeting: meeting)
         }
@@ -353,9 +337,6 @@ struct MeetingsListView: View {
         }
         .sheet(isPresented: $showingFilterBar) {
             FilterBarView(filter: $filter)
-        }
-        .sheet(isPresented: $showingSettings) {
-            NavigationStack { SettingsView() }
         }
         .sheet(isPresented: $showingAsk) {
             NavigationStack {
