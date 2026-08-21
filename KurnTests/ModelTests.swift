@@ -293,6 +293,23 @@ struct ModelTests {
         #expect(recording.effectiveBitRate == 48_000)
     }
 
+    @Test func highlightsDefaultToEmpty() {
+        #expect(Recording(fileName: "a.m4a", duration: 1).highlights.isEmpty)
+    }
+
+    @Test func highlightsRoundTripThroughTheStore() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Highlighted")
+        context.insert(meeting)
+        let highlight = Highlight(timestamp: 42)
+        context.insert(Recording(meeting: meeting, fileName: "a.m4a", duration: 60, highlights: [highlight]))
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<Recording>())
+        #expect(fetched.first?.highlights == [highlight])
+    }
+
     @Test(arguments: [(0.0, Int64(360_000)), (60.0, Int64(0))])
     func effectiveBitRateIsUnknownWithoutBothInputs(duration: TimeInterval, fileSize: Int64) {
         let recording = Recording(fileName: "a.m4a", duration: duration, fileSize: fileSize)

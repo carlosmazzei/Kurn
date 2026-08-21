@@ -114,7 +114,7 @@ struct RecordingRecoveryEdgeCaseTests {
         // While a recorder session is registered, the sweep must not touch
         // anything — the in-progress file has no Recording row yet.
         RecordingCommandRouter.shared.register(
-            onTogglePause: {}, onPause: {}, onResume: {}, onStop: {}
+            onTogglePause: {}, onPause: {}, onResume: {}, onStop: {}, onHighlight: {}
         )
         RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
         #expect(try context.fetch(FetchDescriptor<Recording>()).isEmpty)

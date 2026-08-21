@@ -35,9 +35,14 @@ struct RecordingLiveActivityWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    elapsedText(context)
-                        .font(.system(size: 17, weight: .light, design: .rounded).monospacedDigit())
-                        .foregroundStyle(.white)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        elapsedText(context)
+                            .font(.system(size: 17, weight: .light, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.white)
+                        if context.state.highlightCount > 0 {
+                            highlightCountBadge(context)
+                        }
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     commandButtons(context, height: 34)
@@ -83,13 +88,18 @@ private struct LockScreenRecordingView: View {
                         .foregroundStyle(.white.opacity(0.55))
                 }
                 Spacer()
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                        .frame(width: 7, height: 7)
-                    elapsedText(context)
-                        .font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
-                        .foregroundStyle(.white)
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
+                            .frame(width: 7, height: 7)
+                        elapsedText(context)
+                            .font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.white)
+                    }
+                    if context.state.highlightCount > 0 {
+                        highlightCountBadge(context)
+                    }
                 }
             }
 
@@ -164,7 +174,30 @@ private func commandButtons(
             style: .destructive,
             height: height
         )
+        // Icon-only, fixed width rather than a third full-width text pill,
+        // which would crowd "Pause"/"Stop" labels in longer languages.
+        if !context.state.isPaused {
+            Link(destination: URL(string: "kurn://recording/highlight")!) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: height < 40 ? 13 : 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: height, height: height)
+                    .background(Color.white.opacity(0.12), in: Circle())
+                    .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
+            }
+        }
     }
+}
+
+@ViewBuilder
+private func highlightCountBadge(_ context: ActivityViewContext<RecordingActivityAttributes>) -> some View {
+    HStack(spacing: 3) {
+        Image(systemName: "star.fill")
+            .font(.system(size: 10, weight: .bold))
+        Text("\(context.state.highlightCount)")
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+    }
+    .foregroundStyle(.yellow)
 }
 
 @ViewBuilder

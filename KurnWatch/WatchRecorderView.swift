@@ -16,7 +16,7 @@ struct WatchRecorderView: View {
             switch connectivity.state {
             case .idle:
                 idleView
-            case .recording(let title, let referenceDate, let accumulatedElapsed):
+            case .recording(let title, let referenceDate, let accumulatedElapsed, let highlightCount):
                 // Shift the reference date back by the already-accumulated time so the
                 // native ticking Text shows accumulatedElapsed + (now - referenceDate).
                 let timerOrigin = referenceDate.addingTimeInterval(-accumulatedElapsed)
@@ -24,14 +24,16 @@ struct WatchRecorderView: View {
                     title: title,
                     isPaused: false,
                     timerText: { Text(timerOrigin, style: .timer) },
-                    accumulatedElapsed: accumulatedElapsed
+                    accumulatedElapsed: accumulatedElapsed,
+                    highlightCount: highlightCount
                 )
-            case .paused(let title, let accumulatedElapsed):
+            case .paused(let title, let accumulatedElapsed, let highlightCount):
                 activeView(
                     title: title,
                     isPaused: true,
                     timerText: { Text(accumulatedElapsed.formattedTimer) },
-                    accumulatedElapsed: accumulatedElapsed
+                    accumulatedElapsed: accumulatedElapsed,
+                    highlightCount: highlightCount
                 )
             }
         }
@@ -55,7 +57,8 @@ struct WatchRecorderView: View {
         title: String,
         isPaused: Bool,
         timerText: () -> Text,
-        accumulatedElapsed: TimeInterval
+        accumulatedElapsed: TimeInterval,
+        highlightCount: Int
     ) -> some View {
         VStack(spacing: 8) {
             Text(title)
@@ -66,6 +69,12 @@ struct WatchRecorderView: View {
             timerText()
                 .font(.title2)
                 .monospacedDigit()
+
+            if highlightCount > 0 {
+                Label("\(highlightCount)", systemImage: "star.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.yellow)
+            }
 
             if !isPaused {
                 LevelMeter(level: connectivity.level)
@@ -85,6 +94,14 @@ struct WatchRecorderView: View {
                     Image(systemName: "stop.fill")
                 }
                 .buttonStyle(.bordered)
+
+                Button {
+                    Task { await connectivity.send(.highlight) }
+                } label: {
+                    Image(systemName: "star.fill")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isPaused)
             }
 
             if connectivity.lastCommandFailed {

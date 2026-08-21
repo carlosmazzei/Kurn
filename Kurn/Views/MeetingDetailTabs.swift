@@ -77,6 +77,7 @@ struct TranscriptTab: View {
                     speakers: meeting.speakers,
                     activeTime: player.loadedFileName == recording.fileName ? player.currentTime : nil,
                     offset: offsetFor(recording),
+                    highlights: recording.highlights,
                     onSeek: { time in onSeek(recording, time) }
                 )
             }

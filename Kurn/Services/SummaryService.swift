@@ -143,9 +143,12 @@ struct SummaryService {
         them, so completeness matters more than polish. Capture every \
         decision, action item (with owner and deadline when stated), open \
         question, key fact, number, date, and name, and keep the [mm:ss] \
-        timestamps of important moments. Record action items as markdown task \
-        checkboxes ("- [ ] task — owner, deadline") so their status survives \
-        into the final summary. Do not editorialize and do not drop topics.
+        timestamps of important moments. Lines prefixed with ⭐ mark moments \
+        the speaker explicitly flagged as important during the recording — \
+        always preserve the ⭐ marker and the line's timestamp when carrying \
+        it into these notes. Record action items as markdown task checkboxes \
+        ("- [ ] task — owner, deadline") so their status survives into the \
+        final summary. Do not editorialize and do not drop topics.
         """,
         sections: ["Discussion", "Decisions", "Action Items", "Open Questions"]
     )
@@ -248,13 +251,15 @@ struct SummaryService {
     /// timestamps read as one continuous, chronologically ordered timeline across
     /// multiple recordings rather than restarting at 0:00 per segment.
     static func assembleTranscriptText(
-        from groups: [(offset: TimeInterval, segments: [TranscriptSegment])]
+        from groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])]
     ) -> String {
         var lines: [String] = []
         for group in groups {
             for segment in group.segments {
                 let stamp = (segment.startTime + group.offset).clockDisplay
-                lines.append("[\(stamp)] \(segment.speakerLabel): \(segment.text)")
+                let isHighlighted = group.highlights.contains { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
+                let prefix = isHighlighted ? "⭐ " : ""
+                lines.append("\(prefix)[\(stamp)] \(segment.speakerLabel): \(segment.text)")
             }
         }
         return lines.joined(separator: "\n")

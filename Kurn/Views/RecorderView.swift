@@ -194,11 +194,19 @@ private struct RecorderContent: View {
     }
 
     private var timer: some View {
-        Text(vm.elapsed.clockDisplay)
-            .font(.system(size: 64, weight: .ultraLight, design: .default))
-            .monospacedDigit()
-            .foregroundStyle(.white)
-            .contentTransition(.numericText())
+        VStack(spacing: 4) {
+            Text(vm.elapsed.clockDisplay)
+                .font(.system(size: 64, weight: .ultraLight, design: .default))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+            if vm.highlightCount > 0 {
+                Label("\(vm.highlightCount)", systemImage: "star.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.warning)
+                    .contentTransition(.numericText())
+            }
+        }
     }
 
     private var titleField: some View {
@@ -305,6 +313,25 @@ private struct RecorderContent: View {
             .buttonBorderShape(.capsule)
             .tint(Theme.accent)
             .disabled(vm.state == .idle)
+
+            // Highlight. Fixed-size circle rather than a third full-width pill,
+            // since marking is a secondary action relative to pause/stop.
+            Button {
+                AppLog.recorderUI.atInfo.info("UI: highlight tapped, state=\(String(describing: vm.state), privacy: .public)")
+                vm.markHighlight()
+            } label: {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 58, height: 58)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(Theme.warning)
+            // Stricter than pause/stop: marking during a pause has no
+            // "current instant" to capture (mirrors `markHighlight()`'s guard).
+            .disabled(vm.state != .recording)
+            .sensoryFeedback(.success, trigger: vm.highlightCount)
+            .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
         }
         .opacity(vm.state == .idle ? 0.5 : 1)
     }

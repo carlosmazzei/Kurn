@@ -19,17 +19,17 @@ struct TranscriptView: View {
     /// timeline. Seeking and active-segment highlighting still use the raw,
     /// recording-relative times, since playback is per recording.
     var offset: TimeInterval = 0
+    /// Recording-relative highlight markers, same convention as `startTime`.
+    var highlights: [Highlight] = []
     let onSeek: (TimeInterval) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(segments) { segment in
-                Button {
-                    onSeek(segment.startTime)
-                } label: {
-                    segmentRow(segment)
-                }
-                .buttonStyle(.plain)
+                segmentRow(segment)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onSeek(segment.startTime) }
+                    .accessibilityAddTraits(.isButton)
             }
         }
     }
@@ -40,6 +40,7 @@ struct TranscriptView: View {
         let name = speaker?.displayName ?? segment.speakerLabel
         let color = Color(hex: speaker?.color ?? "#888888")
         let isActive = activeTime.map { $0 >= segment.startTime && $0 < segment.endTime } ?? false
+        let matchingHighlights = highlights.filter { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
@@ -55,6 +56,16 @@ struct TranscriptView: View {
                 Text((segment.startTime + offset).clockDisplay)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.textTertiary)
+                ForEach(matchingHighlights) { highlight in
+                    Button {
+                        onSeek(highlight.timestamp)
+                    } label: {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.warning)
+                    }
+                    .buttonStyle(.plain)
+                }
                 Spacer()
             }
             Text(segment.text)

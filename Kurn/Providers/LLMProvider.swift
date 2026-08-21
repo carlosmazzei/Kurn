@@ -447,6 +447,14 @@ enum SummaryPrompt {
         speaker labels, produce a structured summary in the SAME LANGUAGE as the \
         transcript.
 
+        Some transcript lines are prefixed with ⭐ — these mark moments the \
+        speaker explicitly flagged as important while the meeting was being \
+        recorded. Whenever at least one ⭐-marked line is present, include a \
+        dedicated section (title translated into the transcript's language, \
+        along the lines of "Highlighted Moments") listing each one with its \
+        [mm:ss] timestamp and a short description of what was said, in \
+        chronological order.
+
         \(template.instructions)
         """
 

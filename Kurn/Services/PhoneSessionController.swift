@@ -44,7 +44,8 @@ final class PhoneSessionController: NSObject {
         meetingTitle: String,
         accumulatedElapsed: TimeInterval,
         referenceDate: Date,
-        isAvailable: Bool
+        isAvailable: Bool,
+        highlightCount: Int
     ) {
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
@@ -54,7 +55,8 @@ final class PhoneSessionController: NSObject {
             WatchSessionKey.meetingTitle: meetingTitle,
             WatchSessionKey.referenceDate: referenceDate,
             WatchSessionKey.accumulatedElapsed: accumulatedElapsed,
-            WatchSessionKey.isAvailable: isAvailable
+            WatchSessionKey.isAvailable: isAvailable,
+            WatchSessionKey.highlightCount: highlightCount
         ]
         try? session.updateApplicationContext(context)
     }
@@ -65,7 +67,8 @@ final class PhoneSessionController: NSObject {
             meetingTitle: "",
             accumulatedElapsed: 0,
             referenceDate: Date(),
-            isAvailable: false
+            isAvailable: false,
+            highlightCount: 0
         )
     }
 

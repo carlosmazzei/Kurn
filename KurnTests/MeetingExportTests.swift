@@ -148,6 +148,57 @@ struct MeetingExportTests {
         #expect(markdown.contains("[0:30] Speaker 1:** part 1"))
     }
 
+    @Test func markdownPrefixesHighlightedTranscriptLines() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+
+        let recording = Recording(
+            meeting: meeting, fileName: "a.m4a", duration: 10,
+            highlights: [Highlight(timestamp: 6)]
+        )
+        context.insert(recording)
+
+        let segments = [
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "not highlighted"),
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 5, endTime: 10, text: "highlighted")
+        ]
+        let transcript = Transcript(recording: recording, segments: segments)
+        context.insert(transcript)
+        recording.transcript = transcript
+
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
+        #expect(markdown.contains("**[0:00] Speaker 1:** not highlighted"))
+        #expect(markdown.contains("⭐ **[0:05] Speaker 1:** highlighted"))
+    }
+
+    @Test func markdownIncludesHighlightsSectionWhenPresent() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+
+        let recording = Recording(
+            meeting: meeting, fileName: "a.m4a", duration: 10,
+            highlights: [Highlight(timestamp: 12), Highlight(timestamp: 3)]
+        )
+        context.insert(recording)
+
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
+        #expect(markdown.contains("## Highlights"))
+        // Chronological, not insertion order.
+        let highlightsRange = markdown.range(of: "## Highlights")!
+        let afterHighlights = markdown[highlightsRange.upperBound...]
+        let threeIndex = afterHighlights.range(of: "- 0:03")!.lowerBound
+        let twelveIndex = afterHighlights.range(of: "- 0:12")!.lowerBound
+        #expect(threeIndex < twelveIndex)
+    }
+
+    @Test func markdownOmitsHighlightsSectionWhenNoneMarked() {
+        let meeting = Meeting(title: "Sprint Planning")
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
+        #expect(!markdown.contains("## Highlights"))
+    }
+
     @Test func temporaryFileSanitizesTitleForFileName() throws {
         let meeting = Meeting(title: "Q&A: Sprint / Review?")
         let url = try MeetingExport.temporaryFile(for: meeting, summary: nil)

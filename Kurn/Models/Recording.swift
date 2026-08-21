@@ -43,6 +43,13 @@ final class Recording {
     /// Byte count of the enhanced copy, cached so the storage screen can total
     /// them without stat-ing every file.
     var enhancedFileSize: Int64 = 0
+    /// JSON-encoded `[Highlight]` marked during this recording. SwiftData
+    /// can't store arbitrary Codable arrays directly (see `JSONStorage`), and
+    /// — like `fileSize`/`enhancedAudioVersion` above — the inline default
+    /// lets SwiftData migrate existing rows lightly instead of needing a
+    /// migration plan; `Data()` decodes to `[]` through `JSONStorage.decode`'s
+    /// failure fallback.
+    var highlightsData: Data = Data()
 
     @Relationship(deleteRule: .cascade, inverse: \Transcript.recording)
     var transcript: Transcript?
@@ -55,7 +62,8 @@ final class Recording {
         recordedAt: Date = Date(),
         transcriptionStatus: TranscriptionStatus = .none,
         transcriptionMode: TranscriptionMode = .onDevice,
-        fileSize: Int64 = 0
+        fileSize: Int64 = 0,
+        highlights: [Highlight] = []
     ) {
         self.id = id
         self.meeting = meeting
@@ -65,6 +73,7 @@ final class Recording {
         self.transcriptionStatusRaw = transcriptionStatus.rawValue
         self.transcriptionModeRaw = transcriptionMode.rawValue
         self.fileSize = fileSize
+        self.highlightsData = JSONStorage.encode(highlights)
     }
 
     var transcriptionStatus: TranscriptionStatus {
@@ -85,6 +94,11 @@ final class Recording {
         set {
             transcriptionCheckpointData = newValue.map(JSONStorage.encode)
         }
+    }
+
+    var highlights: [Highlight] {
+        get { JSONStorage.decode([Highlight].self, from: highlightsData) }
+        set { highlightsData = JSONStorage.encode(newValue) }
     }
 
     /// Absolute URL of the backing audio file in the current container.

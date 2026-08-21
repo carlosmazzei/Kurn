@@ -27,6 +27,8 @@ enum WatchSessionKey {
     static let isAvailable = "isAvailable"
     /// Normalized 0...1 audio level, phone → watch.
     static let level = "level"
+    /// Number of highlights marked so far this recording, phone → watch.
+    static let highlightCount = "highlightCount"
     /// Command reply: whether the phone handled the command.
     static let ok = "ok"
     /// Command reply: failure reason (see `WatchSessionReplyError`).
