@@ -83,11 +83,23 @@ final class RecorderViewModel {
         self.recorder.audioBitRate = options.audioQuality.bitRate
         self.recorder.forceBuiltInMic = options.alwaysUseBuiltInMic
         self.recorder.onStateChanged = { [weak self] state, elapsed in
-            self?.lockScreenController.update(state: state, elapsed: elapsed)
+            self?.lockScreenController.update(state: state, elapsed: elapsed, highlightCount: self?.recorder.highlights.count ?? 0)
             self?.pushWatchState(state: state, elapsed: elapsed)
         }
         self.recorder.onLevelChanged = { level in
             PhoneSessionController.shared.pushLevel(level)
+        }
+        // Marking a highlight doesn't change `state`/`elapsed`, so
+        // `onStateChanged` above never fires for it — this is the only signal
+        // that re-pushes the updated count to the Lock Screen and the Watch.
+        self.recorder.onHighlightAdded = { [weak self] _ in
+            guard let self else { return }
+            self.lockScreenController.update(
+                state: self.recorder.state,
+                elapsed: self.recorder.elapsed,
+                highlightCount: self.recorder.highlights.count
+            )
+            self.pushWatchState(state: self.recorder.state, elapsed: self.recorder.elapsed)
         }
         if options.liveTranscriptionEnabled {
             // Capture the service directly (not via `self`) so this closure,
@@ -116,7 +128,8 @@ final class RecorderViewModel {
             meetingTitle: displayTitle,
             accumulatedElapsed: elapsed,
             referenceDate: Date(),
-            isAvailable: state != .idle
+            isAvailable: state != .idle,
+            highlightCount: recorder.highlights.count
         )
     }
 
@@ -133,6 +146,7 @@ final class RecorderViewModel {
     var level: Float { recorder.level }
     var elapsed: TimeInterval { recorder.elapsed }
     var routeMessage: String? { recorder.routeChangeMessage }
+    var highlightCount: Int { recorder.highlights.count }
 
     /// Editable meeting title, surfaced as the recorder's "Add title…" field.
     var meetingTitle: String {
@@ -213,7 +227,8 @@ final class RecorderViewModel {
             lockScreenController.start(
                 title: displayTitle,
                 state: recorder.state,
-                elapsed: recorder.elapsed
+                elapsed: recorder.elapsed,
+                highlightCount: 0
             )
             RecordingCommandRouter.shared.register(
                 onTogglePause: { [weak self] in self?.togglePause() },
@@ -222,7 +237,8 @@ final class RecorderViewModel {
                     self?.recorder.pause(reason: .watchCommand)
                 },
                 onResume: { [weak self] in self?.recorder.resume() },
-                onStop: { [weak self] in self?.stopAndSave() }
+                onStop: { [weak self] in self?.stopAndSave() },
+                onHighlight: { [weak self] in self?.markHighlight() }
             )
             await liveStartTask?.value
             AppLog.recorderUI.atInfo.info("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
@@ -237,6 +253,10 @@ final class RecorderViewModel {
             if liveTranscriptionEnabled { await liveTranscription.stop() }
             self.error = .audioError(error.localizedDescription)
         }
+    }
+
+    func markHighlight() {
+        recorder.markHighlight()
     }
 
     func togglePause() {
@@ -291,7 +311,8 @@ final class RecorderViewModel {
             fileName: result.fileName,
             duration: result.duration,
             transcriptionMode: defaultMode,
-            fileSize: AudioFileStore.byteSize(fileName: result.fileName)
+            fileSize: AudioFileStore.byteSize(fileName: result.fileName),
+            highlights: result.highlights
         )
         modelContext.insert(recording)
         do {

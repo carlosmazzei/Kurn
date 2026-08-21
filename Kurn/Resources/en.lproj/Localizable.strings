@@ -169,6 +169,7 @@
 "recorder.pause" = "Pause";
 "recorder.resume" = "Resume";
 "recorder.stop" = "Stop";
+"recorder.highlight" = "Highlight";
 "recorder.paused" = "PAUSED";
 "recorder.permission.title" = "Microphone Access Needed";
 "recorder.permission.message" = "Kurn needs microphone access to record meetings. Enable it in Settings.";

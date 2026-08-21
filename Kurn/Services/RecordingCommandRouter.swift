@@ -17,6 +17,7 @@ enum WatchCommand: String, Sendable {
     case pause
     case resume
     case stop
+    case highlight
 }
 
 @MainActor
@@ -27,6 +28,7 @@ final class RecordingCommandRouter {
     private var onPause: (() -> Void)?
     private var onResume: (() -> Void)?
     private var onStop: (() -> Void)?
+    private var onHighlight: (() -> Void)?
 
     private init() {}
 
@@ -40,12 +42,14 @@ final class RecordingCommandRouter {
         onTogglePause: @escaping () -> Void,
         onPause: @escaping () -> Void,
         onResume: @escaping () -> Void,
-        onStop: @escaping () -> Void
+        onStop: @escaping () -> Void,
+        onHighlight: @escaping () -> Void
     ) {
         self.onTogglePause = onTogglePause
         self.onPause = onPause
         self.onResume = onResume
         self.onStop = onStop
+        self.onHighlight = onHighlight
     }
 
     func unregister() {
@@ -53,6 +57,7 @@ final class RecordingCommandRouter {
         onPause = nil
         onResume = nil
         onStop = nil
+        onHighlight = nil
     }
 
     func handle(_ url: URL) {
@@ -65,6 +70,9 @@ final class RecordingCommandRouter {
         case "/stop":
             AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity stop received")
             onStop?()
+        case "/highlight":
+            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity highlight received")
+            onHighlight?()
         default:
             break
         }
@@ -94,6 +102,12 @@ final class RecordingCommandRouter {
                 return false
             }
             onStop()
+        case .highlight:
+            guard let onHighlight else {
+                AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch highlight ignored, no active session")
+                return false
+            }
+            onHighlight()
         }
         return true
     }

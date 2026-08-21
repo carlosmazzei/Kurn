@@ -24,6 +24,8 @@ enum MeetingExport {
             out += renderSummary(summary)
         }
 
+        out += renderHighlights(for: meeting)
+
         let recordings = meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }
         let transcribed = recordings.filter { $0.transcript != nil }
         if !transcribed.isEmpty {
@@ -85,6 +87,24 @@ enum MeetingExport {
         return out
     }
 
+    /// Bullet list of every recording-relative highlight, converted to
+    /// meeting-relative `[mm:ss]` stamps and sorted chronologically. Static
+    /// document, no tap-to-seek — purely a navigational list.
+    @MainActor
+    private static func renderHighlights(for meeting: Meeting) -> String {
+        let stamps = meeting.recordings
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .flatMap { recording in
+                recording.highlights.map { meeting.startOffset(of: recording) + $0.timestamp }
+            }
+            .sorted()
+        guard !stamps.isEmpty else { return "" }
+        var out = "## Highlights\n\n"
+        out += stamps.map { "- \($0.clockDisplay)" }.joined(separator: "\n")
+        out += "\n\n"
+        return out
+    }
+
     /// Map speaker labels to display names for nicer export.
     @MainActor
     private static func speakerNames(for meeting: Meeting) -> [String: String] {
@@ -98,10 +118,13 @@ enum MeetingExport {
     private static func renderTranscript(for meeting: Meeting, recording: Recording, nameByLabel: [String: String]) -> String {
         var out = ""
         let offset = meeting.startOffset(of: recording)
+        let highlights = recording.highlights
         for segment in recording.transcript?.segments ?? [] {
             let name = nameByLabel[segment.speakerLabel] ?? segment.speakerLabel
             let stamp = (segment.startTime + offset).clockDisplay
-            out += "**[\(stamp)] \(name):** \(segment.text)\n\n"
+            let isHighlighted = highlights.contains { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
+            let prefix = isHighlighted ? "⭐ " : ""
+            out += "\(prefix)**[\(stamp)] \(name):** \(segment.text)\n\n"
         }
         return out
     }

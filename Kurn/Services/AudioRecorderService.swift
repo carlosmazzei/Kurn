@@ -107,10 +107,18 @@ final class AudioRecorderService: NSObject {
     /// Accumulated time across pause cycles plus the active span.
     private var accumulated: TimeInterval = 0
     private var segmentStart: Date?
+    /// Timestamps marked during the current recording, chronological (only
+    /// appended while `state == .recording`, so append order == time order).
+    private(set) var highlights: [Highlight] = []
     @ObservationIgnored var onStateChanged: ((State, TimeInterval) -> Void)?
     /// Fired on every metering tick (~50ms) while recording, for low-latency
     /// mirroring (e.g. to the Watch app). Not used for UI state transitions.
     @ObservationIgnored var onLevelChanged: ((Float) -> Void)?
+    /// Fired synchronously right after a highlight is captured — unlike
+    /// `onStateChanged`, marking a highlight does not change `state`/`elapsed`,
+    /// so this is the only signal callers get to re-push the Lock Screen /
+    /// Watch highlight count.
+    @ObservationIgnored var onHighlightAdded: ((Highlight) -> Void)?
     /// Fired with every raw captured buffer (e.g. for live transcription
     /// preview). Called on the audio render thread, like the tap itself —
     /// `nonisolated(unsafe)` so setting it doesn't require the main actor.
@@ -189,6 +197,7 @@ final class AudioRecorderService: NSObject {
         self.accumulated = 0
         self.segmentStart = Date()
         self.elapsed = 0
+        self.highlights = []
         self.routeChangeMessage = nil
         self.state = .recording
         notifyStateChanged()
@@ -251,10 +260,24 @@ final class AudioRecorderService: NSObject {
         startMetering()
     }
 
-    /// Stop and finalize. Returns the saved file name and total duration, or nil
-    /// if nothing was recorded. The session is deactivated afterwards.
+    /// Mark the current instant as a highlight. No-op unless actively
+    /// recording (mirrors `pause()`'s state guard) — marking while paused has
+    /// no "current instant" to capture, unlike pause/resume/stop which operate
+    /// on the whole session.
+    func markHighlight() {
+        guard state == .recording, let start = segmentStart else { return }
+        let timestamp = accumulated + Date().timeIntervalSince(start)
+        let highlight = Highlight(timestamp: timestamp)
+        highlights.append(highlight)
+        AppLog.recorder.atNotice.notice("markHighlight: added at \(timestamp, privacy: .public)s, count=\(self.highlights.count, privacy: .public)")
+        onHighlightAdded?(highlight)
+    }
+
+    /// Stop and finalize. Returns the saved file name, total duration, and the
+    /// highlights marked during this recording, or nil if nothing was
+    /// recorded. The session is deactivated afterwards.
     @discardableResult
-    func stop() -> (fileName: String, duration: TimeInterval)? {
+    func stop() -> (fileName: String, duration: TimeInterval, highlights: [Highlight])? {
         AppLog.recorder.atNotice.notice("stop: called state=\(String(describing: self.state), privacy: .public) file=\(self.currentFileName ?? "nil", privacy: .public)")
         guard state != .idle, let fileName = currentFileName else {
             AppLog.recorder.atDebug.debug("stop: nothing to stop (idle or no file)")
@@ -265,17 +288,19 @@ final class AudioRecorderService: NSObject {
         teardownEngine()
 
         let duration = accumulated
-        AppLog.recorder.atNotice.notice("stop: finalized file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s")
+        let capturedHighlights = highlights
+        AppLog.recorder.atNotice.notice("stop: finalized file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
         self.currentFileName = nil
         self.state = .idle
         self.level = 0
         self.elapsed = 0
         self.accumulated = 0
         self.segmentStart = nil
+        self.highlights = []
         notifyStateChanged()
 
         deactivateSession()
-        return (fileName, duration)
+        return (fileName, duration, capturedHighlights)
     }
 
     /// Abort the current recording and delete its partial file.
@@ -290,6 +315,7 @@ final class AudioRecorderService: NSObject {
         self.elapsed = 0
         self.accumulated = 0
         self.segmentStart = nil
+        self.highlights = []
         notifyStateChanged()
         deactivateSession()
     }

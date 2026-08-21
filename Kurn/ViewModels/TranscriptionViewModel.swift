@@ -460,11 +460,11 @@ final class TranscriptionViewModel {
     private func generateAITitle(for meeting: Meeting?, settings: AppSettings) async {
         guard let meeting, meeting.aiTitle == nil else { return }
         guard KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount) else { return }
-        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = meeting.recordings
+        let groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])] = meeting.recordings
             .sorted { $0.recordedAt < $1.recordedAt }
             .compactMap { recording in
                 guard let segments = recording.transcript?.segments else { return nil }
-                return (offset: meeting.startOffset(of: recording), segments: segments)
+                return (offset: meeting.startOffset(of: recording), segments: segments, highlights: recording.highlights)
             }
         let transcriptText = SummaryService.assembleTranscriptText(from: groups)
         guard !transcriptText.isEmpty else { return }
@@ -749,11 +749,11 @@ final class TranscriptionViewModel {
         // Assemble transcript text on the main actor (reads SwiftData). Each
         // group carries the recording's absolute start offset so the timestamps
         // stay chronological across multiple segments.
-        let groups: [(offset: TimeInterval, segments: [TranscriptSegment])] = meeting.recordings
+        let groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])] = meeting.recordings
             .sorted { $0.recordedAt < $1.recordedAt }
             .compactMap { recording in
                 guard let segments = recording.transcript?.segments else { return nil }
-                return (offset: meeting.startOffset(of: recording), segments: segments)
+                return (offset: meeting.startOffset(of: recording), segments: segments, highlights: recording.highlights)
             }
         let transcriptText = SummaryService.assembleTranscriptText(from: groups)
         let title = meeting.title

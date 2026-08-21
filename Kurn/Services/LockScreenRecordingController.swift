@@ -17,16 +17,19 @@ final class LockScreenRecordingController {
     private var title = ""
     private var state: AudioRecorderService.State = .idle
     private var elapsed: TimeInterval = 0
+    private var highlightCount = 0
     private var isActive = false
 
     func start(
         title: String,
         state: AudioRecorderService.State,
-        elapsed: TimeInterval
+        elapsed: TimeInterval,
+        highlightCount: Int
     ) {
         self.title = title
         self.state = state
         self.elapsed = elapsed
+        self.highlightCount = highlightCount
         self.isActive = true
 
         let activitiesEnabled = ActivityAuthorizationInfo().areActivitiesEnabled
@@ -37,7 +40,7 @@ final class LockScreenRecordingController {
             do {
                 let attributes = RecordingActivityAttributes(meetingTitle: title)
                 let content = ActivityContent(
-                    state: contentState(state: state, elapsed: elapsed),
+                    state: contentState(state: state, elapsed: elapsed, highlightCount: highlightCount),
                     staleDate: nil
                 )
                 activity = try Activity.request(
@@ -53,16 +56,17 @@ final class LockScreenRecordingController {
         }
     }
 
-    func update(state: AudioRecorderService.State, elapsed: TimeInterval) {
+    func update(state: AudioRecorderService.State, elapsed: TimeInterval, highlightCount: Int) {
         guard isActive else { return }
 
         self.state = state
         self.elapsed = elapsed
+        self.highlightCount = highlightCount
 
         AppLog.recorderUI.atDebug.debug("LockScreenRecordingController: update state=\(String(describing: state), privacy: .public)")
 
         let content = ActivityContent(
-            state: contentState(state: state, elapsed: elapsed),
+            state: contentState(state: state, elapsed: elapsed, highlightCount: highlightCount),
             staleDate: nil
         )
 
@@ -77,13 +81,14 @@ final class LockScreenRecordingController {
         AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: end")
 
         let finalContent = ActivityContent(
-            state: contentState(state: .idle, elapsed: elapsed),
+            state: contentState(state: .idle, elapsed: elapsed, highlightCount: highlightCount),
             staleDate: nil
         )
 
         title = ""
         state = .idle
         elapsed = 0
+        highlightCount = 0
         isActive = false
 
         Task { @MainActor in
@@ -94,12 +99,14 @@ final class LockScreenRecordingController {
 
     private func contentState(
         state: AudioRecorderService.State,
-        elapsed: TimeInterval
+        elapsed: TimeInterval,
+        highlightCount: Int
     ) -> RecordingActivityAttributes.ContentState {
         RecordingActivityAttributes.ContentState(
             isPaused: state != .recording,
             elapsed: elapsed,
-            referenceDate: Date()
+            referenceDate: Date(),
+            highlightCount: highlightCount
         )
     }
 }

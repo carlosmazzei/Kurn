@@ -17,12 +17,13 @@ enum WatchCommand: String, Sendable {
     case pause
     case resume
     case stop
+    case highlight
 }
 
 enum RemoteRecordingState: Equatable {
     case idle
-    case recording(meetingTitle: String, referenceDate: Date, accumulatedElapsed: TimeInterval)
-    case paused(meetingTitle: String, accumulatedElapsed: TimeInterval)
+    case recording(meetingTitle: String, referenceDate: Date, accumulatedElapsed: TimeInterval, highlightCount: Int)
+    case paused(meetingTitle: String, accumulatedElapsed: TimeInterval, highlightCount: Int)
 }
 
 private struct WatchRecordingContext: Sendable {
@@ -31,6 +32,7 @@ private struct WatchRecordingContext: Sendable {
     let meetingTitle: String
     let referenceDate: Date
     let accumulatedElapsed: TimeInterval
+    let highlightCount: Int
 
     init(_ context: [String: Any]) {
         isAvailable = (context[WatchSessionKey.isAvailable] as? Bool) ?? false
@@ -38,6 +40,7 @@ private struct WatchRecordingContext: Sendable {
         meetingTitle = (context[WatchSessionKey.meetingTitle] as? String) ?? ""
         referenceDate = (context[WatchSessionKey.referenceDate] as? Date) ?? Date()
         accumulatedElapsed = (context[WatchSessionKey.accumulatedElapsed] as? TimeInterval) ?? 0
+        highlightCount = (context[WatchSessionKey.highlightCount] as? Int) ?? 0
     }
 }
 
@@ -88,12 +91,14 @@ final class WatchConnectivityManager: NSObject {
             state = .recording(
                 meetingTitle: context.meetingTitle,
                 referenceDate: context.referenceDate,
-                accumulatedElapsed: context.accumulatedElapsed
+                accumulatedElapsed: context.accumulatedElapsed,
+                highlightCount: context.highlightCount
             )
         case WatchSessionState.paused:
             state = .paused(
                 meetingTitle: context.meetingTitle,
-                accumulatedElapsed: context.accumulatedElapsed
+                accumulatedElapsed: context.accumulatedElapsed,
+                highlightCount: context.highlightCount
             )
             level = 0
         default:

@@ -169,6 +169,7 @@
 "recorder.pause" = "Pause";
 "recorder.resume" = "Reprendre";
 "recorder.stop" = "Arrêter";
+"recorder.highlight" = "Marquer";
 "recorder.paused" = "EN PAUSE";
 "recorder.permission.title" = "Accès au microphone requis";
 "recorder.permission.message" = "Kurn a besoin du microphone pour enregistrer les réunions. Activez-le dans Réglages.";

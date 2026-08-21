@@ -15,6 +15,7 @@ struct RecordingActivityAttributes: ActivityAttributes {
         var isPaused: Bool
         var elapsed: TimeInterval
         var referenceDate: Date
+        var highlightCount: Int
     }
 
     var meetingTitle: String

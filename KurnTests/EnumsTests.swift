@@ -152,4 +152,19 @@ struct EnumsTests {
         let inverted = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 5, endTime: 2, text: "hi")
         #expect(inverted.duration == 0)
     }
+
+    // MARK: - Highlight
+
+    @Test func highlightRoundTripsThroughJSONEncoding() throws {
+        let highlight = Highlight(timestamp: 12.5)
+        let data = try JSONEncoder().encode(highlight)
+        let decoded = try JSONDecoder().decode(Highlight.self, from: data)
+        #expect(decoded == highlight)
+    }
+
+    @Test func highlightGetsAUniqueIDByDefault() {
+        let first = Highlight(timestamp: 0)
+        let second = Highlight(timestamp: 0)
+        #expect(first.id != second.id)
+    }
 }

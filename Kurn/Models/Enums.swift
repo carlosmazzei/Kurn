@@ -708,6 +708,18 @@ struct TranscriptSegment: Codable, Identifiable, Hashable, Sendable {
     var duration: TimeInterval { max(0, endTime - startTime) }
 }
 
+/// A single marked instant during a live recording ("this moment matters"),
+/// captured with a one-tap gesture — deliberately no label/note field, since
+/// adding one would require a keyboard mid-recording. `timestamp` is
+/// recording-relative, matching `TranscriptSegment.startTime`'s convention.
+/// Stored inside `Recording` as JSON `Data`, same pattern as
+/// `Transcript.segments`.
+struct Highlight: Codable, Identifiable, Hashable, Sendable {
+    var id: UUID = UUID()
+    var timestamp: TimeInterval
+    var createdAt: Date = Date()
+}
+
 // `MeetingLanguage` lives in its own file, `Models/MeetingLanguage.swift`,
 // since its table-driven implementation (covering every Whisper-supported
 // language) is too large to sit alongside the other enums here.
