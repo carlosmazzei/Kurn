@@ -3,6 +3,7 @@
 //  KurnTests
 //
 
+import Foundation
 import Testing
 @testable import Kurn
 
