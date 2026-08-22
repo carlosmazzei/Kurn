@@ -1,0 +1,1 @@
+Local-first meeting recorder with on-device transcription, speaker ID, and AI summaries. Your recordings stay on your device by default.

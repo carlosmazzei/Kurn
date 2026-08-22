@@ -1,0 +1,22 @@
+Kurn is a local-first app for recording meetings, transcribing audio, identifying speakers, and generating structured AI summaries — built so your recordings stay on your device by default.
+
+RECORD AND TRANSCRIBE
+- Record meetings in one or more segments, with pause, resume, and stop controls from the app, the Lock Screen, Dynamic Island, or your Apple Watch.
+- Transcribe on device with Apple's Speech framework or an on-device multilingual model, or optionally use a cloud Whisper-compatible API for longer recordings.
+- Automatic speaker diarization tells you who said what, with editable speaker names.
+- An opt-in live transcription preview shows a rolling draft while you record.
+- Long transcriptions resume automatically if the app is backgrounded or interrupted, continuing from where they left off instead of starting over.
+
+UNDERSTAND YOUR MEETINGS
+- Structured, template-driven AI summaries — general, standup, or interview formats, or your own custom template.
+- Search meetings and filter by date, tags, status, or duration.
+- Organize meetings into folders, Smart Folders, favorites, and an archive.
+- Tag meetings manually or with optional AI-suggested tags.
+- Ask questions about a single meeting or across your whole library, with cited, tappable timestamps that jump straight to that moment in the transcript.
+
+PRIVATE BY DESIGN
+- Recordings and meeting data are stored on your device, encrypted at rest, and gated behind Face ID, Touch ID, or your passcode.
+- Network requests only happen if you choose cloud transcription or an AI summary provider — everything else runs entirely on device.
+- No tracking, no analytics, no accounts required.
+
+Kurn's UI is available in English, Brazilian Portuguese, Spanish, French, Italian, German, and Simplified Chinese. Transcription supports every language Whisper recognizes.
