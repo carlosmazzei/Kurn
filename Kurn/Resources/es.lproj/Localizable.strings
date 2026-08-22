@@ -405,6 +405,8 @@
 "settings.templates" = "Plantillas de Resumen";
 "settings.templates_footer" = "Las plantillas definen cómo se resume una transcripción. Elige una cada vez que generes un resumen.";
 "settings.add_template" = "Añadir Plantilla";
+"settings.templates_sync" = "Sincronizar Plantillas con iCloud";
+"settings.templates_sync_footer" = "Las plantillas personalizadas que crees se sincronizan mediante iCloud, para que estén disponibles al cambiar de dispositivo. Las plantillas predeterminadas ya se mantienen actualizadas por sí solas.";
 "settings.template_name" = "Nombre";
 "settings.template_instructions" = "Instrucciones";
 "settings.template_instructions_footer" = "Describe el enfoque y el tono del resumen. El modelo siempre responde en el idioma de la transcripción.";
