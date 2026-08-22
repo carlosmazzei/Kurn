@@ -107,15 +107,13 @@ lane :beta do
   )
 end
 
-# Pushes fastlane/metadata/ (description, keywords, support/marketing URLs,
-# category, copyright — see that folder for the actual English copy) to App
-# Store Connect. Deliberately scoped to text only: no binary, no screenshots,
-# so this never collides with `beta`'s TestFlight upload or `screenshots`'
-# capture run. privacy_url.txt is intentionally absent — Apple requires a
-# real hosted privacy policy page, which doesn't exist yet, so this lane will
-# need that file added before the first real `deliver` (without
-# skip_metadata/force it would otherwise prompt interactively for missing
-# required fields, which can't happen in CI).
+# Pushes fastlane/metadata/ (description, keywords, support/marketing/privacy
+# URLs, category, copyright — see that folder for the actual English copy) to
+# App Store Connect. Deliberately scoped to text only: no binary, no
+# screenshots, so this never collides with `beta`'s TestFlight upload or
+# `screenshots`' capture run. privacy_url.txt points at PRIVACY.md rendered
+# on GitHub rather than a dedicated hosted page — a real webpage with no
+# extra infrastructure to stand up or keep online.
 lane :metadata do
   deliver(
     skip_binary_upload: true,
