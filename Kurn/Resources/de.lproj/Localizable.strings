@@ -405,6 +405,8 @@
 "settings.templates" = "Zusammenfassungsvorlagen";
 "settings.templates_footer" = "Vorlagen bestimmen, wie ein Transkript zusammengefasst wird. Wählen Sie jedes Mal eine aus, wenn Sie eine Zusammenfassung erstellen.";
 "settings.add_template" = "Vorlage hinzufügen";
+"settings.templates_sync" = "Vorlagen über iCloud synchronisieren";
+"settings.templates_sync_footer" = "Von Ihnen erstellte, benutzerdefinierte Vorlagen werden über iCloud synchronisiert und sind so nach einem Gerätewechsel verfügbar. Integrierte Vorlagen bleiben ohnehin stets aktuell.";
 "settings.template_name" = "Name";
 "settings.template_instructions" = "Anweisungen";
 "settings.template_instructions_footer" = "Beschreiben Sie Schwerpunkt und Ton der Zusammenfassung. Das Modell antwortet immer in der Sprache des Transkripts.";

@@ -59,9 +59,16 @@ final class AppSettings {
         static let semanticSearchEnabled = "settings.semanticSearchEnabled"
         static let wikiEnabled = "settings.wikiEnabled"
         static let correctionEnabled = "settings.correctionEnabled"
+        static let templatesSyncEnabled = "settings.templatesSyncEnabled"
     }
 
+    /// iCloud key-value storage key for the synced custom-template payload.
+    /// Not in `Keys` (that enum is `UserDefaults` keys) — this one lives in
+    /// `CloudKeyValueStore` instead.
+    private static let cloudTemplatesKey = "cloud.summaryTemplates"
+
     private let defaults = UserDefaults.standard
+    private let cloudStore: CloudKeyValueStore
 
     var providers: [AIProvider] {
         didSet { persistProviders() }
@@ -165,6 +172,23 @@ final class AppSettings {
     /// explicit opt-in. See `LLMTranscriptCorrector`.
     var correctionEnabled: Bool {
         didSet { defaults.set(correctionEnabled, forKey: Keys.correctionEnabled) }
+    }
+
+    /// Whether custom summary templates sync via iCloud key-value storage, so
+    /// they survive a device switch. Off by default: it's the first setting
+    /// that leaves the device, even though — unlike `wikiEnabled`/
+    /// `correctionEnabled` — no cloud LLM call or network request is involved.
+    /// Toggling it on reconciles immediately in both directions; toggling it
+    /// off clears the iCloud copy rather than leaving it to go stale.
+    var templatesSyncEnabled: Bool {
+        didSet {
+            defaults.set(templatesSyncEnabled, forKey: Keys.templatesSyncEnabled)
+            if templatesSyncEnabled {
+                reconcileTemplatesWithCloud()
+            } else {
+                cloudStore.setData(nil, forKey: Self.cloudTemplatesKey)
+            }
+        }
     }
 
     /// When on, the recordings UI requires Face ID / Touch ID / passcode once
@@ -429,11 +453,15 @@ final class AppSettings {
 
     func addTemplate(_ template: SummaryTemplate) {
         summaryTemplates.append(template)
+        pushTemplatesToCloudIfSyncing()
     }
 
     func updateTemplate(_ template: SummaryTemplate) {
         guard let index = summaryTemplates.firstIndex(where: { $0.id == template.id }) else { return }
-        summaryTemplates[index] = template
+        var updated = template
+        updated.updatedAt = Date()
+        summaryTemplates[index] = updated
+        pushTemplatesToCloudIfSyncing()
     }
 
     func removeTemplate(_ template: SummaryTemplate) {
@@ -442,6 +470,7 @@ final class AppSettings {
         if lastSummaryTemplateID == template.id {
             lastSummaryTemplateID = summaryTemplates.first?.id ?? SummaryTemplate.general.id
         }
+        pushTemplatesToCloudIfSyncing()
     }
 
     func addProvider(_ provider: AIProvider) {
@@ -469,7 +498,8 @@ final class AppSettings {
         }
     }
 
-    init() {
+    init(cloudStore: CloudKeyValueStore = CloudSettingsSync.shared) {
+        self.cloudStore = cloudStore
         // An empty stored list is treated as absent: it can only come from a
         // corrupt write, and shipping the app with no providers at all is worse
         // than re-seeding the built-ins.
@@ -573,6 +603,50 @@ final class AppSettings {
         lastSummaryTemplateID = loadedTemplates.contains(where: { $0.id == storedTemplateID })
             ? storedTemplateID
             : (loadedTemplates.first?.id ?? SummaryTemplate.general.id)
+        templatesSyncEnabled = defaults.bool(forKey: Keys.templatesSyncEnabled, default: false)
+
+        if templatesSyncEnabled {
+            reconcileTemplatesWithCloud()
+        }
+        // Registered last: the closure captures `self` weakly and dispatches
+        // back to the main actor, so it must not run before every stored
+        // property above has its initial value.
+        cloudStore.didChangeExternally = { [weak self] changedKeys in
+            guard changedKeys.contains(AppSettings.cloudTemplatesKey) else { return }
+            Task { @MainActor in
+                guard let self, self.templatesSyncEnabled else { return }
+                self.reconcileTemplatesWithCloud()
+            }
+        }
+    }
+
+    /// Merges this device's custom templates with whatever is currently in
+    /// iCloud (`TemplateSyncMerger`), applies the result locally if it
+    /// changed, and pushes the merged set back so both sides converge.
+    private func reconcileTemplatesWithCloud() {
+        let localCustom = summaryTemplates.filter { !$0.isBuiltIn }
+        let remoteCustom: [SummaryTemplate]
+        if let data = cloudStore.data(forKey: Self.cloudTemplatesKey),
+           let decoded = try? JSONDecoder().decode([SummaryTemplate].self, from: data) {
+            remoteCustom = decoded
+        } else {
+            remoteCustom = []
+        }
+        let merged = TemplateSyncMerger.merge(local: localCustom, remote: remoteCustom)
+        if merged != localCustom {
+            let builtIns = summaryTemplates.filter(\.isBuiltIn)
+            summaryTemplates = builtIns + merged
+        }
+        if let data = try? JSONEncoder().encode(merged) {
+            cloudStore.setData(data, forKey: Self.cloudTemplatesKey)
+        }
+    }
+
+    private func pushTemplatesToCloudIfSyncing() {
+        guard templatesSyncEnabled else { return }
+        let custom = summaryTemplates.filter { !$0.isBuiltIn }
+        guard let data = try? JSONEncoder().encode(custom) else { return }
+        cloudStore.setData(data, forKey: Self.cloudTemplatesKey)
     }
 
     private func persistProviders() {

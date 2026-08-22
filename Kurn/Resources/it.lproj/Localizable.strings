@@ -405,6 +405,8 @@
 "settings.templates" = "Modelli di Riassunto";
 "settings.templates_footer" = "I modelli definiscono come viene riassunta una trascrizione. Scegline uno ogni volta che generi un riassunto.";
 "settings.add_template" = "Aggiungi Modello";
+"settings.templates_sync" = "Sincronizza i Modelli tramite iCloud";
+"settings.templates_sync_footer" = "I modelli personalizzati che crei vengono sincronizzati tramite iCloud, così sono disponibili dopo il cambio di dispositivo. I modelli predefiniti restano sempre aggiornati autonomamente.";
 "settings.template_name" = "Nome";
 "settings.template_instructions" = "Istruzioni";
 "settings.template_instructions_footer" = "Descrivi il focus e il tono del riassunto. Il modello risponde sempre nella lingua della trascrizione.";

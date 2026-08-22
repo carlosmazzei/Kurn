@@ -64,6 +64,15 @@ struct SummarySettingsView: View {
             } footer: {
                 Text(NSLocalizedString("settings.templates_footer", comment: "Templates footer"))
             }
+
+            Section {
+                Toggle(
+                    NSLocalizedString("settings.templates_sync", comment: "Sync Templates via iCloud"),
+                    isOn: $settings.templatesSyncEnabled
+                )
+            } footer: {
+                Text(NSLocalizedString("settings.templates_sync_footer", comment: "Templates sync footer"))
+            }
         }
         .navigationTitle(NSLocalizedString("settings.summary", comment: "Summary"))
         .sheet(isPresented: $showingAddTemplate) {
