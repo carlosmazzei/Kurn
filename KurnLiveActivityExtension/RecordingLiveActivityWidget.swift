@@ -178,7 +178,7 @@ private func commandButtons(
         // which would crowd "Pause"/"Stop" labels in longer languages.
         if !context.state.isPaused {
             Link(destination: URL(string: "kurn://recording/highlight")!) {
-                Image(systemName: "star.fill")
+                Image(systemName: "bookmark.fill")
                     .font(.system(size: height < 40 ? 13 : 15, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: height, height: height)
@@ -192,12 +192,12 @@ private func commandButtons(
 @ViewBuilder
 private func highlightCountBadge(_ context: ActivityViewContext<RecordingActivityAttributes>) -> some View {
     HStack(spacing: 3) {
-        Image(systemName: "star.fill")
+        Image(systemName: "bookmark.fill")
             .font(.system(size: 10, weight: .bold))
         Text("\(context.state.highlightCount)")
             .font(.system(size: 12, weight: .semibold, design: .rounded))
     }
-    .foregroundStyle(.yellow)
+    .foregroundStyle(Color.kurnHighlight)
 }
 
 @ViewBuilder
@@ -264,6 +264,8 @@ private extension Color {
     static let kurnAccent = Color(red: 1.0, green: 0.231, blue: 0.188)
     static let kurnPaused = Color(red: 1.0, green: 0.624, blue: 0.039)
     static let kurnStop = Color(red: 1.0, green: 0.231, blue: 0.188)
+    /// Matches `Theme.warning` in the app target: orange = user-marked.
+    static let kurnHighlight = Color(red: 1.0, green: 0.624, blue: 0.039)
 }
 
 private extension TimeInterval {
