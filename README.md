@@ -445,3 +445,8 @@ third-party components under their own licenses; see
 ## Privacy
 
 Kurn's data handling is described in [PRIVACY.md](PRIVACY.md).
+
+## Terms of Use
+
+Using Kurn — including your responsibility for consent when recording other
+people — is described in [TERMS.md](TERMS.md).
