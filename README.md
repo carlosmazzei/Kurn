@@ -449,4 +449,7 @@ Kurn's data handling is described in [PRIVACY.md](PRIVACY.md).
 ## Terms of Use
 
 Using Kurn — including your responsibility for consent when recording other
-people — is described in [TERMS.md](TERMS.md).
+people — is described in [TERMS.md](TERMS.md). [EULA.md](EULA.md) is the same
+substantive terms formatted to satisfy Apple's required minimum terms, ready
+to paste into App Store Connect as a custom License Agreement if the default
+Apple Standard License Agreement isn't used.
