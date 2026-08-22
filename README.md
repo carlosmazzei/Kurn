@@ -446,6 +446,11 @@ third-party components under their own licenses; see
 
 Kurn's data handling is described in [PRIVACY.md](PRIVACY.md).
 
+## Encryption
+
+Kurn's use of encryption, for App Store export compliance, is described in
+[ENCRYPTION.md](ENCRYPTION.md).
+
 ## Terms of Use
 
 Using Kurn — including your responsibility for consent when recording other
