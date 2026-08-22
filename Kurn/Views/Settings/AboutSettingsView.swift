@@ -38,8 +38,6 @@ struct AboutSettingsView: View {
                         systemImage: "heart"
                     )
                 }
-            } footer: {
-                Text(NSLocalizedString("settings.appstore_status", comment: "App Store status note"))
             }
         }
         .navigationTitle(NSLocalizedString("settings.about", comment: "About"))

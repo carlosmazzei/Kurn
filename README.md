@@ -21,12 +21,10 @@ Recordings and meeting data are stored on device by default. Network requests
 only happen when the user chooses cloud (Whisper-compatible) transcription or
 generates a summary with a configured AI provider.
 
-> **App Store status:** Kurn is not yet published on the App Store — for now,
-> build it yourself from this repo (see [Getting Started](#getting-started)).
-> Once [GitHub Sponsors](https://github.com/sponsors/carlosmazzei) funding for
-> the project reaches a combined **$100**, I'll submit Kurn to the App Store
-> and keep it free to download. If you'd like to help it get there, sponsoring
-> is the fastest way.
+> **App Store status:** Kurn is not yet published on the App Store — it's
+> currently in TestFlight testing, with an App Store submission to follow.
+> For now, you can also build it yourself from this repo (see
+> [Getting Started](#getting-started)).
 
 ## Current App
 
@@ -297,12 +295,14 @@ Fastlane-driven process (see `fastlane/Fastfile`):
    same `build-and-test` job that gates every push/PR, then publishes a
    GitHub Release with auto-generated notes.
 
-No code signing, archiving, or App Store/TestFlight upload is automated yet —
-that requires provisioning Apple Developer certificates and an App Store
-Connect API key as repo secrets, which is a separate future step. Submitting
-Kurn to the App Store itself is gated on reaching $100 in combined
-[GitHub Sponsors](https://github.com/sponsors/carlosmazzei) funding — see the
-App Store status note near the top of this README.
+Pushing the tag also triggers the `beta` job, which signs (via `fastlane
+match`), archives, and uploads the build to TestFlight — gated behind the
+`release` GitHub Environment so nothing reaches App Store Connect without
+approval. TestFlight distribution and an actual App Store submission are
+different things: uploading a build is automated, but selecting it,
+completing App Store Connect's one-time account-level setup (pricing, App
+Privacy, age rating, review notes), and clicking Submit for Review are not,
+and shouldn't be.
 
 ## Linting
 

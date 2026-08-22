@@ -562,7 +562,6 @@
 "settings.about" = "À propos";
 "settings.acknowledgements" = "Remerciements";
 "settings.sponsor" = "Sponsoriser Kurn";
-"settings.appstore_status" = "Kurn n'est pas encore sur l'App Store. Une fois que le financement cumulé via GitHub Sponsors atteindra 100 $, l'app sera soumise à l'App Store et restera gratuite à télécharger.";
 "ack.intro" = "La reconnaissance vocale sur l'appareil, la diarisation des intervenants et la détection d'activité vocale sont assurées par Fluid Inference et whisper.cpp. Kurn utilise les packages ci-dessous et télécharge à la demande leurs modèles de machine learning. Chaque composant est utilisé sous sa propre licence.";
 "ack.packages" = "Packages Swift";
 "ack.models" = "Modèles de Machine Learning";
