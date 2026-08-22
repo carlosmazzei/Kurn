@@ -2,22 +2,6 @@
 
 **Last updated: August 22, 2026**
 
-> **This is a template, not legal advice**, drafted to satisfy Apple's
-> required minimum terms for a custom End User License Agreement (see the
-> Apple Developer Program License Agreement, Schedule 2) plus Kurn-specific
-> terms carried over from [TERMS.md](TERMS.md). It has not been reviewed by a
-> lawyer — check it (and Apple's current minimum-terms requirements, which
-> Apple can update) before pasting it into App Store Connect. Nothing here
-> should be pasted as-is into a paid, regulated, or high-stakes app without
-> that review.
->
-> **How to use this file:** App Store Connect → your app → App Information →
-> License Agreement → switch to "Custom License Agreement" and paste the text
-> below (everything after this notice). If you leave the default in place,
-> Apple's Standard License Agreement applies instead — Part 1 below exists
-> only because a custom agreement must independently satisfy those same
-> minimum terms.
-
 ---
 
 ## Part 1 — Apple's Required Minimum Terms
@@ -177,8 +161,7 @@ is visible in the repository's commit log.
 
 ### Governing Law
 
-*Placeholder — confirm with a lawyer before relying on this section.* This
-Agreement is governed by the laws of Brazil, without regard to its
+This Agreement is governed by the laws of Brazil, without regard to its
 conflict-of-law principles, and any dispute will be subject to the
 jurisdiction of the courts of Brazil, except where applicable law requires
 otherwise (for example, mandatory consumer-protection rules of your own

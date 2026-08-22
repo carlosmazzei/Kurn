@@ -2,12 +2,6 @@
 
 **Last updated: August 22, 2026**
 
-> **This is a template, not legal advice.** It reflects common terms used by
-> similar apps, grounded in how Kurn actually works, but it has not been
-> reviewed by a lawyer. Given that Kurn records audio of other people, get it
-> reviewed for your jurisdiction — in particular the "Your Responsibility for
-> Recordings" and "Governing Law" sections — before relying on it.
-
 ## 1. Acceptance
 
 By downloading, installing, or using Kurn ("the App"), you agree to these
