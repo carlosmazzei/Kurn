@@ -60,7 +60,7 @@ struct TranscriptView: View {
                     Button {
                         onSeek(highlight.timestamp)
                     } label: {
-                        Image(systemName: "star.fill")
+                        Image(systemName: "bookmark.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.warning)
                     }

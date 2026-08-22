@@ -71,9 +71,9 @@ struct WatchRecorderView: View {
                 .monospacedDigit()
 
             if highlightCount > 0 {
-                Label("\(highlightCount)", systemImage: "star.fill")
+                Label("\(highlightCount)", systemImage: "bookmark.fill")
                     .font(.caption2)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(.orange)
             }
 
             if !isPaused {
@@ -98,7 +98,7 @@ struct WatchRecorderView: View {
                 Button {
                     Task { await connectivity.send(.highlight) }
                 } label: {
-                    Image(systemName: "star.fill")
+                    Image(systemName: "bookmark.fill")
                 }
                 .buttonStyle(.bordered)
                 .disabled(isPaused)

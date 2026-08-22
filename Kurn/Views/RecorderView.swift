@@ -201,7 +201,7 @@ private struct RecorderContent: View {
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
             if vm.highlightCount > 0 {
-                Label("\(vm.highlightCount)", systemImage: "star.fill")
+                Label("\(vm.highlightCount)", systemImage: "bookmark.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.warning)
                     .contentTransition(.numericText())
@@ -320,7 +320,7 @@ private struct RecorderContent: View {
                 AppLog.recorderUI.atInfo.info("UI: highlight tapped, state=\(String(describing: vm.state), privacy: .public)")
                 vm.markHighlight()
             } label: {
-                Image(systemName: "star.fill")
+                Image(systemName: "bookmark.fill")
                     .font(.system(size: 20, weight: .semibold))
                     .frame(width: 58, height: 58)
             }
