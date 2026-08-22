@@ -107,6 +107,23 @@ lane :beta do
   )
 end
 
+# Pushes fastlane/metadata/ (description, keywords, support/marketing URLs,
+# category, copyright — see that folder for the actual English copy) to App
+# Store Connect. Deliberately scoped to text only: no binary, no screenshots,
+# so this never collides with `beta`'s TestFlight upload or `screenshots`'
+# capture run. privacy_url.txt is intentionally absent — Apple requires a
+# real hosted privacy policy page, which doesn't exist yet, so this lane will
+# need that file added before the first real `deliver` (without
+# skip_metadata/force it would otherwise prompt interactively for missing
+# required fields, which can't happen in CI).
+lane :metadata do
+  deliver(
+    skip_binary_upload: true,
+    skip_screenshots: true,
+    force: true
+  )
+end
+
 # Generates App Store screenshots from the KurnUITests target. The app is
 # launched with the "UI-Testing-Screenshots" argument (see KurnApp.swift and
 # Kurn/DebugSupport/ScreenshotSeedData.swift), which swaps in a seeded,

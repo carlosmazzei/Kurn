@@ -1,0 +1,1 @@
+meeting,transcript,notes,diarization,speakers,summary,recorder,privacy,offline,whisper
