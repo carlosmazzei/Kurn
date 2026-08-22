@@ -441,3 +441,7 @@ available in the app under **Settings → Acknowledgements**.
 Kurn is released under the [MIT License](LICENSE). It includes and downloads
 third-party components under their own licenses; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Privacy
+
+Kurn's data handling is described in [PRIVACY.md](PRIVACY.md).
