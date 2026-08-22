@@ -1,0 +1,8 @@
+# git_url, git_basic_authorization and password are read from the
+# MATCH_GIT_URL / MATCH_GIT_BASIC_AUTHORIZATION / MATCH_PASSWORD env vars
+# (fastlane match's own naming convention), never hardcoded here — see the
+# `beta` lane in the Fastfile and the release job in swift.yml for how CI
+# supplies them.
+storage_mode("git")
+type("appstore")
+app_identifier(["ai.kurn.app", "ai.kurn.app.watchkitapp", "ai.kurn.app.LiveActivityExtension"])

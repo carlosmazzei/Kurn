@@ -64,6 +64,49 @@ lane :github_release do
   )
 end
 
+# CI-only: signs and uploads a TestFlight build for the tag that triggered
+# the release workflow (runs in parallel with `github_release`, gated behind
+# the `release` GitHub Environment so a stray tag push still waits for
+# manual approval before anything is uploaded to App Store Connect).
+#
+# Signing comes entirely from fastlane match (readonly in CI — this lane
+# never generates or revokes certs, only installs ones that already exist
+# in the private kurn-certificates repo) plus an App Store Connect API key,
+# so no Apple ID password or 2FA prompt is ever needed here.
+lane :beta do
+  # Creates a throwaway keychain and points match/gym at it instead of the
+  # runner's login keychain, which has no unlock password to script around
+  # non-interactively. No-op outside CI.
+  setup_ci if is_ci
+
+  api_key = app_store_connect_api_key(
+    key_id: ENV["ASC_KEY_ID"],
+    issuer_id: ENV["ASC_ISSUER_ID"],
+    key_content: ENV["ASC_KEY_CONTENT"],
+    is_key_content_base64: true
+  )
+
+  match(type: "appstore", readonly: is_ci)
+
+  build_app(
+    scheme: "Kurn",
+    export_method: "app-store",
+    output_directory: "build",
+    export_options: {
+      provisioningProfiles: {
+        "ai.kurn.app" => "match AppStore ai.kurn.app",
+        "ai.kurn.app.watchkitapp" => "match AppStore ai.kurn.app.watchkitapp",
+        "ai.kurn.app.LiveActivityExtension" => "match AppStore ai.kurn.app.LiveActivityExtension"
+      }
+    }
+  )
+
+  upload_to_testflight(
+    api_key: api_key,
+    skip_waiting_for_build_processing: true
+  )
+end
+
 # Generates App Store screenshots from the KurnUITests target. The app is
 # launched with the "UI-Testing-Screenshots" argument (see KurnApp.swift and
 # Kurn/DebugSupport/ScreenshotSeedData.swift), which swaps in a seeded,
