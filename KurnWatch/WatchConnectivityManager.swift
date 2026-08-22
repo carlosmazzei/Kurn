@@ -72,10 +72,10 @@ final class WatchConnectivityManager: NSObject {
         let ok = await withCheckedContinuation { continuation in
             WCSession.default.sendMessage(
                 [WatchSessionKey.command: command.rawValue],
-                replyHandler: { reply in
+                replyHandler: { @Sendable reply in
                     continuation.resume(returning: (reply[WatchSessionKey.ok] as? Bool) ?? false)
                 },
-                errorHandler: { _ in
+                errorHandler: { @Sendable _ in
                     continuation.resume(returning: false)
                 }
             )
