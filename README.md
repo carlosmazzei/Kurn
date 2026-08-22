@@ -297,12 +297,19 @@ Fastlane-driven process (see `fastlane/Fastfile`):
    same `build-and-test` job that gates every push/PR, then publishes a
    GitHub Release with auto-generated notes.
 
-No code signing, archiving, or App Store/TestFlight upload is automated yet —
-that requires provisioning Apple Developer certificates and an App Store
-Connect API key as repo secrets, which is a separate future step. Submitting
-Kurn to the App Store itself is gated on reaching $100 in combined
-[GitHub Sponsors](https://github.com/sponsors/carlosmazzei) funding — see the
-App Store status note near the top of this README.
+Pushing the tag also triggers the `beta` job, which signs (via `fastlane
+match`), archives, and uploads the build to TestFlight — gated behind the
+`release` GitHub Environment so nothing reaches App Store Connect without
+approval. TestFlight distribution and an actual App Store submission are
+different things: uploading a build is automated, but selecting it,
+completing App Store Connect's one-time account-level setup (pricing, App
+Privacy, age rating, review notes), and clicking Submit for Review are not,
+and shouldn't be — see
+[`docs/app-store-submission-checklist.md`](docs/app-store-submission-checklist.md)
+for the full breakdown of what's automated versus what's a deliberate manual
+step. Submitting Kurn to the public App Store itself is gated on reaching
+$100 in combined [GitHub Sponsors](https://github.com/sponsors/carlosmazzei)
+funding — see the App Store status note near the top of this README.
 
 ## Linting
 
