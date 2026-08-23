@@ -15,7 +15,12 @@ concurrency:
 jobs:
   screenshots:
     runs-on: macos-26
-    timeout-minutes: 60
+    # The `screenshots` lane now does two separate capture_screenshots runs
+    # (iPhone/iPad, then the KurnWatchUITests scheme for the Watch) — a
+    # second Xcode build plus a Watch simulator boot on top of the ~59 min
+    # the iPhone/iPad-only capture already took, so the old 60 min budget
+    # left ~0 margin. Widened rather than tuned tightly.
+    timeout-minutes: 90
     # Only needed for the optional ASC upload step below; capture itself
     # touches no App Store Connect credentials. Gated behind `release` like
     # `beta`/`metadata` in swift.yml, so an upload still waits for approval
@@ -37,6 +42,9 @@ jobs:
           sudo xcodebuild -runFirstLaunch
           if ! xcrun simctl list runtimes available | grep -q "iOS"; then
             xcodebuild -downloadPlatform iOS
+          fi
+          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
+            xcodebuild -downloadPlatform watchOS
           fi
 
       - name: Generate screenshots
