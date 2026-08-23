@@ -302,7 +302,10 @@ approval. TestFlight distribution and an actual App Store submission are
 different things: uploading a build is automated, but selecting it,
 completing App Store Connect's one-time account-level setup (pricing, App
 Privacy, age rating, review notes), and clicking Submit for Review are not,
-and shouldn't be.
+and shouldn't be — see
+[`docs/app-store-submission-checklist.md`](docs/app-store-submission-checklist.md)
+for the full breakdown of what's automated versus what's a deliberate manual
+step.
 
 ## Linting
 

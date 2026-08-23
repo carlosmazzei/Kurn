@@ -1,1 +1,1 @@
-Initial TestFlight build.
+Welcome to Kurn. Record meetings, transcribe them on device, identify who said what, and get AI-generated summaries — all built to keep your recordings on your device by default.
