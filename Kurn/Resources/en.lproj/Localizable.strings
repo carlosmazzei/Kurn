@@ -635,6 +635,8 @@
 "chat.untitled_meeting" = "Untitled meeting";
 "chat.starter.title" = "Ask about this meeting";
 "chat.starter.subtitle" = "Answers are grounded in the transcript, with timestamps you can tap.";
+"chat.starter.library.title" = "Ask about your meetings";
+"chat.starter.library.subtitle" = "Answers are grounded in your library's transcribed meetings, with citations you can tap to jump to what was said.";
 "chat.placeholder" = "Ask a question…";
 "chat.disabled.title" = "Semantic search is off";
 "chat.disabled.subtitle" = "Turn on semantic search in Settings to chat about your meetings.";

@@ -635,6 +635,8 @@
 "chat.untitled_meeting" = "Réunion sans titre";
 "chat.starter.title" = "Posez une question sur cette réunion";
 "chat.starter.subtitle" = "Les réponses s'appuient sur la transcription, avec des horodatages sur lesquels vous pouvez appuyer.";
+"chat.starter.library.title" = "Posez une question sur vos réunions";
+"chat.starter.library.subtitle" = "Les réponses s'appuient sur les réunions transcrites de votre bibliothèque, avec des citations sur lesquelles vous pouvez appuyer pour accéder à ce qui a été dit.";
 "chat.placeholder" = "Posez une question…";
 "chat.disabled.title" = "La recherche sémantique est désactivée";
 "chat.disabled.subtitle" = "Activez la recherche sémantique dans les Réglages pour discuter de vos réunions.";

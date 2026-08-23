@@ -635,6 +635,8 @@
 "chat.untitled_meeting" = "Reunião sem título";
 "chat.starter.title" = "Pergunte sobre esta reunião";
 "chat.starter.subtitle" = "As respostas se baseiam na transcrição, com carimbos de tempo que você pode tocar.";
+"chat.starter.library.title" = "Pergunte sobre suas reuniões";
+"chat.starter.library.subtitle" = "As respostas se baseiam nas reuniões transcritas da sua biblioteca, com citações que você pode tocar para ir direto ao que foi dito.";
 "chat.placeholder" = "Faça uma pergunta…";
 "chat.disabled.title" = "A busca semântica está desativada";
 "chat.disabled.subtitle" = "Ative a busca semântica nos Ajustes para conversar sobre suas reuniões.";

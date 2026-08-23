@@ -635,6 +635,8 @@
 "chat.untitled_meeting" = "Meeting ohne Titel";
 "chat.starter.title" = "Frag zu diesem Meeting";
 "chat.starter.subtitle" = "Antworten basieren auf dem Transkript, mit antippbaren Zeitstempeln.";
+"chat.starter.library.title" = "Frag zu deinen Meetings";
+"chat.starter.library.subtitle" = "Antworten basieren auf den transkribierten Meetings deiner Bibliothek, mit antippbaren Zitaten, die direkt zur jeweiligen Stelle springen.";
 "chat.placeholder" = "Stelle eine Frage …";
 "chat.disabled.title" = "Semantische Suche ist aus";
 "chat.disabled.subtitle" = "Aktiviere die semantische Suche in den Einstellungen, um über deine Meetings zu chatten.";
