@@ -1,6 +1,12 @@
 name: App Store Screenshots
 
 on:
+  workflow_call:
+    inputs:
+      upload:
+        required: false
+        type: boolean
+        default: true
   workflow_dispatch:
     inputs:
       upload:
@@ -9,7 +15,7 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-screenshots-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,14 +38,10 @@ jobs:
     # the iPhone/iPad-only capture already took, so the old 60 min budget
     # left ~0 margin. Widened rather than tuned tightly.
     timeout-minutes: 90
-    # No `environment:` here on purpose. This job never touches App Store
-    # Connect, and this workflow is dispatched against arbitrary branches
-    # (usually `main`) rather than a release tag — putting it behind the
-    # `release` environment (whose deployment policy allows only `v*` tags,
-    # same as `beta`/`metadata` in swift.yml) made every dispatch fail
-    # instantly with no runner assigned, before checkout even ran. The
-    # environment gate belongs only on the `upload` job below, which is the
-    # one that actually needs the ASC secrets.
+    # No `environment:` here on purpose. Capture never touches App Store
+    # Connect and also supports ad-hoc dispatches on arbitrary branches. The
+    # environment gate belongs only on the tag-only `upload` job below, which
+    # is the one that needs ASC secrets and changes App Store Connect.
 
     steps:
       - name: Checkout
@@ -75,10 +77,9 @@ jobs:
     if: ${{ inputs.upload && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     # Gated behind the `release` GitHub Environment (required reviewers, if
-    # configured), same as `beta`/`metadata` in swift.yml, so a stray
-    # dispatch with `upload: true` still waits for manual approval before
-    # anything reaches App Store Connect. Text/screenshot push only — no
-    # signing, no binary — so this runs on ubuntu-latest, same as `metadata`.
+    # configured), same as `beta`/`submit` in swift.yml, so every asset upload
+    # waits for manual approval before reaching App Store Connect. Text and
+    # screenshots only — no signing or binary — so this runs on ubuntu-latest.
     environment: release
 
     steps:

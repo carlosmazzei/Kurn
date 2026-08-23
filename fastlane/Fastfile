@@ -103,7 +103,7 @@ lane :beta do
 
   upload_to_testflight(
     api_key: api_key,
-    skip_waiting_for_build_processing: true
+    skip_waiting_for_build_processing: false
   )
 end
 
@@ -183,16 +183,23 @@ lane :store_assets do
 end
 
 lane :submit_review do |options|
-  version = options[:version].to_s
-  build_number = options[:build_number].to_s
-  UI.user_error!("version must use MAJOR.MINOR.PATCH format") unless version.match?(/\A\d+\.\d+\.\d+\z/)
-  UI.user_error!("build_number must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
-
   pbxproj = File.read(XCODEPROJ_PBXPROJ)
   current_marketing = pbxproj[/MARKETING_VERSION = ([\d.]+);/, 1]
-  UI.user_error!("Version #{version} does not match project MARKETING_VERSION #{current_marketing}") unless version == current_marketing
+  current_build = pbxproj[/CURRENT_PROJECT_VERSION = (\d+);/, 1]
+  UI.user_error!("Could not find project version/build") if current_marketing.nil? || current_build.nil?
 
-  if is_ci
+  ci = is_ci
+  version = options[:version].to_s
+  build_number = options[:build_number].to_s
+  version = current_marketing if ci && version.empty?
+  build_number = current_build if ci && build_number.empty?
+
+  UI.user_error!("version must use MAJOR.MINOR.PATCH format") unless version.match?(/\A\d+\.\d+\.\d+\z/)
+  UI.user_error!("build_number must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
+  UI.user_error!("Version #{version} does not match project MARKETING_VERSION #{current_marketing}") unless version == current_marketing
+  UI.user_error!("Build #{build_number} does not match project CURRENT_PROJECT_VERSION #{current_build}") unless build_number == current_build
+
+  if ci
     tag = ENV["GITHUB_REF_NAME"].to_s
     UI.user_error!("Workflow tag #{tag} does not match version #{version}") unless tag == "v#{version}"
   end

@@ -321,15 +321,15 @@ Fastlane-driven process (see `fastlane/Fastfile`):
    same `build-and-test` job that gates every push/PR, then publishes a
    GitHub Release with auto-generated notes.
 
-Pushing the tag also triggers the `beta` job, which signs (via `fastlane
-match`), archives, and uploads the build to TestFlight — gated behind the
-`release` GitHub Environment so nothing reaches App Store Connect without
-approval. Metadata is statically validated in CI and pushed by a separate
-release job. Once the build finishes processing, a maintainer can dispatch the
-`App Store Submission` workflow against its `vX.Y.Z` release tag with the exact
-version and build number; the same Environment gate protects the operation
-before Fastlane attaches the build and submits it to App Review. Account-level
-setup and the public release after Apple's approval remain manual — see
+Pushing the tag also starts the protected App Store pipeline. After
+`build-and-test`, `beta` signs with `fastlane match`, uploads to TestFlight, and
+waits for Apple to finish processing; in parallel, the reusable screenshots
+workflow captures iPhone, iPad, and Watch assets, then `store_assets` uploads
+them with all localized metadata. Once both branches succeed, `submit` derives
+the exact version/build from the tagged project and offers it to App Review.
+TestFlight upload, assets upload, and submission each wait for administrator
+approval through the `release` GitHub Environment. Account-level setup and the
+public release after Apple's approval remain manual — see
 [`docs/app-store-submission-checklist.md`](docs/app-store-submission-checklist.md)
 for the full breakdown.
 

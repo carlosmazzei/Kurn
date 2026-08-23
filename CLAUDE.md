@@ -57,29 +57,22 @@ If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
 substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
 which reorder unrelated parts of this file because it uses Xcode 16
 file-system-synchronized groups), then commits, tags `vX.Y.Z`, and pushes —
-run locally by a maintainer. Pushing that tag triggers three CI-only jobs in
-`.github/workflows/swift.yml` (all gated with `if: startsWith(github.ref,
-'refs/tags/v')` and `needs: build-and-test`, so they only run after the same
-lint/build/test job that gates every push/PR): `release` runs `github_release`
-to publish a GitHub Release; `beta` and `metadata` are both gated behind the
-`release` GitHub Environment (manual approval before anything reaches App
-Store Connect) and run `bundle exec fastlane beta`/`bundle exec fastlane
-metadata`. `beta` signs the build via `fastlane match` (readonly in CI —
-certs come from the private `kurn-certificates` repo, never generated or
-revoked here) and an App Store Connect API key, then `build_app` +
-`upload_to_testflight` — no Apple ID password or 2FA prompt is needed.
-`metadata` pushes `fastlane/metadata/` (App Store listing text — see that
-folder) via `deliver`, text only (`skip_binary_upload: true`,
-`skip_screenshots: true`), so it never collides with `beta`'s binary upload.
+run locally by a maintainer. Pushing that tag starts the pipeline in
+`.github/workflows/swift.yml` after `build-and-test`: `release` publishes the
+GitHub Release; `beta` signs via readonly `fastlane match`, uploads to TestFlight,
+and waits for Apple processing; and `store-assets` calls the reusable
+`.github/workflows/screenshots.yml` to capture iPhone/iPad/Watch screenshots and
+upload them with all localized metadata. `beta` and the assets upload each use
+the protected `release` GitHub Environment, so every App Store Connect mutation
+waits for administrator approval. Once both succeed, the dependent protected
+`submit` job runs `submit_review`; that lane derives version/build from the
+tagged project, verifies the `vX.Y.Z` tag, attaches the processed build, and
+submits it to App Review with `automatic_release: false`. The standalone
+`.github/workflows/app-store-submit.yml` remains a manual retry path.
 `Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
-and URLs in the regular CI job. `screenshots` captures App Store screenshots
-from `KurnUITests`/`KurnWatchUITests` using the `UI-Testing-Screenshots` seeded
-launch argument, and `store_assets` uploads screenshots + metadata together.
-The manually dispatched `.github/workflows/app-store-submit.yml` runs the
-seventh lane, `submit_review`, only against a matching `vX.Y.Z` tag: it requires
-an exact version and processed TestFlight build number, is gated by the `release`
-Environment, attaches that build, and submits it to App Review without enabling
-automatic release.
+and URLs in the regular CI job. No Apple ID password or 2FA prompt is required;
+App Store Connect calls use its API key, while signing credentials come from the
+private `kurn-certificates` repository.
 
 SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
 function body at 120, cyclomatic complexity at 15, type body at 400.
