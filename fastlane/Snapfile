@@ -16,7 +16,6 @@ only_testing(["KurnUITests/ScreenshotUITests"])
 
 devices([
   "iPhone 17 Pro Max",
-  "iPhone 17",
   "iPad Pro 13-inch (M5)"
 ])
 

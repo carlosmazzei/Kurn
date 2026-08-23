@@ -45,6 +45,13 @@
 			remoteGlobalIDString = AA30000000000000000000B1;
 			remoteInfo = KurnWatch;
 		};
+		1A2E9DC89EDF32444B31E063 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000003 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA30000000000000000000B1;
+			remoteInfo = KurnWatch;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -81,6 +88,7 @@
 		AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/Infrastructure/RecordingActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
 		AA20000000000000000000A1 /* KurnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA30000000000000000000A1 /* KurnWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KurnWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A40F5A8AB42D975B97D6879D /* KurnWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -116,6 +124,7 @@
 		AA10000000000000000000C1 /* KurnLiveActivityExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KurnLiveActivityExtension; sourceTree = "<group>"; };
 		AA20000000000000000000C1 /* KurnTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnTests; sourceTree = "<group>"; };
 		AA30000000000000000000C1 /* KurnWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA30000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KurnWatch; sourceTree = "<group>"; };
+		82B2499CCCAA3DB0E20DE3B1 /* KurnWatchUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnWatchUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -156,6 +165,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		034D966C3A765439823E1F1A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -182,6 +198,7 @@
 				AA00000000000000000000C1 /* Kurn */,
 				AA10000000000000000000C1 /* KurnLiveActivityExtension */,
 				AA30000000000000000000C1 /* KurnWatch */,
+				82B2499CCCAA3DB0E20DE3B1 /* KurnWatchUITests */,
 				AA20000000000000000000C1 /* KurnTests */,
 				2AD3E59D300D5CA2003DA9A9 /* KurnUITests */,
 				2AA9E32B2FEA18F40067BF88 /* Frameworks */,
@@ -196,6 +213,7 @@
 				AA00000000000000000000A1 /* Kurn.app */,
 				AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */,
 				AA30000000000000000000A1 /* KurnWatch.app */,
+				A40F5A8AB42D975B97D6879D /* KurnWatchUITests.xctest */,
 				AA20000000000000000000A1 /* KurnTests.xctest */,
 				2AD3E59C300D5CA2003DA9A9 /* KurnUITests.xctest */,
 			);
@@ -313,6 +331,29 @@
 			productReference = AA30000000000000000000A1 /* KurnWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
+		EBBBD6334193D0EC90187C56 /* KurnWatchUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C11A2B8557FB632ADA69ED20 /* Build configuration list for PBXNativeTarget "KurnWatchUITests" */;
+			buildPhases = (
+				84827FCA1EA7974707F328BD /* Sources */,
+				034D966C3A765439823E1F1A /* Frameworks */,
+				C39B262F57897CD35407CBE1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				370A03F1E44C271FFDE363B1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				82B2499CCCAA3DB0E20DE3B1 /* KurnWatchUITests */,
+			);
+			name = KurnWatchUITests;
+			packageProductDependencies = (
+			);
+			productName = KurnWatchUITests;
+			productReference = A40F5A8AB42D975B97D6879D /* KurnWatchUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -339,6 +380,10 @@
 					};
 					AA30000000000000000000B1 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					EBBBD6334193D0EC90187C56 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = AA30000000000000000000B1;
 					};
 				};
 			};
@@ -368,6 +413,7 @@
 				AA00000000000000000000B1 /* Kurn */,
 				AA10000000000000000000B1 /* KurnLiveActivityExtension */,
 				AA30000000000000000000B1 /* KurnWatch */,
+				EBBBD6334193D0EC90187C56 /* KurnWatchUITests */,
 				AA20000000000000000000B1 /* KurnTests */,
 				2AD3E59B300D5CA2003DA9A9 /* KurnUITests */,
 			);
@@ -406,6 +452,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA3000000000000000000111 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C39B262F57897CD35407CBE1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -451,6 +504,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		84827FCA1EA7974707F328BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -473,6 +533,11 @@
 			isa = PBXTargetDependency;
 			target = AA30000000000000000000B1 /* KurnWatch */;
 			targetProxy = AA3000000000000000000141 /* PBXContainerItemProxy */;
+		};
+		370A03F1E44C271FFDE363B1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA30000000000000000000B1 /* KurnWatch */;
+			targetProxy = 1A2E9DC89EDF32444B31E063 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -836,6 +901,48 @@
 			};
 			name = Release;
 		};
+		AF72FEC2380963B127D42062 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.KurnWatchUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = KurnWatch;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		1B0D16313F41631A6B460BF8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.KurnWatchUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = KurnWatch;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -889,6 +996,15 @@
 			buildConfigurations = (
 				AA3000000000000000000211 /* Debug */,
 				AA3000000000000000000212 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C11A2B8557FB632ADA69ED20 /* Build configuration list for PBXNativeTarget "KurnWatchUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF72FEC2380963B127D42062 /* Debug */,
+				1B0D16313F41631A6B460BF8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
