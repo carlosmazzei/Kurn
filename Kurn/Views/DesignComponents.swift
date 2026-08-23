@@ -125,7 +125,7 @@ struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .font(.system(.footnote, design: .default, weight: isSelected ? .semibold : .regular))
                 .lineLimit(1)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
@@ -198,12 +198,12 @@ struct KurnDialogModifier: ViewModifier {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(Theme.headline)
                         .foregroundStyle(Theme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                     if !message.isEmpty {
                         Text(message)
-                            .font(.system(size: 14))
+                            .font(Theme.footnote)
                             .foregroundStyle(Theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -256,7 +256,7 @@ struct KurnDialogModifier: ViewModifier {
 
         return Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(Theme.footnoteEmphasized)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
                 .frame(maxWidth: .infinity)

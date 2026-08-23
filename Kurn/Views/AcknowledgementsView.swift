@@ -71,7 +71,7 @@ struct AcknowledgementsView: View {
         Form {
             Section {
                 Text(NSLocalizedString("ack.intro", comment: "Acknowledgements intro"))
-                    .font(.system(size: 13))
+                    .font(Theme.footnote)
                     .foregroundStyle(Theme.textSecondary)
             }
 
@@ -95,10 +95,10 @@ struct AcknowledgementsView: View {
     private func creditRow(_ credit: Credit) -> some View {
         let content = VStack(alignment: .leading, spacing: 2) {
             Text(credit.name)
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(.subheadline, design: .default, weight: .medium))
                 .foregroundStyle(Theme.textPrimary)
             Text(credit.license)
-                .font(.system(size: 12))
+                .font(Theme.caption)
                 .foregroundStyle(Theme.textSecondary)
         }
 

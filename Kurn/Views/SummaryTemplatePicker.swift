@@ -56,10 +56,10 @@ struct SummaryTemplatePicker: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(template.displayName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(Theme.calloutEmphasized)
                     .foregroundStyle(Theme.textPrimary)
                 Text(template.summaryDescription)
-                    .font(.system(size: 13))
+                    .font(Theme.footnote)
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)

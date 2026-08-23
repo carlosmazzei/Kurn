@@ -13,7 +13,7 @@ struct TagChip: View {
 
     var body: some View {
         Text(tag.name)
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(.caption2, design: .default, weight: .medium))
             .foregroundStyle(Color(hex: tag.colorHex))
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
@@ -47,7 +47,7 @@ struct TagChipsView: View {
             }
             if overflowCount > 0 {
                 Text("+\(overflowCount)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(.caption2, design: .default, weight: .medium))
                     .foregroundStyle(Theme.textTertiary)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
