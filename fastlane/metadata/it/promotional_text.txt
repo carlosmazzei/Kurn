@@ -1,0 +1,1 @@
+Registratore di riunioni local-first con trascrizione on-device, identificazione degli speaker e riepiloghi IA. Registrazioni sempre sul tuo dispositivo.

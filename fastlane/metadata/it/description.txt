@@ -1,0 +1,22 @@
+Kurn è un'app local-first per registrare riunioni, trascrivere l'audio, identificare chi parla e generare riepiloghi strutturati con IA, pensata perché le tue registrazioni restino sul tuo dispositivo per impostazione predefinita.
+
+REGISTRA E TRASCRIVI
+- Registra riunioni in uno o più segmenti, con controlli di pausa, ripresa e stop dall'app, dalla Lock Screen, dalla Dynamic Island o dal tuo Apple Watch.
+- Trascrivi sul dispositivo con il framework Speech di Apple o un modello multilingue on-device, oppure usa facoltativamente un'API compatibile con Whisper nel cloud per registrazioni più lunghe.
+- La diarizzazione automatica degli speaker indica chi ha detto cosa, con nomi modificabili.
+- Un'anteprima di trascrizione live (facoltativa) mostra una bozza in tempo reale mentre registri.
+- Le trascrizioni lunghe riprendono automaticamente se l'app va in background o viene interrotta, continuando da dove si erano fermate invece di ricominciare.
+
+COMPRENDI LE TUE RIUNIONI
+- Riepiloghi strutturati con IA basati su modelli: generale, standup o colloquio, oppure un tuo modello personalizzato.
+- Cerca le riunioni e filtra per data, tag, stato o durata.
+- Organizza le riunioni in cartelle, Cartelle Intelligenti, preferiti e un archivio.
+- Assegna tag alle riunioni manualmente o con tag suggeriti dall'IA (facoltativo).
+- Fai domande su una singola riunione o su tutta la tua libreria, con timestamp citati e selezionabili che ti portano direttamente a quel momento nella trascrizione.
+
+PRIVATA FIN DALLA PROGETTAZIONE
+- Registrazioni e dati delle riunioni sono archiviati sul tuo dispositivo, cifrati a riposo e protetti da Face ID, Touch ID o dal codice di accesso.
+- Le richieste di rete avvengono solo se scegli la trascrizione cloud o un provider di riepiloghi IA: tutto il resto viene eseguito interamente sul dispositivo.
+- Nessun tracciamento, nessuna analitica, nessun account richiesto.
+
+L'interfaccia di Kurn è disponibile in inglese, portoghese brasiliano, spagnolo, francese, italiano, tedesco e cinese semplificato. La trascrizione supporta tutte le lingue riconosciute da Whisper.

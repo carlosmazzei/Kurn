@@ -1,0 +1,22 @@
+Kurn est une application local-first pour enregistrer des réunions, transcrire l'audio, identifier les intervenants et générer des résumés structurés par IA, conçue pour que vos enregistrements restent sur votre appareil par défaut.
+
+ENREGISTREZ ET TRANSCRIVEZ
+- Enregistrez des réunions en un ou plusieurs segments, avec des contrôles de pause, reprise et arrêt depuis l'app, l'écran verrouillé, la Dynamic Island ou votre Apple Watch.
+- Transcrivez sur l'appareil avec le framework Speech d'Apple ou un modèle multilingue on-device, ou utilisez en option une API compatible Whisper dans le cloud pour les enregistrements plus longs.
+- La diarisation automatique des intervenants indique qui a dit quoi, avec des noms modifiables.
+- Un aperçu de transcription en direct (optionnel) affiche un brouillon continu pendant l'enregistrement.
+- Les longues transcriptions reprennent automatiquement si l'app passe en arrière-plan ou est interrompue, en repartant de là où elles s'étaient arrêtées plutôt que de recommencer.
+
+COMPRENEZ VOS RÉUNIONS
+- Résumés structurés par IA, guidés par modèle : général, point d'équipe ou entretien, ou votre propre modèle personnalisé.
+- Recherchez des réunions et filtrez par date, tags, statut ou durée.
+- Organisez vos réunions en dossiers, Dossiers Intelligents, favoris et une archive.
+- Taguez vos réunions manuellement ou avec des tags suggérés par IA (en option).
+- Posez des questions sur une réunion précise ou sur toute votre bibliothèque, avec des horodatages cités et cliquables qui vous amènent directement à ce moment de la transcription.
+
+PRIVÉE PAR CONCEPTION
+- Les enregistrements et les données de réunion sont stockés sur votre appareil, chiffrés au repos et protégés par Face ID, Touch ID ou votre code.
+- Les requêtes réseau n'ont lieu que si vous choisissez la transcription cloud ou un fournisseur de résumé par IA — tout le reste s'exécute entièrement sur l'appareil.
+- Aucun suivi, aucune analyse, aucun compte requis.
+
+L'interface de Kurn est disponible en anglais, portugais du Brésil, espagnol, français, italien, allemand et chinois simplifié. La transcription prend en charge toutes les langues reconnues par Whisper.
