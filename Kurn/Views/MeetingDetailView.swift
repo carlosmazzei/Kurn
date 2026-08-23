@@ -210,10 +210,10 @@ struct MeetingDetailView: View {
                     Text(totalDuration.clockDisplay)
                 }
             }
-            .font(.system(size: 13))
+            .font(Theme.footnote)
             .foregroundStyle(Theme.textSecondary)
             Text(displayLanguage.displayName)
-                .font(.system(size: 13))
+                .font(Theme.footnote)
                 .foregroundStyle(Theme.textSecondary)
             if !meeting.tags.isEmpty {
                 TagChipsView(tags: meeting.tags)
@@ -326,10 +326,10 @@ struct MeetingDetailView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(Theme.accent.opacity(0.12)).frame(width: 34, height: 34)
-                    Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                    Image(systemName: "plus").font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.accent)
                 }
                 Text(NSLocalizedString("detail.add_segment", comment: "Add segment"))
-                    .font(.system(size: 15)).foregroundStyle(Theme.textSecondary)
+                    .font(Theme.subheadline).foregroundStyle(Theme.textSecondary)
                 Spacer()
             }
             .padding(14)
@@ -450,7 +450,7 @@ struct MeetingDetailView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text.uppercased())
-            .font(.system(size: 11, weight: .semibold))
+            .font(Theme.caption2Emphasized)
             .tracking(0.8)
             .foregroundStyle(Theme.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -569,7 +569,7 @@ private struct RecordingSegmentRow: View {
                                 .controlSize(.small)
                         } else {
                             Image(systemName: (isLoaded && player.isPlaying) ? "pause.fill" : "play.fill")
-                                .font(.system(size: 13))
+                                .font(Theme.footnote)
                                 .foregroundStyle(Theme.textPrimary)
                         }
                     }
@@ -586,10 +586,10 @@ private struct RecordingSegmentRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(Theme.subheadlineEmphasized)
                         .foregroundStyle(Theme.textPrimary)
                     Text("\(recording.recordedAt.meetingDisplay) · \(recording.duration.clockDisplay)")
-                        .font(.system(size: 12))
+                        .font(Theme.caption)
                         .foregroundStyle(Theme.textTertiary)
                 }
                 Spacer(minLength: 8)
@@ -606,7 +606,7 @@ private struct RecordingSegmentRow: View {
                                 onCancelTranscription()
                             } label: {
                                 Image(systemName: "pause.fill")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(Theme.footnoteEmphasized)
                                     .foregroundStyle(Theme.textSecondary)
                                     .frame(width: 30, height: 30)
                                     .background(Theme.fill, in: Circle())
@@ -617,7 +617,7 @@ private struct RecordingSegmentRow: View {
                                 onStopTranscription()
                             } label: {
                                 Image(systemName: "stop.fill")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(Theme.footnoteEmphasized)
                                     .foregroundStyle(Theme.accent)
                                     .frame(width: 30, height: 30)
                                     .background(Theme.fill, in: Circle())
@@ -642,7 +642,7 @@ private struct RecordingSegmentRow: View {
                             pendingRetranscribe = recording
                         } label: {
                             Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(Theme.footnoteEmphasized)
                                 .foregroundStyle(Theme.textSecondary)
                                 .frame(width: 30, height: 30)
                                 .background(Theme.fill, in: Circle())
@@ -660,7 +660,7 @@ private struct RecordingSegmentRow: View {
                             onStartTranscription()
                         } label: {
                             Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(Theme.footnoteEmphasized)
                                 .foregroundStyle(Theme.textSecondary)
                                 .frame(width: 30, height: 30)
                                 .background(Theme.fill, in: Circle())
@@ -787,7 +787,7 @@ private struct SegmentPlaybackScrubber: View {
                 )
 
                 Text(boundedCurrentTime.clockDisplay)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.caption2Emphasized)
                     .foregroundStyle(Theme.textPrimary)
                     .frame(width: markerWidth, height: 22)
                     .background(Theme.fill, in: Capsule())
@@ -812,13 +812,13 @@ private struct SegmentPlaybackScrubber: View {
 
             HStack(spacing: 8) {
                 Image(systemName: isPlaying ? "waveform" : "timer")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.caption2Emphasized)
                     .foregroundStyle(Theme.textTertiary)
                 Text("0:00")
                 Spacer(minLength: 8)
                 Button { onSkip(-AudioPlayerService.skipInterval) } label: {
                     Image(systemName: "gobackward.15")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Theme.captionEmphasized)
                         .foregroundStyle(Theme.accent)
                         .frame(minWidth: 34)
                         .padding(.vertical, 3)
@@ -828,7 +828,7 @@ private struct SegmentPlaybackScrubber: View {
                 .accessibilityLabel(NSLocalizedString("detail.skip_backward", comment: "Skip back 15 seconds"))
                 Button { onSkip(AudioPlayerService.skipInterval) } label: {
                     Image(systemName: "goforward.15")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Theme.captionEmphasized)
                         .foregroundStyle(Theme.accent)
                         .frame(minWidth: 34)
                         .padding(.vertical, 3)
@@ -844,7 +844,7 @@ private struct SegmentPlaybackScrubber: View {
                                 .scaleEffect(0.5)
                         } else {
                             Image(systemName: "sparkles")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(Theme.caption2Emphasized)
                                 .foregroundStyle(isEnhanced ? Theme.accent : Theme.textTertiary)
                         }
                     }
@@ -864,7 +864,7 @@ private struct SegmentPlaybackScrubber: View {
                 )
                 Button(action: onCycleRate) {
                     Text(rateLabel)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.caption2Emphasized)
                         .foregroundStyle(Theme.accent)
                         .frame(minWidth: 34)
                         .padding(.vertical, 3)
@@ -875,7 +875,7 @@ private struct SegmentPlaybackScrubber: View {
                 .accessibilityValue(rateLabel)
                 Text(playableDuration.clockDisplay)
             }
-            .font(.system(size: 11))
+            .font(Theme.caption2)
             .foregroundStyle(Theme.textTertiary)
 
             if let enhancementProgress {

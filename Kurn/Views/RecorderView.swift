@@ -65,6 +65,9 @@ private struct RecorderContent: View {
     /// Fixed 20 Hz drive for the waveform scroll — the same cadence as the
     /// recorder's metering tick.
     private let waveformClock = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    /// The timer digits have no standard `TextStyle` at this size, so they scale
+    /// from their own base rather than a semantic `Theme` font.
+    @ScaledMetric(relativeTo: .largeTitle) private var timerFontSize: CGFloat = 64
 
     var body: some View {
         ZStack {
@@ -95,6 +98,11 @@ private struct RecorderContent: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
+        // This screen is a fixed, immersive layout (58pt transport buttons,
+        // a hand-tuned timer size) rather than a scrolling list of text, so —
+        // unlike the rest of the app — it caps how far Dynamic Type can grow
+        // instead of scaling without bound.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .navigationTitle(NSLocalizedString("recorder.title", comment: "Record"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -175,7 +183,7 @@ private struct RecorderContent: View {
             Text(vm.state == .paused
                  ? NSLocalizedString("recorder.paused", comment: "Paused")
                  : "REC")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(.footnote, design: .default, weight: .bold))
                 .tracking(2.5)
                 .foregroundStyle(vm.state == .paused ? Theme.warning : Theme.accent)
         }
@@ -198,13 +206,13 @@ private struct RecorderContent: View {
     private var timer: some View {
         VStack(spacing: 4) {
             Text(vm.elapsed.clockDisplay)
-                .font(.system(size: 64, weight: .ultraLight, design: .default))
+                .font(.system(size: timerFontSize, weight: .ultraLight, design: .default))
                 .monospacedDigit()
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
             if vm.highlightCount > 0 {
                 Label("\(vm.highlightCount)", systemImage: "bookmark.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Theme.footnoteEmphasized)
                     .foregroundStyle(Theme.warning)
                     .contentTransition(.numericText())
             }
@@ -218,7 +226,7 @@ private struct RecorderContent: View {
                 text: $vm.meetingTitle
             )
             .multilineTextAlignment(.center)
-            .font(.system(size: 17))
+            .font(Theme.body)
             .foregroundStyle(.white)
             .tint(Theme.accent)
             Rectangle()
@@ -232,7 +240,7 @@ private struct RecorderContent: View {
         if vm.isLiveTranscriptionRequested {
             ScrollView {
                 Text(liveTranscriptText)
-                    .font(.system(size: 15))
+                    .font(Theme.subheadline)
                     .foregroundStyle(liveTranscriptColor)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -349,7 +357,7 @@ private struct RecorderContent: View {
         HStack(spacing: 10) {
             Image(systemName: systemImage)
                 .accessibilityHidden(true)
-            Text(title).font(.system(size: 16, weight: .semibold))
+            Text(title).font(Theme.calloutEmphasized)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 58)

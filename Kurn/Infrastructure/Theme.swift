@@ -62,12 +62,21 @@ enum Theme {
     /// exception — see `RecorderView`'s use of `@ScaledMetric` with a capped
     /// `dynamicTypeSize` instead of these tokens.
     static let title = Font.system(.title2, design: .default, weight: .bold)
+    static let title3 = Font.system(.title3, design: .default, weight: .semibold)
     static let headline = Font.system(.headline, design: .default, weight: .semibold)
     static let body = Font.system(.body, design: .default)
     static let bodyEmphasized = Font.system(.body, design: .default, weight: .semibold)
     static let callout = Font.system(.callout, design: .default)
+    static let calloutEmphasized = Font.system(.callout, design: .default, weight: .semibold)
+    static let subheadline = Font.system(.subheadline, design: .default)
+    static let subheadlineEmphasized = Font.system(.subheadline, design: .default, weight: .semibold)
     static let footnote = Font.system(.footnote, design: .default)
+    static let footnoteEmphasized = Font.system(.footnote, design: .default, weight: .semibold)
     static let caption = Font.system(.caption, design: .default)
+    static let captionEmphasized = Font.system(.caption, design: .default, weight: .semibold)
+    static let caption2 = Font.system(.caption2, design: .default)
+    static let caption2Emphasized = Font.system(.caption2, design: .default, weight: .semibold)
+    static let caption2Bold = Font.system(.caption2, design: .default, weight: .bold)
 
     // MARK: - Helpers
 
