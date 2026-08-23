@@ -3,6 +3,12 @@ require_relative "accessibility_labels"
 XCODEPROJ_PBXPROJ = File.expand_path("../Kurn.xcodeproj/project.pbxproj", __dir__)
 ACCESSIBILITY_CONFIG = File.expand_path("accessibility.json", __dir__)
 
+def kurn_marketing_version
+  version = File.read(XCODEPROJ_PBXPROJ)[/MARKETING_VERSION = ([\d.]+);/, 1]
+  UI.user_error!("Could not find MARKETING_VERSION in #{XCODEPROJ_PBXPROJ}") if version.nil?
+  version
+end
+
 # Bumps MARKETING_VERSION / CURRENT_PROJECT_VERSION directly via text
 # substitution rather than `increment_version_number` / `xcodeproj`, which
 # rewrite and reorder large unrelated parts of this pbxproj (it uses Xcode
@@ -127,8 +133,10 @@ lane :metadata do
 
   deliver(
     api_key: api_key,
+    app_version: kurn_marketing_version,
     skip_binary_upload: true,
     skip_screenshots: true,
+    precheck_include_in_app_purchases: false,
     force: true
   )
 end
@@ -176,11 +184,15 @@ lane :store_assets do
     key_content: ENV["ASC_KEY_CONTENT"],
     is_key_content_base64: true
   )
+  ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
 
   deliver(
     api_key: api_key,
+    app_version: kurn_marketing_version,
     skip_binary_upload: true,
     skip_screenshots: false,
+    sync_screenshots: true,
+    precheck_include_in_app_purchases: false,
     force: true
   )
 

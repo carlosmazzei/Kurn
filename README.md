@@ -327,8 +327,9 @@ Fastlane-driven process (see `fastlane/Fastfile`):
 Pushing the tag also starts the protected App Store pipeline. After
 `build-and-test`, `beta` signs with `fastlane match`, uploads to TestFlight, and
 waits for Apple to finish processing; in parallel, the reusable screenshots
-workflow captures iPhone, iPad, and Watch assets, then `store_assets` uploads
-them with all localized metadata and synchronizes draft Accessibility Nutrition
+workflow captures iPhone, iPad, and Watch assets, then `store_assets` reconciles
+the remote screenshot set (removing stale/duplicate images), uploads all assets
+to the exact tagged app version, and synchronizes draft Accessibility Nutrition
 Labels. Once both branches succeed, `submit` derives the exact version/build
 from the tagged project and offers it to App Review.
 TestFlight upload, assets upload, and submission each wait for administrator

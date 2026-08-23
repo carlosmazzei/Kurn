@@ -27,10 +27,12 @@ This is what's still needed to take a tagged build public, split by who does it.
       around still-English content. Translating the seed data is a
       prerequisite, not wired up here.
 - [x] Pushing screenshots + text metadata together — `fastlane store_assets`
-      runs automatically for the tag after capture, behind its own `release`
-      Environment approval. A manual dispatch with `upload: false` still captures
-      from any branch without touching App Store Connect; manual upload requires
-      a `vX.Y.Z` ref.
+      targets the exact `MARKETING_VERSION` and runs automatically for the tag
+      after capture, behind its own `release` Environment approval. Screenshot
+      sync reconciles App Store Connect with the local set, deleting stale or
+      duplicate images instead of appending until Apple's 10-image limit. A
+      manual dispatch with `upload: false` still captures from any branch without
+      touching App Store Connect; manual upload requires a `vX.Y.Z` ref.
 - [x] Static metadata validation — `Tools/validate_store_metadata.py` runs in
       the regular `iOS CI` workflow and checks locale/file completeness, Apple's
       text limits (including the 100-byte keyword limit), and HTTPS URLs before

@@ -63,12 +63,17 @@ run locally by a maintainer. Pushing that tag starts the pipeline in
 GitHub Release; `beta` signs via readonly `fastlane match`, uploads to TestFlight,
 and waits for Apple processing; and `store-assets` calls the reusable
 `.github/workflows/screenshots.yml` to capture iPhone/iPad/Watch screenshots and
-upload them with all localized metadata. `beta` and the assets upload each use
-the protected `release` GitHub Environment, so every App Store Connect mutation
-waits for administrator approval. Once both succeed, the dependent protected
-`submit` job runs `submit_review`; that lane derives version/build from the
-tagged project, verifies the `vX.Y.Z` tag, attaches the processed build, and
-submits it to App Review with `automatic_release: false`. The standalone
+sync them with all localized metadata to the exact project `MARKETING_VERSION`.
+This uses deliver's beta `sync_screenshots` path (enabled only inside the
+`store_assets` lane), which removes remote extras before uploading missing
+images; the legacy uploader retries before Apple exposes checksums and can create
+duplicates.
+`beta` and the assets upload each use the protected `release` GitHub Environment,
+so every App Store Connect mutation waits for administrator approval. Once both
+succeed, the dependent protected `submit` job runs `submit_review`; that lane
+derives version/build from the tagged project, verifies the `vX.Y.Z` tag,
+attaches the processed build, and submits it to App Review with
+`automatic_release: false`. The standalone
 `.github/workflows/app-store-submit.yml` remains a manual retry path.
 `Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
 and URLs in the regular CI job. No Apple ID password or 2FA prompt is required;
