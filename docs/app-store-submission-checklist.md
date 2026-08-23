@@ -1,9 +1,9 @@
 # App Store Submission Checklist
 
-TestFlight (`fastlane beta`) and the App Store are two different things — a
-build validated on TestFlight is not automatically submitted anywhere else.
-This is what's still needed to take a TestFlight build public, split by who
-does it.
+TestFlight (`fastlane beta`) and the App Store are two different stages. A
+`vX.Y.Z` tag now drives both in sequence, but every App Store Connect mutation
+waits for an administrator to approve its protected `release` Environment job.
+This is what's still needed to take a tagged build public, split by who does it.
 
 ## Already automated
 
@@ -13,12 +13,12 @@ does it.
 - [x] Text metadata (description, keywords, subtitle, promotional text,
       release notes, support/marketing/privacy URLs, copyright, category),
       **for all 7 UI locales** (`fastlane/metadata/{en-US,pt-BR,es-ES,fr-FR,
-      it,de-DE,zh-Hans}/`) — pushed to App Store Connect automatically by
-      the `metadata` job on the same tag push, via `fastlane metadata`. No
-      signing needed (text-only), so it runs on `ubuntu-latest`.
-- [x] Screenshots — captured by `fastlane screenshots` via the
-      `App Store Screenshots` GitHub Actions workflow
-      (`workflow_dispatch`), always uploaded as the `screenshots` artifact.
+      it,de-DE,zh-Hans}/`) — uploaded together with screenshots by the
+      `store-assets` job after the tag passes `build-and-test`.
+- [x] Screenshots — captured automatically for every successful `vX.Y.Z` tag
+      through the reusable `App Store Screenshots` workflow, and always uploaded
+      as the `screenshots` artifact before their protected upload job starts.
+      The workflow can still be dispatched manually for ad-hoc captures.
       **English (`en-US`) only for now** — `KurnUITests/ScreenshotUITests.swift`
       already drives navigation purely through `.accessibilityIdentifier`,
       but `Kurn/DebugSupport/ScreenshotSeedData.swift`'s seeded meeting
@@ -26,34 +26,32 @@ does it.
       adding more `Snapfile` languages today would just localize the chrome
       around still-English content. Translating the seed data is a
       prerequisite, not wired up here.
-- [x] Pushing screenshots + text metadata together —
-      `fastlane store_assets`. Dispatch `App Store Screenshots` against the
-      matching `vX.Y.Z` tag with `upload: true`; leave it `false` to capture
-      from any branch without touching App Store Connect. An invalid branch
-      upload now fails immediately instead of spending up to 90 minutes
-      capturing.
+- [x] Pushing screenshots + text metadata together — `fastlane store_assets`
+      runs automatically for the tag after capture, behind its own `release`
+      Environment approval. A manual dispatch with `upload: false` still captures
+      from any branch without touching App Store Connect; manual upload requires
+      a `vX.Y.Z` ref.
 - [x] Static metadata validation — `Tools/validate_store_metadata.py` runs in
       the regular `iOS CI` workflow and checks locale/file completeness, Apple's
       text limits (including the 100-byte keyword limit), and HTTPS URLs before
       a release tag can reach the metadata upload job.
-- [x] Attaching an exact processed TestFlight build and submitting it to App
-      Review — manually dispatch `App Store Submission`
-      (`.github/workflows/app-store-submit.yml`) against its `vX.Y.Z` release
-      tag, enter the matching `MARKETING_VERSION` and build number, then
-      approve the `release` Environment deployment. The `submit_review` lane
-      rejects malformed or mismatched tags/versions and never releases an
-      approved version automatically.
+- [x] Waiting for TestFlight processing, attaching the tagged build, and
+      submitting it to App Review — `beta` now waits for Apple to finish
+      processing, then the dependent `submit` job derives version/build from the
+      tagged project and waits for its own `release` Environment approval. The
+      standalone `App Store Submission` workflow remains available as a manual
+      retry. Neither path releases an approved version automatically.
 - [x] Privacy policy, Terms of Use, EULA, encryption documentation —
       `PRIVACY.md`, `TERMS.md`, `EULA.md`, `ENCRYPTION.md`.
 - [x] Export compliance declared in `Info.plist`
       (`ITSAppUsesNonExemptEncryption = false`).
 
-Tag-driven jobs never submit the app for review or change what's publicly
-visible. Metadata, screenshot upload, TestFlight upload, and the separately
-and explicitly dispatched App Review submission are gated behind the `release`
-GitHub Environment, so each App Store Connect mutation can require reviewer
-approval. The submission lane sets `automatic_release: false`, leaving the
-public release after Apple's approval as a deliberate manual action.
+The tag-driven workflow reaches App Review only after `beta` and `store-assets`
+succeed. TestFlight upload, screenshot/metadata upload, and App Review submission
+each reference the protected `release` GitHub Environment, so each mutation
+requires a separate administrator approval. The submission lane sets
+`automatic_release: false`, leaving the public release after Apple's approval as
+a deliberate manual action.
 
 ## Manual, in App Store Connect — one-time setup
 
@@ -83,14 +81,15 @@ information this repo has no business holding):
 
 ## Manual, per release
 
-- [ ] Review the localized "What's New" text (`release_notes.txt` per
-      locale) reads well for a public audience, not just testers.
-- [ ] Wait for the tagged build to finish processing in TestFlight and note its
-      exact build number.
-- [ ] Dispatch `App Store Submission` against the matching `vX.Y.Z` tag with
-      the exact version/build and approve its `release` Environment deployment.
-      This is the explicit human decision to submit; the workflow then attaches
-      the build and clicks the App Review API equivalent of **Submit for Review**.
+- [ ] Before tagging, review that each localized `release_notes.txt` reads well
+      for a public audience, not just testers.
+- [ ] After `build-and-test` succeeds, approve the protected `beta` job to build,
+      upload, and wait for TestFlight processing.
+- [ ] Approve the protected screenshot/metadata upload after inspecting the
+      generated `screenshots` artifact if desired.
+- [ ] When both prerequisites are green, approve the protected `submit` job. This
+      is the explicit human decision to send the derived tagged build to App
+      Review; no version/build entry or separate workflow dispatch is required.
 - [ ] After Apple approves the version, release it manually in App Store Connect.
       The workflow deliberately does not enable automatic or phased release.
 
