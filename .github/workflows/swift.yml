@@ -39,6 +39,26 @@ jobs:
       - name: Lint
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
 
+      # The github-actions-logging reporter above doesn't include file/line in
+      # its console output, and SwiftLint lints in parallel, so "Linting 'X'"
+      # progress lines and violation reports interleave in whatever order
+      # workers finish — adjacency in the log does NOT indicate which file a
+      # violation belongs to. This step re-lints (read-only, `|| true` so it
+      # never itself fails the job) with the `json` reporter, which does
+      # carry exact file/line, and uploads it so violations can be attributed
+      # without a local Xcode/swiftlint install.
+      - name: Generate lint report (file/line diagnostics)
+        if: always()
+        run: swiftlint lint --config .swiftlint.yml --reporter json > swiftlint-report.json || true
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swiftlint-report
+          path: swiftlint-report.json
+          retention-days: 14
+
       # SwiftLint does not read .strings, and Xcode compiles them into a binary
       # plist that silently collapses duplicate keys — so a duplicate is
       # invisible to both the linter and the test suite. Check the sources.
