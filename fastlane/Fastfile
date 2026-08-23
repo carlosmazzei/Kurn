@@ -136,8 +136,26 @@ end
 # in-memory SwiftData store and bypasses the recordings lock screen — no real
 # recordings, transcripts, or API keys are ever involved. Never touches
 # project.pbxproj, matching bump_version's reasoning above.
+#
+# A second capture_screenshots call covers the Apple Watch tab: KurnWatchUITests
+# is a separate UI Testing target/scheme (paired with the KurnWatch app, not
+# Kurn), since a standalone watchOS app can't share a scheme with its iOS
+# companion. Same "UI-Testing-Screenshots" launch argument, but seeded by
+# WatchConnectivityManager.seedForScreenshot() instead — there's no paired
+# iPhone simulator during a UI test run to drive the real WatchConnectivity
+# session. clear_previous_screenshots is off here so this pass doesn't wipe
+# the iPhone/iPad screenshots the first call just wrote. "Apple Watch Series 11
+# (46mm)" is the current-generation large-case simulator as of Xcode 26; if a
+# local Xcode install doesn't have it, substitute an installed Watch simulator
+# name (`xcrun simctl list devicetypes`).
 lane :screenshots do
   capture_screenshots
+  capture_screenshots(
+    scheme: "KurnWatchUITests",
+    devices: ["Apple Watch Series 11 (46mm)"],
+    only_testing: ["KurnWatchUITests/ScreenshotUITests"],
+    clear_previous_screenshots: false
+  )
 end
 
 # Everything a real App Store submission needs beyond the binary already on
