@@ -7,20 +7,40 @@ does it.
 
 ## Already automated
 
-- [x] Signing, archiving, and TestFlight upload — `fastlane beta` (CI, tag-triggered)
+- [x] Signing, archiving, and TestFlight upload — `fastlane beta`, runs
+      automatically in the `beta` job whenever a `vX.Y.Z` tag is pushed
+      (`.github/workflows/swift.yml`).
 - [x] Text metadata (description, keywords, subtitle, promotional text,
-      release notes, support/marketing/privacy URLs, copyright, category) —
-      `fastlane metadata`, from `fastlane/metadata/en-US/`
-- [x] Screenshots — `fastlane screenshots` (or the `App Store Screenshots`
-      GitHub Actions workflow, `workflow_dispatch`, artifact `screenshots`)
-- [x] Metadata + screenshots together — `fastlane store_assets`
+      release notes, support/marketing/privacy URLs, copyright, category),
+      **for all 7 UI locales** (`fastlane/metadata/{en-US,pt-BR,es-ES,fr-FR,
+      it,de-DE,zh-Hans}/`) — pushed to App Store Connect automatically by
+      the `metadata` job on the same tag push, via `fastlane metadata`. No
+      signing needed (text-only), so it runs on `ubuntu-latest`.
+- [x] Screenshots — captured by `fastlane screenshots` via the
+      `App Store Screenshots` GitHub Actions workflow
+      (`workflow_dispatch`), always uploaded as the `screenshots` artifact.
+      **English (`en-US`) only for now** — `KurnUITests/ScreenshotUITests.swift`
+      already drives navigation purely through `.accessibilityIdentifier`,
+      but `Kurn/DebugSupport/ScreenshotSeedData.swift`'s seeded meeting
+      titles, transcript lines, and summaries are hardcoded English, so
+      adding more `Snapfile` languages today would just localize the chrome
+      around still-English content. Translating the seed data is a
+      prerequisite, not wired up here.
+- [x] Pushing screenshots + text metadata together —
+      `fastlane store_assets`. The same `App Store Screenshots` workflow
+      runs this automatically when dispatched with `upload: true`; leave it
+      `false` to capture without touching App Store Connect.
 - [x] Privacy policy, Terms of Use, EULA, encryption documentation —
-      `PRIVACY.md`, `TERMS.md`, `EULA.md`, `ENCRYPTION.md`
+      `PRIVACY.md`, `TERMS.md`, `EULA.md`, `ENCRYPTION.md`.
 - [x] Export compliance declared in `Info.plist`
-      (`ITSAppUsesNonExemptEncryption = false`)
+      (`ITSAppUsesNonExemptEncryption = false`).
 
 None of the above submits the app for review or changes what's publicly
-visible — `deliver`'s `submit_for_review` is never set, deliberately.
+visible — `deliver`'s `submit_for_review` is never set, deliberately. The
+`metadata` and screenshot-upload jobs are gated behind the `release` GitHub
+Environment, same as `beta`, so a stray tag push still waits for approval
+(if the environment requires reviewers) before anything reaches App Store
+Connect.
 
 ## Manual, in App Store Connect — one-time setup
 
@@ -58,8 +78,9 @@ information this repo has no business holding):
 
 ## Note on localization
 
-Metadata (`fastlane/metadata/`) and screenshots (`Snapfile`) are currently
-English-only (`en-US`), even though the app's UI ships in 7 languages. Adding
-more App Store locales means adding matching `fastlane/metadata/<locale>/`
-folders and `languages` entries in `Snapfile` — not required to submit, but
-worth doing before or shortly after the first release.
+Text metadata (`fastlane/metadata/`) now covers all 7 UI locales and is
+pushed automatically on every tag (see above). Screenshots (`Snapfile`) are
+still `en-US` only: the seeded meeting content in `ScreenshotSeedData.swift`
+is hardcoded English, so localizing screenshots means translating that seed
+data first, then adding `languages` entries to `Snapfile` — not required to
+submit, but worth doing before or shortly after the first public release.
