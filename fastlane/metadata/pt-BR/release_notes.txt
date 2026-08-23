@@ -1,1 +1,1 @@
-Bem-vindo ao Kurn. Grave reuniões, transcreva no dispositivo, identifique quem disse o quê e receba resumos gerados por IA — tudo pensado para manter suas gravações no seu dispositivo por padrão.
+Esta versão traz suporte completo de acessibilidade: rótulos de VoiceOver em todo o app, no companion para Apple Watch e na Live Activity da Tela de Bloqueio/Dynamic Island; Texto Dinâmico, para que o texto escale conforme o tamanho de leitura preferido; e suporte a Reduzir Movimento. O status nunca é mostrado só pela cor.

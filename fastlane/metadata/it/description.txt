@@ -14,6 +14,11 @@ COMPRENDI LE TUE RIUNIONI
 - Assegna tag alle riunioni manualmente o con tag suggeriti dall'IA (facoltativo).
 - Fai domande su una singola riunione o su tutta la tua libreria, con timestamp citati e selezionabili che ti portano direttamente a quel momento nella trascrizione.
 
+ACCESSIBILE FIN DALLA PROGETTAZIONE
+- Supporto completo a VoiceOver in tutta l'app, nell'app companion per Apple Watch e nella Live Activity della Lock Screen/Dynamic Island.
+- Testo dinamico: il testo si adatta alla dimensione di lettura che preferisci.
+- Rispetta Riduci movimento e non si basa mai solo sul colore per mostrare lo stato.
+
 PRIVATA FIN DALLA PROGETTAZIONE
 - Registrazioni e dati delle riunioni sono archiviati sul tuo dispositivo, cifrati a riposo e protetti da Face ID, Touch ID o dal codice di accesso.
 - Le richieste di rete avvengono solo se scegli la trascrizione cloud o un provider di riepiloghi IA: tutto il resto viene eseguito interamente sul dispositivo.

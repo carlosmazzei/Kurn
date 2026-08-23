@@ -62,6 +62,9 @@ generates a summary with a configured AI provider.
 - Delete meetings and individual recording segments.
 - Track local audio storage usage, manage downloaded on-device transcription
   models, and reset all app data from Settings.
+- Full VoiceOver support, Dynamic Type, and Reduce Motion throughout the app,
+  the Watch companion, and the Lock Screen/Dynamic Island Live Activity — see
+  [Accessibility](#accessibility).
 
 ## Recording And Transcription
 
@@ -202,6 +205,29 @@ Kurn is designed to avoid a backend service controlled by the app.
   summary feature.
 - No analytics or tracking SDKs are included.
 - The privacy manifest declares no tracking and no collected data types.
+
+## Accessibility
+
+- Full VoiceOver support across the iOS app, the Watch companion
+  (`KurnWatch`), and the Lock Screen/Dynamic Island Live Activity
+  (`KurnLiveActivityExtension`) — every interactive control has a label, and
+  decorative-only elements (waveforms, status dots already redundant with
+  text) are hidden from the accessibility tree instead of read aloud.
+- Dynamic Type: reading text scales with the user's preferred text size via
+  semantic, Dynamic-Type-aware fonts. A few fixed-geometry elements (e.g. the
+  Recorder's timer) scale up to a capped size via `@ScaledMetric` rather than
+  unbounded, to avoid breaking a fixed-dimension layout.
+- Reduce Motion is respected: looping animations render their final static
+  state instead of animating when the setting is on.
+- Status is never conveyed by color alone — e.g. the Live Activity's
+  recording/paused indicator differs by icon shape, not just color.
+- The Watch and Live Activity targets are localized into the same 7 languages
+  as the main app, not just English/Portuguese, so VoiceOver reads the right
+  language everywhere.
+- Enforced by a SwiftLint guardrail (`accessibility_label_for_image`,
+  `accessibility_trait_for_button`, both build-breaking) and an automated UI
+  test (`KurnUITests/AccessibilityAuditUITests.swift`) that runs
+  `XCUIApplication.performAccessibilityAudit(for:)` over key screens in CI.
 
 ## Requirements
 

@@ -14,6 +14,11 @@ COMPRENEZ VOS RÉUNIONS
 - Taguez vos réunions manuellement ou avec des tags suggérés par IA (en option).
 - Posez des questions sur une réunion précise ou sur toute votre bibliothèque, avec des horodatages cités et cliquables qui vous amènent directement à ce moment de la transcription.
 
+ACCESSIBLE PAR CONCEPTION
+- Prise en charge complète de VoiceOver dans toute l'app, l'app compagnon Apple Watch et la Live Activity de l'écran verrouillé/Dynamic Island.
+- Texte dynamique : le texte s'adapte à la taille de lecture que vous préférez.
+- Respecte Réduire les animations et ne s'appuie jamais uniquement sur la couleur pour indiquer un état.
+
 PRIVÉE PAR CONCEPTION
 - Les enregistrements et les données de réunion sont stockés sur votre appareil, chiffrés au repos et protégés par Face ID, Touch ID ou votre code.
 - Les requêtes réseau n'ont lieu que si vous choisissez la transcription cloud ou un fournisseur de résumé par IA — tout le reste s'exécute entièrement sur l'appareil.

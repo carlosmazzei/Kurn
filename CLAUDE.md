@@ -52,17 +52,30 @@ If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
 
 ### Releasing
 
-`fastlane/Fastfile` has two lanes: `bump_version type:{patch,minor,major}` bumps
+`fastlane/Fastfile` has six lanes. `bump_version type:{patch,minor,major}` bumps
 `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` across all targets via direct text
 substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
 which reorder unrelated parts of this file because it uses Xcode 16
 file-system-synchronized groups), then commits, tags `vX.Y.Z`, and pushes —
-run locally by a maintainer. Pushing that tag triggers the `release` job in
-`.github/workflows/swift.yml` (gated with `if: startsWith(github.ref,
-'refs/tags/v')`, `needs: build-and-test` so it only runs after the same
-lint/build/test job that gates every push/PR), which runs the CI-only
-`github_release` lane to publish a GitHub Release. No signing/archiving/
-TestFlight upload is wired up yet.
+run locally by a maintainer. Pushing that tag triggers three CI-only jobs in
+`.github/workflows/swift.yml` (all gated with `if: startsWith(github.ref,
+'refs/tags/v')` and `needs: build-and-test`, so they only run after the same
+lint/build/test job that gates every push/PR): `release` runs `github_release`
+to publish a GitHub Release; `beta` and `metadata` are both gated behind the
+`release` GitHub Environment (manual approval before anything reaches App
+Store Connect) and run `bundle exec fastlane beta`/`bundle exec fastlane
+metadata`. `beta` signs the build via `fastlane match` (readonly in CI —
+certs come from the private `kurn-certificates` repo, never generated or
+revoked here) and an App Store Connect API key, then `build_app` +
+`upload_to_testflight` — no Apple ID password or 2FA prompt is needed.
+`metadata` pushes `fastlane/metadata/` (App Store listing text — see that
+folder) via `deliver`, text only (`skip_binary_upload: true`,
+`skip_screenshots: true`), so it never collides with `beta`'s binary upload.
+Two more lanes exist but aren't wired into CI: `screenshots` (captures App
+Store screenshots from `KurnUITests`/`KurnWatchUITests` using the
+`UI-Testing-Screenshots` seeded launch argument) and `store_assets` (uploads
+screenshots + metadata together, still never submitting for review — that
+stays a manual step in App Store Connect).
 
 SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
 function body at 120, cyclomatic complexity at 15, type body at 400.
@@ -1093,6 +1106,67 @@ toolbar would be the wrong control**:
   (see "Secure local storage for recordings"), so there is no toolbar to hide.
 - Accessibility identifiers used by `KurnUITests/ScreenshotUITests.swift`
   (`nav.settings`, `meetingCard`) must survive any further chrome rework.
+
+### Accessibility
+
+VoiceOver, Dynamic Type, and Reduce Motion are supported throughout the app,
+the Watch companion, and the Lock Screen/Dynamic Island Live Activity —
+enforced by lint and by a CI audit test, not just convention:
+
+- **`Kurn/Infrastructure/Accessibility/`** — `ColorAccessibility.swift` gives
+  `FolderColorPalette`/`TagColorPalette` (closed, curated hex sets) a static
+  `accessibleName(for hex:)` lookup into localized names, so a color swatch
+  reads as "Red"/"Blue" rather than a hex string or nothing at all.
+  `MotionSafeAnimation.swift`'s `View.kurnAnimation(_:value:)` wraps
+  `@Environment(\.accessibilityReduceMotion)` so call sites don't each
+  re-implement the check; a `repeatForever` loop (e.g. `RecorderView`'s
+  `PulsingDot`) instead gates its own start on that environment value and
+  renders the final static state when Reduce Motion is on, since wrapping a
+  looping animation in `kurnAnimation` alone doesn't stop it from starting.
+- **Dynamic Type** — `Theme.swift`'s "Typography" section provides semantic,
+  Dynamic-Type-aware `Font` constants (`Font.system(_:design:weight:)`, never
+  `Font.system(size:)`) that all real reading text should use. Fixed-geometry
+  UI (icon glyphs, a circular avatar, `RecorderView`'s big timer) stays a
+  fixed size via `@ScaledMetric(relativeTo:)` with a capped
+  `.dynamicTypeSize(...DynamicTypeSize.accessibility2)` on that subtree,
+  rather than scaling unbounded and breaking a fixed-dimension layout — this
+  is a deliberate, narrow exception, not the app-wide default.
+- **Lint guardrail** — `.swiftlint.yml`'s opt-in `accessibility_label_for_image`
+  and `accessibility_trait_for_button` rules are `severity: error`, so a new
+  unlabeled icon-only control or untraited tappable view fails CI, not just a
+  warning. Note the rule attributes a violation to the *enclosing view's
+  declaration line*, not the modifier call site — a misplaced
+  `// swiftlint:disable:next` comment a few lines below the real declaration
+  silently does nothing. When violations need triage beyond what the console
+  log shows (SwiftLint lints in parallel, so log-line adjacency to a
+  "Linting 'X'" message is not a reliable attribution signal), the CI job
+  also uploads `swiftlint-report.json` (`--reporter json`, exact file/line)
+  as a build artifact.
+- **`KurnUITests/AccessibilityAuditUITests.swift`** — runs
+  `XCUIApplication.performAccessibilityAudit(for: [.sufficientElementDescription,
+  .trait])` over the Recorder, Meeting Detail (Transcript/Summary tabs),
+  Settings root, and Folder Form screens, reusing the same seeded
+  `"UI-Testing-Screenshots"` launch state and identifiers as the screenshot
+  tests. It's wired into the `Kurn.xcscheme`'s default `TestAction` alongside
+  `KurnTests` (`KurnUITests` wasn't in the scheme before this was added, so it
+  never ran in CI), with `ScreenshotUITests` explicitly skipped there since it
+  depends on fastlane's snapshot setup.
+- **Speaker identity, not color, carries meaning** everywhere it matters: the
+  Live Activity's Lock Screen status dot differs by *shape* (pause icon vs.
+  filled circle), not only color, and status text is never color-only.
+- **Locale parity** — `KurnWatch/` and `KurnLiveActivityExtension/` each carry
+  the same 7 locales as the main app (`en`, `pt-BR`, `es`, `fr`, `it`, `de`,
+  `zh-Hans`), not just `en`/`pt-BR` — a VoiceOver user on the Watch or reading
+  the widget in one of the other 5 languages would otherwise hear/read
+  English. Keep new strings in these two targets in sync across all 7 the
+  same way the main app's `Localizable.strings` are.
+- **Known gaps, left out of scope deliberately**: `ScreenshotUITests` and the
+  accessibility audit both run at the system's default text size, so neither
+  catches a layout break at large accessibility text sizes — that needs
+  manual testing (Accessibility Inspector / Simulator) per screen.
+  `KurnWatchUITests` doesn't run in `iOS CI` today (no separate watchOS test
+  destination is configured), so Watch VoiceOver is verified manually, not by
+  CI.
 
 ## Conventions
 

@@ -14,6 +14,11 @@ MEETINGS VERSTEHEN
 - Meetings manuell oder mit optional KI-vorgeschlagenen Tags versehen.
 - Stelle Fragen zu einem einzelnen Meeting oder deiner gesamten Bibliothek, mit zitierten, antippbaren Zeitstempeln, die direkt zu diesem Moment im Transkript springen.
 
+BARRIEREFREI VON GRUND AUF
+- Vollständige VoiceOver-Unterstützung in der gesamten App, der Apple-Watch-Begleit-App und der Live Activity auf dem Sperrbildschirm/in der Dynamic Island.
+- Dynamische Schriftgröße: Text skaliert mit deiner bevorzugten Lesegröße.
+- Berücksichtigt „Bewegung reduzieren" und verlässt sich nie allein auf Farbe, um einen Status anzuzeigen.
+
 PRIVAT VON GRUND AUF
 - Aufnahmen und Meeting-Daten werden auf deinem Gerät gespeichert, im Ruhezustand verschlüsselt und durch Face ID, Touch ID oder deinen Code geschützt.
 - Netzwerkanfragen erfolgen nur, wenn du Cloud-Transkription oder einen KI-Zusammenfassungsanbieter wählst — alles andere läuft vollständig auf dem Gerät.
