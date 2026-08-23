@@ -8,13 +8,13 @@ opt_in_rules:
   - accessibility_label_for_image
   - accessibility_trait_for_button
 
-# Warning-level while the accessibility pass (see the "Fase 0-8" plan) is in
-# progress across the app; raised to the default error severity once Views
-# and the Watch/widget targets have full VoiceOver coverage.
+# Error severity (rather than relying on the rules' own default) so escalating
+# this is an explicit, visible decision — see the "Fase 0-8" accessibility
+# plan's Phase 7. Previously warning-level while the pass was in progress.
 accessibility_label_for_image:
-  severity: warning
+  severity: error
 accessibility_trait_for_button:
-  severity: warning
+  severity: error
 
 excluded:
   - .build
