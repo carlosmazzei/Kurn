@@ -57,6 +57,7 @@ struct SummaryTemplateTests {
         #expect(ids.contains("general"))
         #expect(ids.contains("standup"))
         #expect(ids.contains("interview"))
+        #expect(ids.contains("outline"))
         let allBuiltIn = SummaryTemplate.defaultTemplates.allSatisfy(\.isBuiltIn)
         #expect(allBuiltIn)
     }

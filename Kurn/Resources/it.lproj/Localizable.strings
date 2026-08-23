@@ -424,6 +424,8 @@
 "template.standup.desc" = "Cosa è stato fatto, prossimi passi e blocchi.";
 "template.interview.name" = "Colloquio";
 "template.interview.desc" = "Domande, risposte, punti di forza e valutazione.";
+"template.outline.name" = "Struttura della Riunione";
+"template.outline.desc" = "Breve sintesi e struttura cronologica e gerarchica degli argomenti trattati.";
 
 /* Impostazioni */
 "settings.title" = "Impostazioni";

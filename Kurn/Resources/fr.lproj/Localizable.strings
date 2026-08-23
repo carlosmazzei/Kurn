@@ -424,6 +424,8 @@
 "template.standup.desc" = "Ce qui a été fait, la suite, et les blocages.";
 "template.interview.name" = "Entretien";
 "template.interview.desc" = "Questions, réponses, points forts et évaluation.";
+"template.outline.name" = "Plan de la Réunion";
+"template.outline.desc" = "Bref résumé et structure chronologique et hiérarchique des sujets abordés.";
 
 /* Réglages */
 "settings.title" = "Réglages";

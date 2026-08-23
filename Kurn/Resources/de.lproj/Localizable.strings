@@ -424,6 +424,8 @@
 "template.standup.desc" = "Was erledigt wurde, was als Nächstes ansteht, und Blockaden.";
 "template.interview.name" = "Interview";
 "template.interview.desc" = "Fragen, Antworten, Stärken und Bewertung.";
+"template.outline.name" = "Besprechungsgliederung";
+"template.outline.desc" = "Kurze Zusammenfassung und chronologische, hierarchische Gliederung der Themen.";
 
 /* Einstellungen */
 "settings.title" = "Einstellungen";

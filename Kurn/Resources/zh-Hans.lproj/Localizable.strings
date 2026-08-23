@@ -424,6 +424,8 @@
 "template.standup.desc" = "已完成的工作、下一步计划及阻碍。";
 "template.interview.name" = "面试";
 "template.interview.desc" = "问题、回答、优势及评估。";
+"template.outline.name" = "会议大纲";
+"template.outline.desc" = "简要总结，加上按时间顺序列出讨论主题的分层大纲。";
 
 /* 设置 */
 "settings.title" = "设置";
