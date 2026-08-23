@@ -21,11 +21,14 @@ jobs:
     # the iPhone/iPad-only capture already took, so the old 60 min budget
     # left ~0 margin. Widened rather than tuned tightly.
     timeout-minutes: 90
-    # Only needed for the optional ASC upload step below; capture itself
-    # touches no App Store Connect credentials. Gated behind `release` like
-    # `beta`/`metadata` in swift.yml, so an upload still waits for approval
-    # if the environment requires reviewers.
-    environment: release
+    # No `environment:` here on purpose. This job never touches App Store
+    # Connect, and this workflow is dispatched against arbitrary branches
+    # (usually `main`) rather than a release tag — putting it behind the
+    # `release` environment (whose deployment policy allows only `v*` tags,
+    # same as `beta`/`metadata` in swift.yml) made every dispatch fail
+    # instantly with no runner assigned, before checkout even ran. The
+    # environment gate belongs only on the `upload` job below, which is the
+    # one that actually needs the ASC secrets.
 
     steps:
       - name: Checkout
@@ -56,8 +59,34 @@ jobs:
           name: screenshots
           path: fastlane/screenshots
 
+  upload:
+    needs: screenshots
+    if: ${{ inputs.upload }}
+    runs-on: ubuntu-latest
+    # Gated behind the `release` GitHub Environment (required reviewers, if
+    # configured), same as `beta`/`metadata` in swift.yml, so a stray
+    # dispatch with `upload: true` still waits for manual approval before
+    # anything reaches App Store Connect. Text/screenshot push only — no
+    # signing, no binary — so this runs on ubuntu-latest, same as `metadata`.
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Download screenshots artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: screenshots
+          path: fastlane/screenshots
+
       - name: Push screenshots + metadata to App Store Connect
-        if: ${{ inputs.upload }}
         run: bundle exec fastlane store_assets
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
