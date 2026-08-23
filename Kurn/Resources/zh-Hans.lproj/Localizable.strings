@@ -635,6 +635,8 @@
 "chat.untitled_meeting" = "未命名会议";
 "chat.starter.title" = "询问这次会议";
 "chat.starter.subtitle" = "回答基于转录内容，并附有可点按的时间戳。";
+"chat.starter.library.title" = "询问你的所有会议";
+"chat.starter.library.subtitle" = "回答基于你资料库中已转录的会议，并附有可点按的引用，可直接跳转到相关内容。";
 "chat.placeholder" = "输入问题…";
 "chat.disabled.title" = "语义搜索已关闭";
 "chat.disabled.subtitle" = "在设置中开启语义搜索，即可就会议内容进行聊天。";

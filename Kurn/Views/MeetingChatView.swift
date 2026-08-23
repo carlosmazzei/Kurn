@@ -166,10 +166,14 @@ struct MeetingChatView: View {
     }
 
     private var starterHint: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(NSLocalizedString("chat.starter.title", comment: "Chat starter title"))
+        // The library-wide "Ask" sheet (`meeting == nil`) needs its own copy —
+        // "Ask about this meeting" makes no sense when there isn't one.
+        let titleKey = meeting == nil ? "chat.starter.library.title" : "chat.starter.title"
+        let subtitleKey = meeting == nil ? "chat.starter.library.subtitle" : "chat.starter.subtitle"
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(NSLocalizedString(titleKey, comment: "Chat starter title"))
                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-            Text(NSLocalizedString("chat.starter.subtitle", comment: "Chat starter subtitle"))
+            Text(NSLocalizedString(subtitleKey, comment: "Chat starter subtitle"))
                 .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
