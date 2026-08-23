@@ -124,7 +124,7 @@ struct FolderFormView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(hex)
+                .accessibilityLabel(FolderColorPalette.accessibleName(for: hex))
                 .accessibilityAddTraits(colorHex == hex ? .isSelected : [])
             }
         }

@@ -173,6 +173,7 @@ struct FolderSidebarView: View {
                         .foregroundStyle(Theme.accent)
                 }
                 .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
+                .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
             }
         }
     }
@@ -272,6 +273,7 @@ struct FolderSidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
             .accessibilityLabel(NSLocalizedString("folder.open_subfolders", comment: "Open subfolders"))
         }
         .swipeActions(edge: .trailing) {

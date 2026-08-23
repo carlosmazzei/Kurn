@@ -239,6 +239,16 @@
 "tag.new" = "Nueva Etiqueta";
 "tag.name_placeholder" = "Nombre de la etiqueta";
 "tag.color" = "Color";
+"tag.color.red" = "Rojo";
+"tag.color.orange" = "Naranja";
+"tag.color.yellow" = "Amarillo";
+"tag.color.green" = "Verde";
+"tag.color.indigo" = "Índigo";
+"tag.color.blue" = "Azul";
+"tag.color.purple" = "Morado";
+"tag.color.pink" = "Rosa";
+"tag.color.gray" = "Gris";
+"tag.color.brown" = "Marrón";
 "tag.add" = "Añadir Etiqueta";
 "tag.edit" = "Editar Etiqueta";
 "tag.delete" = "Eliminar Etiqueta";

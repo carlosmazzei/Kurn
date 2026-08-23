@@ -246,6 +246,9 @@ struct StorageSettingsView: View {
                         .buttonStyle(.borderless)
                         .tint(.red)
                         .disabled(downloads.isDownloading)
+                        .accessibilityLabel(
+                            "\(model.displayName): \(NSLocalizedString("settings.models.delete", comment: "Delete model"))"
+                        )
                     }
                 }
             }

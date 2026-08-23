@@ -111,6 +111,7 @@ struct TagPickerView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 pendingDelete = tag

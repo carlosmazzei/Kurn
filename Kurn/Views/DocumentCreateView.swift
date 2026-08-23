@@ -240,6 +240,7 @@ struct DocumentCreateView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedIDs.contains(id) ? .isSelected : [])
     }
 
     private func generate() async {

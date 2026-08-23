@@ -350,6 +350,7 @@ struct SummaryTab: View {
 }
 
 private struct IndeterminateSummaryProgressBar: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase = false
 
     var body: some View {
@@ -370,6 +371,9 @@ private struct IndeterminateSummaryProgressBar: View {
         .frame(height: 4)
         .onAppear {
             phase = false
+            // Reduce Motion: never start the infinite slide, leave the segment
+            // parked at its resting position.
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: false)) {
                 phase = true
             }

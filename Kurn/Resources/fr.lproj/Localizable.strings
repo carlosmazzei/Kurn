@@ -239,6 +239,16 @@
 "tag.new" = "Nouveau Tag";
 "tag.name_placeholder" = "Nom du tag";
 "tag.color" = "Couleur";
+"tag.color.red" = "Rouge";
+"tag.color.orange" = "Orange";
+"tag.color.yellow" = "Jaune";
+"tag.color.green" = "Vert";
+"tag.color.indigo" = "Indigo";
+"tag.color.blue" = "Bleu";
+"tag.color.purple" = "Violet";
+"tag.color.pink" = "Rose";
+"tag.color.gray" = "Gris";
+"tag.color.brown" = "Marron";
 "tag.add" = "Ajouter un tag";
 "tag.edit" = "Modifier le tag";
 "tag.delete" = "Supprimer le tag";

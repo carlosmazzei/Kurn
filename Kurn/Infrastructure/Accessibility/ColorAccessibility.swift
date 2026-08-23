@@ -31,3 +31,25 @@ extension FolderColorPalette {
         }
     }
 }
+
+extension TagColorPalette {
+    /// Same rationale as `FolderColorPalette.accessibleName(for:)`: `colors` is a
+    /// small closed palette (see `Models/Tag.swift`), so a static lookup is enough.
+    /// Kept as a separate table rather than sharing `FolderColorPalette`'s, since
+    /// the two palettes' hex values don't fully overlap (e.g. the reds differ).
+    static func accessibleName(for hex: String) -> String {
+        switch hex.uppercased() {
+        case "#FF453A": return NSLocalizedString("tag.color.red", comment: "Red")
+        case "#FF9500": return NSLocalizedString("tag.color.orange", comment: "Orange")
+        case "#FFCC00": return NSLocalizedString("tag.color.yellow", comment: "Yellow")
+        case "#34C759": return NSLocalizedString("tag.color.green", comment: "Green")
+        case "#5E5CE6": return NSLocalizedString("tag.color.indigo", comment: "Indigo")
+        case "#007AFF": return NSLocalizedString("tag.color.blue", comment: "Blue")
+        case "#AF52DE": return NSLocalizedString("tag.color.purple", comment: "Purple")
+        case "#FF2D55": return NSLocalizedString("tag.color.pink", comment: "Pink")
+        case "#8E8E93": return NSLocalizedString("tag.color.gray", comment: "Gray")
+        case "#C69F6B": return NSLocalizedString("tag.color.brown", comment: "Brown")
+        default: return hex
+        }
+    }
+}

@@ -195,6 +195,8 @@ struct TagEditorView: View {
                                     )
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(TagColorPalette.accessibleName(for: hex))
+                            .accessibilityAddTraits(colorHex == hex ? .isSelected : [])
                         }
                     }
                     .padding(.vertical, 8)
