@@ -1,0 +1,22 @@
+Kurn ist eine local-first App zum Aufnehmen von Meetings, Transkribieren von Audio, Erkennen von Sprechern und Erstellen strukturierter KI-Zusammenfassungen — so konzipiert, dass deine Aufnahmen standardmäßig auf deinem Gerät bleiben.
+
+AUFNEHMEN UND TRANSKRIBIEREN
+- Nimm Meetings in einem oder mehreren Abschnitten auf, mit Pause-, Fortsetzen- und Stopp-Steuerung aus der App, vom Sperrbildschirm, der Dynamic Island oder deiner Apple Watch.
+- Transkribiere auf dem Gerät mit Apples Speech-Framework oder einem mehrsprachigen On-Device-Modell, oder nutze optional eine Whisper-kompatible Cloud-API für längere Aufnahmen.
+- Die automatische Sprechererkennung (Diarisierung) zeigt, wer was gesagt hat, mit bearbeitbaren Sprechernamen.
+- Eine optionale Live-Transkriptionsvorschau zeigt während der Aufnahme einen laufenden Entwurf.
+- Lange Transkriptionen werden automatisch fortgesetzt, wenn die App in den Hintergrund wechselt oder unterbrochen wird — sie machen dort weiter, wo sie aufgehört haben, statt von vorn zu beginnen.
+
+MEETINGS VERSTEHEN
+- Strukturierte, vorlagenbasierte KI-Zusammenfassungen — allgemein, Standup oder Interview, oder deine eigene individuelle Vorlage.
+- Meetings durchsuchen und nach Datum, Tags, Status oder Dauer filtern.
+- Meetings in Ordnern, Smart-Ordnern, Favoriten und einem Archiv organisieren.
+- Meetings manuell oder mit optional KI-vorgeschlagenen Tags versehen.
+- Stelle Fragen zu einem einzelnen Meeting oder deiner gesamten Bibliothek, mit zitierten, antippbaren Zeitstempeln, die direkt zu diesem Moment im Transkript springen.
+
+PRIVAT VON GRUND AUF
+- Aufnahmen und Meeting-Daten werden auf deinem Gerät gespeichert, im Ruhezustand verschlüsselt und durch Face ID, Touch ID oder deinen Code geschützt.
+- Netzwerkanfragen erfolgen nur, wenn du Cloud-Transkription oder einen KI-Zusammenfassungsanbieter wählst — alles andere läuft vollständig auf dem Gerät.
+- Kein Tracking, keine Analyse, kein Konto erforderlich.
+
+Die Kurn-Oberfläche ist auf Englisch, brasilianischem Portugiesisch, Spanisch, Französisch, Italienisch, Deutsch und vereinfachtem Chinesisch verfügbar. Die Transkription unterstützt jede von Whisper erkannte Sprache.

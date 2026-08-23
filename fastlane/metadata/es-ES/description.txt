@@ -1,0 +1,22 @@
+Kurn es una app local-first para grabar reuniones, transcribir audio, identificar quién habla y generar resúmenes estructurados con IA, diseñada para que tus grabaciones permanezcan en tu dispositivo de forma predeterminada.
+
+GRABA Y TRANSCRIBE
+- Graba reuniones en uno o varios segmentos, con controles de pausar, reanudar y detener desde la app, la Pantalla de Bloqueo, la Dynamic Island o tu Apple Watch.
+- Transcribe en el dispositivo con el framework de Voz de Apple o un modelo multilingüe on-device, o usa opcionalmente una API compatible con Whisper en la nube para grabaciones más largas.
+- La diarización automática de hablantes indica quién dijo qué, con nombres editables.
+- Una vista previa de transcripción en vivo (opcional) muestra un borrador continuo mientras grabas.
+- Las transcripciones largas se reanudan automáticamente si la app pasa a segundo plano o se interrumpe, continuando donde se quedaron en lugar de empezar de nuevo.
+
+ENTIENDE TUS REUNIONES
+- Resúmenes estructurados con IA basados en plantillas: general, standup o entrevista, o tu propia plantilla personalizada.
+- Busca reuniones y filtra por fecha, etiquetas, estado o duración.
+- Organiza reuniones en carpetas, Carpetas Inteligentes, favoritos y un archivo.
+- Etiqueta reuniones manualmente o con etiquetas sugeridas por IA (opcional).
+- Haz preguntas sobre una reunión concreta o sobre toda tu biblioteca, con marcas de tiempo citadas y pulsables que te llevan directo a ese momento de la transcripción.
+
+PRIVADA POR DISEÑO
+- Las grabaciones y los datos de las reuniones se almacenan en tu dispositivo, cifrados en reposo y protegidos con Face ID, Touch ID o tu código de acceso.
+- Las solicitudes de red solo ocurren si eliges transcripción en la nube o un proveedor de resúmenes con IA; todo lo demás se ejecuta completamente en el dispositivo.
+- Sin rastreo, sin analítica, sin necesidad de cuenta.
+
+La interfaz de Kurn está disponible en inglés, portugués de Brasil, español, francés, italiano, alemán y chino simplificado. La transcripción admite todos los idiomas que reconoce Whisper.

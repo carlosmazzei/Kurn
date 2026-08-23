@@ -1,0 +1,1 @@
+réunion,transcription,notes,diarisation,intervenants,résumé,enregistreur,privé,offline,whisper

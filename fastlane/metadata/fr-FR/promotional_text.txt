@@ -1,0 +1,1 @@
+Enregistreur de réunions local-first avec transcription on-device, identification des intervenants et résumés IA. Vos enregistrements restent sur l'appareil par défaut.

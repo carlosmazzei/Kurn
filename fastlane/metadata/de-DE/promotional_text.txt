@@ -1,0 +1,1 @@
+Local-first Meeting-Rekorder mit On-Device-Transkription, Sprechererkennung und KI-Zusammenfassungen. Deine Aufnahmen bleiben standardmäßig auf dem Gerät.
