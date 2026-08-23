@@ -1,0 +1,51 @@
+name: App Store Accessibility
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish labels immediately (requires an existing live App Store version)"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: app-store-accessibility
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ref:
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require a release tag
+        run: |
+          echo "::error::accessibility sync requires dispatching this workflow against a vX.Y.Z release tag"
+          exit 1
+
+  sync:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Sync Accessibility Nutrition Labels
+        run: bundle exec fastlane accessibility_labels publish:"$PUBLISH"
+        env:
+          PUBLISH: ${{ inputs.publish }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}

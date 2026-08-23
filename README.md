@@ -228,6 +228,9 @@ Kurn is designed to avoid a backend service controlled by the app.
   `accessibility_trait_for_button`, both build-breaking) and an automated UI
   test (`KurnUITests/AccessibilityAuditUITests.swift`) that runs
   `XCUIApplication.performAccessibilityAudit(for:)` over key screens in CI.
+- App Store Accessibility Nutrition Labels are declared in
+  `fastlane/accessibility.json`: VoiceOver, Larger Text, Reduced Motion, and
+  Differentiate Without Color Alone for iPhone, iPad, and Apple Watch.
 
 ## Requirements
 
@@ -324,12 +327,17 @@ Fastlane-driven process (see `fastlane/Fastfile`):
 Pushing the tag also starts the protected App Store pipeline. After
 `build-and-test`, `beta` signs with `fastlane match`, uploads to TestFlight, and
 waits for Apple to finish processing; in parallel, the reusable screenshots
-workflow captures iPhone, iPad, and Watch assets, then `store_assets` uploads
-them with all localized metadata. Once both branches succeed, `submit` derives
-the exact version/build from the tagged project and offers it to App Review.
+workflow captures iPhone, iPad, and Watch assets, then `store_assets` reconciles
+the remote screenshot set (removing stale/duplicate images), uploads all assets
+to the exact tagged app version, and synchronizes draft Accessibility Nutrition
+Labels. Once both branches succeed, `submit` derives the exact version/build
+from the tagged project and offers it to App Review.
 TestFlight upload, assets upload, and submission each wait for administrator
-approval through the `release` GitHub Environment. Account-level setup and the
-public release after Apple's approval remain manual — see
+approval through the `release` GitHub Environment. After the first version is
+live, the protected `App Store Accessibility` workflow can publish the synced
+labels (Apple doesn't permit publishing them before a live version exists).
+Account-level setup and the public release after Apple's approval remain manual
+— see
 [`docs/app-store-submission-checklist.md`](docs/app-store-submission-checklist.md)
 for the full breakdown.
 

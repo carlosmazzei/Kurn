@@ -52,7 +52,8 @@ If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
 
 ### Releasing
 
-`fastlane/Fastfile` has seven lanes. `bump_version type:{patch,minor,major}` bumps
+`fastlane/Fastfile` has eight public lanes.
+`bump_version type:{patch,minor,major}` bumps
 `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` across all targets via direct text
 substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
 which reorder unrelated parts of this file because it uses Xcode 16
@@ -62,17 +63,31 @@ run locally by a maintainer. Pushing that tag starts the pipeline in
 GitHub Release; `beta` signs via readonly `fastlane match`, uploads to TestFlight,
 and waits for Apple processing; and `store-assets` calls the reusable
 `.github/workflows/screenshots.yml` to capture iPhone/iPad/Watch screenshots and
-upload them with all localized metadata. `beta` and the assets upload each use
-the protected `release` GitHub Environment, so every App Store Connect mutation
-waits for administrator approval. Once both succeed, the dependent protected
-`submit` job runs `submit_review`; that lane derives version/build from the
-tagged project, verifies the `vX.Y.Z` tag, attaches the processed build, and
-submits it to App Review with `automatic_release: false`. The standalone
+sync them with all localized metadata to the exact project `MARKETING_VERSION`.
+This uses deliver's beta `sync_screenshots` path (enabled only inside the
+`store_assets` lane), which removes remote extras before uploading missing
+images; the legacy uploader retries before Apple exposes checksums and can create
+duplicates.
+`beta` and the assets upload each use the protected `release` GitHub Environment,
+so every App Store Connect mutation waits for administrator approval. Once both
+succeed, the dependent protected `submit` job runs `submit_review`; that lane
+derives version/build from the tagged project, verifies the `vX.Y.Z` tag,
+attaches the processed build, and submits it to App Review with
+`automatic_release: false`. The standalone
 `.github/workflows/app-store-submit.yml` remains a manual retry path.
 `Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
 and URLs in the regular CI job. No Apple ID password or 2FA prompt is required;
 App Store Connect calls use its API key, while signing credentials come from the
-private `kurn-certificates` repository.
+private `kurn-certificates` repository. `store_assets` also calls the private
+`sync_accessibility_labels` lane to upsert draft Accessibility Nutrition Labels
+from `fastlane/accessibility.json` for iPhone, iPad, and Apple Watch through
+Apple's `accessibilityDeclarations` API; Fastlane 2.238.0 has no native model for
+that endpoint, so `fastlane/accessibility_labels.rb` uses Spaceship's
+authenticated request client directly. The public `accessibility_labels` lane
+supports `dry_run:true` and `publish:true`; publishing is separate because Apple
+rejects publication until the app has a live App Store version. The protected
+manual `.github/workflows/accessibility-labels.yml` workflow exposes that
+operation for a `v*` tag after the first public release.
 
 SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
 function body at 120, cyclomatic complexity at 15, type body at 400.

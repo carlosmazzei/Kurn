@@ -1,4 +1,13 @@
+require_relative "accessibility_labels"
+
 XCODEPROJ_PBXPROJ = File.expand_path("../Kurn.xcodeproj/project.pbxproj", __dir__)
+ACCESSIBILITY_CONFIG = File.expand_path("accessibility.json", __dir__)
+
+def kurn_marketing_version
+  version = File.read(XCODEPROJ_PBXPROJ)[/MARKETING_VERSION = ([\d.]+);/, 1]
+  UI.user_error!("Could not find MARKETING_VERSION in #{XCODEPROJ_PBXPROJ}") if version.nil?
+  version
+end
 
 # Bumps MARKETING_VERSION / CURRENT_PROJECT_VERSION directly via text
 # substitution rather than `increment_version_number` / `xcodeproj`, which
@@ -124,8 +133,10 @@ lane :metadata do
 
   deliver(
     api_key: api_key,
+    app_version: kurn_marketing_version,
     skip_binary_upload: true,
     skip_screenshots: true,
+    precheck_include_in_app_purchases: false,
     force: true
   )
 end
@@ -173,13 +184,19 @@ lane :store_assets do
     key_content: ENV["ASC_KEY_CONTENT"],
     is_key_content_base64: true
   )
+  ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
 
   deliver(
     api_key: api_key,
+    app_version: kurn_marketing_version,
     skip_binary_upload: true,
     skip_screenshots: false,
+    sync_screenshots: true,
+    precheck_include_in_app_purchases: false,
     force: true
   )
+
+  sync_accessibility_labels(api_key: api_key, publish: false)
 end
 
 lane :submit_review do |options|
@@ -223,4 +240,39 @@ lane :submit_review do |options|
     precheck_include_in_app_purchases: false,
     force: true
   )
+end
+
+lane :accessibility_labels do |options|
+  dry_run = options[:dry_run] == true || options[:dry_run].to_s == "true"
+  publish = options[:publish] == true || options[:publish].to_s == "true"
+  config = AccessibilityLabels.load(ACCESSIBILITY_CONFIG)
+
+  if dry_run
+    UI.message("Accessibility labels valid for #{config.fetch('declarations').keys.join(', ')}")
+    UI.message("Publish requested: #{publish}")
+    next
+  end
+
+  api_key = app_store_connect_api_key(
+    key_id: ENV["ASC_KEY_ID"],
+    issuer_id: ENV["ASC_ISSUER_ID"],
+    key_content: ENV["ASC_KEY_CONTENT"],
+    is_key_content_base64: true
+  )
+  sync_accessibility_labels(api_key: api_key, publish: publish)
+end
+
+private_lane :sync_accessibility_labels do |options|
+  config = AccessibilityLabels.load(ACCESSIBILITY_CONFIG)
+  token = Spaceship::ConnectAPI::Token.from(hash: options[:api_key])
+  client = Spaceship::ConnectAPI::Client.new(token: token)
+  app = Spaceship::ConnectAPI::App.find("ai.kurn.app", client: client)
+  UI.user_error!("Could not find ai.kurn.app in App Store Connect") if app.nil?
+
+  actions = AccessibilityLabels.new(
+    client: client.tunes_request_client,
+    app_id: app.id,
+    config: config
+  ).sync(publish: options[:publish])
+  actions.each { |action| UI.success(action) }
 end
