@@ -804,6 +804,11 @@ private struct SegmentPlaybackScrubber: View {
             )
             .tint(Theme.accent)
             .disabled(playableDuration <= 0)
+            // VoiceOver's Adjustable rotor acts on the slider itself, so it
+            // needs its own label/value — the container's `.contain` grouping
+            // below keeps this reachable but doesn't supply them on its own.
+            .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
+            .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
 
             HStack(spacing: 8) {
                 Image(systemName: isPlaying ? "waveform" : "timer")

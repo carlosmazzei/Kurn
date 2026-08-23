@@ -90,9 +90,15 @@ private struct LockScreenRecordingView: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(spacing: 8) {
-                        Circle()
-                            .fill(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
+                        // Shape, not just color, carries the paused/recording
+                        // state here — the Lock Screen has no adjacent status
+                        // word the way `RecordingStatusBadge` does — plus a
+                        // VoiceOver label since the icon alone is decorative.
+                        Image(systemName: context.state.isPaused ? "pause.fill" : "circle.fill")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
                             .frame(width: 7, height: 7)
+                            .accessibilityLabel(Text(statusText(context)))
                         elapsedText(context)
                             .font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
                             .foregroundStyle(.white)
@@ -151,6 +157,10 @@ private struct KurnLogo: View {
                     Circle().fill(.white).frame(width: size * 0.22, height: size * 0.22)
                 }
             }
+            // Decorative branding everywhere it's used; in the Dynamic Island's
+            // compact/minimal states especially, it shouldn't compete with the
+            // actual recording state and timer for VoiceOver's attention.
+            .accessibilityHidden(true)
     }
 }
 
@@ -185,6 +195,7 @@ private func commandButtons(
                     .background(Color.white.opacity(0.12), in: Circle())
                     .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
             }
+            .accessibilityLabel(Text("live_activity.highlight"))
         }
     }
 }

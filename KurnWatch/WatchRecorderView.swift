@@ -77,7 +77,10 @@ struct WatchRecorderView: View {
             }
 
             if !isPaused {
+                // Decorative: the timer and title already communicate that
+                // recording is active, and this has no other accessible value.
                 LevelMeter(level: connectivity.level)
+                    .accessibilityHidden(true)
             }
 
             HStack(spacing: 16) {
@@ -87,6 +90,7 @@ struct WatchRecorderView: View {
                     Image(systemName: isPaused ? "play.fill" : "pause.fill")
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityLabel(Text(isPaused ? "watch.resume" : "watch.pause"))
 
                 Button(role: .destructive) {
                     Task { await connectivity.send(.stop) }
@@ -94,6 +98,7 @@ struct WatchRecorderView: View {
                     Image(systemName: "stop.fill")
                 }
                 .buttonStyle(.bordered)
+                .accessibilityLabel(Text("watch.stop"))
 
                 Button {
                     Task { await connectivity.send(.highlight) }
@@ -102,6 +107,7 @@ struct WatchRecorderView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(isPaused)
+                .accessibilityLabel(Text("watch.highlight"))
             }
 
             if connectivity.lastCommandFailed {
