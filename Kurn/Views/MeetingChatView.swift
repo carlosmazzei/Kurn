@@ -120,7 +120,7 @@ struct MeetingChatView: View {
                         Button { onJumpToTime?(time) } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "clock").font(.system(size: 10))
-                                Text(time.clockDisplay).font(.system(size: 12, weight: .medium))
+                                Text(time.clockDisplay).font(.system(.caption, design: .default, weight: .medium))
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Theme.fill, in: Capsule())
@@ -150,7 +150,7 @@ struct MeetingChatView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "quote.opening").font(.system(size: 10))
                             Text(citationLabel(for: hit))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(.caption, design: .default, weight: .medium))
                         }
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(Theme.fill, in: Capsule())
@@ -167,7 +167,7 @@ struct MeetingChatView: View {
         HStack(spacing: 8) {
             ProgressView()
             Text(NSLocalizedString("chat.thinking", comment: "Assistant thinking"))
-                .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
         }
     }
 
@@ -178,9 +178,9 @@ struct MeetingChatView: View {
         let subtitleKey = meeting == nil ? "chat.starter.library.subtitle" : "chat.starter.subtitle"
         return VStack(alignment: .leading, spacing: 6) {
             Text(NSLocalizedString(titleKey, comment: "Chat starter title"))
-                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                .font(Theme.subheadlineEmphasized).foregroundStyle(Theme.textPrimary)
             Text(NSLocalizedString(subtitleKey, comment: "Chat starter subtitle"))
-                .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
