@@ -23,6 +23,7 @@ struct MeetingChatView: View {
 
     @Environment(AppSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var vm = MeetingChatViewModel()
     @State private var input = ""
@@ -67,7 +68,12 @@ struct MeetingChatView: View {
             // block scrolling.
             .simultaneousGesture(TapGesture().onEnded { inputFocused = false })
             .onChange(of: vm.turns.count) { _, _ in
-                if let last = vm.turns.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                guard let last = vm.turns.last else { return }
+                if reduceMotion {
+                    proxy.scrollTo(last.id, anchor: .bottom)
+                } else {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
             }
         }
     }
@@ -202,6 +208,7 @@ struct MeetingChatView: View {
                 Button { vm.cancel() } label: {
                     Image(systemName: "stop.circle.fill").font(.system(size: 30)).foregroundStyle(Theme.warning)
                 }
+                .accessibilityLabel(NSLocalizedString("chat.stop", comment: "Stop"))
             } else {
                 Button { send() } label: {
                     Image(systemName: "arrow.up.circle.fill")
@@ -209,6 +216,7 @@ struct MeetingChatView: View {
                         .foregroundStyle(canSend ? Theme.accent : Theme.textTertiary)
                 }
                 .disabled(!canSend)
+                .accessibilityLabel(NSLocalizedString("chat.send", comment: "Send"))
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)

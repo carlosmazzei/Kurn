@@ -223,6 +223,15 @@
 "folder.deleted" = "Dossier supprimé";
 "folder.icon" = "Icône";
 "folder.color" = "Couleur";
+"folder.color.indigo" = "Indigo";
+"folder.color.red" = "Rouge";
+"folder.color.orange" = "Orange";
+"folder.color.yellow" = "Jaune";
+"folder.color.green" = "Vert";
+"folder.color.teal" = "Sarcelle";
+"folder.color.blue" = "Bleu";
+"folder.color.purple" = "Violet";
+"folder.color.gray" = "Gris";
 "folder.section.subfolders" = "Sous-dossiers";
 "folder.select_this" = "Sélectionner ce dossier";
 "folder.open_subfolders" = "Ouvrir les sous-dossiers";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "Posez une question sur vos réunions";
 "chat.starter.library.subtitle" = "Les réponses s'appuient sur les réunions transcrites de votre bibliothèque, avec des citations sur lesquelles vous pouvez appuyer pour accéder à ce qui a été dit.";
 "chat.placeholder" = "Posez une question…";
+"chat.send" = "Envoyer";
+"chat.stop" = "Arrêter";
 "chat.disabled.title" = "La recherche sémantique est désactivée";
 "chat.disabled.subtitle" = "Activez la recherche sémantique dans les Réglages pour discuter de vos réunions.";
 "chat.no_index.title" = "Rien à discuter pour l'instant";

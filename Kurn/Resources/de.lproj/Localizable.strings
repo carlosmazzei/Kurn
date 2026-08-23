@@ -223,6 +223,15 @@
 "folder.deleted" = "Ordner gelöscht";
 "folder.icon" = "Symbol";
 "folder.color" = "Farbe";
+"folder.color.indigo" = "Indigo";
+"folder.color.red" = "Rot";
+"folder.color.orange" = "Orange";
+"folder.color.yellow" = "Gelb";
+"folder.color.green" = "Grün";
+"folder.color.teal" = "Petrol";
+"folder.color.blue" = "Blau";
+"folder.color.purple" = "Lila";
+"folder.color.gray" = "Grau";
 "folder.section.subfolders" = "Unterordner";
 "folder.select_this" = "Diesen Ordner auswählen";
 "folder.open_subfolders" = "Unterordner öffnen";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "Frag zu deinen Meetings";
 "chat.starter.library.subtitle" = "Antworten basieren auf den transkribierten Meetings deiner Bibliothek, mit antippbaren Zitaten, die direkt zur jeweiligen Stelle springen.";
 "chat.placeholder" = "Stelle eine Frage …";
+"chat.send" = "Senden";
+"chat.stop" = "Stopp";
 "chat.disabled.title" = "Semantische Suche ist aus";
 "chat.disabled.subtitle" = "Aktiviere die semantische Suche in den Einstellungen, um über deine Meetings zu chatten.";
 "chat.no_index.title" = "Noch nichts zum Chatten";

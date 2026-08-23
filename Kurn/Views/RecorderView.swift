@@ -165,10 +165,12 @@ private struct RecorderContent: View {
         HStack(spacing: 8) {
             if vm.state == .recording {
                 PulsingDot(color: Theme.accent)
+                    .accessibilityHidden(true)
             } else {
                 Circle()
                     .fill(vm.state == .paused ? Theme.warning : Theme.accent)
                     .frame(width: 10, height: 10)
+                    .accessibilityHidden(true)
             }
             Text(vm.state == .paused
                  ? NSLocalizedString("recorder.paused", comment: "Paused")
@@ -278,7 +280,11 @@ private struct RecorderContent: View {
             }
         }
         .frame(height: 56)
-        .animation(.linear(duration: 0.06), value: levels)
+        .kurnAnimation(.linear(duration: 0.06), value: levels)
+        // Purely decorative: the recording state and elapsed time are already
+        // announced as text above, and a live level readout at 20 Hz would be
+        // noise, not signal, to VoiceOver.
+        .accessibilityHidden(true)
     }
 
     private var controls: some View {
@@ -342,6 +348,7 @@ private struct RecorderContent: View {
     private func pillLabel(systemImage: String, title: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: systemImage)
+                .accessibilityHidden(true)
             Text(title).font(.system(size: 16, weight: .semibold))
         }
         .frame(maxWidth: .infinity)
@@ -361,6 +368,7 @@ private struct RecorderContent: View {
 /// keeps it from interacting with the recorder's 20 Hz metering re-renders.
 private struct PulsingDot: View {
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dim = false
 
     var body: some View {
@@ -369,6 +377,8 @@ private struct PulsingDot: View {
             .frame(width: 10, height: 10)
             .opacity(dim ? 0.25 : 1)
             .onAppear {
+                // Reduce Motion: never start the infinite pulse, just render solid.
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
                     dim = true
                 }

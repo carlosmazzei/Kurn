@@ -223,6 +223,15 @@
 "folder.deleted" = "Pasta apagada";
 "folder.icon" = "Ícone";
 "folder.color" = "Cor";
+"folder.color.indigo" = "Índigo";
+"folder.color.red" = "Vermelho";
+"folder.color.orange" = "Laranja";
+"folder.color.yellow" = "Amarelo";
+"folder.color.green" = "Verde";
+"folder.color.teal" = "Azul-petróleo";
+"folder.color.blue" = "Azul";
+"folder.color.purple" = "Roxo";
+"folder.color.gray" = "Cinza";
 "folder.section.subfolders" = "Subpastas";
 "folder.select_this" = "Selecionar esta pasta";
 "folder.open_subfolders" = "Abrir subpastas";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "Pergunte sobre suas reuniões";
 "chat.starter.library.subtitle" = "As respostas se baseiam nas reuniões transcritas da sua biblioteca, com citações que você pode tocar para ir direto ao que foi dito.";
 "chat.placeholder" = "Faça uma pergunta…";
+"chat.send" = "Enviar";
+"chat.stop" = "Parar";
 "chat.disabled.title" = "A busca semântica está desativada";
 "chat.disabled.subtitle" = "Ative a busca semântica nos Ajustes para conversar sobre suas reuniões.";
 "chat.no_index.title" = "Ainda não há sobre o que conversar";
