@@ -57,11 +57,34 @@ final class WatchConnectivityManager: NSObject {
 
     override init() {
         super.init()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
+            seedForScreenshot()
+            return
+        }
+        #endif
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
         session.delegate = self
         session.activate()
     }
+
+    #if DEBUG
+    /// Mock "recording in progress" state for App Store screenshot automation
+    /// (`KurnWatchUITests`, run via `bundle exec fastlane screenshots`). There is
+    /// no paired iPhone during a UI test run, so this bypasses WatchConnectivity
+    /// entirely rather than waiting on a session that will never activate.
+    private func seedForScreenshot() {
+        isAvailable = true
+        level = 0.6
+        state = .recording(
+            meetingTitle: "Product Roadmap Sync",
+            referenceDate: Date().addingTimeInterval(-642),
+            accumulatedElapsed: 0,
+            highlightCount: 2
+        )
+    }
+    #endif
 
     @discardableResult
     func send(_ command: WatchCommand) async -> Bool {
