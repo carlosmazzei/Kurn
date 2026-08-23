@@ -21,12 +21,10 @@ Recordings and meeting data are stored on device by default. Network requests
 only happen when the user chooses cloud (Whisper-compatible) transcription or
 generates a summary with a configured AI provider.
 
-> **App Store status:** Kurn is not yet published on the App Store — for now,
-> build it yourself from this repo (see [Getting Started](#getting-started)).
-> Once [GitHub Sponsors](https://github.com/sponsors/carlosmazzei) funding for
-> the project reaches a combined **$100**, I'll submit Kurn to the App Store
-> and keep it free to download. If you'd like to help it get there, sponsoring
-> is the fastest way.
+> **App Store status:** Kurn is not yet published on the App Store — it's
+> currently in TestFlight testing, with an App Store submission to follow.
+> For now, you can also build it yourself from this repo (see
+> [Getting Started](#getting-started)).
 
 ## Current App
 
@@ -307,9 +305,7 @@ Privacy, age rating, review notes), and clicking Submit for Review are not,
 and shouldn't be — see
 [`docs/app-store-submission-checklist.md`](docs/app-store-submission-checklist.md)
 for the full breakdown of what's automated versus what's a deliberate manual
-step. Submitting Kurn to the public App Store itself is gated on reaching
-$100 in combined [GitHub Sponsors](https://github.com/sponsors/carlosmazzei)
-funding — see the App Store status note near the top of this README.
+step.
 
 ## Linting
 

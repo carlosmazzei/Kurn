@@ -562,7 +562,6 @@
 "settings.about" = "关于";
 "settings.acknowledgements" = "致谢";
 "settings.sponsor" = "赞助 Kurn";
-"settings.appstore_status" = "Kurn 尚未上架 App Store。一旦通过 GitHub Sponsors 累计获得 100 美元赞助，就会提交至 App Store，并将保持免费下载。";
 "ack.intro" = "设备端语音识别、说话人分离和语音活动检测由 Fluid Inference 与 whisper.cpp 提供支持。Kurn 使用下列软件包，并按需下载其机器学习模型。每个组件均在各自的许可协议下使用。";
 "ack.packages" = "Swift 包";
 "ack.models" = "机器学习模型";
