@@ -51,6 +51,10 @@ struct MeetingChatView: View {
 
     private var conversation: some View {
         ScrollViewReader { proxy in
+            // SwiftLint attributes the accessibility_trait_for_button
+            // violation from the `.simultaneousGesture` below to this
+            // ScrollView's declaration, not to the modifier call site.
+            // swiftlint:disable:next accessibility_trait_for_button
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     if vm.turns.isEmpty { starterHint }
@@ -69,7 +73,6 @@ struct MeetingChatView: View {
             // dismiss-keyboard convenience on the whole scroll area — so
             // `.isButton` would misrepresent it to VoiceOver rather than fix
             // anything.
-            // swiftlint:disable:next accessibility_trait_for_button
             .simultaneousGesture(TapGesture().onEnded { inputFocused = false })
             .onChange(of: vm.turns.count) { _, _ in
                 guard let last = vm.turns.last else { return }
