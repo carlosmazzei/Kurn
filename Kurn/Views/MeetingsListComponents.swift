@@ -41,7 +41,7 @@ struct LockedRecordingsView: View {
                 Task { await gate.authenticate() }
             } label: {
                 Text(NSLocalizedString("recordings.unlock_button", comment: "Unlock"))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(Theme.subheadlineEmphasized)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -53,7 +53,7 @@ struct LockedRecordingsView: View {
                 showingSettings = true
             } label: {
                 Text(NSLocalizedString("recordings.open_settings", comment: "Open Settings"))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(Theme.subheadlineEmphasized)
                     .foregroundStyle(Theme.accent)
             }
             .buttonStyle(.plain)
@@ -79,7 +79,7 @@ struct MeetingCard: View {
                             .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
                     }
                     Text(meeting.title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.calloutEmphasized)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                 }
@@ -88,7 +88,7 @@ struct MeetingCard: View {
 
                 if !preview.isEmpty {
                     Text(preview)
-                        .font(.system(size: 14))
+                        .font(Theme.footnote)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(2)
                 }
@@ -140,7 +140,7 @@ struct MeetingCard: View {
                 }
                 if overflowCount > 0 {
                     Text("+\(overflowCount)")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(.caption2, design: .default, weight: .medium))
                         .foregroundStyle(Theme.textTertiary)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
@@ -155,11 +155,11 @@ struct MeetingCard: View {
     private func metadataItem(systemImage: String, text: String, tint: Color = Theme.textSecondary) -> some View {
         HStack(spacing: 4) {
             Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(.caption2, design: .default, weight: .medium))
             Text(text)
                 .lineLimit(1)
         }
-        .font(.system(size: 13))
+        .font(Theme.footnote)
         .foregroundStyle(tint)
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -167,9 +167,9 @@ struct MeetingCard: View {
     private func folderChip(_ folder: Folder) -> some View {
         HStack(spacing: 4) {
             Image(systemName: folder.iconName)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(.caption2, design: .default, weight: .semibold))
             Text(folder.name)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(.caption2, design: .default, weight: .medium))
                 .lineLimit(1)
         }
         .foregroundStyle(Color(hex: folder.colorHex))

@@ -234,7 +234,7 @@ struct SummaryModelPicker: View {
             }
         } else if let errorText {
             Text(errorText)
-                .font(.system(size: 12))
+                .font(Theme.caption)
                 .foregroundStyle(Theme.textSecondary)
         }
 
@@ -322,7 +322,7 @@ struct TranscriptionModelPicker: View {
             }
         } else if let errorText {
             Text(errorText)
-                .font(.system(size: 12))
+                .font(Theme.caption)
                 .foregroundStyle(Theme.textSecondary)
         }
 
@@ -513,9 +513,9 @@ struct ProviderRow: View {
         HStack(spacing: 12) {
             ProviderIcon(provider: provider)
             VStack(alignment: .leading, spacing: 2) {
-                Text(provider.displayName).font(.system(size: 15, weight: .semibold))
+                Text(provider.displayName).font(Theme.subheadlineEmphasized)
                 Text(provider.kind.displayName)
-                    .font(.system(size: 12))
+                    .font(Theme.caption)
                     .foregroundStyle(Theme.textSecondary)
                 let configured = KeychainManager.shared.hasValue(for: provider.keychainAccount)
                 HStack(spacing: 5) {
@@ -525,7 +525,7 @@ struct ProviderRow: View {
                     Text(configured
                          ? NSLocalizedString("settings.configured", comment: "Configured")
                          : NSLocalizedString("settings.not_configured", comment: "Not configured"))
-                        .font(.system(size: 12))
+                        .font(Theme.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }
                 .id(revision)
@@ -542,7 +542,7 @@ private struct ProviderIcon: View {
             .frame(width: 32, height: 32)
             .overlay(
                 Text(String(provider.displayName.prefix(1)))
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(.subheadline, design: .default, weight: .bold))
                     .foregroundStyle(.white)
             )
     }
