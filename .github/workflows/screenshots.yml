@@ -2,6 +2,11 @@ name: App Store Screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      upload:
+        description: "Also push captured screenshots (+ text metadata) to App Store Connect via `fastlane store_assets`"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -10,7 +15,17 @@ concurrency:
 jobs:
   screenshots:
     runs-on: macos-26
-    timeout-minutes: 60
+    # The `screenshots` lane now does two separate capture_screenshots runs
+    # (iPhone/iPad, then the KurnWatchUITests scheme for the Watch) — a
+    # second Xcode build plus a Watch simulator boot on top of the ~59 min
+    # the iPhone/iPad-only capture already took, so the old 60 min budget
+    # left ~0 margin. Widened rather than tuned tightly.
+    timeout-minutes: 90
+    # Only needed for the optional ASC upload step below; capture itself
+    # touches no App Store Connect credentials. Gated behind `release` like
+    # `beta`/`metadata` in swift.yml, so an upload still waits for approval
+    # if the environment requires reviewers.
+    environment: release
 
     steps:
       - name: Checkout
@@ -28,12 +43,23 @@ jobs:
           if ! xcrun simctl list runtimes available | grep -q "iOS"; then
             xcodebuild -downloadPlatform iOS
           fi
+          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
+            xcodebuild -downloadPlatform watchOS
+          fi
 
       - name: Generate screenshots
         run: bundle exec fastlane screenshots
 
-      - name: Upload screenshots
+      - name: Upload screenshots artifact
         uses: actions/upload-artifact@v7
         with:
           name: screenshots
           path: fastlane/screenshots
+
+      - name: Push screenshots + metadata to App Store Connect
+        if: ${{ inputs.upload }}
+        run: bundle exec fastlane store_assets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
