@@ -747,7 +747,7 @@ private struct RecordingSegmentRow: View {
             ProgressView(value: fraction)
                 .progressViewStyle(.linear)
                 .tint(Theme.accent)
-                .animation(.easeInOut(duration: 0.25), value: fraction)
+                .kurnAnimation(.easeInOut(duration: 0.25), value: fraction)
         }
     }
 }

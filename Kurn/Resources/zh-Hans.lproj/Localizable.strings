@@ -239,6 +239,16 @@
 "tag.new" = "新建标签";
 "tag.name_placeholder" = "标签名称";
 "tag.color" = "颜色";
+"tag.color.red" = "红色";
+"tag.color.orange" = "橙色";
+"tag.color.yellow" = "黄色";
+"tag.color.green" = "绿色";
+"tag.color.indigo" = "靛蓝";
+"tag.color.blue" = "蓝色";
+"tag.color.purple" = "紫色";
+"tag.color.pink" = "粉色";
+"tag.color.gray" = "灰色";
+"tag.color.brown" = "棕色";
 "tag.add" = "添加标签";
 "tag.edit" = "编辑标签";
 "tag.delete" = "删除标签";

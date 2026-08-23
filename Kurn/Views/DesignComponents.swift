@@ -181,7 +181,7 @@ struct KurnDialogModifier: ViewModifier {
                     .zIndex(100)
                 }
             }
-            .animation(.easeInOut(duration: 0.18), value: isPresented)
+            .kurnAnimation(.easeInOut(duration: 0.18), value: isPresented)
     }
 
     private var dialog: some View {
