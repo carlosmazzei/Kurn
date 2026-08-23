@@ -210,6 +210,7 @@ struct SummaryTab: View {
                         Image(systemName: "sparkles")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(Theme.accent)
+                            .accessibilityHidden(true)
                     }
                 }
 
@@ -238,6 +239,7 @@ struct SummaryTab: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "xmark.circle")
+                        .accessibilityHidden(true)
                     Text(NSLocalizedString("detail.summary.cancel", comment: "Cancel summary"))
                         .font(Theme.footnoteEmphasized)
                 }
@@ -263,6 +265,7 @@ struct SummaryTab: View {
                     .fill(Theme.fill)
                     .frame(width: 72, height: 72)
                 Image(systemName: "sparkles").font(.system(size: 30)).foregroundStyle(Theme.textTertiary)
+                    .accessibilityHidden(true)
             }
             VStack(spacing: 8) {
                 Text(NSLocalizedString("detail.summary.empty.title", comment: ""))
@@ -273,6 +276,7 @@ struct SummaryTab: View {
             }
             HStack(spacing: 6) {
                 Image(systemName: "cpu").font(Theme.caption2).foregroundStyle(Theme.textSecondary)
+                    .accessibilityHidden(true)
                 Text(summaryModelNudge)
                     .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             }
@@ -336,6 +340,7 @@ struct SummaryTab: View {
         Button { onGenerate() } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
+                    .accessibilityHidden(true)
                 Text(title)
                     .font(Theme.calloutEmphasized)
             }

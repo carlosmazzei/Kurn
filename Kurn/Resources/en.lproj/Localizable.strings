@@ -378,6 +378,7 @@
 "detail.summary.delete_confirm.title" = "Delete this summary?";
 "detail.summary.delete_confirm.message" = "This can't be undone.";
 "detail.share" = "Share";
+"detail.more_options" = "More options";
 "detail.segment_count" = "%d segments";
 "detail.recording_n" = "Recording %d";
 "detail.playback_position" = "Playback position";

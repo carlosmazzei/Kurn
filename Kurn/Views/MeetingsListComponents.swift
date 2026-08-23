@@ -24,6 +24,7 @@ struct LockedRecordingsView: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: 44))
                 .foregroundStyle(Theme.textSecondary)
+                .accessibilityHidden(true)
             Text(NSLocalizedString("recordings.locked_title", comment: "Recordings Locked"))
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
@@ -156,6 +157,7 @@ struct MeetingCard: View {
         HStack(spacing: 4) {
             Image(systemName: systemImage)
                 .font(.system(.caption2, design: .default, weight: .medium))
+                .accessibilityHidden(true)
             Text(text)
                 .lineLimit(1)
         }
@@ -168,6 +170,7 @@ struct MeetingCard: View {
         HStack(spacing: 4) {
             Image(systemName: folder.iconName)
                 .font(.system(.caption2, design: .default, weight: .semibold))
+                .accessibilityHidden(true)
             Text(folder.name)
                 .font(.system(.caption2, design: .default, weight: .medium))
                 .lineLimit(1)

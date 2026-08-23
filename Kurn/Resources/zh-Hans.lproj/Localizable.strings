@@ -378,6 +378,7 @@
 "detail.summary.delete_confirm.title" = "删除此摘要？";
 "detail.summary.delete_confirm.message" = "此操作无法撤销。";
 "detail.share" = "分享";
+"detail.more_options" = "更多选项";
 "detail.segment_count" = "%d 个片段";
 "detail.recording_n" = "录音 %d";
 "detail.playback_position" = "播放位置";

@@ -106,6 +106,7 @@ struct TagPickerView: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
                 }
             }
             .contentShape(Rectangle())

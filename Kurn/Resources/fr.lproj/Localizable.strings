@@ -378,6 +378,7 @@
 "detail.summary.delete_confirm.title" = "Supprimer ce résumé ?";
 "detail.summary.delete_confirm.message" = "Cette action est irréversible.";
 "detail.share" = "Partager";
+"detail.more_options" = "Plus d'options";
 "detail.segment_count" = "%d segments";
 "detail.recording_n" = "Enregistrement %d";
 "detail.playback_position" = "Position de lecture";

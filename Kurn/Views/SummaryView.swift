@@ -78,6 +78,7 @@ struct SummaryView: View {
                     .foregroundStyle(Theme.accent)
                     .font(.system(size: 6))
                     .padding(.top, 7)
+                    .accessibilityHidden(true)
                 markdownInlineText(item)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

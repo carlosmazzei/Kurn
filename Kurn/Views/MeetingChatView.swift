@@ -65,7 +65,11 @@ struct MeetingChatView: View {
             .scrollDismissesKeyboard(.interactively)
             // Tap on the message area lowers the keyboard. `simultaneousGesture`
             // (not `onTapGesture`) so it doesn't swallow citation-button taps or
-            // block scrolling.
+            // block scrolling. Not a button semantically — it's a
+            // dismiss-keyboard convenience on the whole scroll area — so
+            // `.isButton` would misrepresent it to VoiceOver rather than fix
+            // anything.
+            // swiftlint:disable:next accessibility_trait_for_button
             .simultaneousGesture(TapGesture().onEnded { inputFocused = false })
             .onChange(of: vm.turns.count) { _, _ in
                 guard let last = vm.turns.last else { return }
@@ -120,6 +124,7 @@ struct MeetingChatView: View {
                         Button { onJumpToTime?(time) } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "clock").font(.system(size: 10))
+                                    .accessibilityHidden(true)
                                 Text(time.clockDisplay).font(.system(.caption, design: .default, weight: .medium))
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
@@ -149,6 +154,7 @@ struct MeetingChatView: View {
                     Button { onJump?(hit) } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "quote.opening").font(.system(size: 10))
+                                .accessibilityHidden(true)
                             Text(citationLabel(for: hit))
                                 .font(.system(.caption, design: .default, weight: .medium))
                         }
@@ -243,6 +249,7 @@ struct MeetingChatView: View {
     private func infoState(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon).font(.largeTitle).foregroundStyle(Theme.textTertiary)
+                .accessibilityHidden(true)
             Text(title).font(.headline).foregroundStyle(Theme.textPrimary)
             Text(subtitle).font(.subheadline).foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)

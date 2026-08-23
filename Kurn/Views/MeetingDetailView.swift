@@ -327,6 +327,7 @@ struct MeetingDetailView: View {
                 ZStack {
                     Circle().fill(Theme.accent.opacity(0.12)).frame(width: 34, height: 34)
                     Image(systemName: "plus").font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
                 }
                 Text(NSLocalizedString("detail.add_segment", comment: "Add segment"))
                     .font(Theme.subheadline).foregroundStyle(Theme.textSecondary)
@@ -460,6 +461,7 @@ struct MeetingDetailView: View {
     private func placeholder(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon).font(.largeTitle).foregroundStyle(Theme.textTertiary)
+                .accessibilityHidden(true)
             Text(title).font(.headline).foregroundStyle(Theme.textPrimary)
             Text(subtitle).font(.subheadline).foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -531,6 +533,7 @@ struct MeetingDetailView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
+            .accessibilityLabel(NSLocalizedString("detail.more_options", comment: "More options"))
         }
     }
 }

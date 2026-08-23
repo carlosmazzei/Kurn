@@ -30,6 +30,7 @@ struct DiagnosticReportsListView: View {
                         HStack {
                             Image(systemName: entry.kind == .crash ? "exclamationmark.triangle.fill" : "hourglass")
                                 .foregroundStyle(Theme.accent)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading) {
                                 Text(entry.kind == .crash
                                     ? NSLocalizedString("settings.diagnostic_reports.crash", comment: "Crash")
@@ -41,6 +42,7 @@ struct DiagnosticReportsListView: View {
                             Spacer()
                             Image(systemName: "square.and.arrow.up")
                                 .foregroundStyle(Theme.textSecondary)
+                                .accessibilityHidden(true)
                         }
                     }
                     .buttonStyle(.plain)

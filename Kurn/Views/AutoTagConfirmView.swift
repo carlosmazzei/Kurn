@@ -52,6 +52,7 @@ struct AutoTagConfirmView: View {
                                     selectionIndicator(selectedNewTagNames.contains(name))
                                     Image(systemName: "sparkles")
                                         .foregroundStyle(Theme.accent)
+                                        .accessibilityHidden(true)
                                     Text(name)
                                         .foregroundStyle(Theme.textPrimary)
                                     Spacer()
@@ -133,5 +134,6 @@ struct AutoTagConfirmView: View {
         Image(systemName: selected ? "checkmark.circle.fill" : "circle")
             .font(.title3)
             .foregroundStyle(selected ? Theme.accent : Theme.textTertiary)
+            .accessibilityHidden(true)
     }
 }

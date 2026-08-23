@@ -16,6 +16,7 @@ struct PrivacyCoverView: View {
             Image(systemName: "waveform")
                 .font(.system(size: 48))
                 .foregroundStyle(Theme.accent)
+                .accessibilityHidden(true)
         }
     }
 }

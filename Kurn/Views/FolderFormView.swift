@@ -52,6 +52,7 @@ struct FolderFormView: View {
                             .frame(width: 32, height: 32)
                             .background(Color(hex: colorHex).opacity(0.18), in: Circle())
                             .foregroundStyle(Color(hex: colorHex))
+                            .accessibilityHidden(true)
                         TextField(
                             NSLocalizedString("folder.name_placeholder", comment: "Folder name"),
                             text: $name

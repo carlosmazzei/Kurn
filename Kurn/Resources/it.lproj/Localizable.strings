@@ -378,6 +378,7 @@
 "detail.summary.delete_confirm.title" = "Eliminare questo riassunto?";
 "detail.summary.delete_confirm.message" = "Non è possibile annullare l'operazione.";
 "detail.share" = "Condividi";
+"detail.more_options" = "Altre opzioni";
 "detail.segment_count" = "%d segmenti";
 "detail.recording_n" = "Registrazione %d";
 "detail.playback_position" = "Posizione riproduzione";
