@@ -140,5 +140,28 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         isBuiltIn: true
     )
 
-    static let defaultTemplates: [SummaryTemplate] = [.general, .standup, .interview]
+    /// Meeting outline — brief summary plus a hierarchical, chronological
+    /// breakdown of topics discussed, without separate decisions/action items
+    /// sections.
+    static let outline = SummaryTemplate(
+        id: "outline",
+        name: "Meeting Outline",
+        iconName: "list.bullet.indent",
+        instructions: """
+        Start with a brief summary (2-4 sentences) capturing what the meeting was \
+        about and its overall outcome. Then produce a pure hierarchical outline of \
+        the meeting, organized chronologically by topic in the order they were \
+        actually discussed (not grouped by theme). For each topic, create a \
+        top-level outline entry with nested sub-points capturing the details, \
+        arguments, and context raised under it, including [mm:ss] timestamps where \
+        helpful. Do not add separate sections for decisions or action items — if a \
+        decision or action item comes up, note it as a nested sub-point under the \
+        topic where it was raised, not pulled out into its own list. Prefer \
+        indentation over long prose paragraphs.
+        """,
+        sections: ["Summary", "Outline"],
+        isBuiltIn: true
+    )
+
+    static let defaultTemplates: [SummaryTemplate] = [.general, .standup, .interview, .outline]
 }

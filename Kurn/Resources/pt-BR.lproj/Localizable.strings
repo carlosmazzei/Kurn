@@ -424,6 +424,8 @@
 "template.standup.desc" = "O que foi feito, próximos passos e impedimentos.";
 "template.interview.name" = "Entrevista";
 "template.interview.desc" = "Perguntas, respostas, pontos fortes e avaliação.";
+"template.outline.name" = "Outline da Reunião";
+"template.outline.desc" = "Sumário breve e estrutura cronológica e hierárquica dos tópicos discutidos.";
 
 /* Ajustes */
 "settings.title" = "Ajustes";

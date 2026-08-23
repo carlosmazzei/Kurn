@@ -424,6 +424,8 @@
 "template.standup.desc" = "What was done, what's next, and blockers.";
 "template.interview.name" = "Interview";
 "template.interview.desc" = "Questions, answers, strengths, and assessment.";
+"template.outline.name" = "Meeting Outline";
+"template.outline.desc" = "Brief summary plus a chronological, nested outline of the topics discussed.";
 
 /* Settings */
 "settings.title" = "Settings";

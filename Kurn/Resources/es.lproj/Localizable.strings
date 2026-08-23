@@ -424,6 +424,8 @@
 "template.standup.desc" = "Qué se hizo, qué sigue y los bloqueos.";
 "template.interview.name" = "Entrevista";
 "template.interview.desc" = "Preguntas, respuestas, fortalezas y valoración.";
+"template.outline.name" = "Esquema de la Reunión";
+"template.outline.desc" = "Resumen breve y estructura cronológica y jerárquica de los temas tratados.";
 
 /* Ajustes */
 "settings.title" = "Ajustes";
