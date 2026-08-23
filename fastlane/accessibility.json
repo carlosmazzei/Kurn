@@ -1,0 +1,38 @@
+{
+  "accessibilityUrl": "https://github.com/carlosmazzei/Kurn#accessibility",
+  "declarations": {
+    "IPHONE": {
+      "supportsAudioDescriptions": false,
+      "supportsCaptions": false,
+      "supportsDarkInterface": false,
+      "supportsDifferentiateWithoutColorAlone": true,
+      "supportsLargerText": true,
+      "supportsReducedMotion": true,
+      "supportsSufficientContrast": false,
+      "supportsVoiceControl": false,
+      "supportsVoiceover": true
+    },
+    "IPAD": {
+      "supportsAudioDescriptions": false,
+      "supportsCaptions": false,
+      "supportsDarkInterface": false,
+      "supportsDifferentiateWithoutColorAlone": true,
+      "supportsLargerText": true,
+      "supportsReducedMotion": true,
+      "supportsSufficientContrast": false,
+      "supportsVoiceControl": false,
+      "supportsVoiceover": true
+    },
+    "APPLE_WATCH": {
+      "supportsAudioDescriptions": false,
+      "supportsCaptions": false,
+      "supportsDarkInterface": false,
+      "supportsDifferentiateWithoutColorAlone": true,
+      "supportsLargerText": true,
+      "supportsReducedMotion": true,
+      "supportsSufficientContrast": false,
+      "supportsVoiceControl": false,
+      "supportsVoiceover": true
+    }
+  }
+}

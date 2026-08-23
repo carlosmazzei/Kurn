@@ -35,6 +35,12 @@ This is what's still needed to take a tagged build public, split by who does it.
       the regular `iOS CI` workflow and checks locale/file completeness, Apple's
       text limits (including the 100-byte keyword limit), and HTTPS URLs before
       a release tag can reach the metadata upload job.
+- [x] Accessibility Nutrition Labels — `fastlane/accessibility.json` declares
+      VoiceOver, Larger Text, Reduced Motion, and Differentiate Without Color
+      Alone for iPhone, iPad, and Apple Watch. `store_assets` upserts those
+      declarations as drafts through Apple's API on every tagged release. The
+      protected `App Store Accessibility` workflow publishes them when run with
+      `publish: true` after an App Store version is live.
 - [x] Waiting for TestFlight processing, attaching the tagged build, and
       submitting it to App Review — `beta` now waits for Apple to finish
       processing, then the dependent `submit` job derives version/build from the
@@ -92,6 +98,11 @@ information this repo has no business holding):
       Review; no version/build entry or separate workflow dispatch is required.
 - [ ] After Apple approves the version, release it manually in App Store Connect.
       The workflow deliberately does not enable automatic or phased release.
+- [ ] Once the first version is live — and whenever the declared capabilities
+      change — dispatch `App Store Accessibility` against a tag with
+      `publish: true`, then approve its protected deployment. Apple allows draft
+      synchronization before launch but rejects label publication until a live
+      version exists.
 
 ## Note on localization
 

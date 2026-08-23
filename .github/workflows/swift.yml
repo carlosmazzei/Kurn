@@ -82,7 +82,9 @@ jobs:
           exit $status
 
       - name: Validate App Store metadata
-        run: python3 Tools/validate_store_metadata.py
+        run: |
+          python3 Tools/validate_store_metadata.py
+          ruby -r ./fastlane/accessibility_labels -e 'AccessibilityLabels.load("fastlane/accessibility.json")'
 
       - name: Prepare simulator runtimes
         run: |
