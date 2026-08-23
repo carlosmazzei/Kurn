@@ -85,7 +85,7 @@ struct TranscriptTab: View {
             if !sortedSpeakers.isEmpty {
                 Divider().overlay(Theme.separator).padding(.vertical, 4)
                 Text(NSLocalizedString("detail.speakers", comment: "Speakers").uppercased())
-                    .font(.system(size: 11, weight: .semibold)).tracking(0.8)
+                    .font(Theme.caption2Emphasized).tracking(0.8)
                     .foregroundStyle(Theme.textTertiary)
                 ForEach(sortedSpeakers) { speaker in
                     SpeakerRow(speaker: speaker, onCommit: onRenameCommit)
@@ -215,10 +215,10 @@ struct SummaryTab: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(progressTitle)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(Theme.headline)
                         .foregroundStyle(Theme.textPrimary)
                     Text(progressSubtitle)
-                        .font(.system(size: 13))
+                        .font(Theme.footnote)
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -239,7 +239,7 @@ struct SummaryTab: View {
                 HStack(spacing: 8) {
                     Image(systemName: "xmark.circle")
                     Text(NSLocalizedString("detail.summary.cancel", comment: "Cancel summary"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(Theme.footnoteEmphasized)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 42)
@@ -266,15 +266,15 @@ struct SummaryTab: View {
             }
             VStack(spacing: 8) {
                 Text(NSLocalizedString("detail.summary.empty.title", comment: ""))
-                    .font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.textPrimary)
+                    .font(.system(.title3, design: .default, weight: .bold)).foregroundStyle(Theme.textPrimary)
                 Text(NSLocalizedString("detail.summary.needs_transcript", comment: ""))
-                    .font(.system(size: 14)).foregroundStyle(Theme.textSecondary)
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
                     .multilineTextAlignment(.center)
             }
             HStack(spacing: 6) {
-                Image(systemName: "cpu").font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
+                Image(systemName: "cpu").font(Theme.caption2).foregroundStyle(Theme.textSecondary)
                 Text(summaryModelNudge)
-                    .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
             }
             .padding(.horizontal, 14).padding(.vertical, 6)
             .background(Theme.fill, in: Capsule())
@@ -337,7 +337,7 @@ struct SummaryTab: View {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles")
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(Theme.calloutEmphasized)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity).frame(height: 54)
