@@ -3,3 +3,4 @@
 "live_activity.pause" = "Pause";
 "live_activity.resume" = "Resume";
 "live_activity.stop" = "Stop";
+"live_activity.highlight" = "Highlight";
