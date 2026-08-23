@@ -21,11 +21,11 @@ struct TemplateRow: View {
                 .frame(width: 32, height: 32)
                 .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(template.displayName).font(.system(size: 15, weight: .semibold))
+                Text(template.displayName).font(Theme.subheadlineEmphasized)
                 Text(template.isBuiltIn
                      ? NSLocalizedString("settings.template.builtin", comment: "Preset")
                      : NSLocalizedString("settings.template.custom", comment: "Custom"))
-                    .font(.system(size: 12))
+                    .font(Theme.caption)
                     .foregroundStyle(Theme.textSecondary)
             }
         }

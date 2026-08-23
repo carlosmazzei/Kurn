@@ -135,11 +135,11 @@ struct MeetingShareSelectionView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(Theme.subheadlineEmphasized)
                         .foregroundStyle(Theme.textPrimary)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 12))
+                            .font(Theme.caption)
                             .foregroundStyle(Theme.textTertiary)
                     }
                 }

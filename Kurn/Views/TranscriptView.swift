@@ -51,10 +51,10 @@ struct TranscriptView: View {
                         .foregroundStyle(color)
                 }
                 Text(name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Theme.footnoteEmphasized)
                     .foregroundStyle(color)
                 Text((segment.startTime + offset).clockDisplay)
-                    .font(.system(size: 11))
+                    .font(Theme.caption2)
                     .foregroundStyle(Theme.textTertiary)
                 ForEach(matchingHighlights) { highlight in
                     Button {
@@ -70,7 +70,7 @@ struct TranscriptView: View {
                 Spacer()
             }
             Text(segment.text)
-                .font(.system(size: 15))
+                .font(Theme.subheadline)
                 .foregroundStyle(Theme.textPrimary.opacity(0.85))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 34)
