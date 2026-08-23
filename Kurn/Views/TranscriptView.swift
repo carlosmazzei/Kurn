@@ -65,6 +65,7 @@ struct TranscriptView: View {
                             .foregroundStyle(Theme.warning)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(NSLocalizedString("transcript.jump_to_highlight", comment: "Jump to highlight"))
                 }
                 Spacer()
             }

@@ -170,6 +170,7 @@
 "recorder.resume" = "恢复";
 "recorder.stop" = "停止";
 "recorder.highlight" = "标记高亮";
+"transcript.jump_to_highlight" = "跳转到标记";
 "recorder.paused" = "已暂停";
 "recorder.permission.title" = "需要麦克风权限";
 "recorder.permission.message" = "Kurn 需要麦克风权限来录制会议。请在设置中启用。";

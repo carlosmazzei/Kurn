@@ -170,6 +170,7 @@
 "recorder.resume" = "Fortsetzen";
 "recorder.stop" = "Stopp";
 "recorder.highlight" = "Markieren";
+"transcript.jump_to_highlight" = "Zum Highlight springen";
 "recorder.paused" = "PAUSIERT";
 "recorder.permission.title" = "Mikrofonzugriff erforderlich";
 "recorder.permission.message" = "Kurn benötigt Mikrofonzugriff, um Meetings aufzuzeichnen. Aktivieren Sie ihn in den Einstellungen.";

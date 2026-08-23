@@ -170,6 +170,7 @@
 "recorder.resume" = "Riprendi";
 "recorder.stop" = "Interrompi";
 "recorder.highlight" = "Evidenzia";
+"transcript.jump_to_highlight" = "Vai al segnalibro";
 "recorder.paused" = "IN PAUSA";
 "recorder.permission.title" = "Accesso al Microfono Necessario";
 "recorder.permission.message" = "Kurn ha bisogno del microfono per registrare le riunioni. Attivalo nelle Impostazioni.";
