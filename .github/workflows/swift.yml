@@ -81,6 +81,9 @@ jobs:
           done
           exit $status
 
+      - name: Validate App Store metadata
+        run: python3 Tools/validate_store_metadata.py
+
       - name: Prepare simulator runtimes
         run: |
           sudo xcodebuild -runFirstLaunch

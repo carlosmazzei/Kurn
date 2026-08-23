@@ -1,0 +1,55 @@
+name: App Store Submission
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version matching the selected vX.Y.Z workflow tag (for example, 1.4.0)"
+        required: true
+        type: string
+      build_number:
+        description: "Processed TestFlight build number to attach"
+        required: true
+        type: string
+
+concurrency:
+  group: app-store-submission-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ref:
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require a release tag
+        run: |
+          echo "::error::submission requires dispatching this workflow against a vX.Y.Z release tag"
+          exit 1
+
+  submit:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Attach build and submit for App Review
+        run: bundle exec fastlane submit_review version:"$APP_VERSION" build_number:"$BUILD_NUMBER"
+        env:
+          APP_VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}

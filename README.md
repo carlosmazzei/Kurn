@@ -324,14 +324,14 @@ Fastlane-driven process (see `fastlane/Fastfile`):
 Pushing the tag also triggers the `beta` job, which signs (via `fastlane
 match`), archives, and uploads the build to TestFlight — gated behind the
 `release` GitHub Environment so nothing reaches App Store Connect without
-approval. TestFlight distribution and an actual App Store submission are
-different things: uploading a build is automated, but selecting it,
-completing App Store Connect's one-time account-level setup (pricing, App
-Privacy, age rating, review notes), and clicking Submit for Review are not,
-and shouldn't be — see
+approval. Metadata is statically validated in CI and pushed by a separate
+release job. Once the build finishes processing, a maintainer can dispatch the
+`App Store Submission` workflow against its `vX.Y.Z` release tag with the exact
+version and build number; the same Environment gate protects the operation
+before Fastlane attaches the build and submits it to App Review. Account-level
+setup and the public release after Apple's approval remain manual — see
 [`docs/app-store-submission-checklist.md`](docs/app-store-submission-checklist.md)
-for the full breakdown of what's automated versus what's a deliberate manual
-step.
+for the full breakdown.
 
 ## Linting
 

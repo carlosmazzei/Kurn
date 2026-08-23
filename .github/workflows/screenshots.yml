@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       upload:
-        description: "Also push captured screenshots (+ text metadata) to App Store Connect via `fastlane store_assets`"
+        description: "Push screenshots + metadata to App Store Connect (requires a vX.Y.Z workflow ref)"
         type: boolean
         default: false
 
@@ -13,7 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate-upload-ref:
+    if: inputs.upload && !startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require a release tag for upload
+        run: |
+          echo "::error::upload requires dispatching this workflow against a vX.Y.Z release tag"
+          exit 1
+
   screenshots:
+    if: ${{ !inputs.upload || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: macos-26
     # The `screenshots` lane now does two separate capture_screenshots runs
     # (iPhone/iPad, then the KurnWatchUITests scheme for the Watch) — a
@@ -61,7 +72,7 @@ jobs:
 
   upload:
     needs: screenshots
-    if: ${{ inputs.upload }}
+    if: ${{ inputs.upload && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     # Gated behind the `release` GitHub Environment (required reviewers, if
     # configured), same as `beta`/`metadata` in swift.yml, so a stray
