@@ -34,6 +34,20 @@
                ReferencedContainer = "container:Kurn.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2AD3E59B300D5CA2003DA9A9"
+               BuildableName = "KurnUITests.xctest"
+               BlueprintName = "KurnUITests"
+               ReferencedContainer = "container:Kurn.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -51,6 +65,26 @@
                BlueprintName = "KurnTests"
                ReferencedContainer = "container:Kurn.xcodeproj">
             </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2AD3E59B300D5CA2003DA9A9"
+               BuildableName = "KurnUITests.xctest"
+               BlueprintName = "KurnUITests"
+               ReferencedContainer = "container:Kurn.xcodeproj">
+            </BuildableReference>
+            <!-- ScreenshotUITests is deliberately excluded from the default
+                 `xcodebuild test` run: it needs fastlane's snapshot setup and
+                 is meant to run via `bundle exec fastlane screenshots`
+                 (see ScreenshotUITests.swift's header comment). Only the
+                 accessibility audit runs as part of `iOS CI`. -->
+            <SkippedTests>
+               <Test
+                  Identifier = "ScreenshotUITests">
+               </Test>
+            </SkippedTests>
          </TestableReference>
       </Testables>
    </TestAction>
