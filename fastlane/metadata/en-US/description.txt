@@ -14,6 +14,11 @@ UNDERSTAND YOUR MEETINGS
 - Tag meetings manually or with optional AI-suggested tags.
 - Ask questions about a single meeting or across your whole library, with cited, tappable timestamps that jump straight to that moment in the transcript.
 
+ACCESSIBLE BY DESIGN
+- Full VoiceOver support throughout the app, the Watch companion, and the Lock Screen / Dynamic Island Live Activity.
+- Dynamic Type: text scales with your preferred reading size.
+- Respects Reduce Motion, and never relies on color alone to show status.
+
 PRIVATE BY DESIGN
 - Recordings and meeting data are stored on your device, encrypted at rest, and gated behind Face ID, Touch ID, or your passcode.
 - Network requests only happen if you choose cloud transcription or an AI summary provider — everything else runs entirely on device.

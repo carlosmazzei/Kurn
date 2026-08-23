@@ -14,6 +14,11 @@ ENTIENDE TUS REUNIONES
 - Etiqueta reuniones manualmente o con etiquetas sugeridas por IA (opcional).
 - Haz preguntas sobre una reunión concreta o sobre toda tu biblioteca, con marcas de tiempo citadas y pulsables que te llevan directo a ese momento de la transcripción.
 
+ACCESIBLE POR DISEÑO
+- Compatibilidad completa con VoiceOver en toda la app, en la app complementaria para Apple Watch y en la Live Activity de la Pantalla de Bloqueo/Dynamic Island.
+- Texto Dinámico: el texto se adapta al tamaño de lectura que prefieras.
+- Respeta Reducir Movimiento y nunca depende únicamente del color para mostrar el estado.
+
 PRIVADA POR DISEÑO
 - Las grabaciones y los datos de las reuniones se almacenan en tu dispositivo, cifrados en reposo y protegidos con Face ID, Touch ID o tu código de acceso.
 - Las solicitudes de red solo ocurren si eliges transcripción en la nube o un proveedor de resúmenes con IA; todo lo demás se ejecuta completamente en el dispositivo.

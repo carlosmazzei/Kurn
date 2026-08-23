@@ -14,6 +14,11 @@ ENTENDA SUAS REUNIÕES
 - Marque reuniões manualmente ou com tags sugeridas por IA (opcional).
 - Faça perguntas sobre uma reunião específica ou sobre toda a sua biblioteca, com marcações de tempo citadas e clicáveis que levam direto àquele momento na transcrição.
 
+ACESSIBILIDADE POR DESIGN
+- Suporte completo ao VoiceOver em todo o app, no companion para Apple Watch e na Live Activity da Tela de Bloqueio/Dynamic Island.
+- Texto Dinâmico: o texto escala conforme o tamanho de leitura que você preferir.
+- Respeita Reduzir Movimento e nunca depende só da cor para mostrar o status.
+
 PRIVACIDADE POR DESIGN
 - Gravações e dados das reuniões ficam armazenados no seu dispositivo, criptografados em repouso e protegidos por Face ID, Touch ID ou sua senha.
 - Requisições de rede só acontecem se você optar por transcrição na nuvem ou um provedor de resumo com IA — todo o resto roda inteiramente no dispositivo.
