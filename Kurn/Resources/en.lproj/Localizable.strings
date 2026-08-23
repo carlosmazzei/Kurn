@@ -223,6 +223,15 @@
 "folder.deleted" = "Deleted folder";
 "folder.icon" = "Icon";
 "folder.color" = "Color";
+"folder.color.indigo" = "Indigo";
+"folder.color.red" = "Red";
+"folder.color.orange" = "Orange";
+"folder.color.yellow" = "Yellow";
+"folder.color.green" = "Green";
+"folder.color.teal" = "Teal";
+"folder.color.blue" = "Blue";
+"folder.color.purple" = "Purple";
+"folder.color.gray" = "Gray";
 "folder.section.subfolders" = "Subfolders";
 "folder.select_this" = "Select this folder";
 "folder.open_subfolders" = "Open subfolders";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "Ask about your meetings";
 "chat.starter.library.subtitle" = "Answers are grounded in your library's transcribed meetings, with citations you can tap to jump to what was said.";
 "chat.placeholder" = "Ask a question…";
+"chat.send" = "Send";
+"chat.stop" = "Stop";
 "chat.disabled.title" = "Semantic search is off";
 "chat.disabled.subtitle" = "Turn on semantic search in Settings to chat about your meetings.";
 "chat.no_index.title" = "Nothing to chat about yet";

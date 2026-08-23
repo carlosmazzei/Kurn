@@ -223,6 +223,15 @@
 "folder.deleted" = "Cartella eliminata";
 "folder.icon" = "Icona";
 "folder.color" = "Colore";
+"folder.color.indigo" = "Indaco";
+"folder.color.red" = "Rosso";
+"folder.color.orange" = "Arancione";
+"folder.color.yellow" = "Giallo";
+"folder.color.green" = "Verde";
+"folder.color.teal" = "Turchese";
+"folder.color.blue" = "Blu";
+"folder.color.purple" = "Viola";
+"folder.color.gray" = "Grigio";
 "folder.section.subfolders" = "Sottocartelle";
 "folder.select_this" = "Seleziona questa cartella";
 "folder.open_subfolders" = "Apri sottocartelle";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "Fai una domanda sulle tue riunioni";
 "chat.starter.library.subtitle" = "Le risposte si basano sulle riunioni trascritte nella tua libreria, con citazioni che puoi toccare per andare direttamente a ciò che è stato detto.";
 "chat.placeholder" = "Fai una domanda…";
+"chat.send" = "Invia";
+"chat.stop" = "Interrompi";
 "chat.disabled.title" = "La ricerca semantica è disattivata";
 "chat.disabled.subtitle" = "Attiva la ricerca semantica in Impostazioni per chattare sulle tue riunioni.";
 "chat.no_index.title" = "Non c'è ancora nulla di cui parlare";

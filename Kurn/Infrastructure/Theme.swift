@@ -51,6 +51,24 @@ enum Theme {
             : UIColor.tertiaryLabel
     })
 
+    // MARK: - Typography
+
+    /// Dynamic-Type-aware replacements for the fixed `.font(.system(size:))` call
+    /// sites throughout the app. `Font.system(_:design:weight:)` (unlike
+    /// `Font.system(size:weight:)`) scales with the user's text size setting, so
+    /// migrating a call site to one of these (see Views for the largest offenders)
+    /// restores Dynamic Type support without hand-picking a new point size.
+    /// Fixed-size geometry (e.g. the recorder's timer digits) is a deliberate
+    /// exception — see `RecorderView`'s use of `@ScaledMetric` with a capped
+    /// `dynamicTypeSize` instead of these tokens.
+    static let title = Font.system(.title2, design: .default, weight: .bold)
+    static let headline = Font.system(.headline, design: .default, weight: .semibold)
+    static let body = Font.system(.body, design: .default)
+    static let bodyEmphasized = Font.system(.body, design: .default, weight: .semibold)
+    static let callout = Font.system(.callout, design: .default)
+    static let footnote = Font.system(.footnote, design: .default)
+    static let caption = Font.system(.caption, design: .default)
+
     // MARK: - Helpers
 
     private static func adaptive(dark: Int, light: Int?, lightSystem: UIColor) -> Color {

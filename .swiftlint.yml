@@ -4,6 +4,18 @@ included:
   - KurnWatch
   - KurnLiveActivityExtension
 
+opt_in_rules:
+  - accessibility_label_for_image
+  - accessibility_trait_for_button
+
+# Warning-level while the accessibility pass (see the "Fase 0-8" plan) is in
+# progress across the app; raised to the default error severity once Views
+# and the Watch/widget targets have full VoiceOver coverage.
+accessibility_label_for_image:
+  severity: warning
+accessibility_trait_for_button:
+  severity: warning
+
 excluded:
   - .build
   - .git

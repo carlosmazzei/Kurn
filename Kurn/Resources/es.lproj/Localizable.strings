@@ -223,6 +223,15 @@
 "folder.deleted" = "Carpeta eliminada";
 "folder.icon" = "Icono";
 "folder.color" = "Color";
+"folder.color.indigo" = "Índigo";
+"folder.color.red" = "Rojo";
+"folder.color.orange" = "Naranja";
+"folder.color.yellow" = "Amarillo";
+"folder.color.green" = "Verde";
+"folder.color.teal" = "Verde azulado";
+"folder.color.blue" = "Azul";
+"folder.color.purple" = "Morado";
+"folder.color.gray" = "Gris";
 "folder.section.subfolders" = "Subcarpetas";
 "folder.select_this" = "Seleccionar esta carpeta";
 "folder.open_subfolders" = "Abrir subcarpetas";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "Pregunta sobre tus reuniones";
 "chat.starter.library.subtitle" = "Las respuestas se basan en las reuniones transcritas de tu biblioteca, con citas que puedes tocar para ir directamente a lo que se dijo.";
 "chat.placeholder" = "Haz una pregunta…";
+"chat.send" = "Enviar";
+"chat.stop" = "Detener";
 "chat.disabled.title" = "La búsqueda semántica está desactivada";
 "chat.disabled.subtitle" = "Activa la búsqueda semántica en Ajustes para chatear sobre tus reuniones.";
 "chat.no_index.title" = "Aún no hay nada de qué hablar";

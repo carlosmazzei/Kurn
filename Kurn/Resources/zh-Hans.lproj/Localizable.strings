@@ -223,6 +223,15 @@
 "folder.deleted" = "已删除文件夹";
 "folder.icon" = "图标";
 "folder.color" = "颜色";
+"folder.color.indigo" = "靛蓝";
+"folder.color.red" = "红色";
+"folder.color.orange" = "橙色";
+"folder.color.yellow" = "黄色";
+"folder.color.green" = "绿色";
+"folder.color.teal" = "青色";
+"folder.color.blue" = "蓝色";
+"folder.color.purple" = "紫色";
+"folder.color.gray" = "灰色";
 "folder.section.subfolders" = "子文件夹";
 "folder.select_this" = "选择此文件夹";
 "folder.open_subfolders" = "打开子文件夹";
@@ -640,6 +649,8 @@
 "chat.starter.library.title" = "询问你的所有会议";
 "chat.starter.library.subtitle" = "回答基于你资料库中已转录的会议，并附有可点按的引用，可直接跳转到相关内容。";
 "chat.placeholder" = "输入问题…";
+"chat.send" = "发送";
+"chat.stop" = "停止";
 "chat.disabled.title" = "语义搜索已关闭";
 "chat.disabled.subtitle" = "在设置中开启语义搜索，即可就会议内容进行聊天。";
 "chat.no_index.title" = "暂时没有可聊天的内容";
