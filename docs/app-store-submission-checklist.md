@@ -27,20 +27,33 @@ does it.
       around still-English content. Translating the seed data is a
       prerequisite, not wired up here.
 - [x] Pushing screenshots + text metadata together —
-      `fastlane store_assets`. The same `App Store Screenshots` workflow
-      runs this automatically when dispatched with `upload: true`; leave it
-      `false` to capture without touching App Store Connect.
+      `fastlane store_assets`. Dispatch `App Store Screenshots` against the
+      matching `vX.Y.Z` tag with `upload: true`; leave it `false` to capture
+      from any branch without touching App Store Connect. An invalid branch
+      upload now fails immediately instead of spending up to 90 minutes
+      capturing.
+- [x] Static metadata validation — `Tools/validate_store_metadata.py` runs in
+      the regular `iOS CI` workflow and checks locale/file completeness, Apple's
+      text limits (including the 100-byte keyword limit), and HTTPS URLs before
+      a release tag can reach the metadata upload job.
+- [x] Attaching an exact processed TestFlight build and submitting it to App
+      Review — manually dispatch `App Store Submission`
+      (`.github/workflows/app-store-submit.yml`) against its `vX.Y.Z` release
+      tag, enter the matching `MARKETING_VERSION` and build number, then
+      approve the `release` Environment deployment. The `submit_review` lane
+      rejects malformed or mismatched tags/versions and never releases an
+      approved version automatically.
 - [x] Privacy policy, Terms of Use, EULA, encryption documentation —
       `PRIVACY.md`, `TERMS.md`, `EULA.md`, `ENCRYPTION.md`.
 - [x] Export compliance declared in `Info.plist`
       (`ITSAppUsesNonExemptEncryption = false`).
 
-None of the above submits the app for review or changes what's publicly
-visible — `deliver`'s `submit_for_review` is never set, deliberately. The
-`metadata` and screenshot-upload jobs are gated behind the `release` GitHub
-Environment, same as `beta`, so a stray tag push still waits for approval
-(if the environment requires reviewers) before anything reaches App Store
-Connect.
+Tag-driven jobs never submit the app for review or change what's publicly
+visible. Metadata, screenshot upload, TestFlight upload, and the separately
+and explicitly dispatched App Review submission are gated behind the `release`
+GitHub Environment, so each App Store Connect mutation can require reviewer
+approval. The submission lane sets `automatic_release: false`, leaving the
+public release after Apple's approval as a deliberate manual action.
 
 ## Manual, in App Store Connect — one-time setup
 
@@ -70,11 +83,16 @@ information this repo has no business holding):
 
 ## Manual, per release
 
-- [ ] Select the TestFlight build to attach to the App Store version being
-      submitted.
 - [ ] Review the localized "What's New" text (`release_notes.txt` per
       locale) reads well for a public audience, not just testers.
-- [ ] Click **Submit for Review**.
+- [ ] Wait for the tagged build to finish processing in TestFlight and note its
+      exact build number.
+- [ ] Dispatch `App Store Submission` against the matching `vX.Y.Z` tag with
+      the exact version/build and approve its `release` Environment deployment.
+      This is the explicit human decision to submit; the workflow then attaches
+      the build and clicks the App Review API equivalent of **Submit for Review**.
+- [ ] After Apple approves the version, release it manually in App Store Connect.
+      The workflow deliberately does not enable automatic or phased release.
 
 ## Note on localization
 

@@ -52,7 +52,7 @@ If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
 
 ### Releasing
 
-`fastlane/Fastfile` has six lanes. `bump_version type:{patch,minor,major}` bumps
+`fastlane/Fastfile` has seven lanes. `bump_version type:{patch,minor,major}` bumps
 `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` across all targets via direct text
 substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
 which reorder unrelated parts of this file because it uses Xcode 16
@@ -71,11 +71,15 @@ revoked here) and an App Store Connect API key, then `build_app` +
 `metadata` pushes `fastlane/metadata/` (App Store listing text — see that
 folder) via `deliver`, text only (`skip_binary_upload: true`,
 `skip_screenshots: true`), so it never collides with `beta`'s binary upload.
-Two more lanes exist but aren't wired into CI: `screenshots` (captures App
-Store screenshots from `KurnUITests`/`KurnWatchUITests` using the
-`UI-Testing-Screenshots` seeded launch argument) and `store_assets` (uploads
-screenshots + metadata together, still never submitting for review — that
-stays a manual step in App Store Connect).
+`Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
+and URLs in the regular CI job. `screenshots` captures App Store screenshots
+from `KurnUITests`/`KurnWatchUITests` using the `UI-Testing-Screenshots` seeded
+launch argument, and `store_assets` uploads screenshots + metadata together.
+The manually dispatched `.github/workflows/app-store-submit.yml` runs the
+seventh lane, `submit_review`, only against a matching `vX.Y.Z` tag: it requires
+an exact version and processed TestFlight build number, is gated by the `release`
+Environment, attaches that build, and submits it to App Review without enabling
+automatic release.
 
 SwiftLint limits worth knowing before adding code: file length warns at 600 lines,
 function body at 120, cyclomatic complexity at 15, type body at 400.

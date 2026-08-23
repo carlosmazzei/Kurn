@@ -164,9 +164,8 @@ end
 # — this lane does not capture them itself, only uploads what's already on
 # disk, so it also works with screenshots downloaded from the
 # `screenshots.yml` CI artifact instead of a local run. Still never touches
-# the binary and never submits for review (deliver's submit_for_review
-# defaults to false) — that stays a manual, deliberate step in App Store
-# Connect.
+# the binary and never submits for review; `submit_review` handles that as a
+# separate, manually dispatched and environment-gated operation.
 lane :store_assets do
   api_key = app_store_connect_api_key(
     key_id: ENV["ASC_KEY_ID"],
@@ -179,6 +178,42 @@ lane :store_assets do
     api_key: api_key,
     skip_binary_upload: true,
     skip_screenshots: false,
+    force: true
+  )
+end
+
+lane :submit_review do |options|
+  version = options[:version].to_s
+  build_number = options[:build_number].to_s
+  UI.user_error!("version must use MAJOR.MINOR.PATCH format") unless version.match?(/\A\d+\.\d+\.\d+\z/)
+  UI.user_error!("build_number must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
+
+  pbxproj = File.read(XCODEPROJ_PBXPROJ)
+  current_marketing = pbxproj[/MARKETING_VERSION = ([\d.]+);/, 1]
+  UI.user_error!("Version #{version} does not match project MARKETING_VERSION #{current_marketing}") unless version == current_marketing
+
+  if is_ci
+    tag = ENV["GITHUB_REF_NAME"].to_s
+    UI.user_error!("Workflow tag #{tag} does not match version #{version}") unless tag == "v#{version}"
+  end
+
+  api_key = app_store_connect_api_key(
+    key_id: ENV["ASC_KEY_ID"],
+    issuer_id: ENV["ASC_ISSUER_ID"],
+    key_content: ENV["ASC_KEY_CONTENT"],
+    is_key_content_base64: true
+  )
+
+  deliver(
+    api_key: api_key,
+    app_version: version,
+    build_number: build_number,
+    skip_binary_upload: true,
+    skip_metadata: true,
+    skip_screenshots: true,
+    submit_for_review: true,
+    automatic_release: false,
+    precheck_include_in_app_purchases: false,
     force: true
   )
 end
