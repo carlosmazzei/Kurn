@@ -53,6 +53,7 @@ struct SummaryTemplatePicker: View {
                 Image(systemName: template.iconName)
                     .font(.system(size: 18))
                     .foregroundStyle(Theme.accent)
+                    .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(template.displayName)
@@ -68,6 +69,7 @@ struct SummaryTemplatePicker: View {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(Theme.accent)
+                    .accessibilityHidden(true)
             }
         }
         .kurnCard()

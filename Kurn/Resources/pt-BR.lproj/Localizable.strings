@@ -378,6 +378,7 @@
 "detail.summary.delete_confirm.title" = "Excluir este resumo?";
 "detail.summary.delete_confirm.message" = "Essa ação não pode ser desfeita.";
 "detail.share" = "Compartilhar";
+"detail.more_options" = "Mais opções";
 "detail.segment_count" = "%d segmentos";
 "detail.recording_n" = "Gravação %d";
 "detail.playback_position" = "Posição da reprodução";

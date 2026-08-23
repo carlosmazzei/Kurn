@@ -20,6 +20,7 @@ struct TemplateRow: View {
                 .foregroundStyle(Theme.accent)
                 .frame(width: 32, height: 32)
                 .background(Theme.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(template.displayName).font(Theme.subheadlineEmphasized)
                 Text(template.isBuiltIn

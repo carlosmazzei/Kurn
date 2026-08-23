@@ -191,6 +191,7 @@ struct FolderSidebarView: View {
                 Image(systemName: bucket.systemImage)
                     .frame(width: 26, alignment: .center)
                     .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
+                    .accessibilityHidden(true)
                 Text(bucket.displayName)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
@@ -201,6 +202,7 @@ struct FolderSidebarView: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
                 }
             }
             .contentShape(Rectangle())
@@ -219,6 +221,7 @@ struct FolderSidebarView: View {
                 Image(systemName: smartFolder.iconName)
                     .frame(width: 26, alignment: .center)
                     .foregroundStyle(Color(hex: smartFolder.colorHex))
+                    .accessibilityHidden(true)
                 Text(smartFolder.name)
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
@@ -229,6 +232,7 @@ struct FolderSidebarView: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
                 }
             }
             .contentShape(Rectangle())
@@ -248,6 +252,7 @@ struct FolderSidebarView: View {
                     Image(systemName: folder.iconName)
                         .frame(width: 26, alignment: .center)
                         .foregroundStyle(Color(hex: folder.colorHex))
+                        .accessibilityHidden(true)
                     Text(folder.name)
                         .foregroundStyle(Theme.textPrimary)
                     Spacer()
@@ -258,6 +263,7 @@ struct FolderSidebarView: View {
                         Image(systemName: "checkmark")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.accent)
+                            .accessibilityHidden(true)
                     }
                 }
                 .contentShape(Rectangle())

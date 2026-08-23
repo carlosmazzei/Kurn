@@ -70,6 +70,7 @@ struct MeetingFormView: View {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.textTertiary)
+                                .accessibilityHidden(true)
                         }
                     }
                     .buttonStyle(.plain)

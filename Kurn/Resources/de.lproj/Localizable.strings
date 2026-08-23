@@ -378,6 +378,7 @@
 "detail.summary.delete_confirm.title" = "Diese Zusammenfassung löschen?";
 "detail.summary.delete_confirm.message" = "Dies kann nicht rückgängig gemacht werden.";
 "detail.share" = "Teilen";
+"detail.more_options" = "Weitere Optionen";
 "detail.segment_count" = "%d Abschnitte";
 "detail.recording_n" = "Aufnahme %d";
 "detail.playback_position" = "Wiedergabeposition";

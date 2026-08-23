@@ -8,19 +8,20 @@ opt_in_rules:
   - accessibility_label_for_image
   - accessibility_trait_for_button
 
-# Warning-level: escalating to error (CI run 32656104597, this branch)
-# surfaced 44 real violations — far beyond the VoiceOver pass's scope (Views/,
-# KurnWatch/, KurnLiveActivityExtension/) and spread across files the pass
-# never touched, with no file/line available from any tool in this session
-# (SwiftLint's github-actions-logging reporter emits bare messages here; the
-# GitHub annotations API needs authenticated access this session doesn't
-# have). Escalating blind risked "fixing" 44 unlocated violations by guesswork,
-# so this stays warning — still tracked, not silently regressed — until
-# someone with local Xcode/swiftlint or GitHub UI access can attribute them.
+# Error severity. A first escalation attempt (CI run 32656104597) surfaced
+# 44 real violations with no file/line available from any tool in that
+# session; a follow-up CI step (see .github/workflows/swift.yml, "Generate
+# lint report") uploads a `swiftlint-report.json` (--reporter json) with
+# exact file/line for exactly this situation. All 44 from that report are
+# now fixed (each Image() got either an .accessibilityLabel or an explicit
+# .accessibilityHidden(true); the two accessibility_trait_for_button sites
+# were tap-to-dismiss-keyboard gestures on a whole form/scroll view, not
+# buttons, so those use `// swiftlint:disable:next` with a comment instead
+# of a misleading `.isButton` trait).
 accessibility_label_for_image:
-  severity: warning
+  severity: error
 accessibility_trait_for_button:
-  severity: warning
+  severity: error
 
 excluded:
   - .build

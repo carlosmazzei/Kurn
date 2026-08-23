@@ -97,6 +97,7 @@ struct DocumentsListView: View {
                 .foregroundStyle(Theme.accent)
                 .frame(width: 32, height: 32)
                 .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 Text(document.title)
                     .font(.headline)
@@ -104,6 +105,7 @@ struct DocumentsListView: View {
                     .lineLimit(2)
                 HStack(spacing: 5) {
                     Image(systemName: document.sourceKind.systemImage)
+                        .accessibilityHidden(true)
                     Text(document.sourceNames.joined(separator: ", "))
                         .lineLimit(1)
                 }

@@ -45,6 +45,7 @@ struct WatchRecorderView: View {
             Image(systemName: "iphone.gen3")
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text("watch.open_iphone")
                 .font(.footnote)
                 .multilineTextAlignment(.center)

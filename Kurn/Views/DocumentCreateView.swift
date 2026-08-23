@@ -96,6 +96,9 @@ struct DocumentCreateView: View {
                     )
                 }
             }
+            // Dismiss-keyboard convenience on the whole form, not a button
+            // semantically — `.isButton` would misrepresent it to VoiceOver.
+            // swiftlint:disable:next accessibility_trait_for_button
             .simultaneousGesture(
                 TapGesture().onEnded { isPromptFocused = false }
             )
@@ -226,6 +229,7 @@ struct DocumentCreateView: View {
                 Image(systemName: icon)
                     .foregroundStyle(Theme.accent)
                     .frame(width: 22)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .foregroundStyle(Theme.textPrimary)
@@ -236,6 +240,7 @@ struct DocumentCreateView: View {
                 Spacer()
                 Image(systemName: selectedIDs.contains(id) ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(selectedIDs.contains(id) ? Theme.accent : Theme.textTertiary)
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
         }

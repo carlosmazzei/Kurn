@@ -130,12 +130,14 @@ struct FolderPickerView: View {
             Image(systemName: systemImage)
                 .frame(width: 26, alignment: .center)
                 .foregroundStyle(tint)
+                .accessibilityHidden(true)
             Text(text).foregroundStyle(Theme.textPrimary)
             Spacer()
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.accent)
+                    .accessibilityHidden(true)
             }
         }
         .contentShape(Rectangle())
