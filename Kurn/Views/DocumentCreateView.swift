@@ -65,6 +65,10 @@ struct DocumentCreateView: View {
                     }
             }
 
+            // SwiftLint attributes the accessibility_trait_for_button
+            // violation from the `.simultaneousGesture` below to this
+            // Section's declaration, not to the modifier call site.
+            // swiftlint:disable:next accessibility_trait_for_button
             Section {
                 Picker(
                     NSLocalizedString("documents.source.title", comment: "Source type"),
@@ -96,9 +100,8 @@ struct DocumentCreateView: View {
                     )
                 }
             }
-            // Dismiss-keyboard convenience on the whole form, not a button
+            // Dismiss-keyboard convenience on the whole section, not a button
             // semantically — `.isButton` would misrepresent it to VoiceOver.
-            // swiftlint:disable:next accessibility_trait_for_button
             .simultaneousGesture(
                 TapGesture().onEnded { isPromptFocused = false }
             )
