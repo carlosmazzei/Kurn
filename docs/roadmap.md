@@ -1,7 +1,7 @@
 # Roadmap
 
-Fifteen candidate capabilities, each judged against what Kurn is rather than
-against what is fashionable: six to adopt, five to evaluate, four deliberately
+Fourteen candidate capabilities, each judged against what Kurn is rather than
+against what is fashionable: six to adopt, four to evaluate, four deliberately
 out of scope, plus one engineering change that is not a feature at all.
 
 The verdicts matter less than the reasoning attached to them. A "no" with a
@@ -48,6 +48,11 @@ already exists, and so planning does not restart from a blank page.
   normalization, offline-rendered derived copies.
 - **Semantic search and chat** — on-device embeddings, hybrid dense + BM25 with
   RRF, LLM rerank, `[mm:ss]` citations.
+- **Multiple summaries per meeting** — `Meeting.summaries` is one-to-many, each
+  `Summary` recording the template, provider and model it came from, with a
+  switcher, per-summary delete and per-summary export already in the UI.
+  Comparing two templates over one transcript is a shipped feature, not a
+  roadmap item.
 - **Derived artifacts** — per-meeting wiki articles and cross-meeting generated
   documents.
 - **Transcript correction** — opt-in LLM pass with a change-magnitude guardrail
@@ -246,16 +251,7 @@ The cost is real: OAuth with PKCE, token refresh, a local callback. **Condition:
 sequence this after F1 and reassess. If a local provider already satisfies "works
 with no key at all", much of the motivation evaporates.
 
-### F8 · Side-by-side summary variations
-
-Running one transcript through two templates and keeping both. `Meeting.summary`
-is a single cascading relationship today, so this is a SwiftData shape change.
-
-The value is narrower than it first appears: wiki articles and generated
-documents already exist as separate derived artifacts, covering much of the
-"compare different outputs" need. Low priority.
-
-### F9 · Reading mode
+### F8 · Reading mode
 
 Filler-word removal and paragraph reflow for readability. This **cannot be a
 pipeline stage**: `TextNormalizer` is explicitly comparison-only, and the stored
@@ -265,7 +261,7 @@ So: a render-time transform over `Transcript.segments`, plus an option in
 `MeetingExport`. Cheap, pure and testable — a good first candidate for
 extraction into the package described below.
 
-### F10 · On-device translation
+### F9 · On-device translation
 
 Apple's `Translation` framework runs entirely on-device with language packs
 downloaded on demand. Kurn already transcribes many languages; reading an
@@ -274,7 +270,7 @@ English meeting in Portuguese is a real case and the fit with I1 is exact.
 The pack download is a heavy dependency, so it goes through I5 — reuse the
 `ModelDownloadConsent` pattern rather than fetching independently.
 
-### F11 · Spotlight indexing
+### F10 · Spotlight indexing
 
 The value is obvious: find a meeting from system search. The problem is specific
 and disqualifying by default. The `CoreSpotlight` index lives outside the app's
@@ -369,5 +365,5 @@ the next cheaper or more verifiable.
    speaker identity, so it wants F2 in place to pay off.
 6. **F5 · Reminders and F6 · Import.** Independent of each other and of the
    rest; slot them in as room appears.
-7. **Reassess F7, F9, F10 and F11.** F7 especially: if F1 delivered "works with
+7. **Reassess F7, F8, F9 and F10.** F7 especially: if F1 delivered "works with
    no key", the case for OAuth shrinks considerably.

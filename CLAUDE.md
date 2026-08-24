@@ -268,7 +268,7 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 ### Data model
 
 `Meeting` is the aggregate root. It cascades deletes to its `recordings`,
-`speakers`, `summary`, `semanticChunks`, and `wikiArticle` — every
+`speakers`, `summaries`, `semanticChunks`, and `wikiArticle` — every
 transcript-derived artifact dies with the meeting it came from, which is what
 makes "delete the meeting" a complete erasure rather than a partial one.
 `GeneratedDocument` is the deliberate exception: it snapshots its sources
@@ -1042,8 +1042,9 @@ completion-calling `LLMProvider` clients above.
 
 Summaries are template-driven: `SummaryPrompt.system(for:)` builds the system prompt
 from the chosen `SummaryTemplate` (`Models/SummaryTemplate.swift` — persona/
-instructions plus suggested sections; built-ins are `.general`, `.standup`, and
-`.interview`, collected in `defaultTemplates`), and the model returns a flexible
+instructions plus suggested sections; built-ins are `.general`, `.standup`,
+`.interview`, and `.outline`, collected in `defaultTemplates`), and the model
+returns a flexible
 `{ "sections": [...] }` shape decoded into `[SummarySection]`
 (`Models/SummarySection.swift` — title, Markdown body, bullet items) rather than
 a fixed set of fields. `SummaryJSON.parse` tolerantly strips
@@ -1054,6 +1055,28 @@ picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` hold
 template-driven body that the views and export render. `SummaryView` renders inline
 Markdown in titles, body text, and item text, with lightweight block handling for
 headings and lists.
+
+**A meeting accumulates summaries; it does not have one.** `Meeting.summaries`
+is `[Summary]`, one per generation run, and each `Summary` records the
+`templateName`, provider and model it came from. Running the same transcript
+through General and then Standup keeps both, so templates can be compared
+side by side instead of overwriting each other — which is why the summary
+provenance is stored per summary rather than read from current settings.
+
+The consequences show up across the UI, and new code should follow the same
+convention rather than reaching for a singular summary:
+
+- `Meeting.latestSummary` (max by `createdAt`) is the **default selection**,
+  not the meeting's summary. `MeetingDetailView` holds `selectedSummaryID` and
+  re-points it at the latest whenever `meeting.summaries.count` changes, so a
+  freshly generated summary is the one shown.
+- `MeetingDetailTabs` renders a switcher over `summaries` sorted newest-first,
+  with per-summary delete. `MeetingsListComponents` shows a count badge, and
+  `MeetingShareSelectionView` lets the user pick which summaries to export.
+- `MeetingFilter`'s `hasSummary` tests `summaries.isEmpty`, not a nil check.
+- Single-summary consumers pick deliberately: `MeetingExport` and the chat's
+  context builder both take `latestSummary`, because "the newest one" is the
+  sensible default when only one can be used.
 
 Every provider HTTP call funnels through `LLMHTTP.sendValidated`, which retries
 transient transport errors and `429/500/502/503/504` with exponential
