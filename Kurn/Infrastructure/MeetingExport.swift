@@ -10,11 +10,15 @@ import Foundation
 
 enum MeetingExport {
     /// Build the full Markdown representation of a meeting.
-    /// - Parameter summary: the summary currently shown on screen, if any —
-    ///   a meeting can have several; only this one is included.
+    /// - Parameters:
+    ///   - summary: the summary currently shown on screen, if any — a meeting
+    ///     can have several; only this one is included.
+    ///   - obsidianStyle: when `true`, prepends a YAML frontmatter block
+    ///     (title/date/tags/folder/favorite) and renders speaker names as
+    ///     `[[wikilinks]]` instead of plain text.
     @MainActor
-    static func markdown(for meeting: Meeting, summary: Summary?) -> String {
-        var out = header(for: meeting)
+    static func markdown(for meeting: Meeting, summary: Summary?, obsidianStyle: Bool = false) -> String {
+        var out = header(for: meeting, obsidianStyle: obsidianStyle)
 
         if !meeting.notes.isEmpty {
             out += "## Notes\n\n\(meeting.notes)\n\n"
@@ -35,7 +39,12 @@ enum MeetingExport {
                 if transcribed.count > 1 {
                     out += "### Segment \(index + 1)\n\n"
                 }
-                out += renderTranscript(for: meeting, recording: recording, nameByLabel: nameByLabel)
+                out += renderTranscript(
+                    for: meeting,
+                    recording: recording,
+                    nameByLabel: nameByLabel,
+                    obsidianStyle: obsidianStyle
+                )
             }
         }
 
@@ -46,29 +55,86 @@ enum MeetingExport {
     /// header, no other recordings or summaries) so it can be shared/copied
     /// independently of the rest of the meeting.
     @MainActor
-    static func transcriptMarkdown(for meeting: Meeting, recording: Recording) -> String {
-        var out = header(for: meeting)
+    static func transcriptMarkdown(for meeting: Meeting, recording: Recording, obsidianStyle: Bool = false) -> String {
+        var out = header(for: meeting, obsidianStyle: obsidianStyle)
         out += "## Transcript\n\n"
-        out += renderTranscript(for: meeting, recording: recording, nameByLabel: speakerNames(for: meeting))
+        out += renderTranscript(
+            for: meeting,
+            recording: recording,
+            nameByLabel: speakerNames(for: meeting),
+            obsidianStyle: obsidianStyle
+        )
         return out
     }
 
     /// Markdown for a single summary, standalone (own title/date header, no
     /// other summaries or transcripts).
     @MainActor
-    static func summaryMarkdown(for meeting: Meeting, summary: Summary) -> String {
-        header(for: meeting) + renderSummary(summary)
+    static func summaryMarkdown(for meeting: Meeting, summary: Summary, obsidianStyle: Bool = false) -> String {
+        header(for: meeting, obsidianStyle: obsidianStyle) + renderSummary(summary)
     }
 
     @MainActor
-    private static func header(for meeting: Meeting) -> String {
-        var out = "# \(meeting.title)\n\n"
+    private static func header(for meeting: Meeting, obsidianStyle: Bool) -> String {
+        var out = obsidianStyle ? frontmatter(for: meeting) : ""
+        out += "# \(meeting.title)\n\n"
         out += "_\(meeting.createdAt.meetingDisplay)_\n\n"
         if meeting.totalDuration > 0 {
             out += "**Duration:** \(meeting.totalDuration.clockDisplay)\n\n"
         }
         return out
     }
+
+    /// YAML frontmatter block Obsidian recognizes as note properties: title,
+    /// date, tags, folder, and favorite. Keys whose value is absent/false are
+    /// omitted entirely rather than emitted empty, so an untagged, unfiled,
+    /// non-favorite meeting doesn't carry noise in its frontmatter.
+    @MainActor
+    private static func frontmatter(for meeting: Meeting) -> String {
+        var lines = ["title: \(yamlString(meeting.title))"]
+        lines.append("date: \(isoDateFormatter.string(from: meeting.createdAt))")
+        if !meeting.tags.isEmpty {
+            let tags = meeting.tags.map { yamlString($0.name) }.joined(separator: ", ")
+            lines.append("tags: [\(tags)]")
+        }
+        if let folder = meeting.folder {
+            lines.append("folder: \(yamlString(folderPath(folder)))")
+        }
+        if meeting.isFavorite {
+            lines.append("favorite: true")
+        }
+        return "---\n" + lines.joined(separator: "\n") + "\n---\n\n"
+    }
+
+    /// `Parent/Child` path for a (possibly nested) folder.
+    private static func folderPath(_ folder: Folder) -> String {
+        var components = [folder.name]
+        var current = folder.parent
+        while let parent = current {
+            components.append(parent.name)
+            current = parent.parent
+        }
+        return components.reversed().joined(separator: "/")
+    }
+
+    /// Renders a value as a double-quoted YAML scalar, escaping the
+    /// characters that would otherwise break the frontmatter block: an
+    /// embedded quote, or a newline (frontmatter values are single-line).
+    private static func yamlString(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: " ")
+        return "\"\(escaped)\""
+    }
+
+    private static let isoDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 
     private static func renderSummary(_ summary: Summary) -> String {
         var out = "## Summary\n\n"
@@ -115,12 +181,18 @@ enum MeetingExport {
     }
 
     @MainActor
-    private static func renderTranscript(for meeting: Meeting, recording: Recording, nameByLabel: [String: String]) -> String {
+    private static func renderTranscript(
+        for meeting: Meeting,
+        recording: Recording,
+        nameByLabel: [String: String],
+        obsidianStyle: Bool = false
+    ) -> String {
         var out = ""
         let offset = meeting.startOffset(of: recording)
         let highlights = recording.highlights
         for segment in recording.transcript?.segments ?? [] {
-            let name = nameByLabel[segment.speakerLabel] ?? segment.speakerLabel
+            let rawName = nameByLabel[segment.speakerLabel] ?? segment.speakerLabel
+            let name = obsidianStyle ? "[[\(rawName)]]" : rawName
             let stamp = (segment.startTime + offset).clockDisplay
             let isHighlighted = highlights.contains { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
             let prefix = isHighlighted ? "⭐ " : ""
