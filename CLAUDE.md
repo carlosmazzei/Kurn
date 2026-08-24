@@ -1385,8 +1385,9 @@ enforced by lint and by a CI audit test, not just convention:
   as a build artifact.
 - **`KurnUITests/AccessibilityAuditUITests.swift`** — runs
   `XCUIApplication.performAccessibilityAudit(for: [.sufficientElementDescription,
-  .trait])` over the Recorder, Meeting Detail (Transcript/Summary tabs),
-  Settings root, and Folder Form screens, reusing the same seeded
+  .trait])` over five screens, one test each: the meetings list
+  (`testMeetingsList`), the Meeting Detail Recordings, Transcript and Summary
+  tabs, and the Settings root. It reuses the same seeded
   `"UI-Testing-Screenshots"` launch state and identifiers as the screenshot
   tests. It's wired into the `Kurn.xcscheme`'s default `TestAction` alongside
   `KurnTests` (`KurnUITests` wasn't in the scheme before this was added, so it
@@ -1400,14 +1401,20 @@ enforced by lint and by a CI audit test, not just convention:
   `zh-Hans`), not just `en`/`pt-BR` — a VoiceOver user on the Watch or reading
   the widget in one of the other 5 languages would otherwise hear/read
   English. Keep new strings in these two targets in sync across all 7 the
-  same way the main app's `Localizable.strings` are.
+  same way the main app's `Localizable.strings` are — which CI enforces for
+  the main app (see the Localization convention below).
 - **Known gaps, left out of scope deliberately**: `ScreenshotUITests` and the
   accessibility audit both run at the system's default text size, so neither
   catches a layout break at large accessibility text sizes — that needs
   manual testing (Accessibility Inspector / Simulator) per screen.
-  `KurnWatchUITests` doesn't run in `iOS CI` today (no separate watchOS test
-  destination is configured), so Watch VoiceOver is verified manually, not by
-  CI.
+  `KurnWatchUITests` doesn't run in `iOS CI` today (the watchOS runtime is
+  downloaded so the scheme *builds*, but `test` runs only against
+  `$IOS_DESTINATION`), so Watch VoiceOver is verified manually, not by CI.
+  **`RecorderView` and `FolderFormView` are not audited either** — worth
+  knowing before trusting the audit as a safety net, since the recorder is the
+  screen with the most icon-only controls. Adding a test for a new screen is
+  the cheap part; the audit's coverage is exactly the five tests listed above
+  and nothing more.
 
 ## Conventions
 
@@ -1419,7 +1426,13 @@ enforced by lint and by a CI audit test, not just convention:
   German, and Simplified Chinese (`Kurn/Resources/{en,pt-BR,es,fr,it,de,zh-Hans}.lproj/`).
   Every new user-facing string must be added as a key to **all seven**
   `Localizable.strings` files in the same change — none skipped. `displayName` on
-  enums is the localization seam.
+  enums is the localization seam. This is **enforced by CI, not by convention**:
+  the "Check localization files" step in `.github/workflows/swift.yml` fails the
+  build when any locale's key set differs from `en.lproj`, or when a file
+  contains a duplicate key. That step exists because neither of those is
+  otherwise detectable — SwiftLint does not read `.strings`, and Xcode compiles
+  them into a binary plist that silently collapses duplicates, so a duplicated
+  key is invisible to the linter and to the test suite alike.
 - **Logging:** use `AppLog.<category>` (subsystem `ai.kurn.app`), which wraps
   `os.Logger` in a `CategoryLogger` that gates every message by `AppLog.minimumLevel`.
   Pick the severity per call site — `.debug` for high-frequency/per-iteration traces,
