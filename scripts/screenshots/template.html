@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Kurn Marketing Screenshot</title>
+<style>
+  :root {
+    --accent: #7c5cff;
+    --accent-2: #34d1c8;
+    --bg-1: #05060a;
+    --bg-2: #12081f;
+    --ink: #f5f4ff;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-1);
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .canvas {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 18% 10%, rgba(124, 92, 255, 0.55), transparent 42%),
+      radial-gradient(circle at 88% 78%, rgba(52, 209, 200, 0.32), transparent 46%),
+      linear-gradient(160deg, var(--bg-2) 0%, var(--bg-1) 55%, #000 100%);
+  }
+
+  /* subtle grain-free vignette so the far edges never look flat */
+  .canvas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  .glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(9vw);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .glow.top {
+    width: 62vw;
+    height: 62vw;
+    top: -22vw;
+    left: -12vw;
+    background: var(--accent);
+  }
+
+  .glow.bottom {
+    width: 52vw;
+    height: 52vw;
+    bottom: -16vw;
+    right: -12vw;
+    background: var(--accent-2);
+  }
+
+  .badge {
+    margin-top: 7vh;
+    padding: 1.4vh 3.4vw;
+    border-radius: 999px;
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    color: #05060a;
+    font-weight: 700;
+    font-size: 2.5vw;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    box-shadow: 0 1.6vh 3.2vh rgba(124, 92, 255, 0.45);
+    z-index: 3;
+  }
+
+  .copy {
+    z-index: 3;
+    text-align: center;
+    padding: 0 8vw;
+    margin-top: 3.2vh;
+  }
+
+  .copy h1 {
+    color: var(--ink);
+    font-size: 6.4vw;
+    line-height: 1.14;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .copy h1 .highlight {
+    background: linear-gradient(120deg, var(--accent-2), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .copy p {
+    margin-top: 2.2vh;
+    color: rgba(235, 233, 255, 0.72);
+    font-size: 2.8vw;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .stage {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    perspective: 200vw;
+    margin-top: 4vh;
+    z-index: 1;
+  }
+
+  .phone {
+    position: relative;
+    width: 78vw;
+    aspect-ratio: 1290 / 2796;
+    transform-style: preserve-3d;
+    transform: rotateX(9deg) rotateY(-15deg) rotateZ(1deg);
+    border-radius: 5.4vw;
+    padding: 1.1vw;
+    background: linear-gradient(160deg, #2c2c38, #08080b);
+    box-shadow:
+      -6vw 8vh 11vh rgba(0, 0, 0, 0.6),
+      0 4vh 7vh rgba(124, 92, 255, 0.25),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .phone .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 4.6vw;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .phone .screen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .phone .screen-sheen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, rgba(255, 255, 255, 0.14) 0%, transparent 22%, transparent 78%, rgba(255, 255, 255, 0.06) 100%);
+    pointer-events: none;
+  }
+
+  .phone .notch {
+    position: absolute;
+    top: 1.9vw;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 27vw;
+    height: 2.5vw;
+    border-radius: 999px;
+    background: #000;
+    z-index: 4;
+  }
+
+  .glass-card {
+    position: absolute;
+    left: 5vw;
+    bottom: 7vh;
+    width: 46vw;
+    padding: 2.4vh 2.2vw;
+    border-radius: 2vw;
+    background: rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 3vh 4.5vh rgba(0, 0, 0, 0.4);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 1.6vw;
+  }
+
+  .glass-card .icon {
+    width: 6.2vw;
+    height: 6.2vw;
+    border-radius: 1.5vw;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3vw;
+    color: #05060a;
+    flex-shrink: 0;
+  }
+
+  .glass-card .text .stat {
+    color: #fff;
+    font-weight: 800;
+    font-size: 2.3vw;
+    line-height: 1.25;
+  }
+
+  .glass-card .text .label {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 1.7vw;
+    font-weight: 500;
+    margin-top: 0.3vh;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="glow top"></div>
+    <div class="glow bottom"></div>
+
+    <div class="badge">{{BADGE}}</div>
+
+    <div class="copy">
+      <h1>{{TITLE}} <span class="highlight">{{TITLE_HIGHLIGHT}}</span></h1>
+      <p>{{SUBTITLE}}</p>
+    </div>
+
+    <div class="stage">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <img src="{{SCREENSHOT_SRC}}" alt="" />
+          <div class="screen-sheen"></div>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <div class="icon">{{CARD_ICON}}</div>
+        <div class="text">
+          <div class="stat">{{CARD_STAT}}</div>
+          <div class="label">{{CARD_LABEL}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

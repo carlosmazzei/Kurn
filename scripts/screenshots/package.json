@@ -1,0 +1,16 @@
+{
+  "name": "kurn-marketing-screenshots",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Renders framed marketing screenshots from raw fastlane snapshot captures using Playwright.",
+  "main": "render.js",
+  "scripts": {
+    "render": "node render.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
