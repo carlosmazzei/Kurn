@@ -264,6 +264,11 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   persisting results.
 - **Views/** — SwiftUI screens.
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions.
+- **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
+  `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
+  container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
+  backing both the fastlane screenshot run and `AccessibilityAuditUITests`. It
+  never seeds a real recording or transcript.
 
 ### Data model
 
@@ -281,7 +286,11 @@ Whisper expects in its `language` hint, plus `.autoDetect`. It is table-driven
 rather than switch-driven so SwiftLint's cyclomatic-complexity and
 function-length limits stay unaffected as languages are added. Its rawValues are
 persisted in `Meeting.languageRaw` — **never rename or remove an existing
-case.**
+case.** Not every engine handles every language, so
+`TranscriptionLanguageSupport.isSupported(_:by:)` pairs a `MeetingLanguage` with
+a `TranscriptionEngine` and lets the picker warn up front, rather than letting
+the user discover the gap as a transcription-time error. `.autoDetect` always
+counts as supported — every engine either detects or ignores the hint.
 
 Key persistence convention: **SwiftData can't store
 arbitrary `Codable` arrays**, so `Transcript.segments` (`[TranscriptSegment]`) and
@@ -863,7 +872,8 @@ Every stage call is preceded by `ResourceGuard.requireTranscriptionHeadroom()`
 `AppError.resourceUnavailable` rather than let the pipeline run out of disk
 mid-transcription; `TempFileCleaner.cleanupOrphanedTempFiles()` runs at the
 start of every `transcribe` call to sweep temp files (`kurn_clean_`,
-`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_` prefixes, plus stale
+`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_`, `kurn_enh_` prefixes,
+plus stale
 Whisper upload spool files) older than an hour that earlier interrupted runs left
 behind; the same cleaner backs the manual "Free up space" action in Settings.
 
@@ -1109,6 +1119,16 @@ The watchOS target does **not** share source files with the app — types like
 strings) are intentionally duplicated byte-for-byte in `KurnWatch/`. Keep both
 copies in sync.
 
+`AppSettings.hideLiveActivityMeetingTitle` (**default on**) is applied in
+`RecorderViewModel.displayTitle`, which substitutes a generic localized string
+for `meeting.title`. That one property feeds **both** the Live Activity and the
+paired Watch, because both are glanceable surfaces someone other than the owner
+can read — the Lock Screen and Dynamic Island on one side, a wrist on the other
+— and a title like "Performance review — Ana" would otherwise leak from the
+locked device the rest of the app is careful to protect. Anything else pushed to
+those surfaces should honor the same setting through the same property rather
+than reading `meeting.title` directly.
+
 `RecordingActivityAttributes` (`Infrastructure/RecordingActivityAttributes.swift`)
 is, by contrast, a single file compiled into both the `Kurn` and
 `KurnLiveActivityExtension` targets — unlike `WatchCommand`, there was no reason
@@ -1226,8 +1246,9 @@ Settings is a **hub, not one long form**. `SettingsView` is a short list of
 `NavigationLink` rows grouped into Intelligence / Capture / Library / System,
 each pushing a focused screen in `Views/Settings/` (`ProvidersSettingsView`,
 `SummarySettingsView`, `SemanticSearchSettingsView`, `RecordingSettingsView`,
-`TranscriptionSettingsView`, `TagsSettingsView`, `StorageSettingsView`,
-`DiagnosticsSettingsView`, `AboutSettingsView`). Three things deliberately stay
+`TranscriptionSettingsView`, `TagsSettingsView`, `WikiSettingsView`,
+`StorageSettingsView`, `DiagnosticsSettingsView`, `AboutSettingsView`). Three
+things deliberately stay
 on the root because they can't belong to any one screen: the destructive
 "Delete all data" reset, the `keyRevision` counter passed down so provider rows
 re-read Keychain status, and `ensureSelectedProviderIsConfigured()` /
