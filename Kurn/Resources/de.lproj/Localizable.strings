@@ -644,6 +644,9 @@
 "share.copy" = "Kopieren";
 "share.copy_all" = "Alles kopieren";
 "share.share_action" = "Teilen";
+"share.format.picker" = "Format";
+"share.format.standard" = "Standard";
+"share.format.obsidian" = "Obsidian";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Erledigte Aufgabe";
