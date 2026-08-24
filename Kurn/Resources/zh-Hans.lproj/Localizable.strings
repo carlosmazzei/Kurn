@@ -472,6 +472,10 @@
 "settings.whisper_provider_key_missing_footer" = "请在「AI 提供方」中配置一个 OpenAI 兼容的 API 密钥（如 OpenAI 或 Groq），以启用 Whisper API 转录。";
 "settings.summary" = "摘要";
 "settings.recording" = "录音";
+"settings.recording_section_capture" = "录制";
+"settings.recording_section_live_transcription" = "实时转录";
+"settings.recording_section_playback" = "播放";
+"settings.recording_section_privacy" = "隐私";
 "settings.model" = "模型";
 "settings.no_models" = "无可用模型";
 "settings.loading_models" = "正在加载模型";
@@ -563,6 +567,7 @@
 "settings.storage.enhanced_audio_message" = "删除所有生成的增强音频副本？原始录音将会保留。";
 "settings.on_device_auto_language" = "设备端语言检测（自动）";
 "settings.live_transcription" = "实时转录预览";
+"settings.live_transcription_footer" = "在录制过程中于设备上实时预览转录内容。它绝不会替代录制结束后生成的最终转录。";
 "settings.model_download.title" = "一次性模型下载";
 "settings.model_download.message" = "此功能会在您首次使用时从 FluidAudio 下载一个设备端模型。之后该模型会被缓存，无需再次下载。";
 "settings.model_download.allow" = "允许并下载";
