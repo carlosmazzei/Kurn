@@ -644,6 +644,9 @@
 "share.copy" = "复制";
 "share.copy_all" = "全部复制";
 "share.share_action" = "分享";
+"share.format.picker" = "格式";
+"share.format.standard" = "标准";
+"share.format.obsidian" = "Obsidian";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "已完成任务";
