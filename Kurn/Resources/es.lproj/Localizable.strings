@@ -472,6 +472,10 @@
 "settings.whisper_provider_key_missing_footer" = "Configura una clave de API compatible con OpenAI (como OpenAI o Groq) en Proveedores de IA para habilitar la transcripción con la API de Whisper.";
 "settings.summary" = "Resumen";
 "settings.recording" = "Grabación";
+"settings.recording_section_capture" = "Captura";
+"settings.recording_section_live_transcription" = "Transcripción en Vivo";
+"settings.recording_section_playback" = "Reproducción";
+"settings.recording_section_privacy" = "Privacidad";
 "settings.model" = "Modelo";
 "settings.no_models" = "Sin modelos";
 "settings.loading_models" = "Cargando modelos";
@@ -563,6 +567,7 @@
 "settings.storage.enhanced_audio_message" = "¿Eliminar todas las copias de audio mejorado generadas? Las grabaciones originales se conservarán.";
 "settings.on_device_auto_language" = "Detectar Idioma en el Dispositivo (Auto)";
 "settings.live_transcription" = "Vista Previa de Transcripción en Vivo";
+"settings.live_transcription_footer" = "Una vista previa de la transcripción en el dispositivo mientras grabas. Nunca reemplaza la transcripción final, que se genera después de finalizar la grabación.";
 "settings.model_download.title" = "Descarga Única de Modelo";
 "settings.model_download.message" = "Esta función descarga un modelo local de FluidAudio la primera vez que la uses. El modelo queda en caché después y no hacen falta más descargas.";
 "settings.model_download.allow" = "Permitir y Descargar";
