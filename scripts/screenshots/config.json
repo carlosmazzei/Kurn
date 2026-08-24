@@ -1,0 +1,387 @@
+{
+  "_comment": "Copywriting for marketing screenshots, indexed by App Store locale (matching fastlane/metadata/<locale>/) then by screen name (the suffix after the device name in the raw fastlane snapshot filename, e.g. 'iPhone 17 Pro Max-01Meetings.png' -> '01Meetings'). 'default' is used by render.js when a captured locale has no entry here.",
+
+  "default": {
+    "01Meetings": {
+      "badge": "NEW",
+      "title": "Every meeting,",
+      "titleHighlight": "organized",
+      "subtitle": "Record, search, and revisit every conversation - all in one place.",
+      "cardIcon": "✦",
+      "cardStat": "100% On-Device",
+      "cardLabel": "Private by design"
+    },
+    "02MeetingRecordings": {
+      "badge": "RECORD",
+      "title": "Capture every",
+      "titleHighlight": "word",
+      "subtitle": "High-quality audio recording that keeps working even in the background.",
+      "cardIcon": "●",
+      "cardStat": "24kHz AAC",
+      "cardLabel": "Studio-grade capture"
+    },
+    "03Transcript": {
+      "badge": "AI-POWERED",
+      "title": "Transcripts that",
+      "titleHighlight": "know who's talking",
+      "subtitle": "Automatic speaker detection turns raw audio into a readable conversation.",
+      "cardIcon": "◐",
+      "cardStat": "Speaker ID",
+      "cardLabel": "Built-in diarization"
+    },
+    "04Summary": {
+      "badge": "SMART",
+      "title": "Meetings,",
+      "titleHighlight": "summarized",
+      "subtitle": "Get structured takeaways and action items generated automatically.",
+      "cardIcon": "✨",
+      "cardStat": "AI Summaries",
+      "cardLabel": "Key points, instantly"
+    },
+    "05Settings": {
+      "badge": "EXCLUSIVE",
+      "title": "Your data,",
+      "titleHighlight": "your control",
+      "subtitle": "Choose on-device or cloud processing - and keep everything encrypted.",
+      "cardIcon": "◈",
+      "cardStat": "You decide",
+      "cardLabel": "Flexible & secure"
+    }
+  },
+
+  "en-US": {
+    "01Meetings": {
+      "badge": "NEW",
+      "title": "Every meeting,",
+      "titleHighlight": "organized",
+      "subtitle": "Record, search, and revisit every conversation - all in one place.",
+      "cardIcon": "✦",
+      "cardStat": "100% On-Device",
+      "cardLabel": "Private by design"
+    },
+    "02MeetingRecordings": {
+      "badge": "RECORD",
+      "title": "Capture every",
+      "titleHighlight": "word",
+      "subtitle": "High-quality audio recording that keeps working even in the background.",
+      "cardIcon": "●",
+      "cardStat": "24kHz AAC",
+      "cardLabel": "Studio-grade capture"
+    },
+    "03Transcript": {
+      "badge": "AI-POWERED",
+      "title": "Transcripts that",
+      "titleHighlight": "know who's talking",
+      "subtitle": "Automatic speaker detection turns raw audio into a readable conversation.",
+      "cardIcon": "◐",
+      "cardStat": "Speaker ID",
+      "cardLabel": "Built-in diarization"
+    },
+    "04Summary": {
+      "badge": "SMART",
+      "title": "Meetings,",
+      "titleHighlight": "summarized",
+      "subtitle": "Get structured takeaways and action items generated automatically.",
+      "cardIcon": "✨",
+      "cardStat": "AI Summaries",
+      "cardLabel": "Key points, instantly"
+    },
+    "05Settings": {
+      "badge": "EXCLUSIVE",
+      "title": "Your data,",
+      "titleHighlight": "your control",
+      "subtitle": "Choose on-device or cloud processing - and keep everything encrypted.",
+      "cardIcon": "◈",
+      "cardStat": "You decide",
+      "cardLabel": "Flexible & secure"
+    }
+  },
+
+  "pt-BR": {
+    "01Meetings": {
+      "badge": "NOVO",
+      "title": "Cada reunião,",
+      "titleHighlight": "organizada",
+      "subtitle": "Grave, pesquise e revisite qualquer conversa - tudo em um só lugar.",
+      "cardIcon": "✦",
+      "cardStat": "100% no aparelho",
+      "cardLabel": "Privacidade por padrão"
+    },
+    "02MeetingRecordings": {
+      "badge": "GRAVAÇÃO",
+      "title": "Capture cada",
+      "titleHighlight": "palavra",
+      "subtitle": "Gravação de áudio de alta qualidade que continua funcionando mesmo em segundo plano.",
+      "cardIcon": "●",
+      "cardStat": "AAC 24kHz",
+      "cardLabel": "Captura de estúdio"
+    },
+    "03Transcript": {
+      "badge": "COM IA",
+      "title": "Transcrições que",
+      "titleHighlight": "sabem quem fala",
+      "subtitle": "Identificação automática de interlocutores transforma áudio em texto legível.",
+      "cardIcon": "◐",
+      "cardStat": "ID de falantes",
+      "cardLabel": "Diarização integrada"
+    },
+    "04Summary": {
+      "badge": "INTELIGENTE",
+      "title": "Reuniões,",
+      "titleHighlight": "resumidas",
+      "subtitle": "Receba pontos-chave e próximos passos gerados automaticamente.",
+      "cardIcon": "✨",
+      "cardStat": "Resumos com IA",
+      "cardLabel": "Pontos-chave, na hora"
+    },
+    "05Settings": {
+      "badge": "EXCLUSIVO",
+      "title": "Seus dados,",
+      "titleHighlight": "seu controle",
+      "subtitle": "Escolha processamento local ou na nuvem - tudo sempre criptografado.",
+      "cardIcon": "◈",
+      "cardStat": "Você decide",
+      "cardLabel": "Flexível e seguro"
+    }
+  },
+
+  "es-ES": {
+    "01Meetings": {
+      "badge": "NUEVO",
+      "title": "Cada reunión,",
+      "titleHighlight": "organizada",
+      "subtitle": "Graba, busca y revisa cualquier conversación, todo en un solo lugar.",
+      "cardIcon": "✦",
+      "cardStat": "100% en el dispositivo",
+      "cardLabel": "Privacidad por diseño"
+    },
+    "02MeetingRecordings": {
+      "badge": "GRABACIÓN",
+      "title": "Capta cada",
+      "titleHighlight": "palabra",
+      "subtitle": "Grabación de audio de alta calidad que sigue funcionando en segundo plano.",
+      "cardIcon": "●",
+      "cardStat": "AAC 24kHz",
+      "cardLabel": "Captura de estudio"
+    },
+    "03Transcript": {
+      "badge": "CON IA",
+      "title": "Transcripciones que",
+      "titleHighlight": "saben quién habla",
+      "subtitle": "La identificación automática de hablantes convierte el audio en texto legible.",
+      "cardIcon": "◐",
+      "cardStat": "ID de hablantes",
+      "cardLabel": "Diarización integrada"
+    },
+    "04Summary": {
+      "badge": "INTELIGENTE",
+      "title": "Reuniones,",
+      "titleHighlight": "resumidas",
+      "subtitle": "Obtén puntos clave y próximos pasos generados automáticamente.",
+      "cardIcon": "✨",
+      "cardStat": "Resúmenes con IA",
+      "cardLabel": "Puntos clave al instante"
+    },
+    "05Settings": {
+      "badge": "EXCLUSIVO",
+      "title": "Tus datos,",
+      "titleHighlight": "tu control",
+      "subtitle": "Elige procesamiento local o en la nube, todo siempre cifrado.",
+      "cardIcon": "◈",
+      "cardStat": "Tú decides",
+      "cardLabel": "Flexible y seguro"
+    }
+  },
+
+  "fr-FR": {
+    "01Meetings": {
+      "badge": "NOUVEAU",
+      "title": "Chaque réunion,",
+      "titleHighlight": "organisée",
+      "subtitle": "Enregistrez, recherchez et retrouvez chaque conversation, au même endroit.",
+      "cardIcon": "✦",
+      "cardStat": "100 % sur l'appareil",
+      "cardLabel": "Confidentialité par conception"
+    },
+    "02MeetingRecordings": {
+      "badge": "ENREGISTREMENT",
+      "title": "Capturez chaque",
+      "titleHighlight": "mot",
+      "subtitle": "Un enregistrement audio haute qualité qui continue même en arrière-plan.",
+      "cardIcon": "●",
+      "cardStat": "AAC 24 kHz",
+      "cardLabel": "Qualité studio"
+    },
+    "03Transcript": {
+      "badge": "PAR IA",
+      "title": "Des transcriptions qui",
+      "titleHighlight": "savent qui parle",
+      "subtitle": "La détection automatique des locuteurs transforme l'audio en texte lisible.",
+      "cardIcon": "◐",
+      "cardStat": "ID des locuteurs",
+      "cardLabel": "Diarisation intégrée"
+    },
+    "04Summary": {
+      "badge": "INTELLIGENT",
+      "title": "Réunions,",
+      "titleHighlight": "résumées",
+      "subtitle": "Obtenez des points clés et des actions générés automatiquement.",
+      "cardIcon": "✨",
+      "cardStat": "Résumés par IA",
+      "cardLabel": "L'essentiel, instantanément"
+    },
+    "05Settings": {
+      "badge": "EXCLUSIF",
+      "title": "Vos données,",
+      "titleHighlight": "votre contrôle",
+      "subtitle": "Choisissez un traitement local ou cloud, toujours chiffré.",
+      "cardIcon": "◈",
+      "cardStat": "Vous décidez",
+      "cardLabel": "Flexible et sécurisé"
+    }
+  },
+
+  "it": {
+    "01Meetings": {
+      "badge": "NOVITÀ",
+      "title": "Ogni riunione,",
+      "titleHighlight": "organizzata",
+      "subtitle": "Registra, cerca e rivedi ogni conversazione, tutto in un unico posto.",
+      "cardIcon": "✦",
+      "cardStat": "100% on-device",
+      "cardLabel": "Privacy per progettazione"
+    },
+    "02MeetingRecordings": {
+      "badge": "REGISTRAZIONE",
+      "title": "Cattura ogni",
+      "titleHighlight": "parola",
+      "subtitle": "Registrazione audio di alta qualità che continua anche in background.",
+      "cardIcon": "●",
+      "cardStat": "AAC 24kHz",
+      "cardLabel": "Qualità da studio"
+    },
+    "03Transcript": {
+      "badge": "CON IA",
+      "title": "Trascrizioni che",
+      "titleHighlight": "sanno chi parla",
+      "subtitle": "Il riconoscimento automatico degli speaker trasforma l'audio in testo leggibile.",
+      "cardIcon": "◐",
+      "cardStat": "ID speaker",
+      "cardLabel": "Diarizzazione integrata"
+    },
+    "04Summary": {
+      "badge": "INTELLIGENTE",
+      "title": "Riunioni,",
+      "titleHighlight": "riassunte",
+      "subtitle": "Ottieni punti chiave e prossimi passi generati automaticamente.",
+      "cardIcon": "✨",
+      "cardStat": "Riepiloghi IA",
+      "cardLabel": "Punti chiave, all'istante"
+    },
+    "05Settings": {
+      "badge": "ESCLUSIVO",
+      "title": "I tuoi dati,",
+      "titleHighlight": "il tuo controllo",
+      "subtitle": "Scegli l'elaborazione locale o cloud, sempre crittografata.",
+      "cardIcon": "◈",
+      "cardStat": "Decidi tu",
+      "cardLabel": "Flessibile e sicuro"
+    }
+  },
+
+  "de-DE": {
+    "01Meetings": {
+      "badge": "NEU",
+      "title": "Jedes Meeting,",
+      "titleHighlight": "organisiert",
+      "subtitle": "Nimm auf, durchsuche und rufe jedes Gespräch ab - alles an einem Ort.",
+      "cardIcon": "✦",
+      "cardStat": "100% auf dem Gerät",
+      "cardLabel": "Datenschutz von Anfang an"
+    },
+    "02MeetingRecordings": {
+      "badge": "AUFNAHME",
+      "title": "Jedes Wort",
+      "titleHighlight": "erfasst",
+      "subtitle": "Hochwertige Audioaufnahme, die auch im Hintergrund weiterläuft.",
+      "cardIcon": "●",
+      "cardStat": "AAC 24 kHz",
+      "cardLabel": "Studioqualität"
+    },
+    "03Transcript": {
+      "badge": "MIT KI",
+      "title": "Transkripte, die",
+      "titleHighlight": "wissen, wer spricht",
+      "subtitle": "Automatische Sprechererkennung macht aus Audio lesbaren Text.",
+      "cardIcon": "◐",
+      "cardStat": "Sprecher-ID",
+      "cardLabel": "Integrierte Diarisierung"
+    },
+    "04Summary": {
+      "badge": "SMART",
+      "title": "Meetings,",
+      "titleHighlight": "zusammengefasst",
+      "subtitle": "Erhalte automatisch generierte Kernpunkte und nächste Schritte.",
+      "cardIcon": "✨",
+      "cardStat": "KI-Zusammenfassungen",
+      "cardLabel": "Kernpunkte, sofort"
+    },
+    "05Settings": {
+      "badge": "EXKLUSIV",
+      "title": "Deine Daten,",
+      "titleHighlight": "deine Kontrolle",
+      "subtitle": "Wähle lokale oder Cloud-Verarbeitung - immer verschlüsselt.",
+      "cardIcon": "◈",
+      "cardStat": "Du entscheidest",
+      "cardLabel": "Flexibel & sicher"
+    }
+  },
+
+  "zh-Hans": {
+    "01Meetings": {
+      "badge": "全新",
+      "title": "每场会议，",
+      "titleHighlight": "井井有条",
+      "subtitle": "录制、搜索并回顾每一次对话——一切尽在一处。",
+      "cardIcon": "✦",
+      "cardStat": "100% 本地处理",
+      "cardLabel": "隐私优先设计"
+    },
+    "02MeetingRecordings": {
+      "badge": "录音",
+      "title": "捕捉每一个",
+      "titleHighlight": "字",
+      "subtitle": "高品质音频录制，切换应用时仍然持续工作。",
+      "cardIcon": "●",
+      "cardStat": "AAC 24kHz",
+      "cardLabel": "录音室级品质"
+    },
+    "03Transcript": {
+      "badge": "AI 驱动",
+      "title": "转录文本，",
+      "titleHighlight": "自动识别发言人",
+      "subtitle": "自动说话人识别，把音频变成清晰易读的文字。",
+      "cardIcon": "◐",
+      "cardStat": "说话人识别",
+      "cardLabel": "内置分离技术"
+    },
+    "04Summary": {
+      "badge": "智能",
+      "title": "会议内容，",
+      "titleHighlight": "一键总结",
+      "subtitle": "自动生成关键要点和后续行动事项。",
+      "cardIcon": "✨",
+      "cardStat": "AI 摘要",
+      "cardLabel": "要点，即刻呈现"
+    },
+    "05Settings": {
+      "badge": "专属",
+      "title": "你的数据，",
+      "titleHighlight": "你做主",
+      "subtitle": "自由选择本地或云端处理——始终加密保护。",
+      "cardIcon": "◈",
+      "cardStat": "自主选择",
+      "cardLabel": "灵活又安全"
+    }
+  }
+}

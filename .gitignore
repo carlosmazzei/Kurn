@@ -56,3 +56,7 @@ fastlane/README.md
 *.tmp
 __pycache__/
 *.pyc
+
+# Node (scripts/screenshots marketing screenshot renderer)
+node_modules/
+scripts/screenshots/screenshots-framed/
