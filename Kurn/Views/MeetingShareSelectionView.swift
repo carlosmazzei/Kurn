@@ -12,6 +12,20 @@ import SwiftUI
 import UIKit
 
 struct MeetingShareSelectionView: View {
+    /// Output format for every export in this sheet: standard plain Markdown,
+    /// or "Obsidian" (YAML frontmatter + `[[wikilinks]]` for speakers) — see
+    /// `MeetingExport.markdown(for:summary:obsidianStyle:)`.
+    private enum ShareFormat: String, CaseIterable {
+        case standard, obsidian
+
+        var title: String {
+            switch self {
+            case .standard: NSLocalizedString("share.format.standard", comment: "Standard")
+            case .obsidian: NSLocalizedString("share.format.obsidian", comment: "Obsidian")
+            }
+        }
+    }
+
     let meeting: Meeting
     let onShare: ([URL]) -> Void
 
@@ -22,6 +36,7 @@ struct MeetingShareSelectionView: View {
     @State private var copiedRowID: UUID?
     @State private var copiedAll = false
     @State private var shareError: AppError?
+    @State private var format: ShareFormat = .standard
 
     /// Defaults to every transcribed recording plus the summary currently
     /// shown on screen, matching the export this replaces.
@@ -54,6 +69,16 @@ struct MeetingShareSelectionView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $format) {
+                        ForEach(ShareFormat.allCases, id: \.self) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets())
+                    .padding(.vertical, 4)
+                }
                 if !sortedSummaries.isEmpty {
                     Section(NSLocalizedString("share.select.summaries", comment: "Summaries")) {
                         ForEach(sortedSummaries) { summary in
@@ -105,7 +130,7 @@ struct MeetingShareSelectionView: View {
                 toggleSummary(summary)
             }
             copyButton(id: summary.id) {
-                MeetingExport.summaryMarkdown(for: meeting, summary: summary)
+                MeetingExport.summaryMarkdown(for: meeting, summary: summary, obsidianStyle: format == .obsidian)
             }
         }
     }
@@ -120,7 +145,7 @@ struct MeetingShareSelectionView: View {
                 toggleRecording(recording)
             }
             copyButton(id: recording.id) {
-                MeetingExport.transcriptMarkdown(for: meeting, recording: recording)
+                MeetingExport.transcriptMarkdown(for: meeting, recording: recording, obsidianStyle: format == .obsidian)
             }
         }
     }
@@ -200,12 +225,13 @@ struct MeetingShareSelectionView: View {
     }
 
     private func copyAll() {
+        let obsidianStyle = format == .obsidian
         let summaryTexts = sortedSummaries
             .filter { selectedSummaryIDs.contains($0.id) }
-            .map { MeetingExport.summaryMarkdown(for: meeting, summary: $0) }
+            .map { MeetingExport.summaryMarkdown(for: meeting, summary: $0, obsidianStyle: obsidianStyle) }
         let transcriptTexts = transcribedRecordings
             .filter { selectedRecordingIDs.contains($0.recording.id) }
-            .map { MeetingExport.transcriptMarkdown(for: meeting, recording: $0.recording) }
+            .map { MeetingExport.transcriptMarkdown(for: meeting, recording: $0.recording, obsidianStyle: obsidianStyle) }
         let combined = (summaryTexts + transcriptTexts).joined(separator: "\n\n---\n\n")
         guard !combined.isEmpty else { return }
         UIPasteboard.general.string = combined
@@ -218,14 +244,15 @@ struct MeetingShareSelectionView: View {
 
     private func performShare() {
         do {
+            let obsidianStyle = format == .obsidian
             var urls: [URL] = []
             for summary in sortedSummaries where selectedSummaryIDs.contains(summary.id) {
-                let text = MeetingExport.summaryMarkdown(for: meeting, summary: summary)
+                let text = MeetingExport.summaryMarkdown(for: meeting, summary: summary, obsidianStyle: obsidianStyle)
                 let name = "\(meeting.title)-summary-\(summary.templateName ?? "\(urls.count + 1)")"
                 urls.append(try MeetingExport.temporaryFile(markdown: text, suggestedName: name))
             }
             for entry in transcribedRecordings where selectedRecordingIDs.contains(entry.recording.id) {
-                let text = MeetingExport.transcriptMarkdown(for: meeting, recording: entry.recording)
+                let text = MeetingExport.transcriptMarkdown(for: meeting, recording: entry.recording, obsidianStyle: obsidianStyle)
                 let name = "\(meeting.title)-transcript-\(entry.index + 1)"
                 urls.append(try MeetingExport.temporaryFile(markdown: text, suggestedName: name))
             }

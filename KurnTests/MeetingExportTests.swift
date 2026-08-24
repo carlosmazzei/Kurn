@@ -296,4 +296,116 @@ struct MeetingExportTests {
         #expect(!url.lastPathComponent.contains("?"))
         #expect(try String(contentsOf: url, encoding: .utf8) == "hello world")
     }
+
+    // MARK: - Obsidian-style export
+
+    @Test func markdownOmitsFrontmatterByDefault() {
+        let meeting = Meeting(title: "Sprint Planning")
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil)
+        #expect(!markdown.hasPrefix("---"))
+    }
+
+    @Test func obsidianStyleMarkdownIncludesFrontmatterWithTitleAndDate() {
+        let meeting = Meeting(title: "Sprint Planning")
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: true)
+        #expect(markdown.hasPrefix("---\n"))
+        #expect(markdown.contains("title: \"Sprint Planning\""))
+        #expect(markdown.contains("date: "))
+        // Frontmatter closes before the title heading.
+        let frontmatterEnd = markdown.range(of: "\n---\n")!
+        let titleRange = markdown.range(of: "# Sprint Planning")!
+        #expect(frontmatterEnd.upperBound < titleRange.lowerBound)
+    }
+
+    @Test func obsidianStyleMarkdownOmitsTagsFolderAndFavoriteWhenAbsent() {
+        let meeting = Meeting(title: "Sprint Planning")
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: true)
+        #expect(!markdown.contains("tags:"))
+        #expect(!markdown.contains("folder:"))
+        #expect(!markdown.contains("favorite:"))
+    }
+
+    @Test func obsidianStyleMarkdownIncludesTagsFolderAndFavoriteWhenPresent() {
+        let context = makeContext()
+        let folder = Folder(name: "Product")
+        context.insert(folder)
+        let meeting = Meeting(title: "Sprint Planning", isFavorite: true, folder: folder)
+        context.insert(meeting)
+        let tag = Tag(name: "weekly")
+        context.insert(tag)
+        meeting.tags = [tag]
+
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: true)
+        #expect(markdown.contains("tags: [\"weekly\"]"))
+        #expect(markdown.contains("folder: \"Product\""))
+        #expect(markdown.contains("favorite: true"))
+    }
+
+    @Test func obsidianStyleMarkdownJoinsNestedFolderNamesWithSlash() {
+        let context = makeContext()
+        let parent = Folder(name: "Product")
+        context.insert(parent)
+        let child = Folder(name: "Roadmap", parent: parent)
+        context.insert(child)
+        let meeting = Meeting(title: "Sprint Planning", folder: child)
+        context.insert(meeting)
+
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: true)
+        #expect(markdown.contains("folder: \"Product/Roadmap\""))
+    }
+
+    @Test func obsidianStyleMarkdownEscapesQuotesInTitle() {
+        let meeting = Meeting(title: "Say \"hi\" to Q3")
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: true)
+        #expect(markdown.contains("title: \"Say \\\"hi\\\" to Q3\""))
+    }
+
+    @Test func obsidianStyleMarkdownWrapsSpeakerNamesAsWikilinks() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+
+        let speaker = Speaker(meeting: meeting, label: "Speaker 1", name: "Carlos", color: "#FFFFFF")
+        context.insert(speaker)
+
+        let recording = Recording(meeting: meeting, fileName: "a.m4a", duration: 10)
+        context.insert(recording)
+
+        let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Let's begin")
+        let transcript = Transcript(recording: recording, segments: [segment])
+        context.insert(transcript)
+        recording.transcript = transcript
+
+        let markdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: true)
+        #expect(markdown.contains("[[Carlos]]:"))
+
+        let plainMarkdown = MeetingExport.markdown(for: meeting, summary: nil, obsidianStyle: false)
+        #expect(!plainMarkdown.contains("[[Carlos]]"))
+        #expect(plainMarkdown.contains("Carlos:"))
+    }
+
+    @Test func transcriptAndSummaryMarkdownSupportObsidianStyleToo() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+        let summary = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "Recap", body: "We aligned on scope.")],
+            provider: .openAI
+        )
+        context.insert(summary)
+        let recording = Recording(meeting: meeting, fileName: "a.m4a", duration: 10)
+        context.insert(recording)
+        let segment = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Let's begin")
+        let transcript = Transcript(recording: recording, segments: [segment])
+        context.insert(transcript)
+        recording.transcript = transcript
+
+        let transcriptMarkdown = MeetingExport.transcriptMarkdown(for: meeting, recording: recording, obsidianStyle: true)
+        #expect(transcriptMarkdown.hasPrefix("---\n"))
+        #expect(transcriptMarkdown.contains("[[Speaker 1]]:"))
+
+        let summaryMarkdown = MeetingExport.summaryMarkdown(for: meeting, summary: summary, obsidianStyle: true)
+        #expect(summaryMarkdown.hasPrefix("---\n"))
+    }
 }
