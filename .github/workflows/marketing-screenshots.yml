@@ -2,68 +2,32 @@ name: Marketing Screenshots
 
 # Renders sophisticated App Store / marketing screenshots (3D device mockup,
 # dark gradient background, glassmorphism card) from the raw captures that
-# `bundle exec fastlane screenshots` (fastlane/Fastfile, fastlane/Snapfile)
-# produces. Two jobs, split by what each needs:
+# .github/workflows/screenshots.yml's `screenshots` job already produces via
+# `bundle exec fastlane screenshots` (fastlane/Fastfile, fastlane/Snapfile).
 #
-#   capture-ui      (macOS)  - runs the UI tests / Fastlane Snapshot and
-#                              uploads the raw PNGs as a build artifact.
-#   render-marketing (Linux) - downloads that artifact, renders the final
-#                              marketing PNGs with Playwright, and uploads
-#                              them as a separate artifact.
+# This is a reusable workflow (workflow_call), invoked as a follow-up job
+# from screenshots.yml right after its `screenshots` job uploads the
+# "screenshots" artifact — reusing that macOS capture rather than running UI
+# tests a second time. Rendering itself needs no Xcode, so it runs on
+# ubuntu-latest to save macOS CI minutes.
 #
-# Rendering never needs Xcode, so it runs on ubuntu-latest to save macOS CI
-# minutes. This is independent of .github/workflows/screenshots.yml, which
-# captures the same raw screenshots for a literal App Store Connect upload
-# (fastlane's `store_assets` lane) - this workflow is for framed marketing
-# assets (website, social, press kit), not the App Store Connect gallery.
+# It can also be dispatched manually (workflow_dispatch) to re-render against
+# an *existing* screenshots.yml run without recapturing — pass that run's ID
+# as `run_id`. Left empty, it looks for a "screenshots" artifact in this same
+# run, which only exists when called from screenshots.yml.
 
 on:
-  workflow_dispatch: {}
   workflow_call: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID of an 'App Store Screenshots' run to pull the 'screenshots' artifact from (leave empty only if this run already has one, e.g. re-dispatching after a failure)"
+        type: string
+        required: false
 
 jobs:
-  capture-ui:
-    name: Capture raw screenshots (Fastlane Snapshot)
-    runs-on: macos-26
-    # Mirrors the timeout on screenshots.yml's equivalent job - a stuck UI
-    # test has no other bound.
-    timeout-minutes: 90
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-
-      - name: Generate raw screenshots
-        run: bundle exec fastlane screenshots
-
-      - name: Upload raw screenshots artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots-raw
-          path: fastlane/screenshots
-          if-no-files-found: error
-          retention-days: 14
-
   render-marketing:
     name: Render marketing screenshots (Playwright)
-    needs: capture-ui
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -77,13 +41,18 @@ jobs:
           node-version: '20'
 
       # actions/download-artifact@v4 restores the artifact's directory
-      # structure directly (screenshots-raw/<locale>/<device>-<name>.png) -
-      # no manual unzip step needed.
+      # structure directly (screenshots/<locale>/<device>-<name>.png) - no
+      # manual unzip step needed. `run-id` only needs setting for the
+      # workflow_dispatch cross-run path above; within a workflow_call from
+      # screenshots.yml it resolves to this same run, where the artifact
+      # already is.
       - name: Download raw screenshots artifact
         uses: actions/download-artifact@v4
         with:
-          name: screenshots-raw
+          name: screenshots
           path: raw-screenshots
+          run-id: ${{ inputs.run_id || github.run_id }}
+          github-token: ${{ inputs.run_id && secrets.GITHUB_TOKEN || '' }}
 
       - name: Install Node dependencies
         working-directory: scripts/screenshots
