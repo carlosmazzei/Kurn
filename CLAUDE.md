@@ -9,6 +9,14 @@ meetings, transcribing audio, diarizing speakers, and generating structured AI
 summaries. Everything is stored on device; network calls happen only when the user
 opts into cloud (Whisper-compatible) transcription or a cloud summary provider.
 
+Beyond the summary, a transcript also feeds three further derived artifacts, each
+opt-in and each described in its own section below: a per-meeting **wiki**
+(`WikiArticle`), free-form **documents** synthesized across meetings
+(`GeneratedDocument`), and an optional **LLM correction pass** over the fused
+segments. All three are cloud-LLM-backed and therefore off by default — the rule
+throughout is that a fresh install transcribes offline and asks before it ever
+reaches the network.
+
 The iOS app targets **iOS 26.0** and uses the system's Liquid Glass chrome
 directly (see "Navigation chrome" below); the watchOS companion still targets
 watchOS 10.0. There is no `#available` fallback for pre-26 iOS — the floor is the
@@ -242,24 +250,49 @@ MVVM with `@Observable` `@MainActor` view models, value-type async services, and
 single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 
 - **Models/** — SwiftData `@Model` classes (`Meeting`, `Recording`, `Transcript`,
-  `Speaker`, `Summary`, `Tag`, `Folder`, `SmartFolder`) plus shared value types
-  (`Enums.swift`, `MeetingFilter`, `TranscriptionCheckpoint`, `FolderCatalog`,
-  `SummarySection`, `SummaryTemplate`).
+  `Speaker`, `Summary`, `Tag`, `Folder`, `SmartFolder`, `SemanticChunk`,
+  `WikiArticle`, `GeneratedDocument`) plus shared value types (`Enums.swift`,
+  `MeetingFilter`, `MeetingLanguage`, `TranscriptionCheckpoint`, `FolderCatalog`,
+  `SummarySection`, `SummaryTemplate`, `UsageStats`, `DocumentSourceResolver`).
 - **Services/** — audio capture, transcription pipeline (`Services/Pipeline/`),
   on-device FluidAudio engines, diarization, live transcription preview,
-  summaries, folder analytics, auto-tagging. These are mostly `struct`/`actor`
-  types operating on plain values so they stay decoupled from SwiftData and
-  safe off the main actor.
+  summaries, wiki and document generation, folder analytics, auto-tagging. These
+  are mostly `struct`/`actor` types operating on plain values so they stay
+  decoupled from SwiftData and safe off the main actor.
 - **Providers/** — cloud LLM clients behind the `LLMProvider` protocol.
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and
   persisting results.
 - **Views/** — SwiftUI screens.
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions.
+- **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
+  `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
+  container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
+  backing both the fastlane screenshot run and `AccessibilityAuditUITests`. It
+  never seeds a real recording or transcript.
 
 ### Data model
 
 `Meeting` is the aggregate root. It cascades deletes to its `recordings`,
-`speakers`, and `summary`. Key persistence convention: **SwiftData can't store
+`speakers`, `summaries`, `semanticChunks`, and `wikiArticle` — every
+transcript-derived artifact dies with the meeting it came from, which is what
+makes "delete the meeting" a complete erasure rather than a partial one.
+`GeneratedDocument` is the deliberate exception: it snapshots its sources
+instead of relating to them, so deleting a meeting cannot destroy a document
+already generated from it.
+
+The spoken language is `MeetingLanguage` (`Models/MeetingLanguage.swift`),
+carrying both the BCP-47 locale for the on-device recognizer and the code
+Whisper expects in its `language` hint, plus `.autoDetect`. It is table-driven
+rather than switch-driven so SwiftLint's cyclomatic-complexity and
+function-length limits stay unaffected as languages are added. Its rawValues are
+persisted in `Meeting.languageRaw` — **never rename or remove an existing
+case.** Not every engine handles every language, so
+`TranscriptionLanguageSupport.isSupported(_:by:)` pairs a `MeetingLanguage` with
+a `TranscriptionEngine` and lets the picker warn up front, rather than letting
+the user discover the gap as a transcription-time error. `.autoDetect` always
+counts as supported — every engine either detects or ignores the hint.
+
+Key persistence convention: **SwiftData can't store
 arbitrary `Codable` arrays**, so `Transcript.segments` (`[TranscriptSegment]`) and
 similar collections are encoded to/from JSON `Data` via computed properties
 (`Transcript.segmentsData`). Relationships are set by assigning the parent (e.g.
@@ -570,6 +603,7 @@ stage (enums in `Models/Enums.swift`) are:
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber) | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`) |
 | Diarization | `diarizationEngine` | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) is the no-download fallback |
 | Transcription | `transcriptionEngine` | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale) | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud) |
+| Correction | `correctionEnabled` | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work) | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below) |
 
 `TranscriptionService.transcribe` drives the stages in order:
 
@@ -612,6 +646,61 @@ stage (enums in `Models/Enums.swift`) are:
    long span's words across turns proportionally when it crosses a handover;
    with word timestamps now available (below) it is the fallback, not the
    normal path.
+6. **Correct** (opt-in) — an LLM pass over the already-fused, speaker-attributed
+   segments, fixing spelling, punctuation and homophones. Skipped entirely when
+   `effectiveCorrection == .none`, which is the default.
+
+#### LLM transcript correction
+
+The only pipeline stage that runs *after* fusion, and the only one that can be
+enabled without a model download but still needs the network. It is off by
+default because it makes paid cloud LLM calls on every transcription.
+
+`TranscriptCorrecting` (`Pipeline/PipelineStages.swift`) states the contract
+every conformer must honor, and the contract is the feature: **never throw,
+always return `segments.count` segments in the same order, and only ever touch
+`.text`.** A correction stage that could drop, merge or reorder segments would
+invalidate every timestamp, speaker attribution and `[mm:ss]` citation
+downstream of it, so those properties are not left to the prompt.
+
+- **Enablement is a pair**, like `effectiveDiarization`: `effectiveCorrection`
+  returns `.llm` only when `correction == .llm` *and* `correctionConsented`. The
+  gate differs though — here it means "is this usable right now" (the correction
+  provider has a key in the Keychain), not "has the user agreed to a download".
+  This stage has no local model.
+- **Not every segment is sent.** `isEligible` skips empty text, and sends a
+  segment only when it carries no confidence signal at all (Apple Speech and
+  FluidAudio Parakeet expose no per-token probability, so "can't rule it out")
+  or a Whisper confidence below `lowConfidenceThreshold` (0.85). The target is
+  marginal decodes; outright hallucinations were already dropped by
+  `TranscriptQualityFilter` before fusion.
+- **Batching** reuses the shape of `SummaryService.packWholeItems`: greedy packs
+  bounded by both `maxBatchChars` (6,000) and `maxSegmentsPerBatch` (40), never
+  splitting a segment.
+- **`MeetingVocabularyExtractor`** (`Pipeline/`) builds a small vocabulary hint
+  from the meeting's *own* transcript — recurring proper nouns, acronyms and
+  terms with digits, `minOccurrences = 2` — so a word rendered correctly in one
+  segment can resolve the same word misheard in another. It is sent once per
+  request and deliberately not counted against `maxBatchChars`. Note the
+  premise and its limit: this can only fix a term the ASR got right *somewhere*,
+  so it does nothing for a name mis-heard consistently throughout.
+- **`TranscriptCorrectionGuardrail`** bounds how far a proposed correction may
+  drift before it is rejected: `maxWordChangeRatio` 0.35, `maxLengthRatio` 1.5,
+  `minLengthRatio` 0.6 — a plausible spelling fix, not a paraphrase, invention,
+  or emptied segment. It deliberately does **not** reuse
+  `KurnTests/Support/Evaluation/`'s `WordErrorRate`/`TextNormalizer`: those are
+  test-target-only, and `TextNormalizer` must never touch stored or displayed
+  transcript text. The guardrail works on raw, unnormalized strings and only
+  needs to bound the *magnitude* of a change, not produce a comparable metric.
+- **Application is by id lookup.** `apply(corrections:to:)` walks the original
+  array and replaces `.text` only where the id matches and the guardrail
+  accepts. A missing id, a rejected correction, or an id matching no segment all
+  leave the original untouched — which is what makes the "can't drop, merge or
+  reorder" guarantee structural rather than a prompt instruction.
+- **It fails open at every level.** `parseCorrections` reuses `ModelJSON`'s
+  tolerant fence/prose stripping (the same parser behind `SummaryJSON.parse`);
+  any JSON failure yields an empty map, so that whole batch silently leaves its
+  segments unchanged rather than failing the transcription.
 
 #### Word timestamps
 
@@ -783,7 +872,8 @@ Every stage call is preceded by `ResourceGuard.requireTranscriptionHeadroom()`
 `AppError.resourceUnavailable` rather than let the pipeline run out of disk
 mid-transcription; `TempFileCleaner.cleanupOrphanedTempFiles()` runs at the
 start of every `transcribe` call to sweep temp files (`kurn_clean_`,
-`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_` prefixes, plus stale
+`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_`, `kurn_enh_` prefixes,
+plus stale
 Whisper upload spool files) older than an hour that earlier interrupted runs left
 behind; the same cleaner backs the manual "Free up space" action in Settings.
 
@@ -962,8 +1052,9 @@ completion-calling `LLMProvider` clients above.
 
 Summaries are template-driven: `SummaryPrompt.system(for:)` builds the system prompt
 from the chosen `SummaryTemplate` (`Models/SummaryTemplate.swift` — persona/
-instructions plus suggested sections; built-ins are `.general`, `.standup`, and
-`.interview`, collected in `defaultTemplates`), and the model returns a flexible
+instructions plus suggested sections; built-ins are `.general`, `.standup`,
+`.interview`, and `.outline`, collected in `defaultTemplates`), and the model
+returns a flexible
 `{ "sections": [...] }` shape decoded into `[SummarySection]`
 (`Models/SummarySection.swift` — title, Markdown body, bullet items) rather than
 a fixed set of fields. `SummaryJSON.parse` tolerantly strips
@@ -974,6 +1065,28 @@ picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` hold
 template-driven body that the views and export render. `SummaryView` renders inline
 Markdown in titles, body text, and item text, with lightweight block handling for
 headings and lists.
+
+**A meeting accumulates summaries; it does not have one.** `Meeting.summaries`
+is `[Summary]`, one per generation run, and each `Summary` records the
+`templateName`, provider and model it came from. Running the same transcript
+through General and then Standup keeps both, so templates can be compared
+side by side instead of overwriting each other — which is why the summary
+provenance is stored per summary rather than read from current settings.
+
+The consequences show up across the UI, and new code should follow the same
+convention rather than reaching for a singular summary:
+
+- `Meeting.latestSummary` (max by `createdAt`) is the **default selection**,
+  not the meeting's summary. `MeetingDetailView` holds `selectedSummaryID` and
+  re-points it at the latest whenever `meeting.summaries.count` changes, so a
+  freshly generated summary is the one shown.
+- `MeetingDetailTabs` renders a switcher over `summaries` sorted newest-first,
+  with per-summary delete. `MeetingsListComponents` shows a count badge, and
+  `MeetingShareSelectionView` lets the user pick which summaries to export.
+- `MeetingFilter`'s `hasSummary` tests `summaries.isEmpty`, not a nil check.
+- Single-summary consumers pick deliberately: `MeetingExport` and the chat's
+  context builder both take `latestSummary`, because "the newest one" is the
+  sensible default when only one can be used.
 
 Every provider HTTP call funnels through `LLMHTTP.sendValidated`, which retries
 transient transport errors and `429/500/502/503/504` with exponential
@@ -1005,6 +1118,16 @@ The watchOS target does **not** share source files with the app — types like
 (the `WCSession` application-context/message dictionary keys and state
 strings) are intentionally duplicated byte-for-byte in `KurnWatch/`. Keep both
 copies in sync.
+
+`AppSettings.hideLiveActivityMeetingTitle` (**default on**) is applied in
+`RecorderViewModel.displayTitle`, which substitutes a generic localized string
+for `meeting.title`. That one property feeds **both** the Live Activity and the
+paired Watch, because both are glanceable surfaces someone other than the owner
+can read — the Lock Screen and Dynamic Island on one side, a wrist on the other
+— and a title like "Performance review — Ana" would otherwise leak from the
+locked device the rest of the app is careful to protect. Anything else pushed to
+those surfaces should honor the same setting through the same property rather
+than reading `meeting.title` directly.
 
 `RecordingActivityAttributes` (`Infrastructure/RecordingActivityAttributes.swift`)
 is, by contrast, a single file compiled into both the `Kurn` and
@@ -1050,7 +1173,64 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   conversation, surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a
   library-wide "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are
   tappable and seek the transcript. History is in-memory only — nothing
-  chat-related is persisted, so there is nothing extra to encrypt.
+  chat-related is persisted, so there is nothing extra to encrypt. When
+  `wikiEnabled` is on, the library-wide path additionally grounds on the
+  condensed per-meeting articles — see "Derived artifacts" below for why that
+  answers synthesis and counting questions retrieval alone cannot.
+
+### Derived artifacts: wiki and documents
+
+Two further LLM-derived artifacts sit on top of a finished transcript. Both are
+`@Model`s in the one app store, so their text is encrypted at rest by
+`ModelStoreProtection` with everything else — the same rule as `SemanticChunk`:
+transcript-derived text never goes to a loose file or a cache.
+
+**`WikiArticle`** (`Models/WikiArticle.swift`) is one condensed article per
+meeting: dense, factual, timestamped notes over the whole transcript —
+decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
+`.cascade`, so it dies with its meeting.
+
+- **Why it exists is `MeetingChatSynthesis`**, not the reading experience. The
+  library-wide chat gives the model *both* groundings in one prompt: the
+  retrieved verbatim excerpts (for exact quotes and tappable `[mm:ss]`
+  citations) and the condensed articles of the meetings in play (for synthesis,
+  comparison and counting). A hybrid question — "what did we decide about X and
+  how did it evolve" — is then answered in a single pass instead of being routed
+  to one strategy or the other. Articles are 1–4 KB, so a handful of them plus
+  the excerpts fit the single-pass budget where whole transcripts never could.
+  Over budget — chiefly a global aggregate over a large library — the articles
+  are packed **whole, never split** into blocks and map-reduced in the same shape
+  as `SummaryService.mapReduce`, with the excerpts carried into the reduce so
+  citations survive. It is also readable from the meeting's detail screen
+  (`MeetingWikiView`) for transparency.
+- **`WikiService` delegates rather than reimplements.** It calls `SummaryService`
+  with that service's internal `notesTemplate` — the same "capture every
+  decision, action item, number, name, with `[mm:ss]`" format the summary's map
+  stage already produces — so chunking, staging, cancellation, retry and
+  rate-limit behaviour are inherited rather than duplicated. A long meeting is
+  condensed in stages, a short one in a single pass.
+- **Staleness is tracked, and a rebuild replaces.** `sourceContentHash` /
+  `generatorModelIdentifier` are the wiki analogue of `SemanticChunk`'s
+  `modelIdentifier` check; when the transcript or the generating model changes
+  the article is rebuilt, never appended to. `WikiCoordinator` (`ViewModels/`)
+  owns the main-actor/SwiftData half; the LLM call runs off-main in the service.
+- Gated by `AppSettings.wikiEnabled`, **off by default** — it makes a paid cloud
+  LLM call per transcription.
+
+**`GeneratedDocument`** (`Models/GeneratedDocument.swift`) is free-form Markdown
+synthesized from one or more transcripts against a user's prompt, surfaced by
+`DocumentsListView` / `DocumentCreateView` / `DocumentDetailView`.
+
+- Sources are chosen by `DocumentSourceKind` — `.transcripts`, `.tags`, or
+  `.folders`. `DocumentSourceResolver` (`Models/`) holds that resolution,
+  including folder traversal, as pure logic so the SwiftUI view never owns the
+  domain rule about which meetings a tag or folder selection stands for.
+- **Source labels and meeting ids are snapshots.** Deleting a meeting, retagging
+  it, or moving it between folders must not retroactively damage a document that
+  was already generated, so the document keeps its own copy of what it was built
+  from rather than a live relationship.
+- `DocumentGenerationService` map/reduces long selections, so picking a folder
+  never silently truncates the meetings that happen to sort last.
 
 ### Settings & secrets
 
@@ -1066,8 +1246,9 @@ Settings is a **hub, not one long form**. `SettingsView` is a short list of
 `NavigationLink` rows grouped into Intelligence / Capture / Library / System,
 each pushing a focused screen in `Views/Settings/` (`ProvidersSettingsView`,
 `SummarySettingsView`, `SemanticSearchSettingsView`, `RecordingSettingsView`,
-`TranscriptionSettingsView`, `TagsSettingsView`, `StorageSettingsView`,
-`DiagnosticsSettingsView`, `AboutSettingsView`). Three things deliberately stay
+`TranscriptionSettingsView`, `TagsSettingsView`, `WikiSettingsView`,
+`StorageSettingsView`, `DiagnosticsSettingsView`, `AboutSettingsView`). Three
+things deliberately stay
 on the root because they can't belong to any one screen: the destructive
 "Delete all data" reset, the `keyRevision` counter passed down so provider rows
 re-read Keychain status, and `ensureSelectedProviderIsConfigured()` /
@@ -1083,6 +1264,54 @@ Transcription, Recording and Storage screens all read `isDownloading` and can
 all start a download, and so can the diarization prompt on a meeting's
 transcript — two controllers would each track a download the other knew nothing
 about. Screens that can trigger one attach `.modelDownloadAlerts(_:settings:)`.
+
+**Three settings are off by default, for two different reasons.** `wikiEnabled`
+and `correctionEnabled` make paid cloud LLM calls on *every* transcription, so
+neither can be a default. `templatesSyncEnabled` costs nothing per
+transcription and involves no LLM at all, but it is the first setting that
+sends anything off the device — which is reason enough here.
+
+**Template sync is iCloud key-value, deliberately not CloudKit.**
+`CloudSettingsSync` (`Infrastructure/`) is a thin wrapper over
+`NSUbiquitousKeyValueStore`, in the same spirit as `KeychainManager`: no
+business logic, just get/set/observe. Adopting SwiftData+CloudKit instead would
+pull the app's whole model container — meetings, transcripts, summaries —
+toward iCloud, which is exactly what the local-first design rules out. Only
+`AppSettings` decides what gets written; the `CloudKeyValueStore` protocol is
+the seam that keeps this testable on CI, which has no signed-in iCloud account.
+`TemplateSyncMerger` is the pure merge: per id, whichever side has the later
+`updatedAt` wins. Built-ins never sync — `AppSettings.mergedTemplates` already
+re-seeds them locally — so only user-created templates are reconciled. Deletions
+deliberately do **not** propagate in this v1: an id reappearing after a delete
+just means the other device hasn't synced its own delete yet.
+
+`UsageStats` (`Models/UsageStats.swift`) holds local-only counters — recordings
+completed, per-`TranscriptionEngine` and per-`SummaryTemplate` tallies —
+persisted as a JSON blob in `AppSettings` the same way `summaryTemplates` is,
+and rendered by `UsageInsightsView`. Pure on-device self-observability; it is
+never transmitted anywhere.
+
+### Crash and hang diagnostics
+
+`Infrastructure/CrashReporting/` turns MetricKit payloads into readable reports
+that stay on the device unless the user explicitly shares one.
+
+`DiagnosticsSubscriber` registers with `MXMetricManager` unconditionally in
+`KurnApp.init()` — so subscription never depends on `AppSettings`' construction
+order — and checks consent at **delivery** time instead, reading `UserDefaults`
+directly in `didReceive(_:)`. Without consent every payload is discarded without
+touching disk. Nothing is transmitted automatically under either setting:
+reports leave the device only through the explicit Share action in
+`DiagnosticReportsListView`. iOS usually delivers these in a batch on the next
+launch after the crash or hang, not at the moment it happens.
+
+`DiagnosticReportFormatter` is pure and MetricKit-free *in its signature* — it
+takes primitives the caller already extracted from the live payload — so it is
+unit-testable against hand-authored fixture JSON rather than OS-constructed
+objects. It re-serializes Apple's own `jsonRepresentation()`, which already
+carries symbolicated-if-available frames and thread state, instead of walking
+the call stack by hand and risking silent information loss.
+`DiagnosticReportStore` owns the on-disk side.
 
 ### Navigation chrome (Liquid Glass)
 
@@ -1156,8 +1385,9 @@ enforced by lint and by a CI audit test, not just convention:
   as a build artifact.
 - **`KurnUITests/AccessibilityAuditUITests.swift`** — runs
   `XCUIApplication.performAccessibilityAudit(for: [.sufficientElementDescription,
-  .trait])` over the Recorder, Meeting Detail (Transcript/Summary tabs),
-  Settings root, and Folder Form screens, reusing the same seeded
+  .trait])` over five screens, one test each: the meetings list
+  (`testMeetingsList`), the Meeting Detail Recordings, Transcript and Summary
+  tabs, and the Settings root. It reuses the same seeded
   `"UI-Testing-Screenshots"` launch state and identifiers as the screenshot
   tests. It's wired into the `Kurn.xcscheme`'s default `TestAction` alongside
   `KurnTests` (`KurnUITests` wasn't in the scheme before this was added, so it
@@ -1171,14 +1401,20 @@ enforced by lint and by a CI audit test, not just convention:
   `zh-Hans`), not just `en`/`pt-BR` — a VoiceOver user on the Watch or reading
   the widget in one of the other 5 languages would otherwise hear/read
   English. Keep new strings in these two targets in sync across all 7 the
-  same way the main app's `Localizable.strings` are.
+  same way the main app's `Localizable.strings` are — which CI enforces for
+  the main app (see the Localization convention below).
 - **Known gaps, left out of scope deliberately**: `ScreenshotUITests` and the
   accessibility audit both run at the system's default text size, so neither
   catches a layout break at large accessibility text sizes — that needs
   manual testing (Accessibility Inspector / Simulator) per screen.
-  `KurnWatchUITests` doesn't run in `iOS CI` today (no separate watchOS test
-  destination is configured), so Watch VoiceOver is verified manually, not by
-  CI.
+  `KurnWatchUITests` doesn't run in `iOS CI` today (the watchOS runtime is
+  downloaded so the scheme *builds*, but `test` runs only against
+  `$IOS_DESTINATION`), so Watch VoiceOver is verified manually, not by CI.
+  **`RecorderView` and `FolderFormView` are not audited either** — worth
+  knowing before trusting the audit as a safety net, since the recorder is the
+  screen with the most icon-only controls. Adding a test for a new screen is
+  the cheap part; the audit's coverage is exactly the five tests listed above
+  and nothing more.
 
 ## Conventions
 
@@ -1190,7 +1426,13 @@ enforced by lint and by a CI audit test, not just convention:
   German, and Simplified Chinese (`Kurn/Resources/{en,pt-BR,es,fr,it,de,zh-Hans}.lproj/`).
   Every new user-facing string must be added as a key to **all seven**
   `Localizable.strings` files in the same change — none skipped. `displayName` on
-  enums is the localization seam.
+  enums is the localization seam. This is **enforced by CI, not by convention**:
+  the "Check localization files" step in `.github/workflows/swift.yml` fails the
+  build when any locale's key set differs from `en.lproj`, or when a file
+  contains a duplicate key. That step exists because neither of those is
+  otherwise detectable — SwiftLint does not read `.strings`, and Xcode compiles
+  them into a binary plist that silently collapses duplicates, so a duplicated
+  key is invisible to the linter and to the test suite alike.
 - **Logging:** use `AppLog.<category>` (subsystem `ai.kurn.app`), which wraps
   `os.Logger` in a `CategoryLogger` that gates every message by `AppLog.minimumLevel`.
   Pick the severity per call site — `.debug` for high-frequency/per-iteration traces,
