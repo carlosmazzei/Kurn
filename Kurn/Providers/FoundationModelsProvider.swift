@@ -81,11 +81,12 @@ struct FoundationModelsProvider: LLMProvider {
     /// `SummaryJSON.summarySections`'s trimming/filtering instead of duplicating
     /// it. Guided generation means there is no free-text JSON to parse here —
     /// `SummaryJSON.parse`'s fence-stripping and `AppError.summaryTruncated`
-    /// are both unreachable on this path.
+    /// are both unreachable on this path. Not `private`: the `@Generable`
+    /// macro emits a conformance extension that can't see a private type.
     @Generable
-    private struct GeneratedSummary {
+    struct GeneratedSummary: Sendable {
         @Generable
-        struct Section {
+        struct Section: Sendable {
             let title: String
             let body: String?
             let items: [String]?
@@ -96,10 +97,13 @@ struct FoundationModelsProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         let session = LanguageModelSession(instructions: systemPrompt)
         let options = GenerationOptions(maximumResponseTokens: Self.clampedOutputTokens(LLMHTTP.summaryMaxOutputTokens))
-        let response = try await Self.withTimeout(seconds: LLMHTTP.summaryTimeout) {
-            try await session.respond(to: userPrompt, generating: GeneratedSummary.self, options: options)
+        // Extract `.content` inside the task rather than returning the whole
+        // `Response`, which doesn't conform to `Sendable` and can't cross the
+        // `withTimeout` task-group boundary as-is.
+        let generated = try await Self.withTimeout(seconds: LLMHTTP.summaryTimeout) {
+            try await session.respond(to: userPrompt, generating: GeneratedSummary.self, options: options).content
         }
-        let asSummaryJSON = SummaryJSON(sections: response.content.sections.map {
+        let asSummaryJSON = SummaryJSON(sections: generated.sections.map {
             SummaryJSON.Section(title: $0.title, body: $0.body, items: $0.items)
         })
         return SummaryResult(sections: asSummaryJSON.summarySections)
@@ -115,10 +119,10 @@ struct FoundationModelsProvider: LLMProvider {
         let session = LanguageModelSession(instructions: systemPrompt)
         let prompt = Self.foldPrompt(messages)
         let genOptions = GenerationOptions(maximumResponseTokens: Self.clampedOutputTokens(options.maxOutputTokens))
-        let response = try await Self.withTimeout(seconds: options.timeout) {
-            try await session.respond(to: prompt, options: genOptions)
+        let generated = try await Self.withTimeout(seconds: options.timeout) {
+            try await session.respond(to: prompt, options: genOptions).content
         }
-        let content = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let content = generated.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else {
             throw AppError.decodingError("empty on-device response")
         }
