@@ -8,6 +8,13 @@
 //  when launched with the "UI-Testing-Screenshots" argument. The whole file
 //  is compiled out of Release builds.
 //
+//  `MeetingsListView` sorts by `createdAt` descending, and
+//  `ScreenshotUITests` always opens "the first meeting" for screens
+//  02MeetingRecordings/03Transcript/04Summary — so whichever meeting has the
+//  newest `createdAt` here is the one those three screenshots actually show.
+//  Keep the richest meeting (multiple speakers, multiple recordings, a
+//  structured summary) newest for that reason.
+//
 
 #if DEBUG
 import AVFoundation
@@ -18,20 +25,33 @@ import SwiftData
 enum ScreenshotSeedData {
     static func seed(into context: ModelContext) {
         seedRoadmapMeeting(into: context)
+        seedDesignReviewMeeting(into: context)
         seedOnboardingMeeting(into: context)
+        seedCustomerInterviewMeeting(into: context)
         seedArchivedStandup(into: context)
         try? context.save()
     }
 
-    // MARK: - "Product Roadmap Sync" — multi-speaker, favorited, full summary
+    // MARK: - "Product Roadmap Sync" — hero meeting: newest, multi-speaker,
+    // multiple recordings, favorited, folder + tags, full bulleted summary.
 
     private static func seedRoadmapMeeting(into context: ModelContext) {
+        let folder = Folder(name: "Product", iconName: "lightbulb", colorHex: "#5E5CE6")
+        context.insert(folder)
+
+        let tagRoadmap = Tag(name: "Roadmap")
+        let tagQ3 = Tag(name: "Q3")
+        context.insert(tagRoadmap)
+        context.insert(tagQ3)
+
         let meeting = Meeting(
             title: "Product Roadmap Sync",
-            createdAt: Date().addingTimeInterval(-3600 * 26),
+            createdAt: Date().addingTimeInterval(-3600 * 1),
             language: .english,
-            isFavorite: true
+            isFavorite: true,
+            folder: folder
         )
+        meeting.tags = [tagRoadmap, tagQ3]
         context.insert(meeting)
 
         let alex = Speaker(meeting: meeting, label: "Speaker 1", name: "Alex", color: "#5E5CE6")
@@ -71,6 +91,27 @@ enum ScreenshotSeedData {
         let transcript = Transcript(recording: recording, segments: segments, language: "en-US")
         context.insert(transcript)
 
+        // A second, shorter recording on the same meeting — demonstrates
+        // that a meeting can hold more than one take (e.g. a follow-up
+        // huddle recorded later the same day).
+        let followUp = Recording(
+            meeting: meeting,
+            fileName: AudioFileStore.fileName(meetingID: meeting.id),
+            duration: 96,
+            transcriptionStatus: .done
+        )
+        context.insert(followUp)
+        writeSilentAudioFile(fileName: followUp.fileName)
+
+        let followUpSegments: [TranscriptSegment] = [
+            .init(speakerLabel: "Speaker 1", startTime: 0, endTime: 22,
+                  text: "Quick follow-up — Sam, can you share the export flow mockups before Thursday's review?"),
+            .init(speakerLabel: "Speaker 3", startTime: 22, endTime: 41,
+                  text: "Yes, I'll drop them in the shared folder tonight.")
+        ]
+        let followUpTranscript = Transcript(recording: followUp, segments: followUpSegments, language: "en-US")
+        context.insert(followUpTranscript)
+
         let summary = Summary(
             meeting: meeting,
             sections: [
@@ -84,7 +125,7 @@ enum ScreenshotSeedData {
                 SummarySection(
                     title: "Action Items",
                     items: [
-                        "Sam — finalize the export flow design.",
+                        "Sam — finalize the export flow design and share mockups before Thursday.",
                         "Priya — scope offline sync with the mobile team by Friday."
                     ]
                 ),
@@ -102,10 +143,81 @@ enum ScreenshotSeedData {
         context.insert(summary)
     }
 
-    // MARK: - "Client Onboarding Call" — folder + tags, single speaker
+    // MARK: - "Design Review" — second-newest, two speakers, one recording,
+    // its own folder + tag, bulleted summary.
+
+    private static func seedDesignReviewMeeting(into context: ModelContext) {
+        let folder = Folder(name: "Design", iconName: "paintpalette", colorHex: "#FF9500")
+        context.insert(folder)
+
+        let tagUI = Tag(name: "UI")
+        context.insert(tagUI)
+
+        let meeting = Meeting(
+            title: "Design Review",
+            createdAt: Date().addingTimeInterval(-3600 * 3),
+            language: .english,
+            folder: folder
+        )
+        meeting.tags = [tagUI]
+        context.insert(meeting)
+
+        let jordan = Speaker(meeting: meeting, label: "Speaker 1", name: "Jordan", color: "#FF375F")
+        let sam = Speaker(meeting: meeting, label: "Speaker 2", name: "Sam", color: "#FF9500")
+        context.insert(jordan)
+        context.insert(sam)
+
+        let recording = Recording(
+            meeting: meeting,
+            fileName: AudioFileStore.fileName(meetingID: meeting.id),
+            duration: 418,
+            transcriptionStatus: .done
+        )
+        context.insert(recording)
+        writeSilentAudioFile(fileName: recording.fileName)
+
+        let segments: [TranscriptSegment] = [
+            .init(speakerLabel: "Speaker 1", startTime: 0, endTime: 26,
+                  text: "Walk me through the new export flow — I want to check the empty state first."),
+            .init(speakerLabel: "Speaker 2", startTime: 26, endTime: 58,
+                  text: "Sure. When there's nothing to export yet, we show a short explainer and a single call to action."),
+            .init(speakerLabel: "Speaker 1", startTime: 58, endTime: 84,
+                  text: "That works. Can we make the button match the accent color everywhere else in the app?"),
+            .init(speakerLabel: "Speaker 2", startTime: 84, endTime: 110,
+                  text: "Good catch — I'll update it before the review on Thursday.")
+        ]
+        let transcript = Transcript(recording: recording, segments: segments, language: "en-US")
+        context.insert(transcript)
+
+        let summary = Summary(
+            meeting: meeting,
+            sections: [
+                SummarySection(
+                    title: "Feedback",
+                    items: [
+                        "Empty state for the export flow is approved as designed.",
+                        "Use the app's accent color for the primary button, not a one-off color."
+                    ]
+                ),
+                SummarySection(
+                    title: "Action Items",
+                    items: [
+                        "Jordan — update the button color before Thursday's review."
+                    ]
+                )
+            ],
+            templateName: "General",
+            provider: .openAI,
+            model: "gpt-4o-mini"
+        )
+        context.insert(summary)
+    }
+
+    // MARK: - "Client Onboarding Call" — folder + tags, two recordings,
+    // bulleted summary.
 
     private static func seedOnboardingMeeting(into context: ModelContext) {
-        let folder = Folder(name: "Clients")
+        let folder = Folder(name: "Clients", iconName: "person.2", colorHex: "#34C759")
         context.insert(folder)
 
         let tagOnboarding = Tag(name: "Onboarding")
@@ -115,7 +227,7 @@ enum ScreenshotSeedData {
 
         let meeting = Meeting(
             title: "Client Onboarding Call",
-            createdAt: Date().addingTimeInterval(-3600 * 4),
+            createdAt: Date().addingTimeInterval(-3600 * 6),
             language: .english,
             folder: folder
         )
@@ -140,12 +252,85 @@ enum ScreenshotSeedData {
         let transcript = Transcript(recording: recording, segments: segments, language: "en-US")
         context.insert(transcript)
 
+        // A short second recording — a follow-up check-in a little later,
+        // showing a meeting doesn't have to be a single take.
+        let checkIn = Recording(
+            meeting: meeting,
+            fileName: AudioFileStore.fileName(meetingID: meeting.id),
+            duration: 87,
+            transcriptionStatus: .done
+        )
+        context.insert(checkIn)
+        writeSilentAudioFile(fileName: checkIn.fileName)
+
+        let checkInSegments: [TranscriptSegment] = [
+            .init(speakerLabel: "Speaker 1", startTime: 0, endTime: 19,
+                  text: "Quick check-in — any questions after trying it out this week?"),
+            .init(speakerLabel: "Speaker 2", startTime: 19, endTime: 44,
+                  text: "Just one — can we invite two more people from our team?")
+        ]
+        let checkInTranscript = Transcript(recording: checkIn, segments: checkInSegments, language: "en-US")
+        context.insert(checkInTranscript)
+
         let summary = Summary(
             meeting: meeting,
             sections: [
                 SummarySection(
                     title: "Summary",
-                    body: "Walked the client through on-device recording, transcription, and summaries."
+                    items: [
+                        "Walked the client through on-device recording, transcription, and summaries.",
+                        "Client asked about adding two more teammates."
+                    ]
+                ),
+                SummarySection(
+                    title: "Action Items",
+                    items: [
+                        "Send the client an invite link for two additional seats."
+                    ]
+                )
+            ],
+            templateName: "General",
+            provider: .openAI,
+            model: "gpt-4o-mini"
+        )
+        context.insert(summary)
+    }
+
+    // MARK: - "Customer Interview" — older, single speaker, prose summary,
+    // no folder/tags.
+
+    private static func seedCustomerInterviewMeeting(into context: ModelContext) {
+        let meeting = Meeting(
+            title: "Customer Interview",
+            createdAt: Date().addingTimeInterval(-3600 * 30),
+            language: .english
+        )
+        context.insert(meeting)
+
+        let recording = Recording(
+            meeting: meeting,
+            fileName: AudioFileStore.fileName(meetingID: meeting.id),
+            duration: 512,
+            transcriptionStatus: .done
+        )
+        context.insert(recording)
+        writeSilentAudioFile(fileName: recording.fileName)
+
+        let segments: [TranscriptSegment] = [
+            .init(speakerLabel: "Speaker 1", startTime: 0, endTime: 30,
+                  text: "Tell me about the last time you had to dig up notes from an old meeting."),
+            .init(speakerLabel: "Speaker 1", startTime: 30, endTime: 58,
+                  text: "It took me twenty minutes to find who owned a decision we made two months ago.")
+        ]
+        let transcript = Transcript(recording: recording, segments: segments, language: "en-US")
+        context.insert(transcript)
+
+        let summary = Summary(
+            meeting: meeting,
+            sections: [
+                SummarySection(
+                    title: "Summary",
+                    body: "Customer struggles to find decisions and owners from past meetings; search and clear action-item tracking are the biggest asks."
                 )
             ],
             templateName: "General",

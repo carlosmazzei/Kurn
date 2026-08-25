@@ -1,0 +1,25 @@
+{
+  "_comment": "Device frame assets vendored from fastlane/frameit-frames (MIT license: https://github.com/fastlane/frameit-frames). offsetX/offsetY/screenshotWidth are pixel values from that repo's offsets.json, in the frame PNG's own coordinate space (top-left corner + width to resize the raw screenshot to, before compositing it behind the frame). outputWidth/outputHeight are Apple's exact required App Store Connect screenshot pixel sizes for this device's display class (developer.apple.com/help/app-store-connect/reference/screenshot-specifications) - the final composited PNG must match exactly, no tolerance.",
+
+  "iPhone 17 Pro Max": {
+    "outputWidth": 1320,
+    "outputHeight": 2868,
+    "defaultColor": "silver",
+    "colors": {
+      "silver": { "file": "Apple iPhone 17 Pro Max Silver.png", "offsetX": 75, "offsetY": 66, "screenshotWidth": 1320 },
+      "deepBlue": { "file": "Apple iPhone 17 Pro Max Deep Blue.png", "offsetX": 75, "offsetY": 66, "screenshotWidth": 1320 },
+      "cosmicOrange": { "file": "Apple iPhone 17 Pro Max Cosmic Orange.png", "offsetX": 75, "offsetY": 66, "screenshotWidth": 1320 }
+    }
+  },
+
+  "iPad Pro 13-inch (M5)": {
+    "_comment": "frameit-frames has no frame for this exact model yet; standing in with 'iPad Pro (12.9-inch) (4th generation)' - its screen aspect ratio (2048/2732 = 0.7496) is within 0.1% of the 13-inch M5's native ratio (2064/2752 = 0.7500), so the composite has no visible gap or distortion. outputWidth/outputHeight (2048x2732) is one of the two Apple-accepted '13-inch Display' sizes and happens to equal this frame's own native screenshot width, so no scaling mismatch either.",
+    "outputWidth": 2048,
+    "outputHeight": 2732,
+    "defaultColor": "silver",
+    "colors": {
+      "silver": { "file": "Apple iPad Pro (12.9-inch) (4th generation) Silver.png", "offsetX": 96, "offsetY": 102, "screenshotWidth": 2048 },
+      "spaceGray": { "file": "Apple iPad Pro (12.9-inch) (4th generation) Space Gray.png", "offsetX": 96, "offsetY": 102, "screenshotWidth": 2048 }
+    }
+  }
+}
