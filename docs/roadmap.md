@@ -60,59 +60,80 @@ already exists, and so planning does not restart from a blank page.
   documents.
 - **Transcript correction** — opt-in LLM pass with a change-magnitude guardrail
   and vocabulary auto-extracted from the meeting itself.
+- **On-device LLM provider** — `FoundationModelsProvider`
+  (`Providers/FoundationModelsProvider.swift`, Apple's `FoundationModels`)
+  resolves through the same `ProviderFactory` as every cloud vendor, with no
+  API key and no network call; new installs default to it. `AutoTaggingService`
+  and the retrieval-grounded chat path already run against it unmodified. See
+  F1 below for what shipped and what's still a first-cut estimate.
 
 ## Adopt
 
 Ordered by payoff, not by effort. None of the six creates tension with the five
 invariants.
 
-### F1 · Apple Foundation Models as a local provider
+### F1 · Apple Foundation Models as a local provider — Implemented
 
 | | |
 |---|---|
 | **Couples to** | `Providers/LLMProvider.swift`, `ProviderFactory`, `AIProviderKind` |
-| **Invariant** | Closes I1, which the app currently violates in practice |
-| **Effort** | Medium-high |
+| **Invariant** | Closes I1, which the app used to violate in practice |
+| **Status** | Implemented — [PR #139](https://github.com/carlosmazzei/Kurn/pull/139) |
 
-This is the largest gap between what Kurn promises and what it does. Today
+This closed the largest gap between what Kurn promises and what it does.
 `SummaryService`, `MeetingChatService`, `AutoTaggingService`,
-`LLMTranscriptCorrector`, `WikiService` and `DocumentGenerationService` all
-resolve through `ProviderFactory` to a cloud vendor with an API key. Two
-consequences follow: a user who never adds a key gets transcription and nothing
-else, and a user who does add one ships the entire transcript of a private
-meeting to a third party. The app's central promise is that recordings stay on
-the device; everything built on top of the transcript currently doesn't.
+`LLMTranscriptCorrector`, `WikiService` and `DocumentGenerationService` used to
+all resolve through `ProviderFactory` to a cloud vendor with an API key: a user
+who never added a key got transcription and nothing else, and a user who did
+add one shipped the entire transcript of a private meeting to a third party.
 
-The deployment target is iOS 26.0, so `FoundationModels` is available with no
-`#available` guard — the same reason the app uses Liquid Glass chrome directly.
+A new `AIProviderKind.appleOnDevice` case and `FoundationModelsProvider`
+(`Providers/FoundationModelsProvider.swift`) resolve through the same
+`ProviderFactory`, with no API key and no network call — the deployment target
+is iOS 26.0, so `FoundationModels` needed no `#available` guard, the same
+reason the app uses Liquid Glass chrome directly. New installs default
+`AppSettings.aiProviderID` to it; an existing user's stored selection is
+untouched.
 
-**Honest constraints.** These are the reasons this is medium-high rather than
-low effort, and skipping them produces a feature that appears to work and then
-fails on real meetings:
+**What shipped:**
 
-- **Availability is a runtime fact, not a compile-time one.**
-  `SystemLanguageModel.default.availability` depends on Apple Intelligence
-  hardware and on the feature being enabled. It must degrade the way a missing
-  API key degrades today — a provider that reports itself unusable — rather than
-  trapping or silently returning nothing.
-- **The context window is small.** A 90-minute meeting does not fit.
-  `SummaryService` already map-reduces above `maxSinglePassChars`, but that
-  threshold has to become per-provider; for this one it is orders of magnitude
-  smaller, meaning many more reduce rounds and a materially slower summary.
-- **Not every surface fits.** `answerAcrossLibrary` already operates over
-  retrieved passages and works. `answerAboutMeeting` deliberately sends the whole
-  transcript because that is more accurate than retrieving fragments — that path
-  does not fit and should keep using a cloud provider when one is configured.
+- `AIProvider.isUsable` replaces the ad hoc `KeychainManager.hasValue(...)`
+  checks that used to gate title generation, the wiki/correction toggles and
+  `configuredProviders` — all of which would otherwise have treated the
+  on-device provider as permanently unconfigured, since it has no Keychain
+  entry at all. `ProviderFactory` checks `SystemLanguageModel.default.availability`
+  in its place, throwing `AppError.onDeviceModelUnavailable` the same way a
+  missing API key throws `AppError.noAPIKey` today.
+- `AutoTaggingService` runs against it unmodified — its excerpt was already
+  small enough. `MeetingChatService`'s retrieval-grounded chat
+  (`answerAcrossLibrary`, and the `answerAboutMeeting` full-transcript path for
+  meetings short enough to fit) and `SummaryService`'s map-reduce both do too,
+  now that `maxSinglePassChars`/`mapBlockChars` and the retrieval pool sizes
+  are per-provider — the on-device context window is far smaller than any
+  cloud vendor's, so a long meeting takes more reduce rounds there than it
+  would on a cloud provider, exactly as anticipated below.
+- `summarize` uses guided generation (`@Generable`) rather than
+  `SummaryJSON`'s tolerant JSON parsing for this provider, so
+  `SummaryJSON.parse`'s fence-stripping and `AppError.summaryTruncated` are
+  both unreachable on this path — the secondary benefit originally named here.
 
-**Order of attack.** Start with `AutoTaggingService`: a short excerpt in, a few
-labels out, comfortably inside the window, and already opt-in. Then chat over
-retrieved passages. Full summarization last, together with the per-provider
-map-reduce threshold.
+**Left for a follow-up, per I3:** the on-device char/token thresholds
+(`SummaryService`'s on-device `maxSinglePassChars`/`mapBlockChars`,
+`FoundationModelsProvider`'s output-token ceiling, `MeetingChatService`'s
+on-device pool sizes) are conservative first-cut estimates against Apple's
+documented ~4096-token session window, explicitly commented as such in the
+code — not yet measured against real on-device runs the way the transcription
+pipeline's accuracy is. `LLMTranscriptCorrector`, `WikiService` and
+`DocumentGenerationService` can already select the on-device provider through
+the generic factory path, but that hasn't been exercised or validated the way
+tagging/chat/summary were.
 
-A secondary benefit worth collecting: guided generation (`@Generable`) returns a
-typed struct. For this provider the tolerant cleanup in `SummaryJSON.parse` —
-markdown fences, outermost `{…}` extraction — becomes unnecessary, and
-`AppError.summaryTruncated` stops being a reachable failure mode.
+**Availability is a runtime fact, not a compile-time one** remains true after
+shipping: `SystemLanguageModel.default.availability` depends on Apple
+Intelligence hardware and on the feature being enabled, so how often real
+users actually get a usable on-device provider — versus falling through to
+"no provider configured" on a fresh install with Apple Intelligence off — is
+still unmeasured. That number is what F7 (below) should be reassessed against.
 
 ### F2 · User-maintained meeting glossary
 
@@ -250,9 +271,13 @@ provisioned API key. It changes nothing about the privacy posture — cloud is
 still cloud — but it changes *who can reach it*: today the barrier is creating a
 developer account and entering a credit card.
 
-The cost is real: OAuth with PKCE, token refresh, a local callback. **Condition:**
-sequence this after F1 and reassess. If a local provider already satisfies "works
-with no key at all", much of the motivation evaporates.
+The cost is real: OAuth with PKCE, token refresh, a local callback.
+**Condition:** F1 has now shipped, so reassess. On a device where the
+on-device provider satisfies "works with no key at all", much of the
+motivation evaporates — what's still unmeasured is how often that's actually
+true across the install base (Apple Intelligence hardware and the feature
+being enabled), which is exactly the number F1's write-up above flags as
+outstanding.
 
 ### F8 · Reading mode
 
@@ -517,17 +542,21 @@ the next cheaper or more verifiable.
    introduces.
 2. **F3 · Frictionless capture.** Lowest effort, immediate value, depends on
    nothing else here. The dispatcher already exists.
-3. **F1 · Apple Foundation Models, starting with auto-tagging.** Highest payoff.
-   The internal order matters: tagging fits the context window, full
-   summarization does not.
+3. **F1 · Apple Foundation Models — done.** Shipped in
+   [PR #139](https://github.com/carlosmazzei/Kurn/pull/139): provider
+   plumbing, auto-tagging, retrieval chat and per-provider summary thresholds,
+   in that order. Left open: measuring the on-device thresholds against real
+   runs, and exercising correction/wiki/document generation against the new
+   provider.
 4. **F2 · Meeting glossary.** After step 1, so the WER effect can be measured
    without waiting on simulator CI.
 5. **F4 · Calendar context.** Feeds F2 real names and unlocks cross-meeting
    speaker identity, so it wants F2 in place to pay off.
 6. **F5 · Reminders and F6 · Import.** Independent of each other and of the
    rest; slot them in as room appears.
-7. **Reassess F7, F8, F9 and F10.** F7 especially: if F1 delivered "works with
-   no key", the case for OAuth shrinks considerably.
+7. **Reassess F7, F8, F9 and F10.** F7 especially: F1 now delivers "works with
+   no key" wherever the on-device provider is actually available — see F7's
+   own entry above for what's still unmeasured.
 
 The diarization track runs on its own clock, because two of its items are
 defects and because D2 is a prerequisite rather than a feature:
