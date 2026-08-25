@@ -2,20 +2,26 @@
 //
 // render.js
 //
-// Renders polished marketing screenshots (dark gradient background, 3D
-// phone mockup, glassmorphism card) from the raw App Store screenshots that
-// `bundle exec fastlane screenshots` (fastlane/Fastfile) captures.
+// Renders App-Store-ready marketing screenshots (dark gradient background,
+// real iPhone/iPad device frame, glassmorphism card) from the raw App Store
+// screenshots that `bundle exec fastlane screenshots` (fastlane/Fastfile)
+// captures. Output is sized to Apple's exact required App Store Connect
+// pixel dimensions per device (see frames.json) so it can be uploaded
+// directly, not just used as a separate marketing asset.
 //
 // Expects --input-dir to contain one subdirectory per App Store locale
 // (matching fastlane/metadata/<locale>/, e.g. "en-US", "pt-BR"), each with
 // fastlane's raw "<device>-<screenName>.png" files (SnapshotHelper's
 // naming). Copy per locale + screen name comes from config.json; a locale
-// with no entry falls back to config.json's "default" block.
+// with no entry falls back to config.json's "default" block. Device frame
+// assets + placement come from frames.json + frames/*.png (vendored from
+// fastlane/frameit-frames, MIT).
 //
 // Usage:
 //   node render.js --input-dir <dir> --output-dir <dir> \
 //     [--config <config.json>] [--template <template.html>] \
-//     [--width 1290] [--height 2796]
+//     [--frames-manifest <frames.json>] [--frames-dir <frames/>] \
+//     [--frame-color <name>] [--width 1290] [--height 2796]
 //
 'use strict';
 
@@ -32,6 +38,9 @@ function parseArgs(argv) {
     outputDir: null,
     configPath: path.join(__dirname, 'config.json'),
     templatePath: path.join(__dirname, 'template.html'),
+    framesManifestPath: path.join(__dirname, 'frames.json'),
+    framesDir: path.join(__dirname, 'frames'),
+    frameColor: null,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT
   };
@@ -51,6 +60,15 @@ function parseArgs(argv) {
       case '--template':
         args.templatePath = argv[++i];
         break;
+      case '--frames-manifest':
+        args.framesManifestPath = argv[++i];
+        break;
+      case '--frames-dir':
+        args.framesDir = argv[++i];
+        break;
+      case '--frame-color':
+        args.frameColor = argv[++i];
+        break;
       case '--width':
         args.width = parseInt(argv[++i], 10);
         break;
@@ -65,7 +83,9 @@ function parseArgs(argv) {
   if (!args.inputDir || !args.outputDir || Number.isNaN(args.width) || Number.isNaN(args.height)) {
     console.error(
       '[render] Usage: node render.js --input-dir <dir> --output-dir <dir> ' +
-        '[--config <config.json>] [--template <template.html>] [--width N] [--height N]'
+        '[--config <config.json>] [--template <template.html>] ' +
+        '[--frames-manifest <frames.json>] [--frames-dir <frames/>] [--frame-color <name>] ' +
+        '[--width N] [--height N]'
     );
     process.exit(1);
   }
@@ -89,13 +109,34 @@ function loadJSON(file, label) {
 // fastlane's SnapshotHelper names files "<device>-<screenName>.png". Device
 // names never contain a dash (e.g. "iPhone 17 Pro Max"), so the first dash
 // is the separator.
+function extractDeviceName(baseName) {
+  const dash = baseName.indexOf('-');
+  return dash === -1 ? baseName : baseName.slice(0, dash);
+}
+
 function extractScreenName(baseName) {
   const dash = baseName.indexOf('-');
   return dash === -1 ? baseName : baseName.slice(dash + 1);
 }
 
-function isPhoneDevice(baseName) {
-  return /iphone/i.test(baseName);
+// Only iPhone/iPad get the marketing frame treatment; Apple Watch captures
+// are always skipped here (framing isn't meaningful at that size, and there
+// is no Watch entry in frames.json).
+function isFramableDevice(deviceName) {
+  return /iphone|ipad/i.test(deviceName);
+}
+
+// Reads width/height straight out of a PNG's IHDR chunk (bytes 16-23),
+// avoiding a dependency on an image library just to probe frame dimensions.
+function readPngDimensions(buffer) {
+  const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (buffer.length < 24 || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error('not a valid PNG file (bad signature)');
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
 }
 
 function escapeHTML(value) {
@@ -107,7 +148,67 @@ function escapeHTML(value) {
     .replaceAll("'", '&#39;');
 }
 
-function fillTemplate(template, { copy, screenshotSrc }) {
+// Resolves + caches (per device+color, not per screenshot) the frame image
+// and its placement geometry as percentages, so the same numbers work
+// whatever vw-based scale the template ends up rendering the frame at.
+function resolveFrame(deviceName, colorArg, framesManifest, framesDir, cache) {
+  const entry = framesManifest[deviceName];
+  if (!entry) {
+    console.warn(`[render] No frame configured for device "${deviceName}" in frames.json; skipping.`);
+    return null;
+  }
+
+  let color = colorArg || entry.defaultColor;
+  if (!entry.colors[color]) {
+    console.warn(
+      `[render] Unknown frame color "${color}" for "${deviceName}"; falling back to "${entry.defaultColor}".`
+    );
+    color = entry.defaultColor;
+  }
+  const colorEntry = entry.colors[color];
+  if (!colorEntry) {
+    console.warn(`[render] No usable frame color for "${deviceName}"; skipping.`);
+    return null;
+  }
+
+  const cacheKey = `${deviceName}::${color}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+
+  const framePath = path.join(framesDir, colorEntry.file);
+  let frameBuffer;
+  try {
+    frameBuffer = fs.readFileSync(framePath);
+  } catch (err) {
+    console.warn(`[render] Could not read frame asset "${framePath}": ${err.message}; skipping.`);
+    cache.set(cacheKey, null);
+    return null;
+  }
+
+  let dims;
+  try {
+    dims = readPngDimensions(frameBuffer);
+  } catch (err) {
+    console.warn(`[render] Frame asset "${framePath}" is not a readable PNG: ${err.message}; skipping.`);
+    cache.set(cacheKey, null);
+    return null;
+  }
+
+  const resolved = {
+    frameSrc: `data:image/png;base64,${frameBuffer.toString('base64')}`,
+    leftPct: (colorEntry.offsetX / dims.width) * 100,
+    topPct: (colorEntry.offsetY / dims.height) * 100,
+    widthPct: (colorEntry.screenshotWidth / dims.width) * 100,
+    aspectRatio: `${dims.width} / ${dims.height}`,
+    outputWidth: entry.outputWidth,
+    outputHeight: entry.outputHeight
+  };
+  cache.set(cacheKey, resolved);
+  return resolved;
+}
+
+function fillTemplate(template, { copy, screenshotSrc, frame }) {
   return template
     .replaceAll('{{BADGE}}', escapeHTML(copy.badge || ''))
     .replaceAll('{{TITLE}}', escapeHTML(copy.title || ''))
@@ -116,7 +217,12 @@ function fillTemplate(template, { copy, screenshotSrc }) {
     .replaceAll('{{CARD_ICON}}', escapeHTML(copy.cardIcon || '✦'))
     .replaceAll('{{CARD_STAT}}', escapeHTML(copy.cardStat || ''))
     .replaceAll('{{CARD_LABEL}}', escapeHTML(copy.cardLabel || ''))
-    .replaceAll('{{SCREENSHOT_SRC}}', screenshotSrc);
+    .replaceAll('{{SCREENSHOT_SRC}}', screenshotSrc)
+    .replaceAll('{{FRAME_SRC}}', frame.frameSrc)
+    .replaceAll('{{FRAME_ASPECT_RATIO}}', frame.aspectRatio)
+    .replaceAll('{{SCREENSHOT_LEFT_PCT}}', frame.leftPct.toFixed(3))
+    .replaceAll('{{SCREENSHOT_TOP_PCT}}', frame.topPct.toFixed(3))
+    .replaceAll('{{SCREENSHOT_WIDTH_PCT}}', frame.widthPct.toFixed(3));
 }
 
 async function main() {
@@ -129,6 +235,7 @@ async function main() {
 
   const template = fs.readFileSync(args.templatePath, 'utf8');
   const config = loadJSON(args.configPath, 'config.json');
+  const framesManifest = loadJSON(args.framesManifestPath, 'frames.json');
 
   fs.mkdirSync(args.outputDir, { recursive: true });
 
@@ -143,15 +250,11 @@ async function main() {
   }
 
   const browser = await chromium.launch();
+  const frameCache = new Map();
   let rendered = 0;
   let skipped = 0;
 
   try {
-    const page = await browser.newPage({
-      viewport: { width: args.width, height: args.height },
-      deviceScaleFactor: 1
-    });
-
     for (const locale of locales) {
       const localeInputDir = path.join(args.inputDir, locale);
       let localeConfig = config[locale];
@@ -177,11 +280,12 @@ async function main() {
 
       for (const file of files) {
         const baseName = path.basename(file, '.png');
+        const deviceName = extractDeviceName(baseName);
 
-        if (!isPhoneDevice(baseName)) {
+        if (!isFramableDevice(deviceName)) {
           console.warn(
-            `[render] Skipping "${locale}/${file}": this template targets ${args.width}x${args.height} ` +
-              '(6.7" iPhone); other device sizes need a different template/resolution.'
+            `[render] Skipping "${locale}/${file}": no marketing frame treatment for device "${deviceName}" ` +
+              '(only iPhone/iPad are framed here).'
           );
           skipped++;
           continue;
@@ -193,6 +297,12 @@ async function main() {
           console.warn(
             `[render] No copy configured for screen "${screenName}" (locale "${locale}") in config.json; skipping.`
           );
+          skipped++;
+          continue;
+        }
+
+        const frame = resolveFrame(deviceName, args.frameColor, framesManifest, args.framesDir, frameCache);
+        if (!frame) {
           skipped++;
           continue;
         }
@@ -209,15 +319,25 @@ async function main() {
 
         const html = fillTemplate(template, {
           copy,
-          screenshotSrc: `data:image/png;base64,${imageBase64}`
+          screenshotSrc: `data:image/png;base64,${imageBase64}`,
+          frame
         });
 
-        await page.setContent(html, { waitUntil: 'networkidle' });
-
-        const outFile = path.join(localeOutputDir, `${screenName}.png`);
-        await page.screenshot({ path: outFile });
-        console.log(`[render] Rendered ${locale}/${screenName}.png`);
-        rendered++;
+        const canvasWidth = frame.outputWidth || args.width;
+        const canvasHeight = frame.outputHeight || args.height;
+        const page = await browser.newPage({
+          viewport: { width: canvasWidth, height: canvasHeight },
+          deviceScaleFactor: 1
+        });
+        try {
+          await page.setContent(html, { waitUntil: 'networkidle' });
+          const outFile = path.join(localeOutputDir, `${screenName}.png`);
+          await page.screenshot({ path: outFile });
+          console.log(`[render] Rendered ${locale}/${screenName}.png (${deviceName}, ${canvasWidth}x${canvasHeight})`);
+          rendered++;
+        } finally {
+          await page.close();
+        }
       }
     }
   } finally {

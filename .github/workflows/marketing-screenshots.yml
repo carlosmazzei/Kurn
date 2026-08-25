@@ -1,9 +1,14 @@
 name: Marketing Screenshots
 
-# Renders sophisticated App Store / marketing screenshots (3D device mockup,
-# dark gradient background, glassmorphism card) from the raw captures that
-# .github/workflows/screenshots.yml's `screenshots` job already produces via
-# `bundle exec fastlane screenshots` (fastlane/Fastfile, fastlane/Snapfile).
+# Renders App-Store-ready marketing screenshots (real iPhone/iPad device
+# frame, dark gradient background, glassmorphism card) from the raw captures
+# that .github/workflows/screenshots.yml's `screenshots` job already produces
+# via `bundle exec fastlane screenshots` (fastlane/Fastfile, fastlane/Snapfile).
+# screenshots.yml's `upload` job pushes this workflow's iPhone/iPad output
+# (sized to Apple's exact required pixel dimensions - see
+# scripts/screenshots/frames.json) straight to App Store Connect in place of
+# the raw captures; only the raw Apple Watch captures, which this pipeline
+# never frames, still come from the `screenshots` artifact directly.
 #
 # This is a reusable workflow (workflow_call), invoked as a follow-up job
 # from screenshots.yml right after its `screenshots` job uploads the
