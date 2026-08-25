@@ -38,7 +38,17 @@ struct SummarySettingsView: View {
                     ) {
                         ForEach(configuredProviders) { Text($0.displayName).tag($0.id) }
                     }
-                    SummaryModelPicker(settings: settings, provider: settings.aiProvider, revision: keyRevision)
+                    if settings.aiProvider.kind == .appleOnDevice {
+                        // There is exactly one on-device model and no `/models`
+                        // endpoint to pick from, so this is static text rather
+                        // than a picker.
+                        LabeledContent(
+                            NSLocalizedString("settings.model", comment: "Model"),
+                            value: NSLocalizedString("settings.on_device_model_name", comment: "Apple Intelligence")
+                        )
+                    } else {
+                        SummaryModelPicker(settings: settings, provider: settings.aiProvider, revision: keyRevision)
+                    }
                 }
             }
 

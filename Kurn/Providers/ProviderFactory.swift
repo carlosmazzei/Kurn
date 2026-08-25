@@ -9,9 +9,20 @@
 import Foundation
 
 enum ProviderFactory {
-    /// Build the summary provider chosen in Settings. Throws `.noAPIKey` when the
-    /// selected provider has no stored key.
+    /// Build the summary provider chosen in Settings. Throws `.noAPIKey` when a
+    /// cloud provider has no stored key, or `.onDeviceModelUnavailable` when the
+    /// on-device provider is selected but `SystemLanguageModel` can't run —
+    /// both fail the same way a missing dependency fails today, so every
+    /// existing call site's error handling covers this with no changes.
     static func summaryProvider(for provider: AIProvider, model: String) throws -> LLMProvider {
+        if provider.kind == .appleOnDevice {
+            if let reason = OnDeviceModelAvailability.unavailableReason {
+                AppLog.transcription.atError.error("ProviderFactory: on-device model unavailable (\(reason, privacy: .public))")
+                throw AppError.onDeviceModelUnavailable(reason)
+            }
+            return FoundationModelsProvider(provider: provider)
+        }
+
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(key, provider: provider)
@@ -30,6 +41,8 @@ enum ProviderFactory {
             return AnthropicProvider(provider: provider, apiKey: key, model: resolvedModel)
         case .googleGemini:
             return GoogleProvider(provider: provider, apiKey: key, model: resolvedModel)
+        case .appleOnDevice:
+            preconditionFailure("handled above")
         }
     }
 

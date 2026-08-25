@@ -534,6 +534,10 @@ enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
     case openAICompatible
     case anthropic
     case googleGemini
+    /// Apple's on-device `FoundationModels` framework. Unlike the other kinds,
+    /// this speaks no HTTP at all — no base URL, no API key — so it is excluded
+    /// from `AddProviderView`'s type picker and never reaches `LLMHTTP`.
+    case appleOnDevice
 
     var id: String { rawValue }
 
@@ -542,6 +546,7 @@ enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
         case .openAICompatible: return "OpenAI-compatible"
         case .anthropic: return "Anthropic"
         case .googleGemini: return "Google Gemini"
+        case .appleOnDevice: return "On-Device"
         }
     }
 
@@ -550,8 +555,14 @@ enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
         case .openAICompatible: return "https://api.openai.com/v1"
         case .anthropic: return "https://api.anthropic.com/v1"
         case .googleGemini: return "https://generativelanguage.googleapis.com/v1beta"
+        case .appleOnDevice: return ""
         }
     }
+
+    /// Kinds a user can pick when adding or retyping a provider. `.appleOnDevice`
+    /// speaks no HTTP and is seeded once as a built-in, never user-created, so it
+    /// is excluded from `AddProviderView`/`ProviderEditor`'s type picker.
+    static var networkCases: [AIProviderKind] { allCases.filter { $0 != .appleOnDevice } }
 }
 
 /// Configured LLM provider used for summaries. Built-ins are presets; users can
@@ -649,7 +660,20 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
         legacyKeychainAccount: KeychainKey.groq.rawValue
     )
 
-    static let defaultProviders: [AIProvider] = [.openAI, .anthropic, .google, .groq]
+    /// The on-device provider: no base URL, no API key, and — unlike the other
+    /// built-ins — exactly one model, so `defaultModel` is a fixed placeholder
+    /// rather than something surfaced as a choice.
+    static let appleOnDevice = AIProvider(
+        id: "apple-on-device",
+        displayName: "Apple On-Device",
+        kind: .appleOnDevice,
+        baseURLString: "",
+        brandHex: "#000000",
+        defaultModel: "on-device",
+        isBuiltIn: true
+    )
+
+    static let defaultProviders: [AIProvider] = [.appleOnDevice, .openAI, .anthropic, .google, .groq]
 
     init(
         id: String,
