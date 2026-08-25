@@ -23,6 +23,9 @@ struct ProviderModelsService: Sendable {
     }
 
     func models(for provider: AIProvider) async throws -> [String] {
+        // There is exactly one on-device model and no `/models` endpoint to ask.
+        guard provider.kind != .appleOnDevice else { return [provider.defaultModel] }
+
         let apiKey = apiKey ?? KeychainManager.shared.get(provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
@@ -76,6 +79,8 @@ struct ProviderModelsService: Sendable {
             }
             AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
             return models
+        case .appleOnDevice:
+            preconditionFailure("handled above")
         }
     }
 

@@ -34,6 +34,7 @@ enum AppError: LocalizedError, Identifiable {
     case wikiGenerationFailed(String)
     case wikiUnavailable
     case documentGenerationFailed(String)
+    case onDeviceModelUnavailable(String)
 
     /// Stable identity for item-based presentation and comparisons.
     var id: String { errorDescription ?? "AppError" }
@@ -67,6 +68,7 @@ enum AppError: LocalizedError, Identifiable {
         case .wikiGenerationFailed: return "wiki_generation"
         case .wikiUnavailable: return "wiki_unavailable"
         case .documentGenerationFailed: return "document_generation"
+        case .onDeviceModelUnavailable: return "on_device_model_unavailable"
         }
     }
 
@@ -191,6 +193,11 @@ enum AppError: LocalizedError, Identifiable {
         case .documentGenerationFailed(let detail):
             return String(
                 format: NSLocalizedString("error.document_generation", comment: "Document generation failed"),
+                detail
+            )
+        case .onDeviceModelUnavailable(let detail):
+            return String(
+                format: NSLocalizedString("error.on_device_model_unavailable", comment: "On-device model unavailable"),
                 detail
             )
         }

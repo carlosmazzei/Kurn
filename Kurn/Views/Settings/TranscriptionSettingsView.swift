@@ -31,7 +31,17 @@ struct TranscriptionSettingsView: View {
     /// to the same key changes.
     private var hasSummaryProviderKey: Bool {
         _ = keyRevision
-        return KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+        return settings.aiProvider.isUsable
+    }
+
+    /// The reason the correction toggle is disabled, when it is. Names the
+    /// specific on-device unavailability reason rather than always suggesting
+    /// an API key, which would be the wrong instruction for that provider.
+    private var correctionUnavailableFooter: String {
+        if settings.aiProvider.kind == .appleOnDevice, let reason = OnDeviceModelAvailability.unavailableReason {
+            return reason
+        }
+        return NSLocalizedString("settings.correction_needs_key", comment: "AI transcription correction needs an API key")
     }
 
     var body: some View {
@@ -271,7 +281,7 @@ struct TranscriptionSettingsView: View {
         } footer: {
             Text(hasSummaryProviderKey
                 ? NSLocalizedString("settings.correction_footer", comment: "AI transcription correction footer")
-                : NSLocalizedString("settings.correction_needs_key", comment: "AI transcription correction needs an API key"))
+                : correctionUnavailableFooter)
         }
     }
 }

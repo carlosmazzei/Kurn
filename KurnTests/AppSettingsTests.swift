@@ -98,6 +98,17 @@ struct AppSettingsTests {
         }
     }
 
+    /// A fresh install (no stored `aiProviderID`) must default to the
+    /// on-device provider, not a cloud vendor requiring a key — otherwise a
+    /// user who never opens Settings gets nothing beyond transcription, which
+    /// is the gap F1 exists to close.
+    @Test func aiProviderDefaultsToAppleOnDeviceOnFreshInstall() {
+        withScopedDefaults { settings in
+            #expect(settings.aiProviderID == AIProvider.appleOnDevice.id)
+            #expect(settings.aiProvider.kind == .appleOnDevice)
+        }
+    }
+
     @Test func aiProviderFallsBackToFirstWhenSelectedIDMissing() {
         withScopedDefaults { settings in
             settings.aiProviderID = "no-such-provider"

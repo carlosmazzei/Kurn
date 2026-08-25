@@ -484,6 +484,14 @@
 "settings.no_models_loaded" = "Nenhum modelo utilizável foi retornado por este provedor.";
 "settings.configured" = "Configurado";
 "settings.not_configured" = "Não configurado";
+"settings.on_device_available" = "Disponível neste dispositivo";
+"settings.on_device_reason_ineligible" = "Este dispositivo não é compatível com o Apple Intelligence";
+"settings.on_device_reason_not_enabled" = "O Apple Intelligence não está ativado";
+"settings.on_device_reason_not_ready" = "O modelo no dispositivo ainda não está pronto";
+"settings.on_device_reason_unknown" = "O modelo no dispositivo está indisponível por um motivo desconhecido";
+"settings.on_device_status_title" = "Status no Dispositivo";
+"settings.on_device_footer" = "Executa totalmente neste dispositivo usando o Apple Intelligence. Nada sobre suas reuniões é enviado a um servidor.";
+"settings.on_device_model_name" = "Apple Intelligence";
 "settings.api_key" = "Chave de API";
 "settings.key_footer" = "Sua chave da %@ fica guardada com segurança no Keychain do dispositivo e nunca sai dele.";
 "settings.remove_key" = "Remover Chave";
@@ -731,3 +739,5 @@
 "documents.error.no_transcripts" = "Selecione ao menos uma fonte que contenha uma transcrição.";
 "documents.error.empty_response" = "O provedor de IA retornou um documento vazio.";
 "error.document_generation" = "Não foi possível gerar o documento: %@";
+"error.on_device_model_unavailable" = "Modelo no dispositivo indisponível: %@";
+"error.on_device_generation_timeout" = "A geração no dispositivo expirou.";

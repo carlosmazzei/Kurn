@@ -397,12 +397,12 @@ final class TranscriptionViewModel {
     private func shouldGenerateAITitle(for meeting: Meeting, settings: AppSettings) -> Bool {
         meeting.aiTitle == nil
             && meeting.hasAnyTranscript
-            && KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+            && settings.aiProvider.isUsable
     }
 
     private func shouldGenerateWiki(settings: AppSettings) -> Bool {
         settings.wikiEnabled
-            && KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+            && settings.aiProvider.isUsable
     }
 
     /// Settle a run that ended in cancellation. Which of the two cancellation
@@ -459,7 +459,7 @@ final class TranscriptionViewModel {
     /// blocks or surfaces as a user-facing error.
     private func generateAITitle(for meeting: Meeting?, settings: AppSettings) async {
         guard let meeting, meeting.aiTitle == nil else { return }
-        guard KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount) else { return }
+        guard settings.aiProvider.isUsable else { return }
         let groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])] = meeting.recordings
             .sorted { $0.recordedAt < $1.recordedAt }
             .compactMap { recording in

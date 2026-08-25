@@ -31,46 +31,56 @@ struct ProviderEditor: View {
 
     var body: some View {
         Form {
-            Section {
-                TextField(NSLocalizedString("settings.provider_name", comment: "Provider name"), text: $name)
-                    .disabled(!canEditDetails)
-                Picker(NSLocalizedString("settings.provider_type", comment: "Provider type"), selection: $kind) {
-                    ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
+            if provider.kind == .appleOnDevice {
+                Section {
+                    OnDeviceStatusLabel(reason: OnDeviceModelAvailability.unavailableReason)
+                } header: {
+                    Text(NSLocalizedString("settings.on_device_status_title", comment: "On-Device Status"))
+                } footer: {
+                    Text(NSLocalizedString("settings.on_device_footer", comment: "Runs entirely on-device"))
                 }
-                .disabled(!canEditDetails)
-                TextField(NSLocalizedString("settings.base_url", comment: "Base URL"), text: $baseURLString)
+            } else {
+                Section {
+                    TextField(NSLocalizedString("settings.provider_name", comment: "Provider name"), text: $name)
+                        .disabled(!canEditDetails)
+                    Picker(NSLocalizedString("settings.provider_type", comment: "Provider type"), selection: $kind) {
+                        ForEach(AIProviderKind.networkCases) { Text($0.displayName).tag($0) }
+                    }
+                    .disabled(!canEditDetails)
+                    TextField(NSLocalizedString("settings.base_url", comment: "Base URL"), text: $baseURLString)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .disabled(!canEditDetails)
+                } footer: {
+                    Text(NSLocalizedString("settings.base_url_footer", comment: "Base URL footer"))
+                }
+
+                Section {
+                    SecureField(
+                        NSLocalizedString("settings.api_key", comment: "API Key"),
+                        text: $key
+                    )
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .keyboardType(.URL)
-                    .disabled(!canEditDetails)
-            } footer: {
-                Text(NSLocalizedString("settings.base_url_footer", comment: "Base URL footer"))
-            }
+                } header: {
+                    Text(NSLocalizedString("settings.credentials", comment: "Credentials"))
+                } footer: {
+                    Text(String(
+                        format: NSLocalizedString("settings.key_footer", comment: "Stored securely"),
+                        provider.displayName
+                    ))
+                }
 
-            Section {
-                SecureField(
-                    NSLocalizedString("settings.api_key", comment: "API Key"),
-                    text: $key
-                )
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            } header: {
-                Text(NSLocalizedString("settings.credentials", comment: "Credentials"))
-            } footer: {
-                Text(String(
-                    format: NSLocalizedString("settings.key_footer", comment: "Stored securely"),
-                    provider.displayName
-                ))
-            }
-
-            if !key.isEmpty {
-                Section {
-                    Button(role: .destructive) {
-                        key = ""
-                        KeychainManager.shared.delete(provider.keychainAccount)
-                        onChange()
-                    } label: {
-                        Text(NSLocalizedString("settings.remove_key", comment: "Remove key"))
+                if !key.isEmpty {
+                    Section {
+                        Button(role: .destructive) {
+                            key = ""
+                            KeychainManager.shared.delete(provider.keychainAccount)
+                            onChange()
+                        } label: {
+                            Text(NSLocalizedString("settings.remove_key", comment: "Remove key"))
+                        }
                     }
                 }
             }
@@ -148,7 +158,7 @@ struct AddProviderView: View {
             Section {
                 TextField(NSLocalizedString("settings.provider_name", comment: "Provider name"), text: $name)
                 Picker(NSLocalizedString("settings.provider_type", comment: "Provider type"), selection: $kind) {
-                    ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
+                    ForEach(AIProviderKind.networkCases) { Text($0.displayName).tag($0) }
                 }
                 TextField(NSLocalizedString("settings.base_url", comment: "Base URL"), text: $baseURLString)
                     .textInputAutocapitalization(.never)
@@ -504,7 +514,9 @@ private extension View {
 
 // MARK: - Provider row
 
-/// A provider row showing its brand icon, name, and key configuration status.
+/// A provider row showing its brand icon, name, and configuration/availability
+/// status. The on-device provider has no key to check, so it reads
+/// `SystemLanguageModel` availability instead — see `OnDeviceStatusLabel`.
 struct ProviderRow: View {
     let provider: AIProvider
     let revision: Int
@@ -517,19 +529,41 @@ struct ProviderRow: View {
                 Text(provider.kind.displayName)
                     .font(Theme.caption)
                     .foregroundStyle(Theme.textSecondary)
-                let configured = KeychainManager.shared.hasValue(for: provider.keychainAccount)
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(configured ? Theme.success : Theme.textTertiary)
-                        .frame(width: 6, height: 6)
-                    Text(configured
-                         ? NSLocalizedString("settings.configured", comment: "Configured")
-                         : NSLocalizedString("settings.not_configured", comment: "Not configured"))
-                        .font(Theme.caption)
-                        .foregroundStyle(Theme.textSecondary)
+                if provider.kind == .appleOnDevice {
+                    OnDeviceStatusLabel(reason: OnDeviceModelAvailability.unavailableReason)
+                        .id(revision)
+                } else {
+                    let configured = KeychainManager.shared.hasValue(for: provider.keychainAccount)
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(configured ? Theme.success : Theme.textTertiary)
+                            .frame(width: 6, height: 6)
+                        Text(configured
+                             ? NSLocalizedString("settings.configured", comment: "Configured")
+                             : NSLocalizedString("settings.not_configured", comment: "Not configured"))
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .id(revision)
                 }
-                .id(revision)
             }
+        }
+    }
+}
+
+/// Shared status dot + label for the on-device provider, used by both
+/// `ProviderRow` and `ProviderEditor` so the two never drift.
+private struct OnDeviceStatusLabel: View {
+    let reason: String?
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(reason == nil ? Theme.success : Theme.textTertiary)
+                .frame(width: 6, height: 6)
+            Text(reason ?? NSLocalizedString("settings.on_device_available", comment: "Available on this device"))
+                .font(Theme.caption)
+                .foregroundStyle(Theme.textSecondary)
         }
     }
 }
