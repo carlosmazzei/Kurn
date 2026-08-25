@@ -40,7 +40,14 @@ struct PublicDatasetEvaluationHarnessTests {
         /// `nil` for an item with no `.reference.txt` (e.g. AMI, which is
         /// DER-only — see `PublicEvaluationDataset`).
         var wer: WordErrorRate.Result?
+        /// DER scored against the fused, speaker-attributed segments — blends
+        /// diarizer error with ASR boundary placement and fusion policy.
         var der: DiarizationErrorRate.Result?
+        /// DER scored against the diarizer's own raw turns, before fusion. The
+        /// pair with `der` is what localizes a regression to a stage: if only
+        /// this one moves, the diarizer changed; if only `der` moves, fusion or
+        /// the ASR boundaries did.
+        var rawDER: DiarizationErrorRate.Result?
     }
 
     /// `KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to
@@ -287,12 +294,18 @@ struct PublicDatasetEvaluationHarnessTests {
         }
 
         var der: DiarizationErrorRate.Result?
+        var rawDER: DiarizationErrorRate.Result?
         if let referenceRTTM = item.referenceRTTM {
             let reference = RTTM.parse(referenceRTTM)
             let hypothesis = output.segments.map {
                 DiarizationErrorRate.Segment(label: $0.speakerLabel, start: $0.startTime, end: $0.endTime)
             }
             der = DiarizationErrorRate.compare(reference: reference, hypothesis: hypothesis)
+
+            let rawHypothesis = output.turns.map {
+                DiarizationErrorRate.Segment(label: $0.speakerLabel, start: $0.start, end: $0.end)
+            }
+            rawDER = DiarizationErrorRate.compare(reference: reference, hypothesis: rawHypothesis)
         }
 
         return Row(
@@ -301,7 +314,8 @@ struct PublicDatasetEvaluationHarnessTests {
             language: corpusLanguage,
             configLabel: entry.label,
             wer: wer,
-            der: der
+            der: der,
+            rawDER: rawDER
         )
     }
 
@@ -310,7 +324,10 @@ struct PublicDatasetEvaluationHarnessTests {
             print("[pipeline-eval] \(row.corpus)/\(row.name) [\(row.configLabel)]: \(wer.summary)")
         }
         if let der = row.der {
-            print("[pipeline-eval] \(row.corpus)/\(row.name) [\(row.configLabel)]: \(der.summary)")
+            print("[pipeline-eval] \(row.corpus)/\(row.name) [\(row.configLabel)]: fused \(der.summary)")
+        }
+        if let rawDER = row.rawDER {
+            print("[pipeline-eval] \(row.corpus)/\(row.name) [\(row.configLabel)]: raw \(rawDER.summary)")
         }
     }
 
@@ -362,7 +379,15 @@ struct PublicDatasetEvaluationHarnessTests {
                 let derErrors: TimeInterval = derGroup.reduce(0.0) { $0 + $1.errors }
                 let derSpeech: TimeInterval = derGroup.reduce(0.0) { $0 + $1.referenceSpeech }
                 let derRate = derSpeech > 0 ? derErrors / derSpeech : 0
-                parts.append(String(format: "DER %.2f%% over %d file(s)", derRate * 100, derGroup.count))
+                parts.append(String(format: "DER(fused) %.2f%% over %d file(s)", derRate * 100, derGroup.count))
+            }
+
+            let rawDERGroup = group.compactMap(\.rawDER)
+            if !rawDERGroup.isEmpty {
+                let rawDERErrors: TimeInterval = rawDERGroup.reduce(0.0) { $0 + $1.errors }
+                let rawDERSpeech: TimeInterval = rawDERGroup.reduce(0.0) { $0 + $1.referenceSpeech }
+                let rawDERRate = rawDERSpeech > 0 ? rawDERErrors / rawDERSpeech : 0
+                parts.append(String(format: "DER(raw) %.2f%% over %d file(s)", rawDERRate * 100, rawDERGroup.count))
             }
 
             guard !parts.isEmpty else { continue }
@@ -384,7 +409,8 @@ struct PublicDatasetEvaluationHarnessTests {
     /// attempt left behind so the next one can run only the missing cells.
     private final class CSVReportWriter {
         static let header = "corpus,name,language,configuration,wer_pct,wer_sub,wer_ins,wer_del,wer_ref,"
-            + "der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech"
+            + "der_pct,der_missed,der_false_alarm,der_confusion,der_ref_speech,"
+            + "raw_der_pct,raw_der_missed,raw_der_false_alarm,raw_der_confusion"
 
         let path: String
         private let handle: FileHandle
@@ -430,7 +456,7 @@ struct PublicDatasetEvaluationHarnessTests {
             var done: Set<String> = []
             for line in text.split(separator: "\n").dropFirst() {
                 let f = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
-                guard f.count == 14 else { continue }
+                guard f.count == 18 else { continue }
                 let wer = f[8].isEmpty ? nil : WordErrorRate.Result(
                     substitutions: Int(f[5]) ?? 0,
                     insertions: Int(f[6]) ?? 0,
@@ -444,7 +470,18 @@ struct PublicDatasetEvaluationHarnessTests {
                     referenceSpeech: Double(f[13]) ?? 0,
                     mapping: [:]
                 )
-                rows.append(Row(corpus: f[0], name: f[1], language: f[2], configLabel: f[3], wer: wer, der: der))
+                // Raw DER shares the fused DER's reference speech duration —
+                // same reference audio, so nothing new to store for it.
+                let rawDER = f[14].isEmpty ? nil : DiarizationErrorRate.Result(
+                    missed: Double(f[15]) ?? 0,
+                    falseAlarm: Double(f[16]) ?? 0,
+                    confusion: Double(f[17]) ?? 0,
+                    referenceSpeech: Double(f[13]) ?? 0,
+                    mapping: [:]
+                )
+                rows.append(
+                    Row(corpus: f[0], name: f[1], language: f[2], configLabel: f[3], wer: wer, der: der, rawDER: rawDER)
+                )
                 done.insert(key(f[0], f[1], f[3]))
             }
             return (rows, done)
@@ -472,6 +509,12 @@ struct PublicDatasetEvaluationHarnessTests {
         fields.append(der.map { String(format: "%.3f", $0.falseAlarm) } ?? "")
         fields.append(der.map { String(format: "%.3f", $0.confusion) } ?? "")
         fields.append(der.map { String(format: "%.3f", $0.referenceSpeech) } ?? "")
+
+        let rawDER = row.rawDER
+        fields.append(rawDER.map { String(format: "%.4f", $0.rate * 100) } ?? "")
+        fields.append(rawDER.map { String(format: "%.3f", $0.missed) } ?? "")
+        fields.append(rawDER.map { String(format: "%.3f", $0.falseAlarm) } ?? "")
+        fields.append(rawDER.map { String(format: "%.3f", $0.confusion) } ?? "")
 
         return fields
     }
