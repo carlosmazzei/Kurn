@@ -117,14 +117,16 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// exactly one summary-shaped `LLMProvider` in this app (see
     /// `ProviderFactory.summaryProvider`), reused for summaries/chat/wiki/
     /// auto-tagging/titles, and correction follows that precedent.
-    var correctionProvider: AIProvider = .openAI
+    var correctionProvider: AIProvider = .appleOnDevice
     var correctionModel: String = ""
     /// Whether the user opted in (Settings toggle) AND the correction provider
-    /// currently has a configured API key. Read together with `correction` by
-    /// `effectiveCorrection` — same fail-before-trying shape as
-    /// `effectiveDiarization`, except the gate is "is this usable right now"
-    /// (key present), not "has the user agreed to a model download" (this
-    /// stage has no local model).
+    /// is usable right now (`AIProvider.isUsable`: a configured API key for a
+    /// cloud vendor, or a runnable model for the on-device provider). Read
+    /// together with `correction` by `effectiveCorrection` — same
+    /// fail-before-trying shape as `effectiveDiarization`, except the gate is
+    /// "is this usable right now", not "has the user agreed to a model
+    /// download" (only the on-device provider has a local model here, and it
+    /// needs no download).
     var correctionConsented: Bool = false
 
     /// The correction engine that will actually run.
