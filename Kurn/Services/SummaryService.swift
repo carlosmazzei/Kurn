@@ -14,15 +14,38 @@ import Foundation
 struct SummaryService {
 
     /// Transcripts at or below this size are summarized in a single request.
-    /// ~80k chars ≈ 20k tokens — inside every supported model's context window
+    /// ~80k chars ≈ 20k tokens — inside every cloud vendor's context window
     /// with room for the system prompt and the summary itself, while keeping
     /// single-request latency inside the request timeout. A 2h meeting lands
     /// around 100k chars, so long meetings take the staged path.
-    static let maxSinglePassChars = 80_000
-    /// Size of each map-stage block when the transcript exceeds
-    /// `maxSinglePassChars`. Blocks split on line boundaries only, so no
+    private static let cloudMaxSinglePassChars = 80_000
+    /// Size of each map-stage block when the transcript exceeds the
+    /// single-pass threshold. Blocks split on line boundaries only, so no
     /// `[mm:ss] Speaker: text` line is ever cut in half.
-    static let mapBlockChars = 60_000
+    private static let cloudMapBlockChars = 60_000
+
+    /// Apple's on-device `FoundationModels` session window is far smaller than
+    /// any cloud vendor's (~4096 tokens total, shared across instructions,
+    /// input, and generation, as of iOS 26) — these are conservative first-cut
+    /// estimates leaving headroom for the system prompt and output budget, not
+    /// a measured figure; tune against real on-device runs before trusting
+    /// them as a ceiling.
+    private static let onDeviceMaxSinglePassChars = 6_000
+    /// Slightly smaller than the single-pass figure: a map-stage block is also
+    /// wrapped in "Meeting title: …\nTranscript (part X of Y):\n" framing.
+    private static let onDeviceMapBlockChars = 5_000
+
+    /// Transcripts at or below this size are summarized in a single request —
+    /// see `cloudMaxSinglePassChars`/`onDeviceMaxSinglePassChars`.
+    static func maxSinglePassChars(for provider: AIProvider) -> Int {
+        provider.kind == .appleOnDevice ? onDeviceMaxSinglePassChars : cloudMaxSinglePassChars
+    }
+
+    /// Size of each map-stage block when a transcript exceeds
+    /// `maxSinglePassChars(for:)`.
+    static func mapBlockChars(for provider: AIProvider) -> Int {
+        provider.kind == .appleOnDevice ? onDeviceMapBlockChars : cloudMapBlockChars
+    }
 
     /// Generate a structured summary for already-assembled transcript text.
     /// - Parameters:
@@ -50,7 +73,7 @@ struct SummaryService {
 
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
 
-        guard trimmed.count > Self.maxSinglePassChars else {
+        guard trimmed.count > Self.maxSinglePassChars(for: provider) else {
             try Task.checkCancellation()
             let userPrompt = """
             Meeting title: \(meetingTitle)
@@ -86,7 +109,7 @@ struct SummaryService {
         template: SummaryTemplate,
         onProgress: (@Sendable (Int, Int) -> Void)?
     ) async throws -> SummaryResult {
-        let blocks = Self.splitTranscript(transcript, maxChars: Self.mapBlockChars)
+        let blocks = Self.splitTranscript(transcript, maxChars: Self.mapBlockChars(for: llm.provider))
         let totalStages = blocks.count + 1
         AppLog.transcription.atNotice.notice("summary: staged path blocks=\(blocks.count, privacy: .public) chars=\(transcript.count, privacy: .public)")
 

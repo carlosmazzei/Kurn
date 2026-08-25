@@ -159,10 +159,11 @@ final class WikiCoordinator {
         return article.generatorModelIdentifier != generator
     }
 
-    /// Whether the configured summary provider has an API key available.
+    /// Whether the configured summary provider is usable right now (a Keychain
+    /// key for a cloud vendor, or a runnable model for the on-device provider).
     private var hasProviderKey: Bool {
         guard let settings = appSettings else { return false }
-        return KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+        return settings.aiProvider.isUsable
     }
 
     private static func generatorIdentifier(provider: AIProvider, model: String) -> String {

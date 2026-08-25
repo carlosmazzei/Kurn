@@ -15,11 +15,13 @@ import SwiftUI
 
 extension AppSettings {
 
-    /// Providers with a key in the Keychain — the only ones that can be selected
-    /// for summaries. Screens that show these read their `keyRevision` counter
-    /// first, so the list re-derives after a key is added or removed.
+    /// Providers usable right now for summaries: a key in the Keychain for a
+    /// cloud vendor, or a runnable `SystemLanguageModel` for the on-device
+    /// provider (which has no key at all). Screens that show these read their
+    /// `keyRevision` counter first, so the list re-derives after a key is added
+    /// or removed.
     var configuredProviders: [AIProvider] {
-        providers.filter { KeychainManager.shared.hasValue(for: $0.keychainAccount) }
+        providers.filter(\.isUsable)
     }
 
     /// Configured providers that can run cloud (Whisper) transcription — the

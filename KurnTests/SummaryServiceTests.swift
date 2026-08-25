@@ -157,4 +157,26 @@ struct SummaryServiceTests {
         let sections = [SummarySection(title: "Only Title")]
         #expect(SummaryService.markdownText(from: sections) == "## Only Title")
     }
+
+    // MARK: - Per-provider thresholds
+
+    @Test func maxSinglePassCharsIsMuchSmallerOnDeviceThanCloud() {
+        #expect(SummaryService.maxSinglePassChars(for: .appleOnDevice) < SummaryService.maxSinglePassChars(for: .openAI))
+    }
+
+    @Test func mapBlockCharsIsMuchSmallerOnDeviceThanCloud() {
+        #expect(SummaryService.mapBlockChars(for: .appleOnDevice) < SummaryService.mapBlockChars(for: .openAI))
+    }
+
+    @Test func cloudProvidersShareTheSameThresholdsRegardlessOfVendor() {
+        #expect(SummaryService.maxSinglePassChars(for: .openAI) == SummaryService.maxSinglePassChars(for: .anthropic))
+        #expect(SummaryService.maxSinglePassChars(for: .openAI) == SummaryService.maxSinglePassChars(for: .google))
+        #expect(SummaryService.mapBlockChars(for: .openAI) == SummaryService.mapBlockChars(for: .anthropic))
+    }
+
+    @Test func onDeviceMapBlockCharsStaysBelowItsSinglePassThreshold() {
+        // The map-stage prompt wraps a block in extra framing, so its budget
+        // must leave room for that on top of the block itself.
+        #expect(SummaryService.mapBlockChars(for: .appleOnDevice) <= SummaryService.maxSinglePassChars(for: .appleOnDevice))
+    }
 }

@@ -293,7 +293,7 @@ final class AppSettings {
             correction: correctionEnabled ? .llm : .none,
             correctionProvider: aiProvider,
             correctionModel: correctionEnabled ? summaryModel(for: aiProvider) : "",
-            correctionConsented: correctionEnabled && KeychainManager.shared.hasValue(for: aiProvider.keychainAccount)
+            correctionConsented: correctionEnabled && aiProvider.isUsable
         )
     }
 
@@ -507,10 +507,14 @@ final class AppSettings {
             .flatMap { $0.isEmpty ? nil : $0 }
             .map(Self.mergedProviders) ?? AIProvider.defaultProviders
         providers = loadedProviders
-        let storedProviderID = defaults.string(forKey: Keys.provider) ?? AIProvider.openAI.id
+        // A fresh install (no stored value yet) defaults to the on-device
+        // provider rather than a cloud vendor requiring a key — this is what
+        // actually closes invariant I1 for a user who never opens Settings. An
+        // existing stored selection, cloud or on-device, is always honored.
+        let storedProviderID = defaults.string(forKey: Keys.provider) ?? AIProvider.appleOnDevice.id
         aiProviderID = loadedProviders.contains(where: { $0.id == storedProviderID })
             ? storedProviderID
-            : AIProvider.openAI.id
+            : AIProvider.appleOnDevice.id
         let storedTranscriptionProviderID = defaults.string(forKey: Keys.transcriptionProvider)
             ?? AIProvider.openAI.id
         transcriptionProviderID = loadedProviders.contains(where: {

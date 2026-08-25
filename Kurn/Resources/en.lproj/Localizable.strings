@@ -484,6 +484,14 @@
 "settings.no_models_loaded" = "No usable models were returned by this provider.";
 "settings.configured" = "Configured";
 "settings.not_configured" = "Not configured";
+"settings.on_device_available" = "Available on this device";
+"settings.on_device_reason_ineligible" = "This device does not support Apple Intelligence";
+"settings.on_device_reason_not_enabled" = "Apple Intelligence is not turned on";
+"settings.on_device_reason_not_ready" = "The on-device model is not ready yet";
+"settings.on_device_reason_unknown" = "The on-device model is unavailable for an unknown reason";
+"settings.on_device_status_title" = "On-Device Status";
+"settings.on_device_footer" = "Runs entirely on this device using Apple Intelligence. Nothing about your meetings is sent to a server.";
+"settings.on_device_model_name" = "Apple Intelligence";
 "settings.api_key" = "API Key";
 "settings.key_footer" = "Your %@ key is stored securely in the device Keychain and never leaves your device.";
 "settings.remove_key" = "Remove Key";
@@ -731,3 +739,5 @@
 "documents.error.no_transcripts" = "Select at least one source containing a transcript.";
 "documents.error.empty_response" = "The AI provider returned an empty document.";
 "error.document_generation" = "Could not generate the document: %@";
+"error.on_device_model_unavailable" = "On-device model unavailable: %@";
+"error.on_device_generation_timeout" = "On-device generation timed out.";

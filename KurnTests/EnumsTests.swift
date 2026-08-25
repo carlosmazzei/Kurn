@@ -95,6 +95,18 @@ struct EnumsTests {
         #expect(AIProvider.groq.defaultTranscriptionModel == "whisper-large-v3")
     }
 
+    @Test func appleOnDeviceIsABuiltInWithNoTranscriptionSupport() {
+        #expect(AIProvider.appleOnDevice.kind == .appleOnDevice)
+        #expect(AIProvider.appleOnDevice.isBuiltIn)
+        #expect(!AIProvider.appleOnDevice.supportsTranscription)
+        #expect(AIProvider.defaultProviders.contains(where: { $0.id == AIProvider.appleOnDevice.id }))
+    }
+
+    @Test func networkCasesExcludeAppleOnDevice() {
+        #expect(!AIProviderKind.networkCases.contains(.appleOnDevice))
+        #expect(AIProviderKind.networkCases.count == AIProviderKind.allCases.count - 1)
+    }
+
     // MARK: - TranscriptionMode
 
     @Test func transcriptionModeIdMatchesRawValue() {

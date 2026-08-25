@@ -484,6 +484,14 @@
 "settings.no_models_loaded" = "Dieser Anbieter hat keine nutzbaren Modelle zurückgegeben.";
 "settings.configured" = "Konfiguriert";
 "settings.not_configured" = "Nicht konfiguriert";
+"settings.on_device_available" = "Auf diesem Gerät verfügbar";
+"settings.on_device_reason_ineligible" = "Dieses Gerät unterstützt Apple Intelligence nicht";
+"settings.on_device_reason_not_enabled" = "Apple Intelligence ist nicht aktiviert";
+"settings.on_device_reason_not_ready" = "Das On-Device-Modell ist noch nicht bereit";
+"settings.on_device_reason_unknown" = "Das On-Device-Modell ist aus unbekanntem Grund nicht verfügbar";
+"settings.on_device_status_title" = "Status auf dem Gerät";
+"settings.on_device_footer" = "Läuft vollständig auf diesem Gerät mit Apple Intelligence. Nichts zu deinen Meetings wird an einen Server gesendet.";
+"settings.on_device_model_name" = "Apple Intelligence";
 "settings.api_key" = "API-Schlüssel";
 "settings.key_footer" = "Ihr %@-Schlüssel wird sicher im Keychain des Geräts gespeichert und verlässt Ihr Gerät nie.";
 "settings.remove_key" = "Schlüssel entfernen";
@@ -731,3 +739,5 @@
 "documents.error.no_transcripts" = "Wähle mindestens eine Quelle mit einem Transkript.";
 "documents.error.empty_response" = "Der KI-Anbieter hat ein leeres Dokument zurückgegeben.";
 "error.document_generation" = "Dokument konnte nicht erstellt werden: %@";
+"error.on_device_model_unavailable" = "On-Device-Modell nicht verfügbar: %@";
+"error.on_device_generation_timeout" = "Die Generierung auf dem Gerät hat das Zeitlimit überschritten.";

@@ -45,13 +45,42 @@ struct MeetingChatService {
     }
 
     /// Passages fed to the model after reranking (single-meeting scope).
-    static let retrievalLimit = 10
+    private static let cloudRetrievalLimit = 10
     /// Candidate pool size pulled from hybrid retrieval before reranking.
-    static let poolSize = 30
+    private static let cloudPoolSize = 30
     /// Wider pool for the library-wide "Ask": more meetings can contribute.
-    static let libraryPoolSize = 60
+    private static let cloudLibraryPoolSize = 60
     /// Larger answer window for the library so synthesis has more to work with.
-    static let libraryRetrievalLimit = 20
+    private static let cloudLibraryRetrievalLimit = 20
+
+    /// On-device sizes are much smaller than the cloud ones above. Unlike the
+    /// library-wide answer (which falls back to map-reduce when its prompt
+    /// doesn't fit, per `SummaryService.maxSinglePassChars(for:)`),
+    /// `retrievedAnswer`'s single-meeting answer has no such fallback — its
+    /// prompt must fit the small on-device context window directly. The
+    /// rerank prompt lists every pooled passage in full, so the pool itself
+    /// must also stay small. Conservative first-cut figures, not measured.
+    private static let onDeviceRetrievalLimit = 4
+    private static let onDevicePoolSize = 10
+    private static let onDeviceLibraryPoolSize = 15
+    private static let onDeviceLibraryRetrievalLimit = 6
+
+    /// Passages fed to the model after reranking (single-meeting scope).
+    static func retrievalLimit(for provider: AIProvider) -> Int {
+        provider.kind == .appleOnDevice ? onDeviceRetrievalLimit : cloudRetrievalLimit
+    }
+    /// Candidate pool size pulled from hybrid retrieval before reranking.
+    static func poolSize(for provider: AIProvider) -> Int {
+        provider.kind == .appleOnDevice ? onDevicePoolSize : cloudPoolSize
+    }
+    /// Wider pool for the library-wide "Ask": more meetings can contribute.
+    static func libraryPoolSize(for provider: AIProvider) -> Int {
+        provider.kind == .appleOnDevice ? onDeviceLibraryPoolSize : cloudLibraryPoolSize
+    }
+    /// Larger answer window for the library so synthesis has more to work with.
+    static func libraryRetrievalLimit(for provider: AIProvider) -> Int {
+        provider.kind == .appleOnDevice ? onDeviceLibraryRetrievalLimit : cloudLibraryRetrievalLimit
+    }
     /// Cap on excerpts kept from any single meeting before reranking, so one
     /// highly-relevant meeting can't crowd out the rest of the library.
     static let maxHitsPerMeeting = 3
@@ -84,7 +113,7 @@ struct MeetingChatService {
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
         let transcript = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars {
+        if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars(for: provider) {
             let userPrompt = Self.fullContextPrompt(question: trimmed, transcript: transcript)
             let text = try await llm.chat(
                 systemPrompt: Self.fullContextSystemPrompt,
@@ -180,7 +209,7 @@ struct MeetingChatService {
     ) async throws -> Answer {
         let top = try await retrievePassages(
             question: question, candidates: candidates,
-            poolSize: Self.poolSize, limit: Self.retrievalLimit, diversify: false, llm: llm
+            poolSize: Self.poolSize(for: llm.provider), limit: Self.retrievalLimit(for: llm.provider), diversify: false, llm: llm
         )
         let userPrompt = Self.userPrompt(question: question, hits: top, scope: .singleMeeting, summaries: [:])
         let text = try await llm.chat(

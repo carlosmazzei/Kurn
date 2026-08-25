@@ -484,6 +484,14 @@
 "settings.no_models_loaded" = "此提供方未返回任何可用模型。";
 "settings.configured" = "已配置";
 "settings.not_configured" = "未配置";
+"settings.on_device_available" = "在此设备上可用";
+"settings.on_device_reason_ineligible" = "此设备不支持 Apple Intelligence";
+"settings.on_device_reason_not_enabled" = "尚未开启 Apple Intelligence";
+"settings.on_device_reason_not_ready" = "设备端模型尚未就绪";
+"settings.on_device_reason_unknown" = "设备端模型因未知原因不可用";
+"settings.on_device_status_title" = "设备端状态";
+"settings.on_device_footer" = "完全在此设备上使用 Apple Intelligence 运行。有关您会议的任何内容都不会发送到服务器。";
+"settings.on_device_model_name" = "Apple Intelligence";
 "settings.api_key" = "API 密钥";
 "settings.key_footer" = "您的 %@ 密钥安全存储在设备的钥匙串中，绝不会离开您的设备。";
 "settings.remove_key" = "移除密钥";
@@ -731,3 +739,5 @@
 "documents.error.no_transcripts" = "请至少选择一个包含转写的来源。";
 "documents.error.empty_response" = "AI 提供商返回了空文档。";
 "error.document_generation" = "无法生成文档：%@";
+"error.on_device_model_unavailable" = "设备端模型不可用：%@";
+"error.on_device_generation_timeout" = "设备端生成超时。";
