@@ -106,17 +106,29 @@ function loadJSON(file, label) {
   }
 }
 
-// fastlane's SnapshotHelper names files "<device>-<screenName>.png". Device
-// names never contain a dash (e.g. "iPhone 17 Pro Max"), so the first dash
-// is the separator.
-function extractDeviceName(baseName) {
-  const dash = baseName.indexOf('-');
-  return dash === -1 ? baseName : baseName.slice(0, dash);
-}
+// fastlane's SnapshotHelper names files "<device>-<screenName>.png", and the
+// device name itself can contain a dash - "iPad Pro 13-inch (M5)" does - so
+// splitting on the first dash mangles those into device "iPad Pro 13" and
+// screen "inch (M5)-...". Match the known device names from frames.json
+// first (longest wins, so a more specific key can't be shadowed) and only
+// fall back to the first dash for devices the manifest doesn't cover, such
+// as the Apple Watch captures, whose names happen to have no dash.
+function splitDeviceAndScreen(baseName, framesManifest) {
+  const known = Object.keys(framesManifest)
+    .filter((key) => !key.startsWith('_'))
+    .sort((a, b) => b.length - a.length);
 
-function extractScreenName(baseName) {
+  for (const device of known) {
+    const prefix = `${device}-`;
+    if (baseName.startsWith(prefix)) {
+      return { deviceName: device, screenName: baseName.slice(prefix.length) };
+    }
+  }
+
   const dash = baseName.indexOf('-');
-  return dash === -1 ? baseName : baseName.slice(dash + 1);
+  return dash === -1
+    ? { deviceName: baseName, screenName: baseName }
+    : { deviceName: baseName.slice(0, dash), screenName: baseName.slice(dash + 1) };
 }
 
 // Only iPhone/iPad get the marketing frame treatment; Apple Watch captures
@@ -195,11 +207,20 @@ function resolveFrame(deviceName, colorArg, framesManifest, framesDir, cache) {
     return null;
   }
 
+  // The screen box is pinned to the cutout's own measured rectangle rather
+  // than left to the raw capture's intrinsic aspect ratio: the screenshot is
+  // then clipped to (and fills) exactly the cutout, whatever it was captured
+  // at. Corner radii are expressed separately against the box's width and
+  // height so the percentages resolve back to one circular radius.
+  const radius = entry.screenCornerRadius || 0;
   const resolved = {
     frameSrc: `data:image/png;base64,${frameBuffer.toString('base64')}`,
     leftPct: (colorEntry.offsetX / dims.width) * 100,
     topPct: (colorEntry.offsetY / dims.height) * 100,
-    widthPct: (colorEntry.screenshotWidth / dims.width) * 100,
+    widthPct: (entry.screenshotWidth / dims.width) * 100,
+    heightPct: (entry.screenshotHeight / dims.height) * 100,
+    radiusXPct: (radius / entry.screenshotWidth) * 100,
+    radiusYPct: (radius / entry.screenshotHeight) * 100,
     aspectRatio: `${dims.width} / ${dims.height}`,
     outputWidth: entry.outputWidth,
     outputHeight: entry.outputHeight
@@ -222,7 +243,10 @@ function fillTemplate(template, { copy, screenshotSrc, frame }) {
     .replaceAll('{{FRAME_ASPECT_RATIO}}', frame.aspectRatio)
     .replaceAll('{{SCREENSHOT_LEFT_PCT}}', frame.leftPct.toFixed(3))
     .replaceAll('{{SCREENSHOT_TOP_PCT}}', frame.topPct.toFixed(3))
-    .replaceAll('{{SCREENSHOT_WIDTH_PCT}}', frame.widthPct.toFixed(3));
+    .replaceAll('{{SCREENSHOT_WIDTH_PCT}}', frame.widthPct.toFixed(3))
+    .replaceAll('{{SCREENSHOT_HEIGHT_PCT}}', frame.heightPct.toFixed(3))
+    .replaceAll('{{SCREEN_RADIUS_X_PCT}}', frame.radiusXPct.toFixed(3))
+    .replaceAll('{{SCREEN_RADIUS_Y_PCT}}', frame.radiusYPct.toFixed(3));
 }
 
 async function main() {
@@ -249,7 +273,15 @@ async function main() {
     console.warn(`[render] No locale directories found under "${args.inputDir}". Nothing to render.`);
   }
 
-  const browser = await chromium.launch();
+  // KURN_CHROMIUM_EXECUTABLE lets a preview run reuse a Chromium that is
+  // already on the machine (a system package, or one whose build number
+  // doesn't match this Playwright release) instead of downloading one. CI
+  // leaves it unset and uses `npx playwright install`'s own browser.
+  const launchOptions = {};
+  if (process.env.KURN_CHROMIUM_EXECUTABLE) {
+    launchOptions.executablePath = process.env.KURN_CHROMIUM_EXECUTABLE;
+  }
+  const browser = await chromium.launch(launchOptions);
   const frameCache = new Map();
   let rendered = 0;
   let skipped = 0;
@@ -280,7 +312,7 @@ async function main() {
 
       for (const file of files) {
         const baseName = path.basename(file, '.png');
-        const deviceName = extractDeviceName(baseName);
+        const { deviceName, screenName } = splitDeviceAndScreen(baseName, framesManifest);
 
         if (!isFramableDevice(deviceName)) {
           console.warn(
@@ -291,7 +323,6 @@ async function main() {
           continue;
         }
 
-        const screenName = extractScreenName(baseName);
         const copy = localeConfig[screenName];
         if (!copy) {
           console.warn(
@@ -331,9 +362,13 @@ async function main() {
         });
         try {
           await page.setContent(html, { waitUntil: 'networkidle' });
-          const outFile = path.join(localeOutputDir, `${screenName}.png`);
+          // Keep fastlane's own "<device>-<screenName>.png" naming: several
+          // devices produce the same screen names, so a device-less filename
+          // makes them overwrite each other. It also lets the upload job
+          // drop the framed files straight in beside the raw Watch captures.
+          const outFile = path.join(localeOutputDir, `${baseName}.png`);
           await page.screenshot({ path: outFile });
-          console.log(`[render] Rendered ${locale}/${screenName}.png (${deviceName}, ${canvasWidth}x${canvasHeight})`);
+          console.log(`[render] Rendered ${locale}/${baseName}.png (${deviceName}, ${canvasWidth}x${canvasHeight})`);
           rendered++;
         } finally {
           await page.close();
