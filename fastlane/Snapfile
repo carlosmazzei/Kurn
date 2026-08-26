@@ -30,3 +30,15 @@ output_directory("./fastlane/screenshots")
 clear_previous_screenshots(true)
 override_status_bar(true)
 concurrent_simulators(false)
+
+# Raised from snapshot's default of 1. These runs lose whole screenshots to
+# simulator flakiness rather than to test bugs: in run #9 of screenshots.yml,
+# `testMeetingDetailSummary` failed on iPhone with "Simulator device failed
+# to launch ai.kurn.app.KurnUITests.xctrunner" — a runner launch failure, not
+# an assertion — and the single retry hit it again, so that App Store
+# screenshot was simply missing from the upload while the lane still reported
+# success. The same test passed on iPad in that run and on iPhone in the two
+# runs before it. Note a retry re-runs the whole device, not just the failed
+# test, so this multiplies worst-case capture time — screenshots.yml's
+# timeout-minutes was widened to match.
+number_of_retries(3)

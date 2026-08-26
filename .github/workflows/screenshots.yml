@@ -32,12 +32,15 @@ jobs:
   screenshots:
     if: ${{ !inputs.upload || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: macos-26
-    # The `screenshots` lane now does two separate capture_screenshots runs
+    # The `screenshots` lane does two separate capture_screenshots runs
     # (iPhone/iPad, then the KurnWatchUITests scheme for the Watch) — a
     # second Xcode build plus a Watch simulator boot on top of the ~59 min
     # the iPhone/iPad-only capture already took, so the old 60 min budget
-    # left ~0 margin. Widened rather than tuned tightly.
-    timeout-minutes: 90
+    # left ~0 margin. Widened again for fastlane/Snapfile's
+    # `number_of_retries(3)`: a snapshot retry re-runs the entire device, so
+    # a flaky iPhone session can now repeat up to four times (~19 min each
+    # observed) before the iPad and Watch passes even start.
+    timeout-minutes: 150
     # No `environment:` here on purpose. Capture never touches App Store
     # Connect and also supports ad-hoc dispatches on arbitrary branches. The
     # environment gate belongs only on the tag-only `upload` job below, which
