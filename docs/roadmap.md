@@ -350,8 +350,8 @@ features, so they carry a different kind of urgency.
 | **D1** | Speaker labels conflated across recordings in one meeting | Fixed |
 | **D2** | Raw diarizer turns are not measurable | Implemented |
 | **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate |
-| **D4** | A segmentation-first diarizer as a third engine | Evaluate, after D2 |
-| **D5** | Overlapping speech is not representable | Known limit — decide before D4 |
+| **D4** | A segmentation-first diarizer as a third engine | Evaluate — must earn its keep on collapse-resistance alone, not overlap |
+| **D5** | Overlapping speech is not representable | Decided — keep truncating; no engine here has overlap-aware ASR anyway |
 | **D6** | Voiceprints never cross meetings | Implemented (standalone; F4 half still open) |
 
 ### D1 · Speaker labels conflated across recordings in one meeting — Fixed
@@ -460,28 +460,46 @@ under I5. What makes this worth doing is D2: with raw-turn DER in the evaluation
 matrix, "which diarizer is better on meeting audio" becomes a measurement on AMI
 rather than a preference.
 
-**Effort:** medium. **Sequencing:** after D2, and read D5 first.
+**Effort:** medium. **Sequencing:** after D2 (done). D5 is now decided
+(keep truncating overlap — see below): adopting D4 would have to be justified
+by its VBx-collapse resistance alone, since its overlap detection has nowhere
+to go once fusion runs.
 
-### D5 · Overlapping speech is not representable
+### D5 · Overlapping speech is not representable — Decided: keep truncating
 
 `SpeakerTurn` is a flat `speakerLabel` / `start` / `end`, and `TranscriptFusion`
 attributes each span to the single speaker holding most of its duration. Nothing
 in the data model can express two people talking at once.
 
 In a meeting that is not an edge case — interruptions, agreement noises and
-crosstalk are routine — and it interacts directly with D4: a segmentation-first
-diarizer emits overlapping turns as one of its main advantages, and Kurn would
-truncate them at the boundary, discarding the thing that made the engine worth
-adopting.
+crosstalk are routine. Representing it properly would mean `SpeakerTurn`
+allowing concurrent intervals, fusion deciding what an overlapped span even
+renders as, and the transcript UI and Markdown export both needing an answer
+for two simultaneous speakers.
 
-This is recorded as a known limit rather than a task because the fix is not
-local. Representing overlap means `SpeakerTurn` allowing concurrent intervals,
-fusion deciding what an overlapped span even renders as, and the transcript UI
-and Markdown export both needing an answer for two simultaneous speakers. That is
-a design question about what the app should *show*, not a bug.
+**The decision, and why it's smaller than it looks.** None of that is worth
+building, because a harder constraint sits underneath all of it: **no
+transcription engine in this app — Apple Speech, FluidAudio Parakeet,
+whisper.cpp, or the cloud Whisper API — produces separate text for
+simultaneous speech.** Every one of them returns one word sequence per audio
+span. So "show what both people said" has no content to show regardless of
+what the diarizer reports or how the UI is drawn; the question was never
+really about `SpeakerTurn` or `TranscriptView`, it was gated on overlap-aware
+ASR that doesn't exist here. Kurn keeps attributing an overlapped span to
+whoever held most of its duration, exactly as today, and this stops being an
+open question rather than a documented gap.
 
-**Decide it before D4**, so the engine choice is not made on advantages the rest
-of the pipeline throws away.
+**What this means for D4.** A segmentation-first diarizer's overlap detection
+would still be discarded at fusion, same as any other engine's — so if D4 is
+ever adopted, it has to earn that on the VBx-collapse-resistance case (see
+D4 above), not on overlap, which no engine here can turn into text anyway.
+
+**If this is ever revisited**, the blocking question is upstream of anything
+in this app: does an on-device- or cloud-feasible ASR approach exist that
+produces independent hypotheses per overlapping speaker (e.g. re-running
+transcription per diarized track over the overlapped window)? Without an
+answer to that, a data-model/UI redesign here would have nothing real to
+render.
 
 ### D6 · Voiceprints never cross meetings — Implemented (standalone, without F4)
 
@@ -601,8 +619,12 @@ defects and because D2 is a prerequisite rather than a feature:
   waiting on calendar context; the two halves of speaker identity still pay
   off more together, so F4 remains worth doing for the names it would add as
   candidates.
-- **D5 as a decision, then D4 as an experiment.** In that order — settling what
-  the app does with overlapping speech is what tells you whether an
-  overlap-aware engine is worth adopting.
+- **D5 decided — keep truncating.** No transcription engine in the app
+  produces separate text for simultaneous speech, so an overlap-aware
+  diarizer would have nothing to render regardless of the UI; this was never
+  really a UI question. **D4 is downgraded accordingly**: it would have to be
+  justified purely by VBx-collapse resistance on far-field audio (measurable
+  via D2's raw-turn DER), not by overlap handling. Still just "evaluate", not
+  scheduled.
 - **D3 whenever the provider question is reopened**, not before: it presumes a
   transcription provider the app does not have today.
