@@ -89,7 +89,11 @@ struct WhisperCppModelTests {
 
     @Test func modelStoreRoutesTheWhisperGroupToTheWhisperRoot() {
         #expect(ModelStore.ModelGroup.whisperCpp.root == WhisperCppModelDownloader.modelsDirectory)
-        for group in ModelStore.ModelGroup.allCases where group != .whisperCpp {
+        // sherpa-onnx has its own root for the same reason whisper.cpp does
+        // (see `modelsLiveUnderTheirOwnRootNotFluidAudios` below) — every
+        // other group shares FluidAudio's cache.
+        #expect(ModelStore.ModelGroup.sherpaOnnxDiarization.root == SherpaOnnxModelDownloader.modelsDirectory)
+        for group in ModelStore.ModelGroup.allCases where group != .whisperCpp && group != .sherpaOnnxDiarization {
             #expect(group.root == ModelStore.modelsDirectory)
         }
     }
