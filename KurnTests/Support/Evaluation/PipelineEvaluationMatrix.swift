@@ -180,6 +180,7 @@ enum PipelineEvaluationMatrix {
             languageDetection: .byTranscriber,
             diarization: diarization,
             diarizationConsented: diarization == .fluidAudio,
+            sherpaOnnxConsented: diarization == .sherpaOnnx,
             transcription: transcription,
             diarizationPreprocessingEnabled: true
         )
@@ -238,6 +239,7 @@ enum PipelineEvaluationMatrix {
         case .diarization: return "diarization"
         case .vad: return "vad"
         case .whisperCppASR(let model): return "whisperCppASR:\(model.rawValue)"
+        case .sherpaOnnxDiarization: return "sherpaOnnxDiarization"
         }
     }
 

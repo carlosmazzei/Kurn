@@ -89,6 +89,11 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// Whether the user has consented to downloading the FluidAudio diarization
     /// models. Read together with `diarization` by `effectiveDiarization`.
     var diarizationConsented: Bool = false
+    /// Whether the user has consented to downloading the sherpa-onnx
+    /// diarization models. Same pairing as `diarizationConsented`, kept as a
+    /// separate flag rather than one shared boolean because consenting to one
+    /// engine's download must not be read as consent for the other's.
+    var sherpaOnnxConsented: Bool = false
     var transcription: TranscriptionEngine = .appleSpeech
     /// Provider used by the `.whisperAPI` engine, chosen independently of the
     /// summary provider. Ignored by the on-device engines.
@@ -139,18 +144,22 @@ struct PipelineConfiguration: Sendable, Equatable {
     ///
     /// `.fluidAudio` is the default because the heuristic engine is three scalars
     /// and a single greedy clustering pass, and it was what every user got who
-    /// never opened Settings. But the neural engine downloads its models on first
-    /// use, and downloading for a feature the user has not opted into is exactly
-    /// what this app's consent design exists to prevent — and a failed download
-    /// returns *one turn for the whole meeting*, which is worse than the
-    /// heuristic, not better.
+    /// never opened Settings. But both the neural engines (`.fluidAudio` and
+    /// `.sherpaOnnx`) download their models on first use, and downloading for a
+    /// feature the user has not opted into is exactly what this app's consent
+    /// design exists to prevent — and a failed download returns *one turn for
+    /// the whole meeting*, which is worse than the heuristic, not better.
     ///
-    /// So the choice is a pair, not a single value: without consent the selection
-    /// falls back rather than downloading or degrading silently. The caller
-    /// reports the fallback so it can be acted on instead of merely being true.
+    /// So each downloadable choice is a pair with its own consent flag, not a
+    /// single value: without consent the selection falls back rather than
+    /// downloading or degrading silently. The caller reports the fallback so it
+    /// can be acted on instead of merely being true.
     var effectiveDiarization: DiarizationEngine {
-        guard diarization == .fluidAudio, !diarizationConsented else { return diarization }
-        return .heuristic
+        switch diarization {
+        case .heuristic: return .heuristic
+        case .fluidAudio: return diarizationConsented ? .fluidAudio : .heuristic
+        case .sherpaOnnx: return sherpaOnnxConsented ? .sherpaOnnx : .heuristic
+        }
     }
 
     /// Whether `effectiveDiarization` had to step down from the user's choice.

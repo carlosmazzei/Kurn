@@ -41,6 +41,7 @@
 /* Diarisierungs-Engines */
 "diarization.heuristic" = "Heuristisch";
 "diarization.fluid_audio" = "FluidAudio";
+"diarization.sherpa_onnx" = "Sherpa-ONNX";
 
 /* Correction engines */
 "correction.none" = "Aus";
@@ -588,7 +589,9 @@
 "settings.model_download.preparing" = "Modell wird vorbereitet…";
 "settings.model_download.compiling" = "Modell wird kompiliert…";
 "settings.fluid_audio.package_missing" = "Fügen Sie dem Kurn-Target das FluidAudio-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
+"settings.sherpa_onnx.package_missing" = "Fügen Sie dem Kurn-Target das sherpa-onnx-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
 "settings.model_download.message_whisper_cpp" = "Diese Engine lädt ein Whisper-Modell, damit die Transkription vollständig auf diesem Gerät läuft. Das Modell bleibt danach erhalten, weitere Downloads sind nicht nötig. WLAN wird empfohlen.";
+"settings.model_download.message_sherpa_onnx" = "Diese Engine lädt ein Segmentierungs- und ein Sprecher-Embedding-Modell (zusammen etwa 35 MB), damit die Sprechererkennung vollständig auf diesem Gerät läuft, ohne Beschleunigung durch die Apple Neural Engine. Die Modelle bleiben danach erhalten, weitere Downloads sind nicht nötig.";
 "settings.whisper_cpp.package_missing" = "Fügen Sie dem Kurn-Target das whisper.cpp-Swift-Paket hinzu, bevor Sie diese Funktion verwenden.";
 "settings.whisper_cpp.model" = "Whisper-Modell";
 "settings.whisper_cpp.model_footer" = "Größere Modelle transkribieren genauer, laden aber mehr Daten und arbeiten langsamer. Jedes wird einzeln geladen und kann unter Speicher gelöscht werden.";
@@ -614,6 +617,7 @@
 "settings.models.vad" = "Sprachaktivitätserkennung";
 "settings.models.other" = "Weitere FluidAudio-Modelle";
 "settings.models.whisper_cpp" = "Whisper auf dem Gerät";
+"settings.models.sherpa_onnx" = "Sherpa-ONNX-Sprechererkennung";
 "settings.models.installed" = "Installiert";
 "settings.models.delete" = "Modell löschen";
 "settings.models.delete_confirm" = "Dieses Modell löschen?";

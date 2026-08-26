@@ -401,6 +401,14 @@ struct ModelDownloadAlerts: ViewModifier {
                 onCancel: { downloads.cancelDiarization() }
             )
             .modelDownloadDialog(
+                isPresented: $downloads.showingSherpaOnnxConsent,
+                // Distinct copy: CPU-only (no ANE), a different download size,
+                // and a different vendor than the shared FluidAudio message.
+                messageKey: "settings.model_download.message_sherpa_onnx",
+                onConfirm: { downloads.confirmSherpaOnnx(settings: settings) },
+                onCancel: { downloads.cancelSherpaOnnx() }
+            )
+            .modelDownloadDialog(
                 isPresented: $downloads.showingVADConsent,
                 onConfirm: { downloads.confirmVAD(settings: settings) },
                 onCancel: { downloads.cancelVAD() }

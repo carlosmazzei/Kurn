@@ -41,6 +41,7 @@
 /* Motores de diarización */
 "diarization.heuristic" = "Heurístico";
 "diarization.fluid_audio" = "FluidAudio";
+"diarization.sherpa_onnx" = "Sherpa-ONNX";
 
 /* Correction engines */
 "correction.none" = "Desactivado";
@@ -588,7 +589,9 @@
 "settings.model_download.preparing" = "Preparando modelo…";
 "settings.model_download.compiling" = "Compilando modelo…";
 "settings.fluid_audio.package_missing" = "Añade el paquete Swift de FluidAudio al target de Kurn antes de usar esta función.";
+"settings.sherpa_onnx.package_missing" = "Añade el paquete Swift de sherpa-onnx al target de Kurn antes de usar esta función.";
 "settings.model_download.message_whisper_cpp" = "Este motor descarga un modelo de Whisper para que la transcripción se ejecute por completo en este dispositivo. El modelo se conserva y no hacen falta más descargas. Se recomienda Wi-Fi.";
+"settings.model_download.message_sherpa_onnx" = "Este motor descarga un modelo de segmentación y un modelo de identificación de voz (unos 35 MB en total) para que la diarización se ejecute por completo en este dispositivo, sin aceleración del Apple Neural Engine. Los modelos se conservan y no hacen falta más descargas.";
 "settings.whisper_cpp.package_missing" = "Añade el paquete Swift whisper.cpp al target de Kurn antes de usar esta función.";
 "settings.whisper_cpp.model" = "Modelo de Whisper";
 "settings.whisper_cpp.model_footer" = "Los modelos más grandes transcriben con mayor precisión, pero descargan más datos y son más lentos. Cada uno se descarga por separado y puede eliminarse en Almacenamiento.";
@@ -614,6 +617,7 @@
 "settings.models.vad" = "Detección de Actividad de Voz";
 "settings.models.other" = "Otros Modelos de FluidAudio";
 "settings.models.whisper_cpp" = "Whisper en el Dispositivo";
+"settings.models.sherpa_onnx" = "Diarización Sherpa-ONNX";
 "settings.models.installed" = "Instalado";
 "settings.models.delete" = "Eliminar Modelo";
 "settings.models.delete_confirm" = "¿Eliminar este modelo?";

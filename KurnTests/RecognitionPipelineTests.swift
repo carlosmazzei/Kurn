@@ -73,6 +73,7 @@ struct RecognitionPipelineTests {
         #expect(LanguageDetectionEngine.fluidAudioLID.requiredModelSet == .onDeviceASR)
         #expect(DiarizationEngine.heuristic.requiredModelSet == nil)
         #expect(DiarizationEngine.fluidAudio.requiredModelSet == .diarization)
+        #expect(DiarizationEngine.sherpaOnnx.requiredModelSet == .sherpaOnnxDiarization)
         #expect(VADEngine.energyThreshold.requiredModelSet == nil)
         #expect(VADEngine.fluidAudio.requiredModelSet == .vad)
     }

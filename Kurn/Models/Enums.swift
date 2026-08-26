@@ -371,7 +371,18 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Pitch/ZCR/spectral-tilt clustering, always available, no downloads.
     case heuristic
     /// FluidAudio's on-device diarization models (downloaded on first use).
+    /// Clusters speaker embeddings first (VBx), which is what collapses to one
+    /// speaker on far-field/single-mic audio — see `sherpaOnnx` below.
     case fluidAudio
+    /// sherpa-onnx's on-device diarization models (downloaded on first use):
+    /// segments who-is-speaking first (pyannote/segmentation-3.0), then
+    /// clusters speaker embeddings (3D-Speaker CAM++). Structurally different
+    /// failure mode from `fluidAudio`'s cluster-first VBx pipeline, offered as
+    /// an alternative for recordings where that one collapses to one speaker.
+    /// Runs on CPU only (no ANE acceleration), so it is slower than
+    /// `fluidAudio` — a deliberate trade for collapse-resistance, not a
+    /// straight upgrade.
+    case sherpaOnnx
 
     var id: String { rawValue }
 
@@ -379,15 +390,17 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         switch self {
         case .heuristic: return NSLocalizedString("diarization.heuristic", comment: "Heuristic")
         case .fluidAudio: return NSLocalizedString("diarization.fluid_audio", comment: "FluidAudio")
+        case .sherpaOnnx: return NSLocalizedString("diarization.sherpa_onnx", comment: "Sherpa-ONNX")
         }
     }
 
-    /// FluidAudio model family that must be downloaded before this engine runs,
-    /// or `nil` when it needs no download.
+    /// Model family that must be downloaded before this engine runs, or `nil`
+    /// when it needs no download.
     var requiredModelSet: ModelSet? {
         switch self {
         case .heuristic: return nil
         case .fluidAudio: return .diarization
+        case .sherpaOnnx: return .sherpaOnnxDiarization
         }
     }
 }

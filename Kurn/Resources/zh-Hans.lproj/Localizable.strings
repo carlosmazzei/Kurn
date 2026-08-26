@@ -41,6 +41,7 @@
 /* 说话人分离引擎 */
 "diarization.heuristic" = "启发式";
 "diarization.fluid_audio" = "FluidAudio";
+"diarization.sherpa_onnx" = "Sherpa-ONNX";
 
 /* Correction engines */
 "correction.none" = "关闭";
@@ -588,7 +589,9 @@
 "settings.model_download.preparing" = "正在准备模型…";
 "settings.model_download.compiling" = "正在编译模型…";
 "settings.fluid_audio.package_missing" = "使用此功能前，请先将 FluidAudio Swift 包添加到 Kurn target 中。";
+"settings.sherpa_onnx.package_missing" = "使用此功能前，请先将 sherpa-onnx Swift 包添加到 Kurn target 中。";
 "settings.model_download.message_whisper_cpp" = "此引擎会下载一个 Whisper 模型，使转写完全在本设备上运行。模型下载后会保留，无需再次下载。建议使用 Wi-Fi。";
+"settings.model_download.message_sherpa_onnx" = "此引擎会下载一个分割模型和一个说话人嵌入模型（共约 35 MB），使说话人分离完全在本设备上运行，不使用 Apple 神经网络引擎加速。模型下载后会保留，无需再次下载。";
 "settings.whisper_cpp.package_missing" = "使用此功能前，请先将 whisper.cpp Swift 包添加到 Kurn target 中。";
 "settings.whisper_cpp.model" = "Whisper 模型";
 "settings.whisper_cpp.model_footer" = "模型越大转写越准确，但下载数据更多、速度更慢。每个模型单独下载，可在“存储”中删除。";
@@ -614,6 +617,7 @@
 "settings.models.vad" = "语音活动检测";
 "settings.models.other" = "其他 FluidAudio 模型";
 "settings.models.whisper_cpp" = "设备端 Whisper";
+"settings.models.sherpa_onnx" = "Sherpa-ONNX 说话人分离";
 "settings.models.installed" = "已安装";
 "settings.models.delete" = "删除模型";
 "settings.models.delete_confirm" = "删除此模型？";

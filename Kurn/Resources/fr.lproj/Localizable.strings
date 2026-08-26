@@ -41,6 +41,7 @@
 /* Moteurs de diarisation */
 "diarization.heuristic" = "Heuristique";
 "diarization.fluid_audio" = "FluidAudio";
+"diarization.sherpa_onnx" = "Sherpa-ONNX";
 
 /* Correction engines */
 "correction.none" = "Désactivé";
@@ -588,7 +589,9 @@
 "settings.model_download.preparing" = "Préparation du modèle…";
 "settings.model_download.compiling" = "Compilation du modèle…";
 "settings.fluid_audio.package_missing" = "Ajoutez le package Swift FluidAudio à la cible Kurn avant d'utiliser cette fonctionnalité.";
+"settings.sherpa_onnx.package_missing" = "Ajoutez le package Swift sherpa-onnx à la cible Kurn avant d'utiliser cette fonctionnalité.";
 "settings.model_download.message_whisper_cpp" = "Ce moteur télécharge un modèle Whisper pour que la transcription s'exécute entièrement sur cet appareil. Le modèle est conservé ensuite et aucun autre téléchargement n'est nécessaire. Le Wi-Fi est recommandé.";
+"settings.model_download.message_sherpa_onnx" = "Ce moteur télécharge un modèle de segmentation et un modèle d'empreinte vocale (environ 35 Mo au total) pour que la diarisation s'exécute entièrement sur cet appareil, sans accélération Apple Neural Engine. Les modèles sont conservés ensuite et aucun autre téléchargement n'est nécessaire.";
 "settings.whisper_cpp.package_missing" = "Ajoutez le package Swift whisper.cpp à la cible Kurn avant d'utiliser cette fonctionnalité.";
 "settings.whisper_cpp.model" = "Modèle Whisper";
 "settings.whisper_cpp.model_footer" = "Les modèles plus grands transcrivent plus précisément mais téléchargent plus de données et sont plus lents. Chacun se télécharge séparément et peut être supprimé dans Stockage.";
@@ -614,6 +617,7 @@
 "settings.models.vad" = "Détection d'activité vocale";
 "settings.models.other" = "Autres modèles FluidAudio";
 "settings.models.whisper_cpp" = "Whisper sur l'appareil";
+"settings.models.sherpa_onnx" = "Diarisation Sherpa-ONNX";
 "settings.models.installed" = "Installé";
 "settings.models.delete" = "Supprimer le modèle";
 "settings.models.delete_confirm" = "Supprimer ce modèle ?";

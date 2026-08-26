@@ -350,7 +350,7 @@ features, so they carry a different kind of urgency.
 | **D1** | Speaker labels conflated across recordings in one meeting | Fixed |
 | **D2** | Raw diarizer turns are not measurable | Implemented |
 | **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate |
-| **D4** | A segmentation-first diarizer as a third engine | Evaluate — must earn its keep on collapse-resistance alone, not overlap |
+| **D4** | A segmentation-first diarizer as a third engine | In progress — wired but not yet reachable at runtime, pending Xcode build-setting work; unmeasured |
 | **D5** | Overlapping speech is not representable | Decided — keep truncating; no engine here has overlap-aware ASR anyway |
 | **D6** | Voiceprints never cross meetings | Implemented (standalone; F4 half still open) |
 
@@ -464,6 +464,23 @@ rather than a preference.
 (keep truncating overlap — see below): adopting D4 would have to be justified
 by its VBx-collapse resistance alone, since its overlap detection has nowhere
 to go once fusion runs.
+
+**Status: implementation started, not yet measured.** The candidate is
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0): local
+segmentation via `pyannote/segmentation-3.0` (MIT) then clustering via a
+3D-Speaker CAM++ embedding (Apache-2.0) — both permissively licensed, so
+nothing blocks shipping it. `DiarizationEngine.sherpaOnnx`, its own
+`ModelSet`/consent flag/Settings flow, `SherpaOnnxDiarizer` (mirroring
+`FluidAudioDiarizer`'s contract), and the raw-turn-DER evaluation-matrix
+wiring are in place. **Not yet reachable at runtime**: sherpa-onnx exposes a
+C API with no importable Clang module of its own (its SPM product is named
+`sherpa-onnx`, not a valid Swift module identifier), so — unlike FluidAudio
+and whisper.cpp, both `import`ed directly — it needs a bridging header and a
+custom `SHERPA_ONNX_ENABLED` compilation condition on the `Kurn` target
+rather than the usual `#if canImport(...)` guard. Wiring that Xcode
+build-setting pair is the one remaining step before D2's raw-turn DER can
+actually decide whether this clears the bar (see `SherpaOnnxDiarizer.swift`'s
+header comment for the exact two settings needed).
 
 ### D5 · Overlapping speech is not representable — Decided: keep truncating
 

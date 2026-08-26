@@ -31,6 +31,30 @@ Citation, as requested by the project:
 
 Speech features in Kurn are **Powered by Fluid Inference**.
 
+### sherpa-onnx
+
+- Project: https://github.com/k2-fsa/sherpa-onnx
+- Author: The Next-gen Kaldi (k2-fsa) contributors
+- License: Apache License 2.0
+
+Optional third diarization engine (segmentation-first, CPU-only via ONNX
+Runtime), added alongside FluidAudio's neural engine for far-field/single-mic
+recordings where FluidAudio's clustering step collapses to one speaker — see
+`docs/roadmap.md`, item D4. Linked as a remote Swift package (mirroring
+FluidAudio's integration, not whisper.cpp's local binary wrapper), which
+resolves its own transitive `onnxruntime-libs` dependency.
+
+> Copyright the Next-gen Kaldi contributors.
+>
+> Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+> this software except in compliance with the License. You may obtain a copy of
+> the License at http://www.apache.org/licenses/LICENSE-2.0.
+>
+> Unless required by applicable law or agreed to in writing, software distributed
+> under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+> CONDITIONS OF ANY KIND, either express or implied. See the License for the
+> specific language governing permissions and limitations under the License.
+
 ### whisper.cpp
 
 - Project: https://github.com/ggml-org/whisper.cpp
@@ -78,6 +102,22 @@ device.
 - pyannote-audio: https://github.com/pyannote/pyannote-audio (MIT)
 - WeSpeaker: https://github.com/wenet-e2e/wespeaker (Apache License 2.0)
 - NVIDIA Sortformer: distributed under the **NVIDIA Open Model License**.
+
+### Speaker diarization (sherpa-onnx engine) — pyannote segmentation, 3D-Speaker CAM++
+
+Downloaded directly by `SherpaOnnxModelDownloader` (not through FluidAudio)
+when the user opts into the sherpa-onnx diarization engine — same on-demand,
+consent-gated shape as the whisper.cpp weights below.
+
+- Segmentation: converted from `pyannote/segmentation-3.0`
+  (https://huggingface.co/pyannote/segmentation-3.0), **MIT License** — the
+  model checkpoint itself, not only the pyannote-audio training code above.
+  Redistributed as an ONNX conversion by k2-fsa
+  (https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models),
+  which inherits the same MIT terms.
+- Speaker embedding: CAM++ from the 3D-Speaker project
+  (https://github.com/modelscope/3D-Speaker), **Apache License 2.0**.
+  Redistributed as an ONNX conversion by k2-fsa.
 
 ### Voice activity detection — Silero VAD
 
