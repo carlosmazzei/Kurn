@@ -347,62 +347,71 @@ features, so they carry a different kind of urgency.
 
 | | Item | Verdict |
 |---|---|---|
-| **D1** | Speaker labels conflated across recordings in one meeting | Fix — correctness |
-| **D2** | Raw diarizer turns are not measurable | Adopt first — gates the rest |
+| **D1** | Speaker labels conflated across recordings in one meeting | Fixed |
+| **D2** | Raw diarizer turns are not measurable | Implemented |
 | **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate |
-| **D4** | A segmentation-first diarizer as a third engine | Evaluate, after D2 |
-| **D5** | Overlapping speech is not representable | Known limit — decide before D4 |
-| **D6** | Voiceprints never cross meetings | Adopt — pairs with F4 |
+| **D4** | A segmentation-first diarizer as a third engine | Evaluate — must earn its keep on collapse-resistance alone, not overlap |
+| **D5** | Overlapping speech is not representable | Decided — keep truncating; no engine here has overlap-aware ASR anyway |
+| **D6** | Voiceprints never cross meetings | Implemented (standalone; F4 half still open) |
 
-### D1 · Speaker labels conflated across recordings in one meeting
+### D1 · Speaker labels conflated across recordings in one meeting — Fixed
 
-**This is a defect, not a missing feature.** `TranscriptionViewModel.syncSpeakers`
-builds `usedLabels` by walking **every** recording in the meeting and collecting
-the speaker labels found in each transcript. But the `voiceprints` argument holds
-only the vectors from the run that just finished.
+**This was a defect, not a missing feature.** `TranscriptionViewModel.syncSpeakers`
+used to build `usedLabels` by walking **every** recording in the meeting and
+collecting the speaker labels found in each transcript, while the `voiceprints`
+argument held only the vectors from the run that had just finished.
 
-The consequence is in the fallback branch. Voice matching runs first and can only
-speak for labels in the current run; every other row then falls through to step 2,
-which places a row by label identity — so the "Speaker 1" of recording B binds to
-the existing "Speaker 1" row created for recording A. The diarizer hands out
-labels in order of first appearance, independently per recording, so those two are
-the same person only by coincidence. Two different people end up merged into one
-`Speaker` row, and whatever name the user typed now sits on both.
+The consequence was in the fallback branch: voice matching ran first and could
+only speak for labels in the current run, so every other row fell through to
+label-identity matching — the "Speaker 1" of recording B bound to the existing
+"Speaker 1" row created for recording A. The diarizer hands out labels in order
+of first appearance, independently per recording, so those two were the same
+person only by coincidence. Two different people could end up merged into one
+`Speaker` row, with whatever name the user typed sitting on both — and the
+voiceprint refresh compounded it, since it described whichever recording ran
+last rather than the person the row was named for.
 
-Step 5 compounds it: it refreshes the voiceprint of every row the current run
-covers, so the row's stored vector ends up describing whichever recording ran
-last — not the person the row was named for.
+**What shipped:** `Recording.speakerVoiceprintsData` (`Recording.speakerVoiceprints`)
+persists each recording's own diarization run's voiceprints, not just the one
+that just finished. `syncSpeakers` now reconciles **one recording at a time, in
+`recordedAt` order**: each recording's own labels are matched via
+`SpeakerIdentityMatcher` against whichever stored rows an earlier recording in
+the same pass hasn't already claimed, a row already placed can still be
+*reconfirmed* by a later recording's matching voice (never relabelled or
+duplicated), and a label collision between two different recordings' same
+raw number is resolved by handing the second one the next free `"Speaker N"`
+rather than merging into the first's row. `KurnTests/SpeakerSyncTests.swift`
+pins both halves as regression tests: two different voices independently
+numbered the same across recordings stay distinct rows, and one voice heard
+in two recordings under different numbers is still recognized as one person.
 
-**The fix material already exists.** Diarization already produces voiceprints per
-recording; what is missing is retaining them per recording rather than only for
-the newest run, and matching each recording's labels against the meeting's stored
-rows through `SpeakerIdentityMatcher`, exactly as re-transcription of a single
-recording already does.
+**Coupling point:** `TranscriptionViewModel.syncSpeakers`,
+`Kurn/Models/Recording.swift`.
 
-**Effort:** medium. **Coupling point:** `TranscriptionViewModel.syncSpeakers`, plus
-somewhere to persist per-recording voiceprints.
+### D2 · Raw diarizer turns are not measurable — Implemented
 
-### D2 · Raw diarizer turns are not measurable
+`TranscriptionService.Output` used to carry `segments`, `language`,
+`speakerLabels` and `speakerVoiceprints` — but not the diarizer's own turns.
+The public-dataset harness therefore built its DER hypothesis from
+`output.segments`, whose boundaries come from the ASR spans that fusion
+attributed.
 
-`TranscriptionService.Output` carries `segments`, `language`, `speakerLabels` and
-`speakerVoiceprints` — but not the diarizer's own turns. The public-dataset
-harness therefore builds its DER hypothesis from `output.segments`, whose
-boundaries come from the ASR spans that fusion attributed.
+So the number the project called DER was really *fusion-output* DER: it
+blends diarizer error with ASR boundary placement and fusion policy. That is a
+fine end-to-end metric, and it was the wrong instrument for deciding whether
+one diarizer beats another. The repository already documented that DER "is
+not symmetric, since it is scored on the fused segments whose boundaries come
+from the ASR spans"; this item turns that caveat into something actionable.
 
-So the number the project calls DER is really *fusion-output* DER: it blends
-diarizer error with ASR boundary placement and fusion policy. That is a fine
-end-to-end metric, and it is the wrong instrument for deciding whether one
-diarizer beats another. The repository already documents that DER "is not
-symmetric, since it is scored on the fused segments whose boundaries come from
-the ASR spans"; this item is what turns that caveat into something actionable.
-
-The change is small: the `DiarizationOutcome` is in scope at the point `Output`
-is constructed, and its `turns` are simply not passed along. Carry them, and
-score them against the reference RTTM as a second DER column beside the existing
-one. Two numbers that diverge then localize the error to a stage.
-
-**Do this first.** Without it, D3, D4 and D5 are decided by argument. With it,
-they are decided by a table — which is what invariant I3 asks for.
+**What shipped:** `Output.turns` now carries the diarizer's raw,
+pre-fusion `[SpeakerTurn]`. `PublicDatasetEvaluationHarnessTests` scores a
+second DER (`Row.rawDER`) from those turns against the same reference RTTM,
+reports it alongside the existing fused-segment DER in both the per-item and
+aggregate `[pipeline-eval]` output, and persists it as four extra columns in
+the CSV report; `Tools/evaluation/report_to_markdown.py` renders both as
+separate "DER (fused)" / "DER (raw)" columns. Two numbers that diverge now
+localize the error to a stage — this is what D3/D4/D5 need to be decided by a
+table rather than by argument, per invariant I3.
 
 **Effort:** low. **Coupling point:** `TranscriptionService.Output`,
 `PublicDatasetEvaluationHarnessTests`.
@@ -451,50 +460,90 @@ under I5. What makes this worth doing is D2: with raw-turn DER in the evaluation
 matrix, "which diarizer is better on meeting audio" becomes a measurement on AMI
 rather than a preference.
 
-**Effort:** medium. **Sequencing:** after D2, and read D5 first.
+**Effort:** medium. **Sequencing:** after D2 (done). D5 is now decided
+(keep truncating overlap — see below): adopting D4 would have to be justified
+by its VBx-collapse resistance alone, since its overlap detection has nowhere
+to go once fusion runs.
 
-### D5 · Overlapping speech is not representable
+### D5 · Overlapping speech is not representable — Decided: keep truncating
 
 `SpeakerTurn` is a flat `speakerLabel` / `start` / `end`, and `TranscriptFusion`
 attributes each span to the single speaker holding most of its duration. Nothing
 in the data model can express two people talking at once.
 
 In a meeting that is not an edge case — interruptions, agreement noises and
-crosstalk are routine — and it interacts directly with D4: a segmentation-first
-diarizer emits overlapping turns as one of its main advantages, and Kurn would
-truncate them at the boundary, discarding the thing that made the engine worth
-adopting.
+crosstalk are routine. Representing it properly would mean `SpeakerTurn`
+allowing concurrent intervals, fusion deciding what an overlapped span even
+renders as, and the transcript UI and Markdown export both needing an answer
+for two simultaneous speakers.
 
-This is recorded as a known limit rather than a task because the fix is not
-local. Representing overlap means `SpeakerTurn` allowing concurrent intervals,
-fusion deciding what an overlapped span even renders as, and the transcript UI
-and Markdown export both needing an answer for two simultaneous speakers. That is
-a design question about what the app should *show*, not a bug.
+**The decision, and why it's smaller than it looks.** None of that is worth
+building, because a harder constraint sits underneath all of it: **no
+transcription engine in this app — Apple Speech, FluidAudio Parakeet,
+whisper.cpp, or the cloud Whisper API — produces separate text for
+simultaneous speech.** Every one of them returns one word sequence per audio
+span. So "show what both people said" has no content to show regardless of
+what the diarizer reports or how the UI is drawn; the question was never
+really about `SpeakerTurn` or `TranscriptView`, it was gated on overlap-aware
+ASR that doesn't exist here. Kurn keeps attributing an overlapped span to
+whoever held most of its duration, exactly as today, and this stops being an
+open question rather than a documented gap.
 
-**Decide it before D4**, so the engine choice is not made on advantages the rest
-of the pipeline throws away.
+**What this means for D4.** A segmentation-first diarizer's overlap detection
+would still be discarded at fusion, same as any other engine's — so if D4 is
+ever adopted, it has to earn that on the VBx-collapse-resistance case (see
+D4 above), not on overlap, which no engine here can turn into text anyway.
 
-### D6 · Voiceprints never cross meetings
+**If this is ever revisited**, the blocking question is upstream of anything
+in this app: does an on-device- or cloud-feasible ASR approach exist that
+produces independent hypotheses per overlapping speaker (e.g. re-running
+transcription per diarized track over the overlapped window)? Without an
+answer to that, a data-model/UI redesign here would have nothing real to
+render.
 
-`Speaker.voiceprintData` persists an L2-normalized embedding per speaker, and the
-only consumer is `syncSpeakers(for:)` — scoped to one meeting. A person who
-attends every week is an unrelated, freshly-named row each time.
+### D6 · Voiceprints never cross meetings — Implemented (standalone, without F4)
 
-Everything needed already exists: the vectors are stored in the encrypted store,
-`SpeakerIdentityMatcher` already performs total assignment between two candidate
-sets, and `SpeakerClusterRefiner.minSpeakerSeparation` already supplies a
-calibrated same-voice threshold. What is missing is querying stored voiceprints
-across meetings and offering the match rather than applying it silently — a
-misidentified speaker attaches the wrong name to the wrong words, so this
-suggests and lets the user confirm, in the shape `AutoTagConfirmView` already
-established.
+`Speaker.voiceprintData` persisted an L2-normalized embedding per speaker, but
+the only consumer was `syncSpeakers(for:)` — scoped to one meeting. A person
+who attends every week got an unrelated, freshly-named row each time.
 
-This pairs directly with **F4**: calendar attendees supply the candidate names,
-cross-meeting voiceprints supply the continuity, and together they turn "Speaker
-2" into a person the library knows.
+The roadmap paired this with **F4** (calendar attendees supplying candidate
+names), but F4 isn't built, and the other half — cross-meeting *voiceprint*
+continuity — stands on its own: the only candidate names available today are
+ones already typed on `Speaker` rows in other meetings, which is still a real
+improvement over never checking at all.
 
-**Effort:** medium. **Coupling point:** `syncSpeakers`, `SpeakerIdentityMatcher`,
-a confirm sheet.
+**What shipped:** `SpeakerIdentityMatcher.match` assumes each side is
+addressable by a unique label — true within one meeting, false across the
+whole store, where `"Speaker 1"` is the label of countless different people.
+A new `SpeakerIdentityMatcher.closestMatch(to:among:)` sidesteps that: nearest
+single candidate to one voiceprint, over an arbitrary `(value, voiceprint)`
+pool with no uniqueness assumption. `TranscriptionViewModel.syncSpeakers`
+calls it exactly once per sync, at the point a brand-new `Speaker` row is
+created (step 4) — the only place a row is ever created from nothing, so the
+only place "have we heard this voice before, under a name, elsewhere" is
+worth asking — against every *other* meeting's named, voiceprinted rows
+(`crossMeetingSpeakerCandidates`, an unfiltered store-wide fetch filtered in
+Swift, same shape as `SemanticIndexCoordinator`'s sweeps). A hit is staged on
+`pendingCrossMeetingMatches`, never applied directly: `CrossMeetingSpeakerMatchView`
+(a sheet, wired into `MeetingDetailView` scoped to the meeting on screen) lets
+the user confirm or dismiss, mirroring `AutoTagConfirmView`'s "suggest, never
+apply silently" shape. Self-limiting by construction: a given row can only
+reach step 4 — and so only ever get one suggestion — the first time it's
+created; every later re-sync finds it again via intra-meeting voice matching,
+never step 4, so confirming or dismissing is a one-time event, not a repeat
+nag. No new settings toggle — a pure on-device vector comparison over
+already-collected, already-encrypted data, gated by the same explicit-confirm
+step a toggle would add.
+
+**Left open:** the F4 half (attendee names as candidates, independent of
+whether that name has ever been typed before) is still exactly the gap D6's
+original write-up named — see F4 above.
+
+**Coupling point:** `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`
+(split out of `TranscriptionViewModel.swift` to stay under SwiftLint's
+file-length limit, the same reason `MeetingDetailAutoTagging.swift` exists),
+`SpeakerIdentityMatcher`, `CrossMeetingSpeakerMatchView`.
 
 ## The change that isn't a feature: SPM extraction
 
@@ -561,14 +610,21 @@ the next cheaper or more verifiable.
 The diarization track runs on its own clock, because two of its items are
 defects and because D2 is a prerequisite rather than a feature:
 
-- **D2 first, and early.** It is cheap, and every later diarization decision is
-  guesswork without it.
-- **D1 next.** It is a correctness defect that silently attaches a user's typed
-  name to the wrong person, which is worse than any accuracy number here.
-- **D6 alongside F4**, since the two halves of speaker identity only pay off
-  together.
-- **D5 as a decision, then D4 as an experiment.** In that order — settling what
-  the app does with overlapping speech is what tells you whether an
-  overlap-aware engine is worth adopting.
+- **D2 first, and early — done.** It was cheap, and every later diarization
+  decision was guesswork without it.
+- **D1 next — done.** It was a correctness defect that silently attached a
+  user's typed name to the wrong person, which is worse than any accuracy
+  number here.
+- **D6 — done standalone, ahead of F4.** The voiceprint half shipped without
+  waiting on calendar context; the two halves of speaker identity still pay
+  off more together, so F4 remains worth doing for the names it would add as
+  candidates.
+- **D5 decided — keep truncating.** No transcription engine in the app
+  produces separate text for simultaneous speech, so an overlap-aware
+  diarizer would have nothing to render regardless of the UI; this was never
+  really a UI question. **D4 is downgraded accordingly**: it would have to be
+  justified purely by VBx-collapse resistance on far-field audio (measurable
+  via D2's raw-turn DER), not by overlap handling. Still just "evaluate", not
+  scheduled.
 - **D3 whenever the provider question is reopened**, not before: it presumes a
   transcription provider the app does not have today.

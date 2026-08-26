@@ -389,6 +389,11 @@
 "detail.skip_forward" = "Skip forward 15 seconds";
 "detail.download_diarization_models" = "Download speaker models";
 "warning.diarization_models_not_downloaded" = "Speaker separation is using the basic engine. Download the neural models for more accurate speakers.";
+"speaker.cross_meeting_match.title" = "Familiar voice";
+"speaker.cross_meeting_match.message" = "This sounds like %1$@ from \"%2$@\". Apply the name?";
+"speaker.cross_meeting_match.disclaimer" = "Based on a voice match. Review before applying — this can be undone by editing the speaker's name.";
+"speaker.cross_meeting_match.confirm" = "Yes, it's %@";
+"speaker.cross_meeting_match.dismiss" = "Not now";
 "detail.add_segment" = "Add segment";
 "detail.retranscribe" = "Re-transcribe";
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";

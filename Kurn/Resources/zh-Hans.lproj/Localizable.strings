@@ -389,6 +389,11 @@
 "detail.skip_forward" = "前进 15 秒";
 "detail.download_diarization_models" = "下载说话人模型";
 "warning.diarization_models_not_downloaded" = "说话人分离正在使用基础引擎。下载神经网络模型可获得更准确的说话人识别。";
+"speaker.cross_meeting_match.title" = "熟悉的声音";
+"speaker.cross_meeting_match.message" = "这听起来像是「%2$@」中的 %1$@。应用此名称吗？";
+"speaker.cross_meeting_match.disclaimer" = "基于声音匹配。应用前请核实——可通过编辑说话人姓名撤销。";
+"speaker.cross_meeting_match.confirm" = "是的，是 %@";
+"speaker.cross_meeting_match.dismiss" = "暂不";
 "detail.add_segment" = "添加片段";
 "detail.retranscribe" = "重新转录";
 "detail.retranscribe.confirm.title" = "重新转录这段录音？";

@@ -52,6 +52,10 @@ EXPECTED_HEADER = [
     "der_false_alarm",
     "der_confusion",
     "der_ref_speech",
+    "raw_der_pct",
+    "raw_der_missed",
+    "raw_der_false_alarm",
+    "raw_der_confusion",
 ]
 
 MARKER = "[pipeline-eval] "
@@ -76,6 +80,9 @@ class Group:
         self.der_errors = 0.0
         self.der_reference = 0.0
         self.der_files = 0
+        self.raw_der_errors = 0.0
+        self.raw_der_reference = 0.0
+        self.raw_der_files = 0
 
     def add(self, row: dict[str, str]) -> None:
         self.corpora.add(row["corpus"])
@@ -89,6 +96,14 @@ class Group:
             )
             self.der_reference += float(row["der_ref_speech"])
             self.der_files += 1
+        # Raw DER shares the fused DER's reference speech duration — same
+        # reference audio, so the CSV doesn't store it a second time.
+        if row["raw_der_pct"] and row["der_ref_speech"]:
+            self.raw_der_errors += (
+                float(row["raw_der_missed"]) + float(row["raw_der_false_alarm"]) + float(row["raw_der_confusion"])
+            )
+            self.raw_der_reference += float(row["der_ref_speech"])
+            self.raw_der_files += 1
 
     @property
     def wer(self) -> float | None:
@@ -101,6 +116,12 @@ class Group:
         if self.der_files == 0 or self.der_reference == 0:
             return None
         return self.der_errors / self.der_reference * 100
+
+    @property
+    def raw_der(self) -> float | None:
+        if self.raw_der_files == 0 or self.raw_der_reference == 0:
+            return None
+        return self.raw_der_errors / self.raw_der_reference * 100
 
     @property
     def stages(self) -> list[str]:
@@ -207,6 +228,11 @@ def parse_log(path: Path) -> tuple[list[str], list[str], list[str]]:
 def table(groups: list[Group]) -> list[str]:
     show_wer = any(group.wer is not None for group in groups)
     show_der = any(group.der is not None for group in groups)
+    # Raw DER is scored against the diarizer's own turns, before fusion moved
+    # any boundary to match an ASR span — absent from older reports (an
+    # earlier CSV schema without the raw_der_* columns), so it's shown only
+    # when at least one row actually carries it.
+    show_raw_der = any(group.raw_der is not None for group in groups)
 
     # Item counts get their own column per metric rather than one shared one:
     # a corpus can be WER-only (LibriSpeech) or DER-only (AMI), so within a
@@ -216,7 +242,9 @@ def table(groups: list[Group]) -> list[str]:
     if show_wer:
         headers += ["WER", "WER items"]
     if show_der:
-        headers += ["DER", "DER items"]
+        headers += ["DER (fused)", "DER (fused) items"]
+    if show_raw_der:
+        headers += ["DER (raw)", "DER (raw) items"]
 
     lines = ["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |"]
     for group in groups:
@@ -225,6 +253,8 @@ def table(groups: list[Group]) -> list[str]:
             cells += ["—", "—"] if group.wer is None else [f"{group.wer:.2f}%", str(group.wer_files)]
         if show_der:
             cells += ["—", "—"] if group.der is None else [f"{group.der:.2f}%", str(group.der_files)]
+        if show_raw_der:
+            cells += ["—", "—"] if group.raw_der is None else [f"{group.raw_der:.2f}%", str(group.raw_der_files)]
         lines.append("| " + " | ".join(cells) + " |")
     return lines
 

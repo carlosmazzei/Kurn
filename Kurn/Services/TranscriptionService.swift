@@ -68,6 +68,13 @@ struct TranscriptionService {
         /// caller must treat an absent voiceprint as "unknown identity", never
         /// as "different person".
         var speakerVoiceprints: [String: [Float]] = [:]
+        /// The diarizer's own turns, before fusion moved any boundary to match
+        /// an ASR span. `segments` above is what the rest of the app uses, but
+        /// scoring DER against it blends diarizer error with ASR boundary
+        /// placement and fusion policy — the wrong instrument for comparing
+        /// diarizers. This is the raw signal that lets an evaluation harness
+        /// score both and tell which stage a regression belongs to.
+        var turns: [SpeakerTurn] = []
     }
 
     /// Cap on a single fused segment's spoken duration before it's split.
@@ -319,7 +326,8 @@ struct TranscriptionService {
             segments: correctedSegments,
             language: raw.language.isEmpty ? (resolvedLanguage.localeIdentifier ?? raw.language) : raw.language,
             speakerLabels: labels,
-            speakerVoiceprints: voiceprints
+            speakerVoiceprints: voiceprints,
+            turns: turns
         )
     }
 

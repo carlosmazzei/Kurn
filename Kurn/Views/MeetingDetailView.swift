@@ -145,6 +145,7 @@ struct MeetingDetailView: View {
                 }
             )
         }
+        .sheet(item: crossMeetingMatchBinding, content: crossMeetingMatchSheetContent)
         .kurnDialog(
             isPresented: Binding(
                 get: { pendingRetranscribe != nil },

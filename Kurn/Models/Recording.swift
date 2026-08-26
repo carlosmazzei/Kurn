@@ -50,6 +50,21 @@ final class Recording {
     /// migration plan; `Data()` decodes to `[]` through `JSONStorage.decode`'s
     /// failure fallback.
     var highlightsData: Data = Data()
+    /// JSON-encoded `[String: [Float]]`: this recording's own diarization
+    /// run's speaker label → voiceprint, same `JSONStorage` pattern as
+    /// `highlightsData` above.
+    ///
+    /// Speakers are meeting-scoped but a diarization run is per-recording, and
+    /// its labels are only unique *within* that run — the diarizer numbers
+    /// them independently every time, so a second recording's "Speaker 1" is
+    /// not the first recording's "Speaker 1". `TranscriptionViewModel.syncSpeakers`
+    /// used to be handed only the voiceprints of whichever recording had just
+    /// finished, so reconciling any other recording in the meeting fell back
+    /// to matching by that ambiguous label string and could silently attach a
+    /// name to the wrong person. Persisting each recording's own voiceprints
+    /// here is what lets every recording be matched by voice, independently,
+    /// on every sync.
+    var speakerVoiceprintsData: Data = Data()
 
     @Relationship(deleteRule: .cascade, inverse: \Transcript.recording)
     var transcript: Transcript?
@@ -99,6 +114,11 @@ final class Recording {
     var highlights: [Highlight] {
         get { JSONStorage.decode([Highlight].self, from: highlightsData) }
         set { highlightsData = JSONStorage.encode(newValue) }
+    }
+
+    var speakerVoiceprints: [String: [Float]] {
+        get { JSONStorage.decode([String: [Float]].self, from: speakerVoiceprintsData) ?? [:] }
+        set { speakerVoiceprintsData = JSONStorage.encode(newValue) }
     }
 
     /// Absolute URL of the backing audio file in the current container.

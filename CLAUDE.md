@@ -810,24 +810,40 @@ speaker as finally reported. `Speaker.voiceprintData` persists it through
 `VectorData`, in the store, never in a sidecar file.
 
 `TranscriptionViewModel.syncSpeakers` then reconciles as a total assignment
-rather than a diff: `SpeakerIdentityMatcher` matches **every** stored row
-against **every** new label (the common case is the label set staying the same
-while the assignment permutes — matching only what appeared or disappeared
-misses exactly that), voice wins, label identity fills the rest, and the whole
-mapping is applied at once so a swap has no colliding intermediate state. The
-same-voice threshold is `SpeakerClusterRefiner.minSpeakerSeparation`, inherited
-rather than invented.
+rather than a diff, **one recording at a time, in `recordedAt` order**: labels
+are produced per *recording* (the diarizer numbers them independently on every
+run) while `Speaker` is per *meeting*, so a recording's own labels are matched,
+via `SpeakerIdentityMatcher`, only against whichever stored rows an earlier
+recording in the same sync pass hasn't already claimed. Within one recording's
+pass, matching is total — every candidate row against every one of that
+recording's labels (the common case is the label set staying the same while
+the assignment permutes — matching only what appeared or disappeared misses
+exactly that) — voice wins, label identity fills the rest, and a row already
+placed by an earlier recording can still be *reconfirmed* by a later one's
+matching voice rather than relabelled or duplicated. `Recording.speakerVoiceprints`
+is what makes this possible: each recording persists its own diarization run's
+voiceprints, not just the one that just finished, so a second recording's
+"Speaker 1" is judged on its own voice instead of being merged, by label
+string alone, into whatever "Speaker 1" a different recording already
+produced. Two recordings' independently-numbered same label — or a canonical
+label a collision would otherwise create — never collide, since an unmatched
+label is assigned the next free `"Speaker N"` rather than overwriting a
+row another recording already claimed. The whole mapping across every
+recording is applied at once so a swap has no colliding intermediate state.
+The same-voice threshold is `SpeakerClusterRefiner.minSpeakerSeparation`,
+inherited rather than invented.
 
 Where no voiceprint exists — the heuristic engine, or a transcript from before
 this — identity genuinely cannot be recovered, so only the conservative half
-applies: **a row the user has named is never deleted.** Preserved rows can then
-outlive their labels, which is why `MeetingDetailTabs` filters the chips and the
-speaker list to labels actually present in the transcript.
+applies: **a row the user has named is never deleted**, and a label already
+claimed within a sync pass is never handed to a different recording's
+same-numbered speaker. Preserved rows can then outlive their labels, which is
+why `MeetingDetailTabs` filters the chips and the speaker list to labels
+actually present in the transcript.
 
-Two limits worth knowing. Labels are produced per *recording* while `Speaker` is
-per *meeting*, so two recordings' "Speaker 1" are still conflated. And nothing
-crosses meetings — "Ana" in one has no relation to "Ana" in another; the stored
-voiceprint is the material a future change would use for that.
+One limit still worth knowing: nothing crosses *meetings* — "Ana" in one
+meeting has no relation to "Ana" in another; the stored voiceprint is the
+material a future change would use for that.
 
 #### Whisper hallucination filtering
 
