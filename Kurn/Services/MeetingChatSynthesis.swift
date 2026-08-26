@@ -36,7 +36,7 @@ extension MeetingChatService {
     ) async throws -> Answer {
         let passages = try await retrievePassages(
             question: question, candidates: candidates,
-            poolSize: Self.libraryPoolSize, limit: Self.libraryRetrievalLimit, diversify: true, llm: llm
+            poolSize: Self.libraryPoolSize(for: llm.provider), limit: Self.libraryRetrievalLimit(for: llm.provider), diversify: true, llm: llm
         )
         // Adaptive breadth: the wiki articles of every meeting whose best passage
         // clears the relevance floor, ordered chronologically. One path serves
@@ -63,7 +63,7 @@ extension MeetingChatService {
         )
 
         // Fits in one pass → a single call that can quote and aggregate directly.
-        if userPrompt.count <= SummaryService.maxSinglePassChars {
+        if userPrompt.count <= SummaryService.maxSinglePassChars(for: llm.provider) {
             let text = try await llm.chat(
                 systemPrompt: Self.combinedSystemPrompt,
                 messages: history + [ChatMessage(role: .user, content: userPrompt)]
@@ -72,7 +72,7 @@ extension MeetingChatService {
         }
 
         // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
-        let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars)
+        let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars(for: llm.provider))
         let text = try await synthesizeMapReduce(
             question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm
         )

@@ -112,4 +112,41 @@ struct ProviderFactoryTests {
             }
         }
     }
+
+    // MARK: - Apple On-Device
+
+    /// `SystemLanguageModel.default.availability` can't be forced into a
+    /// specific state here (CI's simulator has no Apple Intelligence), so this
+    /// asserts the factory's outcome always agrees with whatever the live
+    /// availability actually is, rather than asserting one fixed outcome.
+    @Test func summaryProviderForAppleOnDeviceMatchesLiveAvailability() {
+        let reason = OnDeviceModelAvailability.unavailableReason
+        do {
+            _ = try ProviderFactory.summaryProvider(for: .appleOnDevice, model: "")
+            #expect(reason == nil, "factory succeeded but availability reports unavailable: \(reason ?? "")")
+        } catch let error as AppError {
+            guard case .onDeviceModelUnavailable = error else {
+                Issue.record("expected onDeviceModelUnavailable, got \(error)")
+                return
+            }
+            #expect(reason != nil, "factory threw but availability reports available")
+        } catch {
+            Issue.record("expected AppError, got \(error)")
+        }
+    }
+
+    /// The on-device provider has no Keychain account in real use, so this
+    /// proves it independently: the factory's outcome must never depend on
+    /// (or fail with) a missing API key for this provider.
+    @Test func summaryProviderForAppleOnDeviceNeverRequiresAnAPIKey() {
+        do {
+            _ = try ProviderFactory.summaryProvider(for: .appleOnDevice, model: "")
+        } catch let error as AppError {
+            if case .noAPIKey = error {
+                Issue.record("appleOnDevice must never require an API key")
+            }
+        } catch {
+            Issue.record("expected AppError, got \(error)")
+        }
+    }
 }

@@ -65,7 +65,7 @@ struct DocumentGenerationService {
         }
 
         let markdown: String
-        if context.count <= SummaryService.maxSinglePassChars {
+        if context.count <= SummaryService.maxSinglePassChars(for: provider) {
             AppLog.generation.atNotice.notice(
                 "document: strategy run=\(runID, privacy: .public) path=single contextChars=\(context.count, privacy: .public)"
             )
@@ -114,7 +114,7 @@ struct DocumentGenerationService {
         runID: String,
         onProgress: (@Sendable (Int, Int) -> Void)?
     ) async throws -> String {
-        let blocks = Self.renderBlocks(sources, maxChars: SummaryService.mapBlockChars)
+        let blocks = Self.renderBlocks(sources, maxChars: SummaryService.mapBlockChars(for: llm.provider))
         let total = blocks.count + 1
         AppLog.generation.atNotice.notice(
             "document: staged run=\(runID, privacy: .public) blocks=\(blocks.count, privacy: .public)"

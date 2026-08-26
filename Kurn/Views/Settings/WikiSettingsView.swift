@@ -5,8 +5,10 @@
 //  The LLM-generated meeting wiki: one condensed article per meeting, used by
 //  the library-wide "Ask" so it can synthesize, compare, and count across
 //  meetings. Unlike the on-device semantic index, building it calls the summary
-//  AI provider, so it needs an explicit opt-in AND a configured API key: the
-//  toggle stays disabled (with an explanatory footer) until a key exists.
+//  AI provider, so it needs an explicit opt-in AND a usable provider: the
+//  toggle stays disabled (with an explanatory footer) until one is — a
+//  configured API key for a cloud provider, or a runnable model for the
+//  on-device provider.
 //
 
 import SwiftUI
@@ -25,8 +27,19 @@ struct WikiSettingsView: View {
     /// be re-triggered.
     @State private var isRebuildingWiki = false
 
+    /// The reason the toggle is disabled, when it is. Names the specific
+    /// on-device unavailability reason rather than always suggesting an API
+    /// key, which would be the wrong instruction when the selected provider
+    /// is on-device.
+    private var unavailableFooter: String {
+        if settings.aiProvider.kind == .appleOnDevice, let reason = OnDeviceModelAvailability.unavailableReason {
+            return reason
+        }
+        return NSLocalizedString("settings.wiki_needs_key", comment: "Meeting wiki needs an API key")
+    }
+
     var body: some View {
-        let hasKey = KeychainManager.shared.hasValue(for: settings.aiProvider.keychainAccount)
+        let hasKey = settings.aiProvider.isUsable
         Form {
             Section {
                 Toggle(
@@ -77,7 +90,7 @@ struct WikiSettingsView: View {
             } footer: {
                 Text(hasKey
                     ? NSLocalizedString("settings.wiki_footer", comment: "Meeting wiki footer")
-                    : NSLocalizedString("settings.wiki_needs_key", comment: "Meeting wiki needs an API key"))
+                    : unavailableFooter)
             }
         }
         .navigationTitle(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"))
