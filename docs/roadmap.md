@@ -352,7 +352,7 @@ features, so they carry a different kind of urgency.
 | **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate |
 | **D4** | A segmentation-first diarizer as a third engine | Evaluate, after D2 |
 | **D5** | Overlapping speech is not representable | Known limit — decide before D4 |
-| **D6** | Voiceprints never cross meetings | Adopt — pairs with F4 |
+| **D6** | Voiceprints never cross meetings | Implemented (standalone; F4 half still open) |
 
 ### D1 · Speaker labels conflated across recordings in one meeting — Fixed
 
@@ -483,27 +483,49 @@ a design question about what the app should *show*, not a bug.
 **Decide it before D4**, so the engine choice is not made on advantages the rest
 of the pipeline throws away.
 
-### D6 · Voiceprints never cross meetings
+### D6 · Voiceprints never cross meetings — Implemented (standalone, without F4)
 
-`Speaker.voiceprintData` persists an L2-normalized embedding per speaker, and the
-only consumer is `syncSpeakers(for:)` — scoped to one meeting. A person who
-attends every week is an unrelated, freshly-named row each time.
+`Speaker.voiceprintData` persisted an L2-normalized embedding per speaker, but
+the only consumer was `syncSpeakers(for:)` — scoped to one meeting. A person
+who attends every week got an unrelated, freshly-named row each time.
 
-Everything needed already exists: the vectors are stored in the encrypted store,
-`SpeakerIdentityMatcher` already performs total assignment between two candidate
-sets, and `SpeakerClusterRefiner.minSpeakerSeparation` already supplies a
-calibrated same-voice threshold. What is missing is querying stored voiceprints
-across meetings and offering the match rather than applying it silently — a
-misidentified speaker attaches the wrong name to the wrong words, so this
-suggests and lets the user confirm, in the shape `AutoTagConfirmView` already
-established.
+The roadmap paired this with **F4** (calendar attendees supplying candidate
+names), but F4 isn't built, and the other half — cross-meeting *voiceprint*
+continuity — stands on its own: the only candidate names available today are
+ones already typed on `Speaker` rows in other meetings, which is still a real
+improvement over never checking at all.
 
-This pairs directly with **F4**: calendar attendees supply the candidate names,
-cross-meeting voiceprints supply the continuity, and together they turn "Speaker
-2" into a person the library knows.
+**What shipped:** `SpeakerIdentityMatcher.match` assumes each side is
+addressable by a unique label — true within one meeting, false across the
+whole store, where `"Speaker 1"` is the label of countless different people.
+A new `SpeakerIdentityMatcher.closestMatch(to:among:)` sidesteps that: nearest
+single candidate to one voiceprint, over an arbitrary `(value, voiceprint)`
+pool with no uniqueness assumption. `TranscriptionViewModel.syncSpeakers`
+calls it exactly once per sync, at the point a brand-new `Speaker` row is
+created (step 4) — the only place a row is ever created from nothing, so the
+only place "have we heard this voice before, under a name, elsewhere" is
+worth asking — against every *other* meeting's named, voiceprinted rows
+(`crossMeetingSpeakerCandidates`, an unfiltered store-wide fetch filtered in
+Swift, same shape as `SemanticIndexCoordinator`'s sweeps). A hit is staged on
+`pendingCrossMeetingMatches`, never applied directly: `CrossMeetingSpeakerMatchView`
+(a sheet, wired into `MeetingDetailView` scoped to the meeting on screen) lets
+the user confirm or dismiss, mirroring `AutoTagConfirmView`'s "suggest, never
+apply silently" shape. Self-limiting by construction: a given row can only
+reach step 4 — and so only ever get one suggestion — the first time it's
+created; every later re-sync finds it again via intra-meeting voice matching,
+never step 4, so confirming or dismissing is a one-time event, not a repeat
+nag. No new settings toggle — a pure on-device vector comparison over
+already-collected, already-encrypted data, gated by the same explicit-confirm
+step a toggle would add.
 
-**Effort:** medium. **Coupling point:** `syncSpeakers`, `SpeakerIdentityMatcher`,
-a confirm sheet.
+**Left open:** the F4 half (attendee names as candidates, independent of
+whether that name has ever been typed before) is still exactly the gap D6's
+original write-up named — see F4 above.
+
+**Coupling point:** `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`
+(split out of `TranscriptionViewModel.swift` to stay under SwiftLint's
+file-length limit, the same reason `MeetingDetailAutoTagging.swift` exists),
+`SpeakerIdentityMatcher`, `CrossMeetingSpeakerMatchView`.
 
 ## The change that isn't a feature: SPM extraction
 
@@ -575,8 +597,10 @@ defects and because D2 is a prerequisite rather than a feature:
 - **D1 next — done.** It was a correctness defect that silently attached a
   user's typed name to the wrong person, which is worse than any accuracy
   number here.
-- **D6 alongside F4**, since the two halves of speaker identity only pay off
-  together.
+- **D6 — done standalone, ahead of F4.** The voiceprint half shipped without
+  waiting on calendar context; the two halves of speaker identity still pay
+  off more together, so F4 remains worth doing for the names it would add as
+  candidates.
 - **D5 as a decision, then D4 as an experiment.** In that order — settling what
   the app does with overlapping speech is what tells you whether an
   overlap-aware engine is worth adopting.

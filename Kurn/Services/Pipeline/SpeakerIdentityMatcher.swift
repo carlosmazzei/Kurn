@@ -90,6 +90,43 @@ enum SpeakerIdentityMatcher {
             return (candidate.label, SpeakerClusterRefiner.normalized(candidate.voiceprint))
         }
     }
+
+    /// Nearest candidate to a single voiceprint, from a pool where the
+    /// caller's own labels are not assumed unique.
+    ///
+    /// `match` above assumes each side is addressable by a unique label —
+    /// true within one meeting, false across the whole store, where
+    /// `"Speaker 1"` is the label of countless different people in countless
+    /// different meetings. Comparing by that label would collapse distinct
+    /// people onto one dictionary key, so this instead takes the caller's own
+    /// opaque `Value` alongside each voiceprint and returns the closest one
+    /// directly — a one-to-many nearest-neighbor lookup, not a bijection.
+    ///
+    /// - Returns: the closest candidate's value within `sameSpeakerDistance`,
+    ///   or `nil` when the pool is empty or nothing is close enough.
+    static func closestMatch<Value>(
+        to voiceprint: [Float],
+        among candidates: [(value: Value, voiceprint: [Float])]
+    ) -> Value? {
+        guard !voiceprint.isEmpty, voiceprint.allSatisfy(\.isFinite) else { return nil }
+        let target = SpeakerClusterRefiner.normalized(voiceprint)
+
+        var best: (value: Value, distance: Double)?
+        for candidate in candidates {
+            guard !candidate.voiceprint.isEmpty,
+                  candidate.voiceprint.allSatisfy(\.isFinite),
+                  candidate.voiceprint.count == voiceprint.count else { continue }
+            let vector = SpeakerClusterRefiner.normalized(candidate.voiceprint)
+            var dot: Double = 0
+            vDSP_dotprD(target, 1, vector, 1, &dot, vDSP_Length(target.count))
+            let distance = 1 - dot
+            guard distance.isFinite, distance < sameSpeakerDistance else { continue }
+            if best == nil || distance < best!.distance {
+                best = (candidate.value, distance)
+            }
+        }
+        return best?.value
+    }
 }
 
 /// Averages the diarizer's per-window embeddings into one vector per speaker.

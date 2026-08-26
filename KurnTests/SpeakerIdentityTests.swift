@@ -149,4 +149,61 @@ struct SpeakerIdentityTests {
         #expect(zip(decoded, vector).allSatisfy { abs($0 - $1) < 1e-6 })
         #expect(Speaker(label: "Speaker 1", color: "#FFFFFF").voiceprint == nil)
     }
+
+    // MARK: - closestMatch (D6: cross-meeting lookup)
+
+    /// `match` assumes each side is addressable by a unique label, which is
+    /// false across the whole store — "Speaker 1" is the label of countless
+    /// different people in countless different meetings. `closestMatch` is
+    /// what a cross-meeting lookup uses instead: nearest single candidate to
+    /// one voiceprint, over an arbitrary pool with no uniqueness assumption.
+    @Test func closestMatchFindsTheNearestCandidateUnderThreshold() {
+        let match = SpeakerIdentityMatcher.closestMatch(
+            to: Self.voiceprint(axis: 0, noise: 0.05),
+            among: [
+                (value: "far", voiceprint: Self.voiceprint(axis: 4)),
+                (value: "near", voiceprint: Self.voiceprint(axis: 0))
+            ]
+        )
+        #expect(match == "near")
+    }
+
+    @Test func closestMatchReturnsNilWhenNothingIsCloseEnough() {
+        let match = SpeakerIdentityMatcher.closestMatch(
+            to: Self.voiceprint(axis: 0),
+            among: [(value: "other", voiceprint: Self.voiceprint(axis: 4))]
+        )
+        #expect(match == nil)
+    }
+
+    @Test func closestMatchReturnsNilForAnEmptyPoolOrVoiceprint() {
+        let empty: [(value: String, voiceprint: [Float])] = []
+        #expect(SpeakerIdentityMatcher.closestMatch(to: Self.voiceprint(axis: 0), among: empty) == nil)
+
+        let poolWithNoUsableVoiceprint: [(value: String, voiceprint: [Float])] = [(value: "x", voiceprint: [])]
+        #expect(SpeakerIdentityMatcher.closestMatch(to: Self.voiceprint(axis: 0), among: poolWithNoUsableVoiceprint) == nil)
+
+        #expect(
+            SpeakerIdentityMatcher.closestMatch(
+                to: [],
+                among: [(value: "x", voiceprint: Self.voiceprint(axis: 0))]
+            ) == nil
+        )
+    }
+
+    /// The exact case `match` cannot handle: two different candidates that
+    /// happen to carry the same label (as "Speaker 1" does across different
+    /// meetings). `closestMatch` compares by voiceprint only, so the
+    /// duplicate label never collapses them into one dictionary entry.
+    @Test func closestMatchHandlesDuplicateLabelsAcrossCandidates() {
+        struct Row: Equatable { let meetingID: Int; let label: String }
+        let match = SpeakerIdentityMatcher.closestMatch(
+            to: Self.voiceprint(axis: 0, noise: 0.05),
+            among: [
+                (value: Row(meetingID: 1, label: "Speaker 1"), voiceprint: Self.voiceprint(axis: 4)),
+                (value: Row(meetingID: 2, label: "Speaker 1"), voiceprint: Self.voiceprint(axis: 0))
+            ]
+        )
+        #expect(match == Row(meetingID: 2, label: "Speaker 1"))
+    }
 }
