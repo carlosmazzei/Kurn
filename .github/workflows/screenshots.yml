@@ -118,12 +118,12 @@ jobs:
           path: screenshots-framed
 
       # Swap in the framed iPhone/iPad images: drop the raw iPhone/iPad
-      # captures (device-prefixed filenames, e.g. "iPhone 17 Pro Max-*.png")
-      # so `deliver` never sees both a raw and a framed copy of the same
-      # screen, then copy the framed replacements (named "<screenName>.png",
-      # no device prefix - see scripts/screenshots/render.js) into the same
-      # per-locale directories. Apple Watch files are untouched by either
-      # glob, since their names start with "Apple Watch".
+      # captures so `deliver` never sees both a raw and a framed copy of the
+      # same screen, then copy the framed replacements in. Both carry the
+      # same "<device>-<screenName>.png" naming (render.js keeps fastlane's),
+      # so the delete must run before the copy - it does. Apple Watch files
+      # are untouched by either glob, since their names start with "Apple
+      # Watch", and they are the one device this pipeline never frames.
       - name: Replace raw iPhone/iPad captures with framed versions
         run: |
           set -euo pipefail

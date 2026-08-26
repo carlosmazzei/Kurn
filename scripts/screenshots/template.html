@@ -4,12 +4,16 @@
 <meta charset="utf-8" />
 <title>Kurn Marketing Screenshot</title>
 <style>
+  /* Palette is the app's own (Kurn/Infrastructure/Theme.swift): the brand
+     accent is the record red #FF3B30, the dark background #0A0A0F, and the
+     secondary warm tone the app's warning orange #FF9F0A. Keep these in sync
+     with Theme.swift rather than inventing marketing colors. */
   :root {
-    --accent: #7c5cff;
-    --accent-2: #34d1c8;
-    --bg-1: #05060a;
-    --bg-2: #12081f;
-    --ink: #f5f4ff;
+    --accent: #ff3b30;
+    --accent-2: #ff9f0a;
+    --bg-1: #0a0a0f;
+    --bg-2: #1a0e12;
+    --ink: #f7f5f6;
   }
 
   * {
@@ -37,26 +41,29 @@
     align-items: center;
     overflow: hidden;
     background:
-      radial-gradient(circle at 18% 10%, rgba(124, 92, 255, 0.55), transparent 42%),
-      radial-gradient(circle at 88% 78%, rgba(52, 209, 200, 0.32), transparent 46%),
+      radial-gradient(circle at 18% 10%, rgba(255, 59, 48, 0.38), transparent 44%),
+      radial-gradient(circle at 88% 80%, rgba(255, 159, 10, 0.22), transparent 46%),
       linear-gradient(160deg, var(--bg-2) 0%, var(--bg-1) 55%, #000 100%);
   }
 
-  /* subtle grain-free vignette so the far edges never look flat */
+  /* Subtle grain-free vignette so the far edges never look flat. It sits
+     BELOW the floating card (z-index 5) on purpose: stacked above it, the
+     vignette's darkest corner lands exactly on the bottom-left card and
+     crushes its contrast. */
   .canvas::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+    background: radial-gradient(ellipse at 50% 40%, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
     pointer-events: none;
-    z-index: 6;
+    z-index: 4;
   }
 
   .glow {
     position: absolute;
     border-radius: 50%;
-    filter: blur(9vw);
-    opacity: 0.55;
+    filter: blur(10vw);
+    opacity: 0.5;
     pointer-events: none;
     z-index: 0;
   }
@@ -87,7 +94,7 @@
     font-size: 2.5vw;
     letter-spacing: 0.09em;
     text-transform: uppercase;
-    box-shadow: 0 1.6vh 3.2vh rgba(124, 92, 255, 0.45);
+    box-shadow: 0 1.6vh 3.2vh rgba(255, 59, 48, 0.4);
     z-index: 3;
   }
 
@@ -115,7 +122,7 @@
 
   .copy p {
     margin-top: 2.2vh;
-    color: rgba(235, 233, 255, 0.72);
+    color: rgba(240, 236, 238, 0.76);
     font-size: 2.8vw;
     font-weight: 500;
     line-height: 1.45;
@@ -134,19 +141,35 @@
 
   .device {
     position: relative;
-    height: 68vh;
+    /* Sized to leave clearance under the device: at 68vh it ended ~5% from
+       the canvas bottom, which clipped the drop shadow and read as a crop. */
+    height: 63vh;
     max-width: 84vw;
     aspect-ratio: {{FRAME_ASPECT_RATIO}};
-    filter: drop-shadow(-2vw 4vh 5vh rgba(0, 0, 0, 0.55)) drop-shadow(0 2vh 4vh rgba(124, 92, 255, 0.2));
+    filter: drop-shadow(-2vw 4vh 5vh rgba(0, 0, 0, 0.55)) drop-shadow(0 2vh 4vh rgba(255, 59, 48, 0.18));
   }
 
-  .device .raw-screenshot {
+  /* Pinned to the frame's measured screen cutout and clipped to it, so the
+     capture can never overhang the bezel. The rounded corners matter: these
+     frames' cutouts are square, and their corners sit outside the device's
+     rounded silhouette - a square-cornered capture pokes out past the bezel
+     as four bright right angles. Radius is given as width% / height% so both
+     resolve to the same circular radius in pixels. */
+  .device .screen {
     position: absolute;
     left: {{SCREENSHOT_LEFT_PCT}}%;
     top: {{SCREENSHOT_TOP_PCT}}%;
     width: {{SCREENSHOT_WIDTH_PCT}}%;
-    height: auto;
+    height: {{SCREENSHOT_HEIGHT_PCT}}%;
+    border-radius: {{SCREEN_RADIUS_X_PCT}}% / {{SCREEN_RADIUS_Y_PCT}}%;
+    overflow: hidden;
     z-index: 1;
+  }
+
+  .device .screen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
   }
 
@@ -159,49 +182,55 @@
     pointer-events: none;
   }
 
+  /* The card floats over whatever is behind it - often the bright white app
+     screen - so its base is a near-opaque dark fill rather than a mostly
+     transparent one. A translucent card reads as washed-out grey over light
+     UI and disappears into the vignette over dark. The blur stays for the
+     glass feel; the opacity is what makes the text legible. z-index 5 keeps
+     it above the vignette (4). */
   .glass-card {
     position: absolute;
     left: 5vw;
     bottom: 7vh;
-    width: 46vw;
-    padding: 2.4vh 2.2vw;
-    border-radius: 2vw;
-    background: rgba(255, 255, 255, 0.09);
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 3vh 4.5vh rgba(0, 0, 0, 0.4);
+    width: 48vw;
+    padding: 2.6vh 2.4vw;
+    border-radius: 2.2vw;
+    background: rgba(14, 12, 16, 0.82);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 3vh 5vh rgba(0, 0, 0, 0.55);
     z-index: 5;
     display: flex;
     align-items: center;
-    gap: 1.6vw;
+    gap: 1.8vw;
   }
 
   .glass-card .icon {
-    width: 6.2vw;
-    height: 6.2vw;
-    border-radius: 1.5vw;
+    width: 6.6vw;
+    height: 6.6vw;
+    border-radius: 1.6vw;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 3vw;
-    color: #05060a;
+    font-size: 3.2vw;
+    color: #0a0a0f;
     flex-shrink: 0;
   }
 
   .glass-card .text .stat {
     color: #fff;
     font-weight: 800;
-    font-size: 2.3vw;
-    line-height: 1.25;
+    font-size: 2.6vw;
+    line-height: 1.22;
   }
 
   .glass-card .text .label {
-    color: rgba(255, 255, 255, 0.65);
-    font-size: 1.7vw;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 2vw;
     font-weight: 500;
-    margin-top: 0.3vh;
+    margin-top: 0.5vh;
   }
 </style>
 </head>
@@ -219,7 +248,7 @@
 
     <div class="stage">
       <div class="device">
-        <img class="raw-screenshot" src="{{SCREENSHOT_SRC}}" alt="" />
+        <div class="screen"><img src="{{SCREENSHOT_SRC}}" alt="" /></div>
         <img class="frame-overlay" src="{{FRAME_SRC}}" alt="" />
       </div>
 
