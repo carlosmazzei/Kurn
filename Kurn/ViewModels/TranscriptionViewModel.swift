@@ -45,6 +45,10 @@ final class TranscriptionViewModel {
     /// never clobber or misattribute each other's warning. Transcription still
     /// succeeds; this is a banner, not an `AppError`.
     private(set) var diarizationWarnings: [UUID: String] = [:]
+    /// A voiceprint match for a new `Speaker` row, found in a different
+    /// meeting — staged, never silently applied. See
+    /// `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`.
+    var pendingCrossMeetingMatches: [CrossMeetingSpeakerMatch] = []
 
     /// Task handles for transcriptions started via `startTranscription`, so
     /// they can be cancelled (by the user or by the background window expiring).
@@ -81,7 +85,8 @@ final class TranscriptionViewModel {
     /// (leave alone) from a stale persisted `.inProgress` (reset to resumable).
     static var activeTranscriptionIDs: Set<UUID> { globalActiveIDs }
 
-    private let modelContext: ModelContext
+    /// Not `private` — `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift` needs it.
+    let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
     private let summaryService = SummaryService()
     /// App-wide settings, set by `KurnApp` so title generation can use the
@@ -101,7 +106,7 @@ final class TranscriptionViewModel {
     /// Persist pending model changes, surfacing failures instead of dropping
     /// them silently — a failed save otherwise leaves the in-memory models and
     /// the store diverged (e.g. status shown as `.done` but stored as `.inProgress`).
-    private func persist() {
+    func persist() {
         do {
             try modelContext.save()
         } catch {
@@ -749,7 +754,13 @@ final class TranscriptionViewModel {
 
         // 4. Rows for labels nobody claimed. The color index counts the rows
         // that will actually remain — deletes above aren't applied until save,
-        // so `meeting.speakers` can't be counted for this.
+        // so `meeting.speakers` can't be counted for this. A brand-new row is
+        // also checked against every *other* meeting's named speakers here
+        // (D6, see TranscriptionViewModel+CrossMeetingSpeakerMatch.swift);
+        // `crossMeetingCandidates` is fetched once, not per entry.
+        let crossMeetingCandidates = unclaimed.contains { $0.voiceprint != nil }
+            ? crossMeetingSpeakerCandidates(excluding: meeting)
+            : []
         var index = assignment.count
         var addedLabels: [String] = []
         for entry in unclaimed {
@@ -766,6 +777,7 @@ final class TranscriptionViewModel {
             claimedLabels.insert(canonical)
             addedLabels.append(canonical)
             index += 1
+            stageCrossMeetingMatchIfPossible(for: speaker, voiceprint: entry.voiceprint, among: crossMeetingCandidates)
         }
 
         // Final state the UI (filter chips + speaker list) will render, plus the

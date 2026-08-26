@@ -389,6 +389,11 @@
 "detail.skip_forward" = "Avanzar 15 segundos";
 "detail.download_diarization_models" = "Descargar modelos de hablantes";
 "warning.diarization_models_not_downloaded" = "La separación de hablantes usa el motor básico. Descarga los modelos neuronales para hablantes más precisos.";
+"speaker.cross_meeting_match.title" = "Voz conocida";
+"speaker.cross_meeting_match.message" = "Esto suena a %1$@, de \"%2$@\". ¿Aplicar el nombre?";
+"speaker.cross_meeting_match.disclaimer" = "Basado en una coincidencia de voz. Revisa antes de aplicar — esto se puede deshacer editando el nombre del hablante.";
+"speaker.cross_meeting_match.confirm" = "Sí, es %@";
+"speaker.cross_meeting_match.dismiss" = "Ahora no";
 "detail.add_segment" = "Añadir segmento";
 "detail.retranscribe" = "Retranscribir";
 "detail.retranscribe.confirm.title" = "¿Retranscribir esta grabación?";
