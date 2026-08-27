@@ -51,9 +51,9 @@ struct PublicDatasetEvaluationHarnessTests {
     }
 
     /// `KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to
-    /// `PipelineEvaluationMatrix.essential` — the 8-entry cleanup×VAD×diarization
+    /// `PipelineEvaluationMatrix.essential` — the 12-entry cleanup×VAD×diarization
     /// sweep against whisper.cpp only — useful for a fast local check before
-    /// dispatching the full 24-entry matrix in CI. Anything else, including
+    /// dispatching the full 36-entry matrix in CI. Anything else, including
     /// unset, runs the full matrix. Both counts assume one whisper.cpp model.
     private var matrix: [PipelineEvaluationMatrix.Entry] {
         let base = ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_MATRIX"] == "essential"
@@ -72,11 +72,12 @@ struct PublicDatasetEvaluationHarnessTests {
         let totalItems = corpora.reduce(0) { $0 + $1.items.count }
 
         let whisperModels = PipelineEvaluationMatrix.whisperCppModelsFromEnvironment().map(\.rawValue).joined(separator: ", ")
+        let diarizers = PipelineEvaluationMatrix.diarizationEnginesFromEnvironment().map(\.rawValue).joined(separator: ", ")
         print("[pipeline-eval] === run summary ===")
         print("[pipeline-eval] matrix: \(mode) (\(entries.count) configuration(s))")
         print("[pipeline-eval]   preprocessing: \(PreprocessingEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   VAD: \(VADEngine.allCases.map(\.rawValue).joined(separator: ", "))")
-        print("[pipeline-eval]   diarization: \(DiarizationEngine.allCases.map(\.rawValue).joined(separator: ", "))")
+        print("[pipeline-eval]   diarization: \(diarizers)")
         print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { $0 != .whisperAPI }.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   whisper.cpp models: \(whisperModels)")
         print("[pipeline-eval]   cloud mode: \(cloudMode)")

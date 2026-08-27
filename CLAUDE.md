@@ -173,7 +173,7 @@ given diarizer actually helps versus just asserting it does.
 `PublicDatasetEvaluationHarnessTests` (`KurnTests/`) is the other half: it runs
 the app's real pipeline — `TranscriptionService`, not a stand-in — once per
 configuration in `PipelineEvaluationMatrix` (preprocessing on/off x VAD x
-diarization x transcription engine, 24 on-device combinations, plus optional
+diarization x transcription engine, 36 on-device combinations, plus optional
 cloud Whisper/OpenAI/Groq entries when their API key secret is present) over
 public benchmark audio in English and Portuguese, scoring WER/DER against each.
 Public audio carries none of the private corpus's restrictions, so this suite
