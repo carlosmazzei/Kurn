@@ -112,9 +112,11 @@ consent-gated shape as the whisper.cpp weights below.
 - Segmentation: converted from `pyannote/segmentation-3.0`
   (https://huggingface.co/pyannote/segmentation-3.0), **MIT License** — the
   model checkpoint itself, not only the pyannote-audio training code above.
-  Redistributed as an ONNX conversion by k2-fsa
-  (https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models),
-  which inherits the same MIT terms.
+  Redistributed as an ONNX conversion by k2-fsa's maintainer
+  (https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0),
+  which inherits the same MIT terms; the app downloads a pinned commit of
+  that file (see `SherpaOnnxModelDownloader.swift`), byte-identical to
+  `model.onnx` in k2-fsa's official GitHub release archive.
 - Speaker embedding: CAM++ from the 3D-Speaker project
   (https://github.com/modelscope/3D-Speaker), **Apache License 2.0**.
   Redistributed as an ONNX conversion by k2-fsa.

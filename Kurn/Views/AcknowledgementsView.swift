@@ -31,6 +31,11 @@ struct AcknowledgementsView: View {
             name: "whisper.cpp",
             license: "MIT License",
             urlString: "https://github.com/ggml-org/whisper.cpp"
+        ),
+        Credit(
+            name: "sherpa-onnx",
+            license: "Apache License 2.0",
+            urlString: "https://github.com/k2-fsa/sherpa-onnx"
         )
     ]
 
@@ -54,6 +59,16 @@ struct AcknowledgementsView: View {
             name: "NVIDIA Sortformer (diarization)",
             license: "NVIDIA Open Model License",
             urlString: "https://github.com/NVIDIA/NeMo"
+        ),
+        Credit(
+            name: "pyannote/segmentation-3.0 (sherpa-onnx diarization)",
+            license: "MIT License",
+            urlString: "https://huggingface.co/pyannote/segmentation-3.0"
+        ),
+        Credit(
+            name: "3D-Speaker CAM++ (sherpa-onnx diarization)",
+            license: "Apache License 2.0",
+            urlString: "https://github.com/modelscope/3D-Speaker"
         ),
         Credit(
             name: "Silero VAD",
