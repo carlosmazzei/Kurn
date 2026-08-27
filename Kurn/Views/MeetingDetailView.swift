@@ -125,10 +125,6 @@ struct MeetingDetailView: View {
             MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
                 shareItem = ShareItem(urls: urls)
             }
-            // A meeting usually has a couple of transcripts and summaries, so
-            // a full-height sheet left most of the screen empty. `.large`
-            // stays available for the meetings that do have a long list.
-            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showingTemplatePicker) {
             SummaryTemplatePicker(

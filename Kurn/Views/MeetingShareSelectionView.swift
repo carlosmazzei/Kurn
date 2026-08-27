@@ -121,6 +121,12 @@ struct MeetingShareSelectionView: View {
             .safeAreaBar(edge: .bottom) { shareBar }
             .errorAlert($shareError)
         }
+        // Sized here rather than at the `.sheet` call site, matching
+        // `CrossMeetingSpeakerMatchView`: this view is only ever presented as
+        // a sheet, so how tall that sheet should be is a property of its own
+        // content. A meeting's two or three exportable items did not warrant
+        // a full-height sheet; `.large` stays for the ones with a long list.
+        .presentationDetents([.medium, .large])
     }
 
     private var shareBar: some View {
