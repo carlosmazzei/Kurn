@@ -68,6 +68,39 @@ pipeline stage moves WER or DER, that shows up in a pull request.
 Record a run when the numbers moved, or when the matrix changed shape. Not
 every dispatch is worth a commit.
 
+## Runs at a glance
+
+Every dispatch recorded below, newest first. "Scope" is what the dispatch
+actually swept — narrower scopes exist because a full matrix costs real CI
+minutes (and real LLM API spend for cloud/correction entries), so most runs
+after the first deliberately target one question rather than re-measuring
+everything.
+
+| Date | Commit | Scope | Corpora | Workflow run(s) |
+| --- | --- | --- | --- | --- |
+| 2026-08-27 | `6f0a094` | `sherpaOnnx` diarizer only × `whisperCpp@small`, 4 configs (prep × VAD) — first runtime measurement of D4, not yet compared against `fluidAudio` | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [33029297796](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796) |
+| 2026-08-09 | `53db49c` | LLM transcript correction (D-stage), `essential`×`whisperCpp/small` paired on/off (16 rows) + `full`×`fluidAudioParakeet` corrected-only (8 rows) vs. the 2026-08-03 baseline | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [essential+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299) |
+| 2026-08-03 | `2644589` | `full` matrix — 32 English configs (on-device × `whisperAPI:groq`) + 16 Portuguese configs (diarizer axis collapsed, no PT reference RTTM) | AMI (4, WER+DER), LibriSpeech (6, WER), CAMOES (40, WER), CORAA (40, WER) | [30800039020](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
+| 2026-08-02 | `3eecdcc` | Portuguese only, 16 configs — predates the corpus rebalance and the per-corpus aggregate | CAMOES (12), CORAA (12) | [30752932441](https://github.com/carlosmazzei/Kurn/actions/runs/30752932441) |
+
+Open questions no run has answered yet:
+
+- **D4 collapse-resistance**: does `sherpaOnnx` actually resist FluidAudio's
+  VBx collapse better on far-field audio? The 2026-08-27 run measured
+  `sherpaOnnx` alone; it needs a same-run dispatch with
+  `diarization_engines: fluidAudio,sherpaOnnx` to be comparable.
+  See that entry below.
+- **DER for Portuguese**: no public, freely downloadable multi-speaker
+  Portuguese corpus with turn-level annotation comparable to AMI has been
+  identified, so every Portuguese row above is WER-only.
+- **Apple Speech**: absent from every run so far — the 2026-08-03 entry
+  found it silently skipping every locale attempt on the CI simulator
+  (unconfirmed root cause: likely no on-device Speech assets provisioned in
+  a headless runner). The app's actual default transcription engine has
+  never produced a measured row.
+- **Whisper via Groq + correction**: the 2026-08-09 dispatch hit Groq's rate
+  limit (429, 20 RPM) partway through and is not recorded.
+
 ## Runs
 
 ### 2026-08-27 — `6f0a094` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796))
