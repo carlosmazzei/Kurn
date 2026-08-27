@@ -52,28 +52,23 @@ enum SherpaOnnxModelDownloader {
     /// Folder names `ModelStore` groups this downloader's files under.
     static let folderNames = ["segmentation", "embedding"]
 
-    /// Converted from `pyannote/segmentation-3.0` (MIT), redistributed by
-    /// k2-fsa on its own GitHub releases rather than a gated HuggingFace repo.
+    /// Converted from `pyannote/segmentation-3.0` (MIT) by sherpa-onnx's
+    /// maintainer. The pinned, public Hugging Face file is byte-identical to
+    /// `model.onnx` inside k2-fsa's official GitHub release archive.
     private static let segmentationFileName = "sherpa-onnx-pyannote-segmentation-3-0.onnx"
     private static let segmentationDownloadURL = URL(
-        string: "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.onnx"
+        string: "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx"
     )!
-    /// ~6.6 MB upstream; loose lower bound so a truncated transfer is
+    /// ~5.7 MiB upstream; loose lower bound so a truncated transfer is
     /// re-fetched rather than handed to sherpa-onnx as a corrupt model.
     private static let segmentationMinimumPlausibleBytes: Int64 = 3 * 1_000_000
 
     /// CAM++ speaker embedding model from the 3D-Speaker project (Apache-2.0),
     /// converted to ONNX by k2-fsa.
     ///
-    /// TODO(verify-before-release): the segmentation URL above was confirmed
-    /// against k2-fsa/sherpa-onnx's GitHub releases during research for this
-    /// change (tag `speaker-segmentation-models`). This embedding URL/exact
-    /// filename was NOT independently confirmed the same way — 3D-Speaker
-    /// ships several CAM++ variants (language/size) under k2-fsa's
-    /// `speaker-recongition-models` release (note: that is k2-fsa's own
-    /// spelling of the tag, not a typo introduced here). Re-check the exact
-    /// asset name/URL on https://github.com/k2-fsa/sherpa-onnx/releases
-    /// before this ships.
+    /// This exact filename is published under k2-fsa's
+    /// `speaker-recongition-models` GitHub release (the tag's spelling is
+    /// upstream's, not a typo introduced here).
     private static let embeddingFileName = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
     private static let embeddingDownloadURL = URL(
         string: "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
