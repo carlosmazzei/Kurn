@@ -9,13 +9,10 @@
 //  header, mirroring the upstream project's own
 //  `swift-api-examples/SherpaOnnx-Bridging-Header.h`.
 //
-//  NOT YET WIRED IN: this header exists so `SherpaOnnxCWrapper.swift` has
-//  something real to reference, but nothing in the Xcode project points the
-//  `Kurn` target's `SWIFT_OBJC_BRIDGING_HEADER` build setting at it yet, and
-//  the `SHERPA_ONNX_ENABLED` compilation condition that guards the real
-//  implementation is not set anywhere either — see `SherpaOnnxDiarizer.swift`
-//  for what completing that wiring requires. Until then this header is
-//  inert and the app builds exactly as it did before this file existed.
+//  Set as the `Kurn` target's `SWIFT_OBJC_BRIDGING_HEADER`, alongside the
+//  `SHERPA_ONNX_ENABLED` compilation condition that guards the real
+//  implementation — see `SherpaOnnxDiarizer.swift`. `KurnTests` gets neither,
+//  so it always takes that file's `#else` stub.
 //
 
 #ifndef SherpaOnnx_Bridging_Header_h

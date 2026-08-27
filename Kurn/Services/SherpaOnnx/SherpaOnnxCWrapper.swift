@@ -9,11 +9,11 @@
 //  diarization surface this app uses — the upstream file also wraps ASR/TTS/
 //  VAD, none of which belong here.
 //
-//  Guarded by `SHERPA_ONNX_ENABLED`, a compilation condition that is NOT yet
-//  set anywhere in the Xcode project — see `SherpaOnnxDiarizer.swift` for
-//  why, and what remains to turn this on. The `#else` branch keeps this file
-//  a harmless no-op until then, and `KurnTests` (which never gets the
-//  bridging header) always takes it.
+//  Guarded by `SHERPA_ONNX_ENABLED`, set on the `Kurn` target's build
+//  settings alongside the bridging header — see `SherpaOnnxDiarizer.swift`
+//  for why this needs a compilation condition instead of `#if
+//  canImport(...)`. `KurnTests` never gets the bridging header or the
+//  condition, so it always takes the `#else` branch.
 //
 
 import Foundation

@@ -350,7 +350,7 @@ features, so they carry a different kind of urgency.
 | **D1** | Speaker labels conflated across recordings in one meeting | Fixed |
 | **D2** | Raw diarizer turns are not measurable | Implemented |
 | **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate |
-| **D4** | A segmentation-first diarizer as a third engine | In progress — wired but not yet reachable at runtime, pending Xcode build-setting work; unmeasured |
+| **D4** | A segmentation-first diarizer as a third engine | Shipped, runtime-verified; collapse-resistance vs. `fluidAudio` still unmeasured (needs a same-run comparison dispatch) |
 | **D5** | Overlapping speech is not representable | Decided — keep truncating; no engine here has overlap-aware ASR anyway |
 | **D6** | Voiceprints never cross meetings | Implemented (standalone; F4 half still open) |
 
@@ -465,22 +465,30 @@ rather than a preference.
 by its VBx-collapse resistance alone, since its overlap detection has nowhere
 to go once fusion runs.
 
-**Status: implementation started, not yet measured.** The candidate is
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0): local
-segmentation via `pyannote/segmentation-3.0` (MIT) then clustering via a
-3D-Speaker CAM++ embedding (Apache-2.0) — both permissively licensed, so
-nothing blocks shipping it. `DiarizationEngine.sherpaOnnx`, its own
-`ModelSet`/consent flag/Settings flow, `SherpaOnnxDiarizer` (mirroring
+**Status: shipped and runtime-verified; collapse-resistance not yet measured.**
+The candidate is [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+(Apache-2.0): local segmentation via `pyannote/segmentation-3.0` (MIT) then
+clustering via a 3D-Speaker CAM++ embedding (Apache-2.0) — both permissively
+licensed, so nothing blocked shipping it. `DiarizationEngine.sherpaOnnx`, its
+own `ModelSet`/consent flag/Settings flow, `SherpaOnnxDiarizer` (mirroring
 `FluidAudioDiarizer`'s contract), and the raw-turn-DER evaluation-matrix
-wiring are in place. **Not yet reachable at runtime**: sherpa-onnx exposes a
-C API with no importable Clang module of its own (its SPM product is named
-`sherpa-onnx`, not a valid Swift module identifier), so — unlike FluidAudio
-and whisper.cpp, both `import`ed directly — it needs a bridging header and a
-custom `SHERPA_ONNX_ENABLED` compilation condition on the `Kurn` target
-rather than the usual `#if canImport(...)` guard. Wiring that Xcode
-build-setting pair is the one remaining step before D2's raw-turn DER can
-actually decide whether this clears the bar (see `SherpaOnnxDiarizer.swift`'s
-header comment for the exact two settings needed).
+wiring are all in place and merged.
+
+sherpa-onnx exposes a C API with no importable Clang module of its own (its
+SPM product is named `sherpa-onnx`, not a valid Swift module identifier), so
+— unlike FluidAudio and whisper.cpp, both `import`ed directly — it needed a
+bridging header and a `SHERPA_ONNX_ENABLED` compilation condition on the
+`Kurn` target rather than the usual `#if canImport(...)` guard; that wiring
+was completed and verified locally (Xcode) after the initial merge. The
+2026-08-27 pipeline-eval dispatch (`docs/pipeline-evaluation.md`) confirms
+the real engine runs in CI (0.08–0.92s per item, not the disabled stub's
+instant fallback) and reports its first raw-turn DER on AMI (37.41%,
+constant across preprocessing/VAD as expected). That run was scoped to
+sherpa-onnx alone, so it does not yet answer D4's actual question — whether
+it resists FluidAudio's VBx collapse on the far-field sessions where that
+engine is known to fail. **Next measurement needed**: a dispatch with
+`diarization_engines: fluidAudio,sherpaOnnx` so both engines' raw DER lands
+in the same run and is directly comparable.
 
 ### D5 · Overlapping speech is not representable — Decided: keep truncating
 

@@ -18,25 +18,20 @@
 //  `diarize(url:)` — falls back to a single speaker turn on any failure,
 //  including missing models.
 //
-//  IMPORTANT — not yet reachable at runtime. The real implementation below
-//  is guarded by `SHERPA_ONNX_ENABLED`, a compilation condition that nothing
-//  in `Kurn.xcodeproj/project.pbxproj` sets yet, so today only the `#else`
-//  stub compiles (same as if the package were simply not linked). Turning
-//  this engine on requires, beyond linking the `sherpa-onnx` remote package:
-//    1. Setting `SWIFT_OBJC_BRIDGING_HEADER` on the `Kurn` target to
-//       `Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h` — sherpa-onnx
-//       ships a C API with no importable Clang module of its own (its SPM
-//       product is literally named "sherpa-onnx", not a valid module
-//       identifier), unlike FluidAudio/whisper.cpp which are `import`ed
-//       directly, so `#if canImport(...)` cannot gate this the usual way.
-//    2. Adding `SHERPA_ONNX_ENABLED` to that target's
-//       `SWIFT_ACTIVE_COMPILATION_CONDITIONS` (Debug and Release), and NOT to
-//       `KurnTests`'s, matching the existing "KurnTests doesn't link the
-//       optional package" convention documented on `WhisperCppModelDownloader`.
-//  Both are per-target Xcode build settings that need verifying in a real
-//  Xcode session — hand-editing them blind risks corrupting the whole
-//  project file's build settings, a far larger blast radius than this one
-//  feature, so they were deliberately left undone here.
+//  The real implementation below is guarded by `SHERPA_ONNX_ENABLED` rather
+//  than `#if canImport(...)`: sherpa-onnx ships a C API with no importable
+//  Clang module of its own (its SPM product is literally named "sherpa-onnx",
+//  not a valid module identifier), unlike FluidAudio/whisper.cpp, which are
+//  `import`ed directly. It reaches Swift through
+//  `Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h`
+//  (`SWIFT_OBJC_BRIDGING_HEADER` on the `Kurn` target) plus that compilation
+//  condition (`SWIFT_ACTIVE_COMPILATION_CONDITIONS`, Debug and Release) —
+//  both verified locally in Xcode and set on the `Kurn` target only, not
+//  `KurnTests`'s, matching the existing "KurnTests doesn't link the optional
+//  package" convention documented on `WhisperCppModelDownloader`. Confirmed
+//  reachable in CI by the 2026-08-27 pipeline-eval dispatch
+//  (`docs/pipeline-evaluation.md`) — the log shows real per-item processing
+//  times, not the `#else` stub's instant fallback.
 //
 
 import AVFoundation
