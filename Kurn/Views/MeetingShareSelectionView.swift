@@ -24,6 +24,17 @@ struct MeetingShareSelectionView: View {
             case .obsidian: NSLocalizedString("share.format.obsidian", comment: "Obsidian")
             }
         }
+
+        /// What the choice actually changes in the exported file. Without it
+        /// "Obsidian" is just a word next to "Standard" — nothing else on this
+        /// screen reacts to the picker, so this line is the only feedback that
+        /// the control did anything.
+        var explanation: String {
+            switch self {
+            case .standard: NSLocalizedString("share.format.standard.detail", comment: "Standard format detail")
+            case .obsidian: NSLocalizedString("share.format.obsidian.detail", comment: "Obsidian format detail")
+            }
+        }
     }
 
     let meeting: Meeting
@@ -69,16 +80,6 @@ struct MeetingShareSelectionView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $format) {
-                        ForEach(ShareFormat.allCases, id: \.self) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowInsets(EdgeInsets())
-                    .padding(.vertical, 4)
-                }
                 if !sortedSummaries.isEmpty {
                     Section(NSLocalizedString("share.select.summaries", comment: "Summaries")) {
                         ForEach(sortedSummaries) { summary in
@@ -109,15 +110,60 @@ struct MeetingShareSelectionView: View {
                     .disabled(!hasSelection)
                     .accessibilityLabel(NSLocalizedString("share.copy_all", comment: "Copy All"))
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("share.share_action", comment: "Share")) {
-                        performShare()
-                    }
-                    .disabled(!hasSelection)
-                }
             }
+            // The format is a modifier on the export, not a segmentation of
+            // the list — as a picker above the content it read as a tab bar
+            // switching between two views, which is not what it does. Sitting
+            // next to the action it modifies, it is read at the moment it
+            // matters. As a safe-area bar it gets the system's glass
+            // background rather than a hand-drawn `.bar` strip, matching
+            // `MeetingChatView`'s composer.
+            .safeAreaBar(edge: .bottom) { shareBar }
             .errorAlert($shareError)
         }
+    }
+
+    private var shareBar: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text(NSLocalizedString("share.format.picker", comment: "Format"))
+                    .font(Theme.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $format) {
+                    ForEach(ShareFormat.allCases, id: \.self) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+            Text(format.explanation)
+                .font(Theme.caption)
+                .foregroundStyle(Theme.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                performShare()
+            } label: {
+                Text(shareButtonTitle).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Theme.accent)
+            .disabled(!hasSelection)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    /// "Share" alone while nothing is selected, "Share (3)" otherwise. The
+    /// count is parenthesised rather than written into the sentence so it
+    /// needs no plural handling in any of the seven localizations.
+    private var shareButtonTitle: String {
+        let share = NSLocalizedString("share.share_action", comment: "Share")
+        let count = selectedSummaryIDs.count + selectedRecordingIDs.count
+        return count > 0 ? "\(share) (\(count))" : share
     }
 
     private func summaryRow(_ summary: Summary) -> some View {

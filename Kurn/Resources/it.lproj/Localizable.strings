@@ -664,6 +664,8 @@
 "share.format.picker" = "Formato";
 "share.format.standard" = "Standard";
 "share.format.obsidian" = "Obsidian";
+"share.format.standard.detail" = "Markdown semplice, senza metadati aggiuntivi.";
+"share.format.obsidian.detail" = "Aggiunge frontmatter YAML e [[wikilink]] per gli interlocutori.";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Attività completata";

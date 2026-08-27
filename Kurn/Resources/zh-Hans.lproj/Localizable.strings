@@ -664,6 +664,8 @@
 "share.format.picker" = "格式";
 "share.format.standard" = "标准";
 "share.format.obsidian" = "Obsidian";
+"share.format.standard.detail" = "纯 Markdown，不含额外元数据。";
+"share.format.obsidian.detail" = "添加 YAML frontmatter 和说话人的 [[wikilinks]]。";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "已完成任务";
