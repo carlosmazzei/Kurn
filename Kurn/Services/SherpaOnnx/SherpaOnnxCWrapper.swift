@@ -49,16 +49,19 @@ final class SherpaOnnxOfflineSpeakerDiarizationWrapper: @unchecked Sendable {
         // not after the nesting closes.
         let created: OpaquePointer? = segmentationModelPath.withCString { segPtr in
             embeddingModelPath.withCString { embPtr in
-                "".withCString { emptyPtr in
+                "cpu".withCString { providerPtr in
                     var config = SherpaOnnxOfflineSpeakerDiarizationConfig()
-                    config.segmentation.model = segPtr
+                    config.segmentation.pyannote.model = segPtr
+                    config.segmentation.pyannote.window_shift_ratio = 0.1
+                    config.segmentation.num_threads = numThreads
+                    config.segmentation.provider = providerPtr
                     config.embedding.model = embPtr
-                    config.clustering.method = emptyPtr
-                    config.clustering.num_speakers = numSpeakers
+                    config.embedding.num_threads = numThreads
+                    config.embedding.provider = providerPtr
+                    config.clustering.num_clusters = numSpeakers
                     config.clustering.threshold = 0.5
-                    config.num_threads = numThreads
-                    config.debug = 0
-                    config.provider = emptyPtr
+                    config.min_duration_on = 0.3
+                    config.min_duration_off = 0.5
                     return SherpaOnnxCreateOfflineSpeakerDiarization(&config)
                 }
             }
@@ -82,16 +85,19 @@ final class SherpaOnnxOfflineSpeakerDiarizationWrapper: @unchecked Sendable {
     /// callers report progress coarsely around it, same as the heuristic
     /// engine does.
     func process(samples: [Float]) -> [SherpaOnnxDiarizationSegmentWrapper] {
-        var numSegments: Int32 = 0
-        guard let result = SherpaOnnxOfflineSpeakerDiarizationProcess(
-            handle, Int32(sampleRate), samples, Int32(samples.count), &numSegments
-        ) else { return [] }
-        defer { SherpaOnnxOfflineSpeakerDiarizationFreeSegments(result) }
+        guard let result = samples.withUnsafeBufferPointer({ buffer in
+            SherpaOnnxOfflineSpeakerDiarizationProcess(handle, buffer.baseAddress, Int32(buffer.count))
+        }) else { return [] }
+        defer { SherpaOnnxOfflineSpeakerDiarizationDestroyResult(result) }
+
+        let numSegments = Int(SherpaOnnxOfflineSpeakerDiarizationResultGetNumSegments(result))
+        guard let resultSegments = SherpaOnnxOfflineSpeakerDiarizationResultSortByStartTime(result) else { return [] }
+        defer { SherpaOnnxOfflineSpeakerDiarizationDestroySegment(resultSegments) }
 
         var segments: [SherpaOnnxDiarizationSegmentWrapper] = []
-        segments.reserveCapacity(Int(numSegments))
-        for i in 0..<Int(numSegments) {
-            let raw = result[i]
+        segments.reserveCapacity(numSegments)
+        for index in 0..<numSegments {
+            let raw = resultSegments[index]
             segments.append(SherpaOnnxDiarizationSegmentWrapper(
                 start: raw.start,
                 end: raw.end,
