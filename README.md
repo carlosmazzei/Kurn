@@ -4,6 +4,7 @@
 
 <h1 align="center">Kurn</h1>
 
+[![Download on the App Store](https://img.shields.io/badge/Download_on_the-App_Store-0D96F6.svg?logo=apple&logoColor=white)](https://apps.apple.com/app/id6804278920)
 [![iOS CI](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-iOS%2017%2B%20%7C%20watchOS%2010%2B-blue.svg)
@@ -21,9 +22,9 @@ Recordings and meeting data are stored on device by default. Network requests
 only happen when the user chooses cloud (Whisper-compatible) transcription or
 generates a summary with a configured AI provider.
 
-> **App Store status:** Kurn is not yet published on the App Store — it's
-> currently in TestFlight testing, with an App Store submission to follow.
-> For now, you can also build it yourself from this repo (see
+> **Kurn is available on the App Store:**
+> [apps.apple.com/app/id6804278920](https://apps.apple.com/app/id6804278920).
+> You can also build it yourself from this repo (see
 > [Getting Started](#getting-started)).
 
 ## Current App
