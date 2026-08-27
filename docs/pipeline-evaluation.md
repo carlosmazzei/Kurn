@@ -70,6 +70,118 @@ every dispatch is worth a commit.
 
 ## Runs
 
+### 2026-08-27 — `6f0a094` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796))
+
+**First runtime measurement of the sherpa-onnx diarization engine (D4)** — the
+segmentation-first alternative to FluidAudio's cluster-first VBx pipeline
+(`docs/roadmap.md`, item D4). Also the first recorded run to report
+`DER (raw)` alongside `DER (fused)`, now that D2's raw-turn metric exists in
+the harness output.
+
+Scope is deliberately narrow: `KURN_PUBLIC_EVAL_DIARIZATION_ENGINES=sherpaOnnx`
+(the new engine only — not compared against `fluidAudio` in this same
+dispatch) and `whisperCpp@small` as the sole transcription engine. **This run
+answers "does the new engine run for real and produce a real number", not yet
+"is it more collapse-resistant than FluidAudio"** — that needs a same-run
+comparison, noted below.
+
+As with the 2026-08-03 entry, the `pipeline-eval-report` artifact's download
+URL (Azure Blob Storage) is blocked by this environment's network policy, so
+this section is built from the harness's own aggregate log output
+(`[pipeline-eval] === aggregate ... ===`) rather than re-derived with
+`report_to_markdown.py` against the raw CSV. A maintainer with normal network
+access can download artifact id `9631144328` from the run above and
+regenerate byte-for-byte.
+
+- matrix: 4 configurations (preprocessing × VAD), diarization fixed to
+  `sherpaOnnx`, transcription fixed to `whisperCpp@small`.
+- corpora: the same four as prior runs — AMI Meeting Corpus (en, 4 meetings,
+  WER+DER), LibriSpeech test-clean (en, 6 items, WER), CAMOES (pt, 40 items,
+  WER), CORAA (pt, 40 items, WER).
+
+#### English by language (AMI + LibriSpeech, 10 files; AMI DER over 4)
+
+| Preprocessing | VAD | WER | DER (fused) | DER (raw) |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 35.25% | 63.12% | 37.41% |
+| none | fluidAudio | 27.34% | 65.27% | 37.41% |
+| standardDSP | energyThreshold | 41.91% | 67.44% | 37.41% |
+| standardDSP | fluidAudio | 25.84% | 67.22% | 37.41% |
+
+#### Portuguese by language (CAMOES + CORAA, 80 files)
+
+| Preprocessing | VAD | WER |
+| --- | --- | --- |
+| none | energyThreshold | 42.49% |
+| none | fluidAudio | 41.14% |
+| standardDSP | energyThreshold | 40.54% |
+| standardDSP | fluidAudio | 40.99% |
+
+#### By corpus
+
+`english/ami-en` (4 meetings — real, multi-speaker meeting audio):
+
+| Preprocessing | VAD | WER | DER (fused) | DER (raw) |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 37.75% | 63.12% | 37.41% |
+| none | fluidAudio | 29.26% | 65.27% | 37.41% |
+| standardDSP | energyThreshold | 44.89% | 67.44% | 37.41% |
+| standardDSP | fluidAudio | 27.65% | 67.22% | 37.41% |
+
+`english/librispeech-en` (6 items): 1.05% WER across all four
+configurations — unchanged from prior runs, the regression canary still
+holds.
+
+`portuguese/camoes-pt` (40 items):
+
+| Preprocessing | VAD | WER |
+| --- | --- | --- |
+| none | energyThreshold | 59.85% |
+| none | fluidAudio | 57.66% |
+| standardDSP | energyThreshold | 54.38% |
+| standardDSP | fluidAudio | 54.38% |
+
+`portuguese/coraa-pt` (40 items):
+
+| Preprocessing | VAD | WER |
+| --- | --- | --- |
+| none | energyThreshold | 30.36% |
+| none | fluidAudio | 29.59% |
+| standardDSP | energyThreshold | 30.87% |
+| standardDSP | fluidAudio | 31.63% |
+
+What this run says:
+
+- **The engine runs, for real, in CI.** The job log shows
+  `SherpaOnnxDiarizer: processing ... complete in 0.08–0.92s` on every item,
+  not the disabled `#else` stub's instant single-turn fallback — the
+  bridging-header/`SHERPA_ONNX_ENABLED` wiring flagged as the remaining step
+  when this engine was added is done.
+- **DER (raw) is identical (37.41%) across all four preprocessing × VAD
+  combinations on AMI** — expected, not a bug: diarization runs against its
+  own cleaned copy (`diarizationPreprocessingEnabled`, fixed `true` here)
+  independent of whatever preprocessing/VAD the ASR side used, so the
+  diarizer sees the same input regardless. A good internal-consistency check
+  on the measurement itself.
+- **DER (fused) is substantially worse than DER (raw) here (63–67% vs.
+  37.41%).** Fusion attributes whisper.cpp's ASR span boundaries to the
+  diarizer's turns, so the fused number blends diarization error with ASR
+  boundary placement — exactly the reason D2 added the raw-turn metric, and
+  this gap is a clean demonstration of why "which diarizer is better" needs
+  the raw number, not the fused one.
+- **This is not yet the collapse-resistance verdict D4 asked for.** 37.41%
+  raw DER on AMI is a real, non-degenerate number — not the ~100%-collapsed
+  pattern a whole-meeting fallback would produce — but nothing in this
+  dispatch measured `fluidAudio`'s raw DER on the same four meetings in the
+  same run, so there is no same-run baseline to say whether sherpa-onnx
+  actually resists the VBx collapse better. **Next step**: dispatch again
+  with `diarization_engines: fluidAudio,sherpaOnnx` (or leave it blank for
+  all three engines) so both raw DERs land in the same CSV and are directly
+  comparable.
+- WER moves with preprocessing/VAD in the same pattern prior whisper.cpp/small
+  runs showed (compare the 2026-08-09 table) — expected, since diarization
+  doesn't touch the transcript text.
+
 ### 2026-08-09 — `53db49c` ([essential+correction run](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction run](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299))
 
 **First measurement of the opt-in LLM transcript-correction stage**
