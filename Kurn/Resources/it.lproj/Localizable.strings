@@ -752,3 +752,10 @@
 "error.document_generation" = "Impossibile generare il documento: %@";
 "error.on_device_model_unavailable" = "Modello sul dispositivo non disponibile: %@";
 "error.on_device_generation_timeout" = "La generazione sul dispositivo è scaduta.";
+
+"intent.startRecording.title" = "Avvia registrazione";
+"intent.startRecording.description" = "Avvia una nuova registrazione in Kurn senza aprire l'app.";
+"intent.startRecording.shortTitle" = "Avvia registrazione";
+"control.startRecording.title" = "Avvia registrazione";
+"control.startRecording.displayName" = "Avvia registrazione";
+"control.startRecording.description" = "Avvia una nuova registrazione in Kurn. Aggiungendolo alla schermata di blocco, può essere attivato con un solo tocco anche a dispositivo bloccato.";

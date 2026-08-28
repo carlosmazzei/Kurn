@@ -4,3 +4,10 @@
 "live_activity.resume" = "Retomar";
 "live_activity.stop" = "Parar";
 "live_activity.highlight" = "Destacar";
+
+"intent.startRecording.title" = "Iniciar gravação";
+"intent.startRecording.description" = "Inicia uma nova gravação no Kurn sem abrir o app.";
+"intent.startRecording.shortTitle" = "Iniciar gravação";
+"control.startRecording.title" = "Iniciar gravação";
+"control.startRecording.displayName" = "Iniciar gravação";
+"control.startRecording.description" = "Inicia uma nova gravação no Kurn. Ao adicionar isso à Tela Bloqueada, ela pode ser acionada com um único toque enquanto o aparelho está bloqueado.";

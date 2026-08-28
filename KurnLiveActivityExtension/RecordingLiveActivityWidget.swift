@@ -17,6 +17,7 @@ import WidgetKit
 struct KurnLiveActivityExtensionBundle: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivityWidget()
+        StartRecordingControl()
     }
 }
 

@@ -752,3 +752,10 @@
 "error.document_generation" = "Could not generate the document: %@";
 "error.on_device_model_unavailable" = "On-device model unavailable: %@";
 "error.on_device_generation_timeout" = "On-device generation timed out.";
+
+"intent.startRecording.title" = "Start Recording";
+"intent.startRecording.description" = "Starts a new Kurn recording without opening the app.";
+"intent.startRecording.shortTitle" = "Start Recording";
+"control.startRecording.title" = "Start Recording";
+"control.startRecording.displayName" = "Start Recording";
+"control.startRecording.description" = "Starts a new Kurn recording. Adding this to the Lock Screen lets it be triggered with a single tap while the device is locked.";

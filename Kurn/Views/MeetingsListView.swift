@@ -311,6 +311,16 @@ struct MeetingsListView: View {
         .sheet(item: $recordMeeting) { meeting in
             NavigationStack { RecorderView(meeting: meeting) }
         }
+        // `StartRecordingIntent` (Siri/Shortcuts/Control Center/Action Button)
+        // queues a meeting here instead of calling into a View directly; pick
+        // it up and present it exactly like a manual tap on the record
+        // button. `initial: true` covers the case where the intent already
+        // ran (e.g. a cold launch triggered by `openAppWhenRun`) before this
+        // view's first appearance.
+        .onChange(of: RecordingLauncher.shared.pendingAutoStartMeeting, initial: true) { _, meeting in
+            guard meeting != nil else { return }
+            recordMeeting = RecordingLauncher.shared.consumePendingAutoStart()
+        }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }

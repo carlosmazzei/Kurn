@@ -4,3 +4,10 @@
 "live_activity.resume" = "Reprendre";
 "live_activity.stop" = "Arrêter";
 "live_activity.highlight" = "Marquer";
+
+"intent.startRecording.title" = "Démarrer l'enregistrement";
+"intent.startRecording.description" = "Démarre un nouvel enregistrement Kurn sans ouvrir l'app.";
+"intent.startRecording.shortTitle" = "Démarrer l'enregistrement";
+"control.startRecording.title" = "Démarrer l'enregistrement";
+"control.startRecording.displayName" = "Démarrer l'enregistrement";
+"control.startRecording.description" = "Démarre un nouvel enregistrement Kurn. En l'ajoutant à l'écran verrouillé, il peut être déclenché d'un geste alors que l'appareil est verrouillé.";

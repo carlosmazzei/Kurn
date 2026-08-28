@@ -135,6 +135,10 @@ struct KurnApp: App {
         _wiki = State(
             initialValue: WikiCoordinator(modelContext: container.mainContext)
         )
+        // Lets `StartRecordingIntent` (Siri/Shortcuts/Control Center/Action
+        // Button) create a meeting and queue it for `MeetingsListView` to
+        // present, without any View having to hand it a `ModelContext`.
+        RecordingLauncher.shared.configure(modelContext: container.mainContext, settings: settings)
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()
