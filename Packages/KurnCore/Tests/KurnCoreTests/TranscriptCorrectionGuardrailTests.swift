@@ -1,11 +1,11 @@
 //
 //  TranscriptCorrectionGuardrailTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 
 import Foundation
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct TranscriptCorrectionGuardrailTests {
 

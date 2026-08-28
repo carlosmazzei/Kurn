@@ -10,6 +10,8 @@
 		2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 2AA9E4B62FECAAE50067BF88 /* FluidAudio */; };
 		2AB0000000000000000000A1 /* whisper in Frameworks */ = {isa = PBXBuildFile; productRef = 2AB0000000000000000000A2 /* whisper */; };
 		2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */ = {isa = PBXBuildFile; productRef = 2AD0000000000000000000A2 /* sherpa-onnx */; };
+		2AE0000000000000000000A1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000A2 /* KurnCore */; };
+		2AE0000000000000000000B1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000B2 /* KurnCore */; };
 		2AC0000000000000000000A1 /* Kurn/Resources/Models/GTCRN.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */; };
 		2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -143,6 +145,7 @@
 				2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */,
 				2AB0000000000000000000A1 /* whisper in Frameworks */,
 				2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */,
+				2AE0000000000000000000A1 /* KurnCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -157,6 +160,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2AE0000000000000000000B1 /* KurnCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -268,6 +272,9 @@
 				AA00000000000000000000C1 /* Kurn */,
 			);
 			name = Kurn;
+			packageProductDependencies = (
+				2AE0000000000000000000A2 /* KurnCore */,
+			);
 			productName = Kurn;
 			productReference = AA00000000000000000000A1 /* Kurn.app */;
 			productType = "com.apple.product-type.application";
@@ -309,6 +316,9 @@
 				AA20000000000000000000C1 /* KurnTests */,
 			);
 			name = KurnTests;
+			packageProductDependencies = (
+				2AE0000000000000000000B2 /* KurnCore */,
+			);
 			productName = KurnTests;
 			productReference = AA20000000000000000000A1 /* KurnTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -408,6 +418,7 @@
 				2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				2AB0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/WhisperCpp" */,
 				2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */,
+				2AE0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/KurnCore" */,
 			);
 			productRefGroup = AA0000000000000000000002 /* Products */;
 			projectDirPath = "";
@@ -1023,6 +1034,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/WhisperCpp;
 		};
+		2AE0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/KurnCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/KurnCore;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1058,6 +1073,14 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */;
 			productName = "sherpa-onnx";
+		};
+		2AE0000000000000000000A2 /* KurnCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KurnCore;
+		};
+		2AE0000000000000000000B2 /* KurnCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KurnCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
