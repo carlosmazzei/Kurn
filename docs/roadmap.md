@@ -587,7 +587,13 @@ original write-up named — see F4 above.
 file-length limit, the same reason `MeetingDetailAutoTagging.swift` exists),
 `SpeakerIdentityMatcher`, `CrossMeetingSpeakerMatchView`.
 
-## The change that isn't a feature: SPM extraction
+## The change that isn't a feature: SPM extraction — Implemented
+
+**Status:** Implemented — [PR #142](https://github.com/carlosmazzei/Kurn/pull/142).
+`Packages/KurnCore` now exists, wired into `Kurn.xcodeproj` the same way
+`Packages/WhisperCpp` is, with a `kurncore-linux` CI job running `swift test`
+on Linux in parallel with `build-and-test`, gating every release job the same
+way.
 
 The app is a single Xcode target plus the whisper binary package. Splitting the
 pure logic into local Swift packages fixes a bottleneck this repository already
@@ -618,6 +624,45 @@ no product risk in the move: these types have no platform dependencies today —
 the package only makes that boundary enforceable by the compiler instead of
 maintained by convention.
 
+**What shipped, and where this table was wrong.** All of "Fusion and quality"
+and "Text and data" moved (`MeetingVocabularyExtractor`, `SummaryJSON`,
+`MeetingFilter`, `MarkdownBlockParser`), plus `SecurityCoverState` and
+`Evaluation`'s already-independent files — but two entries in this table
+turned out not to be pure as claimed, discovered only once each was actually
+read line by line rather than trusted from its file's import statement:
+`MeetingFilter` imported SwiftData and its `matches(_:)` read straight off
+the `Meeting` `@Model` class; it's now a pure predicate over a new
+`MeetingFilterAttributes` snapshot, with the SwiftData-facing translation
+left behind as an adapter (`Kurn/Models/MeetingFilter+Meeting.swift`).
+`SecurityCoverState` imported SwiftUI for `ScenePhase`; it now resolves
+against a portable `AppLifecyclePhase` KurnCore defines itself, with a
+one-line `ScenePhase` mapping left at the single app call site. Both kept
+their existing call-site signatures, so nothing outside either file noticed.
+
+Extraction also pulled in dependencies this table didn't list, because a
+type's own file compiling as Foundation-only doesn't mean nothing *it
+depends on* reaches into SwiftData or AVFoundation — `TranscriptSegment`
+(needed by `TranscriptFusion` and `MeetingVocabularyExtractor`),
+`TranscriptionStatus`/`TranscriptionEngine`/`TranscriptionMode`/
+`MeetingLanguage` (needed once `AppError` and `SummaryJSON` moved),
+`SummarySection` plus its `String.unescapingLiteralWhitespace()` helper
+(needed by `SummaryJSON`), and `SpeechRegion`/`TimelineSegment`/`ChunkBoundary`
+split out of files that also carry an AVFoundation-dependent actor.
+`TranscriptionEngine.requiredModelSet(whisperCppModel:)` stayed behind as an
+app-side extension rather than dragging `ModelSet` (which orchestrates real
+FluidAudio/whisper.cpp downloads) into the package — Swift extensions can add
+methods to a type from another module, so the split needed no call-site change.
+
+**Left out, deliberately: the "Speakers" row and `SpeechLevel`.**
+`SpeakerClusterRefiner`, `SpeakerIdentityMatcher` and `SpeechLevel`
+(`SpeechLevelMeter.swift`) all import `Accelerate`, which doesn't exist on
+Linux — moving them would buy none of this change's actual point (a Linux
+`swift test` signal) while adding an Xcode-project change this session had
+no way to verify locally. If picked up later, the plan is a second package
+target (`KurnCoreAccelerate`, gated by `#if canImport(Accelerate)` in
+`Package.swift` so a Linux `swift test` never sees it), not a portable
+rewrite of the `vDSP` calls.
+
 One caution to carry into any coverage work that follows: a test plan gathers
 coverage for every linked target, third-party dependencies included, which makes
 the raw percentage meaningless. Filter to first-party targets before trusting any
@@ -628,9 +673,10 @@ coverage number.
 Unlike the rest of this document, the numbering here is real — each step makes
 the next cheaper or more verifiable.
 
-1. **Extract the pure types into a package.** First, because it speeds up
-   verification of everything after it — including the pipeline changes F2
-   introduces.
+1. **Extract the pure types into a package — done.** First, because it speeds
+   up verification of everything after it — including the pipeline changes F2
+   introduces. The Accelerate-dependent "Speakers" group is the one deliberate
+   gap; see the section above.
 2. **F3 · Frictionless capture.** Lowest effort, immediate value, depends on
    nothing else here. The dispatcher already exists.
 3. **F1 · Apple Foundation Models — done.** Shipped in
