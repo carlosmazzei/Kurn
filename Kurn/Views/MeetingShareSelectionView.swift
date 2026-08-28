@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import KurnCore
 import UIKit
 
 struct MeetingShareSelectionView: View {

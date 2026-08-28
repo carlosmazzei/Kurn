@@ -17,6 +17,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct MeetingChatService {
     // Not `private`: the synthesis path in `MeetingChatSynthesis.swift` (a

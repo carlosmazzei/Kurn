@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import KurnCore
 
 struct LogEntriesListView: View {
     @State private var entries: [LogEntrySnapshot] = []

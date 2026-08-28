@@ -1,6 +1,6 @@
 //
 //  String+Whitespace.swift
-//  Kurn
+//  KurnCore
 //
 //  Recovers real whitespace from escape sequences an LLM sometimes double-escapes
 //  into the JSON it returns for a summary. When a model writes `"\\n"` in its
@@ -15,7 +15,7 @@ extension String {
     /// Convert literal `\n` / `\r` / `\t` escape sequences (two-character
     /// backslash + letter) into their real whitespace. Real newlines/tabs already
     /// in the string are untouched, and text without a backslash short-circuits.
-    func unescapingLiteralWhitespace() -> String {
+    public func unescapingLiteralWhitespace() -> String {
         guard contains("\\") else { return self }
         return self
             .replacingOccurrences(of: "\\r\\n", with: "\n")

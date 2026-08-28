@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct DocumentTranscriptSource: Sendable {
     let meetingID: UUID

@@ -17,6 +17,7 @@
 //
 
 import Foundation
+import KurnCore
 
 final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
 

@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// Produces unit-normalized embedding vectors for passages of text, fully
 /// on-device. Implementations are `Sendable` so indexing can run off the main

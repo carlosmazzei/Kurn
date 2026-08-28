@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 #if canImport(UIKit)
 import UIKit

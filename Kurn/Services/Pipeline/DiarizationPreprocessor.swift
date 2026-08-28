@@ -19,6 +19,7 @@
 //
 
 import Accelerate
+import KurnCore
 import AVFoundation
 import Foundation
 

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 
 @Model

@@ -14,6 +14,7 @@
 //
 
 import SwiftData
+import KurnCore
 import SwiftUI
 
 struct SettingsView: View {

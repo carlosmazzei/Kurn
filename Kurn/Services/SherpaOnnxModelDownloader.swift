@@ -15,6 +15,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// Downloads and locates sherpa-onnx's diarization models under
 /// `Application Support/SherpaOnnx/Models/`.

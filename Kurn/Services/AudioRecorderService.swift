@@ -21,6 +21,7 @@
 //
 
 import AVFoundation
+import KurnCore
 import Foundation
 import Observation
 import os

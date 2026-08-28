@@ -10,6 +10,7 @@
 //
 
 import SwiftData
+import KurnCore
 import SwiftUI
 
 struct FolderFormView: View {

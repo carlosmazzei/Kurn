@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum ProviderFactory {
     /// Build the summary provider chosen in Settings. Throws `.noAPIKey` when a

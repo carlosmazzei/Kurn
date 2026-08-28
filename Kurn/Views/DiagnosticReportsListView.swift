@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import KurnCore
 
 struct DiagnosticReportsListView: View {
     @State private var entries: [DiagnosticReportEntry] = []

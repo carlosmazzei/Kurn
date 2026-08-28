@@ -9,6 +9,7 @@
 //
 
 import Testing
+import KurnCore
 @testable import Kurn
 
 // Serialized because these tests mutate the real, process-wide Keychain
