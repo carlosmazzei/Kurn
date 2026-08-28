@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// Structured summary returned by a chat/messages completion. The shape is
 /// template-driven, so it is just an ordered list of titled sections.

@@ -21,6 +21,7 @@
 
 import Accelerate
 import Foundation
+import KurnCore
 
 enum SpeakerIdentityMatcher {
 

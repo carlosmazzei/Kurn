@@ -10,6 +10,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 /// Thread-safe bridge between diarization's concurrent callbacks and the phase
 /// shown by the UI. Cloud transcription and diarization start together, but the

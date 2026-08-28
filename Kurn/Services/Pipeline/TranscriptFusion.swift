@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum TranscriptFusion {
 

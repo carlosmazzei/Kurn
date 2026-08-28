@@ -11,6 +11,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 /// What the neural diarizer produces beyond the turns themselves.
 ///

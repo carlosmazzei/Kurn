@@ -36,6 +36,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 #if SHERPA_ONNX_ENABLED
 

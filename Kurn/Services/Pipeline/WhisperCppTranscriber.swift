@@ -16,6 +16,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 #if canImport(whisper)
 import whisper
