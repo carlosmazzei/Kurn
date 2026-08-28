@@ -6,6 +6,7 @@
 //  (provider + model + timestamp).
 //
 
+import KurnCore
 import SwiftUI
 
 struct SummaryView: View {

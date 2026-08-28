@@ -1,6 +1,6 @@
 //
 //  MarkdownBlockParser.swift
-//  Kurn
+//  KurnCore
 //
 //  Tolerant block-level Markdown parser for AI summary content. Produces a
 //  flat list of blocks (headings, lists with task checkboxes and nesting,
@@ -12,7 +12,7 @@
 
 import Foundation
 
-enum MarkdownBlock: Equatable, Sendable {
+public enum MarkdownBlock: Equatable, Sendable {
     case heading(level: Int, text: String)
     case paragraph(text: String)
     case list(items: [MarkdownListItem])
@@ -24,33 +24,39 @@ enum MarkdownBlock: Equatable, Sendable {
 
 // Kept top-level (not nested in MarkdownListItem) to stay within the
 // SwiftLint nesting limit.
-enum MarkdownListMarker: Equatable, Sendable {
+public enum MarkdownListMarker: Equatable, Sendable {
     case bullet
     case ordered(number: Int)
     case task(checked: Bool)
 }
 
-struct MarkdownListItem: Equatable, Sendable {
+public struct MarkdownListItem: Equatable, Sendable {
     /// 0-based nesting depth derived from leading whitespace, clamped so a
     /// runaway indent cannot push content off-screen.
-    var indent: Int
-    var marker: MarkdownListMarker
-    var text: String
+    public var indent: Int
+    public var marker: MarkdownListMarker
+    public var text: String
+
+    public init(indent: Int, marker: MarkdownListMarker, text: String) {
+        self.indent = indent
+        self.marker = marker
+        self.text = text
+    }
 }
 
-enum MarkdownBlockParser {
+public enum MarkdownBlockParser {
     /// Blockquotes nested beyond this stop recursing and render as plain text.
     private static let maxQuoteDepth = 4
     private static let maxIndentLevel = 6
 
-    static func parse(_ raw: String) -> [MarkdownBlock] {
+    public static func parse(_ raw: String) -> [MarkdownBlock] {
         parse(lines: raw.components(separatedBy: "\n"), depth: 0)
     }
 
     /// Detect a task checkbox in a standalone summary item ("[ ] call Bob",
     /// "- [x] send notes"). Items are single strings outside the block parser,
     /// so this is the seam `SummaryView` uses for its bullet rows.
-    static func taskItem(in text: String) -> (checked: Bool, text: String)? {
+    public static func taskItem(in text: String) -> (checked: Bool, text: String)? {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if let first = trimmed.first, "-*+".contains(first) {
             return checkbox(in: trimmed.dropFirst().trimmingCharacters(in: .whitespaces))

@@ -1,6 +1,6 @@
 //
 //  MarkdownBlockParserTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 //  MarkdownBlockParser turns loosely well-formed LLM markdown into blocks for
 //  the summary renderer. It must never fail: unrecognized constructs fall back
@@ -9,7 +9,7 @@
 //
 
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct MarkdownBlockParserTests {
 

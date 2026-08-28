@@ -9,6 +9,7 @@
 //  `AttributedString(markdown:)`.
 //
 
+import KurnCore
 import SwiftUI
 
 struct MarkdownText: View {

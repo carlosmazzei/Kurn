@@ -27,6 +27,7 @@
 import AudioToolbox
 import AVFoundation
 import Foundation
+import KurnCore
 import os
 
 struct PlaybackEnhancementRenderer: Sendable {

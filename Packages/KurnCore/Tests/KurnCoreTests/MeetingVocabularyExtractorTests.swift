@@ -1,12 +1,11 @@
 //
 //  MeetingVocabularyExtractorTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 
 import Foundation
-import KurnCore
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct MeetingVocabularyExtractorTests {
 

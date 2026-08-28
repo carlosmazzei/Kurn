@@ -1,6 +1,6 @@
 //
 //  MeetingVocabularyExtractor.swift
-//  Kurn
+//  KurnCore
 //
 //  Builds a small vocabulary hint from a meeting's own transcript — names,
 //  acronyms, and terms that recur across segments — so `LLMTranscriptCorrector`
@@ -10,18 +10,17 @@
 //
 
 import Foundation
-import KurnCore
 
-enum MeetingVocabularyExtractor {
-    static let maxTerms = 40
-    static let minOccurrences = 2
+public enum MeetingVocabularyExtractor {
+    public static let maxTerms = 40
+    public static let minOccurrences = 2
 
     /// Extracts distinctive recurring terms (proper nouns, acronyms, terms
     /// with digits) from `segments`' text. Runs over the full segment set,
     /// including segments excluded from correction itself — those are exactly
     /// the ones most likely to already have the term spelled right. Pure and
     /// deterministic: the same input always yields the same ordered output.
-    static func extract(from segments: [TranscriptSegment]) -> [String] {
+    public static func extract(from segments: [TranscriptSegment]) -> [String] {
         var counts: [String: Int] = [:]
 
         for segment in segments {
