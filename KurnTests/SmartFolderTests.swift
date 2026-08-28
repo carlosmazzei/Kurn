@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 import Testing
 @testable import Kurn

@@ -7,6 +7,7 @@
 //  shares the exact same tokens (radii, colors, padding).
 //
 
+import KurnCore
 import SwiftUI
 
 /// Compact wrapping layout for metadata and chips. Items move to the next line

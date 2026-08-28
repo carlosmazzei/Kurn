@@ -11,6 +11,7 @@
 //  points for creating a meeting or opening settings.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 

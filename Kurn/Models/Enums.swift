@@ -9,34 +9,8 @@ import Foundation
 import KurnCore
 import SwiftData
 
-/// Lifecycle of a recording's transcription.
-enum TranscriptionStatus: String, Codable, Sendable, CaseIterable, Identifiable {
-    case none
-    case inProgress
-    /// Interrupted mid-transcription (app backgrounded, killed, or cancelled by
-    /// the system) with a checkpoint saved; resumes automatically on the next
-    /// foreground pass.
-    case pending
-    case done
-    case failed
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .none:
-            return NSLocalizedString("status.none", comment: "No transcript")
-        case .inProgress:
-            return NSLocalizedString("status.in_progress", comment: "In progress")
-        case .pending:
-            return NSLocalizedString("status.pending", comment: "Queued to resume")
-        case .done:
-            return NSLocalizedString("status.done", comment: "Done")
-        case .failed:
-            return NSLocalizedString("status.failed", comment: "Failed")
-        }
-    }
-}
+// `TranscriptionStatus` now lives in the KurnCore package
+// (`Sources/KurnCore/Models/TranscriptionStatus.swift`).
 
 /// Fine-grained stage within an in-progress transcription, surfaced to the UI so
 /// the user can see what the app is currently doing (e.g. cleaning audio vs.

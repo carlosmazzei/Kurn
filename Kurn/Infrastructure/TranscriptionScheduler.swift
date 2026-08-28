@@ -16,6 +16,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 
 #if canImport(BackgroundTasks)

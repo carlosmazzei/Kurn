@@ -6,6 +6,7 @@
 //  transcription status, summary presence, and duration bounds.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 
