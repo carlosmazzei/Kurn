@@ -1,6 +1,6 @@
 //
 //  PlaybackTuning.swift
-//  Kurn
+//  KurnCore
 //
 //  The DSP settings the enhanced listening copy is rendered with.
 //
@@ -14,59 +14,97 @@
 
 import Foundation
 
-struct PlaybackTuning: Equatable, Sendable {
+public struct PlaybackTuning: Equatable, Sendable {
 
     /// A peaking/shelving EQ band.
-    struct Band: Equatable, Sendable {
-        var frequency: Float
-        var bandwidth: Float
-        var gain: Float
+    public struct Band: Equatable, Sendable {
+        public var frequency: Float
+        public var bandwidth: Float
+        public var gain: Float
+
+        public init(frequency: Float, bandwidth: Float, gain: Float) {
+            self.frequency = frequency
+            self.bandwidth = bandwidth
+            self.gain = gain
+        }
     }
 
     /// Removes rumble, handling noise and HVAC below the voice.
-    var highPassHz: Float
+    public var highPassHz: Float
 
     /// Presence lift for consonant clarity. Deliberately wider and gentler than
     /// the ASR chain's, and centred above the vowel formants rather than on them —
     /// a narrow loud bell at 2.5 kHz reads as nasal over headphones.
-    var presence: Band
+    public var presence: Band
 
-    var compressorThresholdDB: Float
+    public var compressorThresholdDB: Float
     /// Larger headroom means a softer knee and a lower effective ratio. This is
     /// the single parameter most responsible for the result not sounding pumped.
-    var compressorHeadRoomDB: Float
+    public var compressorHeadRoomDB: Float
     /// Fast enough to catch a shouted word, slow enough that consonant transients
     /// pass intact. A recogniser does not care about transients; an ear does.
-    var compressorAttack: Float
+    public var compressorAttack: Float
     /// Spans inter-syllable gaps so gain does not wobble at syllable rate — that
     /// wobble is exactly what "pumping" sounds like.
-    var compressorRelease: Float
+    public var compressorRelease: Float
 
     /// `1.0` disables the downward expander. Never gate for listening: a gate
     /// chews word tails, and the quiet far-table voice this feature exists to
     /// rescue is precisely what a gate would remove.
-    var expansionRatio: Float
-    var expansionThresholdDB: Float
+    public var expansionRatio: Float
+    public var expansionThresholdDB: Float
 
     /// Restores roughly what the compression took off. Half the ASR chain's.
-    var makeupGainDB: Float
+    public var makeupGainDB: Float
 
     /// The limiter is a seatbelt, not a loudness stage. Any *constant* limiting is
     /// the harshness this tuning exists to avoid, which is why the pre-gain is 0
     /// where the ASR chain used to carry +3.
-    var limiterPreGainDB: Float
-    var limiterAttack: Float
-    var limiterDecay: Float
+    public var limiterPreGainDB: Float
+    public var limiterAttack: Float
+    public var limiterDecay: Float
 
     /// Integrated loudness the render normalizes to, in LUFS. -16 is the podcast
     /// convention, and the app is mono.
-    var targetLUFS: Double
+    public var targetLUFS: Double
 
     /// The original masks denoiser artefacts and restores the 8–12 kHz band the
     /// 16 kHz model cannot represent.
-    var wetMix: Float
+    public var wetMix: Float
 
-    static let listening = PlaybackTuning(
+    public init(
+        highPassHz: Float,
+        presence: Band,
+        compressorThresholdDB: Float,
+        compressorHeadRoomDB: Float,
+        compressorAttack: Float,
+        compressorRelease: Float,
+        expansionRatio: Float,
+        expansionThresholdDB: Float,
+        makeupGainDB: Float,
+        limiterPreGainDB: Float,
+        limiterAttack: Float,
+        limiterDecay: Float,
+        targetLUFS: Double,
+        wetMix: Float
+    ) {
+        self.highPassHz = highPassHz
+        self.presence = presence
+        self.compressorThresholdDB = compressorThresholdDB
+        self.compressorHeadRoomDB = compressorHeadRoomDB
+        self.compressorAttack = compressorAttack
+        self.compressorRelease = compressorRelease
+        self.expansionRatio = expansionRatio
+        self.expansionThresholdDB = expansionThresholdDB
+        self.makeupGainDB = makeupGainDB
+        self.limiterPreGainDB = limiterPreGainDB
+        self.limiterAttack = limiterAttack
+        self.limiterDecay = limiterDecay
+        self.targetLUFS = targetLUFS
+        self.wetMix = wetMix
+    }
+
+    public static let listening = PlaybackTuning(
         highPassHz: 80,
         presence: Band(frequency: 4000, bandwidth: 1.2, gain: 3),
         compressorThresholdDB: -28,
