@@ -7,6 +7,7 @@
 //
 
 import SwiftData
+import KurnCore
 import SwiftUI
 
 struct TagPickerView: View {

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct ProviderModelsService: Sendable {
     private let session: URLSession

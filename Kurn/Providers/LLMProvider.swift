@@ -363,78 +363,9 @@ struct ChatResponse: Decodable {
     var isTruncated: Bool { choices.first?.finishReason == "length" }
 }
 
-// MARK: - Shared JSON shape
-
-/// The JSON contract all vendors are instructed to return for summaries: an
-/// ordered list of titled sections, each with optional prose and/or bullets.
-struct SummaryJSON: Decodable {
-    struct Section: Decodable {
-        let title: String
-        let body: String?
-        let items: [String]?
-    }
-    let sections: [Section]
-
-    /// Map the wire shape into the shared `SummarySection` value type, dropping
-    /// sections that carry neither a title nor any content.
-    var summarySections: [SummarySection] {
-        sections.compactMap { section in
-            let title = section.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let body = (section.body ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let items = (section.items ?? [])
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            guard !title.isEmpty || !body.isEmpty || !items.isEmpty else { return nil }
-            return SummarySection(title: title, body: body, items: items)
-        }
-    }
-}
-
-extension SummaryJSON {
-    /// Tolerant decode that strips accidental markdown code fences before parsing.
-    static func parse(_ raw: String) throws -> SummaryJSON {
-        do {
-            return try JSONDecoder().decode(
-                SummaryJSON.self,
-                from: ModelJSON.objectData(from: raw)
-            )
-        } catch let error as AppError {
-            throw error
-        } catch {
-            throw AppError.decodingError(error.localizedDescription)
-        }
-    }
-}
-
-/// Extract a JSON object from model output while tolerating Markdown fences and
-/// explanatory prose. Structured-output APIs reduce these cases but do not
-/// eliminate them across all providers and model versions.
-enum ModelJSON {
-    static func objectData(from raw: String) throws -> Data {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.hasPrefix("```") {
-            if let firstNewline = text.firstIndex(of: "\n") {
-                text = String(text[text.index(after: firstNewline)...])
-            }
-            if let fenceRange = text.range(of: "```", options: .backwards) {
-                text = String(text[..<fenceRange.lowerBound])
-            }
-            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        if let data = text.data(using: .utf8),
-           (try? JSONSerialization.jsonObject(with: data)) is [String: Any] {
-            return data
-        }
-        if let start = text.firstIndex(of: "{"),
-           let end = text.lastIndex(of: "}"),
-           start < end,
-           let data = String(text[start...end]).data(using: .utf8) {
-            return data
-        }
-        throw AppError.decodingError("response did not contain a JSON object")
-    }
-}
+// `SummaryJSON` and `ModelJSON` now live in the KurnCore package
+// (`Sources/KurnCore/Providers/SummaryJSON.swift`) — no URLSession
+// dependency, unlike everything else in this file.
 
 // MARK: - Shared prompt
 

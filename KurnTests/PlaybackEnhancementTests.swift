@@ -11,6 +11,7 @@
 //
 
 import AVFoundation
+import KurnCore
 import Foundation
 import SwiftData
 import Testing

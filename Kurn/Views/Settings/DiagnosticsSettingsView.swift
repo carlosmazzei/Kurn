@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import KurnCore
 
 struct DiagnosticsSettingsView: View {
     @Environment(AppSettings.self) private var settings

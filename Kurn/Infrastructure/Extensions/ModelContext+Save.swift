@@ -10,6 +10,7 @@
 //
 
 import SwiftData
+import KurnCore
 
 extension ModelContext {
     /// Save pending changes, returning an already-logged `AppError` on failure

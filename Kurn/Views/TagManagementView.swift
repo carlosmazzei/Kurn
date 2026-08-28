@@ -8,6 +8,7 @@
 //
 
 import SwiftData
+import KurnCore
 import SwiftUI
 
 struct TagManagementView: View {

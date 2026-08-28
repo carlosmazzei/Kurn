@@ -18,6 +18,7 @@
 //
 
 import Foundation
+import KurnCore
 
 #if canImport(FluidAudio)
 import FluidAudio

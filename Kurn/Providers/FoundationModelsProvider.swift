@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import KurnCore
 import FoundationModels
 
 /// Whether the on-device model can actually be used right now, shared by

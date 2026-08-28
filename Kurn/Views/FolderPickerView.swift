@@ -11,6 +11,7 @@
 //
 
 import SwiftData
+import KurnCore
 import SwiftUI
 
 struct FolderPickerView: View {

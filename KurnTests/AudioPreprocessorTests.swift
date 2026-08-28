@@ -4,6 +4,7 @@
 //
 
 import AVFoundation
+import KurnCore
 import Foundation
 import Testing
 @testable import Kurn

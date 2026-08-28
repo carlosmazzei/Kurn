@@ -15,6 +15,7 @@
 //
 
 import Foundation
+import KurnCore
 import NaturalLanguage
 
 actor EmbeddingModelStore {

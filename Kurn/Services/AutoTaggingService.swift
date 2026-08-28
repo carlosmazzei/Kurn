@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct AutoTaggingService: Sendable {
 

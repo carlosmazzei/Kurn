@@ -1,6 +1,6 @@
 //
 //  SummaryJSONParsingTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 //  SummaryJSON.parse is the tolerant decoder all LLM providers route their raw
 //  text response through; it has to cope with code fences and stray prose since
@@ -9,7 +9,7 @@
 //
 
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct SummaryJSONParsingTests {
 

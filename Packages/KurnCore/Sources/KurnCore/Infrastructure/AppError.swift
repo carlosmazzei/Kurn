@@ -1,16 +1,15 @@
 //
 //  AppError.swift
-//  Kurn
+//  KurnCore
 //
 //  Central error type surfaced to the UI via app dialogs or non-blocking banners.
 //
 
 import Foundation
-import KurnCore
 
 /// All recoverable failures the app can produce. Conforms to `LocalizedError`
 /// so UI presentation code can render a human-readable message directly.
-enum AppError: LocalizedError, Identifiable {
+public enum AppError: LocalizedError, Identifiable {
     case noAPIKey(provider: String)
     case networkError(URLError)
     case apiError(statusCode: Int, message: String)
@@ -38,12 +37,12 @@ enum AppError: LocalizedError, Identifiable {
     case onDeviceModelUnavailable(String)
 
     /// Stable identity for item-based presentation and comparisons.
-    var id: String { errorDescription ?? "AppError" }
+    public var id: String { errorDescription ?? "AppError" }
 
     /// Content-free identifier safe to include in diagnostic logs. Provider
     /// messages and user data remain available to the UI but are never copied
     /// into this value.
-    var logCode: String {
+    public var logCode: String {
         switch self {
         case .noAPIKey: return "missing_api_key"
         case .networkError: return "network"
@@ -73,7 +72,7 @@ enum AppError: LocalizedError, Identifiable {
         }
     }
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .noAPIKey(let provider):
             return String(

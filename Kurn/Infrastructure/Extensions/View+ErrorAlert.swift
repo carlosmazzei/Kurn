@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import KurnCore
 
 extension View {
     /// Present a standard error dialog bound to an optional `AppError`. The

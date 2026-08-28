@@ -12,6 +12,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// Downloads and locates whisper.cpp models under
 /// `Application Support/WhisperCpp/Models/<variant>/ggml-<variant>.bin`.

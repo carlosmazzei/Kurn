@@ -6,6 +6,7 @@
 //
 
 import SwiftData
+import KurnCore
 import SwiftUI
 
 struct DocumentsListView: View {
