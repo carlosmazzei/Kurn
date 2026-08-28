@@ -1,6 +1,6 @@
 //
 //  TranscriptCorrectionGuardrail.swift
-//  Kurn
+//  KurnCore
 //
 //  Bounds how much an LLM-proposed correction may change a segment's text
 //  before it is rejected. Deliberately not a reuse of
@@ -13,15 +13,15 @@
 
 import Foundation
 
-enum TranscriptCorrectionGuardrail {
-    static let maxWordChangeRatio = 0.35
-    static let maxLengthRatio = 1.5
-    static let minLengthRatio = 0.6
+public enum TranscriptCorrectionGuardrail {
+    public static let maxWordChangeRatio = 0.35
+    public static let maxLengthRatio = 1.5
+    public static let minLengthRatio = 0.6
 
     /// Whether `corrected` is close enough to `original` to be a plausible
     /// spelling/punctuation fix rather than a paraphrase, invention, or
     /// emptied/fabricated segment.
-    static func accepts(original: String, corrected: String) -> Bool {
+    public static func accepts(original: String, corrected: String) -> Bool {
         let originalTrimmed = original.trimmingCharacters(in: .whitespacesAndNewlines)
         let correctedTrimmed = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
         guard correctedTrimmed != originalTrimmed else { return true }

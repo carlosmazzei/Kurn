@@ -3,6 +3,8 @@ included:
   - KurnTests
   - KurnWatch
   - KurnLiveActivityExtension
+  - Packages/KurnCore/Sources
+  - Packages/KurnCore/Tests
 
 opt_in_rules:
   - accessibility_label_for_image

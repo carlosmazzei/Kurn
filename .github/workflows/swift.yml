@@ -107,8 +107,28 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             clean test
 
+  # Fast, Xcode-free signal for the KurnCore package (see docs/roadmap.md,
+  # "The change that isn't a feature: SPM extraction"): runs in seconds on
+  # Linux, well before build-and-test's simulator boot finishes, and proves
+  # the package's pure logic actually passes its tests rather than just
+  # compiling under Xcode. Deliberately no `needs:` on build-and-test so the
+  # two run in parallel.
+  kurncore-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: swift test
+        working-directory: Packages/KurnCore
+        run: swift test
+
   release:
-    needs: build-and-test
+    needs: [build-and-test, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
@@ -130,7 +150,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   beta:
-    needs: build-and-test
+    needs: [build-and-test, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-26
     # Gates the actual TestFlight upload behind the `release` GitHub
@@ -163,7 +183,7 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
 
   store-assets:
-    needs: build-and-test
+    needs: [build-and-test, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/screenshots.yml
     with:

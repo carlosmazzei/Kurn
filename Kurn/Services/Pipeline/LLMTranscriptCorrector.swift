@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// The `.none` correction engine: returns the input unchanged with no
 /// allocation or network work, so leaving correction off costs nothing extra.
