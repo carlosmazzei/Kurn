@@ -5,6 +5,7 @@
 //  Create or edit a meeting: title, notes, and the transcription language.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 

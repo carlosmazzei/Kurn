@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import KurnCore
 import NaturalLanguage
 
 /// Defers detection to the transcription engine (current behavior): returns the

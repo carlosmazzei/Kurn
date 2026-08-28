@@ -7,6 +7,7 @@
 //  so the user finds out here rather than after starting a transcription.
 //
 
+import KurnCore
 import SwiftUI
 
 struct LanguagePickerRow: View {

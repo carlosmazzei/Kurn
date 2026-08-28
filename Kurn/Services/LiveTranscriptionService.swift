@@ -13,6 +13,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 import Observation
 
 #if canImport(FluidAudio)

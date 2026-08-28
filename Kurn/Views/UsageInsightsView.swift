@@ -8,6 +8,7 @@
 //  the counters.
 //
 
+import KurnCore
 import SwiftUI
 
 struct UsageInsightsView: View {

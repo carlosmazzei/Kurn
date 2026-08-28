@@ -8,6 +8,7 @@
 //  choice most people make isn't buried under six stage pickers.
 //
 
+import KurnCore
 import SwiftUI
 
 struct TranscriptionSettingsView: View {

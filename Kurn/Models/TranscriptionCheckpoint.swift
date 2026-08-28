@@ -14,6 +14,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct TranscriptionCheckpoint: Codable, Sendable {
     /// `TranscriptionEngine.rawValue` the chunks were transcribed with.

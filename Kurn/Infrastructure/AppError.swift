@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// All recoverable failures the app can produce. Conforms to `LocalizedError`
 /// so UI presentation code can render a human-readable message directly.
