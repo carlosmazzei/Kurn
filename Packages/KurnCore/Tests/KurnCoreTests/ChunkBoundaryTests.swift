@@ -1,6 +1,6 @@
 //
 //  ChunkBoundaryTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 //  Where a chunk ends.
 //
@@ -12,7 +12,7 @@
 
 import Foundation
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct ChunkBoundaryTests {
 

@@ -24,11 +24,8 @@ protocol AudioPreprocessing: Sendable {
     func cleanup(_ url: URL) async
 }
 
-/// A region of detected speech within a clip, `[start, end)` in seconds.
-struct SpeechRegion: Sendable, Hashable {
-    var start: TimeInterval
-    var end: TimeInterval
-}
+// `SpeechRegion` now lives in the KurnCore package
+// (`Sources/KurnCore/Pipeline/SpeechRegion.swift`).
 
 /// Voice-activity detection: locate the spoken regions of a clip. Used both as a
 /// standalone stage and internally by the heuristic diarizer.
