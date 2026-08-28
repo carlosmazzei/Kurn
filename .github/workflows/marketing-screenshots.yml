@@ -1,0 +1,83 @@
+name: Marketing Screenshots
+
+# Renders App-Store-ready marketing screenshots (real iPhone/iPad device
+# frame, dark gradient background, glassmorphism card) from the raw captures
+# that .github/workflows/screenshots.yml's `screenshots` job already produces
+# via `bundle exec fastlane screenshots` (fastlane/Fastfile, fastlane/Snapfile).
+# screenshots.yml's `upload` job pushes this workflow's iPhone/iPad output
+# (sized to Apple's exact required pixel dimensions - see
+# scripts/screenshots/frames.json) straight to App Store Connect in place of
+# the raw captures; only the raw Apple Watch captures, which this pipeline
+# never frames, still come from the `screenshots` artifact directly.
+#
+# This is a reusable workflow (workflow_call), invoked as a follow-up job
+# from screenshots.yml right after its `screenshots` job uploads the
+# "screenshots" artifact — reusing that macOS capture rather than running UI
+# tests a second time. Rendering itself needs no Xcode, so it runs on
+# ubuntu-latest to save macOS CI minutes.
+#
+# It can also be dispatched manually (workflow_dispatch) to re-render against
+# an *existing* screenshots.yml run without recapturing — pass that run's ID
+# as `run_id`. Left empty, it looks for a "screenshots" artifact in this same
+# run, which only exists when called from screenshots.yml.
+
+on:
+  workflow_call: {}
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID of an 'App Store Screenshots' run to pull the 'screenshots' artifact from (leave empty only if this run already has one, e.g. re-dispatching after a failure)"
+        type: string
+        required: false
+
+jobs:
+  render-marketing:
+    name: Render marketing screenshots (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # actions/download-artifact@v4 restores the artifact's directory
+      # structure directly (screenshots/<locale>/<device>-<name>.png) - no
+      # manual unzip step needed. `run-id` only needs setting for the
+      # workflow_dispatch cross-run path above; within a workflow_call from
+      # screenshots.yml it resolves to this same run, where the artifact
+      # already is.
+      - name: Download raw screenshots artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots
+          path: raw-screenshots
+          run-id: ${{ inputs.run_id || github.run_id }}
+          github-token: ${{ inputs.run_id && secrets.GITHUB_TOKEN || '' }}
+
+      - name: Install Node dependencies
+        working-directory: scripts/screenshots
+        run: npm install
+
+      - name: Install Playwright Chromium
+        working-directory: scripts/screenshots
+        run: npx playwright install --with-deps chromium
+
+      - name: Render marketing screenshots
+        working-directory: scripts/screenshots
+        run: |
+          node render.js \
+            --input-dir "$GITHUB_WORKSPACE/raw-screenshots" \
+            --output-dir "$GITHUB_WORKSPACE/screenshots-framed"
+
+      - name: Upload marketing screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-framed
+          path: screenshots-framed
+          if-no-files-found: error
+          retention-days: 14
