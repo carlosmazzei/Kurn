@@ -18,13 +18,10 @@
 // downgrades the false-positive concurrency diagnostics from AVFAudio.
 @preconcurrency import AVFoundation
 import Foundation
+import KurnCore
 
-/// One contiguous speech run in the compacted file and where it came from.
-struct TimelineSegment: Sendable, Equatable {
-    var compactedStart: TimeInterval
-    var originalStart: TimeInterval
-    var duration: TimeInterval
-}
+// `TimelineSegment` now lives in the KurnCore package
+// (`Sources/KurnCore/Pipeline/TimelineSegment.swift`).
 
 struct CompactionResult: Sendable {
     var url: URL

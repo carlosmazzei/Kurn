@@ -11,6 +11,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 actor EnergyVAD: VoiceActivityDetecting {
 
