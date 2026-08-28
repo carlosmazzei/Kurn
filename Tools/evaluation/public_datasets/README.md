@@ -123,11 +123,18 @@ xcodebuild -project Kurn.xcodeproj -scheme Kurn \
   test -only-testing:KurnTests/PublicDatasetEvaluationHarnessTests
 ```
 
-`KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 8-entry
+`KURN_PUBLIC_EVAL_MATRIX=essential` restricts the run to the 12-entry
 cleanup x VAD x diarization sweep against whisper.cpp only (`PipelineEvaluationMatrix.essential`),
-instead of the full 24-entry matrix -- useful for a fast local check. Omit it,
+instead of the full 36-entry matrix -- useful for a fast local check. Omit it,
 or set it to anything else, to run the full matrix. Both counts assume a single
 whisper.cpp model; sweeping more multiplies them (see below).
+
+`KURN_PUBLIC_EVAL_DIARIZATION_ENGINES` accepts a comma-separated subset of
+`heuristic`, `fluidAudio`, and `sherpaOnnx`; unset or `all` keeps every engine.
+For example, `KURN_PUBLIC_EVAL_MATRIX=essential` together with
+`KURN_PUBLIC_EVAL_DIARIZATION_ENGINES=sherpaOnnx` runs only the four new-engine
+cells (cleanup on/off x the two VAD engines). The CI workflow exposes the same
+filter as its `diarization_engines` dispatch input.
 
 ### Including cloud Whisper (OpenAI, Groq)
 

@@ -50,6 +50,7 @@ final class AppSettings {
         static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let whisperCppModel = "settings.whisperCppModel"
         static let whisperCppModelsConsented = "settings.whisperCppModelsConsented"
+        static let sherpaOnnxModelsConsented = "settings.sherpaOnnxModelsConsented"
         static let logLevel = "settings.logLevel"
         static let requireAuthForRecordings = "settings.requireAuthForRecordings"
         static let hideLiveActivityMeetingTitle = "settings.hideLiveActivityMeetingTitle"
@@ -284,6 +285,7 @@ final class AppSettings {
             languageDetection: languageDetectionEngine,
             diarization: diarizationEngine,
             diarizationConsented: fluidAudioDiarizationModelsConsented,
+            sherpaOnnxConsented: sherpaOnnxModelsConsented,
             transcription: transcriptionEngine,
             transcriptionProvider: transcriptionProvider,
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
@@ -339,6 +341,14 @@ final class AppSettings {
     /// separate choice (`whisperCppModel`).
     var whisperCppModelsConsented: Bool {
         didSet { defaults.set(whisperCppModelsConsented, forKey: Keys.whisperCppModelsConsented) }
+    }
+
+    /// Whether the user has consented to downloading sherpa-onnx's diarization
+    /// models (segmentation + speaker embedding), independent of the
+    /// FluidAudio diarization consent above — the two are separate downloads
+    /// for separate engines.
+    var sherpaOnnxModelsConsented: Bool {
+        didSet { defaults.set(sherpaOnnxModelsConsented, forKey: Keys.sherpaOnnxModelsConsented) }
     }
 
     /// Whether the user has opted in to on-device MetricKit diagnostic reports
@@ -572,6 +582,7 @@ final class AppSettings {
         fluidAudioDiarizationModelsConsented = defaults.bool(forKey: Keys.fluidAudioDiarizationModelsConsented)
         fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
         whisperCppModelsConsented = defaults.bool(forKey: Keys.whisperCppModelsConsented)
+        sherpaOnnxModelsConsented = defaults.bool(forKey: Keys.sherpaOnnxModelsConsented)
         diagnosticReportsConsented = defaults.bool(forKey: AppSettingsKeys.diagnosticReportsConsented)
         // Transcription engine: prefer the stored value; otherwise migrate the
         // legacy `defaultMode` + on-device-multilingual pairing into the new

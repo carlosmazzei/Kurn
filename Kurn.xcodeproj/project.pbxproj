@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 2AA9E4B62FECAAE50067BF88 /* FluidAudio */; };
 		2AB0000000000000000000A1 /* whisper in Frameworks */ = {isa = PBXBuildFile; productRef = 2AB0000000000000000000A2 /* whisper */; };
+		2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */ = {isa = PBXBuildFile; productRef = 2AD0000000000000000000A2 /* sherpa-onnx */; };
 		2AC0000000000000000000A1 /* Kurn/Resources/Models/GTCRN.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */; };
 		2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -141,6 +142,7 @@
 			files = (
 				2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */,
 				2AB0000000000000000000A1 /* whisper in Frameworks */,
+				2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,6 +407,7 @@
 			packageReferences = (
 				2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				2AB0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/WhisperCpp" */,
+				2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */,
 			);
 			productRefGroup = AA0000000000000000000002 /* Products */;
 			projectDirPath = "";
@@ -727,7 +730,9 @@
 				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SHERPA_ONNX_ENABLED";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -755,7 +760,9 @@
 				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "match AppStore ai.kurn.app";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SHERPA_ONNX_ENABLED";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1027,6 +1034,14 @@
 				version = 0.15.6;
 			};
 		};
+		2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/k2-fsa/sherpa-onnx.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.13.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1038,6 +1053,11 @@
 		2AB0000000000000000000A2 /* whisper */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = whisper;
+		};
+		2AD0000000000000000000A2 /* sherpa-onnx */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */;
+			productName = "sherpa-onnx";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

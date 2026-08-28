@@ -4,6 +4,7 @@
 
 <h1 align="center">Kurn</h1>
 
+[![Download on the App Store](https://img.shields.io/badge/Download_on_the-App_Store-0D96F6.svg?logo=apple&logoColor=white)](https://apps.apple.com/app/id6804278920)
 [![iOS CI](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-iOS%2017%2B%20%7C%20watchOS%2010%2B-blue.svg)
@@ -21,9 +22,9 @@ Recordings and meeting data are stored on device by default. Network requests
 only happen when the user chooses cloud (Whisper-compatible) transcription or
 generates a summary with a configured AI provider.
 
-> **App Store status:** Kurn is not yet published on the App Store — it's
-> currently in TestFlight testing, with an App Store submission to follow.
-> For now, you can also build it yourself from this repo (see
+> **Kurn is available on the App Store:**
+> [apps.apple.com/app/id6804278920](https://apps.apple.com/app/id6804278920).
+> You can also build it yourself from this repo (see
 > [Getting Started](#getting-started)).
 
 ## Current App
@@ -85,9 +86,10 @@ generates a summary with a configured AI provider.
   uploads for longer recordings. The transcription provider (OpenAI, Groq, or
   a custom OpenAI-compatible endpoint) is chosen independently of the summary
   provider.
-- Runs speaker diarization, either a lightweight built-in heuristic or
-  FluidAudio's neural on-device engine, and fuses speaker turns with
-  transcript spans.
+- Runs speaker diarization with a choice of three on-device engines — a
+  lightweight built-in heuristic, FluidAudio's neural engine, or sherpa-onnx's
+  segmentation-first engine (a collapse-resistant alternative for far-field
+  audio, CPU-only) — and fuses speaker turns with transcript spans.
 - Voice-activity detection and language detection are each independently
   configurable between an always-available built-in engine and a FluidAudio
   on-device model.
@@ -424,11 +426,14 @@ is shared into the `KurnLiveActivityExtension` target rather than duplicated.
 - Summary generation can use OpenAI, Anthropic, Google AI, or Groq, and long
   transcripts use a staged map-reduce pass with progress and cancellation in
   the Summary tab.
-- Speaker diarization, voice-activity detection, transcription, and language
-  detection are each independently configurable between a built-in engine
-  (available offline, no download) and a FluidAudio on-device engine; the
-  built-in diarizer is heuristic and approximate by design, while FluidAudio's
-  is a neural model that requires a one-time, opt-in download.
+- Voice-activity detection, transcription, and language detection are each
+  independently configurable between a built-in engine (available offline, no
+  download) and a FluidAudio on-device engine. Speaker diarization has a third
+  option too: sherpa-onnx's segmentation-first engine, offered alongside
+  FluidAudio's neural engine as a collapse-resistant alternative for far-field
+  audio (CPU-only, no Apple Neural Engine acceleration). The built-in diarizer
+  is heuristic and approximate by design; both neural engines require a
+  one-time, opt-in download.
 - On-device transcription availability depends on Apple's Speech framework
   or the downloaded FluidAudio model, simulator/device support, and the
   selected language.
@@ -468,6 +473,12 @@ Kurn depends on the [FluidAudio](https://github.com/FluidInference/FluidAudio)
 Swift package (Apache 2.0) and downloads several CoreML models on demand —
 NVIDIA Parakeet TDT for ASR, pyannote / WeSpeaker / NVIDIA Sortformer for
 diarization, and Silero VAD. Each carries its own license.
+
+The optional third diarization engine depends on
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0) and
+downloads pyannote's segmentation-3.0 model (MIT) and a 3D-Speaker CAM++
+speaker-embedding model (Apache 2.0), both converted to ONNX by the
+sherpa-onnx project.
 
 The full attribution list and license details are in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and the same notices are

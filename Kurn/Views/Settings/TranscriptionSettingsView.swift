@@ -255,7 +255,9 @@ struct TranscriptionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if downloads.downloadingModel == .diarization || downloads.downloadingModel == .vad {
+            if downloads.downloadingModel == .diarization
+                || downloads.downloadingModel == .sherpaOnnxDiarization
+                || downloads.downloadingModel == .vad {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress)
             }
         } header: {

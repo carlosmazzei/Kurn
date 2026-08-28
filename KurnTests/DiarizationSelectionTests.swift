@@ -44,4 +44,39 @@ struct DiarizationSelectionTests {
             #expect(!config.diarizationFellBack)
         }
     }
+
+    // MARK: - sherpa-onnx (third engine)
+
+    /// Without its own consent, sherpa-onnx must fall back exactly like
+    /// FluidAudio does — the two consent flags are independent, so consenting
+    /// to one engine's download must never be read as consent for the other.
+    @Test func withoutConsentSherpaOnnxFallsBackToTheHeuristic() {
+        let config = PipelineConfiguration(diarization: .sherpaOnnx, sherpaOnnxConsented: false)
+        #expect(config.effectiveDiarization == .heuristic)
+        #expect(config.diarizationFellBack)
+    }
+
+    @Test func withConsentSherpaOnnxRuns() {
+        let config = PipelineConfiguration(diarization: .sherpaOnnx, sherpaOnnxConsented: true)
+        #expect(config.effectiveDiarization == .sherpaOnnx)
+        #expect(!config.diarizationFellBack)
+    }
+
+    /// FluidAudio's consent must not leak into sherpa-onnx's selection, and
+    /// vice versa — each engine's fallback is decided by its own flag only.
+    @Test func consentFlagsAreIndependentPerEngine() {
+        let fluidAudioSelectedButOnlySherpaConsented = PipelineConfiguration(
+            diarization: .fluidAudio,
+            diarizationConsented: false,
+            sherpaOnnxConsented: true
+        )
+        #expect(fluidAudioSelectedButOnlySherpaConsented.effectiveDiarization == .heuristic)
+
+        let sherpaSelectedButOnlyFluidAudioConsented = PipelineConfiguration(
+            diarization: .sherpaOnnx,
+            diarizationConsented: true,
+            sherpaOnnxConsented: false
+        )
+        #expect(sherpaSelectedButOnlyFluidAudioConsented.effectiveDiarization == .heuristic)
+    }
 }

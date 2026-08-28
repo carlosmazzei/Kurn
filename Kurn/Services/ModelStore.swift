@@ -23,15 +23,18 @@ enum ModelStore {
         case diarization
         case vad
         case whisperCpp
+        case sherpaOnnxDiarization
 
         var id: String { rawValue }
 
         /// Directory the group's folders live under. Everything FluidAudio
-        /// downloads shares its cache; whisper.cpp keeps its own root so neither
-        /// downloader can see — or delete — the other's files.
+        /// downloads shares its cache; whisper.cpp and sherpa-onnx each keep
+        /// their own root so no downloader can see — or delete — another's
+        /// files.
         var root: URL {
             switch self {
             case .whisperCpp: return WhisperCppModelDownloader.modelsDirectory
+            case .sherpaOnnxDiarization: return SherpaOnnxModelDownloader.modelsDirectory
             case .liveTranscription, .onDeviceLanguage, .diarization, .vad: return ModelStore.modelsDirectory
             }
         }
@@ -69,6 +72,9 @@ enum ModelStore {
                 // Deterministic: the app names these folders itself, so unlike
                 // the FluidAudio groups there is nothing to discover.
                 return WhisperCppModel.allCases.map(\.folderName)
+            case .sherpaOnnxDiarization:
+                // Also deterministic — this app names both folders itself.
+                return SherpaOnnxModelDownloader.folderNames
             }
         }
 
@@ -84,14 +90,17 @@ enum ModelStore {
                 return NSLocalizedString("settings.models.vad", comment: "Voice activity detection model")
             case .whisperCpp:
                 return NSLocalizedString("settings.models.whisper_cpp", comment: "On-device Whisper models")
+            case .sherpaOnnxDiarization:
+                return NSLocalizedString("settings.models.sherpa_onnx", comment: "Sherpa-ONNX diarization models")
             }
         }
 
         /// Whether each folder in the group is a model the user can keep or
         /// delete on its own. whisper.cpp's size variants are independent —
         /// keeping `small` and dropping `large-v3-turbo` is a reasonable thing
-        /// to want — whereas FluidAudio's folders are parts of one feature that
-        /// only work together, so those stay a single row.
+        /// to want — whereas FluidAudio's folders (and sherpa-onnx's
+        /// segmentation/embedding pair) are parts of one feature that only
+        /// work together, so those stay a single row.
         var listsFoldersSeparately: Bool { self == .whisperCpp }
 
         /// Name for one folder when the group lists its folders separately.

@@ -96,6 +96,7 @@ struct TranscriptionService {
     private let whisperCppTranscriber = WhisperCppTranscriber()
     private let heuristicDiarizer = SpeakerDiarizer()
     private let fluidAudioDiarizer = FluidAudioDiarizer()
+    private let sherpaOnnxDiarizer = SherpaOnnxDiarizer()
     private let diarizationPreprocessor = DiarizationPreprocessor()
     private let vadCompactor = VADAudioCompactor()
     private let noOpCorrector = NoOpTranscriptCorrector()
@@ -604,6 +605,15 @@ struct TranscriptionService {
             AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(outcome.turns.count, privacy: .public) speakers=\(speakers, privacy: .public) voiceprints=\(outcome.voiceprints.count, privacy: .public)")
             onProgress(0.98)
             return outcome
+        case .sherpaOnnx:
+            onProgress(0.60)
+            let turns = await sherpaOnnxDiarizer.diarize(url: diarURL, speakerCount: speakerCount)
+            try await ResourceGuard.requireTranscriptionHeadroom()
+            AppLog.transcription.atNotice.notice("diarize: SherpaOnnx complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
+            onProgress(0.98)
+            // No voiceprints yet: sherpa-onnx's CAM++ embeddings aren't
+            // surfaced through this engine's MVP — see `SherpaOnnxDiarizer`.
+            return DiarizationOutcome(turns: turns)
         }
     }
 }

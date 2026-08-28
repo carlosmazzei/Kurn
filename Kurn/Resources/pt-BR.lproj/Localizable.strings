@@ -41,6 +41,7 @@
 /* Motores de diarização */
 "diarization.heuristic" = "Heurístico";
 "diarization.fluid_audio" = "FluidAudio";
+"diarization.sherpa_onnx" = "Sherpa-ONNX";
 
 /* Correction engines */
 "correction.none" = "Desativado";
@@ -588,7 +589,9 @@
 "settings.model_download.preparing" = "Preparando modelo…";
 "settings.model_download.compiling" = "Compilando modelo…";
 "settings.fluid_audio.package_missing" = "Adicione o pacote Swift FluidAudio ao target Kurn antes de usar este recurso.";
+"settings.sherpa_onnx.package_missing" = "Adicione o pacote Swift sherpa-onnx ao target Kurn antes de usar este recurso.";
 "settings.model_download.message_whisper_cpp" = "Este mecanismo baixa um modelo Whisper para que a transcrição funcione inteiramente neste dispositivo. O modelo fica salvo e não são necessários novos downloads. Recomenda-se usar Wi-Fi.";
+"settings.model_download.message_sherpa_onnx" = "Este mecanismo baixa um modelo de segmentação e um modelo de identificação de voz (cerca de 35 MB no total) para que a diarização funcione inteiramente neste dispositivo, sem aceleração do Apple Neural Engine. Os modelos ficam salvos e não são necessários novos downloads.";
 "settings.whisper_cpp.package_missing" = "Adicione o pacote Swift whisper.cpp ao target Kurn antes de usar este recurso.";
 "settings.whisper_cpp.model" = "Modelo Whisper";
 "settings.whisper_cpp.model_footer" = "Modelos maiores transcrevem com mais precisão, mas baixam mais dados e são mais lentos. Cada um é baixado separadamente e pode ser excluído em Armazenamento.";
@@ -614,6 +617,7 @@
 "settings.models.vad" = "Detecção de Atividade de Voz";
 "settings.models.other" = "Outros Modelos FluidAudio";
 "settings.models.whisper_cpp" = "Whisper no Dispositivo";
+"settings.models.sherpa_onnx" = "Diarização Sherpa-ONNX";
 "settings.models.installed" = "Instalado";
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
@@ -660,6 +664,8 @@
 "share.format.picker" = "Formato";
 "share.format.standard" = "Padrão";
 "share.format.obsidian" = "Obsidian";
+"share.format.standard.detail" = "Markdown simples, sem metadados extras.";
+"share.format.obsidian.detail" = "Adiciona frontmatter YAML e [[wikilinks]] para falantes.";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Tarefa concluída";

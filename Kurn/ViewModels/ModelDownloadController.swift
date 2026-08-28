@@ -47,6 +47,7 @@ final class ModelDownloadController {
     var showingASRConsent = false
     var showingBatchASRConsent = false
     var showingDiarizationConsent = false
+    var showingSherpaOnnxConsent = false
     var showingVADConsent = false
     var showingWhisperCppConsent = false
 
@@ -159,6 +160,9 @@ final class ModelDownloadController {
         if engine == .fluidAudio && !settings.fluidAudioDiarizationModelsConsented {
             pendingDiarizationEngine = engine
             showingDiarizationConsent = true
+        } else if engine == .sherpaOnnx && !settings.sherpaOnnxModelsConsented {
+            pendingDiarizationEngine = engine
+            showingSherpaOnnxConsent = true
         } else {
             settings.diarizationEngine = engine
         }
@@ -223,6 +227,19 @@ final class ModelDownloadController {
     }
 
     func cancelDiarization() {
+        pendingDiarizationEngine = nil
+    }
+
+    func confirmSherpaOnnx(settings: AppSettings) {
+        guard let engine = pendingDiarizationEngine else { return }
+        pendingDiarizationEngine = nil
+        download(.sherpaOnnxDiarization, recordingAs: .sherpaOnnxDiarization) {
+            settings.sherpaOnnxModelsConsented = true
+            settings.diarizationEngine = engine
+        }
+    }
+
+    func cancelSherpaOnnx() {
         pendingDiarizationEngine = nil
     }
 
@@ -334,6 +351,11 @@ final class ModelDownloadController {
         case .diarization:
             settings.fluidAudioDiarizationModelsConsented = false
             settings.diarizationEngine = .heuristic
+        case .sherpaOnnxDiarization:
+            settings.sherpaOnnxModelsConsented = false
+            if settings.diarizationEngine == .sherpaOnnx {
+                settings.diarizationEngine = .heuristic
+            }
         case .vad:
             settings.fluidAudioVADModelsConsented = false
             settings.vadEngine = .energyThreshold

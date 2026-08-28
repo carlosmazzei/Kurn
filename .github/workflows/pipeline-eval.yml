@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       matrix:
-        description: "essential (8 configs, whisper.cpp only, fast) or full (24+ configs)"
+        description: "essential (12 configs, whisper.cpp only) or full (36+ configs), before optional filters"
         type: choice
         options: [full, essential]
         default: full
@@ -33,6 +33,10 @@ on:
         default: "small"
       transcription_engines:
         description: "on-device engines to sweep: appleSpeech,fluidAudioParakeet,whisperCpp / none (only cloud_providers) / blank=all"
+        type: string
+        default: ""
+      diarization_engines:
+        description: "diarizers to sweep: heuristic,fluidAudio,sherpaOnnx / blank=all"
         type: string
         default: ""
       correction:
@@ -135,6 +139,7 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_ENGINES: ${{ github.event.inputs.transcription_engines }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_DIARIZATION_ENGINES: ${{ github.event.inputs.diarization_engines }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION: ${{ github.event.inputs.correction }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION_PROVIDER: ${{ github.event.inputs.correction_provider }}
           # The report is written row by row, so a cancelled or timed-out run

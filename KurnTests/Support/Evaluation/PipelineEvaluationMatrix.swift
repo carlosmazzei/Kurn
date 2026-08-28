@@ -15,7 +15,7 @@
 //  original request asked about.
 //
 //  `.whisperAPI` (cloud Whisper — OpenAI, Groq) is opt-in and additive, not
-//  part of the base 24. Every other engine here is on-device and free to run
+//  part of the base 36. Every other engine here is on-device and free to run
 //  unattended; a cloud engine sends the recording to a third party and costs
 //  money per call, so it must never be exercised just because the matrix
 //  exists. It is included only for providers whose API key secret
@@ -49,7 +49,8 @@ enum PipelineEvaluationMatrix {
     static let all: [Entry] = build(
         whisperCppModels: whisperCppModelsFromEnvironment(),
         cloudProviders: cloudProvidersFromEnvironment(),
-        transcriptionEngines: transcriptionEnginesFromEnvironment()
+        transcriptionEngines: transcriptionEnginesFromEnvironment(),
+        diarizationEngines: diarizationEnginesFromEnvironment()
     )
 
     /// On-device transcription engines to sweep. Defaults to every on-device
@@ -70,6 +71,19 @@ enum PipelineEvaluationMatrix {
         if tokens == ["none"] { return [] }
         if tokens == ["all"] { return onDeviceEngines }
         return onDeviceEngines.filter { tokens.contains($0.rawValue.lowercased()) }
+    }
+
+    static func diarizationEnginesFromEnvironment() -> [DiarizationEngine] {
+        diarizationEngines(from: ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_DIARIZATION_ENGINES"])
+    }
+
+    static func diarizationEngines(from raw: String?) -> [DiarizationEngine] {
+        guard let raw, !raw.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return DiarizationEngine.allCases
+        }
+        let tokens = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        if tokens == ["all"] { return DiarizationEngine.allCases }
+        return DiarizationEngine.allCases.filter { tokens.contains($0.rawValue.lowercased()) }
     }
 
     /// Whisper.cpp models to sweep when the transcription engine is
@@ -122,15 +136,16 @@ enum PipelineEvaluationMatrix {
         case cloud(AIProvider)
     }
 
-    private static func build(
+    static func build(
         whisperCppModels: [WhisperCppModel],
         cloudProviders: [AIProvider],
-        transcriptionEngines: [TranscriptionEngine]
+        transcriptionEngines: [TranscriptionEngine],
+        diarizationEngines: [DiarizationEngine]
     ) -> [Entry] {
         var entries: [Entry] = []
         for preprocessing in PreprocessingEngine.allCases {
             for vad in VADEngine.allCases {
-                for diarization in DiarizationEngine.allCases {
+                for diarization in diarizationEngines {
                     for transcription in transcriptionEngines {
                         if transcription == .whisperCpp {
                             for model in whisperCppModels {
@@ -180,6 +195,7 @@ enum PipelineEvaluationMatrix {
             languageDetection: .byTranscriber,
             diarization: diarization,
             diarizationConsented: diarization == .fluidAudio,
+            sherpaOnnxConsented: diarization == .sherpaOnnx,
             transcription: transcription,
             diarizationPreprocessingEnabled: true
         )
@@ -238,6 +254,7 @@ enum PipelineEvaluationMatrix {
         case .diarization: return "diarization"
         case .vad: return "vad"
         case .whisperCppASR(let model): return "whisperCppASR:\(model.rawValue)"
+        case .sherpaOnnxDiarization: return "sherpaOnnxDiarization"
         }
     }
 
@@ -327,8 +344,12 @@ enum PipelineEvaluationMatrix {
     /// Portuguese corpora do not have a supported Apple Speech locale on the
     /// simulator, and the goal is to exercise the preprocessing/VAD/diarization
     /// axes, not the ASR vendor.
-    static let essential: [Entry] = all.filter {
-        ($0.configuration.vad == .energyThreshold || $0.configuration.vad == .fluidAudio)
-            && $0.configuration.transcription == .whisperCpp
+    static let essential: [Entry] = essentialEntries(from: all)
+
+    static func essentialEntries(from entries: [Entry]) -> [Entry] {
+        entries.filter {
+            ($0.configuration.vad == .energyThreshold || $0.configuration.vad == .fluidAudio)
+                && $0.configuration.transcription == .whisperCpp
+        }
     }
 }

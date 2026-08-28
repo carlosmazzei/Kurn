@@ -41,6 +41,7 @@
 /* Diarization engines */
 "diarization.heuristic" = "Heuristic";
 "diarization.fluid_audio" = "FluidAudio";
+"diarization.sherpa_onnx" = "Sherpa-ONNX";
 
 /* Correction engines */
 "correction.none" = "Off";
@@ -588,7 +589,9 @@
 "settings.model_download.preparing" = "Preparing model…";
 "settings.model_download.compiling" = "Compiling model…";
 "settings.fluid_audio.package_missing" = "Add the FluidAudio Swift package to the Kurn target before using this feature.";
+"settings.sherpa_onnx.package_missing" = "Add the sherpa-onnx Swift package to the Kurn target before using this feature.";
 "settings.model_download.message_whisper_cpp" = "This engine downloads a Whisper model so transcription runs entirely on this device. The model is kept afterward and no further downloads are needed. Wi-Fi is recommended.";
+"settings.model_download.message_sherpa_onnx" = "This engine downloads a segmentation and a speaker-embedding model (about 35 MB total) so diarization runs entirely on this device, without Apple Neural Engine acceleration. The models are kept afterward and no further downloads are needed.";
 "settings.whisper_cpp.package_missing" = "Add the whisper.cpp Swift package to the Kurn target before using this feature.";
 "settings.whisper_cpp.model" = "Whisper Model";
 "settings.whisper_cpp.model_footer" = "Larger models transcribe more accurately but download more data and run slower. Each one is downloaded separately and can be deleted under Storage.";
@@ -614,6 +617,7 @@
 "settings.models.vad" = "Voice Activity Detection";
 "settings.models.other" = "Other FluidAudio Models";
 "settings.models.whisper_cpp" = "On-Device Whisper";
+"settings.models.sherpa_onnx" = "Sherpa-ONNX Diarization";
 "settings.models.installed" = "Installed";
 "settings.models.delete" = "Delete Model";
 "settings.models.delete_confirm" = "Delete this model?";
@@ -660,6 +664,8 @@
 "share.format.picker" = "Format";
 "share.format.standard" = "Standard";
 "share.format.obsidian" = "Obsidian";
+"share.format.standard.detail" = "Plain Markdown, no extra metadata.";
+"share.format.obsidian.detail" = "Adds YAML frontmatter and [[wikilinks]] for speakers.";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Completed task";

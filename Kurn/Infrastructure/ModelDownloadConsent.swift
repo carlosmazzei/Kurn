@@ -22,6 +22,10 @@ enum ModelSet: Sendable, Equatable {
     /// whisper.cpp GGML weights. Carries the variant because, unlike the
     /// FluidAudio sets, the user chooses which weight file to download.
     case whisperCppASR(WhisperCppModel)
+    /// sherpa-onnx's diarization model pair (segmentation + speaker embedding
+    /// ONNX files). Brings its own downloader, unrelated to FluidAudio's —
+    /// same shape as `whisperCppASR`.
+    case sherpaOnnxDiarization
 }
 
 enum ModelDownloadPhase: Sendable, Equatable {
@@ -45,6 +49,14 @@ struct ModelDownloadConsent {
         // downloader, so this set must work in a build without FluidAudio linked.
         if case .whisperCppASR(let model) = set {
             try await WhisperCppModelDownloader.download(model, onProgress: onProgress)
+            try await ResourceGuard.requireModelDownloadHeadroom()
+            return
+        }
+        // Same reasoning as `.whisperCppASR` above: sherpa-onnx brings its own
+        // downloader, unrelated to FluidAudio, so this set must also work in a
+        // build without FluidAudio linked.
+        if case .sherpaOnnxDiarization = set {
+            try await SherpaOnnxModelDownloader.download(onProgress: onProgress)
             try await ResourceGuard.requireModelDownloadHeadroom()
             return
         }
@@ -83,8 +95,8 @@ struct ModelDownloadConsent {
                 // Silero VAD CoreML model; `VadManager`'s initializer downloads
                 // and loads it on first use.
                 _ = try await VadManager(progressHandler: progressHandler(onProgress))
-            case .whisperCppASR:
-                // Unreachable — returned above, before this branch.
+            case .whisperCppASR, .sherpaOnnxDiarization:
+                // Unreachable — both returned above, before this branch.
                 break
             }
             onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
