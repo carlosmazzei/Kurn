@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct UsageStats: Codable, Sendable, Equatable {
     var recordingsCompleted: Int = 0

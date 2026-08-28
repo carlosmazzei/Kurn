@@ -7,6 +7,7 @@
 //  the user only finding out via a transcription-time error.
 //
 
+import KurnCore
 import Speech
 
 enum TranscriptionLanguageSupport {

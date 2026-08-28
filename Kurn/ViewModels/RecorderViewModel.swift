@@ -8,6 +8,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 import Observation
 import os
 import SwiftData

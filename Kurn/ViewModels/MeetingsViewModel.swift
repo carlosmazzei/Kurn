@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 import Observation
 import SwiftData
 

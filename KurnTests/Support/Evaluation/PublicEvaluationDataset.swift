@@ -30,6 +30,7 @@
 //
 
 import Foundation
+import KurnCore
 @testable import Kurn
 
 enum PublicEvaluationDataset {

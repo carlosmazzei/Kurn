@@ -1,6 +1,6 @@
 //
 //  MeetingLanguage.swift
-//  Kurn
+//  KurnCore
 //
 //  Supported transcription languages: every language Whisper's cloud API
 //  understands. Table-driven rather than switch-driven so SwiftLint's
@@ -14,7 +14,7 @@ import Foundation
 /// on-device recognizer and the code Whisper expects in its `language` hint.
 /// `autoDetect` lets the engine decide. Case rawValues are persisted via
 /// `Meeting.languageRaw` — never rename or remove an existing case.
-enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
+public enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     case autoDetect
     case portuguese
     case english
@@ -117,7 +117,7 @@ enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     case sundanese
     case cantonese
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     /// Per-case metadata driving locale resolution, Whisper hints, and
     /// localization.
@@ -232,12 +232,12 @@ enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     ]
 
     /// BCP-47 identifier for the on-device recognizer, or `nil` for auto-detect.
-    var localeIdentifier: String? { Self.table[self]!.localeIdentifier }
+    public var localeIdentifier: String? { Self.table[self]!.localeIdentifier }
 
     /// Code Whisper expects in its `language` field, or `nil` for auto-detect.
-    var whisperCode: String? { Self.table[self]!.whisperCode }
+    public var whisperCode: String? { Self.table[self]!.whisperCode }
 
-    var displayName: String {
+    public var displayName: String {
         NSLocalizedString(Self.table[self]!.localizationKey, comment: "Language name")
     }
 
@@ -261,7 +261,7 @@ enum MeetingLanguage: String, Codable, Sendable, CaseIterable, Identifiable {
     /// a raw-value match, since some providers (e.g. OpenAI's `verbose_json`
     /// response) report a full English language name like "portuguese"
     /// rather than a code, and that's exactly what each case's rawValue is.
-    init(detectedCode code: String) {
+    public init(detectedCode code: String) {
         let normalized = code.lowercased()
         if let match = Self.byCode[normalized] {
             self = match

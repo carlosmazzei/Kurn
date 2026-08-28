@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 import Observation
 
 /// UserDefaults key for diagnostic-reports consent, hoisted out of `AppSettings.Keys`

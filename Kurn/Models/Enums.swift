@@ -326,20 +326,8 @@ enum AudioQuality: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
-/// Where a transcript is produced.
-enum TranscriptionMode: String, Codable, Sendable, CaseIterable, Identifiable {
-    case onDevice
-    case whisperAPI
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .onDevice: return NSLocalizedString("mode.on_device", comment: "On-device")
-        case .whisperAPI: return NSLocalizedString("mode.whisper", comment: "Whisper API")
-        }
-    }
-}
+// `TranscriptionMode` now lives in the KurnCore package
+// (`Sources/KurnCore/Models/TranscriptionMode.swift`).
 
 /// Speaker diarization engine used when transcribing a recording.
 enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -398,57 +386,11 @@ enum CorrectionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
-/// Transcription engine used to turn audio into text. Replaces the older
-/// `TranscriptionMode` + "multilingual on-device" boolean pair with a single
-/// explicit choice. `TranscriptionMode` is still persisted on `Recording` for
-/// back-compat; map via `storageMode`.
-enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
-    /// Apple `SFSpeechRecognizer`, on-device, fixed locale (no language detection).
-    case appleSpeech
-    /// FluidAudio multilingual on-device batch ASR (Parakeet TDT v3), detects
-    /// the spoken language from the audio. Requires a model download.
-    case fluidAudioParakeet
-    /// OpenAI Whisper cloud API (chunked upload). Requires an OpenAI API key.
-    case whisperAPI
-    /// Whisper running fully on device through whisper.cpp. Same language
-    /// coverage as `.whisperAPI` with nothing leaving the phone, at the cost of
-    /// a one-time GGML weight download (see `WhisperCppModel`).
-    case whisperCpp
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .appleSpeech: return NSLocalizedString("transcription.apple_speech", comment: "Apple Speech")
-        case .fluidAudioParakeet: return NSLocalizedString("transcription.fluid_parakeet", comment: "FluidAudio multilingual")
-        case .whisperAPI: return NSLocalizedString("transcription.whisper", comment: "Whisper API")
-        case .whisperCpp: return NSLocalizedString("transcription.whisper_cpp", comment: "Whisper on-device")
-        }
-    }
-
-    /// Model family that must be downloaded before this engine runs, or `nil`
-    /// when it needs no download.
-    ///
-    /// Unlike the other stage enums this is a function, because whisper.cpp has
-    /// a variant axis: the set has to name *which* weight file to fetch, and a
-    /// defaulted parameter would let a caller silently download the wrong one.
-    func requiredModelSet(whisperCppModel: WhisperCppModel) -> ModelSet? {
-        switch self {
-        case .appleSpeech, .whisperAPI: return nil
-        case .fluidAudioParakeet: return .onDeviceASR
-        case .whisperCpp: return .whisperCppASR(whisperCppModel)
-        }
-    }
-
-    /// The legacy `TranscriptionMode` to persist on `Recording` so the stored
-    /// field stays valid without a SwiftData migration.
-    var storageMode: TranscriptionMode {
-        switch self {
-        case .appleSpeech, .fluidAudioParakeet, .whisperCpp: return .onDevice
-        case .whisperAPI: return .whisperAPI
-        }
-    }
-}
+// `TranscriptionEngine` now lives in the KurnCore package
+// (`Sources/KurnCore/Models/TranscriptionEngine.swift`); its
+// `requiredModelSet(whisperCppModel:)` — which needs `ModelSet`, defined
+// below in `ModelDownloadConsent.swift` and not portable — is added back as
+// an extension in `Kurn/Models/TranscriptionEngine+ModelSet.swift`.
 
 /// Offline DSP cleanup engine applied before the transcription path.
 enum PreprocessingEngine: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -723,6 +665,5 @@ struct Highlight: Codable, Identifiable, Hashable, Sendable {
     var createdAt: Date = Date()
 }
 
-// `MeetingLanguage` lives in its own file, `Models/MeetingLanguage.swift`,
-// since its table-driven implementation (covering every Whisper-supported
-// language) is too large to sit alongside the other enums here.
+// `MeetingLanguage` now lives in the KurnCore package
+// (`Sources/KurnCore/Models/MeetingLanguage.swift`).
