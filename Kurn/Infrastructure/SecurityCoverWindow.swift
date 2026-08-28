@@ -21,9 +21,23 @@
 //  into.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 import UIKit
+
+private extension ScenePhase {
+    /// One-line mapping to KurnCore's portable stand-in, so
+    /// `SecurityCoverState.resolve` never needs to import SwiftUI.
+    var kurnLifecyclePhase: AppLifecyclePhase {
+        switch self {
+        case .active: .active
+        case .inactive: .inactive
+        case .background: .background
+        @unknown default: .background
+        }
+    }
+}
 
 /// Owns the cover window's lifecycle. Not `@Observable`: it is driven from the
 /// outside by `securityCover(...)`, which recomputes the state from the scene
@@ -161,7 +175,7 @@ private struct SecurityCoverModifier: ViewModifier {
     /// transition.
     private var state: SecurityCoverState {
         .resolve(
-            scenePhase: scenePhase,
+            phase: scenePhase.kurnLifecyclePhase,
             requireAuth: settings.requireAuthForRecordings,
             isUnlocked: gate.isUnlocked
         )
