@@ -9,6 +9,7 @@
 //  shared Keychain/singleton state.
 //
 
+import KurnCore
 import SwiftData
 import Testing
 @testable import Kurn
