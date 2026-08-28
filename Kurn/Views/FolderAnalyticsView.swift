@@ -6,6 +6,7 @@
 //  transcription status breakdown, popular tags, and top speakers.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 

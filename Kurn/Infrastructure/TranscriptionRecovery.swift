@@ -19,6 +19,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 
 enum TranscriptionRecovery {

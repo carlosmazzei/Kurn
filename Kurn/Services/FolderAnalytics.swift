@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct FolderAnalytics {
     let meetingCount: Int
