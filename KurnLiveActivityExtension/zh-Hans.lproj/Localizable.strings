@@ -4,3 +4,10 @@
 "live_activity.resume" = "继续";
 "live_activity.stop" = "停止";
 "live_activity.highlight" = "标记";
+
+"intent.startRecording.title" = "开始录音";
+"intent.startRecording.description" = "无需打开应用即可开始一段新的 Kurn 录音。";
+"intent.startRecording.shortTitle" = "开始录音";
+"control.startRecording.title" = "开始录音";
+"control.startRecording.displayName" = "开始录音";
+"control.startRecording.description" = "开始一段新的 Kurn 录音。将其添加到锁定屏幕后，即使设备处于锁定状态，也可以通过单击触发。";

@@ -4,3 +4,10 @@
 "live_activity.resume" = "Fortsetzen";
 "live_activity.stop" = "Stopp";
 "live_activity.highlight" = "Markieren";
+
+"intent.startRecording.title" = "Aufnahme starten";
+"intent.startRecording.description" = "Startet eine neue Kurn-Aufnahme, ohne die App zu öffnen.";
+"intent.startRecording.shortTitle" = "Aufnahme starten";
+"control.startRecording.title" = "Aufnahme starten";
+"control.startRecording.displayName" = "Aufnahme starten";
+"control.startRecording.description" = "Startet eine neue Kurn-Aufnahme. Wird sie zum Sperrbildschirm hinzugefügt, kann sie dort mit einem einzigen Tipp ausgelöst werden, während das Gerät gesperrt ist.";

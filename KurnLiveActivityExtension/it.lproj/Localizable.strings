@@ -4,3 +4,10 @@
 "live_activity.resume" = "Riprendi";
 "live_activity.stop" = "Interrompi";
 "live_activity.highlight" = "Evidenzia";
+
+"intent.startRecording.title" = "Avvia registrazione";
+"intent.startRecording.description" = "Avvia una nuova registrazione in Kurn senza aprire l'app.";
+"intent.startRecording.shortTitle" = "Avvia registrazione";
+"control.startRecording.title" = "Avvia registrazione";
+"control.startRecording.displayName" = "Avvia registrazione";
+"control.startRecording.description" = "Avvia una nuova registrazione in Kurn. Aggiungendolo alla schermata di blocco, può essere attivato con un solo tocco anche a dispositivo bloccato.";
