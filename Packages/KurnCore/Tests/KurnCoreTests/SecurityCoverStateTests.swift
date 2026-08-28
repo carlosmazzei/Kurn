@@ -1,6 +1,6 @@
 //
 //  SecurityCoverStateTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 //  The cover itself is a `UIWindow` and its layering can't be exercised here.
 //  What can be, and what the security of the whole scheme rests on, is the
@@ -10,15 +10,14 @@
 //  owner has turned the requirement off.
 //
 
-import SwiftUI
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct SecurityCoverStateTests {
 
     @Test func activeAndUnlockedShowsNothing() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .active, requireAuth: true, isUnlocked: true
+            phase: .active, requireAuth: true, isUnlocked: true
         )
         #expect(state == .hidden)
         #expect(state.isCovering == false)
@@ -26,7 +25,7 @@ struct SecurityCoverStateTests {
 
     @Test func activeAndLockedShowsLockScreen() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .active, requireAuth: true, isUnlocked: false
+            phase: .active, requireAuth: true, isUnlocked: false
         )
         #expect(state == .locked)
         #expect(state.isCovering)
@@ -37,14 +36,14 @@ struct SecurityCoverStateTests {
     /// gate itself never unlocks — nothing calls `authenticate()` in that mode.
     @Test func requirementOffLeavesAppUncoveredWhileActive() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .active, requireAuth: false, isUnlocked: false
+            phase: .active, requireAuth: false, isUnlocked: false
         )
         #expect(state == .hidden)
     }
 
     @Test func inactivePhaseShowsPrivacyCover() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .inactive, requireAuth: false, isUnlocked: true
+            phase: .inactive, requireAuth: false, isUnlocked: true
         )
         #expect(state == .privacy)
         #expect(state.isCovering)
@@ -52,7 +51,7 @@ struct SecurityCoverStateTests {
 
     @Test func backgroundPhaseShowsPrivacyCover() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .background, requireAuth: false, isUnlocked: true
+            phase: .background, requireAuth: false, isUnlocked: true
         )
         #expect(state == .privacy)
         #expect(state.isCovering)
@@ -63,7 +62,7 @@ struct SecurityCoverStateTests {
     /// the case that keeps a transcript out of the app-switcher card.
     @Test func unlockedAppIsStillCoveredWhenLeavingTheForeground() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .inactive, requireAuth: true, isUnlocked: true
+            phase: .inactive, requireAuth: true, isUnlocked: true
         )
         #expect(state == .privacy)
     }
@@ -73,7 +72,7 @@ struct SecurityCoverStateTests {
     /// and it is what the app-switcher would otherwise photograph.
     @Test func lockedButInactiveShowsPrivacyRatherThanLockScreen() {
         let state = SecurityCoverState.resolve(
-            scenePhase: .inactive, requireAuth: true, isUnlocked: false
+            phase: .inactive, requireAuth: true, isUnlocked: false
         )
         #expect(state == .privacy)
         #expect(state.needsKeyWindow == false)

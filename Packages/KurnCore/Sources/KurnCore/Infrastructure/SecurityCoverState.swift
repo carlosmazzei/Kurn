@@ -1,6 +1,6 @@
 //
 //  SecurityCoverState.swift
-//  Kurn
+//  KurnCore
 //
 //  What the app's security cover should be showing, derived from the scene
 //  phase and the recordings gate. Split out as a pure value type because the
@@ -9,12 +9,10 @@
 //  can, and that is where the behaviour actually lives.
 //
 
-import SwiftUI
-
 /// The three things the cover window can be doing. The uncovered case is named
 /// `hidden` rather than `none` so it never has to be disambiguated from
 /// `Optional.none` at a call site.
-enum SecurityCoverState: Equatable {
+public enum SecurityCoverState: Equatable {
     /// Nothing covered; the window is hidden so it captures no touches.
     case hidden
     /// Opaque placeholder with no controls, so the OS app-switcher snapshot
@@ -25,19 +23,19 @@ enum SecurityCoverState: Equatable {
     case locked
 }
 
-extension SecurityCoverState {
+public extension SecurityCoverState {
     /// Resolve the cover from the two inputs that drive it.
     ///
-    /// A non-active scene always wins. It is the transition during which the
+    /// A non-active phase always wins. It is the transition during which the
     /// snapshot is taken, and the lock screen's controls are useless in it —
     /// so even a locked app shows the neutral privacy cover while inactive,
     /// then flips to `.locked` once it is foregrounded again.
     static func resolve(
-        scenePhase: ScenePhase,
+        phase: AppLifecyclePhase,
         requireAuth: Bool,
         isUnlocked: Bool
     ) -> SecurityCoverState {
-        guard scenePhase == .active else { return .privacy }
+        guard phase == .active else { return .privacy }
         return requireAuth && !isUnlocked ? .locked : .hidden
     }
 

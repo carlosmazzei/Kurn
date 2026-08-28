@@ -16,6 +16,7 @@
 //  controller inherits nothing from the app's view tree.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 
