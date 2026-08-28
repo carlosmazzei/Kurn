@@ -13,6 +13,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// One embeddable passage: text plus where it sits in the meeting timeline.
 struct TranscriptChunk: Sendable, Equatable {

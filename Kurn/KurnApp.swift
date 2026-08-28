@@ -9,6 +9,7 @@
 #if canImport(MetricKit)
 import MetricKit
 #endif
+import KurnCore
 import SwiftData
 import SwiftUI
 
@@ -114,6 +115,11 @@ struct KurnApp: App {
     }()
 
     init() {
+        // KurnCore has no `os` dependency (it needs to build on Linux), so it
+        // exposes this seam instead of logging directly. Wired once, here,
+        // before any transcription can run.
+        TranscriptQualityFilter.logHandler = { AppLog.transcription.atInfo.info("\($0, privacy: .public)") }
+
         let container = modelContainer
         // Build the shared transcription coordinator on the app's main context
         // so the resume pass and the detail screens are the same instance.

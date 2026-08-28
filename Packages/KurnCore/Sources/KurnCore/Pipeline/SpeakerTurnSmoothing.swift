@@ -1,6 +1,6 @@
 //
 //  SpeakerTurnSmoothing.swift
-//  Kurn
+//  KurnCore
 //
 //  Post-processing applied to a diarizer's raw speaker turns before they reach
 //  `TranscriptFusion`.
@@ -19,22 +19,21 @@
 //
 
 import Foundation
-import KurnCore
 
-enum SpeakerTurnSmoothing {
+public enum SpeakerTurnSmoothing {
 
     /// Consecutive turns by the same speaker closer together than this are one
     /// turn — the gap is a breath or an inter-word pause, not a handover.
-    static let defaultMaxMergeGap: TimeInterval = 0.75
+    public static let defaultMaxMergeGap: TimeInterval = 0.75
 
     /// Turns shorter than this are treated as segmentation noise rather than a
     /// real utterance and folded into an adjacent turn.
-    static let defaultMinTurnDuration: TimeInterval = 0.7
+    public static let defaultMinTurnDuration: TimeInterval = 0.7
 
     /// A speaker whose *total* speaking time across the whole recording is below
     /// this is almost always a phantom cluster (one noisy embedding window), not
     /// a participant.
-    static let defaultMinSpeakerTotalDuration: TimeInterval = 3.0
+    public static let defaultMinSpeakerTotalDuration: TimeInterval = 3.0
 
     /// Run all three passes. Labels are renumbered to "Speaker N" in
     /// first-appearance order so the output is contiguous even after speakers
@@ -42,7 +41,7 @@ enum SpeakerTurnSmoothing {
     ///
     /// Guaranteed never to return an empty array for a non-empty input: every
     /// pass that could remove everything is skipped when it would.
-    static func smooth(
+    public static func smooth(
         _ turns: [SpeakerTurn],
         maxMergeGap: TimeInterval = defaultMaxMergeGap,
         minTurnDuration: TimeInterval = defaultMinTurnDuration,
@@ -61,7 +60,7 @@ enum SpeakerTurnSmoothing {
 
     /// Collapse consecutive same-speaker turns whose gap is at most `maxGap`.
     /// Overlapping turns (gap < 0) always merge.
-    static func mergeAdjacent(_ turns: [SpeakerTurn], maxGap: TimeInterval) -> [SpeakerTurn] {
+    public static func mergeAdjacent(_ turns: [SpeakerTurn], maxGap: TimeInterval) -> [SpeakerTurn] {
         guard !turns.isEmpty else { return turns }
         var merged: [SpeakerTurn] = [turns[0]]
         for turn in turns.dropFirst() {
@@ -88,7 +87,7 @@ enum SpeakerTurnSmoothing {
     /// Skipped entirely when *every* turn is short — that's a legitimately
     /// rapid-fire exchange, not noise, and dropping all of it would leave
     /// fusion with nothing.
-    static func absorbShortTurns(_ turns: [SpeakerTurn], minDuration: TimeInterval) -> [SpeakerTurn] {
+    public static func absorbShortTurns(_ turns: [SpeakerTurn], minDuration: TimeInterval) -> [SpeakerTurn] {
         guard turns.count > 1 else { return turns }
         guard turns.contains(where: { $0.end - $0.start >= minDuration }) else { return turns }
 
@@ -137,7 +136,7 @@ enum SpeakerTurnSmoothing {
     /// least two speakers survive. The removed spans are simply left uncovered:
     /// `TranscriptFusion` attributes text with no containing turn to the nearest
     /// remaining one, which is exactly the desired behaviour here.
-    static func dropMarginalSpeakers(
+    public static func dropMarginalSpeakers(
         _ turns: [SpeakerTurn],
         minTotalDuration: TimeInterval
     ) -> [SpeakerTurn] {
@@ -154,7 +153,7 @@ enum SpeakerTurnSmoothing {
 
     /// Renumber to "Speaker N" in first-appearance order so the labels stay
     /// contiguous and match every other engine's convention.
-    static func renumber(_ turns: [SpeakerTurn]) -> [SpeakerTurn] {
+    public static func renumber(_ turns: [SpeakerTurn]) -> [SpeakerTurn] {
         var nameByOriginal: [String: String] = [:]
         return turns.map { turn in
             let label = nameByOriginal[turn.speakerLabel] ?? {
