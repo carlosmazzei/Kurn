@@ -14,12 +14,26 @@ import Foundation
 /// The JSON contract all vendors are instructed to return for summaries: an
 /// ordered list of titled sections, each with optional prose and/or bullets.
 public struct SummaryJSON: Decodable {
-    struct Section: Decodable {
-        let title: String
-        let body: String?
-        let items: [String]?
+    public struct Section: Decodable {
+        public let title: String
+        public let body: String?
+        public let items: [String]?
+
+        public init(title: String, body: String? = nil, items: [String]? = nil) {
+            self.title = title
+            self.body = body
+            self.items = items
+        }
     }
-    let sections: [Section]
+    public let sections: [Section]
+
+    /// Not just a `Decodable` conformance: `FoundationModelsProvider`'s guided
+    /// generation produces a `Section` list directly (no free-text JSON to
+    /// parse), and reuses this initializer to get `summarySections`'s
+    /// trimming/filtering rather than duplicating it.
+    public init(sections: [Section]) {
+        self.sections = sections
+    }
 
     /// Map the wire shape into the shared `SummarySection` value type, dropping
     /// sections that carry neither a title nor any content.
