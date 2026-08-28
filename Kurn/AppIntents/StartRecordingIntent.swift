@@ -28,9 +28,9 @@ extension Notification.Name {
 }
 
 struct StartRecordingIntent: AppIntent {
-    static var title: LocalizedStringResource = "intent.startRecording.title"
-    static var description = IntentDescription("intent.startRecording.description")
-    static var openAppWhenRun: Bool = true
+    static let title: LocalizedStringResource = "intent.startRecording.title"
+    static let description = IntentDescription("intent.startRecording.description")
+    static let openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
         NotificationCenter.default.post(name: .kurnStartRecordingRequested, object: nil)
