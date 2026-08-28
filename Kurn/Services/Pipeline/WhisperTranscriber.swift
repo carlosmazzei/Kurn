@@ -12,6 +12,7 @@
 //
 
 import Foundation
+import KurnCore
 
 actor WhisperTranscriber: Transcribing {
 

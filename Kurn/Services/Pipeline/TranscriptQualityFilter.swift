@@ -28,6 +28,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// Per-segment decoder confidence signals. Every field is optional because the
 /// engines report different subsets — the cloud API returns all three,

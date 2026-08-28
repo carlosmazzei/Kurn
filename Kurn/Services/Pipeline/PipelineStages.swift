@@ -14,6 +14,7 @@
 //
 
 import Foundation
+import KurnCore
 
 /// Offline audio cleanup applied before the transcription path. The returned
 /// URL may be the input unchanged (passthrough) or a temporary cleaned copy that

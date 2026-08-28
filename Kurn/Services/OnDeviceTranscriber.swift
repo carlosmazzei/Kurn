@@ -10,6 +10,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 import Speech
 
 actor OnDeviceTranscriber: Transcribing {

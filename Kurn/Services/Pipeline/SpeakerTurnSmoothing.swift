@@ -19,6 +19,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum SpeakerTurnSmoothing {
 

@@ -23,6 +23,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 actor SpeakerDiarizer: Diarizing {
 

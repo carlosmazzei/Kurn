@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct OpenAIProvider: LLMProvider {
     let provider: AIProvider

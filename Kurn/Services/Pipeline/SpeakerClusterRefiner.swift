@@ -26,6 +26,7 @@
 
 import Accelerate
 import Foundation
+import KurnCore
 
 /// One speaker embedding together with the time range it was extracted from.
 /// Mirrors FluidAudio's `ChunkEmbedding` without depending on it, so the
