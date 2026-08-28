@@ -19,6 +19,7 @@
 #if DEBUG
 import AVFoundation
 import Foundation
+import KurnCore
 import SwiftData
 
 @MainActor

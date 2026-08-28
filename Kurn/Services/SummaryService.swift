@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct SummaryService {
 

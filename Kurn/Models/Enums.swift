@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 
 /// Lifecycle of a recording's transcription.
@@ -731,19 +732,10 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
-/// One speaker-attributed span of speech. Stored inside `Transcript` as JSON
-/// `Data` because SwiftData does not persist arbitrary `Codable` arrays of
-/// structs directly.
-struct TranscriptSegment: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID = UUID()
-    var speakerLabel: String
-    var startTime: TimeInterval
-    var endTime: TimeInterval
-    var text: String
-    var confidence: Float?
-
-    var duration: TimeInterval { max(0, endTime - startTime) }
-}
+// `TranscriptSegment` now lives in the KurnCore package
+// (`Sources/KurnCore/Models/TranscriptSegment.swift`), since it's pure
+// Foundation and needed by `TranscriptFusion`. This file gains `import
+// KurnCore` below for it.
 
 /// A single marked instant during a live recording ("this moment matters"),
 /// captured with a one-tap gesture — deliberately no label/note field, since

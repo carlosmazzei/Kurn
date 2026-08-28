@@ -7,6 +7,7 @@
 //  the owning recording plays) is highlighted.
 //
 
+import KurnCore
 import SwiftUI
 
 struct TranscriptView: View {

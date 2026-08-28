@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum MeetingVocabularyExtractor {
     static let maxTerms = 40

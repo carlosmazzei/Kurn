@@ -1,6 +1,6 @@
 //
 //  TranscriptQualityFilter.swift
-//  Kurn
+//  KurnCore
 //
 //  Drops the segments a Whisper decoder produced without hearing them.
 //
@@ -28,65 +28,85 @@
 //
 
 import Foundation
-import KurnCore
 
 /// Per-segment decoder confidence signals. Every field is optional because the
 /// engines report different subsets — the cloud API returns all three,
 /// whisper.cpp two, and the others none.
-struct SpanQuality: Sendable, Hashable {
-    var averageLogProb: Double?
-    var noSpeechProb: Double?
-    var compressionRatio: Double?
+public struct SpanQuality: Sendable, Hashable {
+    public var averageLogProb: Double?
+    public var noSpeechProb: Double?
+    public var compressionRatio: Double?
 
-    static let unknown = SpanQuality()
+    public static let unknown = SpanQuality()
+
+    public init(averageLogProb: Double? = nil, noSpeechProb: Double? = nil, compressionRatio: Double? = nil) {
+        self.averageLogProb = averageLogProb
+        self.noSpeechProb = noSpeechProb
+        self.compressionRatio = compressionRatio
+    }
 
     /// `averageLogProb` is a mean log-probability per token, so exponentiating it
     /// gives the per-token probability the decoder assigned — a 0…1 confidence in
     /// the same units `TranscribedSpan.confidence` is documented in.
-    var confidence: Float? {
+    public var confidence: Float? {
         guard let averageLogProb, averageLogProb.isFinite else { return nil }
         return Float(min(1, max(0, exp(averageLogProb))))
     }
 }
 
-enum TranscriptQualityFilter {
+public enum TranscriptQualityFilter {
+
+    /// Forwards this filter's diagnostics to the app's leveled logger.
+    /// `nonisolated(unsafe)`, matching `AppLog.minimumLevel`'s own pattern in
+    /// the app — required because Swift 6's strict concurrency mode rejects a
+    /// plain mutable `static var` even when its value type is `Sendable`.
+    /// Written exactly once, at startup, before any concurrent read. `os` is
+    /// unavailable on Linux, so this keeps that dependency out of KurnCore
+    /// while still routing diagnostics through `AppLog` in the app.
+    public nonisolated(unsafe) static var logHandler: (@Sendable (String) -> Void)?
 
     // MARK: - Thresholds
 
     /// Below this, the decoder was guessing. Whisper's own `logprob_threshold`.
-    static let minimumAverageLogProb: Double = -1.0
+    public static let minimumAverageLogProb: Double = -1.0
     /// Above this, the model thinks the window holds no speech. Whisper's own
     /// `no_speech_threshold`.
-    static let maximumNoSpeechProb: Double = 0.6
+    public static let maximumNoSpeechProb: Double = 0.6
     /// Above this, the text compresses too well to be prose. Whisper's own
     /// `compression_ratio_threshold`.
-    static let maximumCompressionRatio: Double = 2.4
+    public static let maximumCompressionRatio: Double = 2.4
 
     /// Why a segment was discarded. Carried out of the decision so the caller can
     /// log the distribution rather than a bare count.
-    enum Rejection: String, Sendable {
+    public enum Rejection: String, Sendable {
         case silence
         case compression
         case repetition
     }
 
     /// A span paired with the quality signals its engine reported for it.
-    struct ScoredSpan: Sendable {
-        var span: TranscribedSpan
-        var quality: SpanQuality
+    public struct ScoredSpan: Sendable {
+        public var span: TranscribedSpan
+        public var quality: SpanQuality
         /// Word timings *inside* this segment, when the engine reports them.
         ///
         /// They ride along with the segment rather than being filtered in their
         /// own right because the quality signals are per segment: a hallucinated
         /// sentence has to be dropped whole, and its words carry no evidence of
         /// their own. A surviving segment is then emitted one span per word.
-        var words: [TimedWord] = []
+        public var words: [TimedWord] = []
+
+        public init(span: TranscribedSpan, quality: SpanQuality, words: [TimedWord] = []) {
+            self.span = span
+            self.quality = quality
+            self.words = words
+        }
     }
 
     // MARK: - Decision
 
     /// Whether this segment should be discarded, and why. Pure.
-    static func rejection(text: String, quality: SpanQuality) -> Rejection? {
+    public static func rejection(text: String, quality: SpanQuality) -> Rejection? {
         // Silence. Both fields are required: a missing one is not evidence, and
         // guessing from `noSpeechProb` alone would drop quiet real speech.
         if let noSpeech = quality.noSpeechProb,
@@ -115,7 +135,7 @@ enum TranscriptQualityFilter {
     /// than one per segment. That is what lets `TranscriptFusion` attribute a
     /// handover mid-sentence to the right speaker instead of estimating the split
     /// from turn durations.
-    static func keeping(_ scored: [ScoredSpan], engine: String) -> [TranscribedSpan] {
+    public static func keeping(_ scored: [ScoredSpan], engine: String) -> [TranscribedSpan] {
         var kept: [TranscribedSpan] = []
         var survivors = 0
         var rejections: [Rejection: Int] = [:]
@@ -123,9 +143,7 @@ enum TranscriptQualityFilter {
         for item in scored {
             if let reason = rejection(text: item.span.text, quality: item.quality) {
                 rejections[reason, default: 0] += 1
-                AppLog.transcription.atInfo.info(
-                    "\(engine, privacy: .public): dropped \(reason.rawValue, privacy: .public) span at \(item.span.start, privacy: .public)s"
-                )
+                logHandler?("\(engine): dropped \(reason.rawValue) span at \(item.span.start)s")
                 continue
             }
             survivors += 1
@@ -137,9 +155,7 @@ enum TranscriptQualityFilter {
                 .sorted { $0.key.rawValue < $1.key.rawValue }
                 .map { "\($0.key.rawValue)=\($0.value)" }
                 .joined(separator: " ")
-            AppLog.transcription.atNotice.notice(
-                "\(engine, privacy: .public): discarded \(scored.count - survivors, privacy: .public)/\(scored.count, privacy: .public) low-quality span(s) [\(summary, privacy: .public)]"
-            )
+            logHandler?("\(engine): discarded \(scored.count - survivors)/\(scored.count) low-quality span(s) [\(summary)]")
         }
         return kept
     }
@@ -195,7 +211,7 @@ enum TranscriptQualityFilter {
     /// three") reads as a loop; that is rarer in a meeting than the hallucination
     /// is, and the coverage floor keeps it to segments that are *nothing but* the
     /// cycle.
-    static func isRepetitionLoop(_ text: String) -> Bool {
+    public static func isRepetitionLoop(_ text: String) -> Bool {
         let units = tokens(in: text)
         guard units.count >= minimumTokens else { return false }
 

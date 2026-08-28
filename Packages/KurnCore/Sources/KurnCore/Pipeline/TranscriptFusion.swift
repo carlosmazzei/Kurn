@@ -1,6 +1,6 @@
 //
 //  TranscriptFusion.swift
-//  Kurn
+//  KurnCore
 //
 //  Pure fusion of transcription spans with diarization speaker turns into
 //  speaker-attributed `TranscriptSegment`s. Extracted from `TranscriptionService`
@@ -9,16 +9,15 @@
 //
 
 import Foundation
-import KurnCore
 
-enum TranscriptFusion {
+public enum TranscriptFusion {
 
     /// Default cap on a single fused segment's spoken duration before it's split.
-    static let defaultMaxSegmentDuration: TimeInterval = 30
+    public static let defaultMaxSegmentDuration: TimeInterval = 30
 
     /// Attribute each text span to a speaker turn, then merge consecutive
     /// same-speaker spans into segments (capped at `maxSegmentDuration`).
-    static func segments(
+    public static func segments(
         spans: [TranscribedSpan],
         turns: [SpeakerTurn],
         maxSegmentDuration: TimeInterval = defaultMaxSegmentDuration
@@ -139,7 +138,7 @@ enum TranscriptFusion {
     /// sub-second turn the span barely touches. Summing per speaker also means
     /// two short turns by the same speaker on either side of an interjection
     /// still outweigh the interjection.
-    static func speakerLabel(for span: TranscribedSpan, in turns: [SpeakerTurn]) -> String {
+    public static func speakerLabel(for span: TranscribedSpan, in turns: [SpeakerTurn]) -> String {
         guard !turns.isEmpty else { return "Speaker 1" }
 
         var overlapByLabel: [String: TimeInterval] = [:]
@@ -170,7 +169,7 @@ enum TranscriptFusion {
         turns.firstIndex { $0.speakerLabel == label } ?? Int.max
     }
 
-    static func distance(from time: TimeInterval, to turn: SpeakerTurn) -> TimeInterval {
+    public static func distance(from time: TimeInterval, to turn: SpeakerTurn) -> TimeInterval {
         if time < turn.start { return turn.start - time }
         if time > turn.end { return time - turn.end }
         return 0

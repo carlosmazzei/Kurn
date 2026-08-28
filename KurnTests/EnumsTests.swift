@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import KurnCore
 import Testing
 @testable import Kurn
 
