@@ -2,8 +2,8 @@
 
 Fourteen candidate capabilities, each judged against what Kurn is rather than
 against what is fashionable: six to adopt, four to evaluate, four deliberately
-out of scope. Then two focused tracks that do not fit that taxonomy — six
-diarization items, and one engineering change that is not a feature at all.
+out of scope. Then three focused engineering tracks that do not fit that
+taxonomy: diarization, package extraction, and reliability/resilience hardening.
 
 The verdicts matter less than the reasoning attached to them. A "no" with a
 recorded reason stops the same idea from being re-litigated every few months; a
@@ -170,31 +170,29 @@ This is also the only entry whose effect the project can *prove*: run the
 public-dataset matrix before and after and compare WER. Under I3, that should be
 part of shipping it, not an afterthought.
 
-### F3 · Frictionless capture: App Intents, widget, Control Center
+### F3 · Frictionless capture: App Intents, Siri, Control Center — Implemented
 
 | | |
 |---|---|
-| **Couples to** | `RecordingCommandRouter` · `KurnLiveActivityExtension` |
+| **Couples to** | `RecordingLauncher` · `RecordingCommandRouter` · `KurnLiveActivityExtension` |
 | **Invariant** | No tension — system integration, no network |
-| **Effort** | Low-medium · best effort-to-value ratio here |
+| **Status** | Implemented — [PR #143](https://github.com/carlosmazzei/Kurn/pull/143) |
 
-`RecordingCommandRouter` already dispatches pause, resume, stop and toggle from
-the Watch and from Live Activity deep links. What is missing is the first
-command: there is no way to *start* a recording without unlocking the phone,
-opening the app and tapping. `KurnLiveActivityExtension` contains only
-`RecordingLiveActivityWidget.swift` — no home or lock-screen widget, no
-`ControlWidget` — and the project contains no `AppIntent` types at all.
+`StartRecordingIntent` now opens the app and posts a process-local request;
+`RecordingLauncher` creates and queues the meeting through the existing
+`RecorderView` path; `KurnShortcuts` exposes the action to Siri/Shortcuts; and
+`StartRecordingControl` makes it available from Control Center, Lock Screen and
+the Action Button. The existing Watch/Live Activity pause, resume, stop and
+highlight commands still converge through `RecordingCommandRouter`.
 
-The use case is the product's own: realizing forty seconds late that this call
-should have been recorded. The dispatcher exists; this is largely wiring.
-`AppShortcutsProvider` brings Siri along, and a `ControlWidget` brings the
-Action Button with it.
-
-**Security check before shipping.** Starting a recording from a lock-screen
-control means capture begins before `RecordingAccessGate` has authenticated.
-That is correct — capture must not wait on Face ID — but it makes the cover
-window load-bearing in a new path. Verify `SecurityCoverState` resolves to
-`.locked`, not `.hidden`, when an intent brings the app forward.
+This deliberately starts capture without waiting for `RecordingAccessGate` — a
+lock-screen control that first required Face ID would miss the moment it exists
+to capture — while the cover window still prevents meeting content from being
+exposed. The remaining work is resilience rather than feature wiring: H8 below
+requires the intent to distinguish “request accepted” from microphone permission
+and actual capture, makes duplicate external commands idempotent, and verifies
+that meeting persistence, the cover window and Live Activity state converge when
+startup fails or the app is launched locked.
 
 ### F4 · Calendar context at record time
 
@@ -668,6 +666,547 @@ coverage for every linked target, third-party dependencies included, which makes
 the raw percentage meaningless. Filter to first-party targets before trusting any
 coverage number.
 
+## Reliability and resilience track
+
+This track is not a claim that Kurn is generally unreliable. It is the result of
+a static, repository-wide failure-path audit on 2026-08-29, covering capture,
+SwiftData, file mutation, transcription, cloud providers, model downloads,
+background execution, WatchConnectivity, Live Activities, diagnostics, UI state,
+and CI. The code already contains unusually strong recovery work; the purpose of
+this section is to turn the remaining implicit assumptions into explicit,
+testable contracts.
+
+Items below are **planned unless marked otherwise**. A green CI run proves that
+the tested paths compile and pass; it does not prove that disk exhaustion, a
+locked background launch, process death, a broken route, or a malformed provider
+behaves safely until that failure is injected. As with accuracy under I3,
+resilience must be measured rather than inferred from clean-path tests.
+
+### Reliability invariants
+
+The five product invariants at the top of this document still apply. Hardening
+adds six operational invariants:
+
+| | Invariant |
+|---|---|
+| **H-I1** | Once capture is acknowledged as running, a write failure is detected and surfaced; the app never continues counting while silently dropping audio |
+| **H-I2** | The only copy of user audio is never automatically deleted merely because metadata is missing, malformed, or unreadable |
+| **H-I3** | Success is reported only after the authoritative state is durable; a failed save cannot leave the UI claiming an operation completed |
+| **H-I4** | A fallback may preserve useful work, but it is recorded and visible; degraded output is never indistinguishable from the requested pipeline succeeding |
+| **H-I5** | A custom network destination is exact: invalid configuration fails closed and never falls through to another vendor or host |
+| **H-I6** | Cancellation, transient failure, permanent failure, and resource deferral are distinct states with bounded automatic retry |
+
+Priorities in this track mean:
+
+- **P0** — possible loss of the only user copy, an unintended network
+  destination, a persistent launch failure, or false success. Address before
+  expanding the affected surface.
+- **P1** — silent quality degradation, repeated paid work, stuck state, or a
+  failure the user cannot recover from without relaunching.
+- **P2** — diagnosability, integration polish, and continuous verification that
+  make P0/P1 guarantees sustainable.
+
+### Foundation already present
+
+The plan builds on these controls rather than replacing them:
+
+| Area | Existing control |
+|---|---|
+| Error domain | `AppError` provides localized, content-free `logCode`s; `errorAlert` gives views one presentation path |
+| Capture | Fixed-format `RecordingSink`, audio interruption/route observers, engine restart, `finalizeIfAbandoned`, protected recording storage, and orphan recovery |
+| Transcription | Per-chunk checkpoints, ordered pipeline events, foreground and launch recovery sweeps, background task cancellation, and per-recording/global in-flight guards |
+| Pipeline | Resource checks between heavy stages, temporary-file cleanup, measured WER/DER, and useful fallbacks for optional preprocessing/VAD/diarization stages |
+| Network | Central status validation, bounded retry with jitter, request timeouts, background Whisper uploads, and explicit cloud/model consent defaults |
+| Diagnostics | Leveled `os.Logger`, user-exported logs, opt-in local MetricKit crash/hang reports, and no automatic diagnostic upload |
+| Tests | 600+ Swift Testing cases, provider stubs through `MockURLProtocol`, recovery/resource tests, accessibility audits, and Linux `KurnCore` CI |
+
+### Risk register
+
+These are verified code paths or direct consequences of them, not hypothetical
+feature requests:
+
+| Item | Observed seam | Failure if it remains | Priority |
+|---|---|---|---|
+| **H1** | `RecordingSink.write` and its final drain use `try?`; elapsed duration is wall-clock time | Disk/encoder failure can drop buffers while the UI still says recording | **P0** |
+| **H2** | Production `ModelContainer` construction ends in `fatalError`; there is no `VersionedSchema`/`SchemaMigrationPlan` | Corruption, incompatible schema, or a locked protected store can create a launch crash loop | **P0** |
+| **H3** | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0** |
+| **H4** | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match | **P0** |
+| **H5** | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation | **P1** |
+| **H6** | `LLMHTTP.jsonRequest` and cloud transcription substitute hard-coded vendor URLs when configured URL construction fails | A malformed custom provider can send meeting-derived content to an unintended host, violating I1 and H-I5 | **P0** |
+| **H7** | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed | **P1** |
+| **H8** | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion | **P1** |
+| **H9** | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription` | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended | **P1** |
+| **H10** | Clean-path CI does not inject store, filesystem, lock, process-death, route, redirect, or response-loss failures | The contracts above can regress while every ordinary test stays green | **P0, cross-cutting** |
+
+### H1 · Lossless capture and truthful finalization — P0
+
+**Plan.**
+
+1. Make `RecordingSink` latch the first conversion/write/final-drain failure,
+   plus attempted/written frame counts and the last successful write time. The
+   render callback should set bounded state only; the existing main-actor meter
+   tick can read it and perform logging/UI work safely.
+2. Add a capture watchdog based on written frames, not microphone level alone.
+   If the engine is running but no frames reach disk for a bounded interval,
+   pause capture, preserve the partial file, and present a specific recovery
+   action rather than continue the clock.
+3. Preflight available storage when recording starts and periodically compute
+   remaining recording runway from the actual byte rate. A failed capacity query
+   is an observable “unknown”, not silently equivalent to “enough”.
+4. Create and durably save a provisional `Recording`/capture operation before
+   opening the file. Move it through `preparing → recording → finalizing → ready`
+   (or `recoveryNeeded`) so process death does not rely only on parsing a file
+   name to rediscover ownership.
+5. On stop, close the encoder, reopen the file, validate readability, actual
+   sample duration, non-zero size, and protection class, then commit `ready`.
+   Keep wall-clock duration only as diagnostic context; the file is authoritative.
+6. Make resume/start failures actionable. If an engine restart fails, retain the
+   partial recording and offer retry input, finish/save, or stop — never a silent
+   no-op.
+
+**Done when.** Every injected write/conversion/disk-full failure is visible within
+a bounded interval; no invalid/empty file is reported as saved; killing the app
+before open, during capture, during close, and during the final SwiftData save
+always converges to either a valid recording or an explicit recoverable artifact.
+
+**Verification.** Add a protocol-backed sink/file writer, deterministic frame and
+clock probes, disk-full/write-failure tests, route/interruption/media-reset tests,
+and a real-device matrix covering screen lock, calls/Siri interruptions,
+Bluetooth disconnect/reconnect, long background capture, and low storage.
+
+### H2 · Recoverable store bootstrap and explicit migrations — P0
+
+**Plan.**
+
+1. Replace the static `fatalError` container initializer with a boot state machine:
+   `waitingForProtectedData`, `opening`, `ready`, `recoveryRequired`. A foreground
+   failure presents a minimal recovery UI; a locked background-only launch defers
+   work and completes/reschedules the system callback without first opening the
+   protected store.
+2. Introduce `VersionedSchema` and an explicit `SchemaMigrationPlan`. Every
+   released schema gets a fixture and every non-additive change gets a reviewed
+   migration stage before model code lands.
+3. Classify open failures without guessing: protected data unavailable, storage
+   full, migration incompatible, and suspected corruption need different actions.
+4. Before a migration, create a consistent, protected backup of the store and its
+   WAL state. Keep bounded generations and record which app/schema version made
+   each one.
+5. Never delete, replace, or silently abandon the existing store automatically.
+   Offer retry after unlock/freeing space, export diagnostics, attempt salvage
+   into a separate container, restore a known-good protected backup, or an
+   explicitly confirmed fresh start. A new empty store must never masquerade as
+   successful recovery.
+6. Make store/file protection verification part of bootstrap. A directory or
+   sidecar that could not be stamped is a visible privacy failure, not an
+   unprotected fallback path.
+
+**Done when.** A locked background launch, full disk, corrupt-store fixture, and
+all supported N-1/N-2 schema fixtures avoid a crash loop; existing bytes remain
+untouched until the user chooses a destructive action; migrations preserve
+recordings, relationships, transcript JSON, summaries, and recovery state.
+
+**Verification.** Add old-store fixtures to CI, migration round trips, protected-
+data and capacity injection, backup/restore tests, and a Release-configuration
+launch test. Production startup must contain no recoverable `fatalError` path.
+
+### H3 · Atomic model/file mutations and non-destructive reconciliation — P0
+
+SwiftData and the filesystem are two stores with no shared transaction. Treating
+sequential calls as one transaction is the source of the current delete and
+recovery hazards.
+
+**Plan.**
+
+1. Add a small durable operation journal for create/finalize/delete/replace work,
+   with a stable operation ID and idempotent steps. On launch, replay or roll back
+   unfinished operations instead of inferring intent from whichever side changed.
+2. For deletion, save intent first, atomically move original audio and derived
+   copies into a protected app trash, commit the model mutation, then purge. A
+   failure before commit restores the files; a failure after commit leaves a
+   retryable purge, not a visible row pointing to missing audio.
+3. Stop automatically deleting readable or unreadable unmatched originals.
+   Move them to a protected quarantine with size/date/reason metadata and expose
+   recover/export/delete actions. Quarantine can warn about storage pressure, but
+   retention is user-controlled because H-I2 outranks automatic cleanup.
+4. On legacy migration collisions, verify identity/size before removing either
+   copy; otherwise quarantine both under unique names.
+5. Remove the unprotected fallback from `recordingsDirectoryURL`. Writers should
+   throw a typed privacy/storage error if the protected directory cannot be
+   created or verified.
+6. Replace `JSONStorage`’s “decode failure means empty value” contract for
+   authoritative content. Use versioned envelopes/checksums and return a typed
+   decode result while preserving the original bytes for recovery. Encoding a
+   transcript/summary/checkpoint must fail the operation rather than persist
+   `Data()`.
+7. Make derived copies explicitly disposable and reconcile them separately;
+   originals, transcripts, and user edits use the stricter path.
+
+**Done when.** Fault injection at every journal boundary converges after relaunch;
+a failed delete never loses the only original; “Delete all data” reports residual
+files accurately; malformed stored JSON is identified as corruption rather than
+rendered as an empty transcript; no privacy-sensitive file is written outside a
+verified protected location.
+
+**Verification.** Add table-driven operation-journal crash points, filesystem
+permission/full-disk failures, legacy collision fixtures, JSON corruption and
+schema-version fixtures, plus row-without-file/file-without-row reconciliation
+tests.
+
+### H4 · Checkpoint identity and durable operation state — P0
+
+**Plan.**
+
+1. Replace the current partial checkpoint match with a versioned pipeline
+   fingerprint containing source identity, source size/duration (and a stable
+   content digest), effective preprocessing/VAD/language/ASR settings, provider
+   **and exact model**, algorithm/prompt versions, compaction map, and chunk
+   offsets/ranges.
+2. Validate checkpoint structure before use: monotonic finite spans within source
+   bounds, `completedChunks` consistent with spans, and an exact chunk-plan
+   fingerprint. A mismatch discards reuse, never the source audio.
+3. Make checkpoint persistence throwing. Do not start the next chunk until the
+   completed chunk is durable; if saving fails, park the run with the in-memory
+   result discarded rather than claim a checkpoint that only existed in RAM.
+4. Persist operation state with stable reason codes, attempt count,
+   `nextAttemptAt`, and last durable transition. Replace ambiguous
+   `.inProgress/.pending/.failed` interpretation with explicit queued, running,
+   paused-by-user, deferred-by-system/resource, retry-scheduled, permanent-failure,
+   and completed semantics.
+5. Bound automatic recovery. Repeated failure of the same stage/fingerprint
+   backs off and eventually requires user action; foreground activation must not
+   create an endless retry loop or repeated paid request.
+6. Apply the same pattern selectively to expensive multi-step summary/wiki/
+   document jobs: keep completed map stages or restart clearly, but never display
+   a partial generation as final structured output.
+
+**Done when.** Changing the audio, cloud model, VAD/preprocessing choice, chunk
+boundaries, or algorithm version invalidates reuse; process death after any chunk
+loses at most that in-flight chunk; a checkpoint save failure stops forward
+progress; retries are bounded and explain why/when they resume.
+
+**Verification.** Extend `TranscriptionCheckpointTests` and
+`ChunkedTranscriptionRunnerTests` with fingerprint mutations and corrupt spans;
+run kill/relaunch tests after each durable transition; script provider
+response-loss to prove an already durable chunk is not rejoined under a different
+configuration.
+
+### H5 · Typed degradation and output-integrity gates — P1
+
+Fallback is valuable: preprocessing can use the original and a transcript is
+usually better than no transcript because diarization failed. The defect is not
+fallback; it is losing the fact that fallback happened.
+
+**Plan.**
+
+1. Have each stage return a typed result carrying requested engine, effective
+   engine, outcome (`succeeded`, `degraded`, `skipped`, `failed`), stable reason,
+   and safe diagnostics. Cancellation remains throwing and can never be converted
+   into fallback output.
+2. Distinguish legitimate “no speech detected” from VAD decode/model failure.
+   Likewise distinguish a genuine one-speaker result from a synthetic one-turn
+   diarization fallback, and a user language hint from successful detection.
+3. Accumulate a pipeline report and persist it beside the transcript. Show
+   “completed with warnings” and stage-specific re-run actions rather than a
+   generic success badge; exports should optionally include provenance, not raw
+   private errors.
+4. Add a final integrity gate: source exists and is readable; spans are finite,
+   ordered, bounded and non-empty when speech was detected; text and speaker
+   attribution counts are internally consistent; correction preserved segment
+   identity. Reject invalid output before replacing the last known-good
+   transcript.
+5. Keep the previous transcript/summary/index until its replacement is fully
+   validated and durably committed. Optional-stage failure must not destroy a
+   usable older artifact.
+
+**Done when.** Every injected optional-stage failure either yields valid output
+with a persisted warning or leaves the previous artifact untouched; no synthetic
+fallback is counted as the requested engine succeeding; users can identify and
+retry the degraded stage without retranscribing unrelated work where technically
+possible.
+
+**Verification.** Build a stage-failure matrix for preprocessing, LID, VAD, each
+ASR, each diarizer, fusion, correction and persistence; add invariant/property
+tests for malformed timestamps, empty/oversized responses and fallback
+provenance; keep WER/DER evaluation separate from reliability pass/fail.
+
+### H6 · Exact network boundaries, bounded retry, and cost control — P0/P1
+
+**Plan.**
+
+1. Remove runtime fallback URLs. Validate provider configuration as an absolute
+   URL with allowed scheme and host before it can be saved or used. Built-in
+   providers already carry their exact URL; a malformed custom provider fails
+   closed. Plain HTTP, local hosts, credentials in URLs, and unusual ports need an
+   explicit policy and disclosure rather than accidental `URL(string:)` success.
+2. Pin each logical operation to a destination snapshot. Reject or explicitly
+   reconfirm cross-origin redirects, and never forward an authorization header or
+   meeting body to an unapproved origin.
+3. Centralize foreground and background traffic behind one HTTP policy: typed
+   transport/status/decoding errors, total deadline plus per-attempt timeout,
+   bounded response size, cooperative cancellation, jitter, and a testable clock.
+4. Honor both delta-seconds and HTTP-date `Retry-After` without truncating a
+   provider’s rate-limit instruction to the current eight-second backoff cap.
+   Give interactive and background work different total wait budgets, and make
+   “waiting for rate limit/connectivity” visible and cancellable.
+5. Bring `WhisperBackgroundUploader` onto that policy; it currently drops
+   `Retry-After`. Make session initialization race-free, cap buffered response
+   bytes, and reconcile orphan URLSession tasks by a persisted logical request ID.
+6. Reuse one client-generated request ID across retries. Add an idempotency header
+   only where the provider documents it; where duplicate billing remains
+   ambiguous, expose that fact and avoid unbounded automatic replay.
+7. Persist a per-provider cooldown/circuit state for automated wiki/backfill/title
+   work. Authentication/quota/configuration failures stop immediately; repeated
+   transient failures back off across foreground activations; an explicit user
+   retry can bypass the cooldown.
+8. Add user policy for cellular, expensive and constrained connections,
+   especially model downloads and large cloud audio uploads. Show estimated
+   transfer size/destination before first use of a cloud provider.
+9. Treat streaming as a separate, measured enhancement: it can improve perceived
+   progress, but partial prose/JSON is not final output and must not weaken the
+   atomic commit rules above.
+
+**Done when.** No malformed custom URL produces a request to a default vendor;
+redirect tests prove credentials/content stay on the approved origin; 401/403
+fail without retry, 429 honors the server, transient 5xx/transport retries stay
+inside one logical operation, cancellation stops waits/transfers, and automated
+paid jobs cannot hammer a broken provider on every activation.
+
+**Verification.** Extend `ProviderHTTPTests`/`LLMHTTPRetryTests` for malformed and
+relative URLs, cross-origin redirects, response-size limits, lost responses,
+HTTP-date rate limits, cancellation during backoff, connectivity transitions,
+background relaunch, cooldown persistence and provider-specific idempotency.
+
+### H7 · Credential and model integrity — P1
+
+**Plan.**
+
+1. Make Keychain get/set/delete return typed results (including `OSStatus`) and
+   surface failures. Mark the accessibility migration complete only after all
+   items were migrated or absence was confirmed; protected-data/transient errors
+   must remain retryable.
+2. Keep API-key edits in memory and commit on explicit Save instead of writing on
+   every keystroke. Validate the provider URL first, then optionally test a
+   minimal endpoint, and never log/display the key.
+3. Consolidate the duplicate app-managed downloaders into an injectable download
+   service with retry, cancellation, resume data, progress, network policy and
+   an atomic staging directory.
+4. Pin immutable model revisions and verify a published exact size plus SHA-256
+   (or stronger signed manifest) before install. A plausible minimum size is not
+   an integrity check.
+5. Install by validating the staged model, atomically replacing the destination,
+   then loading a small health probe. An interrupted/failed update keeps the
+   previously valid model. Corruption offers re-download instead of failing every
+   transcription.
+6. Verify `isExcludedFromBackup`, file protection, model version and digest during
+   storage inventory. Treat a consent flag as permission to fetch, not proof that
+   usable bytes currently exist.
+7. Give app-wide downloads an owned task and cancel/pause action; background
+   expiration/process death should leave resumable state, not a permanently busy
+   UI flag or an unexplained restart from zero.
+
+**Done when.** Injected Keychain failures are visible and do not set a false
+migration/success flag; wrong/truncated model bytes are rejected; cancelling or
+killing an update preserves the old valid model and can resume; Settings reports
+consent, download state and verified installation as separate facts.
+
+**Verification.** Add protocol-backed Security-framework tests, locked-device
+migration tests, wrong-hash/truncation/redirect/no-space download fixtures,
+resume-data tests, atomic-replacement crash points and model-load smoke probes.
+
+### H8 · Operation ownership, resource recovery, and external controls — P1
+
+**Plan.**
+
+1. Give every long-running operation an owner, run ID and explicit lifetime.
+   Recording/transcription/downloads that intentionally outlive a screen belong
+   to app-wide coordinators; chat/search tasks cancel on dismissal; stale callbacks
+   must check the run ID before mutating current state.
+2. Replace sticky resource state with a cooldown/recheck model. A memory warning
+   pauses new heavy work for a measured interval; later admission reevaluates
+   memory, thermal state and storage instead of disabling work until relaunch.
+3. Add a resource-aware scheduler/cap so concurrent preprocessing, ASR,
+   diarization, enhancement and model loading cannot each pass an independent
+   preflight and then exceed memory together.
+4. Audit every `@unchecked Sendable`, `nonisolated(unsafe)`, continuation and
+   callback bridge. Keep the justified lock/queue wrappers, but make ownership
+   and exactly-once completion executable through assertions and stress tests.
+   Initialize the background uploader session under synchronization rather than a
+   racing lazy property.
+5. A timeout must actually bound work. Blocking C/CoreML calls that ignore task
+   cancellation cannot be “timed out” merely by racing a sleeping child task if
+   structured concurrency still waits for the blocked child; use an engine abort
+   hook or report deferred cancellation truthfully.
+6. Track and cancel the in-flight ActivityKit start task so `start → immediate
+   end` cannot create an orphan after teardown. Keep Activity mutations on one
+   actor and tag them with the recording/run ID.
+7. Compile the Watch wire protocol from one shared source. Add command IDs,
+   timeout, deduplication and acknowledgements that distinguish “received”,
+   “state changed” and “recording durably finalized”; reconcile from application
+   context after reconnect.
+8. Apply the same semantics to F3 intents/controls: an intent can report that the
+   request was accepted, but the in-app UI/Live Activity must confirm microphone
+   permission and actual capture before claiming recording started.
+
+**Done when.** Heavy work resumes after transient pressure, respects a global
+resource cap, and has no stale callback state corruption; chat/provider work does
+not continue invisibly after dismissal; rapid Live Activity start/end and lost or
+duplicated Watch/intent messages converge on the recorder’s authoritative state.
+
+**Verification.** Add deterministic clock/resource-scheduler tests, repeated
+start/cancel/restart tests, continuation exactly-once tests, Thread Sanitizer runs
+for first-party bridges, fake `WCSession` command loss/duplication/reordering, and
+ActivityKit adapter race tests.
+
+### H9 · Actionable error UX and privacy-safe diagnostics — P1/P2
+
+**Plan.**
+
+1. Extend the error presentation model around `AppError` with stable code,
+   category, severity, retryability, safe user explanation, private diagnostic
+   context, and recovery actions. Keep cancellation out of error dialogs.
+2. Replace the universal “OK” dead end with contextual actions: Retry, Resume,
+   Free Space, Open Settings, Change Provider/Model, Keep Original, Recover
+   Quarantined Audio, and Export Diagnostics. Use inline state for local/degraded
+   work and modal presentation only when progress is blocked.
+3. Store errors per operation/recording rather than one shared optional that a
+   concurrent failure can overwrite. Queue blocking errors and retain non-blocking
+   warnings in the artifact’s operation report.
+4. Roll back or refresh optimistic UI mutations after a persistence failure. A
+   favorite/delete/title/status shown in memory must not disagree with the last
+   durable state while an alert merely says “OK”.
+5. Standardize structured reliability events with run/operation ID, stage,
+   duration, attempt, outcome and content-free error code. Raw provider messages,
+   transcript text, meeting titles, full URLs/query/user-info and API keys are
+   private or omitted; use `AppError.logCode` consistently instead of publishing
+   arbitrary `localizedDescription`.
+6. Keep the reliability event buffer local, encrypted and bounded. MetricKit
+   crash/hang capture stays opt-in and nothing is transmitted automatically.
+   Export should show a redaction preview and a short reference ID that also
+   appears in the UI error.
+7. Add an on-device health screen for pending recovery, quarantined audio,
+   degraded transcripts, failed/background jobs, model verification and recent
+   error codes. It is a repair surface, not analytics.
+8. Cover recovery UI with VoiceOver labels, Dynamic Type and UI tests; a robust
+   backend with an inaccessible recovery action is not recoverable in practice.
+
+**Done when.** Every P0/P1 failure has a concrete next action; concurrent failures
+remain attributable; cancellation is silent/intentional; a sentinel API key,
+transcript, title and URL query never appear in exported diagnostic events; a
+support report can reconstruct durable transitions without containing meeting
+content.
+
+**Verification.** Add error-to-action table tests, persistence rollback UI tests,
+concurrent error queue tests, diagnostic redaction fixtures, export snapshots and
+accessibility audits of offline, low-storage, permission, degraded, quarantine
+and store-recovery states.
+
+### H10 · Fault injection and CI resilience — P0, cross-cutting
+
+The architecture needs seams that fail on command. Without them, most of this
+track remains prose.
+
+**Plan.**
+
+1. Introduce narrow protocols for filesystem mutation, model-context commit,
+   clock/sleep, resource probes, Keychain, HTTP transport, audio sink/writer,
+   ActivityKit and WatchConnectivity. Production adapters stay small; tests script
+   exact failures and completions.
+2. Maintain a fault matrix and require a test whenever a durability/network state
+   transition is added. The minimum matrix is:
+
+| Operation | Inject at | Invariant asserted after retry/relaunch |
+|---|---|---|
+| Capture | prepare, file open, Nth write, route reset, disk full, close, metadata save, process kill | Only valid partial/full audio survives; state never reports false success |
+| Store launch | protected data unavailable, no space, corrupt SQLite/WAL, N-1/N-2 schema | No crash loop or automatic reset; recovery options preserve original bytes |
+| Delete/replace | intent save, trash move, model save, purge, legacy collision | Original is restorable until durable commit; journal replay is idempotent |
+| Stored JSON | truncated, wrong version/checksum, unknown fields | Corruption is explicit and raw bytes remain recoverable |
+| Transcription | every stage, checkpoint save, process kill after each chunk, changed fingerprint | At most the in-flight chunk is lost; incompatible work is never spliced |
+| Provider | offline/DNS/TLS, timeout before/after server work, 401/403, 429, 5xx, malformed/huge body, redirect, cancellation | Destination and retry/cost bounds hold; cancellation is prompt |
+| Model/key | locked Keychain, denied write, partial/wrong-hash model, replacement crash | No false configured/installed state; prior valid material survives |
+| Integrations | Watch reply loss/duplicate/reorder, Activity start/end race, intent double invocation | Commands are idempotent and reconcile to recorder truth |
+
+3. Split CI signals by purpose: fast pure/unit tests, simulator integration tests,
+   and UI/accessibility tests should report separately so a flaky UI launch does
+   not obscure a deterministic data-integrity failure.
+4. Always upload the `.xcresult`, failed-test screenshots, simulator/system logs,
+   SwiftLint JSON and relevant local diagnostic artifacts on failure. Preserve
+   privacy by seeding only synthetic fixtures.
+5. Add a scheduled/release hardening lane: repeated cancellation/concurrency
+   tests, sanitizer runs where supported, migration fixtures, Release build, and
+   selected UI tests repeated to measure flake rate. Do not use blanket retries to
+   turn a real failure green; classify infrastructure retries separately and
+   retain the first failure artifact.
+6. Add static policy checks, with explicit allow-list annotations, for new
+   production `fatalError`/`preconditionFailure`, `try?` at durability boundaries,
+   raw public error descriptions, custom HTTP destinations, and unowned long-lived
+   tasks.
+7. Keep a manual real-device release checklist for failures simulators cannot
+   reproduce: lock before/after first unlock, memory/thermal pressure, nearly-full
+   storage, phone-call/Siri interruption, Bluetooth route changes, background
+   expiration, Watch disconnect and model compilation.
+
+**Done when.** Every P0 item has a deterministic failing test before its fix and a
+post-relaunch assertion after it; CI retains enough evidence to diagnose one run;
+release candidates exercise old stores and fault paths, not only clean installs;
+flake rate is measured rather than hidden.
+
+### Reliability scorecard
+
+The scorecard is local/test-derived first, consistent with I1. No third-party
+analytics SDK or automatic report upload is required.
+
+- **Capture:** starts, durable finalizations, partial recoveries, quarantines,
+  write/watchdog failures, and actual-vs-wall-clock duration.
+- **Persistence:** open/migration outcomes, failed commits, journal replays,
+  protection verification, JSON corruption, and backup/salvage outcome.
+- **Pipeline:** runs by requested/effective stage, checkpoints reused/discarded,
+  resume attempts, degraded-stage codes, permanent failures, and prior-artifact
+  preservation.
+- **Network/cost:** logical operations, attempts, rate-limit wait, ambiguous
+  response loss, cooldown activation, bytes sent, and approved destination ID —
+  never transcript text or credentials.
+- **Resources/integrations:** memory/thermal deferrals, background windows,
+  Watch/Activity/intent command outcomes, timeout and reconciliation counts.
+- **Quality:** crash/hang reports from the existing opt-in MetricKit path, CI
+  fault-matrix pass rate, migration fixture pass rate and UI flake rate.
+
+Do not invent a numeric reliability SLO before a baseline exists. The first
+instrumented release establishes rates; later releases compare the same counters.
+The immediate release gates are invariants: no loss of the only original under an
+injected failure, no unintended network destination, no recoverable launch
+`fatalError`, no false durable success, and every supported old-store fixture
+migrates.
+
+### Implementation sequence
+
+1. **Baseline and seams.** Land operation IDs, safe event vocabulary, injectable
+   clock/filesystem/store/network/sink adapters, and the fault-matrix harness.
+   This makes every later claim reproducible.
+2. **Small P0 containment.** Fail closed on invalid/custom endpoints; latch audio
+   write failures; stop auto-deleting unmatched originals; detect authoritative
+   JSON decode failures; make Keychain status visible.
+3. **Durability core.** Ship versioned store migration/bootstrap, protected
+   backups, provisional capture rows, the operation journal/trash/quarantine and
+   throwing commit boundaries.
+4. **Resume correctness.** Version and fingerprint checkpoints, make checkpoint
+   writes gate the next chunk, validate final output, and bound automatic retries.
+5. **Visible degradation and recovery.** Persist stage reports, add actionable
+   error UI/health surfaces, previous-artifact preservation and repair actions.
+6. **Network/model lifecycle.** Unify foreground/background HTTP policy,
+   rate-limit/cooldown semantics, request identity, model digest/resume/atomic
+   replacement and explicit network policy.
+7. **External and concurrency hardening.** Resource scheduler, non-cooperative
+   cancellation truth, shared Watch protocol, command acknowledgements and
+   Activity/intent race handling.
+8. **Continuous release gate.** Split CI signals, retain failure artifacts, run
+   migrations/faults/sanitizers/repetition, and record the scorecard alongside
+   the existing accuracy history.
+
+P0 containment and durability take precedence over new features that widen the
+same surfaces (capture entry points, import, provider work, or filesystem
+mutation). Independent feature work may continue, but it does not redefine these
+failure contracts.
+
 ## Suggested sequence
 
 Unlike the rest of this document, the numbering here is real — each step makes
@@ -677,8 +1216,10 @@ the next cheaper or more verifiable.
    up verification of everything after it — including the pipeline changes F2
    introduces. The Accelerate-dependent "Speakers" group is the one deliberate
    gap; see the section above.
-2. **F3 · Frictionless capture.** Lowest effort, immediate value, depends on
-   nothing else here. The dispatcher already exists.
+2. **F3 · Frictionless capture — done.** Shipped in
+   [PR #143](https://github.com/carlosmazzei/Kurn/pull/143); external-command
+   acknowledgement and race hardening continue under H8 rather than reopening
+   the feature itself.
 3. **F1 · Apple Foundation Models — done.** Shipped in
    [PR #139](https://github.com/carlosmazzei/Kurn/pull/139): provider
    plumbing, auto-tagging, retrieval chat and per-provider summary thresholds,
