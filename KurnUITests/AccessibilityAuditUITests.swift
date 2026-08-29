@@ -58,6 +58,15 @@ final class AccessibilityAuditUITests: XCTestCase {
     }
 
     private func openFirstMeeting() {
-        app.buttons["meetingCard"].firstMatch.tap()
+        let card = app.buttons["meetingCard"].firstMatch
+        let detailTab = app.buttons["tab.recordings"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+
+        for _ in 0..<2 {
+            card.tap()
+            if detailTab.waitForExistence(timeout: 10) { return }
+        }
+
+        XCTFail("Meeting detail did not open")
     }
 }
