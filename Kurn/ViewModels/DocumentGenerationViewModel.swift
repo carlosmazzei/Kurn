@@ -30,7 +30,7 @@ final class DocumentGenerationViewModel {
         settings: AppSettings
     ) async -> GeneratedDocument? {
         guard !isGenerating else { return nil }
-        let runID = String(UUID().uuidString.prefix(8))
+        let runID = OperationID()
         let startedAt = Date()
         let sources = meetings.compactMap { meeting -> DocumentTranscriptSource? in
             let transcript = meeting.assembledTranscriptText()
@@ -43,9 +43,10 @@ final class DocumentGenerationViewModel {
             )
         }
         guard !sources.isEmpty else {
-            AppLog.generation.atError.error(
-                "document: rejected run=\(runID, privacy: .public) stage=source_resolution code=no_transcripts"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation",
+                stage: "source_resolution", outcome: .failed, code: "no_transcripts"
+            ))
             error = .documentGenerationFailed(
                 NSLocalizedString("documents.error.no_transcripts", comment: "No selected transcripts")
             )
@@ -85,31 +86,39 @@ final class DocumentGenerationViewModel {
             modelContext.insert(document)
             if let saveError = modelContext.saveOrError() {
                 modelContext.delete(document)
-                AppLog.generation.atError.error(
-                    "document: failed run=\(runID, privacy: .public) stage=persistence code=\(saveError.logCode, privacy: .public) elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s"
-                )
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "document_generation", stage: "persistence",
+                    outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: saveError.logCode
+                ))
                 error = saveError
                 return nil
             }
-            AppLog.generation.atNotice.notice(
-                "document: saved run=\(runID, privacy: .public) elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: "persistence",
+                outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             return document
         } catch is CancellationError {
-            AppLog.generation.atNotice.notice(
-                "document: cancelled run=\(runID, privacy: .public) stage=view_model elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: "view_model",
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             return nil
         } catch let appError as AppError {
-            AppLog.generation.atError.error(
-                "document: surfaced run=\(runID, privacy: .public) code=\(appError.logCode, privacy: .public) elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: "view_model",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: appError.logCode
+            ))
             error = appError
             return nil
         } catch {
-            AppLog.generation.atError.error(
-                "document: surfaced run=\(runID, privacy: .public) code=unexpected elapsed=\(Date().timeIntervalSince(startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: "view_model",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: "unexpected"
+            ))
             self.error = .documentGenerationFailed(error.localizedDescription)
             return nil
         }

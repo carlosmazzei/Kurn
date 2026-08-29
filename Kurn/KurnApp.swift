@@ -97,18 +97,8 @@ struct KurnApp: App {
             }
         }
         #endif
-        ModelStoreProtection.apply()
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
-            let container = try ModelContainer(for: schema, configurations: [configuration])
-            // On a fresh install the first `apply()` above was a no-op (the
-            // store didn't exist yet); SwiftData just created it, so apply
-            // again now the file exists. The protection attribute can be set
-            // on an already-open file and still takes effect on its next
-            // close, so this also hardens the just-created store for later
-            // in this same session.
-            ModelStoreProtection.apply()
-            return container
+            return try ModelContainerBootstrap.makeStore(schema: schema)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
@@ -119,6 +109,17 @@ struct KurnApp: App {
         // exposes this seam instead of logging directly. Wired once, here,
         // before any transcription can run.
         TranscriptQualityFilter.logHandler = { AppLog.transcription.atInfo.info("\($0, privacy: .public)") }
+        // Same shape as above, for the cross-cutting `ReliabilityEvent`
+        // vocabulary: `logLine` is content-free by construction, so `.public`
+        // is safe here without a redaction pass.
+        ReliabilityLog.handler = { event in
+            switch event.outcome {
+            case .failed:
+                AppLog.reliability.atError.error("\(event.logLine, privacy: .public)")
+            default:
+                AppLog.reliability.atInfo.info("\(event.logLine, privacy: .public)")
+            }
+        }
 
         let container = modelContainer
         // Build the shared transcription coordinator on the app's main context

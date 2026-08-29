@@ -99,6 +99,7 @@ enum AppLog {
     private static let generationLogger = Logger(subsystem: subsystem, category: "Generation")
     private static let uiLogger = Logger(subsystem: subsystem, category: "UI")
     private static let persistenceLogger = Logger(subsystem: subsystem, category: "Persistence")
+    private static let reliabilityLogger = Logger(subsystem: subsystem, category: "Reliability")
 
     /// Audio capture lifecycle (engine, session, metering).
     static let recorder = CategoryLogger(recorderLogger)
@@ -112,6 +113,10 @@ enum AppLog {
     static let ui = CategoryLogger(uiLogger)
     /// SwiftData persistence and model migrations.
     static let persistence = CategoryLogger(persistenceLogger)
+    /// Cross-cutting `ReliabilityEvent`s (operation start/success/failure/
+    /// retry) reported through `KurnCore.ReliabilityLog`, independent of the
+    /// per-feature categories above.
+    static let reliability = CategoryLogger(reliabilityLogger)
 }
 
 /// Thin wrapper over `os.Logger` that gates each message by `AppLog.minimumLevel`.

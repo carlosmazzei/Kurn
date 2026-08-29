@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum TempFileCleaner {
     /// Known prefixes for pipeline temporary files created inside the app's
@@ -37,8 +38,8 @@ enum TempFileCleaner {
     /// cleanup in Settings; it ignores the age threshold but only touches files
     /// with known prefixes inside the temporary directory, so recordings in
     /// `Documents/Recordings` are never affected.
-    static func forceCleanup() -> (files: Int, bytes: Int64) {
-        let result = Self.cleanup(olderThan: nil)
+    static func forceCleanup(fileSystem: some FileSystem = SystemFileSystem()) -> (files: Int, bytes: Int64) {
+        let result = Self.cleanup(olderThan: nil, fileSystem: fileSystem)
         AppLog.transcription.atNotice.notice("forceCleanupTempFiles: removed \(result.files, privacy: .public) file(s), \(result.bytes, privacy: .public) bytes")
         return result
     }
@@ -48,15 +49,22 @@ enum TempFileCleaner {
         Self.scan(olderThan: nil, remove: false)
     }
 
-    private static func cleanup(olderThan: TimeInterval?) -> (files: Int, bytes: Int64) {
-        Self.scan(olderThan: olderThan, remove: true)
+    private static func cleanup(
+        olderThan: TimeInterval?,
+        fileSystem: some FileSystem = SystemFileSystem()
+    ) -> (files: Int, bytes: Int64) {
+        Self.scan(olderThan: olderThan, remove: true, fileSystem: fileSystem)
     }
 
-    private static func scan(olderThan: TimeInterval?, remove: Bool) -> (files: Int, bytes: Int64) {
+    private static func scan(
+        olderThan: TimeInterval?,
+        remove: Bool,
+        fileSystem: some FileSystem = SystemFileSystem()
+    ) -> (files: Int, bytes: Int64) {
         let tmp = FileManager.default.temporaryDirectory
         let cutoff = olderThan.map { Date().addingTimeInterval(-$0) }
 
-        let pipelineResult = sweep(directory: tmp, cutoff: cutoff, remove: remove) { _, name in
+        let pipelineResult = sweep(directory: tmp, cutoff: cutoff, remove: remove, fileSystem: fileSystem) { _, name in
             Self.prefixes.contains(where: { name.hasPrefix($0) })
         }
 
@@ -64,7 +72,7 @@ enum TempFileCleaner {
         // background upload task is still actively reading from disk.
         let uploadDir = tmp.appendingPathComponent("WhisperUploadBodies", isDirectory: true)
         let inFlight = WhisperBackgroundUploader.shared.inFlightBodyFilePaths()
-        let uploadResult = sweep(directory: uploadDir, cutoff: cutoff, remove: remove) { file, _ in
+        let uploadResult = sweep(directory: uploadDir, cutoff: cutoff, remove: remove, fileSystem: fileSystem) { file, _ in
             file.pathExtension == "multipart" && !inFlight.contains(file.path)
         }
 
@@ -85,10 +93,11 @@ enum TempFileCleaner {
         directory: URL,
         cutoff: Date?,
         remove: Bool,
+        fileSystem: some FileSystem = SystemFileSystem(),
         isEligible: (URL, String) -> Bool
     ) -> (files: Int, bytes: Int64) {
         let keys: [URLResourceKey] = [.nameKey, .creationDateKey, .isRegularFileKey]
-        guard let files = try? FileManager.default.contentsOfDirectory(
+        guard let files = try? fileSystem.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: keys,
             options: .skipsHiddenFiles
@@ -110,7 +119,7 @@ enum TempFileCleaner {
                 continue
             }
             do {
-                try FileManager.default.removeItem(at: file)
+                try fileSystem.removeItem(at: file)
                 removed += 1
                 removedBytes += Int64(size)
             } catch {

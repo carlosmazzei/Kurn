@@ -28,18 +28,19 @@ struct DocumentGenerationService {
         prompt: String,
         provider: AIProvider,
         model: String,
-        runID: String = String(UUID().uuidString.prefix(8)),
+        runID: OperationID = OperationID(),
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> GeneratedDocumentResult {
         let startedAt = Date()
         let instruction = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         AppLog.generation.atNotice.notice(
-            "document: start run=\(runID, privacy: .public) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) sources=\(sources.count, privacy: .public) promptChars=\(instruction.count, privacy: .public)"
+            "document: start run=\(runID.value, privacy: .public) provider=\(provider.id, privacy: .public) model=\(model, privacy: .public) sources=\(sources.count, privacy: .public) promptChars=\(instruction.count, privacy: .public)"
         )
         guard !instruction.isEmpty else {
-            AppLog.generation.atError.error(
-                "document: failed run=\(runID, privacy: .public) stage=validation code=empty_prompt"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation",
+                stage: "validation", outcome: .failed, code: "empty_prompt"
+            ))
             throw AppError.documentGenerationFailed(
                 NSLocalizedString("documents.error.empty_prompt", comment: "Empty document prompt")
             )
@@ -47,9 +48,10 @@ struct DocumentGenerationService {
 
         let context = Self.render(sources)
         guard !context.isEmpty else {
-            AppLog.generation.atError.error(
-                "document: failed run=\(runID, privacy: .public) stage=validation code=no_transcripts"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation",
+                stage: "validation", outcome: .failed, code: "no_transcripts"
+            ))
             throw AppError.documentGenerationFailed(
                 NSLocalizedString("documents.error.no_transcripts", comment: "No selected transcripts")
             )
@@ -59,16 +61,18 @@ struct DocumentGenerationService {
         do {
             llm = try ProviderFactory.summaryProvider(for: provider, model: model)
         } catch {
-            AppLog.generation.atError.error(
-                "document: failed run=\(runID, privacy: .public) stage=provider code=\(Self.errorCode(error), privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: "provider",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: Self.errorCode(error)
+            ))
             throw error
         }
 
         let markdown: String
         if context.count <= SummaryService.maxSinglePassChars(for: provider) {
             AppLog.generation.atNotice.notice(
-                "document: strategy run=\(runID, privacy: .public) path=single contextChars=\(context.count, privacy: .public)"
+                "document: strategy run=\(runID.value, privacy: .public) path=single contextChars=\(context.count, privacy: .public)"
             )
             markdown = try await requestText(
                 llm: llm,
@@ -79,7 +83,7 @@ struct DocumentGenerationService {
             )
         } else {
             AppLog.generation.atNotice.notice(
-                "document: strategy run=\(runID, privacy: .public) path=staged contextChars=\(context.count, privacy: .public)"
+                "document: strategy run=\(runID.value, privacy: .public) path=staged contextChars=\(context.count, privacy: .public)"
             )
             markdown = try await generateLongDocument(
                 sources: sources,
@@ -92,16 +96,22 @@ struct DocumentGenerationService {
 
         let clean = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else {
-            AppLog.generation.atError.error(
-                "document: failed run=\(runID, privacy: .public) stage=output code=empty_response elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: "output",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: "empty_response"
+            ))
             throw AppError.documentGenerationFailed(
                 NSLocalizedString("documents.error.empty_response", comment: "Empty generated document")
             )
         }
         AppLog.generation.atNotice.notice(
-            "document: complete run=\(runID, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s outputChars=\(clean.count, privacy: .public)"
+            "document: complete run=\(runID.value, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s outputChars=\(clean.count, privacy: .public)"
         )
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "document_generation",
+            outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+        ))
         return GeneratedDocumentResult(
             title: Self.extractTitle(from: clean, fallbackPrompt: instruction),
             markdown: clean
@@ -112,13 +122,13 @@ struct DocumentGenerationService {
         sources: [DocumentTranscriptSource],
         instruction: String,
         llm: LLMProvider,
-        runID: String,
+        runID: OperationID,
         onProgress: (@Sendable (Int, Int) -> Void)?
     ) async throws -> String {
         let blocks = Self.renderBlocks(sources, maxChars: SummaryService.mapBlockChars(for: llm.provider))
         let total = blocks.count + 1
         AppLog.generation.atNotice.notice(
-            "document: staged run=\(runID, privacy: .public) blocks=\(blocks.count, privacy: .public)"
+            "document: staged run=\(runID.value, privacy: .public) blocks=\(blocks.count, privacy: .public)"
         )
         var notes: [String] = []
         for (index, block) in blocks.enumerated() {
@@ -159,11 +169,11 @@ struct DocumentGenerationService {
         systemPrompt: String,
         message: String,
         stage: String,
-        runID: String
+        runID: OperationID
     ) async throws -> String {
         let startedAt = Date()
         AppLog.generation.atInfo.info(
-            "document: request run=\(runID, privacy: .public) stage=\(stage, privacy: .public) inputChars=\(message.count, privacy: .public) maxOutputTokens=\(TextGenerationOptions.document.maxOutputTokens, privacy: .public)"
+            "document: request run=\(runID.value, privacy: .public) stage=\(stage, privacy: .public) inputChars=\(message.count, privacy: .public) maxOutputTokens=\(TextGenerationOptions.document.maxOutputTokens, privacy: .public)"
         )
         do {
             let response = try await llm.chat(
@@ -172,18 +182,21 @@ struct DocumentGenerationService {
                 options: .document
             )
             AppLog.generation.atInfo.info(
-                "document: response run=\(runID, privacy: .public) stage=\(stage, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s outputChars=\(response.count, privacy: .public)"
+                "document: response run=\(runID.value, privacy: .public) stage=\(stage, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s outputChars=\(response.count, privacy: .public)"
             )
             return response
         } catch is CancellationError {
-            AppLog.generation.atNotice.notice(
-                "document: cancelled run=\(runID, privacy: .public) stage=\(stage, privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: stage,
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             throw CancellationError()
         } catch {
-            AppLog.generation.atError.error(
-                "document: failed run=\(runID, privacy: .public) stage=\(stage, privacy: .public) code=\(Self.errorCode(error), privacy: .public) elapsed=\(Self.duration(since: startedAt), privacy: .public)s"
-            )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "document_generation", stage: stage,
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: Self.errorCode(error)
+            ))
             throw error
         }
     }
