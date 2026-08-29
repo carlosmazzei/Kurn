@@ -52,7 +52,7 @@ jobs:
       # screenshots.yml it resolves to this same run, where the artifact
       # already is.
       - name: Download raw screenshots artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: screenshots
           path: raw-screenshots
