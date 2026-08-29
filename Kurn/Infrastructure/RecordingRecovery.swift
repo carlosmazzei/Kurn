@@ -110,11 +110,10 @@ enum RecordingRecovery {
         }
 
         guard changedAny else { return }
-        do {
-            try context.save()
-        } catch {
-            AppLog.recorder.atError.error("recovery: failed to save recovered recordings: \(error.localizedDescription, privacy: .public)")
-        }
+        // `saveOrError()` already logs the failure (category "Persistence");
+        // nothing here needs to react further, so it isn't logged a second
+        // time, matching every other call site in the app.
+        context.saveOrError()
     }
 
     /// Stat the backing file of every recording whose cached size is still

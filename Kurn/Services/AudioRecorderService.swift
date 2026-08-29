@@ -90,8 +90,9 @@ final class AudioRecorderService: NSObject {
     @ObservationIgnored private nonisolated(unsafe) let engine = AVAudioEngine()
     /// Thread-safe sink that owns the output file and the latest level. The input
     /// tap runs on a render thread, so it talks to the sink rather than to this
-    /// main-actor object directly.
-    @ObservationIgnored private nonisolated let sink = RecordingSink()
+    /// main-actor object directly. Typed as the protocol (defaulted to the real
+    /// `RecordingSink`) so a test can inject a fake that observes/fails writes.
+    @ObservationIgnored private nonisolated let sink: any AudioSinkWriting
     @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
     /// Input format the tap was created with, so the engine-stall recovery can
     /// tell a plain restart (same format) from one that needs the tap and the
@@ -129,7 +130,8 @@ final class AudioRecorderService: NSObject {
     /// decide whether to auto-resume when it ends.
     private var wasRecordingBeforeInterruption = false
 
-    override init() {
+    init(sink: any AudioSinkWriting = RecordingSink()) {
+        self.sink = sink
         super.init()
         registerNotifications()
     }
@@ -443,7 +445,7 @@ final class AudioRecorderService: NSObject {
     private nonisolated static func installTap(
         on input: AVAudioInputNode,
         format: AVAudioFormat,
-        sink: RecordingSink
+        sink: any AudioSinkWriting
     ) {
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
             sink.write(buffer)
