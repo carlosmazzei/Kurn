@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -52,7 +52,7 @@ jobs:
       # screenshots.yml it resolves to this same run, where the artifact
       # already is.
       - name: Download raw screenshots artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: screenshots
           path: raw-screenshots
@@ -75,7 +75,7 @@ jobs:
             --output-dir "$GITHUB_WORKSPACE/screenshots-framed"
 
       - name: Upload marketing screenshots artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots-framed
           path: screenshots-framed
