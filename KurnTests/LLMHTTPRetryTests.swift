@@ -7,6 +7,10 @@ import Foundation
 import Testing
 @testable import Kurn
 
+// `MockURLProtocol`'s scripted state is process-global (see its own doc
+// comment), so the one test here that drives `sendValidated` through it
+// must be serialized against any other suite doing the same.
+@Suite(.serialized)
 struct LLMHTTPRetryTests {
 
     // MARK: - Retriable vs. non-retriable
@@ -86,5 +90,32 @@ struct LLMHTTPRetryTests {
             attempt: 0, status: 503, urlError: nil, retryAfter: LLMHTTP.maxDelay + 100
         )
         #expect(delay == LLMHTTP.maxDelay)
+    }
+
+    // MARK: - Deterministic retry via the injected clock
+
+    /// Proves the `SleepClock` seam end to end against the one production
+    /// call site that actually sleeps on the retry path: a 429 (with a
+    /// server `Retry-After`, so the delay is exact rather than jittered)
+    /// followed by a 200 completes with the final response, and the injected
+    /// clock (which never really waits) recorded exactly that delay — in
+    /// milliseconds, not real seconds.
+    @Test func sendValidatedBacksOffUsingInjectedClock() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 429, body: Data(), headers: ["Retry-After": "1"]),
+            MockURLProtocol.json(["ok": true])
+        ])
+        let clock = ManualSleepClock()
+        let request = URLRequest(url: try #require(URL(string: "https://example.com/v1")))
+
+        let (data, response) = try await LLMHTTP.sendValidated(
+            request, session: MockURLProtocol.session(), clock: clock
+        )
+
+        let http = try #require(response as? HTTPURLResponse)
+        #expect(http.statusCode == 200)
+        let body = try JSONSerialization.jsonObject(with: data) as? [String: Bool]
+        #expect(body?["ok"] == true)
+        #expect(clock.durations == [1])
     }
 }

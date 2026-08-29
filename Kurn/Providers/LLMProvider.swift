@@ -231,7 +231,11 @@ enum LLMHTTP {
     /// and server failures with exponential backoff (honoring `Retry-After`).
     /// This is the entry point providers should use; `send`/`validate` remain
     /// available for callers that need the two steps separately.
-    static func sendValidated(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+    static func sendValidated(
+        _ request: URLRequest,
+        session: URLSession,
+        clock: some SleepClock = SystemClock()
+    ) async throws -> (Data, URLResponse) {
         var attempt = 0
         while true {
             // Transport step. Only `AppError.networkError` is retriable here;
@@ -243,7 +247,7 @@ enum LLMHTTP {
                 guard let delay = retryableDelay(
                     attempt: attempt, status: nil, urlError: urlError, retryAfter: nil
                 ) else { throw AppError.networkError(urlError) }
-                try await backoff(delay, attempt: attempt, reason: "network \(urlError.code.rawValue)")
+                try await backoff(delay, attempt: attempt, reason: "network \(urlError.code.rawValue)", clock: clock)
                 attempt += 1
                 continue
             }
@@ -258,7 +262,7 @@ enum LLMHTTP {
                 guard let delay = retryableDelay(
                     attempt: attempt, status: status, urlError: nil, retryAfter: retryAfter
                 ) else { throw AppError.apiError(statusCode: status, message: message) }
-                try await backoff(delay, attempt: attempt, reason: "HTTP \(status)")
+                try await backoff(delay, attempt: attempt, reason: "HTTP \(status)", clock: clock)
                 attempt += 1
                 continue
             }
@@ -314,11 +318,11 @@ enum LLMHTTP {
         return min(exponential + jitter, maxDelay)
     }
 
-    private static func backoff(_ delay: TimeInterval, attempt: Int, reason: String) async throws {
+    private static func backoff(_ delay: TimeInterval, attempt: Int, reason: String, clock: some SleepClock) async throws {
         let seconds = String(format: "%.2f", delay)
         let nextAttempt = attempt + 2
         AppLog.transcription.atInfo.info("http: retrying after \(seconds, privacy: .public)s (attempt \(nextAttempt, privacy: .public)/\(maxAttempts, privacy: .public), \(reason, privacy: .public))")
-        try await Task.sleep(for: .seconds(delay))
+        try await clock.sleep(seconds: delay)
     }
 
     /// Parse a `Retry-After` header expressed in delta-seconds. The HTTP-date
