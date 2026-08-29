@@ -1,2 +1,2 @@
-datasets>=2.19
+datasets>=5.0.1
 huggingface_hub>=0.23
