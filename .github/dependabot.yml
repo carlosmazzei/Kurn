@@ -11,3 +11,32 @@ updates:
     schedule:
       interval: "weekly"
     labels: ["dependencies"]
+
+  # Kurn.xcodeproj declares its Swift Package dependencies (FluidAudio,
+  # sherpa-onnx) directly in project.pbxproj rather than a top-level
+  # Package.swift. This entry needs a committed
+  # Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+  # to have anything to act on — see .gitignore's exception for that file.
+  # Packages/KurnCore and Packages/WhisperCpp intentionally have no entry:
+  # KurnCore has zero external package dependencies, and WhisperCpp's only
+  # "dependency" is a hardcoded binaryTarget URL/checksum, not an SPM package
+  # reference Dependabot can track.
+  - package-ecosystem: "swift"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]
+
+  # scripts/screenshots/package.json (Playwright, marketing screenshot renderer).
+  - package-ecosystem: "npm"
+    directory: "/scripts/screenshots"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]
+
+  # Tools/evaluation/public_datasets/requirements.txt (public dataset fetchers).
+  - package-ecosystem: "pip"
+    directory: "/Tools/evaluation/public_datasets"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]

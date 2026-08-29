@@ -32,6 +32,10 @@ secrets.xcconfig
 .build/
 .swiftpm/
 Package.resolved
+# ...except the main Xcode project's own resolved manifest: Dependabot's
+# "swift" ecosystem needs this committed to track FluidAudio/sherpa-onnx
+# versions pinned directly in project.pbxproj (see .github/dependabot.yml).
+!/Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # CocoaPods / Carthage (unused now, ignored if added later)
 Pods/
