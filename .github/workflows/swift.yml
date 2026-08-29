@@ -98,6 +98,23 @@ jobs:
             xcodebuild -downloadPlatform watchOS
           fi
 
+      # Caches the resolved/checked-out SPM packages (FluidAudio, KurnCore,
+      # and the two large ones: the whisper.cpp binary XCFramework and
+      # sherpa-onnx), not compiled build products. `xcodebuild clean` only
+      # wipes `<DerivedDataPath>/Build/`, never `SourcePackages`, so this is
+      # safe alongside `clean test` below — it cannot serve a stale compiled
+      # artifact, only avoid re-fetching unchanged package sources. Keyed on
+      # the files that actually pin what gets resolved: project.pbxproj's
+      # `XCRemoteSwiftPackageReference` entries and WhisperCpp's manifest
+      # (which pins the XCFramework's download URL/checksum).
+      - name: Cache resolved SPM packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/DerivedData/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Build and test
         run: |
           xcodebuild \
