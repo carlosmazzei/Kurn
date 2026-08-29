@@ -108,7 +108,7 @@ jobs:
       # `XCRemoteSwiftPackageReference` entries and WhisperCpp's manifest
       # (which pins the XCFramework's download URL/checksum).
       - name: Cache resolved SPM packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/DerivedData/SourcePackages
           key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
