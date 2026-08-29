@@ -12,6 +12,7 @@
 import ActivityKit
 import AVFoundation
 import Foundation
+import KurnCore
 import SwiftData
 
 enum RecordingRecovery {
@@ -110,10 +111,8 @@ enum RecordingRecovery {
         }
 
         guard changedAny else { return }
-        do {
-            try context.save()
-        } catch {
-            AppLog.recorder.atError.error("recovery: failed to save recovered recordings: \(error.localizedDescription, privacy: .public)")
+        if let saveError = context.saveOrError() {
+            AppLog.recorder.atError.error("recovery: failed to save recovered recordings: \(saveError.logCode, privacy: .public)")
         }
     }
 

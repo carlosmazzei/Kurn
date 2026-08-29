@@ -12,6 +12,28 @@ import AVFoundation
 import Foundation
 import os
 
+/// The surface `AudioRecorderService` needs from its sink, carved out so a
+/// fake can stand in for `RecordingSink` in tests — the real-time render
+/// thread's write path had no injection point at all before this. Reliability
+/// track ("Baseline and seams", `docs/roadmap.md`): this only lands the seam,
+/// it does not yet change what the app does when `write(_:)` reports failure
+/// (that reaction is H1's job) — `AudioRecorderService` still discards the
+/// return value today.
+protocol AudioSinkWriting: Sendable {
+    func open(
+        _ file: AVAudioFile,
+        converter: AVAudioConverter,
+        targetFormat: AVAudioFormat,
+        onBuffer: ((AVAudioPCMBuffer) -> Void)?
+    )
+    func replaceConverter(_ converter: AVAudioConverter)
+    var currentTargetFormat: AVAudioFormat? { get }
+    func setPaused(_ value: Bool)
+    func close()
+    var currentLevel: Float { get }
+    @discardableResult func write(_ buffer: AVAudioPCMBuffer) -> Bool
+}
+
 /// Thread-safe owner of the recording file and the latest input level. The audio
 /// tap runs on a real-time render thread; routing all file/level access through
 /// this lock-guarded box keeps it off the main actor and free of data races.
@@ -21,7 +43,7 @@ import os
 /// speech format rather than the tap's (see
 /// `AudioRecorderService.storageSampleRate`), so every buffer passes through
 /// `converter` on its way to disk.
-final class RecordingSink: @unchecked Sendable {
+final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
     private let lock = NSLock()
     private var file: AVAudioFile?
     private var paused = true
@@ -87,14 +109,24 @@ final class RecordingSink: @unchecked Sendable {
         return level
     }
 
-    func write(_ buffer: AVAudioPCMBuffer) {
+    @discardableResult
+    func write(_ buffer: AVAudioPCMBuffer) -> Bool {
         lock.lock()
-        guard !paused, let file, let converter, let targetFormat else { lock.unlock(); return }
+        guard !paused, let file, let converter, let targetFormat else { lock.unlock(); return false }
         guard let converted = Self.convert(buffer, using: converter, to: targetFormat) else {
             lock.unlock()
-            return
+            return false
         }
-        try? file.write(from: converted)
+        // `@discardableResult` because nothing reacts to a write failure yet
+        // (that's H1's job) — but the signal now exists at the boundary
+        // instead of being silently discarded by `try?`.
+        let succeeded: Bool
+        do {
+            try file.write(from: converted)
+            succeeded = true
+        } catch {
+            succeeded = false
+        }
         level = Self.level(of: converted)
         let callback = onBuffer
         lock.unlock()
@@ -102,6 +134,7 @@ final class RecordingSink: @unchecked Sendable {
         // closer to the 16kHz the streaming engines want than the mic's native
         // rate was, and it is a smaller buffer to copy on the render thread.
         callback?(converted)
+        return succeeded
     }
 
     /// Resample one tap buffer. Sample rate conversion is not 1:1, so this needs

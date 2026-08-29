@@ -12,7 +12,25 @@
 import SwiftData
 import KurnCore
 
-extension ModelContext {
+/// The one operation reliability-track call sites need from a `ModelContext`:
+/// save, with failure reported rather than thrown/dropped. A full fake (one
+/// that can also stand in for `fetch`) is deliberately not built yet — several
+/// call sites, `RecordingRecovery` included, fetch and save on the same
+/// concrete context in one function, and splitting that into separately
+/// injected read/write dependencies is a real architectural change, not a
+/// seam. That split belongs to the durability-core phase, when
+/// `RecordingRecovery` is restructured for the operation journal anyway.
+///
+/// Deliberately not `@MainActor`: `RecordingRecovery.recoverOrphans` builds a
+/// background `ModelContext(modelContainer)` (not `.mainContext`) and calls
+/// `save()` from a plain, non-async static function — matching `ModelContext`
+/// itself, which is not statically actor-isolated.
+protocol ModelPersisting {
+    @discardableResult
+    func saveOrError() -> AppError?
+}
+
+extension ModelContext: ModelPersisting {
     /// Save pending changes, returning an already-logged `AppError` on failure
     /// (instead of silently dropping it) so the caller can surface it. Returns
     /// `nil` on success.
