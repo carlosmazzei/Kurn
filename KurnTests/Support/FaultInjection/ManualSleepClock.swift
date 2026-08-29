@@ -17,9 +17,12 @@ final class ManualSleepClock: SleepClock, @unchecked Sendable {
     private var recordedDurations: [TimeInterval] = []
 
     func sleep(seconds: TimeInterval) async throws {
-        lock.lock()
-        recordedDurations.append(seconds)
-        lock.unlock()
+        // `NSLock.lock()`/`unlock()` are unavailable from an async function
+        // body (the compiler can't prove no suspension happens mid-lock);
+        // `withLock` is the scoped-locking form that sidesteps that check.
+        lock.withLock {
+            recordedDurations.append(seconds)
+        }
     }
 
     var durations: [TimeInterval] {
