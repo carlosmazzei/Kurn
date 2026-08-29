@@ -12,7 +12,6 @@
 import ActivityKit
 import AVFoundation
 import Foundation
-import KurnCore
 import SwiftData
 
 enum RecordingRecovery {
@@ -111,9 +110,10 @@ enum RecordingRecovery {
         }
 
         guard changedAny else { return }
-        if let saveError = context.saveOrError() {
-            AppLog.recorder.atError.error("recovery: failed to save recovered recordings: \(saveError.logCode, privacy: .public)")
-        }
+        // `saveOrError()` already logs the failure (category "Persistence");
+        // nothing here needs to react further, so it isn't logged a second
+        // time, matching every other call site in the app.
+        context.saveOrError()
     }
 
     /// Stat the backing file of every recording whose cached size is still
