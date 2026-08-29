@@ -353,6 +353,32 @@ struct ProviderHTTPTests {
         #expect(MockURLProtocol.capturedRequests.count == 2)
     }
 
+    /// Proves the `SleepClock` seam end to end against the one production
+    /// call site that actually sleeps on the retry path: a 429 (with a
+    /// server `Retry-After`, so the delay is exact rather than jittered)
+    /// followed by a 200 completes with the final response, and the injected
+    /// clock (which never really waits) recorded exactly that delay — in
+    /// milliseconds, not real seconds. Lives in this suite, not its own, for
+    /// the same process-global `MockURLProtocol` reason noted below.
+    @Test func sendValidatedBacksOffUsingInjectedClock() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 429, body: Data(), headers: ["Retry-After": "1"]),
+            MockURLProtocol.json(["ok": true])
+        ])
+        let clock = ManualSleepClock()
+        let request = URLRequest(url: try #require(URL(string: "https://example.com/v1")))
+
+        let (data, response) = try await LLMHTTP.sendValidated(
+            request, session: MockURLProtocol.session(), clock: clock
+        )
+
+        let http = try #require(response as? HTTPURLResponse)
+        #expect(http.statusCode == 200)
+        let body = try JSONSerialization.jsonObject(with: data) as? [String: Bool]
+        #expect(body?["ok"] == true)
+        #expect(clock.durations == [1])
+    }
+
     // MARK: - Chat (plain-text LLMProvider.chat)
 
     // These live in this suite (not their own) for the same reason as the
