@@ -26,6 +26,13 @@ import Foundation
 import Observation
 import os
 
+struct AudioRecordingResult {
+    let fileName: String
+    let duration: TimeInterval
+    let highlights: [Highlight]
+    let captureFailure: AudioSinkFailure?
+}
+
 @MainActor
 @Observable
 final class AudioRecorderService: NSObject {
@@ -83,6 +90,7 @@ final class AudioRecorderService: NSObject {
     private(set) var elapsed: TimeInterval = 0
     /// Set when a route change (e.g. headphones unplugged) auto-paused us.
     private(set) var routeChangeMessage: String?
+    private(set) var captureFailure: AudioSinkFailure?
 
     // The engine, sink and tap flag are touched by the off-main setup/teardown
     // path (see `setUpEngine`), so they are kept out of main-actor isolation and
@@ -162,6 +170,7 @@ final class AudioRecorderService: NSObject {
             return
         }
         isStarting = true
+        captureFailure = nil
         defer { isStarting = false }
 
         let pickup = micPickup
@@ -232,6 +241,7 @@ final class AudioRecorderService: NSObject {
         case engineRecoveryFailed = "engine recovery failed (tap rebuild after format change)"
         case engineRestartFailed = "engine recovery failed (engine.start() after rebuild)"
         case routeChanged = "input route became unavailable (oldDeviceUnavailable)"
+        case sinkFailure = "audio conversion or file write failed"
     }
 
     func pause(reason: PauseReason) {
@@ -248,6 +258,10 @@ final class AudioRecorderService: NSObject {
     func resume() {
         AppLog.recorder.atInfo.info("resume: called state=\(String(describing: self.state), privacy: .public)")
         guard state == .paused else { return }
+        guard sink.snapshot.firstFailure == nil else {
+            _ = pollSinkStatus()
+            return
+        }
         // An interruption may have stopped the engine while we were paused.
         if !engine.isRunning {
             do { try engine.start() } catch {
@@ -276,11 +290,11 @@ final class AudioRecorderService: NSObject {
         onHighlightAdded?(highlight)
     }
 
-    /// Stop and finalize. Returns the saved file name, total duration, and the
-    /// highlights marked during this recording, or nil if nothing was
-    /// recorded. The session is deactivated afterwards.
+    /// Stop and finalize. Returns the file name, total duration, highlights, and
+    /// any latched capture failure, or nil if nothing was recorded. The session
+    /// is deactivated afterwards.
     @discardableResult
-    func stop() -> (fileName: String, duration: TimeInterval, highlights: [Highlight])? {
+    func stop() -> AudioRecordingResult? {
         AppLog.recorder.atNotice.notice("stop: called state=\(String(describing: self.state), privacy: .public) file=\(self.currentFileName ?? "nil", privacy: .public)")
         guard state != .idle, let fileName = currentFileName else {
             AppLog.recorder.atDebug.debug("stop: nothing to stop (idle or no file)")
@@ -289,10 +303,13 @@ final class AudioRecorderService: NSObject {
         accumulateElapsed()
         stopMetering()
         teardownEngine()
+        _ = pollSinkStatus()
 
         let duration = accumulated
         let capturedHighlights = highlights
-        AppLog.recorder.atNotice.notice("stop: finalized file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
+        let finalCaptureFailure = sink.snapshot.firstFailure
+        let outcome = finalCaptureFailure == nil ? "ready" : "partial"
+        AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
         self.currentFileName = nil
         self.state = .idle
         self.level = 0
@@ -303,7 +320,12 @@ final class AudioRecorderService: NSObject {
         notifyStateChanged()
 
         deactivateSession()
-        return (fileName, duration, capturedHighlights)
+        return AudioRecordingResult(
+            fileName: fileName,
+            duration: duration,
+            highlights: capturedHighlights,
+            captureFailure: finalCaptureFailure
+        )
     }
 
     /// Abort the current recording and delete its partial file.
@@ -605,6 +627,7 @@ final class AudioRecorderService: NSObject {
 
     private func tick() {
         guard state == .recording else { return }
+        if pollSinkStatus() { return }
         // Level is computed off the render thread by the sink; just publish it.
         level = sink.currentLevel
         onLevelChanged?(level)
@@ -622,6 +645,24 @@ final class AudioRecorderService: NSObject {
         if tickCount == 1 || tickCount % 20 == 0 {
             AppLog.recorder.atDebug.debug("tick #\(self.tickCount, privacy: .public): elapsed=\(self.elapsed, privacy: .public) level=\(self.level, privacy: .public)")
         }
+    }
+
+    @discardableResult
+    func pollSinkStatus() -> Bool {
+        let snapshot = sink.snapshot
+        guard let failure = snapshot.firstFailure, captureFailure == nil else { return false }
+        captureFailure = failure
+        routeChangeMessage = NSLocalizedString(
+            "recorder.write_failed",
+            comment: "Recording paused because captured audio could not be written"
+        )
+        if state == .recording {
+            pause(reason: .sinkFailure)
+        }
+        AppLog.recorder.atError.error(
+            "capture sink failed code=\(failure.rawValue, privacy: .public) attemptedInputFrames=\(snapshot.attemptedInputFrames, privacy: .public) writtenOutputFrames=\(snapshot.writtenOutputFrames, privacy: .public)"
+        )
+        return true
     }
 
     private func notifyStateChanged() {

@@ -165,6 +165,8 @@
 /* Gravador */
 "recorder.route_changed" = "Gravação pausada: o dispositivo de áudio mudou (ex.: fones desconectados).";
 "recorder.engine_stalled" = "Gravação pausada: o sistema interrompeu a captura de áudio. Toque em retomar para continuar.";
+"recorder.write_failed" = "Gravação pausada porque não foi possível salvar o áudio. Verifique o espaço disponível e pare para manter a gravação parcial.";
+"recorder.partial_saved" = "Uma gravação parcial foi salva após uma falha na captura de áudio. Verifique o espaço disponível antes de gravar novamente.";
 "recorder.title" = "Nova Gravação";
 "recorder.add_title" = "Adicionar título…";
 "recorder.pause" = "Pausar";

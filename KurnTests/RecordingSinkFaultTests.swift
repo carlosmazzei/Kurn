@@ -2,18 +2,14 @@
 //  RecordingSinkFaultTests.swift
 //  KurnTests
 //
-//  Proves the `AudioSinkWriting` seam: (1) a fake conforming to it can record
-//  writes and be told to fail from a specific call, and (2) `AudioRecorderService`
-//  actually accepts an injected sink instead of always building its own
-//  `RecordingSink` — the DI point this seam exists for. Driving a real
-//  recording through `AudioRecorderService.start()` needs microphone
-//  permission and a live `AVAudioEngine` session, which isn't reliable in CI
-//  (see CLAUDE.md's note that the recorder is one of the least-tested
-//  surfaces), so this stops short of that; reacting to a write failure is
-//  H1's job, not this seam's.
+//  Exercises H1's fault seams without a microphone: the real `RecordingSink`
+//  latches a scripted writer failure and metrics, while the injected sink drives
+//  `AudioRecorderService`'s write and final-drain reporting paths. Starting a real
+//  `AVAudioEngine` session still belongs to the device matrix rather than CI.
 //
 
 import AVFoundation
+import Foundation
 import Testing
 @testable import Kurn
 
@@ -38,11 +34,78 @@ struct RecordingSinkFaultTests {
         #expect(sink.write(buffer) == false)
         #expect(sink.write(buffer) == false)
         #expect(sink.writesAttempted == 4)
+        #expect(sink.snapshot.firstFailure == .write)
+        #expect(sink.snapshot.attemptedInputFrames == 256)
+        #expect(sink.snapshot.writtenOutputFrames == 128)
+    }
+
+    @Test func recordingSinkLatchesTheFirstWriterFailureAndMetrics() throws {
+        let buffer = try Self.makeBuffer()
+        let converter = try #require(AVAudioConverter(from: buffer.format, to: buffer.format))
+        let writer = ScriptedAudioFileWriter(failFromWrite: 2)
+        let timestamp = Date(timeIntervalSince1970: 42)
+        let sink = RecordingSink(now: { timestamp })
+        var callbackCount = 0
+        sink.open(writer, converter: converter, targetFormat: buffer.format) { _ in
+            callbackCount += 1
+        }
+
+        #expect(sink.write(buffer))
+        #expect(!sink.write(buffer))
+        #expect(!sink.write(buffer))
+
+        let snapshot = sink.snapshot
+        #expect(snapshot.firstFailure == .write)
+        #expect(snapshot.attemptedInputFrames == 192)
+        #expect(snapshot.writtenOutputFrames > 0)
+        #expect(snapshot.lastSuccessfulWriteAt == timestamp)
+        #expect(writer.writeCount == 2)
+        #expect(callbackCount == 1)
+    }
+
+    @Test @MainActor func audioRecorderServiceSurfacesAnInjectedSinkFailure() throws {
+        let sink = FakeAudioSinkWriting()
+        let recorder = AudioRecorderService(sink: sink)
+        let buffer = try Self.makeBuffer()
+        sink.failWrites(fromCall: 1)
+        #expect(!sink.write(buffer))
+
+        #expect(recorder.pollSinkStatus())
+        #expect(recorder.captureFailure == .write)
+        #expect(recorder.routeChangeMessage != nil)
+        #expect(!recorder.pollSinkStatus())
+    }
+
+    @Test @MainActor func audioRecorderServiceSurfacesAnInjectedFinalDrainFailure() {
+        let sink = FakeAudioSinkWriting()
+        let recorder = AudioRecorderService(sink: sink)
+        sink.failOnClose()
+        sink.close()
+
+        #expect(recorder.pollSinkStatus())
+        #expect(recorder.captureFailure == .finalDrain)
+        #expect(recorder.routeChangeMessage != nil)
     }
 
     @Test @MainActor func audioRecorderServiceAcceptsAnInjectedSink() {
         let sink = FakeAudioSinkWriting()
         let recorder = AudioRecorderService(sink: sink)
         #expect(recorder.state == .idle)
+    }
+}
+
+private final class ScriptedAudioFileWriter: AudioFileWriting {
+    private let failFromWrite: Int?
+    private(set) var writeCount = 0
+
+    init(failFromWrite: Int? = nil) {
+        self.failFromWrite = failFromWrite
+    }
+
+    func write(from buffer: AVAudioPCMBuffer) throws {
+        writeCount += 1
+        if let failFromWrite, writeCount >= failFromWrite {
+            throw CocoaError(.fileWriteOutOfSpace)
+        }
     }
 }

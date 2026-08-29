@@ -16,13 +16,13 @@ five invariants are what it decomposes into. Every entry below is judged against
 them, and where an entry creates tension the tension is stated rather than
 smoothed over.
 
-| | Invariant | What holds it up today |
-|---|---|---|
-| **I1** | Nothing leaves the device without an explicit request | Network only on opt-in cloud transcription or a cloud summary provider; a fresh install works offline |
-| **I2** | Meeting-derived content lives in the encrypted store | `ModelStoreProtection` (`.completeUnlessOpen`) covers the SwiftData store; never a loose file, cache, or `UserDefaults` |
-| **I3** | Accuracy is measured, not asserted | `KurnTests/Support/Evaluation/` (WER, DER, RTTM) plus the public-dataset matrix |
-| **I4** | The subject is meetings, not dictation | The value is a 90-minute multi-speaker file, not a six-second insert |
-| **I5** | Heavy dependencies are opt-in | `ModelDownloadConsent` gates every model fetch, with a working fallback when declined |
+|        | Invariant                                             | What holds it up today                                                                                                  |
+| ------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **I1** | Nothing leaves the device without an explicit request | Network only on opt-in cloud transcription or a cloud summary provider; a fresh install works offline                   |
+| **I2** | Meeting-derived content lives in the encrypted store  | `ModelStoreProtection` (`.completeUnlessOpen`) covers the SwiftData store; never a loose file, cache, or `UserDefaults` |
+| **I3** | Accuracy is measured, not asserted                    | `KurnTests/Support/Evaluation/` (WER, DER, RTTM) plus the public-dataset matrix                                         |
+| **I4** | The subject is meetings, not dictation                | The value is a 90-minute multi-speaker file, not a six-second insert                                                    |
+| **I5** | Heavy dependencies are opt-in                         | `ModelDownloadConsent` gates every model fetch, with a working fallback when declined                                   |
 
 Two further rules follow from I1 that are easy to violate by accident: a feature
 that makes a paid cloud call *per transcription* cannot ship enabled (this is
@@ -74,11 +74,11 @@ invariants.
 
 ### F1 · Apple Foundation Models as a local provider — Implemented
 
-| | |
-|---|---|
-| **Couples to** | `Providers/LLMProvider.swift`, `ProviderFactory`, `AIProviderKind` |
-| **Invariant** | Closes I1, which the app used to violate in practice |
-| **Status** | Implemented — [PR #139](https://github.com/carlosmazzei/Kurn/pull/139) |
+|                |                                                                        |
+| -------------- | ---------------------------------------------------------------------- |
+| **Couples to** | `Providers/LLMProvider.swift`, `ProviderFactory`, `AIProviderKind`     |
+| **Invariant**  | Closes I1, which the app used to violate in practice                   |
+| **Status**     | Implemented — [PR #139](https://github.com/carlosmazzei/Kurn/pull/139) |
 
 This closed the largest gap between what Kurn promises and what it does.
 `SummaryService`, `MeetingChatService`, `AutoTaggingService`,
@@ -137,11 +137,11 @@ still unmeasured. That number is what F7 (below) should be reassessed against.
 
 ### F2 · User-maintained meeting glossary
 
-| | |
-|---|---|
+|                |                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------- |
 | **Couples to** | New `@Model` in the store · `WhisperCppTranscriber` · `OpenAIProvider` · `LLMTranscriptCorrector` |
-| **Invariant** | I2 for storage; I3 because the effect is measurable |
-| **Effort** | Medium |
+| **Invariant**  | I2 for storage; I3 because the effect is measurable                                               |
+| **Effort**     | Medium                                                                                            |
 
 `MeetingVocabularyExtractor` already exists, but it derives terms from the
 transcript itself with `minOccurrences = 2`, on the premise that the term appears
@@ -172,11 +172,11 @@ part of shipping it, not an afterthought.
 
 ### F3 · Frictionless capture: App Intents, Siri, Control Center — Implemented
 
-| | |
-|---|---|
+|                |                                                                              |
+| -------------- | ---------------------------------------------------------------------------- |
 | **Couples to** | `RecordingLauncher` · `RecordingCommandRouter` · `KurnLiveActivityExtension` |
-| **Invariant** | No tension — system integration, no network |
-| **Status** | Implemented — [PR #143](https://github.com/carlosmazzei/Kurn/pull/143) |
+| **Invariant**  | No tension — system integration, no network                                  |
+| **Status**     | Implemented — [PR #143](https://github.com/carlosmazzei/Kurn/pull/143)       |
 
 `StartRecordingIntent` now opens the app and posts a process-local request;
 `RecordingLauncher` creates and queues the meeting through the existing
@@ -196,11 +196,11 @@ startup fails or the app is launched locked.
 
 ### F4 · Calendar context at record time
 
-| | |
-|---|---|
-| **Couples to** | `MeetingFormView` · `Speaker` · `SpeakerIdentityMatcher` |
-| **Invariant** | I2 — attendee names are meeting-derived content, so they go in the store |
-| **Effort** | Low-medium |
+|                |                                                                          |
+| -------------- | ------------------------------------------------------------------------ |
+| **Couples to** | `MeetingFormView` · `Speaker` · `SpeakerIdentityMatcher`                 |
+| **Invariant**  | I2 — attendee names are meeting-derived content, so they go in the store |
+| **Effort**     | Low-medium                                                               |
 
 Offer the calendar event happening now as the meeting title, and its attendees as
 pre-created `Speaker` rows. Read-only EventKit access with
@@ -216,11 +216,11 @@ relation to "Ana" in another.
 
 ### F5 · Action items to Reminders
 
-| | |
-|---|---|
-| **Couples to** | `SummarySection.items` · the `AutoTagConfirmView` review pattern |
-| **Invariant** | Compatible — local write; any syncing is the user's Reminders setting |
-| **Effort** | Low-medium |
+|                |                                                                       |
+| -------------- | --------------------------------------------------------------------- |
+| **Couples to** | `SummarySection.items` · the `AutoTagConfirmView` review pattern      |
+| **Invariant**  | Compatible — local write; any syncing is the user's Reminders setting |
+| **Effort**     | Low-medium                                                            |
 
 `Summary.sections` already produces `SummarySection.items`. Today they are text a
 person retypes somewhere else. Writing them as `EKReminder`s, with the meeting in
@@ -234,11 +234,11 @@ review flow.
 
 ### F6 · Import audio recorded elsewhere
 
-| | |
-|---|---|
+|                |                                                                       |
+| -------------- | --------------------------------------------------------------------- |
 | **Couples to** | New extension target · `RecordingProtection` · `OfflineAudioRenderer` |
-| **Invariant** | Compatible — a file comes in, nothing goes out |
-| **Effort** | Medium |
+| **Invariant**  | Compatible — a file comes in, nothing goes out                        |
+| **Effort**     | Medium                                                                |
 
 Kurn can only transcribe what Kurn recorded: there is no Share Extension, no
 Action Extension, no document picker. But plenty of meetings are captured by
@@ -343,14 +343,14 @@ way the F-list is not: **D2 gates D3, D4 and D5**, and deciding any of those
 without it means arguing rather than measuring. Two are defects rather than
 features, so they carry a different kind of urgency.
 
-| | Item | Verdict |
-|---|---|---|
-| **D1** | Speaker labels conflated across recordings in one meeting | Fixed |
-| **D2** | Raw diarizer turns are not measurable | Implemented |
-| **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate |
-| **D4** | A segmentation-first diarizer as a third engine | Shipped as an opt-in alternative; measures ~17pp behind `fluidAudio` on AMI, but the collapse case it targets is still untested (needs a per-file, same-run comparison) |
-| **D5** | Overlapping speech is not representable | Decided — keep truncating; no engine here has overlap-aware ASR anyway |
-| **D6** | Voiceprints never cross meetings | Implemented (standalone; F4 half still open) |
+|        | Item                                                       | Verdict                                                                                                                                                                 |
+| ------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D1** | Speaker labels conflated across recordings in one meeting  | Fixed                                                                                                                                                                   |
+| **D2** | Raw diarizer turns are not measurable                      | Implemented                                                                                                                                                             |
+| **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate                                                                                                                                                                |
+| **D4** | A segmentation-first diarizer as a third engine            | Shipped as an opt-in alternative; measures ~17pp behind `fluidAudio` on AMI, but the collapse case it targets is still untested (needs a per-file, same-run comparison) |
+| **D5** | Overlapping speech is not representable                    | Decided — keep truncating; no engine here has overlap-aware ASR anyway                                                                                                  |
+| **D6** | Voiceprints never cross meetings                           | Implemented (standalone; F4 half still open)                                                                                                                            |
 
 ### D1 · Speaker labels conflated across recordings in one meeting — Fixed
 
@@ -606,14 +606,14 @@ Swift compiler stops at the first error.
 Much of the most heavily tested logic here is already plain Foundation, with no
 UIKit, no SwiftData and no AVFoundation:
 
-| Domain | Types that are already pure |
-|---|---|
+| Domain             | Types that are already pure                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
 | Fusion and quality | `TranscriptFusion`, `TranscriptQualityFilter`, `TranscriptCorrectionGuardrail`, `ChunkBoundary` |
-| Speakers | `SpeakerClusterRefiner`, `SpeakerIdentityMatcher`, `SpeakerTurnSmoothing` |
-| Audio decisions | `SpeechLevel`, `PlaybackTuning` |
-| Text and data | `MeetingVocabularyExtractor`, `SummaryJSON`, `MeetingFilter`, `MarkdownBlockParser` |
-| Security | `SecurityCoverState` |
-| Evaluation | All of `KurnTests/Support/Evaluation/` — WER, DER, RTTM, `TextNormalizer` |
+| Speakers           | `SpeakerClusterRefiner`, `SpeakerIdentityMatcher`, `SpeakerTurnSmoothing`                       |
+| Audio decisions    | `SpeechLevel`, `PlaybackTuning`                                                                 |
+| Text and data      | `MeetingVocabularyExtractor`, `SummaryJSON`, `MeetingFilter`, `MarkdownBlockParser`             |
+| Security           | `SecurityCoverState`                                                                            |
+| Evaluation         | All of `KurnTests/Support/Evaluation/` — WER, DER, RTTM, `TextNormalizer`                       |
 
 Extracted into a `KurnCore` package, these run under `swift test` **on Linux, in
 seconds, without a simulator**. A change to transcript fusion or DER scoring
@@ -687,14 +687,14 @@ resilience must be measured rather than inferred from clean-path tests.
 The five product invariants at the top of this document still apply. Hardening
 adds six operational invariants:
 
-| | Invariant |
-|---|---|
-| **H-I1** | Once capture is acknowledged as running, a write failure is detected and surfaced; the app never continues counting while silently dropping audio |
-| **H-I2** | The only copy of user audio is never automatically deleted merely because metadata is missing, malformed, or unreadable |
-| **H-I3** | Success is reported only after the authoritative state is durable; a failed save cannot leave the UI claiming an operation completed |
+|          | Invariant                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **H-I1** | Once capture is acknowledged as running, a write failure is detected and surfaced; the app never continues counting while silently dropping audio      |
+| **H-I2** | The only copy of user audio is never automatically deleted merely because metadata is missing, malformed, or unreadable                                |
+| **H-I3** | Success is reported only after the authoritative state is durable; a failed save cannot leave the UI claiming an operation completed                   |
 | **H-I4** | A fallback may preserve useful work, but it is recorded and visible; degraded output is never indistinguishable from the requested pipeline succeeding |
-| **H-I5** | A custom network destination is exact: invalid configuration fails closed and never falls through to another vendor or host |
-| **H-I6** | Cancellation, transient failure, permanent failure, and resource deferral are distinct states with bounded automatic retry |
+| **H-I5** | A custom network destination is exact: invalid configuration fails closed and never falls through to another vendor or host                            |
+| **H-I6** | Cancellation, transient failure, permanent failure, and resource deferral are distinct states with bounded automatic retry                             |
 
 Priorities in this track mean:
 
@@ -706,46 +706,68 @@ Priorities in this track mean:
 - **P2** — diagnosability, integration polish, and continuous verification that
   make P0/P1 guarantees sustainable.
 
+### Current implementation status (2026-08-29)
+
+Status here is evidence-based and deliberately distinguishes an injectable seam
+from the production invariant that will eventually use it. PR
+[#151](https://github.com/carlosmazzei/Kurn/pull/151) established the first
+baseline; later rows include controls that predated that PR where they already
+satisfy part of a planned contract.
+
+| Track              | Status                 | Implemented evidence and remaining contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                                 |
+| **H1**             | **In progress**        | `RecordingSink` now latches the first conversion/write/final-drain failure and exposes attempted/written frames plus the last successful write time. `AudioRecorderService` polls that snapshot on its main-actor meter tick, pauses on a live failure, blocks resume, and carries the failure through stop; `RecorderViewModel` preserves the partial file/row and waits for the localized warning to be dismissed before reporting completion. The frame-stall watchdog, storage runway, provisional row, authoritative final-file validation, and process-death matrix remain. |
+| **H2**             | **Seam only**          | Container creation is injectable through `ModelContainerBootstrap`, but production still terminates with `fatalError`; versioned schemas, migrations, backups, failure classification, and recovery UI remain.                                                                                                                                                                                                                                                                                                                                                                    |
+| **H3**             | **Foundation only**    | Recovery preserves some large unreadable orphan files, but unmatched/malformed/small originals can still be deleted and model/file mutations have no journal, trash, quarantine, or typed authoritative JSON corruption path.                                                                                                                                                                                                                                                                                                                                                     |
+| **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                                       |
+| **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **H6**             | **Partial, pre-track** | Foreground HTTP has bounded transient retry and delta-seconds `Retry-After`; invalid custom endpoints can still fall through to vendor URLs, and redirect/origin, response-size, background-upload, cooldown, and cost policies remain.                                                                                                                                                                                                                                                                                                                                           |
+| **H7**             | **Planned**            | Existing Keychain/model flows work on the clean path, but typed `OSStatus`, explicit credential save, cryptographic model verification, resumable staging, atomic replacement, and health probes remain.                                                                                                                                                                                                                                                                                                                                                                          |
+| **H8**             | **Partial, pre-track** | Several long jobs have app-level owners and run IDs, but memory pressure is sticky until relaunch and the scheduler, cancellation truth, Activity race handling, shared Watch protocol, deduplication, timeout, and durable acknowledgements remain.                                                                                                                                                                                                                                                                                                                              |
+| **H9**             | **Started**            | `AppError.logCode` and the content-free `ReliabilityEvent` vocabulary are present. Action metadata, per-operation queues/reports, bounded encrypted event storage, health UI, redaction preview, and recovery accessibility coverage remain.                                                                                                                                                                                                                                                                                                                                      |
+| **H10**            | **Started**            | Clock, filesystem, store-factory, reliability-event, and audio-sink fakes prove initial seams. The full transition fault matrix, split CI signals, retained failure artifacts, sanitizers/repetition, static policy checks, and device checklist remain.                                                                                                                                                                                                                                                                                                                          |
+
 ### Foundation already present
 
 The plan builds on these controls rather than replacing them:
 
-| Area | Existing control |
-|---|---|
-| Error domain | `AppError` provides localized, content-free `logCode`s; `errorAlert` gives views one presentation path |
-| Capture | Fixed-format `RecordingSink`, audio interruption/route observers, engine restart, `finalizeIfAbandoned`, protected recording storage, and orphan recovery |
+| Area          | Existing control                                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Error domain  | `AppError` provides localized, content-free `logCode`s; `errorAlert` gives views one presentation path                                                         |
+| Capture       | Fixed-format `RecordingSink`, audio interruption/route observers, engine restart, `finalizeIfAbandoned`, protected recording storage, and orphan recovery      |
 | Transcription | Per-chunk checkpoints, ordered pipeline events, foreground and launch recovery sweeps, background task cancellation, and per-recording/global in-flight guards |
-| Pipeline | Resource checks between heavy stages, temporary-file cleanup, measured WER/DER, and useful fallbacks for optional preprocessing/VAD/diarization stages |
-| Network | Central status validation, bounded retry with jitter, request timeouts, background Whisper uploads, and explicit cloud/model consent defaults |
-| Diagnostics | Leveled `os.Logger`, user-exported logs, opt-in local MetricKit crash/hang reports, and no automatic diagnostic upload |
-| Tests | 600+ Swift Testing cases, provider stubs through `MockURLProtocol`, recovery/resource tests, accessibility audits, and Linux `KurnCore` CI |
+| Pipeline      | Resource checks between heavy stages, temporary-file cleanup, measured WER/DER, and useful fallbacks for optional preprocessing/VAD/diarization stages         |
+| Network       | Central status validation, bounded retry with jitter, request timeouts, background Whisper uploads, and explicit cloud/model consent defaults                  |
+| Diagnostics   | Leveled `os.Logger`, user-exported logs, opt-in local MetricKit crash/hang reports, and no automatic diagnostic upload                                         |
+| Tests         | 600+ Swift Testing cases, provider stubs through `MockURLProtocol`, recovery/resource tests, accessibility audits, and Linux `KurnCore` CI                     |
 
 ### Risk register
 
 These are verified code paths or direct consequences of them, not hypothetical
 feature requests:
 
-| Item | Observed seam | Failure if it remains | Priority |
-|---|---|---|---|
-| **H1** | `RecordingSink.write` and its final drain use `try?`; elapsed duration is wall-clock time | Disk/encoder failure can drop buffers while the UI still says recording | **P0** |
-| **H2** | Production `ModelContainer` construction ends in `fatalError`; there is no `VersionedSchema`/`SchemaMigrationPlan` | Corruption, incompatible schema, or a locked protected store can create a launch crash loop | **P0** |
-| **H3** | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0** |
-| **H4** | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match | **P0** |
-| **H5** | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation | **P1** |
-| **H6** | `LLMHTTP.jsonRequest` and cloud transcription substitute hard-coded vendor URLs when configured URL construction fails | A malformed custom provider can send meeting-derived content to an unintended host, violating I1 and H-I5 | **P0** |
-| **H7** | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed | **P1** |
-| **H8** | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion | **P1** |
-| **H9** | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription` | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended | **P1** |
-| **H10** | Clean-path CI does not inject store, filesystem, lock, process-death, route, redirect, or response-loss failures | The contracts above can regress while every ordinary test stays green | **P0, cross-cutting** |
+| Item    | Observed seam                                                                                                                                                                                     | Failure if it remains                                                                                                            | Priority              |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **H1**  | Sink failures now latch, pause live capture, and preserve a warned partial result; elapsed duration is still wall-clock and there is no frame-progress/capacity watchdog or final-file validation | A stall without an explicit sink error can still continue the clock, and an unreadable or empty file can still pass finalization | **P0**                |
+| **H2**  | Production `ModelContainer` construction ends in `fatalError`; there is no `VersionedSchema`/`SchemaMigrationPlan`                                                                                | Corruption, incompatible schema, or a locked protected store can create a launch crash loop                                      | **P0**                |
+| **H3**  | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content                                  | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript      | **P0**                |
+| **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                         | **P0**                |
+| **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                             | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation          | **P1**                |
+| **H6**  | `LLMHTTP.jsonRequest` and cloud transcription substitute hard-coded vendor URLs when configured URL construction fails                                                                            | A malformed custom provider can send meeting-derived content to an unintended host, violating I1 and H-I5                        | **P0**                |
+| **H7**  | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally                                                                  | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed                          | **P1**                |
+| **H8**  | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts                                                  | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion                 | **P1**                |
+| **H9**  | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription`                                                                            | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended         | **P1**                |
+| **H10** | Clean-path CI does not inject store, filesystem, lock, process-death, route, redirect, or response-loss failures                                                                                  | The contracts above can regress while every ordinary test stays green                                                            | **P0, cross-cutting** |
 
 ### H1 · Lossless capture and truthful finalization — P0
 
 **Plan.**
 
-1. Make `RecordingSink` latch the first conversion/write/final-drain failure,
-   plus attempted/written frame counts and the last successful write time. The
-   render callback should set bounded state only; the existing main-actor meter
-   tick can read it and perform logging/UI work safely.
+1. **Implemented (2026-08-29).** `RecordingSink` latches the first conversion/
+   write/final-drain failure, attempted input/written output frame counts, and
+   the last successful write time. Its render-thread failure path latches only
+   bounded locked state; the main-actor meter tick handles logging, pause, and UI.
 2. Add a capture watchdog based on written frames, not microphone level alone.
    If the engine is running but no frames reach disk for a bounded interval,
    pause capture, preserve the partial file, and present a specific recovery
@@ -1114,16 +1136,16 @@ track remains prose.
 2. Maintain a fault matrix and require a test whenever a durability/network state
    transition is added. The minimum matrix is:
 
-| Operation | Inject at | Invariant asserted after retry/relaunch |
-|---|---|---|
-| Capture | prepare, file open, Nth write, route reset, disk full, close, metadata save, process kill | Only valid partial/full audio survives; state never reports false success |
-| Store launch | protected data unavailable, no space, corrupt SQLite/WAL, N-1/N-2 schema | No crash loop or automatic reset; recovery options preserve original bytes |
-| Delete/replace | intent save, trash move, model save, purge, legacy collision | Original is restorable until durable commit; journal replay is idempotent |
-| Stored JSON | truncated, wrong version/checksum, unknown fields | Corruption is explicit and raw bytes remain recoverable |
-| Transcription | every stage, checkpoint save, process kill after each chunk, changed fingerprint | At most the in-flight chunk is lost; incompatible work is never spliced |
-| Provider | offline/DNS/TLS, timeout before/after server work, 401/403, 429, 5xx, malformed/huge body, redirect, cancellation | Destination and retry/cost bounds hold; cancellation is prompt |
-| Model/key | locked Keychain, denied write, partial/wrong-hash model, replacement crash | No false configured/installed state; prior valid material survives |
-| Integrations | Watch reply loss/duplicate/reorder, Activity start/end race, intent double invocation | Commands are idempotent and reconcile to recorder truth |
+| Operation      | Inject at                                                                                                         | Invariant asserted after retry/relaunch                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Capture        | prepare, file open, Nth write, route reset, disk full, close, metadata save, process kill                         | Only valid partial/full audio survives; state never reports false success  |
+| Store launch   | protected data unavailable, no space, corrupt SQLite/WAL, N-1/N-2 schema                                          | No crash loop or automatic reset; recovery options preserve original bytes |
+| Delete/replace | intent save, trash move, model save, purge, legacy collision                                                      | Original is restorable until durable commit; journal replay is idempotent  |
+| Stored JSON    | truncated, wrong version/checksum, unknown fields                                                                 | Corruption is explicit and raw bytes remain recoverable                    |
+| Transcription  | every stage, checkpoint save, process kill after each chunk, changed fingerprint                                  | At most the in-flight chunk is lost; incompatible work is never spliced    |
+| Provider       | offline/DNS/TLS, timeout before/after server work, 401/403, 429, 5xx, malformed/huge body, redirect, cancellation | Destination and retry/cost bounds hold; cancellation is prompt             |
+| Model/key      | locked Keychain, denied write, partial/wrong-hash model, replacement crash                                        | No false configured/installed state; prior valid material survives         |
+| Integrations   | Watch reply loss/duplicate/reorder, Activity start/end race, intent double invocation                             | Commands are idempotent and reconcile to recorder truth                    |
 
 3. Split CI signals by purpose: fast pure/unit tests, simulator integration tests,
    and UI/accessibility tests should report separately so a flaky UI launch does

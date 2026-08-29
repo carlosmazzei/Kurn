@@ -165,6 +165,8 @@
 /* 录音 */
 "recorder.route_changed" = "录音已暂停：音频设备发生变化（例如耳机被拔出）。";
 "recorder.engine_stalled" = "录音已暂停：系统停止了音频采集。点击恢复以继续。";
+"recorder.write_failed" = "录音已暂停，因为无法保存音频。请检查可用存储空间，然后停止录音以保留部分录音。";
+"recorder.partial_saved" = "音频采集失败后已保存部分录音。再次录音前请检查可用存储空间。";
 "recorder.title" = "新建录音";
 "recorder.add_title" = "添加标题…";
 "recorder.pause" = "暂停";

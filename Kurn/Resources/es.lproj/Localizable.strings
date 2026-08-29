@@ -165,6 +165,8 @@
 /* Grabadora */
 "recorder.route_changed" = "Grabación en pausa: cambió el dispositivo de audio (p. ej. se desconectaron los auriculares).";
 "recorder.engine_stalled" = "Grabación en pausa: el sistema detuvo la captura de audio. Toca reanudar para continuar.";
+"recorder.write_failed" = "La grabación se pausó porque no se pudo guardar el audio. Comprueba el espacio disponible y detén la grabación para conservar la parte grabada.";
+"recorder.partial_saved" = "Se guardó una grabación parcial tras un fallo de captura de audio. Comprueba el espacio disponible antes de volver a grabar.";
 "recorder.title" = "Nueva Grabación";
 "recorder.add_title" = "Añadir título…";
 "recorder.pause" = "Pausar";

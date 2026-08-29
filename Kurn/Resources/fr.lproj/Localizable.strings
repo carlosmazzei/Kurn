@@ -165,6 +165,8 @@
 /* Enregistreur */
 "recorder.route_changed" = "Enregistrement en pause : le périphérique audio a changé (ex. casque débranché).";
 "recorder.engine_stalled" = "Enregistrement en pause : le système a interrompu la capture audio. Touchez reprendre pour continuer.";
+"recorder.write_failed" = "L’enregistrement a été mis en pause car l’audio n’a pas pu être enregistré. Vérifiez l’espace disponible, puis arrêtez pour conserver l’enregistrement partiel.";
+"recorder.partial_saved" = "Un enregistrement partiel a été sauvegardé après un échec de capture audio. Vérifiez l’espace disponible avant de recommencer.";
 "recorder.title" = "Nouvel Enregistrement";
 "recorder.add_title" = "Ajouter un titre…";
 "recorder.pause" = "Pause";

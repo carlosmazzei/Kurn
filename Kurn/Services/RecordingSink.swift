@@ -10,18 +10,46 @@
 
 import AVFoundation
 import Foundation
-import os
+
+enum AudioSinkFailure: String, Equatable, Error, Sendable {
+    case conversion = "conversion_failed"
+    case write = "write_failed"
+    case finalDrain = "final_drain_failed"
+}
+
+struct AudioSinkSnapshot: Equatable, Sendable {
+    var firstFailure: AudioSinkFailure?
+    var attemptedInputFrames: Int64
+    var writtenOutputFrames: Int64
+    var lastSuccessfulWriteAt: Date?
+
+    init(
+        firstFailure: AudioSinkFailure? = nil,
+        attemptedInputFrames: Int64 = 0,
+        writtenOutputFrames: Int64 = 0,
+        lastSuccessfulWriteAt: Date? = nil
+    ) {
+        self.firstFailure = firstFailure
+        self.attemptedInputFrames = attemptedInputFrames
+        self.writtenOutputFrames = writtenOutputFrames
+        self.lastSuccessfulWriteAt = lastSuccessfulWriteAt
+    }
+}
+
+protocol AudioFileWriting: AnyObject {
+    func write(from buffer: AVAudioPCMBuffer) throws
+}
+
+extension AVAudioFile: AudioFileWriting {}
 
 /// The surface `AudioRecorderService` needs from its sink, carved out so a
 /// fake can stand in for `RecordingSink` in tests — the real-time render
-/// thread's write path had no injection point at all before this. Reliability
-/// track ("Baseline and seams", `docs/roadmap.md`): this only lands the seam,
-/// it does not yet change what the app does when `write(_:)` reports failure
-/// (that reaction is H1's job) — `AudioRecorderService` still discards the
-/// return value today.
+/// thread's write path had no injection point at all before this. The sink
+/// exposes only a bounded snapshot; `AudioRecorderService` reads it on the
+/// main-actor metering tick instead of touching UI from the render thread.
 protocol AudioSinkWriting: Sendable {
     func open(
-        _ file: AVAudioFile,
+        _ file: any AudioFileWriting,
         converter: AVAudioConverter,
         targetFormat: AVAudioFormat,
         onBuffer: ((AVAudioPCMBuffer) -> Void)?
@@ -31,6 +59,7 @@ protocol AudioSinkWriting: Sendable {
     func setPaused(_ value: Bool)
     func close()
     var currentLevel: Float { get }
+    var snapshot: AudioSinkSnapshot { get }
     @discardableResult func write(_ buffer: AVAudioPCMBuffer) -> Bool
 }
 
@@ -45,15 +74,21 @@ protocol AudioSinkWriting: Sendable {
 /// `converter` on its way to disk.
 final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
     private let lock = NSLock()
-    private var file: AVAudioFile?
+    private let now: @Sendable () -> Date
+    private var file: (any AudioFileWriting)?
     private var paused = true
     private var level: Float = 0
+    private var sinkSnapshot = AudioSinkSnapshot()
     private var onBuffer: ((AVAudioPCMBuffer) -> Void)?
     private var converter: AVAudioConverter?
     private var targetFormat: AVAudioFormat?
 
+    init(now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
+    }
+
     func open(
-        _ file: AVAudioFile,
+        _ file: any AudioFileWriting,
         converter: AVAudioConverter,
         targetFormat: AVAudioFormat,
         onBuffer: ((AVAudioPCMBuffer) -> Void)?
@@ -65,6 +100,7 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
         self.onBuffer = onBuffer
         paused = false
         level = 0
+        sinkSnapshot = AudioSinkSnapshot()
     }
 
     /// Swap in a converter for a new input format, keeping the open file. Used by
@@ -91,10 +127,21 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         // Drain whatever the resampler is still holding (well under a
         // millisecond) so the tail of the recording isn't clipped.
-        if let file, let converter, let targetFormat,
-           let tail = Self.drain(converter: converter, to: targetFormat),
-           tail.frameLength > 0 {
-            try? file.write(from: tail)
+        if let file, let converter, let targetFormat {
+            switch Self.drain(converter: converter, to: targetFormat) {
+            case .success(let tail):
+                if let tail, tail.frameLength > 0 {
+                    do {
+                        try file.write(from: tail)
+                        sinkSnapshot.writtenOutputFrames += Int64(tail.frameLength)
+                        sinkSnapshot.lastSuccessfulWriteAt = now()
+                    } catch {
+                        latch(.finalDrain)
+                    }
+                }
+            case .failure:
+                latch(.finalDrain)
+            }
         }
         file = nil
         converter = nil
@@ -109,32 +156,53 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
         return level
     }
 
+    var snapshot: AudioSinkSnapshot {
+        lock.lock(); defer { lock.unlock() }
+        return sinkSnapshot
+    }
+
     @discardableResult
     func write(_ buffer: AVAudioPCMBuffer) -> Bool {
         lock.lock()
         guard !paused, let file, let converter, let targetFormat else { lock.unlock(); return false }
-        guard let converted = Self.convert(buffer, using: converter, to: targetFormat) else {
+        sinkSnapshot.attemptedInputFrames += Int64(buffer.frameLength)
+        guard sinkSnapshot.firstFailure == nil else { lock.unlock(); return false }
+
+        let converted: AVAudioPCMBuffer
+        switch Self.convert(buffer, using: converter, to: targetFormat) {
+        case .success(let output):
+            guard let output else { lock.unlock(); return true }
+            converted = output
+        case .failure:
+            latch(.conversion)
             lock.unlock()
             return false
         }
-        // `@discardableResult` because nothing reacts to a write failure yet
-        // (that's H1's job) — but the signal now exists at the boundary
-        // instead of being silently discarded by `try?`.
+
         let succeeded: Bool
         do {
             try file.write(from: converted)
+            sinkSnapshot.writtenOutputFrames += Int64(converted.frameLength)
+            sinkSnapshot.lastSuccessfulWriteAt = now()
             succeeded = true
         } catch {
+            latch(.write)
             succeeded = false
         }
-        level = Self.level(of: converted)
-        let callback = onBuffer
+        level = succeeded ? Self.level(of: converted) : 0
+        let callback = succeeded ? onBuffer : nil
         lock.unlock()
         // Hand the live-transcription preview the converted buffer: 24kHz mono is
         // closer to the 16kHz the streaming engines want than the mic's native
         // rate was, and it is a smaller buffer to copy on the render thread.
         callback?(converted)
         return succeeded
+    }
+
+    private func latch(_ failure: AudioSinkFailure) {
+        if sinkSnapshot.firstFailure == nil {
+            sinkSnapshot.firstFailure = failure
+        }
     }
 
     /// Resample one tap buffer. Sample rate conversion is not 1:1, so this needs
@@ -144,14 +212,16 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
         _ buffer: AVAudioPCMBuffer,
         using converter: AVAudioConverter,
         to format: AVAudioFormat
-    ) -> AVAudioPCMBuffer? {
-        guard buffer.frameLength > 0, buffer.format.sampleRate > 0 else { return nil }
+    ) -> Result<AVAudioPCMBuffer?, AudioSinkFailure> {
+        guard buffer.frameLength > 0, buffer.format.sampleRate > 0 else {
+            return .failure(.conversion)
+        }
         let ratio = format.sampleRate / buffer.format.sampleRate
         // A little slack above the theoretical frame count: the resampler can
         // emit frames it buffered from a previous call along with this one.
         let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 64
         guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
-            return nil
+            return .failure(.conversion)
         }
 
         let input = ConverterInput(buffer)
@@ -170,12 +240,11 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
             // `inputRanDry` is the steady state here: we hand over exactly one
             // buffer per call, and the resampler may hold a few frames back to
             // combine with the next one.
-            return output.frameLength > 0 ? output : nil
+            return .success(output.frameLength > 0 ? output : nil)
         case .error:
-            AppLog.recorder.atError.error("RecordingSink: conversion failed: \(error?.localizedDescription ?? "unknown", privacy: .public)")
-            return nil
+            return .failure(.conversion)
         @unknown default:
-            return nil
+            return .failure(.conversion)
         }
     }
 
@@ -183,15 +252,25 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
     private static func drain(
         converter: AVAudioConverter,
         to format: AVAudioFormat
-    ) -> AVAudioPCMBuffer? {
-        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4096) else { return nil }
+    ) -> Result<AVAudioPCMBuffer?, AudioSinkFailure> {
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4096) else {
+            return .failure(.finalDrain)
+        }
         var error: NSError?
         let status = converter.convert(to: output, error: &error) { _, outStatus in
             outStatus.pointee = .endOfStream
             return nil
         }
-        guard status == .haveData || status == .endOfStream else { return nil }
-        return output
+        switch status {
+        case .haveData, .endOfStream:
+            return .success(output.frameLength > 0 ? output : nil)
+        case .inputRanDry:
+            return .success(nil)
+        case .error:
+            return .failure(.finalDrain)
+        @unknown default:
+            return .failure(.finalDrain)
+        }
     }
 
     /// Hands one buffer to `AVAudioConverter`'s input block, then reports the

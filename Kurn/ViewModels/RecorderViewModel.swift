@@ -59,6 +59,7 @@ final class RecorderViewModel {
     private let liveTranscriptionEnabled: Bool
     private let hideLiveActivityMeetingTitle: Bool
     private var micChoiceContinuation: CheckedContinuation<String?, Never>?
+    private var finishAfterErrorDismissal = false
     private let lockScreenController = LockScreenRecordingController()
     /// Invoked once a recording is actually persisted (not on the "ignored"
     /// no-result/too-short paths, and not on a save failure) — lets the caller
@@ -294,8 +295,8 @@ final class RecorderViewModel {
             didSaveRecording = true
             return
         }
-        // Ignore zero-length recordings.
-        guard result.duration >= 0.5 else {
+        // Ignore a healthy recording shorter than the minimum usable duration.
+        guard result.duration >= 0.5 || result.captureFailure != nil else {
             AudioFileStore.delete(fileName: result.fileName)
             lockScreenController.end()
             RecordingCommandRouter.shared.unregister()
@@ -316,15 +317,34 @@ final class RecorderViewModel {
             highlights: result.highlights
         )
         modelContext.insert(recording)
+        let saved: Bool
         do {
             try modelContext.save()
             onRecordingSaved()
+            saved = true
         } catch {
             self.error = .persistenceFailed(error.localizedDescription)
+            saved = false
         }
         lockScreenController.end()
         RecordingCommandRouter.shared.unregister()
         PhoneSessionController.shared.notifyEnded()
+        guard saved else { return }
+        if result.captureFailure != nil {
+            finishAfterErrorDismissal = true
+            error = .audioError(NSLocalizedString(
+                "recorder.partial_saved",
+                comment: "A partial recording was preserved after a capture failure"
+            ))
+        } else {
+            didSaveRecording = true
+        }
+    }
+
+    func dismissError() {
+        error = nil
+        guard finishAfterErrorDismissal else { return }
+        finishAfterErrorDismissal = false
         didSaveRecording = true
     }
 

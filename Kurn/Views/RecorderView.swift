@@ -162,7 +162,16 @@ private struct RecorderContent: View {
             primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
             primaryAction: onFinished
         )
-        .errorAlert($vm.error)
+        .errorAlert(Binding(
+            get: { vm.error },
+            set: { newValue in
+                if let newValue {
+                    vm.error = newValue
+                } else {
+                    vm.dismissError()
+                }
+            }
+        ))
         .interactiveDismissDisabled(vm.state != .idle)
     }
 
