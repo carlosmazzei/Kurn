@@ -166,6 +166,7 @@
 "recorder.route_changed" = "Registrazione in pausa: il dispositivo audio è cambiato (es. cuffie scollegate).";
 "recorder.engine_stalled" = "Registrazione in pausa: il sistema ha interrotto l'acquisizione audio. Tocca riprendi per continuare.";
 "recorder.write_failed" = "La registrazione è stata messa in pausa perché non è stato possibile salvare l’audio. Controlla lo spazio disponibile, quindi interrompi per conservare la registrazione parziale.";
+"recorder.capture_stalled" = "La registrazione è stata messa in pausa perché l’audio non raggiunge più il file. Tocca Riprendi per riprovare oppure Interrompi per conservare la registrazione parziale.";
 "recorder.partial_saved" = "È stata salvata una registrazione parziale dopo un errore di acquisizione audio. Controlla lo spazio disponibile prima di registrare di nuovo.";
 "recorder.title" = "Nuova Registrazione";
 "recorder.add_title" = "Aggiungi titolo…";

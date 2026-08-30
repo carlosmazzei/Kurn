@@ -63,6 +63,63 @@ struct RecordingSinkFaultTests {
         #expect(callbackCount == 1)
     }
 
+    @Test func captureWatchdogWaitsForItsDeadline() {
+        var watchdog = CaptureProgressWatchdog(stallInterval: 2)
+
+        let initial = watchdog.hasStalled(writtenFrames: 0, now: 10)
+        let beforeDeadline = watchdog.hasStalled(writtenFrames: 0, now: 11.99)
+        let atDeadline = watchdog.hasStalled(writtenFrames: 0, now: 12)
+
+        #expect(!initial)
+        #expect(!beforeDeadline)
+        #expect(atDeadline)
+    }
+
+    @Test func captureWatchdogResetsItsDeadlineAfterProgress() {
+        var watchdog = CaptureProgressWatchdog(stallInterval: 2)
+
+        let initial = watchdog.hasStalled(writtenFrames: 0, now: 10)
+        let progressed = watchdog.hasStalled(writtenFrames: 64, now: 11.5)
+        let beforeNewDeadline = watchdog.hasStalled(writtenFrames: 64, now: 13.49)
+        let atNewDeadline = watchdog.hasStalled(writtenFrames: 64, now: 13.5)
+
+        #expect(!initial)
+        #expect(!progressed)
+        #expect(!beforeNewDeadline)
+        #expect(atNewDeadline)
+    }
+
+    @Test func captureWatchdogTreatsACounterResetAsProgress() {
+        var watchdog = CaptureProgressWatchdog(stallInterval: 2)
+
+        let initial = watchdog.hasStalled(writtenFrames: 64, now: 10)
+        let reset = watchdog.hasStalled(writtenFrames: 0, now: 20)
+        let beforeNewDeadline = watchdog.hasStalled(writtenFrames: 0, now: 21.99)
+        let atNewDeadline = watchdog.hasStalled(writtenFrames: 0, now: 22)
+
+        #expect(!initial)
+        #expect(!reset)
+        #expect(!beforeNewDeadline)
+        #expect(atNewDeadline)
+    }
+
+    @Test @MainActor func audioRecorderServiceSurfacesAFrameProgressStall() {
+        let recorder = AudioRecorderService(sink: FakeAudioSinkWriting(), stallInterval: 2)
+        let snapshot = AudioSinkSnapshot(writtenOutputFrames: 0)
+
+        let initial = recorder.pollCaptureProgress(snapshot: snapshot, now: 10)
+        let beforeDeadline = recorder.pollCaptureProgress(snapshot: snapshot, now: 11.99)
+        let atDeadline = recorder.pollCaptureProgress(snapshot: snapshot, now: 12)
+        let duplicate = recorder.pollCaptureProgress(snapshot: snapshot, now: 13)
+
+        #expect(!initial)
+        #expect(!beforeDeadline)
+        #expect(atDeadline)
+        #expect(!duplicate)
+        #expect(recorder.captureFailure == .stalled)
+        #expect(recorder.routeChangeMessage != nil)
+    }
+
     @Test @MainActor func audioRecorderServiceSurfacesAnInjectedSinkFailure() throws {
         let sink = FakeAudioSinkWriting()
         let recorder = AudioRecorderService(sink: sink)

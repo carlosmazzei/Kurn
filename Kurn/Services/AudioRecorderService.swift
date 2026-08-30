@@ -91,6 +91,7 @@ final class AudioRecorderService: NSObject {
     /// Set when a route change (e.g. headphones unplugged) auto-paused us.
     private(set) var routeChangeMessage: String?
     private(set) var captureFailure: AudioSinkFailure?
+    @ObservationIgnored private var activeCaptureFailure: AudioSinkFailure?
 
     // The engine, sink and tap flag are touched by the off-main setup/teardown
     // path (see `setUpEngine`), so they are kept out of main-actor isolation and
@@ -101,6 +102,8 @@ final class AudioRecorderService: NSObject {
     /// main-actor object directly. Typed as the protocol (defaulted to the real
     /// `RecordingSink`) so a test can inject a fake that observes/fails writes.
     @ObservationIgnored private nonisolated let sink: any AudioSinkWriting
+    @ObservationIgnored private let monotonicNow: @Sendable () -> TimeInterval
+    @ObservationIgnored private var captureWatchdog: CaptureProgressWatchdog
     @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
     /// Input format the tap was created with, so the engine-stall recovery can
     /// tell a plain restart (same format) from one that needs the tap and the
@@ -138,8 +141,14 @@ final class AudioRecorderService: NSObject {
     /// decide whether to auto-resume when it ends.
     private var wasRecordingBeforeInterruption = false
 
-    init(sink: any AudioSinkWriting = RecordingSink()) {
+    init(
+        sink: any AudioSinkWriting = RecordingSink(),
+        stallInterval: TimeInterval = 2,
+        monotonicNow: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    ) {
         self.sink = sink
+        self.monotonicNow = monotonicNow
+        self.captureWatchdog = CaptureProgressWatchdog(stallInterval: stallInterval)
         super.init()
         registerNotifications()
     }
@@ -171,6 +180,7 @@ final class AudioRecorderService: NSObject {
         }
         isStarting = true
         captureFailure = nil
+        activeCaptureFailure = nil
         defer { isStarting = false }
 
         let pickup = micPickup
@@ -195,12 +205,12 @@ final class AudioRecorderService: NSObject {
         } catch let error as AppError {
             AppLog.recorder.atError.error("start: setup threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
             teardownEngine()
-            deactivateSession()
+            AudioRecorderEngineSupport.deactivateSession()
             throw error
         } catch {
             AppLog.recorder.atError.error("start: setup threw: \(error.localizedDescription, privacy: .public)")
             teardownEngine()
-            deactivateSession()
+            AudioRecorderEngineSupport.deactivateSession()
             throw AppError.audioError(error.localizedDescription)
         }
 
@@ -211,6 +221,10 @@ final class AudioRecorderService: NSObject {
         self.elapsed = 0
         self.highlights = []
         self.routeChangeMessage = nil
+        self.captureWatchdog.reset(
+            writtenFrames: sink.snapshot.writtenOutputFrames,
+            now: monotonicNow()
+        )
         self.state = .recording
         notifyStateChanged()
         startMetering()
@@ -242,6 +256,7 @@ final class AudioRecorderService: NSObject {
         case engineRestartFailed = "engine recovery failed (engine.start() after rebuild)"
         case routeChanged = "input route became unavailable (oldDeviceUnavailable)"
         case sinkFailure = "audio conversion or file write failed"
+        case captureStalled = "no output frames reached the recording file"
     }
 
     func pause(reason: PauseReason) {
@@ -258,9 +273,24 @@ final class AudioRecorderService: NSObject {
     func resume() {
         AppLog.recorder.atInfo.info("resume: called state=\(String(describing: self.state), privacy: .public)")
         guard state == .paused else { return }
+        let retryingStall = activeCaptureFailure == .stalled
+        guard activeCaptureFailure == nil || retryingStall else {
+            _ = pollSinkStatus()
+            return
+        }
         guard sink.snapshot.firstFailure == nil else {
             _ = pollSinkStatus()
             return
+        }
+        if retryingStall {
+            if engine.isRunning { engine.stop() }
+            let currentFormat = engine.inputNode.outputFormat(forBus: 0)
+            guard rebuildTapForCurrentInput(currentFormat) else {
+                AppLog.recorder.atError.error("resume: capture watchdog retry could not rebuild the input tap")
+                return
+            }
+            try? AVAudioSession.sharedInstance().setActive(true)
+            engine.prepare()
         }
         // An interruption may have stopped the engine while we were paused.
         if !engine.isRunning {
@@ -269,7 +299,12 @@ final class AudioRecorderService: NSObject {
                 return
             }
         }
+        activeCaptureFailure = nil
         sink.setPaused(false)
+        captureWatchdog.reset(
+            writtenFrames: sink.snapshot.writtenOutputFrames,
+            now: monotonicNow()
+        )
         segmentStart = Date()
         routeChangeMessage = nil
         state = .recording
@@ -307,7 +342,7 @@ final class AudioRecorderService: NSObject {
 
         let duration = accumulated
         let capturedHighlights = highlights
-        let finalCaptureFailure = sink.snapshot.firstFailure
+        let finalCaptureFailure = captureFailure ?? sink.snapshot.firstFailure
         let outcome = finalCaptureFailure == nil ? "ready" : "partial"
         AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
         self.currentFileName = nil
@@ -319,7 +354,7 @@ final class AudioRecorderService: NSObject {
         self.highlights = []
         notifyStateChanged()
 
-        deactivateSession()
+        AudioRecorderEngineSupport.deactivateSession()
         return AudioRecordingResult(
             fileName: fileName,
             duration: duration,
@@ -342,7 +377,7 @@ final class AudioRecorderService: NSObject {
         self.segmentStart = nil
         self.highlights = []
         notifyStateChanged()
-        deactivateSession()
+        AudioRecorderEngineSupport.deactivateSession()
     }
 
     // MARK: - Engine
@@ -414,7 +449,7 @@ final class AudioRecorderService: NSObject {
             }
         }
 
-        guard let converter = Self.makeConverter(from: format, to: storageFormat) else {
+        guard let converter = AudioRecorderEngineSupport.makeConverter(from: format, to: storageFormat) else {
             AppLog.recorder.atError.error("beginEngine: could not build a converter from \(format.sampleRate, privacy: .public)Hz/\(format.channelCount, privacy: .public)ch")
             throw AppError.audioError(
                 NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
@@ -428,7 +463,7 @@ final class AudioRecorderService: NSObject {
         // isolated, the Swift runtime would abort (`_dispatch_assert_queue_fail`)
         // on the first buffer because the executor check fails off the main
         // thread.
-        Self.installTap(on: input, format: format, sink: sink)
+        AudioRecorderEngineSupport.installTap(on: input, format: format, sink: sink)
         tapInstalled = true
         tapFormat = format
 
@@ -441,36 +476,6 @@ final class AudioRecorderService: NSObject {
             throw AppError.audioError(
                 NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
             )
-        }
-    }
-
-    /// Build the resampler that takes tap buffers to the stored format. Uses the
-    /// highest-quality sample rate conversion (this runs on a fraction of a
-    /// core for mono speech) and downmixes rather than dropping channels, so a
-    /// stereo external mic keeps both sides' content.
-    private nonisolated static func makeConverter(
-        from input: AVAudioFormat,
-        to output: AVAudioFormat
-    ) -> AVAudioConverter? {
-        guard let converter = AVAudioConverter(from: input, to: output) else { return nil }
-        converter.sampleRateConverterQuality = AVAudioQuality.high.rawValue
-        if input.channelCount > output.channelCount {
-            converter.downmix = true
-        }
-        return converter
-    }
-
-    /// Install the input tap. Declared `nonisolated` so the block it creates is
-    /// NOT inferred as `@MainActor`-isolated: AVAudioEngine invokes it on its
-    /// real-time render thread, where a main-actor isolation check would abort.
-    /// The block only touches `sink`, which is thread-safe (`@unchecked Sendable`).
-    private nonisolated static func installTap(
-        on input: AVAudioInputNode,
-        format: AVAudioFormat,
-        sink: any AudioSinkWriting
-    ) {
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
-            sink.write(buffer)
         }
     }
 
@@ -502,7 +507,12 @@ final class AudioRecorderService: NSObject {
                 options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try await activateSession(session)
-            configureMicrophone(session, pickup: pickup, forceBuiltIn: forceBuiltIn, preferredInputUID: preferredInputUID)
+            AudioRecorderEngineSupport.configureMicrophone(
+                session,
+                pickup: pickup,
+                forceBuiltIn: forceBuiltIn,
+                preferredInputUID: preferredInputUID
+            )
             AppLog.recorder.atDebug.debug("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
         } catch {
             AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
@@ -527,72 +537,6 @@ final class AudioRecorderService: NSObject {
                 try? await Task.sleep(nanoseconds: 200_000_000)
             }
         }
-    }
-
-    /// Select which physical input the session uses, then (for the built-in
-    /// mic only) the polar pattern.
-    ///
-    /// Priority: an explicit `preferredInputUID` (from a per-recording
-    /// microphone picker) always wins. Otherwise, if `forceBuiltIn` is set
-    /// (Settings → always use the iPhone mic), the built-in mic is selected
-    /// even with an accessory connected. Otherwise the system's own route
-    /// choice is left alone — unless there's no external input at all, in
-    /// which case the built-in mic is selected explicitly so its polar
-    /// pattern can be steered.
-    private nonisolated func configureMicrophone(
-        _ session: AVAudioSession,
-        pickup: MicPickup,
-        forceBuiltIn: Bool,
-        preferredInputUID: String?
-    ) {
-        guard let inputs = session.availableInputs else { return }
-
-        if let uid = preferredInputUID, let match = inputs.first(where: { $0.uid == uid }) {
-            try? session.setPreferredInput(match)
-            if match.portType == .builtInMic {
-                applyPolarPattern(to: match, pickup: pickup)
-            }
-            return
-        }
-
-        guard let builtIn = inputs.first(where: { $0.portType == .builtInMic }) else { return }
-        let hasExternal = inputs.contains { $0.portType != .builtInMic }
-        guard forceBuiltIn || !hasExternal else { return }
-
-        try? session.setPreferredInput(builtIn)
-        applyPolarPattern(to: builtIn, pickup: pickup)
-    }
-
-    /// Steer the built-in mic's polar pattern according to `micPickup`:
-    /// whole-room favours an omnidirectional pickup (every participant), while
-    /// focus-speaker favours cardioid (the person in front). Both fall back to
-    /// subcardioid, then the hardware default.
-    private nonisolated func applyPolarPattern(to builtIn: AVAudioSessionPortDescription, pickup: MicPickup) {
-        guard let sources = builtIn.dataSources, !sources.isEmpty else { return }
-
-        // Try patterns in priority order for the chosen pickup mode; apply the
-        // first one the hardware actually supports.
-        let preferredPatterns: [AVAudioSession.PolarPattern] = pickup == .wholeRoom
-            ? [.omnidirectional, .subcardioid]
-            : [.cardioid, .subcardioid]
-
-        for pattern in preferredPatterns {
-            guard let source = sources.first(where: {
-                $0.supportedPolarPatterns?.contains(pattern) == true
-            }) else { continue }
-            try? source.setPreferredPolarPattern(pattern)
-            try? builtIn.setPreferredDataSource(source)
-            AppLog.recorder.atDebug.debug("configureMicrophone: pickup=\(pickup.rawValue, privacy: .public) pattern=\(pattern.rawValue, privacy: .public) source=\(source.dataSourceName, privacy: .public)")
-            return
-        }
-        AppLog.recorder.atDebug.debug("configureMicrophone: pickup=\(pickup.rawValue, privacy: .public) hardware default pattern (no preferred pattern available)")
-    }
-
-    private nonisolated func deactivateSession() {
-        try? AVAudioSession.sharedInstance().setActive(
-            false,
-            options: [.notifyOthersOnDeactivation]
-        )
     }
 
     // MARK: - Metering / timing
@@ -627,7 +571,19 @@ final class AudioRecorderService: NSObject {
 
     private func tick() {
         guard state == .recording else { return }
-        if pollSinkStatus() { return }
+        let snapshot = sink.snapshot
+        if pollSinkStatus(snapshot: snapshot) { return }
+        guard engine.isRunning else {
+            recoverEngineIfNeeded(reason: "capture watchdog")
+            if state == .recording {
+                captureWatchdog.reset(
+                    writtenFrames: sink.snapshot.writtenOutputFrames,
+                    now: monotonicNow()
+                )
+            }
+            return
+        }
+        if pollCaptureProgress(snapshot: snapshot, now: monotonicNow()) { return }
         // Level is computed off the render thread by the sink; just publish it.
         level = sink.currentLevel
         onLevelChanged?(level)
@@ -648,10 +604,13 @@ final class AudioRecorderService: NSObject {
     }
 
     @discardableResult
-    func pollSinkStatus() -> Bool {
-        let snapshot = sink.snapshot
-        guard let failure = snapshot.firstFailure, captureFailure == nil else { return false }
-        captureFailure = failure
+    func pollSinkStatus(snapshot: AudioSinkSnapshot? = nil) -> Bool {
+        let snapshot = snapshot ?? sink.snapshot
+        guard let failure = snapshot.firstFailure, activeCaptureFailure == nil else { return false }
+        if captureFailure == nil {
+            captureFailure = failure
+        }
+        activeCaptureFailure = failure
         routeChangeMessage = NSLocalizedString(
             "recorder.write_failed",
             comment: "Recording paused because captured audio could not be written"
@@ -661,6 +620,36 @@ final class AudioRecorderService: NSObject {
         }
         AppLog.recorder.atError.error(
             "capture sink failed code=\(failure.rawValue, privacy: .public) attemptedInputFrames=\(snapshot.attemptedInputFrames, privacy: .public) writtenOutputFrames=\(snapshot.writtenOutputFrames, privacy: .public)"
+        )
+        return true
+    }
+
+    @discardableResult
+    func pollCaptureProgress(snapshot: AudioSinkSnapshot, now: TimeInterval) -> Bool {
+        guard captureWatchdog.hasStalled(
+            writtenFrames: snapshot.writtenOutputFrames,
+            now: now
+        ) else { return false }
+        return reportCaptureStall(snapshot: snapshot)
+    }
+
+    @discardableResult
+    func reportCaptureStall(snapshot: AudioSinkSnapshot? = nil) -> Bool {
+        guard activeCaptureFailure == nil else { return false }
+        let snapshot = snapshot ?? sink.snapshot
+        if captureFailure == nil {
+            captureFailure = .stalled
+        }
+        activeCaptureFailure = .stalled
+        routeChangeMessage = NSLocalizedString(
+            "recorder.capture_stalled",
+            comment: "Recording paused because frames stopped reaching the file"
+        )
+        if state == .recording {
+            pause(reason: .captureStalled)
+        }
+        AppLog.recorder.atError.error(
+            "capture watchdog stalled writtenOutputFrames=\(snapshot.writtenOutputFrames, privacy: .public) attemptedInputFrames=\(snapshot.attemptedInputFrames, privacy: .public)"
         )
         return true
     }
@@ -714,7 +703,7 @@ final class AudioRecorderService: NSObject {
         case .began:
             let interruptionReason = (info[AVAudioSessionInterruptionReasonKey] as? UInt)
                 .flatMap { AVAudioSession.InterruptionReason(rawValue: $0) }
-            AppLog.recorder.atNotice.notice("handleInterruption: began reason=\(Self.interruptionReasonDescription(interruptionReason), privacy: .public)")
+            AppLog.recorder.atNotice.notice("handleInterruption: began reason=\(AudioRecorderEngineSupport.interruptionReasonDescription(interruptionReason), privacy: .public)")
             Task { @MainActor in
                 self.wasRecordingBeforeInterruption = (self.state == .recording)
                 if self.state == .recording { self.pause(reason: .audioInterruption) }
@@ -739,19 +728,6 @@ final class AudioRecorderService: NSObject {
             }
         @unknown default:
             break
-        }
-    }
-
-    /// Human-readable description of `AVAudioSessionInterruptionReasonKey`
-    /// (iOS 14.5+), used only for the diagnostic log line above.
-    private nonisolated static func interruptionReasonDescription(_ reason: AVAudioSession.InterruptionReason?) -> String {
-        guard let reason else { return "unknown" }
-        switch reason {
-        case .default: return "default"
-        case .appWasSuspended: return "appWasSuspended"
-        case .builtInMicMuted: return "builtInMicMuted"
-        case .routeDisconnected: return "routeDisconnected"
-        @unknown default: return "unknown"
         }
     }
 
@@ -821,7 +797,7 @@ final class AudioRecorderService: NSObject {
     private func rebuildTapForCurrentInput(_ format: AVAudioFormat) -> Bool {
         guard format.sampleRate > 0, format.channelCount > 0 else { return false }
         guard let targetFormat = sink.currentTargetFormat,
-              let converter = Self.makeConverter(from: format, to: targetFormat) else {
+              let converter = AudioRecorderEngineSupport.makeConverter(from: format, to: targetFormat) else {
             AppLog.recorder.atError.error("rebuildTap: could not build a converter for the new input format")
             return false
         }
@@ -830,7 +806,7 @@ final class AudioRecorderService: NSObject {
             tapInstalled = false
         }
         sink.replaceConverter(converter)
-        Self.installTap(on: engine.inputNode, format: format, sink: sink)
+        AudioRecorderEngineSupport.installTap(on: engine.inputNode, format: format, sink: sink)
         tapInstalled = true
         tapFormat = format
         return true

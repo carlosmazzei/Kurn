@@ -166,6 +166,7 @@
 "recorder.route_changed" = "Aufnahme pausiert: Das Audiogerät hat sich geändert (z. B. Kopfhörer getrennt).";
 "recorder.engine_stalled" = "Aufnahme pausiert: Das System hat die Audioaufnahme gestoppt. Tippen Sie auf Fortsetzen, um weiterzumachen.";
 "recorder.write_failed" = "Die Aufnahme wurde pausiert, weil das Audio nicht gespeichert werden konnte. Prüfen Sie den freien Speicher und stoppen Sie dann, um die Teilaufnahme zu behalten.";
+"recorder.capture_stalled" = "Die Aufnahme wurde pausiert, weil keine Audiodaten mehr in der Datei ankamen. Tippen Sie auf Fortsetzen, um es erneut zu versuchen, oder auf Stopp, um die Teilaufnahme zu behalten.";
 "recorder.partial_saved" = "Nach einem Fehler bei der Audioaufnahme wurde eine Teilaufnahme gespeichert. Prüfen Sie den freien Speicher, bevor Sie erneut aufnehmen.";
 "recorder.title" = "Neue Aufnahme";
 "recorder.add_title" = "Titel hinzufügen…";

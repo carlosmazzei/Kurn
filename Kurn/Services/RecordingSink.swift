@@ -10,11 +10,13 @@
 
 import AVFoundation
 import Foundation
+import os
 
 enum AudioSinkFailure: String, Equatable, Error, Sendable {
     case conversion = "conversion_failed"
     case write = "write_failed"
     case finalDrain = "final_drain_failed"
+    case stalled = "frame_progress_stalled"
 }
 
 struct AudioSinkSnapshot: Equatable, Sendable {
@@ -33,6 +35,33 @@ struct AudioSinkSnapshot: Equatable, Sendable {
         self.attemptedInputFrames = attemptedInputFrames
         self.writtenOutputFrames = writtenOutputFrames
         self.lastSuccessfulWriteAt = lastSuccessfulWriteAt
+    }
+}
+
+struct CaptureProgressWatchdog: Sendable {
+    let stallInterval: TimeInterval
+    private var lastWrittenFrames: Int64?
+    private var lastProgressAt: TimeInterval?
+
+    init(stallInterval: TimeInterval) {
+        self.stallInterval = max(0, stallInterval)
+    }
+
+    mutating func reset(writtenFrames: Int64, now: TimeInterval) {
+        lastWrittenFrames = writtenFrames
+        lastProgressAt = now
+    }
+
+    mutating func hasStalled(writtenFrames: Int64, now: TimeInterval) -> Bool {
+        guard let lastWrittenFrames, let lastProgressAt else {
+            reset(writtenFrames: writtenFrames, now: now)
+            return false
+        }
+        guard writtenFrames == lastWrittenFrames, now >= lastProgressAt else {
+            reset(writtenFrames: writtenFrames, now: now)
+            return false
+        }
+        return now - lastProgressAt >= stallInterval
     }
 }
 
@@ -311,5 +340,115 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
         let floor: Float = -50
         let clamped = max(floor, db)
         return (clamped - floor) / (-floor)
+    }
+}
+
+enum AudioRecorderEngineSupport {
+    /// Build the resampler that takes tap buffers to the stored format. Uses the
+    /// highest-quality sample rate conversion (this runs on a fraction of a
+    /// core for mono speech) and downmixes rather than dropping channels, so a
+    /// stereo external mic keeps both sides' content.
+    static func makeConverter(
+        from input: AVAudioFormat,
+        to output: AVAudioFormat
+    ) -> AVAudioConverter? {
+        guard let converter = AVAudioConverter(from: input, to: output) else { return nil }
+        converter.sampleRateConverterQuality = AVAudioQuality.high.rawValue
+        if input.channelCount > output.channelCount {
+            converter.downmix = true
+        }
+        return converter
+    }
+
+    /// Install the input tap outside main-actor isolation: AVAudioEngine invokes
+    /// the block on its real-time render thread, where a main-actor check would
+    /// abort. The block only touches the thread-safe sink.
+    static func installTap(
+        on input: AVAudioInputNode,
+        format: AVAudioFormat,
+        sink: any AudioSinkWriting
+    ) {
+        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
+            sink.write(buffer)
+        }
+    }
+
+    /// Select which physical input the session uses, then (for the built-in
+    /// mic only) the polar pattern.
+    ///
+    /// Priority: an explicit `preferredInputUID` (from a per-recording
+    /// microphone picker) always wins. Otherwise, if `forceBuiltIn` is set
+    /// (Settings → always use the iPhone mic), the built-in mic is selected
+    /// even with an accessory connected. Otherwise the system's own route
+    /// choice is left alone — unless there's no external input at all, in
+    /// which case the built-in mic is selected explicitly so its polar
+    /// pattern can be steered.
+    static func configureMicrophone(
+        _ session: AVAudioSession,
+        pickup: MicPickup,
+        forceBuiltIn: Bool,
+        preferredInputUID: String?
+    ) {
+        guard let inputs = session.availableInputs else { return }
+
+        if let uid = preferredInputUID, let match = inputs.first(where: { $0.uid == uid }) {
+            try? session.setPreferredInput(match)
+            if match.portType == .builtInMic {
+                applyPolarPattern(to: match, pickup: pickup)
+            }
+            return
+        }
+
+        guard let builtIn = inputs.first(where: { $0.portType == .builtInMic }) else { return }
+        let hasExternal = inputs.contains { $0.portType != .builtInMic }
+        guard forceBuiltIn || !hasExternal else { return }
+
+        try? session.setPreferredInput(builtIn)
+        applyPolarPattern(to: builtIn, pickup: pickup)
+    }
+
+    /// Steer the built-in mic's polar pattern according to `micPickup`:
+    /// whole-room favours an omnidirectional pickup (every participant), while
+    /// focus-speaker favours cardioid (the person in front). Both fall back to
+    /// subcardioid, then the hardware default.
+    private static func applyPolarPattern(to builtIn: AVAudioSessionPortDescription, pickup: MicPickup) {
+        guard let sources = builtIn.dataSources, !sources.isEmpty else { return }
+
+        // Try patterns in priority order for the chosen pickup mode; apply the
+        // first one the hardware actually supports.
+        let preferredPatterns: [AVAudioSession.PolarPattern] = pickup == .wholeRoom
+            ? [.omnidirectional, .subcardioid]
+            : [.cardioid, .subcardioid]
+
+        for pattern in preferredPatterns {
+            guard let source = sources.first(where: {
+                $0.supportedPolarPatterns?.contains(pattern) == true
+            }) else { continue }
+            try? source.setPreferredPolarPattern(pattern)
+            try? builtIn.setPreferredDataSource(source)
+            AppLog.recorder.atDebug.debug("configureMicrophone: pickup=\(pickup.rawValue, privacy: .public) pattern=\(pattern.rawValue, privacy: .public) source=\(source.dataSourceName, privacy: .public)")
+            return
+        }
+        AppLog.recorder.atDebug.debug("configureMicrophone: pickup=\(pickup.rawValue, privacy: .public) hardware default pattern (no preferred pattern available)")
+    }
+
+    static func deactivateSession() {
+        try? AVAudioSession.sharedInstance().setActive(
+            false,
+            options: [.notifyOthersOnDeactivation]
+        )
+    }
+
+    /// Human-readable description of `AVAudioSessionInterruptionReasonKey`
+    /// (iOS 14.5+), used only for diagnostic logging.
+    static func interruptionReasonDescription(_ reason: AVAudioSession.InterruptionReason?) -> String {
+        guard let reason else { return "unknown" }
+        switch reason {
+        case .default: return "default"
+        case .appWasSuspended: return "appWasSuspended"
+        case .builtInMicMuted: return "builtInMicMuted"
+        case .routeDisconnected: return "routeDisconnected"
+        @unknown default: return "unknown"
+        }
     }
 }
