@@ -167,6 +167,8 @@
 "recorder.engine_stalled" = "Aufnahme pausiert: Das System hat die Audioaufnahme gestoppt. Tippen Sie auf Fortsetzen, um weiterzumachen.";
 "recorder.write_failed" = "Die Aufnahme wurde pausiert, weil das Audio nicht gespeichert werden konnte. Prüfen Sie den freien Speicher und stoppen Sie dann, um die Teilaufnahme zu behalten.";
 "recorder.capture_stalled" = "Die Aufnahme wurde pausiert, weil keine Audiodaten mehr in der Datei ankamen. Tippen Sie auf Fortsetzen, um es erneut zu versuchen, oder auf Stopp, um die Teilaufnahme zu behalten.";
+"recorder.storage_unknown" = "Der verfügbare Speicher konnte nicht geprüft werden. Die Aufnahme wird fortgesetzt; überwachen Sie den Gerätespeicher.";
+"recorder.storage_low" = "Geschätzte verbleibende Aufnahmezeit: %@. Geben Sie Speicher frei oder stoppen Sie, um die Aufnahme zu behalten.";
 "recorder.partial_saved" = "Nach einem Fehler bei der Audioaufnahme wurde eine Teilaufnahme gespeichert. Prüfen Sie den freien Speicher, bevor Sie erneut aufnehmen.";
 "recorder.title" = "Neue Aufnahme";
 "recorder.add_title" = "Titel hinzufügen…";

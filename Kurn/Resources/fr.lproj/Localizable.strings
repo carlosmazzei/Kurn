@@ -167,6 +167,8 @@
 "recorder.engine_stalled" = "Enregistrement en pause : le système a interrompu la capture audio. Touchez reprendre pour continuer.";
 "recorder.write_failed" = "L’enregistrement a été mis en pause car l’audio n’a pas pu être enregistré. Vérifiez l’espace disponible, puis arrêtez pour conserver l’enregistrement partiel.";
 "recorder.capture_stalled" = "L’enregistrement a été mis en pause car l’audio n’arrivait plus dans le fichier. Touchez Reprendre pour réessayer ou Arrêter pour conserver l’enregistrement partiel.";
+"recorder.storage_unknown" = "Impossible de vérifier l’espace disponible. L’enregistrement continuera ; surveillez le stockage de l’appareil.";
+"recorder.storage_low" = "Durée d’enregistrement restante estimée : %@. Libérez de l’espace ou arrêtez pour conserver l’enregistrement.";
 "recorder.partial_saved" = "Un enregistrement partiel a été sauvegardé après un échec de capture audio. Vérifiez l’espace disponible avant de recommencer.";
 "recorder.title" = "Nouvel Enregistrement";
 "recorder.add_title" = "Ajouter un titre…";

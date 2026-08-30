@@ -61,7 +61,8 @@ enum ResourceGuard {
 
     static func availableStorageBytes(
         at url: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-            .first ?? FileManager.default.temporaryDirectory
+            .first ?? FileManager.default.temporaryDirectory,
+        logFailure: Bool = true
     ) -> Int64? {
         do {
             let values = try url.resourceValues(forKeys: [
@@ -75,7 +76,9 @@ enum ResourceGuard {
                 return Int64(capacity)
             }
         } catch {
-            AppLog.transcription.atError.error("resource: storage check failed: \(error.localizedDescription, privacy: .public)")
+            if logFailure {
+                AppLog.transcription.atError.error("resource: storage capacity query failed")
+            }
         }
         return nil
     }
@@ -106,6 +109,136 @@ enum ResourceGuard {
         }
 
         return nil
+    }
+}
+
+enum RecordingStorageCapacity: Equatable, Sendable {
+    case available(Int64)
+    case unknown
+}
+
+protocol RecordingStorageProbing: Sendable {
+    func capacity(at url: URL) -> RecordingStorageCapacity
+    func fileSize(at url: URL) -> Int64?
+}
+
+struct SystemRecordingStorageProbe: RecordingStorageProbing {
+    func capacity(at url: URL) -> RecordingStorageCapacity {
+        guard let bytes = ResourceGuard.availableStorageBytes(at: url, logFailure: false) else { return .unknown }
+        return .available(bytes)
+    }
+
+    func fileSize(at url: URL) -> Int64? {
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return nil }
+        return Int64(size)
+    }
+}
+
+enum RecordingStorageRateBasis: Equatable, Sendable {
+    case configured
+    case measured
+}
+
+struct RecordingStorageEstimate: Equatable, Sendable {
+    let availableBytes: Int64
+    let runway: TimeInterval
+    let bytesPerSecond: Double
+    let rateBasis: RecordingStorageRateBasis
+}
+
+enum RecordingStorageState: Equatable, Sendable {
+    case unknown
+    case sufficient(RecordingStorageEstimate)
+    case low(RecordingStorageEstimate)
+
+    var estimate: RecordingStorageEstimate? {
+        switch self {
+        case .unknown: return nil
+        case .sufficient(let estimate), .low(let estimate): return estimate
+        }
+    }
+
+    var userMessage: String? {
+        switch self {
+        case .unknown:
+            return NSLocalizedString(
+                "recorder.storage_unknown",
+                comment: "Available recording storage could not be checked"
+            )
+        case .low(let estimate):
+            return String(
+                format: NSLocalizedString(
+                    "recorder.storage_low",
+                    comment: "Estimated recording time remaining"
+                ),
+                estimate.runway.clockDisplay
+            )
+        case .sufficient:
+            return nil
+        }
+    }
+}
+
+struct RecordingStorageMonitor: Sendable {
+    static let safetyReserveBytes: Int64 = 10 * 1_024 * 1_024
+    static let minimumStartRunway: TimeInterval = 30 * 60
+    static let lowRunway: TimeInterval = 5 * 60
+    static let minimumMeasurementDuration: TimeInterval = 10
+    static let outputSampleRate: Double = 24_000
+
+    let configuredBytesPerSecond: Double
+
+    init(bitRate: Int) {
+        configuredBytesPerSecond = max(1, Double(bitRate) / 8 * 1.1)
+    }
+
+    var requiredStartBytes: Int64 {
+        Self.safetyReserveBytes
+            + Int64(ceil(configuredBytesPerSecond * Self.minimumStartRunway))
+    }
+
+    func assess(
+        capacity: RecordingStorageCapacity,
+        fileSize: Int64?,
+        writtenOutputFrames: Int64
+    ) -> RecordingStorageState {
+        guard case .available(let availableBytes) = capacity else { return .unknown }
+        let rate = byteRate(fileSize: fileSize, writtenOutputFrames: writtenOutputFrames)
+        let usableBytes = max(0, availableBytes - Self.safetyReserveBytes)
+        let estimate = RecordingStorageEstimate(
+            availableBytes: availableBytes,
+            runway: Double(usableBytes) / rate.bytesPerSecond,
+            bytesPerSecond: rate.bytesPerSecond,
+            rateBasis: rate.basis
+        )
+        return estimate.runway <= Self.lowRunway ? .low(estimate) : .sufficient(estimate)
+    }
+
+    func startError(for state: RecordingStorageState) -> AppError? {
+        guard let estimate = state.estimate,
+              estimate.runway < Self.minimumStartRunway else { return nil }
+        return .resourceUnavailable(String(
+            format: NSLocalizedString("error.resource_low_storage", comment: "Low storage"),
+            ByteCountFormatter.string(fromByteCount: requiredStartBytes, countStyle: .file),
+            ByteCountFormatter.string(fromByteCount: estimate.availableBytes, countStyle: .file)
+        ))
+    }
+
+    private func byteRate(
+        fileSize: Int64?,
+        writtenOutputFrames: Int64
+    ) -> (bytesPerSecond: Double, basis: RecordingStorageRateBasis) {
+        let duration = Double(writtenOutputFrames) / Self.outputSampleRate
+        guard duration >= Self.minimumMeasurementDuration,
+              let fileSize,
+              fileSize > 0 else {
+            return (configuredBytesPerSecond, .configured)
+        }
+        let measured = Double(fileSize) / duration
+        guard measured.isFinite, measured > configuredBytesPerSecond else {
+            return (configuredBytesPerSecond, .configured)
+        }
+        return (measured, .measured)
     }
 }
 

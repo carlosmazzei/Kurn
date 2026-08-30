@@ -167,6 +167,8 @@
 "recorder.engine_stalled" = "Recording paused: the system stopped audio capture. Tap resume to continue.";
 "recorder.write_failed" = "Recording paused because audio could not be saved. Check available storage, then stop to keep the partial recording.";
 "recorder.capture_stalled" = "Recording paused because audio stopped reaching the file. Tap Resume to retry, or Stop to keep the partial recording.";
+"recorder.storage_unknown" = "Available storage could not be checked. Recording will continue; monitor device storage.";
+"recorder.storage_low" = "Estimated recording time remaining: %@. Free space or stop to keep the recording.";
 "recorder.partial_saved" = "A partial recording was saved after an audio capture failure. Check available storage before recording again.";
 "recorder.title" = "New Recording";
 "recorder.add_title" = "Add title…";

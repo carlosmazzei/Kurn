@@ -167,6 +167,8 @@
 "recorder.engine_stalled" = "录音已暂停：系统停止了音频采集。点击恢复以继续。";
 "recorder.write_failed" = "录音已暂停，因为无法保存音频。请检查可用存储空间，然后停止录音以保留部分录音。";
 "recorder.capture_stalled" = "录音已暂停，因为音频不再写入文件。轻点“继续”重试，或轻点“停止”保留部分录音。";
+"recorder.storage_unknown" = "无法检查可用存储空间。录音将继续；请留意设备存储空间。";
+"recorder.storage_low" = "预计剩余录音时间：%@。请释放空间或停止录音以保留当前内容。";
 "recorder.partial_saved" = "音频采集失败后已保存部分录音。再次录音前请检查可用存储空间。";
 "recorder.title" = "新建录音";
 "recorder.add_title" = "添加标题…";

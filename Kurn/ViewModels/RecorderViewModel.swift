@@ -147,7 +147,7 @@ final class RecorderViewModel {
     var state: AudioRecorderService.State { recorder.state }
     var level: Float { recorder.level }
     var elapsed: TimeInterval { recorder.elapsed }
-    var routeMessage: String? { recorder.routeChangeMessage }
+    var routeMessage: String? { recorder.routeChangeMessage ?? recorder.storageState.userMessage }
     var highlightCount: Int { recorder.highlights.count }
 
     /// Editable meeting title, surfaced as the recorder's "Add title…" field.

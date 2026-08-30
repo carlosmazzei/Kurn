@@ -10,6 +10,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 import os
 
 enum AudioSinkFailure: String, Equatable, Error, Sendable {
@@ -370,6 +371,51 @@ enum AudioRecorderEngineSupport {
     ) {
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
             sink.write(buffer)
+        }
+    }
+
+    static func configureSession(
+        pickup: MicPickup,
+        forceBuiltIn: Bool,
+        preferredInputUID: String?
+    ) async throws {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetoothHFP]
+            )
+            try await activateSession(session)
+            configureMicrophone(
+                session,
+                pickup: pickup,
+                forceBuiltIn: forceBuiltIn,
+                preferredInputUID: preferredInputUID
+            )
+            AppLog.recorder.atDebug.debug("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
+        } catch {
+            AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
+            throw AppError.audioError(error.localizedDescription)
+        }
+    }
+
+    /// Activate the session with a short retry/backoff. Requesting
+    /// `.playAndRecord` while a Bluetooth headset is connected forces the
+    /// accessory to switch profile (A2DP/idle → HFP), an asynchronous radio
+    /// handshake that can make `setActive(true)` throw transiently while it's
+    /// in flight. A brief retry rides out that window instead of failing the
+    /// whole recording start on the first attempt.
+    private static func activateSession(_ session: AVAudioSession, attempts: Int = 3) async throws {
+        for attempt in 1...attempts {
+            do {
+                try session.setActive(true)
+                return
+            } catch {
+                if attempt == attempts { throw error }
+                AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying: \(error.localizedDescription, privacy: .public)")
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
         }
     }
 

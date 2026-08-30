@@ -91,6 +91,7 @@ final class AudioRecorderService: NSObject {
     /// Set when a route change (e.g. headphones unplugged) auto-paused us.
     private(set) var routeChangeMessage: String?
     private(set) var captureFailure: AudioSinkFailure?
+    private(set) var storageState: RecordingStorageState = .unknown
     @ObservationIgnored private var activeCaptureFailure: AudioSinkFailure?
 
     // The engine, sink and tap flag are touched by the off-main setup/teardown
@@ -103,7 +104,9 @@ final class AudioRecorderService: NSObject {
     /// `RecordingSink`) so a test can inject a fake that observes/fails writes.
     @ObservationIgnored private nonisolated let sink: any AudioSinkWriting
     @ObservationIgnored private let monotonicNow: @Sendable () -> TimeInterval
+    @ObservationIgnored private let storageProbe: any RecordingStorageProbing
     @ObservationIgnored private var captureWatchdog: CaptureProgressWatchdog
+    @ObservationIgnored private var storageMonitor: RecordingStorageMonitor?
     @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
     /// Input format the tap was created with, so the engine-stall recovery can
     /// tell a plain restart (same format) from one that needs the tap and the
@@ -117,6 +120,7 @@ final class AudioRecorderService: NSObject {
     /// Counts metering ticks so we can log progress without flooding the console.
     private var tickCount = 0
     private var currentFileName: String?
+    private var currentFileURL: URL?
     /// Accumulated time across pause cycles plus the active span.
     private var accumulated: TimeInterval = 0
     private var segmentStart: Date?
@@ -144,10 +148,12 @@ final class AudioRecorderService: NSObject {
     init(
         sink: any AudioSinkWriting = RecordingSink(),
         stallInterval: TimeInterval = 2,
-        monotonicNow: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+        monotonicNow: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        storageProbe: any RecordingStorageProbing = SystemRecordingStorageProbe()
     ) {
         self.sink = sink
         self.monotonicNow = monotonicNow
+        self.storageProbe = storageProbe
         self.captureWatchdog = CaptureProgressWatchdog(stallInterval: stallInterval)
         super.init()
         registerNotifications()
@@ -187,8 +193,10 @@ final class AudioRecorderService: NSObject {
         let bitRate = audioBitRate
         let forceBuiltIn = forceBuiltInMic
         let preferredUID = preferredInputUID
+        let directory = AudioFileStore.recordingsDirectoryURL
+        try prepareStorageForRecording(bitRate: bitRate, directory: directory)
         let fileName = AudioFileStore.fileName(meetingID: meetingID)
-        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+        let url = directory.appendingPathComponent(fileName)
         AppLog.recorder.atDebug.debug("start: writing to \(fileName, privacy: .public)")
 
         do {
@@ -216,6 +224,7 @@ final class AudioRecorderService: NSObject {
 
         // Back on the main actor: publish state and start the metering timer.
         self.currentFileName = fileName
+        self.currentFileURL = url
         self.accumulated = 0
         self.segmentStart = Date()
         self.elapsed = 0
@@ -241,7 +250,11 @@ final class AudioRecorderService: NSObject {
         forceBuiltIn: Bool,
         preferredInputUID: String?
     ) async throws {
-        try await configureSession(pickup: pickup, forceBuiltIn: forceBuiltIn, preferredInputUID: preferredInputUID)
+        try await AudioRecorderEngineSupport.configureSession(
+            pickup: pickup,
+            forceBuiltIn: forceBuiltIn,
+            preferredInputUID: preferredInputUID
+        )
         try await beginEngine(writingTo: url, bitRate: bitRate)
     }
 
@@ -346,6 +359,7 @@ final class AudioRecorderService: NSObject {
         let outcome = finalCaptureFailure == nil ? "ready" : "partial"
         AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
         self.currentFileName = nil
+        self.currentFileURL = nil
         self.state = .idle
         self.level = 0
         self.elapsed = 0
@@ -370,6 +384,7 @@ final class AudioRecorderService: NSObject {
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)
         self.currentFileName = nil
+        self.currentFileURL = nil
         self.state = .idle
         self.level = 0
         self.elapsed = 0
@@ -492,53 +507,6 @@ final class AudioRecorderService: NSObject {
         try? engine.inputNode.setVoiceProcessingEnabled(false)
     }
 
-    // MARK: - Session
-
-    private nonisolated func configureSession(
-        pickup: MicPickup,
-        forceBuiltIn: Bool,
-        preferredInputUID: String?
-    ) async throws {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(
-                .playAndRecord,
-                mode: .default,
-                options: [.defaultToSpeaker, .allowBluetoothHFP]
-            )
-            try await activateSession(session)
-            AudioRecorderEngineSupport.configureMicrophone(
-                session,
-                pickup: pickup,
-                forceBuiltIn: forceBuiltIn,
-                preferredInputUID: preferredInputUID
-            )
-            AppLog.recorder.atDebug.debug("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
-        } catch {
-            AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
-            throw AppError.audioError(error.localizedDescription)
-        }
-    }
-
-    /// Activate the session with a short retry/backoff. Requesting
-    /// `.playAndRecord` while a Bluetooth headset is connected forces the
-    /// accessory to switch profile (A2DP/idle → HFP), an asynchronous radio
-    /// handshake that can make `setActive(true)` throw transiently while it's
-    /// in flight. A brief retry rides out that window instead of failing the
-    /// whole recording start on the first attempt.
-    private nonisolated func activateSession(_ session: AVAudioSession, attempts: Int = 3) async throws {
-        for attempt in 1...attempts {
-            do {
-                try session.setActive(true)
-                return
-            } catch {
-                if attempt == attempts { throw error }
-                AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying: \(error.localizedDescription, privacy: .public)")
-                try? await Task.sleep(nanoseconds: 200_000_000)
-            }
-        }
-    }
-
     // MARK: - Metering / timing
 
     private func accumulateElapsed() {
@@ -598,9 +566,34 @@ final class AudioRecorderService: NSObject {
         }
         // Log roughly once per second so we can confirm the timer keeps firing.
         tickCount += 1
+        if tickCount == 1 || tickCount % 100 == 0 {
+            refreshStorage(snapshot: snapshot)
+        }
         if tickCount == 1 || tickCount % 20 == 0 {
             AppLog.recorder.atDebug.debug("tick #\(self.tickCount, privacy: .public): elapsed=\(self.elapsed, privacy: .public) level=\(self.level, privacy: .public)")
         }
+    }
+
+    func prepareStorageForRecording(bitRate: Int, directory: URL) throws {
+        storageMonitor = nil
+        let monitor = RecordingStorageMonitor(bitRate: bitRate)
+        let state = monitor.assess(
+            capacity: storageProbe.capacity(at: directory),
+            fileSize: nil,
+            writtenOutputFrames: 0
+        )
+        storageState = state
+        if let error = monitor.startError(for: state) { throw error }
+        storageMonitor = monitor
+    }
+
+    func refreshStorage(snapshot: AudioSinkSnapshot, fileURL: URL? = nil) {
+        guard let storageMonitor, let fileURL = fileURL ?? currentFileURL else { return }
+        storageState = storageMonitor.assess(
+            capacity: storageProbe.capacity(at: fileURL.deletingLastPathComponent()),
+            fileSize: storageProbe.fileSize(at: fileURL),
+            writtenOutputFrames: snapshot.writtenOutputFrames
+        )
     }
 
     @discardableResult

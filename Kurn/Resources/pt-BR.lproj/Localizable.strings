@@ -167,6 +167,8 @@
 "recorder.engine_stalled" = "Gravação pausada: o sistema interrompeu a captura de áudio. Toque em retomar para continuar.";
 "recorder.write_failed" = "Gravação pausada porque não foi possível salvar o áudio. Verifique o espaço disponível e pare para manter a gravação parcial.";
 "recorder.capture_stalled" = "Gravação pausada porque o áudio parou de chegar ao arquivo. Toque em Retomar para tentar novamente ou em Parar para manter a gravação parcial.";
+"recorder.storage_unknown" = "Não foi possível verificar o espaço disponível. A gravação continuará; monitore o armazenamento do dispositivo.";
+"recorder.storage_low" = "Tempo estimado restante de gravação: %@. Libere espaço ou pare para manter a gravação.";
 "recorder.partial_saved" = "Uma gravação parcial foi salva após uma falha na captura de áudio. Verifique o espaço disponível antes de gravar novamente.";
 "recorder.title" = "Nova Gravação";
 "recorder.add_title" = "Adicionar título…";
