@@ -385,6 +385,17 @@ is also what lets the field be added without a SwiftData migration plan).
 `RecordingRecovery` backfills it during the launch/foreground sweep it already
 runs, and `Recording.effectiveBitRate` derives the stored rate from it.
 
+Capture ownership is persisted before the audio file opens. New recordings use
+`Recording.id` in their filename and move through `RecordingCaptureState`
+(`preparing`, `recording`, `finalizing`, `ready`, `recoveryNeeded`). Playback,
+transcription, export, compaction, and enhancement must gate on
+`Recording.isReadyForConsumption`. `RecordingFileFinalizer` is the single
+production definition of ready: after the sink closes, it reopens the file,
+measures duration/bytes, and applies/verifies `.completeUnlessOpen`; both normal
+stop and `RecordingRecovery` use it. The simulator cannot observe iOS file
+protection, so enforcement is covered by the release device matrix while tests
+inject protection failure through the finalizer seam.
+
 `RecordingCompactor` (`Services/RecordingCompactor.swift`) re-encodes
 already-transcribed recordings down to the current quality, for libraries
 recorded before the fixed format. It is user-triggered from Settings → Storage

@@ -154,6 +154,7 @@ final class TranscriptionViewModel {
         language: MeetingLanguage,
         config: PipelineConfiguration
     ) {
+        guard recording.isReadyForConsumption else { return }
         let recordingID = recording.id
         guard transcriptionTasks[recordingID] == nil,
               !Self.globalActiveIDs.contains(recordingID) else {
@@ -209,7 +210,8 @@ final class TranscriptionViewModel {
         language: MeetingLanguage,
         config: PipelineConfiguration
     ) async {
-        guard !transcribingIDs.contains(recording.id),
+        guard recording.isReadyForConsumption,
+              !transcribingIDs.contains(recording.id),
               !Self.globalActiveIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id

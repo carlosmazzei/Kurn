@@ -37,8 +37,8 @@ struct MicInputOption: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 final class RecorderViewModel {
-    let recorder = AudioRecorderService()
-    let liveTranscription = LiveTranscriptionService()
+    let recorder: AudioRecorderService
+    let liveTranscription: LiveTranscriptionService
 
     var error: AppError?
     var permissionDenied = false
@@ -62,6 +62,10 @@ final class RecorderViewModel {
     private let liveTranscriptionModelsConsented: Bool
     private let largeTransferPolicy: LargeTransferPolicy
     private let hideLiveActivityMeetingTitle: Bool
+    private let fileFinalizer: any RecordingFileFinalizing
+    private let lifecycleSaver: any RecordingLifecycleSaving
+    private var activeRecording: Recording?
+    private var cancellationRequested = false
     private var micChoiceContinuation: CheckedContinuation<String?, Never>?
     private var finishAfterErrorDismissal = false
     private let lockScreenController = LockScreenRecordingController()
@@ -76,11 +80,19 @@ final class RecorderViewModel {
         modelContext: ModelContext,
         defaultMode: TranscriptionMode,
         options: RecorderOptions = RecorderOptions(),
+        recorder: AudioRecorderService = AudioRecorderService(),
+        liveTranscription: LiveTranscriptionService = LiveTranscriptionService(),
+        fileFinalizer: any RecordingFileFinalizing = RecordingFileFinalizer(),
+        lifecycleSaver: any RecordingLifecycleSaving = ModelContextRecordingLifecycleSaver(),
         onRecordingSaved: @escaping () -> Void = {}
     ) {
         self.meeting = meeting
         self.modelContext = modelContext
         self.defaultMode = defaultMode
+        self.recorder = recorder
+        self.liveTranscription = liveTranscription
+        self.fileFinalizer = fileFinalizer
+        self.lifecycleSaver = lifecycleSaver
         self.alwaysUseBuiltInMic = options.alwaysUseBuiltInMic
         self.liveTranscriptionEnabled = options.liveTranscriptionEnabled
         self.liveTranscriptionModelsConsented = options.liveTranscriptionModelsConsented
@@ -166,6 +178,9 @@ final class RecorderViewModel {
     /// asking the user via `micChoices` when more than one input is available
     /// and Settings isn't forcing the built-in mic — then begin recording.
     func prepareToRecord() async {
+        guard !isStarting else { return }
+        isStarting = true
+        defer { isStarting = false }
         if !alwaysUseBuiltInMic {
             let session = AVAudioSession.sharedInstance()
             // `availableInputs` only lists a Bluetooth accessory once the
@@ -206,18 +221,70 @@ final class RecorderViewModel {
         micChoiceContinuation = nil
     }
 
-    /// Request permission (if needed) and begin recording.
-    func startRecording() async {
+    func prepareCaptureOwnership() throws -> Recording {
+        guard meeting.modelContext === modelContext else {
+            throw AppError.persistenceFailed(NSLocalizedString(
+                "recorder.meeting_unavailable",
+                comment: "The meeting is unavailable in the active store"
+            ))
+        }
+        let recordingID = UUID()
+        let recording = Recording(
+            id: recordingID,
+            meeting: meeting,
+            fileName: AudioFileStore.fileName(meetingID: meeting.id, recordingID: recordingID),
+            duration: 0,
+            transcriptionMode: defaultMode,
+            captureState: .preparing
+        )
+        modelContext.insert(recording)
+        do {
+            try lifecycleSaver.save(modelContext)
+            activeRecording = recording
+            return recording
+        } catch {
+            modelContext.delete(recording)
+            throw AppError.persistenceFailed(error.localizedDescription)
+        }
+    }
+
+    private func prepareCaptureOwnershipOrPresentError() -> Recording? {
+        do {
+            return try prepareCaptureOwnership()
+        } catch let appError as AppError {
+            error = appError
+        } catch {
+            self.error = .persistenceFailed(error.localizedDescription)
+        }
+        return nil
+    }
+
+    private func canBeginCapture() async -> Bool {
+        guard activeRecording == nil else {
+            error = .audioError(NSLocalizedString(
+                "recorder.already_active",
+                comment: "A recording is already starting or active"
+            ))
+            return false
+        }
         AppLog.recorderUI.atNotice.notice("startRecording: begin, requesting permission")
-        let granted = await recorder.requestMicrophonePermission()
-        guard granted else {
+        guard await recorder.requestMicrophonePermission() else {
             AppLog.recorderUI.atError.error("startRecording: permission denied")
             permissionDenied = true
-            return
+            return false
         }
-        // Load the streaming ASR model in parallel with the audio engine
-        // spin-up so the first usable buffer arrives at an already-loaded
-        // engine instead of being dropped while we wait on model I/O.
+        return true
+    }
+
+    /// Request permission (if needed) and begin recording.
+    func startRecording() async {
+        guard await canBeginCapture() else { return }
+        cancellationRequested = false
+        isStarting = true
+        defer { isStarting = false }
+        guard let recording = prepareCaptureOwnershipOrPresentError() else { return }
+        let fileName = recording.fileName
+
         let liveLanguage = meeting.language
         let liveStartTask: Task<Void, Never>? = liveTranscriptionEnabled && liveTranscriptionModelsConsented
             ? Task { @MainActor [weak self] in
@@ -229,16 +296,16 @@ final class RecorderViewModel {
                 )
             }
             : nil
-        isStarting = true
-        defer { isStarting = false }
         do {
-            try await recorder.start(meetingID: meeting.id)
-            // Bring up the Live Activity / Dynamic Island the instant the
-            // recorder is running, BEFORE awaiting the optional live-transcription
-            // model warmup. `loadModels()` can take several seconds on first run
-            // (or stall/fail), and the Lock Screen widget must never be held
-            // hostage to it — otherwise it appears late or, if the load hangs,
-            // never at all.
+            try await recorder.start(fileName: fileName)
+            recording.captureState = .recording
+            do {
+                try lifecycleSaver.save(modelContext)
+            } catch {
+                let result = recorder.stop()
+                finalizeCapture(recording, result: result, forcedReason: .interruptedDuringCapture)
+                throw AppError.persistenceFailed(error.localizedDescription)
+            }
             lockScreenController.start(
                 title: displayTitle,
                 state: recorder.state,
@@ -258,15 +325,22 @@ final class RecorderViewModel {
             await liveStartTask?.value
             AppLog.recorderUI.atInfo.info("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
         } catch let appError as AppError {
+            if cancellationRequested { return }
             AppLog.recorderUI.atError.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
+            recoverFailedStart(recording)
             await liveStartTask?.value
             if liveTranscriptionEnabled { await liveTranscription.stop() }
-            error = appError
+            if error == nil { error = appError }
+        } catch is CancellationError {
+            if !cancellationRequested { recoverFailedStart(recording) }
+            if liveTranscriptionEnabled { await liveTranscription.stop() }
         } catch {
+            if cancellationRequested { return }
             AppLog.recorderUI.atError.error("startRecording: error: \(error.localizedDescription, privacy: .public)")
+            recoverFailedStart(recording)
             await liveStartTask?.value
             if liveTranscriptionEnabled { await liveTranscription.stop() }
-            self.error = .audioError(error.localizedDescription)
+            if self.error == nil { self.error = .audioError(error.localizedDescription) }
         }
     }
 
@@ -301,57 +375,97 @@ final class RecorderViewModel {
     func stopAndSave() {
         AppLog.recorderUI.atNotice.notice("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
         stopLiveTranscription()
-        guard let result = recorder.stop() else {
-            lockScreenController.end()
-            RecordingCommandRouter.shared.unregister()
-            PhoneSessionController.shared.notifyEnded()
-            didSaveRecording = true
+        guard let recording = activeRecording else {
+            finishExternalRecordingState()
             return
         }
-        // Ignore a healthy recording shorter than the minimum usable duration.
-        guard result.duration >= 0.5 || result.captureFailure != nil else {
-            AudioFileStore.delete(fileName: result.fileName)
-            lockScreenController.end()
-            RecordingCommandRouter.shared.unregister()
-            PhoneSessionController.shared.notifyEnded()
-            didSaveRecording = true
-            return
+        recording.captureState = .finalizing
+        do {
+            try lifecycleSaver.save(modelContext)
+        } catch {
+            AppLog.persistence.atError.error("recording: finalizing transition save failed")
+        }
+        let result = recorder.stop()
+        finalizeCapture(recording, result: result)
+        finishExternalRecordingState()
+    }
+
+    func finalizeCapture(
+        _ recording: Recording,
+        result: AudioRecordingResult?,
+        forcedReason: CaptureRecoveryReason? = nil
+    ) {
+        do {
+            let metadata = try fileFinalizer.finalize(fileName: recording.fileName)
+            let recoveryReason = forcedReason ?? result?.captureFailure.map(CaptureRecoveryReason.init)
+            if metadata.duration < 0.5, recoveryReason == nil {
+                discardShortRecording(recording)
+                return
+            }
+            recording.duration = metadata.duration
+            recording.fileSize = metadata.fileSize
+            recording.highlights = result?.highlights ?? recording.highlights
+            recording.captureState = recoveryReason == nil ? .ready : .recoveryNeeded
+            recording.captureRecoveryReason = recoveryReason
+        } catch let finalizationError as RecordingFileFinalizationError {
+            recording.captureState = .recoveryNeeded
+            recording.captureRecoveryReason = finalizationError.recoveryReason
+        } catch {
+            recording.captureState = .recoveryNeeded
+            recording.captureRecoveryReason = .unreadableFile
         }
 
-        // Setting `meeting` establishes the relationship; SwiftData maintains the
-        // inverse `meeting.recordings`, so we don't append manually.
-        // `recorder.stop()` has already closed the file, so its size is final.
-        let recording = Recording(
-            meeting: meeting,
-            fileName: result.fileName,
-            duration: result.duration,
-            transcriptionMode: defaultMode,
-            fileSize: AudioFileStore.byteSize(fileName: result.fileName),
-            highlights: result.highlights
-        )
-        modelContext.insert(recording)
-        let saved: Bool
         do {
-            try modelContext.save()
-            onRecordingSaved()
-            saved = true
+            try lifecycleSaver.save(modelContext)
+            if recording.fileSize > 0 { onRecordingSaved() }
+            activeRecording = nil
         } catch {
             self.error = .persistenceFailed(error.localizedDescription)
-            saved = false
+            return
         }
-        lockScreenController.end()
-        RecordingCommandRouter.shared.unregister()
-        PhoneSessionController.shared.notifyEnded()
-        guard saved else { return }
-        if result.captureFailure != nil {
+        if recording.captureState == .ready {
+            didSaveRecording = true
+        } else {
             finishAfterErrorDismissal = true
             error = .audioError(NSLocalizedString(
                 "recorder.partial_saved",
                 comment: "A partial recording was preserved after a capture failure"
             ))
-        } else {
-            didSaveRecording = true
         }
+    }
+
+    private func discardShortRecording(_ recording: Recording) {
+        AudioFileStore.delete(fileName: recording.fileName)
+        modelContext.delete(recording)
+        do {
+            try lifecycleSaver.save(modelContext)
+            activeRecording = nil
+            didSaveRecording = true
+        } catch {
+            self.error = .persistenceFailed(error.localizedDescription)
+        }
+    }
+
+    private func recoverFailedStart(_ recording: Recording) {
+        guard recording.captureState == .preparing || recording.captureState == .recording else { return }
+        if AudioFileStore.byteSize(fileName: recording.fileName) == 0 {
+            AudioFileStore.delete(fileName: recording.fileName)
+            modelContext.delete(recording)
+            do {
+                try lifecycleSaver.save(modelContext)
+                activeRecording = nil
+            } catch {
+                self.error = .persistenceFailed(error.localizedDescription)
+            }
+            return
+        }
+        finalizeCapture(recording, result: nil, forcedReason: .interruptedBeforeStart)
+    }
+
+    private func finishExternalRecordingState() {
+        lockScreenController.end()
+        RecordingCommandRouter.shared.unregister()
+        PhoneSessionController.shared.notifyEnded()
     }
 
     func dismissError() {
@@ -362,11 +476,19 @@ final class RecorderViewModel {
     }
 
     func cancel() {
+        cancellationRequested = true
         stopLiveTranscription()
         recorder.cancel()
-        lockScreenController.end()
-        RecordingCommandRouter.shared.unregister()
-        PhoneSessionController.shared.notifyEnded()
+        if let recording = activeRecording {
+            modelContext.delete(recording)
+            do {
+                try lifecycleSaver.save(modelContext)
+                activeRecording = nil
+            } catch {
+                self.error = .persistenceFailed(error.localizedDescription)
+            }
+        }
+        finishExternalRecordingState()
     }
 
     /// Last-resort teardown, called when the hosting view disappears. If the

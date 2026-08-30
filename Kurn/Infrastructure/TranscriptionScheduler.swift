@@ -119,8 +119,11 @@ enum TranscriptionScheduler {
     @MainActor
     fileprivate static func pendingRecordings(context: ModelContext) -> [Recording] {
         let pendingRaw = TranscriptionStatus.pending.rawValue
+        let readyRaw = RecordingCaptureState.ready.rawValue
         let descriptor = FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.transcriptionStatusRaw == pendingRaw }
+            predicate: #Predicate {
+                $0.transcriptionStatusRaw == pendingRaw && $0.captureStateRaw == readyRaw
+            }
         )
         return (try? context.fetch(descriptor)) ?? []
     }
@@ -129,9 +132,11 @@ enum TranscriptionScheduler {
     private static func interruptedRecordings(context: ModelContext) -> [Recording] {
         let pendingRaw = TranscriptionStatus.pending.rawValue
         let inProgressRaw = TranscriptionStatus.inProgress.rawValue
+        let readyRaw = RecordingCaptureState.ready.rawValue
         let descriptor = FetchDescriptor<Recording>(
             predicate: #Predicate {
-                $0.transcriptionStatusRaw == pendingRaw || $0.transcriptionStatusRaw == inProgressRaw
+                ($0.transcriptionStatusRaw == pendingRaw || $0.transcriptionStatusRaw == inProgressRaw)
+                    && $0.captureStateRaw == readyRaw
             }
         )
         return (try? context.fetch(descriptor)) ?? []

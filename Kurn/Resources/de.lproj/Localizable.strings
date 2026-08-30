@@ -177,11 +177,14 @@
 /* Rekorder */
 "recorder.route_changed" = "Aufnahme pausiert: Das Audiogerät hat sich geändert (z. B. Kopfhörer getrennt).";
 "recorder.engine_stalled" = "Aufnahme pausiert: Das System hat die Audioaufnahme gestoppt. Tippen Sie auf Fortsetzen, um weiterzumachen.";
+"recorder.already_active" = "Eine Aufnahme wird bereits gestartet oder ist aktiv.";
+"recorder.meeting_unavailable" = "Die Besprechung ist in der aktiven Mediathek nicht mehr verfügbar.";
 "recorder.write_failed" = "Die Aufnahme wurde pausiert, weil das Audio nicht gespeichert werden konnte. Prüfen Sie den freien Speicher und stoppen Sie dann, um die Teilaufnahme zu behalten.";
 "recorder.capture_stalled" = "Die Aufnahme wurde pausiert, weil keine Audiodaten mehr in der Datei ankamen. Tippen Sie auf Fortsetzen, um es erneut zu versuchen, oder auf Stopp, um die Teilaufnahme zu behalten.";
 "recorder.storage_unknown" = "Der verfügbare Speicher konnte nicht geprüft werden. Die Aufnahme wird fortgesetzt; überwachen Sie den Gerätespeicher.";
 "recorder.storage_low" = "Geschätzte verbleibende Aufnahmezeit: %@. Geben Sie Speicher frei oder stoppen Sie, um die Aufnahme zu behalten.";
 "recorder.partial_saved" = "Nach einem Fehler bei der Audioaufnahme wurde eine Teilaufnahme gespeichert. Prüfen Sie den freien Speicher, bevor Sie erneut aufnehmen.";
+"recorder.recovery_failed" = "Die Aufnahme ist weiterhin nicht verfügbar. Das Audio wurde für einen erneuten Wiederherstellungsversuch erhalten.";
 "recorder.title" = "Neue Aufnahme";
 "recorder.add_title" = "Titel hinzufügen…";
 "recorder.pause" = "Pause";
@@ -402,6 +405,9 @@
 "detail.playback_position" = "Wiedergabeposition";
 "detail.playback_speed" = "Wiedergabegeschwindigkeit";
 "detail.play_recording" = "Aufnahme abspielen";
+"detail.recording_recovery_needed" = "Aufnahme muss wiederhergestellt werden";
+"detail.recording_recovery_message" = "Das Audio wurde erhalten, kann aber erst nach erfolgreicher Wiederherstellung verwendet werden.";
+"detail.retry_recovery" = "Wiederherstellung erneut versuchen";
 "detail.pause_recording" = "Wiedergabe pausieren";
 "detail.skip_backward" = "15 Sekunden zurück";
 "detail.skip_forward" = "15 Sekunden vor";

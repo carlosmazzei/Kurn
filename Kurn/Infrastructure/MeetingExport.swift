@@ -30,7 +30,9 @@ enum MeetingExport {
 
         out += renderHighlights(for: meeting)
 
-        let recordings = meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }
+        let recordings = meeting.recordings
+            .filter(\.isReadyForConsumption)
+            .sorted { $0.recordedAt < $1.recordedAt }
         let transcribed = recordings.filter { $0.transcript != nil }
         if !transcribed.isEmpty {
             out += "## Transcript\n\n"
@@ -159,6 +161,7 @@ enum MeetingExport {
     @MainActor
     private static func renderHighlights(for meeting: Meeting) -> String {
         let stamps = meeting.recordings
+            .filter(\.isReadyForConsumption)
             .sorted { $0.recordedAt < $1.recordedAt }
             .flatMap { recording in
                 recording.highlights.map { meeting.startOffset(of: recording) + $0.timestamp }

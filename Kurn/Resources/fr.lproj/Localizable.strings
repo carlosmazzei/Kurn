@@ -177,11 +177,14 @@
 /* Enregistreur */
 "recorder.route_changed" = "Enregistrement en pause : le périphérique audio a changé (ex. casque débranché).";
 "recorder.engine_stalled" = "Enregistrement en pause : le système a interrompu la capture audio. Touchez reprendre pour continuer.";
+"recorder.already_active" = "Un enregistrement est déjà en cours de démarrage ou actif.";
+"recorder.meeting_unavailable" = "La réunion n’est plus disponible dans la bibliothèque active.";
 "recorder.write_failed" = "L’enregistrement a été mis en pause car l’audio n’a pas pu être enregistré. Vérifiez l’espace disponible, puis arrêtez pour conserver l’enregistrement partiel.";
 "recorder.capture_stalled" = "L’enregistrement a été mis en pause car l’audio n’arrivait plus dans le fichier. Touchez Reprendre pour réessayer ou Arrêter pour conserver l’enregistrement partiel.";
 "recorder.storage_unknown" = "Impossible de vérifier l’espace disponible. L’enregistrement continuera ; surveillez le stockage de l’appareil.";
 "recorder.storage_low" = "Durée d’enregistrement restante estimée : %@. Libérez de l’espace ou arrêtez pour conserver l’enregistrement.";
 "recorder.partial_saved" = "Un enregistrement partiel a été sauvegardé après un échec de capture audio. Vérifiez l’espace disponible avant de recommencer.";
+"recorder.recovery_failed" = "L’enregistrement est toujours indisponible. L’audio a été conservé afin de réessayer la récupération.";
 "recorder.title" = "Nouvel Enregistrement";
 "recorder.add_title" = "Ajouter un titre…";
 "recorder.pause" = "Pause";
@@ -402,6 +405,9 @@
 "detail.playback_position" = "Position de lecture";
 "detail.playback_speed" = "Vitesse de lecture";
 "detail.play_recording" = "Lire l’enregistrement";
+"detail.recording_recovery_needed" = "L’enregistrement doit être récupéré";
+"detail.recording_recovery_message" = "L’audio a été conservé, mais ne peut pas être utilisé tant que la récupération n’a pas réussi.";
+"detail.retry_recovery" = "Réessayer la récupération";
 "detail.pause_recording" = "Mettre l’enregistrement en pause";
 "detail.skip_backward" = "Reculer de 15 secondes";
 "detail.skip_forward" = "Avancer de 15 secondes";

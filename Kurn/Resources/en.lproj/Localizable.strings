@@ -177,11 +177,14 @@
 /* Recorder */
 "recorder.route_changed" = "Recording paused: the audio device changed (e.g. headphones unplugged).";
 "recorder.engine_stalled" = "Recording paused: the system stopped audio capture. Tap resume to continue.";
+"recorder.already_active" = "A recording is already starting or active.";
+"recorder.meeting_unavailable" = "The meeting is no longer available in the active library.";
 "recorder.write_failed" = "Recording paused because audio could not be saved. Check available storage, then stop to keep the partial recording.";
 "recorder.capture_stalled" = "Recording paused because audio stopped reaching the file. Tap Resume to retry, or Stop to keep the partial recording.";
 "recorder.storage_unknown" = "Available storage could not be checked. Recording will continue; monitor device storage.";
 "recorder.storage_low" = "Estimated recording time remaining: %@. Free space or stop to keep the recording.";
 "recorder.partial_saved" = "A partial recording was saved after an audio capture failure. Check available storage before recording again.";
+"recorder.recovery_failed" = "The recording is still unavailable. Its audio was preserved so you can try recovery again.";
 "recorder.title" = "New Recording";
 "recorder.add_title" = "Add title…";
 "recorder.pause" = "Pause";
@@ -402,6 +405,9 @@
 "detail.playback_position" = "Playback position";
 "detail.playback_speed" = "Playback speed";
 "detail.play_recording" = "Play recording";
+"detail.recording_recovery_needed" = "Recording needs recovery";
+"detail.recording_recovery_message" = "The audio was preserved but cannot be used until recovery succeeds.";
+"detail.retry_recovery" = "Retry recovery";
 "detail.pause_recording" = "Pause recording";
 "detail.skip_backward" = "Skip back 15 seconds";
 "detail.skip_forward" = "Skip forward 15 seconds";

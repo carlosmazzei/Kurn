@@ -45,6 +45,7 @@ extension MeetingDetailView {
     }
 
     func togglePlay(_ recording: Recording) {
+        guard recording.isReadyForConsumption else { return }
         // Offline neural rendering is intentionally exclusive with starting a
         // fresh player for the same file. The shared coordinator keeps this
         // guard true even after leaving and reopening the detail screen.
@@ -81,6 +82,7 @@ extension MeetingDetailView {
     /// The preference is written too, so the choice sticks for the next recording
     /// instead of having to be made again for each one.
     func toggleEnhancement(_ recording: Recording) {
+        guard recording.isReadyForConsumption else { return }
         let wantEnhanced = !player.isPlayingEnhanced
         settings.playbackEnhancementEnabled = wantEnhanced
 
@@ -124,6 +126,7 @@ extension MeetingDetailView {
     }
 
     func startTranscription(_ recording: Recording) {
+        guard recording.isReadyForConsumption else { return }
         // Routed through the view model's task registry so the run can be
         // cancelled (by the user or when the background grace window expires).
         txVM?.startTranscription(
@@ -131,6 +134,12 @@ extension MeetingDetailView {
             language: meeting.language,
             config: settings.pipelineConfiguration
         )
+    }
+
+    func retryCaptureRecovery(_ recording: Recording) {
+        if let error = RecordingRecovery.retryRecovery(for: recording, context: modelContext) {
+            txVM?.error = error
+        }
     }
 
     func cancelTranscription(_ recording: Recording) {

@@ -22,7 +22,7 @@ struct RecordingRecoveryTests {
         let url = try Self.makeToneFile(named: fileName, seconds: 1.0)
         defer { AudioFileStore.delete(fileName: fileName) }
 
-        RecordingRecovery.recoverOrphans(modelContainer: container)
+        RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
 
         let recordings = try context.fetch(FetchDescriptor<Recording>())
         #expect(recordings.count == 1)
@@ -38,7 +38,7 @@ struct RecordingRecoveryTests {
         let fileName = AudioFileStore.fileName(meetingID: UUID())
         _ = try Self.makeToneFile(named: fileName, seconds: 1.0)
 
-        RecordingRecovery.recoverOrphans(modelContainer: container)
+        RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
 
         let recordings = try container.mainContext.fetch(FetchDescriptor<Recording>())
         #expect(recordings.isEmpty)
@@ -60,11 +60,114 @@ struct RecordingRecoveryTests {
         context.insert(existing)
         try context.save()
 
-        RecordingRecovery.recoverOrphans(modelContainer: container)
+        RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
 
         let recordings = try context.fetch(FetchDescriptor<Recording>())
         #expect(recordings.count == 1)
         #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test func finalizingRowWithValidFileConvergesToReady() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Finalizing")
+        context.insert(meeting)
+        let recordingID = UUID()
+        let fileName = AudioFileStore.fileName(meetingID: meeting.id, recordingID: recordingID)
+        let url = try Self.makeToneFile(named: fileName, seconds: 1)
+        defer { AudioFileStore.delete(fileName: fileName) }
+        let recording = Recording(
+            id: recordingID,
+            meeting: meeting,
+            fileName: fileName,
+            duration: 0,
+            captureState: .finalizing
+        )
+        context.insert(recording)
+        try context.save()
+
+        RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
+
+        #expect(recording.captureState == .ready)
+        #expect(recording.captureRecoveryReason == nil)
+        #expect(recording.duration > 0.9)
+        #expect(recording.fileSize > 0)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test func recordingRowWithValidPartialFileNeedsRecovery() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Interrupted")
+        context.insert(meeting)
+        let recordingID = UUID()
+        let fileName = AudioFileStore.fileName(meetingID: meeting.id, recordingID: recordingID)
+        _ = try Self.makeToneFile(named: fileName, seconds: 1)
+        defer { AudioFileStore.delete(fileName: fileName) }
+        let recording = Recording(
+            id: recordingID,
+            meeting: meeting,
+            fileName: fileName,
+            duration: 0,
+            captureState: .recording
+        )
+        context.insert(recording)
+        try context.save()
+
+        RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
+
+        #expect(recording.captureState == .recoveryNeeded)
+        #expect(recording.captureRecoveryReason == .interruptedDuringCapture)
+        #expect(recording.duration > 0.9)
+        #expect(recording.fileSize > 0)
+    }
+
+    @Test func explicitRetryAcceptsAValidatedPartialFile() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Retry")
+        context.insert(meeting)
+        let recordingID = UUID()
+        let fileName = AudioFileStore.fileName(meetingID: meeting.id, recordingID: recordingID)
+        _ = try Self.makeToneFile(named: fileName, seconds: 1)
+        defer { AudioFileStore.delete(fileName: fileName) }
+        let recording = Recording(
+            id: recordingID,
+            meeting: meeting,
+            fileName: fileName,
+            duration: 0,
+            captureState: .recoveryNeeded,
+            captureRecoveryReason: .interruptedDuringCapture
+        )
+        context.insert(recording)
+        try context.save()
+
+        let error = RecordingRecovery.retryRecovery(for: recording, context: context)
+
+        #expect(error == nil)
+        #expect(recording.captureState == .ready)
+        #expect(recording.captureRecoveryReason == nil)
+        #expect(recording.duration > 0.9)
+    }
+
+    @Test func preparingRowWithoutFileRemainsExplicitlyRecoverable() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let meeting = Meeting(title: "Preparing")
+        context.insert(meeting)
+        let recording = Recording(
+            meeting: meeting,
+            fileName: "missing-\(UUID().uuidString).m4a",
+            duration: 0,
+            captureState: .preparing
+        )
+        context.insert(recording)
+        try context.save()
+
+        RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
+
+        #expect(recording.captureState == .recoveryNeeded)
+        #expect(recording.captureRecoveryReason == .fileMissing)
     }
 
     /// Write a short 440 Hz tone directly into the protected recordings

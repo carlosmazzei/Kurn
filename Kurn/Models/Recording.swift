@@ -21,6 +21,8 @@ final class Recording {
     var recordedAt: Date
     var transcriptionStatusRaw: String
     var transcriptionModeRaw: String
+    var captureStateRaw: String = RecordingCaptureState.ready.rawValue
+    var captureRecoveryReasonRaw: String?
     /// JSON-encoded `TranscriptionCheckpoint` while a chunked transcription is
     /// in flight (SwiftData can't store arbitrary Codable values directly).
     /// Cleared on success; kept on failure/interruption so the next attempt
@@ -78,6 +80,8 @@ final class Recording {
         recordedAt: Date = Date(),
         transcriptionStatus: TranscriptionStatus = .none,
         transcriptionMode: TranscriptionMode = .onDevice,
+        captureState: RecordingCaptureState = .ready,
+        captureRecoveryReason: CaptureRecoveryReason? = nil,
         fileSize: Int64 = 0,
         highlights: [Highlight] = []
     ) {
@@ -88,9 +92,23 @@ final class Recording {
         self.recordedAt = recordedAt
         self.transcriptionStatusRaw = transcriptionStatus.rawValue
         self.transcriptionModeRaw = transcriptionMode.rawValue
+        self.captureStateRaw = captureState.rawValue
+        self.captureRecoveryReasonRaw = captureRecoveryReason?.rawValue
         self.fileSize = fileSize
         self.highlightsData = JSONStorage.encode(highlights)
     }
+
+    var captureState: RecordingCaptureState {
+        get { RecordingCaptureState(rawValue: captureStateRaw) ?? .recoveryNeeded }
+        set { captureStateRaw = newValue.rawValue }
+    }
+
+    var captureRecoveryReason: CaptureRecoveryReason? {
+        get { captureRecoveryReasonRaw.flatMap(CaptureRecoveryReason.init(rawValue:)) }
+        set { captureRecoveryReasonRaw = newValue?.rawValue }
+    }
+
+    var isReadyForConsumption: Bool { captureState == .ready }
 
     var transcriptionStatus: TranscriptionStatus {
         get { TranscriptionStatus(rawValue: transcriptionStatusRaw) ?? .none }

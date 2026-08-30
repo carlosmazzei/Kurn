@@ -177,11 +177,14 @@
 /* 录音 */
 "recorder.route_changed" = "录音已暂停：音频设备发生变化（例如耳机被拔出）。";
 "recorder.engine_stalled" = "录音已暂停：系统停止了音频采集。点击恢复以继续。";
+"recorder.already_active" = "录音正在启动或已有录音进行中。";
+"recorder.meeting_unavailable" = "该会议已不在当前资料库中。";
 "recorder.write_failed" = "录音已暂停，因为无法保存音频。请检查可用存储空间，然后停止录音以保留部分录音。";
 "recorder.capture_stalled" = "录音已暂停，因为音频不再写入文件。轻点“继续”重试，或轻点“停止”保留部分录音。";
 "recorder.storage_unknown" = "无法检查可用存储空间。录音将继续；请留意设备存储空间。";
 "recorder.storage_low" = "预计剩余录音时间：%@。请释放空间或停止录音以保留当前内容。";
 "recorder.partial_saved" = "音频采集失败后已保存部分录音。再次录音前请检查可用存储空间。";
+"recorder.recovery_failed" = "录音仍不可用。音频已保留，您可以再次尝试恢复。";
 "recorder.title" = "新建录音";
 "recorder.add_title" = "添加标题…";
 "recorder.pause" = "暂停";
@@ -402,6 +405,9 @@
 "detail.playback_position" = "播放位置";
 "detail.playback_speed" = "播放速度";
 "detail.play_recording" = "播放录音";
+"detail.recording_recovery_needed" = "录音需要恢复";
+"detail.recording_recovery_message" = "音频已保留，但在恢复成功前无法使用。";
+"detail.retry_recovery" = "重试恢复";
 "detail.pause_recording" = "暂停录音";
 "detail.skip_backward" = "后退 15 秒";
 "detail.skip_forward" = "前进 15 秒";
