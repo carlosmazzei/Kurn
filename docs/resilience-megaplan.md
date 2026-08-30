@@ -20,20 +20,24 @@ Last updated: 2026-08-30.
 - The deleted source branch was `devin/resilience-h1-capture-lifecycle`; do not
   recreate it or stack new work on the stale local branch.
 - PR #154 published this document and the roadmap execution-sequence updates.
-- **In progress, on branch `claude/plano-resiliencia-xe25b2` (not yet a PR, not
-  yet merged):** PR 2, the H2 versioned-schema baseline. `Kurn/Infrastructure/
-  KurnSchema.swift` adds `KurnSchemaV1`/`KurnSchemaMigrationPlan`/
-  `KurnModelGraph`; `ModelContainerBootstrap`, `KurnApp`, and
-  `TestModelContainer` all read the model graph and versioned schema from
-  there; `KurnTests/LegacyStoreAdoptionTests.swift` round-trips a same-run
-  generated unversioned-store fixture through the new versioned path. This
-  session has no macOS/Xcode toolchain, so none of it has run through
-  SwiftLint, `xcodebuild`, or the simulator suite yet — pushing the branch and
-  opening a PR against `main` is the next step, so `iOS CI` produces that
-  evidence. See "PR 2 — H2 versioned-schema baseline" below for the deviation
-  from "commit N-1/N-2 fixtures" (there is no earlier released schema version
-  to fabricate, since this is the first one ever declared) and exactly what
-  shipped.
+- **[PR #155](https://github.com/carlosmazzei/Kurn/pull/155), branch
+  `claude/plano-resiliencia-xe25b2`, open and CI-green, not yet merged:** PR 2,
+  the H2 versioned-schema baseline. `Kurn/Infrastructure/KurnSchema.swift` adds
+  `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`;
+  `ModelContainerBootstrap`, `KurnApp`, and `TestModelContainer` all read the
+  model graph and versioned schema from there;
+  `KurnTests/LegacyStoreAdoptionTests.swift` round-trips a same-run generated
+  unversioned-store fixture through the new versioned path. First `iOS CI` run
+  (commit `75c9188`) failed `build-and-test` with two `'Tag' is ambiguous for
+  type lookup in this context` compile errors — Swift Testing's own `Tag` type
+  collided with Kurn's `Tag` model in two bare type-annotation positions;
+  fixed by qualifying both as `Kurn.Tag` (commit `e5b84eb`). That commit's
+  `iOS CI` run passed both `build-and-test` and `kurncore-linux`, with no
+  unresolved review comments; `mergeable_state` is `blocked` only on required
+  human review, not CI or a merge conflict. See "PR 2 — H2 versioned-schema
+  baseline" below for the deviation from "commit N-1/N-2 fixtures" (there is
+  no earlier released schema version to fabricate, since this is the first one
+  ever declared) and exactly what shipped.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -43,10 +47,9 @@ Last updated: 2026-08-30.
 
 1. Read this file and the `Reliability and resilience track` section of
    `docs/roadmap.md`.
-2. If PR 2 (H2 schema baseline) has not yet been pushed/opened as a PR, do that
-   first — the code is already on `claude/plano-resiliencia-xe25b2` and needs
-   `iOS CI` evidence before anything is claimed done. If it has merged, confirm
-   local `main` contains it before creating the PR-3 branch.
+2. If PR #155 (H2 schema baseline) is still open, it is CI-green and only
+   needs human review/merge — do not duplicate the work. Once it merges,
+   confirm local `main` contains it before creating the PR-3 branch.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -82,7 +85,7 @@ Last updated: 2026-08-30.
 | Track | Status                 | Remaining contract                                                                                                                   |
 | ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
-| H2    | Schema baseline on branch, not yet merged | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph` and an injectable `ModelContainerBootstrap` are implemented (`claude/plano-resiliencia-xe25b2`), pending `iOS CI`. Recoverable boot state, backup, restore, salvage, and recovery UI remain. |
+| H2    | Schema baseline CI-green on PR #155, awaiting review | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph` and an injectable `ModelContainerBootstrap` are implemented and `iOS CI` (`build-and-test`, `kurncore-linux`) passed on commit `e5b84eb`. Recoverable boot state, backup, restore, salvage, and recovery UI remain. |
 | H3    | Foundation only        | Protected fail-closed storage, quarantine/trash, mutation journal, and typed authoritative JSON corruption.                          |
 | H4    | Partial                | Full source/config/model/chunk fingerprint, throwing checkpoint commits, explicit operation states, and bounded recovery.            |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
@@ -146,8 +149,9 @@ Status: merged as PR #153 (`458a502`) after `build-and-test` and
 
 #### PR 2 — H2 versioned-schema baseline
 
-Status: implemented on branch `claude/plano-resiliencia-xe25b2`, not yet
-pushed as a PR or CI-verified — see "Current handoff" above.
+Status: [PR #155](https://github.com/carlosmazzei/Kurn/pull/155), CI-green
+(`build-and-test` and `kurncore-linux` both passed on commit `e5b84eb`),
+awaiting human review/merge — see "Current handoff" above.
 
 Objective: establish an explicit schema/migration contract before another model
 change lands.
