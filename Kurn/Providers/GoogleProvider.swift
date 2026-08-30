@@ -115,6 +115,46 @@ struct GoogleProvider: LLMProvider {
         )
     }
 
+    // MARK: - Chat (streamGenerateContent, streaming)
+
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) -> AsyncThrowingStream<String, Error> {
+        LLMHTTP.streamChatDeltas(
+            session: session,
+            emptyMessage: "empty Gemini response",
+            makeRequest: {
+                try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+                var contents: [[String: Any]] = []
+                for (index, message) in messages.enumerated() where message.role != .system {
+                    let role = message.role == .assistant ? "model" : "user"
+                    var text = message.content
+                    if index == 0 && message.role == .user {
+                        text = "\(systemPrompt)\n\n\(text)"
+                    }
+                    contents.append(["role": role, "parts": [["text": text]]])
+                }
+                if contents.isEmpty {
+                    contents = [["role": "user", "parts": [["text": systemPrompt]]]]
+                }
+                return try makeStreamRequest(
+                    timeout: options.timeout,
+                    body: [
+                        "contents": contents,
+                        "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
+                    ]
+                )
+            },
+            mapPayload: { payload in
+                guard let data = payload.data(using: .utf8),
+                      let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data) else { return nil }
+                return Self.text(from: chunk)
+            }
+        )
+    }
+
     // MARK: - Helpers
 
     /// The `generateContent` route for the configured model. Gemini model IDs are
@@ -122,6 +162,27 @@ struct GoogleProvider: LLMProvider {
     /// rather than emit `models/models/…`.
     private var generateContentPath: String {
         "models/\(model.replacingOccurrences(of: "models/", with: "")):generateContent"
+    }
+
+    /// The `streamGenerateContent` route for the configured model, SSE-shaped
+    /// (`alt=sse`) rather than the newline-delimited JSON array the endpoint
+    /// returns by default — `sseLines` only understands `data:` framing.
+    private var streamGenerateContentPath: String {
+        "models/\(model.replacingOccurrences(of: "models/", with: "")):streamGenerateContent"
+    }
+
+    /// A `streamGenerateContent` request with Gemini's API-key header and
+    /// `alt=sse` query item.
+    private func makeStreamRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
+        try LLMHTTP.jsonRequest(
+            provider: provider,
+            path: streamGenerateContentPath,
+            fallbackURL: "https://generativelanguage.googleapis.com/v1beta/\(streamGenerateContentPath)?alt=sse",
+            timeout: timeout,
+            headers: ["x-goog-api-key": apiKey],
+            queryItems: [URLQueryItem(name: "alt", value: "sse")],
+            body: body
+        )
     }
 
     /// A `generateContent` request with Gemini's API-key header.

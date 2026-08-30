@@ -68,6 +68,26 @@ protocol LLMProvider: Sendable {
         messages: [ChatMessage],
         options: TextGenerationOptions
     ) async throws -> String
+
+    /// Streaming variant of `chat`: calls `onDelta` once per text fragment as
+    /// it arrives, in order, so the concatenation of every `onDelta` call is
+    /// the same string `chat` would have returned. Deliberately shaped as a
+    /// single `async throws` call with a callback — like `chat`, not an
+    /// `AsyncSequence` — so it composes with `LLMHTTP`'s bounded transport
+    /// (`ProviderHTTPTransport.swift`) the same way every other request does:
+    /// one `withTaskCancellationHandler` call that cancels the in-flight
+    /// request the instant the caller's task is cancelled, with no separate
+    /// producer task whose lifetime could outlive it. `onDelta` may be called
+    /// from a background executor; the receiver hops to the main actor
+    /// itself. A conformer with no true streaming transport falls back to the
+    /// `LLMProvider` extension's default below, which just delivers the whole
+    /// `chat` reply as one fragment — still correct, just not incremental.
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws
 }
 
 extension LLMProvider {
@@ -80,5 +100,26 @@ extension LLMProvider {
 
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
+    }
+
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws {
+        try await streamChat(systemPrompt: systemPrompt, messages: messages, options: .chat, onDelta: onDelta)
+    }
+
+    /// Default streaming implementation: awaits the whole `chat` reply and
+    /// delivers it as one fragment. Correct for any conformer (including test
+    /// doubles that only implement `chat`), just not incremental.
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws {
+        let text = try await chat(systemPrompt: systemPrompt, messages: messages, options: options)
+        onDelta(text)
     }
 }

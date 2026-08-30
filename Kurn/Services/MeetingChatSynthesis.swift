@@ -32,24 +32,28 @@ extension MeetingChatService {
         candidates: [SemanticSearchService.Candidate],
         summaries: [UUID: String],
         articles: [UUID: WikiArticleSnapshot],
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: ChatEventHandler = { _ in }
     ) async throws -> Answer {
         let passages = try await retrievePassages(
             question: question, candidates: candidates,
-            poolSize: Self.libraryPoolSize(for: llm.provider), limit: Self.libraryRetrievalLimit(for: llm.provider), diversify: true, llm: llm
+            poolSize: Self.libraryPoolSize(for: llm.provider), limit: Self.libraryRetrievalLimit(for: llm.provider), diversify: true, llm: llm,
+            onEvent: onEvent
         )
         // Adaptive breadth: the wiki articles of every meeting whose best passage
         // clears the relevance floor, ordered chronologically. One path serves
         // pinpoint, evolution, and aggregate questions — the floor decides how
         // wide it goes, not a per-type classifier.
+        onEvent(.phase(.synthesizing))
         let meetingIDs = try await selectRelevantMeetings(question: question, candidates: candidates)
         let selected = Self.orderedArticles(meetingIDs: meetingIDs, articles: articles)
 
         guard !passages.isEmpty || !selected.isEmpty else {
             let empty = Self.userPrompt(question: question, hits: [], scope: .library, summaries: [:])
-            let text = try await llm.chat(
+            let text = try await streamAnswer(
                 systemPrompt: Self.systemPrompt(for: .library),
-                messages: history + [ChatMessage(role: .user, content: empty)]
+                messages: history + [ChatMessage(role: .user, content: empty)],
+                llm: llm, onEvent: onEvent
             )
             return Answer(text: text, citations: [])
         }
@@ -64,9 +68,10 @@ extension MeetingChatService {
 
         // Fits in one pass → a single call that can quote and aggregate directly.
         if userPrompt.count <= SummaryService.maxSinglePassChars(for: llm.provider) {
-            let text = try await llm.chat(
+            let text = try await streamAnswer(
                 systemPrompt: Self.combinedSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)]
+                messages: history + [ChatMessage(role: .user, content: userPrompt)],
+                llm: llm, onEvent: onEvent
             )
             return Answer(text: text, citations: passages)
         }
@@ -74,7 +79,7 @@ extension MeetingChatService {
         // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
         let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars(for: llm.provider))
         let text = try await synthesizeMapReduce(
-            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm
+            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm, onEvent: onEvent
         )
         return Answer(text: text, citations: passages)
     }
@@ -98,8 +103,10 @@ extension MeetingChatService {
         history: [ChatMessage],
         blocks: [String],
         passagesBlock: String,
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: ChatEventHandler
     ) async throws -> String {
+        onEvent(.phase(.synthesizing))
         var partials: [String] = []
         for (index, block) in blocks.enumerated() {
             try Task.checkCancellation()
@@ -119,9 +126,10 @@ extension MeetingChatService {
         let reducePrompt = Self.combinedReducePrompt(
             question: question, partials: combined, passagesBlock: passagesBlock
         )
-        return try await llm.chat(
+        return try await streamAnswer(
             systemPrompt: Self.combinedSystemPrompt,
-            messages: history + [ChatMessage(role: .user, content: reducePrompt)]
+            messages: history + [ChatMessage(role: .user, content: reducePrompt)],
+            llm: llm, onEvent: onEvent
         )
     }
 

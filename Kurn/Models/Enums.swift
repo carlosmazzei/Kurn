@@ -100,6 +100,57 @@ enum TranscriptionPhase: Sendable, Equatable {
     }
 }
 
+/// Fine-grained stage within a "chat with your meetings" turn, surfaced to the
+/// UI so a reply reads as visible work rather than an opaque spinner — the
+/// same idea as `TranscriptionPhase`, reported by `MeetingChatService` as it
+/// advances through query rewriting, retrieval, reranking, and generation.
+/// Not every turn passes through every phase: a single meeting whose
+/// transcript fits the model's context skips straight to `.answering`.
+enum ChatPhase: Sendable, Equatable {
+    case rewritingQuery
+    case retrieving
+    case reranking
+    /// Reading condensed per-meeting wiki articles into the prompt. Only the
+    /// library-wide "Ask" reaches this — a single meeting's chat has no
+    /// cross-meeting notes to read.
+    case synthesizing
+    /// Generating the reply itself; this is the phase during which the
+    /// answer streams into the conversation.
+    case answering
+
+    /// Short, user-facing description of the current stage.
+    var displayName: String {
+        switch self {
+        case .rewritingQuery: return NSLocalizedString("chat.phase.rewriting_query", comment: "Rewriting the question")
+        case .retrieving: return NSLocalizedString("chat.phase.retrieving", comment: "Searching passages")
+        case .reranking: return NSLocalizedString("chat.phase.reranking", comment: "Ranking passages")
+        case .synthesizing: return NSLocalizedString("chat.phase.synthesizing", comment: "Reading meeting notes")
+        case .answering: return NSLocalizedString("chat.phase.answering", comment: "Writing the answer")
+        }
+    }
+
+    /// SF Symbol paired with `displayName` in the reasoning row.
+    var systemImage: String {
+        switch self {
+        case .rewritingQuery: return "text.magnifyingglass"
+        case .retrieving: return "magnifyingglass"
+        case .reranking: return "arrow.up.arrow.down"
+        case .synthesizing: return "doc.text.magnifyingglass"
+        case .answering: return "sparkles"
+        }
+    }
+}
+
+/// One update from an in-flight chat answer: either a change of `ChatPhase`
+/// (the retrieval/generation pipeline advancing) or a text delta to append to
+/// the streaming reply. May be delivered from a background executor — the
+/// receiver hops to the main actor itself, the same contract as
+/// `TranscriptionService.PhaseHandler`.
+enum ChatStreamEvent: Sendable {
+    case phase(ChatPhase)
+    case delta(String)
+}
+
 /// Best-effort work that starts only after the transcript has been saved.
 ///
 /// These phases are deliberately separate from `TranscriptionPhase`: a recording
