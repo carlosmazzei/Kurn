@@ -31,14 +31,21 @@ enum TranscriptionScheduler {
     static let taskIdentifier = "ai.kurn.transcription.processing"
 
     /// Register the launch handler. Must be called before the app finishes
-    /// launching (`KurnApp.init`).
-    static func register(container: ModelContainer) {
+    /// launching (`KurnApp.init`) — and, per the H2 boot state machine
+    /// (docs/resilience-megaplan.md), before the store has even been opened:
+    /// `containerProvider` is only consulted when a task actually fires (from
+    /// the main actor, alongside the existing protected-data check), not at
+    /// registration time, so registration itself never needs a container to
+    /// exist yet. A background-only launch while the device is locked
+    /// registers this handler and then never attempts to open the store at
+    /// all until the scene becomes active.
+    static func register(containerProvider: @escaping @MainActor @Sendable () -> ModelContainer?) {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskIdentifier, using: nil) { task in
             guard let task = task as? BGProcessingTask else {
                 task.setTaskCompleted(success: false)
                 return
             }
-            handle(task, container: container)
+            handle(task, containerProvider: containerProvider)
         }
     }
 
@@ -76,7 +83,10 @@ enum TranscriptionScheduler {
     /// `BGTask` isn't `Sendable`, so the completion call crosses into the
     /// main-actor work task inside an unchecked box; `setTaskCompleted` and
     /// `expirationHandler` are documented as callable from any thread.
-    private static func handle(_ task: BGProcessingTask, container: ModelContainer) {
+    private static func handle(
+        _ task: BGProcessingTask,
+        containerProvider: @escaping @MainActor @Sendable () -> ModelContainer?
+    ) {
         AppLog.transcription.atNotice.notice("bgTask: window started")
         task.expirationHandler = {
             // Cooperative shutdown: each run checkpoints and parks as
@@ -98,6 +108,16 @@ enum TranscriptionScheduler {
                 return
             }
             #endif
+            // Boot may still be `.waitingForProtectedData`/`.opening`/
+            // `.recoveryRequired` even with protected data available (e.g. a
+            // launch that hasn't reached `beginBoot()` yet, or a store that
+            // failed to open) — nothing to resume against either way.
+            guard let container = containerProvider() else {
+                AppLog.transcription.atNotice.notice("bgTask: store not ready, deferring")
+                resubmit()
+                box.value.setTaskCompleted(success: false)
+                return
+            }
             let remaining = await BackgroundTranscriptionRunner.shared.run(container: container)
             AppLog.transcription.atNotice.notice("bgTask: window finished, remaining=\(remaining, privacy: .public)")
             box.value.setTaskCompleted(success: remaining == 0)

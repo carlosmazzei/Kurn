@@ -782,3 +782,12 @@
 "control.startRecording.title" = "开始录音";
 "control.startRecording.displayName" = "开始录音";
 "control.startRecording.description" = "开始一段新的 Kurn 录音。将其添加到锁定屏幕后，即使设备处于锁定状态，也可以通过单击触发。";
+
+/* Store boot recovery (H2 boot state machine) */
+"store_recovery.title" = "Kurn 无法打开你的数据";
+"store_recovery.retry" = "重试";
+"store_recovery.reason_protected_data_unavailable" = "设备已锁定。请解锁后重试。";
+"store_recovery.reason_storage_full" = "设备存储空间不足。请清理空间后重试。";
+"store_recovery.reason_migration_incompatible" = "此版本的 Kurn 无法读取你现有的数据。请更新应用或联系支持。";
+"store_recovery.reason_corrupt_or_unknown" = "打开数据时出现问题。你的录音未被删除。";
+"store_launch.opening" = "正在打开";

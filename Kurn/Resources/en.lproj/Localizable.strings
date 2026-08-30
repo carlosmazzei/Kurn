@@ -782,3 +782,12 @@
 "control.startRecording.title" = "Start Recording";
 "control.startRecording.displayName" = "Start Recording";
 "control.startRecording.description" = "Starts a new Kurn recording. Adding this to the Lock Screen lets it be triggered with a single tap while the device is locked.";
+
+/* Store boot recovery (H2 boot state machine) */
+"store_recovery.title" = "Kurn couldn't open your data";
+"store_recovery.retry" = "Retry";
+"store_recovery.reason_protected_data_unavailable" = "Your device is locked. Unlock it and try again.";
+"store_recovery.reason_storage_full" = "Your device is out of storage space. Free up space and try again.";
+"store_recovery.reason_migration_incompatible" = "This version of Kurn can't read your existing data. Update the app or contact support.";
+"store_recovery.reason_corrupt_or_unknown" = "Something went wrong opening your data. Your recordings were not deleted.";
+"store_launch.opening" = "Opening";

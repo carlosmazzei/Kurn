@@ -782,3 +782,12 @@
 "control.startRecording.title" = "Démarrer l'enregistrement";
 "control.startRecording.displayName" = "Démarrer l'enregistrement";
 "control.startRecording.description" = "Démarre un nouvel enregistrement Kurn. En l'ajoutant à l'écran verrouillé, il peut être déclenché d'un geste alors que l'appareil est verrouillé.";
+
+/* Store boot recovery (H2 boot state machine) */
+"store_recovery.title" = "Kurn n'a pas pu ouvrir vos données";
+"store_recovery.retry" = "Réessayer";
+"store_recovery.reason_protected_data_unavailable" = "Votre appareil est verrouillé. Déverrouillez-le et réessayez.";
+"store_recovery.reason_storage_full" = "Votre appareil n'a plus d'espace de stockage. Libérez de l'espace et réessayez.";
+"store_recovery.reason_migration_incompatible" = "Cette version de Kurn ne peut pas lire vos données existantes. Mettez à jour l'app ou contactez le support.";
+"store_recovery.reason_corrupt_or_unknown" = "Une erreur s'est produite lors de l'ouverture de vos données. Vos enregistrements n'ont pas été supprimés.";
+"store_launch.opening" = "Ouverture";

@@ -782,3 +782,12 @@
 "control.startRecording.title" = "Aufnahme starten";
 "control.startRecording.displayName" = "Aufnahme starten";
 "control.startRecording.description" = "Startet eine neue Kurn-Aufnahme. Wird sie zum Sperrbildschirm hinzugefügt, kann sie dort mit einem einzigen Tipp ausgelöst werden, während das Gerät gesperrt ist.";
+
+/* Store boot recovery (H2 boot state machine) */
+"store_recovery.title" = "Kurn konnte deine Daten nicht öffnen";
+"store_recovery.retry" = "Erneut versuchen";
+"store_recovery.reason_protected_data_unavailable" = "Dein Gerät ist gesperrt. Entsperre es und versuche es erneut.";
+"store_recovery.reason_storage_full" = "Auf deinem Gerät ist kein Speicherplatz mehr verfügbar. Gib Speicherplatz frei und versuche es erneut.";
+"store_recovery.reason_migration_incompatible" = "Diese Version von Kurn kann deine vorhandenen Daten nicht lesen. Aktualisiere die App oder wende dich an den Support.";
+"store_recovery.reason_corrupt_or_unknown" = "Beim Öffnen deiner Daten ist ein Fehler aufgetreten. Deine Aufnahmen wurden nicht gelöscht.";
+"store_launch.opening" = "Wird geöffnet";
