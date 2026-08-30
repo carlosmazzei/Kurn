@@ -16,6 +16,7 @@ public enum AppError: LocalizedError, Identifiable {
     case invalidProviderURL
     case providerResponseTooLarge
     case ambiguousProviderResult
+    case networkPolicyRestricted
     case transcriptionFailed(String)
     case transcriptionLanguageUnsupported(MeetingLanguage, TranscriptionEngine)
     case audioError(String)
@@ -53,6 +54,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .invalidProviderURL: return "provider_configuration"
         case .providerResponseTooLarge: return "provider_response_too_large"
         case .ambiguousProviderResult: return "provider_result_ambiguous"
+        case .networkPolicyRestricted: return "network_policy_restricted"
         case .transcriptionFailed: return "transcription"
         case .transcriptionLanguageUnsupported: return "transcription_language_unsupported"
         case .audioError: return "audio"
@@ -109,6 +111,11 @@ public enum AppError: LocalizedError, Identifiable {
             return NSLocalizedString(
                 "error.ambiguous_provider_result",
                 comment: "Provider result could not be confirmed without risking a duplicate"
+            )
+        case .networkPolicyRestricted:
+            return NSLocalizedString(
+                "error.network_policy_restricted",
+                comment: "Large transfer blocked by the selected network policy"
             )
         case .transcriptionFailed(let detail):
             return String(

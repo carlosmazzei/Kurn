@@ -268,7 +268,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   persisting results.
 - **Views/** — SwiftUI screens.
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
-  and the durable provider circuit used only by automatic cloud enrichment.
+  the durable provider circuit used only by automatic cloud enrichment, and the
+  large-transfer policy shared by cloud audio and model downloads.
 - **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
   `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,

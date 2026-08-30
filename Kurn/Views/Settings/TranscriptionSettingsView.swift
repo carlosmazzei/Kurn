@@ -14,6 +14,7 @@ import SwiftUI
 struct TranscriptionSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelDownloadController.self) private var downloads
+    @State private var cloudConsent = CloudTranscriptionConsentController()
 
     /// Bumped by the root when an API key changes, so the Whisper provider rows
     /// re-read Keychain state.
@@ -48,11 +49,30 @@ struct TranscriptionSettingsView: View {
     var body: some View {
         Form {
             engineSection
+            networkTransferSection
             pipelineSection
             correctionSection
         }
         .navigationTitle(NSLocalizedString("settings.transcription", comment: "Transcription"))
         .modelDownloadAlerts(downloads, settings: settings)
+        .kurnDialog(
+            isPresented: $cloudConsent.isPresented,
+            iconSystemName: "icloud.and.arrow.up.fill",
+            iconTint: Theme.info,
+            title: NSLocalizedString("settings.cloud_upload.title", comment: "Cloud audio upload"),
+            message: cloudConsent.message(settings: settings, providers: transcriptionProviders),
+            primaryTitle: NSLocalizedString("settings.cloud_upload.allow", comment: "Allow cloud upload"),
+            primaryAction: {
+                cloudConsent.confirm(
+                    settings: settings,
+                    providers: transcriptionProviders,
+                    downloads: downloads
+                )
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
+            secondaryAction: { cloudConsent.cancel() }
+        )
+        .onAppear { cloudConsent.presentIfNeeded(settings: settings) }
     }
 
     // MARK: - Engine and language
@@ -65,8 +85,11 @@ struct TranscriptionSettingsView: View {
                 selection: Binding(
                     get: { settings.transcriptionEngine },
                     set: {
-                        downloads.selectTranscriptionEngine(
-                            $0, settings: settings, transcriptionProviders: transcriptionProviders
+                        cloudConsent.selectEngine(
+                            $0,
+                            settings: settings,
+                            providers: transcriptionProviders,
+                            downloads: downloads
                         )
                     }
                 )
@@ -86,7 +109,13 @@ struct TranscriptionSettingsView: View {
                     NSLocalizedString("settings.transcription_provider", comment: "Transcription provider"),
                     selection: Binding(
                         get: { settings.transcriptionProviderID },
-                        set: { settings.transcriptionProviderID = $0 }
+                        set: {
+                            cloudConsent.selectProvider(
+                                $0,
+                                settings: settings,
+                                providers: transcriptionProviders
+                            )
+                        }
                     )
                 ) {
                     ForEach(transcriptionProviders) { provider in
@@ -159,6 +188,29 @@ struct TranscriptionSettingsView: View {
     private static func isDownloadingWhisperCpp(_ downloads: ModelDownloadController) -> Bool {
         if case .whisperCppASR = downloads.downloadingModel { return true }
         return false
+    }
+
+    private var networkTransferSection: some View {
+        Section {
+            Toggle(
+                NSLocalizedString("settings.network.allow_expensive", comment: "Allow cellular transfers"),
+                isOn: Binding(
+                    get: { settings.allowsExpensiveNetworkTransfers },
+                    set: { settings.allowsExpensiveNetworkTransfers = $0 }
+                )
+            )
+            Toggle(
+                NSLocalizedString("settings.network.allow_constrained", comment: "Allow Low Data Mode transfers"),
+                isOn: Binding(
+                    get: { settings.allowsConstrainedNetworkTransfers },
+                    set: { settings.allowsConstrainedNetworkTransfers = $0 }
+                )
+            )
+        } header: {
+            Text(NSLocalizedString("settings.network.large_transfers", comment: "Large transfers"))
+        } footer: {
+            Text(NSLocalizedString("settings.network.large_transfers_footer", comment: "Large transfer network policy"))
+        }
     }
 
     // MARK: - Advanced stages

@@ -28,6 +28,7 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
         config.isDiscretionary = false
         config.sessionSendsLaunchEvents = true
         config.timeoutIntervalForResource = 3600
+        LargeTransferPolicy.wifiOnly.apply(to: config)
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         storedSession = session
         return session

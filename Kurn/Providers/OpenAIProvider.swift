@@ -19,18 +19,22 @@ struct OpenAIProvider: LLMProvider {
     /// Whisper model requested on the transcription route. Configurable because
     /// the model differs per vendor (OpenAI `whisper-1`, Groq `whisper-large-v3`).
     private let transcriptionModel: String
+    private let largeTransferPolicy: LargeTransferPolicy
+
     init(
         provider: AIProvider = .openAI,
         apiKey: String,
         model: String = "gpt-5.4",
         transcriptionModel: String = "whisper-1",
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        largeTransferPolicy: LargeTransferPolicy = .wifiOnly
     ) {
         self.provider = provider
         self.apiKey = apiKey
         self.chatModel = model
         self.transcriptionModel = transcriptionModel
         self.session = session
+        self.largeTransferPolicy = largeTransferPolicy
     }
 
     // MARK: - Transcription (Whisper)
@@ -87,7 +91,7 @@ struct OpenAIProvider: LLMProvider {
         // multi-MB audio upload plus Whisper's server-side processing time —
         // AudioChunker caps chunks at 10 minutes of audio, and transcribing that
         // alone can take longer than 60s under load. 300s leaves comfortable headroom.
-        request.timeoutInterval = 300
+        request.timeoutInterval = LLMHTTP.transcriptionTimeout
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(
             "multipart/form-data; boundary=\(boundary)",
@@ -123,6 +127,7 @@ struct OpenAIProvider: LLMProvider {
 
         do {
             request.httpBody = body
+            largeTransferPolicy.apply(to: &request)
             return try await LLMHTTP.sendValidated(
                 request,
                 session: session,

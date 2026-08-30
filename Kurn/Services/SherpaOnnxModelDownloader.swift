@@ -88,6 +88,7 @@ enum SherpaOnnxModelDownloader {
     /// (segmentation is the much smaller of the two, but there is no cost
     /// signal cheap enough to weight the split more precisely than that).
     static func download(
+        policy: LargeTransferPolicy = .wifiOnly,
         onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
     ) async throws {
         if isInstalled {
@@ -100,14 +101,16 @@ enum SherpaOnnxModelDownloader {
         try await fetch(
             url: segmentationDownloadURL,
             destination: segmentationModelURL,
-            minimumPlausibleBytes: segmentationMinimumPlausibleBytes
+            minimumPlausibleBytes: segmentationMinimumPlausibleBytes,
+            policy: policy
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: fraction * 0.5, phase: .downloading))
         }
         try await fetch(
             url: embeddingDownloadURL,
             destination: embeddingModelURL,
-            minimumPlausibleBytes: embeddingMinimumPlausibleBytes
+            minimumPlausibleBytes: embeddingMinimumPlausibleBytes,
+            policy: policy
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: 0.5 + fraction * 0.5, phase: .downloading))
         }
@@ -124,17 +127,25 @@ enum SherpaOnnxModelDownloader {
         url: URL,
         destination: URL,
         minimumPlausibleBytes: Int64,
+        policy: LargeTransferPolicy,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard installedSize(of: destination) < minimumPlausibleBytes else { return }
         AppLog.transcription.atNotice.notice("sherpaOnnxDownload: fetching \(destination.lastPathComponent, privacy: .public)")
         let temporaryURL: URL
         do {
-            temporaryURL = try await Downloader().download(from: url, onProgress: onProgress)
+            temporaryURL = try await Downloader().download(
+                from: url,
+                policy: policy,
+                onProgress: onProgress
+            )
         } catch let appError as AppError {
             throw appError
         } catch {
-            AppLog.transcription.atError.error("sherpaOnnxDownload: failed: \(error.localizedDescription, privacy: .public)")
+            if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+                throw restriction
+            }
+            AppLog.transcription.atError.error("sherpaOnnxDownload: failed code=download_failed")
             try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
@@ -189,13 +200,14 @@ private final class Downloader: NSObject, URLSessionDownloadDelegate, @unchecked
 
     func download(
         from url: URL,
+        policy: LargeTransferPolicy,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         self.onProgress = onProgress
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 60
         configuration.timeoutIntervalForResource = 3600
-        configuration.allowsConstrainedNetworkAccess = true
+        policy.apply(to: configuration)
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
         self.session = session
 

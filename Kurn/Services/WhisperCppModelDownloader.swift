@@ -48,6 +48,7 @@ enum WhisperCppModelDownloader {
     /// a `0...1` fraction of the transfer.
     static func download(
         _ model: WhisperCppModel,
+        policy: LargeTransferPolicy = .wifiOnly,
         onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
     ) async throws {
         if isInstalled(model) {
@@ -65,15 +66,19 @@ enum WhisperCppModelDownloader {
 
         let temporaryURL: URL
         do {
-            temporaryURL = try await Downloader().download(from: model.downloadURL) { fraction in
+            temporaryURL = try await Downloader().download(
+                from: model.downloadURL,
+                policy: policy
+            ) { fraction in
                 onProgress(ModelDownloadStatus(fractionCompleted: fraction, phase: .downloading))
             }
         } catch let appError as AppError {
             throw appError
         } catch {
-            AppLog.transcription.atError.error(
-                "whisperCppDownload: failed: \(error.localizedDescription, privacy: .public)"
-            )
+            if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+                throw restriction
+            }
+            AppLog.transcription.atError.error("whisperCppDownload: failed code=download_failed")
             try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }
@@ -134,6 +139,7 @@ private final class Downloader: NSObject, URLSessionDownloadDelegate, @unchecked
 
     func download(
         from url: URL,
+        policy: LargeTransferPolicy,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         self.onProgress = onProgress
@@ -141,7 +147,7 @@ private final class Downloader: NSObject, URLSessionDownloadDelegate, @unchecked
         configuration.timeoutIntervalForRequest = 60
         // Weight files run to hundreds of megabytes on a phone connection.
         configuration.timeoutIntervalForResource = 3600
-        configuration.allowsConstrainedNetworkAccess = true
+        policy.apply(to: configuration)
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
         self.session = session
 

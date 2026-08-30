@@ -95,6 +95,7 @@ enum LLMHTTP {
     /// generate for minutes, and the non-streaming request only completes when
     /// the whole generation finishes. Mirrors the transcribe path's 300s.
     static let summaryTimeout: TimeInterval = 300
+    static let transcriptionTimeout: TimeInterval = 300
     /// Output budget for summary generations. The previous 2000-token cap cut
     /// long-meeting summaries off mid-JSON, which then failed to parse; 8192
     /// leaves room for a detailed multi-section summary on every vendor.

@@ -55,7 +55,11 @@ enum ProviderFactory {
     /// the `/audio/transcriptions` route, so this resolves the selected provider's
     /// key and base URL independently of the summary provider. Throws `.noAPIKey`
     /// when the chosen provider has no stored key.
-    static func whisperProvider(for provider: AIProvider, model: String) throws -> OpenAIProvider {
+    static func whisperProvider(
+        for provider: AIProvider,
+        model: String,
+        transferPolicy: LargeTransferPolicy = .wifiOnly
+    ) throws -> OpenAIProvider {
         guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
             throw AppError.invalidProviderURL
         }
@@ -71,7 +75,8 @@ enum ProviderFactory {
         return OpenAIProvider(
             provider: provider,
             apiKey: key,
-            transcriptionModel: resolvedModel
+            transcriptionModel: resolvedModel,
+            largeTransferPolicy: transferPolicy
         )
     }
 }

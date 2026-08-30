@@ -21,6 +21,8 @@ struct RecorderOptions {
     var audioQuality: AudioQuality = .high
     var alwaysUseBuiltInMic: Bool = false
     var liveTranscriptionEnabled: Bool = false
+    var liveTranscriptionModelsConsented: Bool = false
+    var largeTransferPolicy: LargeTransferPolicy = .wifiOnly
     var hideLiveActivityMeetingTitle: Bool = true
 }
 
@@ -57,6 +59,8 @@ final class RecorderViewModel {
     private let defaultMode: TranscriptionMode
     private let alwaysUseBuiltInMic: Bool
     private let liveTranscriptionEnabled: Bool
+    private let liveTranscriptionModelsConsented: Bool
+    private let largeTransferPolicy: LargeTransferPolicy
     private let hideLiveActivityMeetingTitle: Bool
     private var micChoiceContinuation: CheckedContinuation<String?, Never>?
     private var finishAfterErrorDismissal = false
@@ -79,6 +83,8 @@ final class RecorderViewModel {
         self.defaultMode = defaultMode
         self.alwaysUseBuiltInMic = options.alwaysUseBuiltInMic
         self.liveTranscriptionEnabled = options.liveTranscriptionEnabled
+        self.liveTranscriptionModelsConsented = options.liveTranscriptionModelsConsented
+        self.largeTransferPolicy = options.largeTransferPolicy
         self.hideLiveActivityMeetingTitle = options.hideLiveActivityMeetingTitle
         self.onRecordingSaved = onRecordingSaved
         self.recorder.micPickup = options.micPickup
@@ -213,8 +219,15 @@ final class RecorderViewModel {
         // spin-up so the first usable buffer arrives at an already-loaded
         // engine instead of being dropped while we wait on model I/O.
         let liveLanguage = meeting.language
-        let liveStartTask: Task<Void, Never>? = liveTranscriptionEnabled
-            ? Task { @MainActor [weak self] in await self?.liveTranscription.start(language: liveLanguage) }
+        let liveStartTask: Task<Void, Never>? = liveTranscriptionEnabled && liveTranscriptionModelsConsented
+            ? Task { @MainActor [weak self] in
+                guard let self else { return }
+                await liveTranscription.start(
+                    language: liveLanguage,
+                    modelsConsented: liveTranscriptionModelsConsented,
+                    policy: largeTransferPolicy
+                )
+            }
             : nil
         isStarting = true
         defer { isStarting = false }

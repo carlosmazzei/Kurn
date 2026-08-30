@@ -120,6 +120,7 @@ struct KurnApp: App {
                 AppLog.reliability.atInfo.info("\(event.logLine, privacy: .public)")
             }
         }
+        _ = NetworkPathObserver.shared
 
         let container = modelContainer
         // Build the shared transcription coordinator on the app's main context
@@ -255,15 +256,23 @@ struct KurnApp: App {
                     // selected and consented to the on-device engine — keeps
                     // later transcriptions fast and reliable.
                     guard phase == .active, settings.usesFluidAudioModel else { return }
-                    prewarmFluidAudioModel()
+                    prewarmFluidAudioModel(policy: settings.largeTransferPolicy)
                 }
         }
         .modelContainer(modelContainer)
     }
 
-    private func prewarmFluidAudioModel() {
+    private func prewarmFluidAudioModel(policy: LargeTransferPolicy) {
         #if canImport(FluidAudio)
         Task.detached(priority: .utility) {
+            do {
+                try ModelDownloadConsent.validateNetworkIfDownloadNeeded(
+                    for: [.onDeviceASR],
+                    policy: policy
+                )
+            } catch {
+                return
+            }
             await FluidAudioModelStore.shared.prewarm()
         }
         #endif

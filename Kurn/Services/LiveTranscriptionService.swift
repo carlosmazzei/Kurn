@@ -33,12 +33,30 @@ final class LiveTranscriptionService {
     /// a slow/stalled engine can't pile up queued copies and Tasks.
     private let inFlight = InFlightGate()
 
-    func start(language: MeetingLanguage) async {
+    func start(
+        language: MeetingLanguage,
+        modelsConsented: Bool = false,
+        policy: LargeTransferPolicy = .wifiOnly
+    ) async {
         guard engine == nil, !isLoading else { return }
+        guard modelsConsented else {
+            isUnavailable = true
+            return
+        }
         isLoading = true
         isUnavailable = false
         partialText = ""
         defer { isLoading = false }
+        do {
+            try ModelDownloadConsent.validateNetworkIfDownloadNeeded(
+                for: [.liveTranscriptionASR],
+                policy: policy
+            )
+        } catch {
+            AppLog.transcription.atError.error("LiveTranscriptionService: model load blocked code=network_policy_restricted")
+            isUnavailable = true
+            return
+        }
         let candidate: any StreamingAsrManager = language.usesEnglishOnlyStreamingModel
             ? StreamingModelVariant.parakeetEou160ms.createManager()
             : FluidAudioMultilingualStreamingManager()
@@ -46,7 +64,8 @@ final class LiveTranscriptionService {
         do {
             try await candidate.loadModels()
         } catch {
-            AppLog.transcription.atError.error("LiveTranscriptionService: model load failed: \(error.localizedDescription, privacy: .public)")
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.transcription.atError.error("LiveTranscriptionService: model load failed code=\(code, privacy: .public)")
             isUnavailable = true
             return
         }
@@ -179,7 +198,11 @@ final class LiveTranscriptionService {
     private(set) var isLoading = false
     private(set) var isUnavailable = false
 
-    func start(language: MeetingLanguage) async {
+    func start(
+        language: MeetingLanguage,
+        modelsConsented: Bool = false,
+        policy: LargeTransferPolicy = .wifiOnly
+    ) async {
         isUnavailable = true
     }
 

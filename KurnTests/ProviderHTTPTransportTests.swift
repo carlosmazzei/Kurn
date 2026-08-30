@@ -109,6 +109,31 @@ extension ProviderHTTPTests {
         #expect(clock.durations == [1])
     }
 
+    @Test func whisperUploadAppliesLargeTransferPolicy() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["text": "ok", "language": "en"])
+        ])
+        let policy = LargeTransferPolicy(
+            allowsExpensiveAccess: true,
+            allowsConstrainedAccess: false
+        )
+        let provider = OpenAIProvider(
+            apiKey: "secret",
+            session: MockURLProtocol.session(),
+            largeTransferPolicy: policy
+        )
+
+        _ = try await provider.transcribe(
+            audioData: Data([1]),
+            fileName: "clip.m4a",
+            language: .english
+        )
+
+        let request = try #require(MockURLProtocol.lastRequest)
+        #expect(request.allowsExpensiveNetworkAccess)
+        #expect(request.allowsConstrainedNetworkAccess == false)
+    }
+
     @Test func responseBodyLargerThanPolicyIsRejected() async throws {
         MockURLProtocol.enqueue([
             .success(status: 200, body: Data([1, 2, 3, 4, 5]), headers: [:])

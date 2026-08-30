@@ -43,6 +43,8 @@ struct RecorderView: View {
                         audioQuality: settings.audioQuality,
                         alwaysUseBuiltInMic: settings.alwaysUseBuiltInMic,
                         liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
+                        liveTranscriptionModelsConsented: settings.fluidAudioASRModelsConsented,
+                        largeTransferPolicy: settings.largeTransferPolicy,
                         hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
                     ),
                     onRecordingSaved: { settings.recordRecordingCompleted() }
