@@ -724,7 +724,7 @@ satisfy part of a planned contract.
 | ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **H1**             | **Core implemented**   | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording preflights and measures storage runway. A `Recording` row now owns a UUID-derived file before open and moves durably through `preparing → recording → finalizing → ready/recoveryNeeded`; re-entry and cross-context ownership fail before capture. One shared finalizer reopens the closed file, measures duration/bytes and applies/verifies protection before `ready`. Launch/foreground recovery reconciles interrupted rows, preserves partial bytes, and exposes explicit retry while playback, transcription, export, compaction and enhancement reject non-ready rows. Focused fault suites and the full simulator suite cover the core; real-device protection, interruption/route, long-background and low-storage scenarios remain the release checklist.                                                                                                                                                                                                                                                               |
-| **H2**             | **Schema baseline merged (PR #155)** | `KurnSchemaV1`/`KurnSchemaMigrationPlan` (`Kurn/Infrastructure/KurnSchema.swift`) centralize the model graph for production, screenshots and tests, and `ModelContainerBootstrap` takes an injectable schema/migration plan; `LegacyStoreAdoptionTests` round-trips an unversioned-store fixture through it. GitHub `iOS CI` (`build-and-test`, `kurncore-linux`) passed before merge (`a14fab3`). Production still terminates with `fatalError`; the boot state machine, protected backups, failure classification, and recovery UI remain (H2 PR 3, not yet started). See the H2 schema-baseline handoff above the H2 plan for what shipped and what CI observed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **H2**             | **Schema baseline merged (PR #155); boot state machine implemented, pending CI** | `KurnSchemaV1`/`KurnSchemaMigrationPlan` (`Kurn/Infrastructure/KurnSchema.swift`) centralize the model graph and are on `main`. On branch `claude/plano-resiliencia-xe25b2`: `ModelStoreBootCoordinator` (`waitingForProtectedData`/`opening`/`ready`/`recoveryRequired`), `ModelStoreOpenFailureClassifier`, and `ModelStoreRecoveryView` replace the recoverable production `fatalError`; background-task registration now runs before the store is ever opened. Protected backups, restore, salvage, and confirmed-fresh-start remain (H2 PR 4). See the H2 boot state machine handoff above the H2 plan for what shipped and what CI observed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **H3**             | **Foundation only**    | Recovery preserves some large unreadable orphan files, but unmatched/malformed/small originals can still be deleted and model/file mutations have no journal, trash, quarantine, or typed authoritative JSON corruption path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -756,7 +756,7 @@ feature requests:
 | Item    | Observed seam                                                                                                                                                                                                                       | Failure if it remains                                                                                                       | Priority              |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **H1**  | Durable capture ownership, file-measured finalization, recovery rows and ready-only consumer gates are implemented; simulator tests cannot observe iOS Data Protection or reproduce physical route/interruption/background pressure | A device-only regression could still interrupt capture or misclassify protection until the release matrix is executed       | **P0 release gate**   |
-| **H2**  | A `VersionedSchema`/`SchemaMigrationPlan` now exists and is injectable, but production `ModelContainer` construction still ends in `fatalError` with no boot state machine or protected backup                                     | Corruption, incompatible schema, or a locked protected store can still create a launch crash loop until the boot state machine (H2 PR 3) lands | **P0**                |
+| **H2**  | A `VersionedSchema`/`SchemaMigrationPlan` exists and the recoverable production `fatalError` is replaced by a classified boot state machine (pending CI), but there is still no protected backup, restore, or salvage path                                     | An open failure no longer crash-loops, but a migration or corruption can still strand the user with only Retry until backup/restore (H2 PR 4) lands | **P0**                |
 | **H3**  | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content                                                                    | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0**                |
 | **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                                                  | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                    | **P0**                |
 | **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                                                               | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
@@ -996,6 +996,113 @@ failure classification, and removing the recoverable production `fatalError`.
 Start it from updated `main` after this PR merges; do not stack it on this
 unmerged branch. Backup/restore/salvage/recovery UI remains the PR after that
 (PR 4), matching the dependency order in the megaplan.
+
+#### H2 boot state machine PR — implemented, pending CI (2026-08-30)
+
+Branch `claude/plano-resiliencia-xe25b2`, on top of merged `main`
+(`77f4d90`). This session has no macOS/Xcode toolchain, so nothing here is
+claimed to compile or pass locally — the `iOS CI` result on the eventual PR is
+the source of truth, per "Verifying without a local macOS/Xcode toolchain."
+
+**Landed in the working tree.**
+
+- `Kurn/Infrastructure/ModelStoreOpenFailure.swift` is new:
+  `ModelStoreOpenFailureReason` (`protectedDataUnavailable`, `storageFull`,
+  `migrationIncompatible`, `corruptOrUnknown`) and
+  `ModelStoreOpenFailureClassifier`, a pure function over an `Error`'s NSError
+  bridge that recognizes known POSIX (`EPERM`/`ENOSPC`), Foundation
+  (`NSFileWriteOutOfSpaceError`, `NSFileReadNoPermissionError`, ...), and Core
+  Data (`NSMigrationError`, `NSPersistentStoreIncompatibleVersionHashError`,
+  ...) signatures — unwrapping one level of `NSUnderlyingErrorKey`, bounded to
+  a depth of 5 — and falls through to `.corruptOrUnknown` for anything else.
+  The classifier only ever narrows *toward* the safe default; a wrong mapping
+  means an imprecise reason shown to the user, never a crash and never a
+  fabricated success.
+- `Kurn/Infrastructure/ModelStoreBootCoordinator.swift` is new: `@MainActor
+  @Observable final class ModelStoreBootCoordinator: Sendable` walks the four
+  states item 1 named. `beginBoot()` (called once from `KurnApp.init()`) and
+  `retryIfNeeded()` (called on every foreground activation) both funnel
+  through one `attemptOpen()` — check protected data first (no attempt at all
+  if unavailable), then call the injected `makeStore` and classify any thrown
+  error. `Sendable` is a real, checked conformance (not `@unchecked`): every
+  stored property is either itself `Sendable` or a `@MainActor`-isolated
+  function type, which the compiler treats as safely `Sendable` since calling
+  it is structurally serialized through the actor.
+- `Kurn/Views/ModelStoreBootViews.swift` is new: `ModelStoreLaunchProgressView`
+  (shown for `.waitingForProtectedData`/`.opening`) and
+  `ModelStoreRecoveryView` (shown for `.recoveryRequired`, with a per-reason
+  message and a single Retry button — no destructive "start fresh" action,
+  matching item 4's "not in this PR" boundary for backup/restore/salvage,
+  which is PR 4). Both are deliberately store-independent: no `ModelContext`,
+  no `AppSettings`.
+- `Kurn/KurnApp.swift` is restructured: background-task registration
+  (`TranscriptionScheduler.register`) now runs before the store is ever
+  touched, satisfying item 3 directly — `TranscriptionScheduler`'s launch
+  handler takes a `containerProvider` closure consulted only when a task
+  actually fires, not at registration time. `boot.beginBoot()` runs at the end
+  of `init()`; on the common path (protected data available, store opens
+  cleanly) this resolves to `.ready` synchronously before `body` is ever
+  evaluated, so behavior is unchanged from before this PR. The four
+  store-dependent coordinators (`TranscriptionViewModel`,
+  `PlaybackEnhancementViewModel`, `SemanticIndexCoordinator`,
+  `WikiCoordinator`) plus `RecordingLauncher`/`RecordingRecovery`/
+  `TranscriptionRecovery` wiring moved into `makeAppEnvironment(container:
+  settings:)`, called from either the synchronous `init()` path or the
+  deferred foreground-activation retry — both converge on identical behavior.
+  The production `fatalError` on construction failure is gone; a failed open
+  renders `ModelStoreRecoveryView` instead. `content` never renders
+  `ContentView()` (and therefore never attaches `.securityCover`/
+  `.modelContainer`) until `appEnvironment` exists, which is what keeps a
+  failed or deferred boot from ever masquerading as a working app.
+- `Kurn/DebugSupport/ModelStoreDebugInjection.swift` is new: `#if DEBUG` only,
+  maps each `ModelStoreOpenFailureReason` to a real `NSError` carrying the
+  classifier's exact signature. `KurnApp.makeStore()` throws one when launched
+  with `UI_TESTING_STORE_OPEN_FAILURE_REASON` in the launch environment;
+  `makeBootCoordinator()` similarly forces `.waitingForProtectedData` when
+  launched with the `UI-Testing-StoreWaitingForProtectedData` argument. Both
+  are compiled out of Release, alongside the existing `ScreenshotSeedData`
+  seam.
+- **Tests.** `KurnTests/ModelStoreOpenFailureClassifierTests.swift` pins the
+  classifier against hand-built `NSError`s for every reason, the
+  underlying-error unwrap, the depth bound, and an unrecognized/generic-Swift-
+  error default. `KurnTests/ModelStoreBootCoordinatorTests.swift` drives the
+  coordinator through injected `makeStore`/`isProtectedDataAvailable` seams
+  (the same shape `ModelContainerBootstrapTests` already established) and
+  pins the acceptance criteria directly: a locked launch never calls
+  `makeStore` at all, a failure never leaves `container` non-nil, and retry
+  only re-attempts from a non-`.ready` state.
+  `KurnUITests/ModelStoreRecoveryUITests.swift` launches the real app with
+  each synthetic failure and asserts the recovery shell appears (by
+  accessibility identifier) with no real app content underneath, plus one
+  locked-launch test for the waiting shell. This is the closest this session
+  could get to item 5's "Release-configuration launch tests cover each
+  classified failure" — it's a Debug-configuration simulator launch (same as
+  `AccessibilityAuditUITests`/`ScreenshotUITests` already are in this scheme),
+  not a true Release-configuration device run; that remains a release-
+  checklist item, the same status H1's real-device matrix already carries.
+
+**Deviations and known gaps, stated plainly.**
+
+- The classifier's exact NSError code mappings (which POSIX/Cocoa/CoreData
+  constant means which reason) are written from documented, long-stable
+  Foundation/CoreData API names, not verified against a real device/simulator
+  failure — this session has no way to trigger a genuine locked-store or
+  full-disk `ModelContainer` construction failure and observe its actual
+  error shape. A misclassification here is cosmetic (the wrong reason shown),
+  never a crash or a fabricated store, per the classifier's fallback design —
+  but the mapping itself should be checked against a real failure the first
+  time one is available (e.g. during the H1 physical-device release matrix).
+- Item 6 ("Make store/file protection verification part of bootstrap") is
+  explicitly PR 4 scope in the megaplan's PR boundaries, not this PR's — left
+  untouched here.
+- No backup, restore, salvage, or "confirmed fresh start" action exists yet;
+  Retry is the only recovery action, matching the megaplan's PR 3 scope
+  exactly (PR 4 adds the rest).
+
+**Not yet observed.** SwiftLint, `xcodebuild` (Debug and Release), the
+simulator test suite (including the new UI tests), and `swift test` in
+`Packages/KurnCore` have not run in this session. Push this branch and open a
+PR targeting `main` next so `iOS CI` produces that evidence before merge.
 
 ### H2 · Recoverable store bootstrap and explicit migrations — P0
 
@@ -1453,19 +1560,26 @@ migrates.
    fixture is a same-run generated legacy store rather than committed N-1/N-2
    binaries (see the H2 schema-baseline handoff above the H2 plan for why).
    `build-and-test` and `kurncore-linux` both passed before merge.
-2. **Finish H2 (P0): recoverable bootstrap — next PR to start.** Replace
-   production `fatalError` with protected-data/opening/recovery states, then
-   add protected backup, restore, salvage and explicitly confirmed fresh
-   start. Start this PR from updated `main` (which now contains PR #155).
-3. **Then H3 (P0): mutation journal and corruption visibility.** Fail closed on
+2. **H2 recoverable bootstrap state machine — implemented on branch, pending
+   CI.** `ModelStoreBootCoordinator` replaces the production `fatalError` with
+   `waitingForProtectedData`/`opening`/`ready`/`recoveryRequired`,
+   `ModelStoreOpenFailureClassifier` names the reason, and background-task
+   registration now runs before the store is ever opened. See the H2 boot
+   state machine handoff above the H2 plan for what shipped. Push and open a
+   PR next to get `iOS CI` evidence before merge.
+3. **Then H2 PR 4 (P0): protected backup, restore, salvage, recovery UI.**
+   Preserve original store bytes, offer restore/salvage/confirmed-fresh-start,
+   and verify protection on the store directory during bootstrap. Start this
+   PR from `main` after the boot-state-machine PR merges.
+5. **Then H3 (P0): mutation journal and corruption visibility.** Fail closed on
    unprotected storage, preserve unmatched originals in quarantine, journal model/
    file mutations and make authoritative JSON corruption typed.
-4. **Then H4 (P0): resume identity and throwing commits.** Fingerprint source,
+6. **Then H4 (P0): resume identity and throwing commits.** Fingerprint source,
    configuration, model and chunk plan; do not start the next chunk until its
    checkpoint is durable.
-5. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
+7. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
    route, lock/background and low-storage matrix without delaying the next code P0.
-6. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
+8. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
    dependency; H9 owns dedicated waiting/cancellation presentation.
 
 P0 containment and durability take precedence over new features that widen the

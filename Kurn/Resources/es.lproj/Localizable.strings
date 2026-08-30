@@ -782,3 +782,12 @@
 "control.startRecording.title" = "Iniciar grabación";
 "control.startRecording.displayName" = "Iniciar grabación";
 "control.startRecording.description" = "Inicia una nueva grabación en Kurn. Si lo añades a la pantalla bloqueada, se puede activar con un solo toque mientras el dispositivo está bloqueado.";
+
+/* Store boot recovery (H2 boot state machine) */
+"store_recovery.title" = "Kurn no pudo abrir tus datos";
+"store_recovery.retry" = "Reintentar";
+"store_recovery.reason_protected_data_unavailable" = "Tu dispositivo está bloqueado. Desbloquéalo e inténtalo de nuevo.";
+"store_recovery.reason_storage_full" = "Tu dispositivo se quedó sin espacio de almacenamiento. Libera espacio e inténtalo de nuevo.";
+"store_recovery.reason_migration_incompatible" = "Esta versión de Kurn no puede leer tus datos existentes. Actualiza la app o contacta con soporte.";
+"store_recovery.reason_corrupt_or_unknown" = "Algo salió mal al abrir tus datos. Tus grabaciones no se eliminaron.";
+"store_launch.opening" = "Abriendo";

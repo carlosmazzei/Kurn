@@ -37,6 +37,25 @@ Last updated: 2026-08-30.
   deviation from "commit N-1/N-2 fixtures" (there is no earlier released
   schema version to fabricate, since this is the first one ever declared) and
   exactly what shipped.
+- [PR #156](https://github.com/carlosmazzei/Kurn/pull/156), a docs-only
+  follow-up recording PR #155 as merged, merged into `main` as commit
+  `77f4d90`.
+- **On branch `claude/plano-resiliencia-xe25b2`, on top of merged `main`
+  (not yet pushed as a PR):** PR 3, the H2 recoverable bootstrap state
+  machine. `ModelStoreBootCoordinator` (`Kurn/Infrastructure/
+  ModelStoreBootCoordinator.swift`) replaces `KurnApp`'s production
+  `fatalError` with the four states item 1 names;
+  `ModelStoreOpenFailureClassifier` (`ModelStoreOpenFailure.swift`) classifies
+  a thrown error into one of the four reasons; `ModelStoreRecoveryView`/
+  `ModelStoreLaunchProgressView` (`Kurn/Views/ModelStoreBootViews.swift`) are
+  the store-independent recovery/waiting shells; `TranscriptionScheduler`'s
+  background-task registration now runs before the store is ever opened, per
+  item 3. Not yet run through SwiftLint/`xcodebuild`/the simulator suite in
+  this session — pushing the branch and opening a PR is the next step. See
+  "PR 3 — H2 recoverable bootstrap state machine" below for what shipped, the
+  known gaps (classifier NSError mappings unverified against a real device
+  failure; PR 3 is a Debug-configuration UI-test launch, not a true
+  Release-configuration device run), and what remains for PR 4.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -46,8 +65,11 @@ Last updated: 2026-08-30.
 
 1. Read this file and the `Reliability and resilience track` section of
    `docs/roadmap.md`.
-2. PR #155 (H2 schema baseline) is merged into `main`. The next PR is PR 3 —
-   the H2 recoverable bootstrap state machine — created from updated `main`.
+2. PR #155/#156 (H2 schema baseline) are merged into `main`. PR 3 (the H2
+   recoverable bootstrap state machine) is implemented on
+   `claude/plano-resiliencia-xe25b2` — if it hasn't been pushed/opened as a PR
+   yet, do that first rather than redoing the work; once it merges, PR 4
+   (backup/restore/salvage/recovery UI) is next, from updated `main`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -83,7 +105,7 @@ Last updated: 2026-08-30.
 | Track | Status                 | Remaining contract                                                                                                                   |
 | ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
-| H2    | Schema baseline merged in PR #155 | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph` and an injectable `ModelContainerBootstrap` are on `main`. Recoverable boot state, backup, restore, salvage, and recovery UI remain (H2 PR 3). |
+| H2    | Schema baseline merged (PR #155); boot state machine implemented, pending CI | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph` and an injectable `ModelContainerBootstrap` are on `main`. `ModelStoreBootCoordinator` replaces the production `fatalError` on branch `claude/plano-resiliencia-xe25b2`. Protected backup, restore, salvage, and recovery UI remain (H2 PR 4). |
 | H3    | Foundation only        | Protected fail-closed storage, quarantine/trash, mutation journal, and typed authoritative JSON corruption.                          |
 | H4    | Partial                | Full source/config/model/chunk fingerprint, throwing checkpoint commits, explicit operation states, and bounded recovery.            |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
@@ -195,6 +217,12 @@ Acceptance:
 - Debug and Release builds, migration tests, full simulator CI, and KurnCore pass.
 
 #### PR 3 — H2 recoverable bootstrap state machine
+
+Status: implemented on branch `claude/plano-resiliencia-xe25b2`, on top of
+merged `main`; not yet pushed as a PR or CI-verified — see "Current handoff"
+above. Item 6 from the roadmap's H2 plan ("make store/file protection
+verification part of bootstrap") is deliberately not in this PR's scope —
+it's PR 4's.
 
 Objective: remove the recoverable production launch crash path.
 

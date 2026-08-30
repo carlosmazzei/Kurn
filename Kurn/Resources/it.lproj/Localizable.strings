@@ -782,3 +782,12 @@
 "control.startRecording.title" = "Avvia registrazione";
 "control.startRecording.displayName" = "Avvia registrazione";
 "control.startRecording.description" = "Avvia una nuova registrazione in Kurn. Aggiungendolo alla schermata di blocco, può essere attivato con un solo tocco anche a dispositivo bloccato.";
+
+/* Store boot recovery (H2 boot state machine) */
+"store_recovery.title" = "Kurn non è riuscito ad aprire i tuoi dati";
+"store_recovery.retry" = "Riprova";
+"store_recovery.reason_protected_data_unavailable" = "Il dispositivo è bloccato. Sbloccalo e riprova.";
+"store_recovery.reason_storage_full" = "Il dispositivo ha esaurito lo spazio di archiviazione. Libera spazio e riprova.";
+"store_recovery.reason_migration_incompatible" = "Questa versione di Kurn non riesce a leggere i tuoi dati esistenti. Aggiorna l'app o contatta l'assistenza.";
+"store_recovery.reason_corrupt_or_unknown" = "Si è verificato un problema durante l'apertura dei tuoi dati. Le tue registrazioni non sono state eliminate.";
+"store_launch.opening" = "Apertura in corso";
