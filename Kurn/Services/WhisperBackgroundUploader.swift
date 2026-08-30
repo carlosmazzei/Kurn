@@ -2,18 +2,11 @@
 //  WhisperBackgroundUploader.swift
 //  Kurn
 //
-//  Uploads Whisper chunk requests over a background `URLSession` so an
-//  in-flight upload survives the app being suspended or the phone locking:
-//  the transfer runs in the system's out-of-process daemon and the app is
-//  woken briefly for each completion, letting the chunk loop advance and
-//  persist its checkpoint without the app staying in the foreground.
-//
-//  If the process is killed mid-upload the awaiting continuation dies with
-//  it. The relaunch hook (`handleEvents`, called from the app delegate)
-//  re-attaches the delegate so the session's remaining events are drained and
-//  the system's completion handler is honored; the transcription itself
-//  resumes from its checkpoint on the next foreground pass, losing at most
-//  the one chunk that was in flight.
+//  Retains the legacy background `URLSession` plumbing needed to drain tasks
+//  created by earlier releases. New Whisper uploads use the origin-locked
+//  foreground transport because iOS background sessions always follow redirects
+//  without consulting `willPerformHTTPRedirection`. The relaunch hook still
+//  re-attaches this delegate so pending legacy events can finish cleanly.
 //
 
 import Foundation
@@ -61,10 +54,9 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
         _ = shared.session
     }
 
-    /// Upload `body` for `request` and return the validated response, with the
-    /// same transient-failure retry policy as `LLMHTTP.sendValidated`.
-    /// Background sessions require file-based uploads, so the body is spooled
-    /// to disk (readable while the device is locked) for the attempt.
+    /// Legacy upload entry point retained so any attempted reuse fails at compile
+    /// time; existing system-owned tasks are drained only through delegate events.
+    @available(*, unavailable, message: "Background URLSession always follows redirects; use the origin-locked foreground transport")
     func sendValidated(_ request: URLRequest, body: Data) async throws -> (Data, URLResponse) {
         cleanupOrphanedUploadBodies()
         var attempt = 0

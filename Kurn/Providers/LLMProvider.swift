@@ -146,6 +146,17 @@ enum LLMHTTP {
         return url
     }
 
+    static func redirectRequest(
+        approvedURL: URL,
+        proposedRequest: URLRequest
+    ) -> URLRequest? {
+        guard let proposedURL = proposedRequest.url,
+              let approvedOrigin = HTTPOrigin(approvedURL),
+              let proposedOrigin = HTTPOrigin(proposedURL),
+              approvedOrigin == proposedOrigin else { return nil }
+        return proposedRequest
+    }
+
     /// Fail fast with `AppError.noAPIKey` when a provider has no configured key.
     static func requireAPIKey(_ key: String, provider: AIProvider) throws {
         guard !key.isEmpty else { throw AppError.noAPIKey(provider: provider.displayName) }
@@ -171,6 +182,25 @@ enum LLMHTTP {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
+    }
+
+    private struct HTTPOrigin: Equatable {
+        let scheme: String
+        let host: String
+        let port: Int
+
+        init?(_ url: URL) {
+            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let scheme = components.scheme?.lowercased(),
+                  scheme == "https" || scheme == "http",
+                  let host = components.host?.lowercased(),
+                  !host.isEmpty,
+                  components.user == nil,
+                  components.password == nil else { return nil }
+            self.scheme = scheme
+            self.host = host
+            self.port = components.port ?? (scheme == "https" ? 443 : 80)
+        }
     }
 
     private static func validatedBaseURLComponents(_ baseURLString: String) -> URLComponents? {
@@ -325,8 +355,10 @@ enum LLMHTTP {
 
     /// Perform the request, mapping transport failures to `AppError.networkError`.
     static func send(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+        guard let approvedURL = request.url else { throw AppError.invalidProviderURL }
+        let redirectDelegate = OriginLockedRedirectDelegate(approvedURL: approvedURL)
         do {
-            return try await session.data(for: request)
+            return try await session.data(for: request, delegate: redirectDelegate)
         } catch let error as URLError {
             throw AppError.networkError(error)
         }
@@ -391,6 +423,33 @@ enum LLMHTTP {
     private static func decodeErrorMessage(_ data: Data) -> String? {
         struct Envelope: Decodable { struct E: Decodable { let message: String }; let error: E }
         return try? JSONDecoder().decode(Envelope.self, from: data).error.message
+    }
+}
+
+private final class OriginLockedRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let approvedURL: URL
+
+    init(approvedURL: URL) {
+        self.approvedURL = approvedURL
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        let redirected = LLMHTTP.redirectRequest(
+            approvedURL: approvedURL,
+            proposedRequest: request
+        )
+        if redirected == nil {
+            AppLog.transcription.atError.error(
+                "http: rejected cross-origin redirect task=\(task.taskIdentifier, privacy: .public)"
+            )
+        }
+        completionHandler(redirected)
     }
 }
 

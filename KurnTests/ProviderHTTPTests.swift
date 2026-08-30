@@ -269,6 +269,39 @@ struct ProviderHTTPTests {
         #expect(LLMHTTP.endpoint(baseURLString: "https://api.example.com/v1", path: path) == nil)
     }
 
+    @Test func sameOriginRedirectIsAllowed() throws {
+        let approved = try #require(URL(string: "https://api.example.com/v1/messages"))
+        let proposedURL = try #require(URL(string: "https://api.example.com/v2/messages"))
+        let proposed = URLRequest(url: proposedURL)
+
+        let redirected = LLMHTTP.redirectRequest(
+            approvedURL: approved,
+            proposedRequest: proposed
+        )
+
+        #expect(redirected?.url == proposedURL)
+    }
+
+    @Test func explicitDefaultPortIsTheSameOrigin() throws {
+        let approved = try #require(URL(string: "https://api.example.com/v1"))
+        let proposed = URLRequest(
+            url: try #require(URL(string: "https://api.example.com:443/v2"))
+        )
+        #expect(LLMHTTP.redirectRequest(approvedURL: approved, proposedRequest: proposed) != nil)
+    }
+
+    @Test(arguments: [
+        "https://other.example.com/v2",
+        "http://api.example.com/v2",
+        "https://api.example.com:444/v2",
+        "https://user@api.example.com/v2"
+    ])
+    func crossOriginRedirectIsRejected(_ destination: String) throws {
+        let approved = try #require(URL(string: "https://api.example.com/v1"))
+        let proposed = URLRequest(url: try #require(URL(string: destination)))
+        #expect(LLMHTTP.redirectRequest(approvedURL: approved, proposedRequest: proposed) == nil)
+    }
+
     @Test func invalidCustomProviderCannotFallBackForSummaryOrTranscription() async {
         MockURLProtocol.enqueue([])
         let configured = AIProvider.custom(

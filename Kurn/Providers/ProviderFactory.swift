@@ -68,14 +68,10 @@ enum ProviderFactory {
         }
         let resolvedModel = model.isEmpty ? provider.defaultTranscriptionModel : model
         AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for Whisper transcription, model=\(resolvedModel, privacy: .public)")
-        // Background uploads: chunk transfers keep running when the app is
-        // suspended or the phone is locked, so a long transcription doesn't
-        // need the app to stay in the foreground.
         return OpenAIProvider(
             provider: provider,
             apiKey: key,
-            transcriptionModel: resolvedModel,
-            usesBackgroundUploads: true
+            transcriptionModel: resolvedModel
         )
     }
 }

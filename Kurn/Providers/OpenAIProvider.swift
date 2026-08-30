@@ -19,26 +19,18 @@ struct OpenAIProvider: LLMProvider {
     /// Whisper model requested on the transcription route. Configurable because
     /// the model differs per vendor (OpenAI `whisper-1`, Groq `whisper-large-v3`).
     private let transcriptionModel: String
-    /// Route transcription uploads through the background `URLSession`
-    /// (`WhisperBackgroundUploader`) so they survive the app suspending or the
-    /// phone locking. Off by default so injected-session tests and summary
-    /// calls are unaffected; `ProviderFactory.whisperProvider(for:model:)` turns it on.
-    private let usesBackgroundUploads: Bool
-
     init(
         provider: AIProvider = .openAI,
         apiKey: String,
         model: String = "gpt-5.4",
         transcriptionModel: String = "whisper-1",
-        session: URLSession = .shared,
-        usesBackgroundUploads: Bool = false
+        session: URLSession = .shared
     ) {
         self.provider = provider
         self.apiKey = apiKey
         self.chatModel = model
         self.transcriptionModel = transcriptionModel
         self.session = session
-        self.usesBackgroundUploads = usesBackgroundUploads
     }
 
     // MARK: - Transcription (Whisper)
@@ -130,9 +122,6 @@ struct OpenAIProvider: LLMProvider {
         )
 
         do {
-            if usesBackgroundUploads {
-                return try await WhisperBackgroundUploader.shared.sendValidated(request, body: body).0
-            }
             request.httpBody = body
             return try await LLMHTTP.sendValidated(request, session: session).0
         } catch {
