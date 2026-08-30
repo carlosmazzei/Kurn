@@ -19,8 +19,21 @@ Last updated: 2026-08-30.
   durable`); GitHub `build-and-test` and `kurncore-linux` passed before merge.
 - The deleted source branch was `devin/resilience-h1-capture-lifecycle`; do not
   recreate it or stack new work on the stale local branch.
-- The next code PR is the H2 versioned-schema baseline, created from updated
-  `main` after this documentation is available remotely.
+- PR #154 published this document and the roadmap execution-sequence updates.
+- **In progress, on branch `claude/plano-resiliencia-xe25b2` (not yet a PR, not
+  yet merged):** PR 2, the H2 versioned-schema baseline. `Kurn/Infrastructure/
+  KurnSchema.swift` adds `KurnSchemaV1`/`KurnSchemaMigrationPlan`/
+  `KurnModelGraph`; `ModelContainerBootstrap`, `KurnApp`, and
+  `TestModelContainer` all read the model graph and versioned schema from
+  there; `KurnTests/LegacyStoreAdoptionTests.swift` round-trips a same-run
+  generated unversioned-store fixture through the new versioned path. This
+  session has no macOS/Xcode toolchain, so none of it has run through
+  SwiftLint, `xcodebuild`, or the simulator suite yet — pushing the branch and
+  opening a PR against `main` is the next step, so `iOS CI` produces that
+  evidence. See "PR 2 — H2 versioned-schema baseline" below for the deviation
+  from "commit N-1/N-2 fixtures" (there is no earlier released schema version
+  to fabricate, since this is the first one ever declared) and exactly what
+  shipped.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -30,10 +43,11 @@ Last updated: 2026-08-30.
 
 1. Read this file and the `Reliability and resilience track` section of
    `docs/roadmap.md`.
-2. Confirm local `main` contains merge commit `458a502` from PR #153 before
-   creating the H2 branch.
-3. Keep the physical H1 matrix as a release gate; it does not block beginning
-   H2 now that the code PR is merged.
+2. If PR 2 (H2 schema baseline) has not yet been pushed/opened as a PR, do that
+   first — the code is already on `claude/plano-resiliencia-xe25b2` and needs
+   `iOS CI` evidence before anything is claimed done. If it has merged, confirm
+   local `main` contains it before creating the PR-3 branch.
+3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
 5. Every new durability/state transition must land with deterministic fault
@@ -68,7 +82,7 @@ Last updated: 2026-08-30.
 | Track | Status                 | Remaining contract                                                                                                                   |
 | ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
-| H2    | Seam only              | Versioned schemas, migration fixtures, recoverable boot state, backup, restore, salvage, and recovery UI.                            |
+| H2    | Schema baseline on branch, not yet merged | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph` and an injectable `ModelContainerBootstrap` are implemented (`claude/plano-resiliencia-xe25b2`), pending `iOS CI`. Recoverable boot state, backup, restore, salvage, and recovery UI remain. |
 | H3    | Foundation only        | Protected fail-closed storage, quarantine/trash, mutation journal, and typed authoritative JSON corruption.                          |
 | H4    | Partial                | Full source/config/model/chunk fingerprint, throwing checkpoint commits, explicit operation states, and bounded recovery.            |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
@@ -132,6 +146,9 @@ Status: merged as PR #153 (`458a502`) after `build-and-test` and
 
 #### PR 2 — H2 versioned-schema baseline
 
+Status: implemented on branch `claude/plano-resiliencia-xe25b2`, not yet
+pushed as a PR or CI-verified — see "Current handoff" above.
+
 Objective: establish an explicit schema/migration contract before another model
 change lands.
 
@@ -146,7 +163,15 @@ Scope:
    do not assume SwiftData will migrate it automatically.
 4. Commit synthetic fixtures for the oldest supported released layouts and
    round-trip relationships, transcript/summary JSON, checkpoints, and capture
-   recovery state.
+   recovery state. **Delivered as `KurnTests/LegacyStoreAdoptionTests.swift`**,
+   which generates the fixture at run time (a store built with a bare,
+   unversioned schema, populated with one of every model plus relationships/
+   checkpoint/capture-recovery state) rather than a committed binary: no app
+   version before this PR ever declared a schema version, so there is no
+   earlier released layout to fabricate, and hand-crafting a binary SwiftData
+   store without Xcode was not judged reliable or independently verifiable in
+   this environment. The test still exercises the real open/adopt path on
+   CI's macOS runner.
 5. Make schema/version selection injectable through `ModelContainerBootstrap`.
 6. Do not add backup/salvage UI or remove the startup `fatalError` in this PR.
 
