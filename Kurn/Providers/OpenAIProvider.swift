@@ -270,8 +270,8 @@ struct OpenAIProvider: LLMProvider {
     // MARK: - HTTP helpers
 
     /// A Chat Completions request with OpenAI's bearer auth. The transcription
-    /// route builds its own request: it is multipart rather than JSON, and can
-    /// be handed to the background uploader instead of `session`.
+    /// route builds its own multipart request and uses the bounded foreground
+    /// transport with the long-running operation policy.
     private func makeRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
         try LLMHTTP.jsonRequest(
             provider: provider,

@@ -259,7 +259,10 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   summaries, wiki and document generation, folder analytics, auto-tagging. These
   are mostly `struct`/`actor` types operating on plain values so they stay
   decoupled from SwiftData and safe off the main actor.
-- **Providers/** — cloud LLM clients behind the `LLMProvider` protocol.
+- **Providers/** — cloud LLM clients behind the `LLMProvider` protocol. Shared
+  networking is split by responsibility: `ProviderHTTPPolicy` owns budgets,
+  `ProviderURLPolicy` owns destination validation, `ProviderHTTPTransport` owns
+  bounded execution/retry, and `ProviderResponseParsing` owns decoding contracts.
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and
   persisting results.
 - **Views/** — SwiftUI screens.
@@ -269,6 +272,15 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
   backing both the fastlane screenshot run and `AccessibilityAuditUITests`. It
   never seeds a real recording or transcript.
+
+### Change discipline
+
+Prefer coherent architectural boundaries over incremental patches. Before extending
+an already large type or test suite, extract cohesive responsibilities into focused
+files and keep dependencies directional. Remove obsolete paths when compatibility no
+longer requires them, keep legacy adapters isolated from active production flows, and
+make tests mirror the production boundary they verify. Treat approaching SwiftLint
+file/type limits as a refactoring signal rather than using the remaining line budget.
 
 ### Data model
 
@@ -596,14 +608,14 @@ always-available, no-download engines so a fresh install works offline.
 enum to it — engines are never spun up per call. The concrete choices per
 stage (enums in `Models/Enums.swift`) are:
 
-| Stage | `AppSettings` property | Default (no download) | Alternative (model download) |
-| --- | --- | --- | --- |
-| Preprocessing | `preprocessingEngine` | `.standardDSP` (`AudioPreprocessor`) | `.none` (passthrough — not FluidAudio, just skips cleanup) |
-| VAD | `vadEngine` | `.energyThreshold` (`Pipeline/EnergyVAD.swift`) | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD) |
-| Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber) | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`) |
-| Diarization | `diarizationEngine` | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) is the no-download fallback |
-| Transcription | `transcriptionEngine` | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale) | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud) |
-| Correction | `correctionEnabled` | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work) | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below) |
+| Stage              | `AppSettings` property    | Default (no download)                                                                                                                                                            | Alternative (model download)                                                                                                                                                                             |
+| ------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preprocessing      | `preprocessingEngine`     | `.standardDSP` (`AudioPreprocessor`)                                                                                                                                             | `.none` (passthrough — not FluidAudio, just skips cleanup)                                                                                                                                               |
+| VAD                | `vadEngine`               | `.energyThreshold` (`Pipeline/EnergyVAD.swift`)                                                                                                                                  | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD)                                                                                                                                               |
+| Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber)                                                                                                                              | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`)                    |
+| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) is the no-download fallback                                                                                                                    |
+| Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud) |
+| Correction         | `correctionEnabled`       | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work)                                                                                       | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below)                                                          |
 
 `TranscriptionService.transcribe` drives the stages in order:
 
@@ -710,11 +722,11 @@ FluidAudio already used. This is what lets `TranscriptFusion` place a speaker
 handover *inside* a sentence instead of estimating the split from turn
 durations (`splitCoarseSpan`, now the fallback).
 
-| Engine | Where the timings come from |
-| --- | --- |
-| Apple Speech | `audioTimeRange` per `AttributedString` run, which the `.timeIndexedProgressiveTranscription` preset attaches. `String(result.text.characters)` used to flatten it away |
-| whisper.cpp | `params.token_timestamps`, then `whisper_full_get_token_data`'s `t0`/`t1`; SentencePiece pieces are aggregated into words (a piece beginning with a space opens a new one) |
-| Cloud | `timestamp_granularities[]` = `segment` + `word`, returned as a **flat top-level array** that `OpenAIProvider` regroups under the segment each word's midpoint falls in |
+| Engine       | Where the timings come from                                                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Apple Speech | `audioTimeRange` per `AttributedString` run, which the `.timeIndexedProgressiveTranscription` preset attaches. `String(result.text.characters)` used to flatten it away    |
+| whisper.cpp  | `params.token_timestamps`, then `whisper_full_get_token_data`'s `t0`/`t1`; SentencePiece pieces are aggregated into words (a piece beginning with a space opens a new one) |
+| Cloud        | `timestamp_granularities[]` = `segment` + `word`, returned as a **flat top-level array** that `OpenAIProvider` regroups under the segment each word's midpoint falls in    |
 
 Two rules hold across all of them. **Missing timings are never an error** —
 each engine falls back to exactly the span it produced before. And Apple's
