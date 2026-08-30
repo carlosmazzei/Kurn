@@ -12,17 +12,29 @@
 import Foundation
 import KurnCore
 
-final class ManualSleepClock: SleepClock, @unchecked Sendable {
+final class ManualSleepClock: MonotonicSleepClock, @unchecked Sendable {
     private let lock = NSLock()
     private var recordedDurations: [TimeInterval] = []
+    private var currentTime: TimeInterval
+
+    init(now: TimeInterval = 0) {
+        currentTime = now
+    }
 
     func sleep(seconds: TimeInterval) async throws {
+        try Task.checkCancellation()
         // `NSLock.lock()`/`unlock()` are unavailable from an async function
         // body (the compiler can't prove no suspension happens mid-lock);
         // `withLock` is the scoped-locking form that sidesteps that check.
         lock.withLock {
             recordedDurations.append(seconds)
+            currentTime += seconds
         }
+    }
+
+    var now: TimeInterval {
+        lock.lock(); defer { lock.unlock() }
+        return currentTime
     }
 
     var durations: [TimeInterval] {

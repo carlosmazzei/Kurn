@@ -75,6 +75,17 @@ struct LLMHTTPRetryTests {
         }
     }
 
+    @Test func injectedJitterMakesBackoffDeterministic() {
+        let delay = LLMHTTP.retryableDelay(
+            attempt: 1,
+            status: 500,
+            urlError: nil,
+            retryAfter: nil,
+            jitter: 0.25
+        )
+        #expect(delay == 1.25)
+    }
+
     @Test func retryAfterHeaderIsHonoredForRateLimiting() {
         // A server Retry-After overrides the computed backoff (clamped to maxDelay).
         let delay = LLMHTTP.retryableDelay(attempt: 0, status: 429, urlError: nil, retryAfter: 2)

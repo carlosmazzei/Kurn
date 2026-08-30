@@ -5,6 +5,7 @@
 "error.network" = "网络错误：%@";
 "error.api" = "API 错误 %1$d：%2$@";
 "error.invalid_provider_url" = "提供方 URL 无效或不被允许。请使用不含凭据、查询参数、片段或自定义端口的公共 HTTPS 主机名。";
+"error.provider_response_too_large" = "提供方响应超过了安全大小限制。";
 "error.transcription" = "转录失败：%@";
 "error.audio" = "音频错误：%@";
 "error.decoding" = "无法读取响应：%@";

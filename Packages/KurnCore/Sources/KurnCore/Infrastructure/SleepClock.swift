@@ -8,10 +8,9 @@
 //  delay meant actually waiting out real seconds, or not proving it at all.
 //
 //  Named `SleepClock`, not `Clock`, to avoid colliding with
-//  `_Concurrency.Clock`, and scoped to the one operation callers actually
-//  need: sleeping for a duration. `SystemClock` is the production adapter;
-//  test doubles that record requested durations without waiting live beside
-//  the callers that use them (see `KurnTests/Support/FaultInjection/`).
+//  `_Concurrency.Clock`. `MonotonicSleepClock` also exposes uptime for operations
+//  whose total deadline spans requests and backoff. `SystemClock` is the
+//  production adapter; deterministic doubles live beside their callers.
 //
 
 import Foundation
@@ -20,8 +19,14 @@ public protocol SleepClock: Sendable {
     func sleep(seconds: TimeInterval) async throws
 }
 
-public struct SystemClock: SleepClock {
+public protocol MonotonicSleepClock: SleepClock {
+    var now: TimeInterval { get }
+}
+
+public struct SystemClock: MonotonicSleepClock {
     public init() {}
+
+    public var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
     public func sleep(seconds: TimeInterval) async throws {
         try await Task.sleep(for: .seconds(seconds))

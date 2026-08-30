@@ -14,6 +14,7 @@ public enum AppError: LocalizedError, Identifiable {
     case networkError(URLError)
     case apiError(statusCode: Int, message: String)
     case invalidProviderURL
+    case providerResponseTooLarge
     case transcriptionFailed(String)
     case transcriptionLanguageUnsupported(MeetingLanguage, TranscriptionEngine)
     case audioError(String)
@@ -49,6 +50,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .networkError: return "network"
         case .apiError: return "provider_api"
         case .invalidProviderURL: return "provider_configuration"
+        case .providerResponseTooLarge: return "provider_response_too_large"
         case .transcriptionFailed: return "transcription"
         case .transcriptionLanguageUnsupported: return "transcription_language_unsupported"
         case .audioError: return "audio"
@@ -95,6 +97,11 @@ public enum AppError: LocalizedError, Identifiable {
             return NSLocalizedString(
                 "error.invalid_provider_url",
                 comment: "Provider URL is not allowed"
+            )
+        case .providerResponseTooLarge:
+            return NSLocalizedString(
+                "error.provider_response_too_large",
+                comment: "Provider response exceeded the safe size limit"
             )
         case .transcriptionFailed(let detail):
             return String(

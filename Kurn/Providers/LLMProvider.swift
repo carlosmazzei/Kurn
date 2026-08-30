@@ -85,6 +85,18 @@ extension LLMProvider {
 
 // MARK: - Shared HTTP helpers
 
+struct HTTPPolicy: Equatable, Sendable {
+    static let defaultMaxResponseBytes = 16 * 1_024 * 1_024
+
+    let totalDeadline: TimeInterval
+    let maxResponseBytes: Int
+
+    init(totalDeadline: TimeInterval, maxResponseBytes: Int = defaultMaxResponseBytes) {
+        self.totalDeadline = max(0, totalDeadline)
+        self.maxResponseBytes = max(0, maxResponseBytes)
+    }
+}
+
 /// HTTP plumbing shared by the cloud providers: both OpenAI and Anthropic talk
 /// to JSON APIs that report failures as `{ "error": { "message" } }`.
 enum LLMHTTP {
@@ -318,26 +330,46 @@ enum LLMHTTP {
     static func sendValidated(
         _ request: URLRequest,
         session: URLSession,
-        clock: some SleepClock = SystemClock()
+        clock: some MonotonicSleepClock = SystemClock(),
+        policy: HTTPPolicy? = nil
     ) async throws -> (Data, URLResponse) {
+        let policy = policy ?? HTTPPolicy(totalDeadline: max(request.timeoutInterval, 1))
+        let startedAt = clock.now
         var attempt = 0
         while true {
-            // Transport step. Only `AppError.networkError` is retriable here;
-            // anything else (e.g. cancellation) propagates immediately.
+            try Task.checkCancellation()
+            let remaining = policy.totalDeadline - (clock.now - startedAt)
+            guard remaining > 0 else { throw deadlineError }
+            var attemptRequest = request
+            let requestedTimeout = max(request.timeoutInterval, 0.001)
+            attemptRequest.timeoutInterval = remaining + 0.001 >= requestedTimeout
+                ? requestedTimeout
+                : remaining
+
             let result: (data: Data, response: URLResponse)
             do {
-                result = try await send(request, session: session)
+                result = try await send(
+                    attemptRequest,
+                    session: session,
+                    maxResponseBytes: policy.maxResponseBytes,
+                    deadlineAt: startedAt + policy.totalDeadline,
+                    clock: clock
+                )
             } catch let AppError.networkError(urlError) {
                 guard let delay = retryableDelay(
                     attempt: attempt, status: nil, urlError: urlError, retryAfter: nil
                 ) else { throw AppError.networkError(urlError) }
-                try await backoff(delay, attempt: attempt, reason: "network \(urlError.code.rawValue)", clock: clock)
+                try await backoffWithinDeadline(
+                    delay,
+                    attempt: attempt,
+                    reason: "network \(urlError.code.rawValue)",
+                    deadlineAt: startedAt + policy.totalDeadline,
+                    clock: clock
+                )
                 attempt += 1
                 continue
             }
 
-            // Validation step. A retriable status code (429/5xx/…) backs off and
-            // retries; any other API error fails fast.
             do {
                 try validate(response: result.response, data: result.data)
                 return result
@@ -346,19 +378,47 @@ enum LLMHTTP {
                 guard let delay = retryableDelay(
                     attempt: attempt, status: status, urlError: nil, retryAfter: retryAfter
                 ) else { throw AppError.apiError(statusCode: status, message: message) }
-                try await backoff(delay, attempt: attempt, reason: "HTTP \(status)", clock: clock)
+                try await backoffWithinDeadline(
+                    delay,
+                    attempt: attempt,
+                    reason: "HTTP \(status)",
+                    deadlineAt: startedAt + policy.totalDeadline,
+                    clock: clock
+                )
                 attempt += 1
-                continue
             }
         }
     }
 
     /// Perform the request, mapping transport failures to `AppError.networkError`.
-    static func send(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+    static func send(
+        _ request: URLRequest,
+        session: URLSession,
+        maxResponseBytes: Int,
+        deadlineAt: TimeInterval,
+        clock: some MonotonicSleepClock
+    ) async throws -> (Data, URLResponse) {
         guard let approvedURL = request.url else { throw AppError.invalidProviderURL }
-        let redirectDelegate = OriginLockedRedirectDelegate(approvedURL: approvedURL)
+        let delegate = BoundedHTTPDataDelegate(
+            approvedURL: approvedURL,
+            maxResponseBytes: maxResponseBytes,
+            deadlineAt: deadlineAt,
+            now: { clock.now }
+        )
+        let controlledSession = URLSession(
+            configuration: session.configuration,
+            delegate: delegate,
+            delegateQueue: nil
+        )
+        defer { controlledSession.invalidateAndCancel() }
         do {
-            return try await session.data(for: request, delegate: redirectDelegate)
+            return try await delegate.execute(request, session: controlledSession)
+        } catch let error as AppError {
+            throw error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled && Task.isCancelled {
+            throw CancellationError()
         } catch let error as URLError {
             throw AppError.networkError(error)
         }
@@ -381,7 +441,8 @@ enum LLMHTTP {
         attempt: Int,
         status: Int?,
         urlError: URLError?,
-        retryAfter: TimeInterval?
+        retryAfter: TimeInterval?,
+        jitter: TimeInterval? = nil
     ) -> TimeInterval? {
         guard attempt < maxAttempts - 1 else { return nil }
 
@@ -400,8 +461,25 @@ enum LLMHTTP {
             return min(retryAfter, maxDelay)
         }
         let exponential = baseDelay * pow(2, Double(attempt))
-        let jitter = Double.random(in: 0...baseDelay)
+        let jitter = jitter.map { min(max($0, 0), baseDelay) }
+            ?? Double.random(in: 0...baseDelay)
         return min(exponential + jitter, maxDelay)
+    }
+
+    private static var deadlineError: AppError {
+        .networkError(URLError(.timedOut))
+    }
+
+    private static func backoffWithinDeadline(
+        _ delay: TimeInterval,
+        attempt: Int,
+        reason: String,
+        deadlineAt: TimeInterval,
+        clock: some MonotonicSleepClock
+    ) async throws {
+        let remaining = deadlineAt - clock.now
+        guard delay < remaining else { throw deadlineError }
+        try await backoff(delay, attempt: attempt, reason: reason, clock: clock)
     }
 
     private static func backoff(_ delay: TimeInterval, attempt: Int, reason: String, clock: some SleepClock) async throws {
@@ -426,11 +504,56 @@ enum LLMHTTP {
     }
 }
 
-private final class OriginLockedRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-    private let approvedURL: URL
+private final class BoundedHTTPDataDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    typealias Output = (Data, URLResponse)
 
-    init(approvedURL: URL) {
+    private let lock = NSLock()
+    private let approvedURL: URL
+    private let maxResponseBytes: Int
+    private let deadlineAt: TimeInterval
+    private let now: @Sendable () -> TimeInterval
+    private var continuation: CheckedContinuation<Output, Error>?
+    private var task: URLSessionDataTask?
+    private var response: URLResponse?
+    private var buffer = Data()
+    private var terminalError: Error?
+    private var cancelled = false
+    private var completed = false
+
+    init(
+        approvedURL: URL,
+        maxResponseBytes: Int,
+        deadlineAt: TimeInterval,
+        now: @escaping @Sendable () -> TimeInterval
+    ) {
         self.approvedURL = approvedURL
+        self.maxResponseBytes = maxResponseBytes
+        self.deadlineAt = deadlineAt
+        self.now = now
+    }
+
+    func execute(_ request: URLRequest, session: URLSession) async throws -> Output {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let task = session.dataTask(with: request)
+                let cancelled = lock.withLock {
+                    self.continuation = continuation
+                    self.task = task
+                    return self.cancelled
+                }
+                if cancelled {
+                    task.cancel()
+                } else {
+                    task.resume()
+                }
+            }
+        } onCancel: {
+            let task = self.lock.withLock {
+                self.cancelled = true
+                return self.task
+            }
+            task?.cancel()
+        }
     }
 
     func urlSession(
@@ -450,6 +573,70 @@ private final class OriginLockedRedirectDelegate: NSObject, URLSessionTaskDelega
             )
         }
         completionHandler(redirected)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        let shouldCancel = lock.withLock {
+            self.response = response
+            if now() >= deadlineAt {
+                terminalError = AppError.networkError(URLError(.timedOut))
+                return true
+            }
+            if response.expectedContentLength > Int64(maxResponseBytes) {
+                terminalError = AppError.providerResponseTooLarge
+                return true
+            }
+            return false
+        }
+        completionHandler(shouldCancel ? .cancel : .allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let shouldCancel = lock.withLock {
+            guard terminalError == nil else { return true }
+            if now() >= deadlineAt {
+                terminalError = AppError.networkError(URLError(.timedOut))
+                return true
+            }
+            guard data.count <= maxResponseBytes - buffer.count else {
+                terminalError = AppError.providerResponseTooLarge
+                return true
+            }
+            buffer.append(data)
+            return false
+        }
+        if shouldCancel { dataTask.cancel() }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let completion: (CheckedContinuation<Output, Error>, Result<Output, Error>)? = lock.withLock {
+            guard !completed, let continuation else { return nil }
+            completed = true
+            self.continuation = nil
+            self.task = nil
+            let result: Result<Output, Error>
+            if let terminalError {
+                result = .failure(terminalError)
+            } else if now() >= deadlineAt {
+                result = .failure(AppError.networkError(URLError(.timedOut)))
+            } else if cancelled {
+                result = .failure(CancellationError())
+            } else if let error {
+                result = .failure(error)
+            } else if let response {
+                result = .success((buffer, response))
+            } else {
+                result = .failure(URLError(.badServerResponse))
+            }
+            return (continuation, result)
+        }
+        guard let completion else { return }
+        completion.0.resume(with: completion.1)
     }
 }
 

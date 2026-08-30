@@ -726,3 +726,141 @@ struct ProviderHTTPTests {
         #expect(corrections.isEmpty)
     }
 }
+
+extension ProviderHTTPTests {
+    @Test func responseBodyLargerThanPolicyIsRejected() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: Data([1, 2, 3, 4, 5]), headers: [:])
+        ])
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+
+        do {
+            _ = try await LLMHTTP.sendValidated(
+                request,
+                session: MockURLProtocol.session(),
+                policy: HTTPPolicy(totalDeadline: 10, maxResponseBytes: 4)
+            )
+            Issue.record("Expected providerResponseTooLarge")
+        } catch AppError.providerResponseTooLarge {
+        } catch {
+            Issue.record("Unexpected response-size error: \(error)")
+        }
+    }
+
+    @Test func declaredResponseLengthIsRejectedBeforeBuffering() async throws {
+        MockURLProtocol.enqueue([
+            .success(
+                status: 200,
+                body: Data([1, 2, 3, 4, 5]),
+                headers: ["Content-Length": "5"]
+            )
+        ])
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+
+        do {
+            _ = try await LLMHTTP.sendValidated(
+                request,
+                session: MockURLProtocol.session(),
+                policy: HTTPPolicy(totalDeadline: 10, maxResponseBytes: 4)
+            )
+            Issue.record("Expected providerResponseTooLarge")
+        } catch AppError.providerResponseTooLarge {
+        } catch {
+            Issue.record("Unexpected declared-size error: \(error)")
+        }
+    }
+
+    @Test func totalDeadlineStopsRetryBeforeBackoff() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 429, body: Data(), headers: ["Retry-After": "2"]),
+            MockURLProtocol.json(["ok": true])
+        ])
+        let clock = ManualSleepClock()
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+
+        do {
+            _ = try await LLMHTTP.sendValidated(
+                request,
+                session: MockURLProtocol.session(),
+                clock: clock,
+                policy: HTTPPolicy(totalDeadline: 1, maxResponseBytes: 1_024)
+            )
+            Issue.record("Expected a total deadline timeout")
+        } catch let AppError.networkError(error) {
+            #expect(error.code == .timedOut)
+        } catch {
+            Issue.record("Unexpected deadline error: \(error)")
+        }
+
+        #expect(clock.durations.isEmpty)
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+    }
+
+    @Test func streamedResponseCannotOutliveTotalDeadline() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: Data([1, 2, 3, 4, 5]), headers: [:])
+        ])
+        let clock = SteppingHTTPClock(step: 0.6)
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+
+        do {
+            _ = try await LLMHTTP.sendValidated(
+                request,
+                session: MockURLProtocol.session(),
+                clock: clock,
+                policy: HTTPPolicy(totalDeadline: 2, maxResponseBytes: 1_024)
+            )
+            Issue.record("Expected streaming deadline timeout")
+        } catch let AppError.networkError(error) {
+            #expect(error.code == .timedOut)
+        } catch {
+            Issue.record("Unexpected streaming deadline error: \(error)")
+        }
+    }
+
+    @Test func retryUsesTheRemainingDeadlineAsAttemptTimeout() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 429, body: Data(), headers: ["Retry-After": "1"]),
+            MockURLProtocol.json(["ok": true])
+        ])
+        let clock = ManualSleepClock()
+        var request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+        request.timeoutInterval = 10
+
+        _ = try await LLMHTTP.sendValidated(
+            request,
+            session: MockURLProtocol.session(),
+            clock: clock,
+            policy: HTTPPolicy(totalDeadline: 3, maxResponseBytes: 1_024)
+        )
+
+        let attempts = MockURLProtocol.capturedRequests
+        #expect(attempts.count == 2)
+        #expect(attempts[0].timeoutInterval == 3)
+        #expect(attempts[1].timeoutInterval == 2)
+        #expect(clock.durations == [1])
+    }
+}
+
+private final class SteppingHTTPClock: MonotonicSleepClock, @unchecked Sendable {
+    private let lock = NSLock()
+    private let step: TimeInterval
+    private var currentTime: TimeInterval = 0
+
+    init(step: TimeInterval) {
+        self.step = step
+    }
+
+    var now: TimeInterval {
+        lock.withLock {
+            defer { currentTime += step }
+            return currentTime
+        }
+    }
+
+    func sleep(seconds: TimeInterval) async throws {
+        lock.withLock {
+            currentTime += seconds
+        }
+    }
+}

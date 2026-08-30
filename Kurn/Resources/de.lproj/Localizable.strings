@@ -5,6 +5,7 @@
 "error.network" = "Netzwerkfehler: %@";
 "error.api" = "API-Fehler %1$d: %2$@";
 "error.invalid_provider_url" = "Die Anbieter-URL ist ungültig oder nicht zulässig. Verwenden Sie einen öffentlichen HTTPS-Hostnamen ohne Zugangsdaten, Abfrageparameter, Fragmente oder benutzerdefinierte Ports.";
+"error.provider_response_too_large" = "Die Anbieterantwort hat das sichere Größenlimit überschritten.";
 "error.transcription" = "Transkription fehlgeschlagen: %@";
 "error.audio" = "Audiofehler: %@";
 "error.decoding" = "Antwort konnte nicht gelesen werden: %@";

@@ -5,6 +5,7 @@
 "error.network" = "Network error: %@";
 "error.api" = "API error %1$d: %2$@";
 "error.invalid_provider_url" = "The provider URL is invalid or not allowed. Use a public HTTPS hostname without credentials, query parameters, fragments, or custom ports.";
+"error.provider_response_too_large" = "The provider response exceeded the safe size limit.";
 "error.transcription" = "Transcription failed: %@";
 "error.audio" = "Audio error: %@";
 "error.decoding" = "Could not read the response: %@";

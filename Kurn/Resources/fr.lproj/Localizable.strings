@@ -5,6 +5,7 @@
 "error.network" = "Erreur réseau : %@";
 "error.api" = "Erreur API %1$d : %2$@";
 "error.invalid_provider_url" = "L’URL du fournisseur est invalide ou non autorisée. Utilisez un nom d’hôte HTTPS public sans identifiants, paramètres de requête, fragment ni port personnalisé.";
+"error.provider_response_too_large" = "La réponse du fournisseur dépasse la limite de taille autorisée.";
 "error.transcription" = "Échec de la transcription : %@";
 "error.audio" = "Erreur audio : %@";
 "error.decoding" = "Impossible de lire la réponse : %@";
