@@ -29,6 +29,12 @@ struct MeetingChatService {
         self.searchService = searchService
     }
 
+    /// Progress/streaming callback fired as an answer is retrieved and
+    /// generated. May be called from a background executor; the receiver hops
+    /// to the main actor itself — the same contract as
+    /// `TranscriptionService.PhaseHandler`.
+    typealias ChatEventHandler = @Sendable (ChatStreamEvent) -> Void
+
     /// An answer plus the passages it was grounded on (retrieval mode). In
     /// full-context mode `citations` is empty — the view makes the `[mm:ss]`
     /// timestamps the model cites tappable instead.
@@ -108,7 +114,8 @@ struct MeetingChatService {
         transcriptText: String,
         candidates: [SemanticSearchService.Candidate],
         provider: AIProvider,
-        model: String
+        model: String,
+        onEvent: @escaping ChatEventHandler = { _ in }
     ) async throws -> Answer {
         let trimmed = try Self.requireQuestion(question)
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
@@ -116,14 +123,15 @@ struct MeetingChatService {
 
         if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars(for: provider) {
             let userPrompt = Self.fullContextPrompt(question: trimmed, transcript: transcript)
-            let text = try await llm.chat(
+            let text = try await streamAnswer(
                 systemPrompt: Self.fullContextSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)]
+                messages: history + [ChatMessage(role: .user, content: userPrompt)],
+                llm: llm, onEvent: onEvent
             )
             return Answer(text: text, citations: [])
         }
         return try await retrievedAnswer(
-            question: trimmed, history: history, candidates: candidates, llm: llm
+            question: trimmed, history: history, candidates: candidates, llm: llm, onEvent: onEvent
         )
     }
 
@@ -141,13 +149,14 @@ struct MeetingChatService {
         summariesByMeeting: [UUID: String] = [:],
         articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
         provider: AIProvider,
-        model: String
+        model: String,
+        onEvent: @escaping ChatEventHandler = { _ in }
     ) async throws -> Answer {
         let trimmed = try Self.requireQuestion(question)
         let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
         return try await libraryCombinedAnswer(
             question: trimmed, history: history, candidates: candidates,
-            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm
+            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm, onEvent: onEvent
         )
     }
 
@@ -163,12 +172,15 @@ struct MeetingChatService {
         poolSize: Int,
         limit: Int,
         diversify: Bool,
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: ChatEventHandler = { _ in }
     ) async throws -> [SemanticSearchService.Hit] {
+        onEvent(.phase(.rewritingQuery))
         let expansion = try? await rewriteQuery(question, llm: llm)
         let denseText = expansion.map { "\(question)\n\($0)" } ?? question
         let lexicalQuery = expansion.map { "\(question) \($0)" } ?? question
 
+        onEvent(.phase(.retrieving))
         var pool = try await searchService.hybridSearch(
             query: lexicalQuery, denseText: denseText, in: candidates, poolSize: poolSize
         )
@@ -176,8 +188,28 @@ struct MeetingChatService {
         if diversify {
             pool = SemanticSearchService.diversify(pool, maxPerMeeting: Self.maxHitsPerMeeting)
         }
+        onEvent(.phase(.reranking))
         return (try? await rerank(question: question, pool: pool, limit: limit, llm: llm))
             ?? Array(pool.prefix(limit))
+    }
+
+    /// Runs the final, user-visible generation call, forwarding each text
+    /// delta through `onEvent` as it arrives and returning the concatenated
+    /// answer. Not `private`: reused by `MeetingChatSynthesis.swift`.
+    func streamAnswer(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        llm: LLMProvider,
+        onEvent: ChatEventHandler
+    ) async throws -> String {
+        onEvent(.phase(.answering))
+        var text = ""
+        for try await delta in llm.streamChat(systemPrompt: systemPrompt, messages: messages) {
+            guard !delta.isEmpty else { continue }
+            text += delta
+            onEvent(.delta(delta))
+        }
+        return text
     }
 
     /// Distinct meetings whose best passage is semantically relevant to the
@@ -206,16 +238,19 @@ struct MeetingChatService {
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: ChatEventHandler = { _ in }
     ) async throws -> Answer {
         let top = try await retrievePassages(
             question: question, candidates: candidates,
-            poolSize: Self.poolSize(for: llm.provider), limit: Self.retrievalLimit(for: llm.provider), diversify: false, llm: llm
+            poolSize: Self.poolSize(for: llm.provider), limit: Self.retrievalLimit(for: llm.provider), diversify: false, llm: llm,
+            onEvent: onEvent
         )
         let userPrompt = Self.userPrompt(question: question, hits: top, scope: .singleMeeting, summaries: [:])
-        let text = try await llm.chat(
+        let text = try await streamAnswer(
             systemPrompt: Self.systemPrompt(for: .singleMeeting),
-            messages: history + [ChatMessage(role: .user, content: userPrompt)]
+            messages: history + [ChatMessage(role: .user, content: userPrompt)],
+            llm: llm, onEvent: onEvent
         )
         return Answer(text: text, citations: top)
     }
