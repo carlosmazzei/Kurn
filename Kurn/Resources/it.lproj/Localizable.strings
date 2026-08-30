@@ -687,6 +687,11 @@
 "meetings.ask" = "Chiedi";
 "chat.error.empty_question" = "Scrivi una domanda.";
 "chat.thinking" = "Sto pensando…";
+"chat.phase.rewriting_query" = "Riformulazione della domanda…";
+"chat.phase.retrieving" = "Ricerca dei passaggi pertinenti…";
+"chat.phase.reranking" = "Classificazione dei passaggi migliori…";
+"chat.phase.synthesizing" = "Lettura degli appunti delle riunioni…";
+"chat.phase.answering" = "Scrittura della risposta…";
 "chat.untitled_meeting" = "Riunione senza titolo";
 "chat.starter.title" = "Fai una domanda su questa riunione";
 "chat.starter.subtitle" = "Le risposte si basano sulla trascrizione, con timestamp che puoi toccare.";

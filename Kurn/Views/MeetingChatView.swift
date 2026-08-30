@@ -61,7 +61,11 @@ struct MeetingChatView: View {
                     ForEach(vm.turns) { turn in
                         turnRow(turn).id(turn.id)
                     }
-                    if vm.isResponding { respondingRow }
+                    // Once the reply starts streaming, its growing text bubble
+                    // (rendered by `turnRow`, with a cursor) replaces this row —
+                    // showing both at once would say "thinking" next to an
+                    // answer that's already appearing.
+                    if vm.isResponding && vm.turns.last?.role != .assistant { respondingRow }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -98,15 +102,20 @@ struct MeetingChatView: View {
             }
         case .assistant, .system:
             VStack(alignment: .leading, spacing: 8) {
-                MarkdownText(turn.text)
-                    .foregroundStyle(Theme.textPrimary)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Theme.separator, lineWidth: 1)
-                    )
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    MarkdownText(turn.text)
+                        .foregroundStyle(Theme.textPrimary)
+                    if isStreaming(turn) {
+                        StreamingCursor()
+                    }
+                }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Theme.separator, lineWidth: 1)
+                )
                 if !turn.citations.isEmpty {
                     citations(turn.citations)
                 } else if meeting != nil {
@@ -172,12 +181,34 @@ struct MeetingChatView: View {
         }
     }
 
+    /// Whether `turn` is the reply currently streaming in, so its bubble gets
+    /// a trailing cursor instead of reading as a finished answer.
+    private func isStreaming(_ turn: MeetingChatViewModel.Turn) -> Bool {
+        vm.isResponding && turn.role == .assistant && turn.id == vm.turns.last?.id
+    }
+
+    /// The "reasoning" row shown before any reply text has arrived. Mirrors
+    /// the current `ChatPhase` reported by `MeetingChatService` — rewriting
+    /// the question, searching, reranking, reading notes — so the wait reads
+    /// as visible work instead of an opaque spinner, the same idea as the
+    /// transcription progress phases.
     private var respondingRow: some View {
         HStack(spacing: 8) {
-            ProgressView()
-            Text(NSLocalizedString("chat.thinking", comment: "Assistant thinking"))
-                .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            if let phase = vm.currentPhase {
+                Image(systemName: phase.systemImage)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textSecondary)
+                    .accessibilityHidden(true)
+                Text(phase.displayName)
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+                    .contentTransition(.opacity)
+            } else {
+                ProgressView()
+                Text(NSLocalizedString("chat.thinking", comment: "Assistant thinking"))
+                    .font(Theme.footnote).foregroundStyle(Theme.textSecondary)
+            }
         }
+        .kurnAnimation(.easeInOut(duration: 0.2), value: vm.currentPhase)
     }
 
     private var starterHint: some View {
@@ -342,5 +373,29 @@ struct MeetingChatView: View {
         guard let meeting else { return nil }
         let text = meeting.assembledTranscriptText()
         return text.isEmpty ? nil : text
+    }
+}
+
+/// A small blinking bar trailing a streaming reply's text, the same "still
+/// typing" cue Claude/ChatGPT-style chat UIs use. Purely decorative — the
+/// growing text and the "reasoning" row above it already convey progress to
+/// VoiceOver, so this renders solid (no blink) rather than looping under
+/// Reduce Motion, matching `RecorderView`'s `PulsingDot`.
+private struct StreamingCursor: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dim = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(Theme.textSecondary)
+            .frame(width: 2, height: 14)
+            .opacity(dim ? 0.15 : 1)
+            .accessibilityHidden(true)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                    dim = true
+                }
+            }
     }
 }

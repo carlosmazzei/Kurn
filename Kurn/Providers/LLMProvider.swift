@@ -68,6 +68,18 @@ protocol LLMProvider: Sendable {
         messages: [ChatMessage],
         options: TextGenerationOptions
     ) async throws -> String
+
+    /// Streaming variant of `chat`: yields the reply as text deltas whose
+    /// concatenation is the same string `chat` would have returned, so the
+    /// chat UI can render an answer as it's generated instead of waiting for
+    /// the whole thing. A conformer with no true streaming transport falls
+    /// back to the `LLMProvider` extension's default below, which just wraps
+    /// `chat` as a single-chunk stream — still correct, just not incremental.
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) -> AsyncThrowingStream<String, Error>
 }
 
 extension LLMProvider {
@@ -80,6 +92,26 @@ extension LLMProvider {
 
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
+    }
+
+    func streamChat(systemPrompt: String, messages: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
+        streamChat(systemPrompt: systemPrompt, messages: messages, options: .chat)
+    }
+
+    /// Default streaming implementation: awaits the whole `chat` reply and
+    /// yields it as one delta. Correct for any conformer (including test
+    /// doubles that only implement `chat`), just not incremental.
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) -> AsyncThrowingStream<String, Error> {
+        let box = LLMHTTP.SingleShotBox()
+        return AsyncThrowingStream(unfolding: {
+            if box.consumed { return nil }
+            box.consumed = true
+            return try await chat(systemPrompt: systemPrompt, messages: messages, options: options)
+        })
     }
 }
 
@@ -126,11 +158,12 @@ enum LLMHTTP {
     /// transient server-side failures. Auth/validation errors (4xx) fail fast.
     static let retriableStatusCodes: Set<Int> = [408, 429, 500, 502, 503, 504]
 
-    static func endpoint(baseURLString: String, path: String) -> URL? {
+    static func endpoint(baseURLString: String, path: String, queryItems: [URLQueryItem] = []) -> URL? {
         guard var components = URLComponents(string: baseURLString) else { return nil }
         let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let endpointPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         components.path = "/" + [basePath, endpointPath].filter { !$0.isEmpty }.joined(separator: "/")
+        if !queryItems.isEmpty { components.queryItems = queryItems }
         return components.url
     }
 
@@ -150,9 +183,10 @@ enum LLMHTTP {
         fallbackURL: String,
         timeout: TimeInterval,
         headers: [String: String],
+        queryItems: [URLQueryItem] = [],
         body: [String: Any]
     ) throws -> URLRequest {
-        let url = endpoint(baseURLString: provider.baseURLString, path: path)
+        let url = endpoint(baseURLString: provider.baseURLString, path: path, queryItems: queryItems)
             ?? URL(string: fallbackURL)!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -288,6 +322,83 @@ enum LLMHTTP {
         }
     }
 
+    // MARK: - Streaming (Server-Sent Events)
+
+    /// Server-Sent-Events payloads for a streaming request (`text/event-stream`
+    /// response). Yields each event's raw `data:` payload (the JSON chunk vendors
+    /// send, or the literal `[DONE]` sentinel some of them emit, which ends the
+    /// stream here rather than being yielded); a non-2xx response is read to
+    /// completion and surfaced as `AppError.apiError`, the same failure shape as
+    /// the non-streaming path.
+    ///
+    /// Built with `AsyncThrowingStream(unfolding:)` rather than a producer
+    /// `Task`, so the underlying `URLSession.bytes(for:)` read is awaited
+    /// directly inside the caller's own task. That preserves the same
+    /// cancellation guarantee `sendValidated` has: cancelling the task that is
+    /// iterating this stream cancels the in-flight request, instead of leaving
+    /// it running in an orphaned background task.
+    static func sseLines(for request: URLRequest, session: URLSession) -> AsyncThrowingStream<String, Error> {
+        let box = LineIteratorBox()
+        return AsyncThrowingStream(unfolding: {
+            if box.iterator == nil {
+                let bytes: URLSession.AsyncBytes
+                let response: URLResponse
+                do {
+                    (bytes, response) = try await session.bytes(for: request)
+                } catch let error as URLError {
+                    throw AppError.networkError(error)
+                }
+                if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                    var data = Data()
+                    for try await byte in bytes { data.append(byte) }
+                    let message = decodeErrorMessage(data) ?? "request failed"
+                    throw AppError.apiError(statusCode: http.statusCode, message: message)
+                }
+                box.iterator = bytes.lines.makeAsyncIterator()
+            }
+            while let line = try await box.iterator?.next() {
+                guard line.hasPrefix("data:") else { continue }
+                let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                guard payload != "[DONE]" else { return nil }
+                guard !payload.isEmpty else { continue }
+                return payload
+            }
+            return nil
+        })
+    }
+
+    /// Build a streaming chat reply: lazily builds the request on the first
+    /// pull (so a `requireAPIKey`/`makeRequest` failure throws at the same
+    /// point the non-streaming path would), maps each SSE payload through
+    /// `mapPayload` (returning `nil` to skip an event with no visible text,
+    /// e.g. Anthropic's `ping`/`message_stop`), and forwards only non-empty
+    /// deltas. Throws `emptyMessage` as `AppError.decodingError` if the stream
+    /// finishes having produced no visible text at all — the streaming sibling
+    /// of `textResult`'s empty-content guard.
+    static func streamChatDeltas(
+        session: URLSession,
+        emptyMessage: String,
+        makeRequest: @escaping @Sendable () throws -> URLRequest,
+        mapPayload: @escaping @Sendable (String) throws -> String?
+    ) -> AsyncThrowingStream<String, Error> {
+        let state = DeltaStreamState()
+        return AsyncThrowingStream(unfolding: {
+            if state.iterator == nil {
+                let request = try makeRequest()
+                state.iterator = sseLines(for: request, session: session).makeAsyncIterator()
+            }
+            while let payload = try await state.iterator?.next() {
+                guard let delta = try mapPayload(payload), !delta.isEmpty else { continue }
+                state.sawContent = true
+                return delta
+            }
+            guard state.sawContent else {
+                throw AppError.decodingError(emptyMessage)
+            }
+            return nil
+        })
+    }
+
     /// Decide whether the attempt that just failed should be retried, and after
     /// how long. `attempt` is zero-based (0 = first try). Returns `nil` when the
     /// failure is non-transient or the attempt budget is exhausted.
@@ -337,6 +448,29 @@ enum LLMHTTP {
     private static func decodeErrorMessage(_ data: Data) -> String? {
         struct Envelope: Decodable { struct E: Decodable { let message: String }; let error: E }
         return try? JSONDecoder().decode(Envelope.self, from: data).error.message
+    }
+
+    /// Boxes the lazily-created line iterator so `sseLines`'s `unfolding`
+    /// closure can hold mutable state across calls. Safe as `@unchecked
+    /// Sendable`: `AsyncThrowingStream(unfolding:)` serializes calls to the
+    /// closure, so there is never more than one call to `next()` in flight.
+    final class LineIteratorBox: @unchecked Sendable {
+        var iterator: AsyncLineSequence<URLSession.AsyncBytes>.AsyncIterator?
+    }
+
+    /// Boxes `streamChatDeltas`'s mutable state (the payload iterator, and
+    /// whether any visible text has been produced yet) for the same reason and
+    /// under the same serialization guarantee as `LineIteratorBox`.
+    final class DeltaStreamState: @unchecked Sendable {
+        var iterator: AsyncThrowingStream<String, Error>.Iterator?
+        var sawContent = false
+    }
+
+    /// Boxes the "have we already produced our one chunk" flag for the
+    /// `LLMProvider` extension's default `streamChat` fallback, under the same
+    /// serialization guarantee as the boxes above.
+    final class SingleShotBox: @unchecked Sendable {
+        var consumed = false
     }
 }
 

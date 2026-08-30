@@ -687,6 +687,11 @@
 "meetings.ask" = "提问";
 "chat.error.empty_question" = "请输入问题。";
 "chat.thinking" = "思考中…";
+"chat.phase.rewriting_query" = "正在重新表述您的问题…";
+"chat.phase.retrieving" = "正在搜索相关片段…";
+"chat.phase.reranking" = "正在对最佳片段排序…";
+"chat.phase.synthesizing" = "正在阅读会议笔记…";
+"chat.phase.answering" = "正在撰写回答…";
 "chat.untitled_meeting" = "未命名会议";
 "chat.starter.title" = "询问这次会议";
 "chat.starter.subtitle" = "回答基于转录内容，并附有可点按的时间戳。";

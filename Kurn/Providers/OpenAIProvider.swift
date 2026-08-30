@@ -275,6 +275,44 @@ struct OpenAIProvider: LLMProvider {
         )
     }
 
+    // MARK: - Chat (Chat Completions, streaming)
+
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) -> AsyncThrowingStream<String, Error> {
+        LLMHTTP.streamChatDeltas(
+            session: session,
+            emptyMessage: "empty chat response",
+            makeRequest: {
+                try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+                var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
+                wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
+                var body: [String: Any] = [
+                    "model": chatModel,
+                    "max_completion_tokens": options.maxOutputTokens,
+                    "messages": wire,
+                    "stream": true
+                ]
+                if provider.id == AIProvider.openAI.id,
+                   chatModel.lowercased().hasPrefix("gpt-5") {
+                    body["reasoning_effort"] = "low"
+                }
+                return try makeRequest(timeout: options.timeout, body: body)
+            },
+            mapPayload: Self.textDelta
+        )
+    }
+
+    /// One `data:` chunk's incremental text, or `nil` for a chunk with none
+    /// (e.g. the first chunk, which only carries the role).
+    private static func textDelta(from payload: String) -> String? {
+        guard let data = payload.data(using: .utf8),
+              let chunk = try? JSONDecoder().decode(ChatStreamChunk.self, from: data) else { return nil }
+        return chunk.choices.first?.delta.content
+    }
+
     // MARK: - HTTP helpers
 
     /// A Chat Completions request with OpenAI's bearer auth. The transcription
@@ -324,6 +362,17 @@ private struct MultipartFile {
     let name: String
     let data: Data
     let mimeType: String
+}
+
+/// One `data:` chunk of a streamed Chat Completions response
+/// (`"stream": true`). Shared by OpenAI and OpenAI-compatible vendors, same as
+/// `ChatResponse`.
+private struct ChatStreamChunk: Decodable {
+    struct Choice: Decodable {
+        struct Delta: Decodable { let content: String? }
+        let delta: Delta
+    }
+    let choices: [Choice]
 }
 
 struct WhisperVerboseResponse: Decodable {

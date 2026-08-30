@@ -687,6 +687,11 @@
 "meetings.ask" = "Fragen";
 "chat.error.empty_question" = "Bitte gib eine Frage ein.";
 "chat.thinking" = "Denkt nach …";
+"chat.phase.rewriting_query" = "Frage wird umformuliert …";
+"chat.phase.retrieving" = "Relevante Passagen werden gesucht …";
+"chat.phase.reranking" = "Beste Passagen werden eingestuft …";
+"chat.phase.synthesizing" = "Besprechungsnotizen werden gelesen …";
+"chat.phase.answering" = "Antwort wird geschrieben …";
 "chat.untitled_meeting" = "Meeting ohne Titel";
 "chat.starter.title" = "Frag zu diesem Meeting";
 "chat.starter.subtitle" = "Antworten basieren auf dem Transkript, mit antippbaren Zeitstempeln.";

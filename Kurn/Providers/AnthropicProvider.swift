@@ -91,6 +91,52 @@ struct AnthropicProvider: LLMProvider {
         )
     }
 
+    // MARK: - Chat (Messages API, streaming)
+
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions
+    ) -> AsyncThrowingStream<String, Error> {
+        LLMHTTP.streamChatDeltas(
+            session: session,
+            emptyMessage: "empty Anthropic response",
+            makeRequest: {
+                try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+                let wire = messages
+                    .filter { $0.role != .system }
+                    .map { ["role": $0.role.rawValue, "content": $0.content] }
+                return try makeRequest(
+                    timeout: options.timeout,
+                    body: [
+                        "model": model,
+                        "max_tokens": options.maxOutputTokens,
+                        "system": systemPrompt,
+                        "messages": wire,
+                        "stream": true
+                    ]
+                )
+            },
+            mapPayload: Self.textDelta
+        )
+    }
+
+    /// One SSE event's incremental text. Anthropic's stream carries several
+    /// event types (`message_start`, `content_block_delta`, `message_stop`,
+    /// `ping`, …); only `content_block_delta` with a `text_delta` carries
+    /// visible text. A mid-stream `error` event is surfaced by throwing rather
+    /// than returning `nil`, so it fails the answer instead of being silently
+    /// dropped.
+    private static func textDelta(from payload: String) throws -> String? {
+        guard let data = payload.data(using: .utf8),
+              let event = try? JSONDecoder().decode(StreamEvent.self, from: data) else { return nil }
+        if event.type == "error" {
+            throw AppError.apiError(statusCode: 0, message: event.error?.message ?? "stream error")
+        }
+        guard event.type == "content_block_delta", event.delta?.type == "text_delta" else { return nil }
+        return event.delta?.text
+    }
+
     // MARK: - Helpers
 
     /// A Messages API request with Anthropic's auth + version headers.
@@ -128,4 +174,20 @@ private struct MessagesResponse: Decodable {
         case content
         case stopReason = "stop_reason"
     }
+}
+
+/// One SSE event from a streaming Messages API response (`"stream": true`).
+/// Only the fields streaming needs — `delta.text` for `content_block_delta`
+/// and `error.message` for a mid-stream `error` event.
+private struct StreamEvent: Decodable {
+    struct Delta: Decodable {
+        let type: String?
+        let text: String?
+    }
+    struct ErrorInfo: Decodable {
+        let message: String
+    }
+    let type: String
+    let delta: Delta?
+    let error: ErrorInfo?
 }
