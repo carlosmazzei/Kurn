@@ -242,8 +242,8 @@ struct KurnApp: App {
                         // the feature is off or everything is already indexed.
                         Task(priority: .utility) { await semanticIndex.backfill() }
                         // Backfill the LLM-generated wiki for meetings without an
-                        // up-to-date article. Opt-in, key-gated, and batch-limited
-                        // inside the coordinator, so this is a no-op unless the
+                        // up-to-date article. Opt-in, key/circuit-gated, and
+                        // batch-limited inside the coordinator, so this is a no-op unless the
                         // user turned the feature on.
                         Task(priority: .utility) { await wiki.backfill() }
                     }

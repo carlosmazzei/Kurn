@@ -267,7 +267,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and
   persisting results.
 - **Views/** — SwiftUI screens.
-- **Infrastructure/** — settings, errors, logging, keychain, export, extensions.
+- **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
+  and the durable provider circuit used only by automatic cloud enrichment.
 - **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
   `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,

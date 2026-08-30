@@ -90,6 +90,7 @@ final class TranscriptionViewModel {
     let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
     private let summaryService = SummaryService()
+    private let aiTitleCoordinator: AITitleCoordinator
     /// App-wide settings, set by `KurnApp` so title generation can use the
     /// configured LLM provider without passing settings through every call site.
     var appSettings: AppSettings?
@@ -100,8 +101,12 @@ final class TranscriptionViewModel {
     /// refreshes the meeting's condensed wiki article through it (opt-in).
     var wikiCoordinator: WikiCoordinator?
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator()
+    ) {
         self.modelContext = modelContext
+        self.aiTitleCoordinator = aiTitleCoordinator
     }
 
     /// Persist pending model changes, surfacing failures instead of dropping
@@ -468,31 +473,15 @@ final class TranscriptionViewModel {
     /// Best-effort: errors are logged and swallowed so a failed title never
     /// blocks or surfaces as a user-facing error.
     private func generateAITitle(for meeting: Meeting?, settings: AppSettings) async {
-        guard let meeting, meeting.aiTitle == nil else { return }
-        guard settings.aiProvider.isUsable else { return }
-        let groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])] = meeting.recordings
-            .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { recording in
-                guard let segments = recording.transcript?.segments else { return nil }
-                return (offset: meeting.startOffset(of: recording), segments: segments, highlights: recording.highlights)
-            }
-        let transcriptText = SummaryService.assembleTranscriptText(from: groups)
-        guard !transcriptText.isEmpty else { return }
-        let provider = settings.aiProvider
-        let model = settings.summaryModel(for: provider)
-        do {
-            let title = try await summaryService.generateTitle(
-                transcriptText: transcriptText,
-                provider: provider,
-                model: model
-            )
-            try Task.checkCancellation()
-            meeting.aiTitle = title
-            persist()
-            AppLog.transcription.atNotice.notice("VM: AI title id=\(meeting.id, privacy: .public) \"\(title, privacy: .private)\"")
-        } catch {
-            AppLog.transcription.atInfo.info("VM: AI title skipped: \(error.localizedDescription, privacy: .public)")
-        }
+        guard let meeting,
+              let title = await aiTitleCoordinator.generateTitle(
+                for: meeting,
+                settings: settings
+              ),
+              !Task.isCancelled else { return }
+        meeting.aiTitle = title
+        persist()
+        AppLog.transcription.atNotice.notice("VM: AI title id=\(meeting.id, privacy: .public) \"\(title, privacy: .private)\"")
     }
 
     /// Whether an `AppError` should pause transcription (→ `.pending`) rather
@@ -823,11 +812,15 @@ final class TranscriptionViewModel {
         // Assemble transcript text on the main actor (reads SwiftData). Each
         // group carries the recording's absolute start offset so the timestamps
         // stay chronological across multiple segments.
-        let groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])] = meeting.recordings
+        let groups = meeting.recordings
             .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { recording in
+            .compactMap { recording -> SummaryService.TranscriptGroup? in
                 guard let segments = recording.transcript?.segments else { return nil }
-                return (offset: meeting.startOffset(of: recording), segments: segments, highlights: recording.highlights)
+                return SummaryService.TranscriptGroup(
+                    offset: meeting.startOffset(of: recording),
+                    segments: segments,
+                    highlights: recording.highlights
+                )
             }
         let transcriptText = SummaryService.assembleTranscriptText(from: groups)
         let title = meeting.title
@@ -877,10 +870,10 @@ final class TranscriptionViewModel {
             AppLog.transcription.atNotice.notice("VM: summary cancelled")
         } catch let appError as AppError {
             error = appError
-            AppLog.transcription.atError.error("VM: summary failed (AppError): \(appError.errorDescription ?? "nil", privacy: .public)")
+            AppLog.transcription.atError.error("VM: summary failed code=\(appError.logCode, privacy: .public)")
         } catch {
             self.error = .apiError(statusCode: 0, message: error.localizedDescription)
-            AppLog.transcription.atError.error("VM: summary failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("VM: summary failed code=unexpected")
         }
     }
 }

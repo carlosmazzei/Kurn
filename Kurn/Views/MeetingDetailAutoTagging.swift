@@ -6,6 +6,7 @@
 //  detail view stays focused on layout and navigation.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 
@@ -36,7 +37,8 @@ extension MeetingDetailView {
                     model: model
                 )
             } catch {
-                AppLog.ui.atError.error("Auto-tagging failed: \(error, privacy: .public)")
+                let code = (error as? AppError)?.logCode ?? "unexpected"
+                AppLog.ui.atError.error("Auto-tagging failed code=\(code, privacy: .public)")
                 autoTagError = .autoTaggingFailed(error.localizedDescription)
             }
         }

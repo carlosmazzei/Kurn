@@ -13,6 +13,11 @@ import Foundation
 import KurnCore
 
 struct SummaryService {
+    struct TranscriptGroup {
+        let offset: TimeInterval
+        let segments: [TranscriptSegment]
+        let highlights: [Highlight]
+    }
 
     /// Transcripts at or below this size are summarized in a single request.
     /// ~80k chars ≈ 20k tokens — inside every cloud vendor's context window
@@ -275,7 +280,7 @@ struct SummaryService {
     /// timestamps read as one continuous, chronologically ordered timeline across
     /// multiple recordings rather than restarting at 0:00 per segment.
     static func assembleTranscriptText(
-        from groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])]
+        from groups: [TranscriptGroup]
     ) -> String {
         var lines: [String] = []
         for group in groups {
