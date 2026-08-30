@@ -818,6 +818,29 @@ extension ProviderHTTPTests {
         }
     }
 
+    @Test func cancelledOperationDoesNotStartOrRetryARequest() async throws {
+        MockURLProtocol.enqueue([MockURLProtocol.json(["ok": true])])
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+
+        let cancelled = await Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try await LLMHTTP.sendValidated(
+                    request,
+                    session: MockURLProtocol.session()
+                )
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }.value
+
+        #expect(cancelled)
+        #expect(MockURLProtocol.capturedRequests.isEmpty)
+    }
+
     @Test func retryUsesTheRemainingDeadlineAsAttemptTimeout() async throws {
         MockURLProtocol.enqueue([
             .success(status: 429, body: Data(), headers: ["Retry-After": "1"]),

@@ -539,13 +539,10 @@ private final class BoundedHTTPDataDelegate: NSObject, URLSessionDataDelegate, @
                 let cancelled = lock.withLock {
                     self.continuation = continuation
                     self.task = task
+                    task.resume()
                     return self.cancelled
                 }
-                if cancelled {
-                    task.cancel()
-                } else {
-                    task.resume()
-                }
+                if cancelled { task.cancel() }
             }
         } onCancel: {
             let task = self.lock.withLock {
