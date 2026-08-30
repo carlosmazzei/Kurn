@@ -13,6 +13,46 @@ import Testing
 @Suite(.serialized)
 struct TempFileCleanerTests {
 
+    @Test func legacyEventCompletionsDrainExactlyOnce() {
+        let store = BackgroundEventCompletionStore()
+        store.append {}
+        store.append {}
+
+        #expect(store.count == 2)
+        #expect(store.drain().count == 2)
+        #expect(store.drain().isEmpty)
+    }
+
+    @Test func unrelatedBackgroundSessionCompletesImmediately() async {
+        await withCheckedContinuation { continuation in
+            WhisperBackgroundUploader.handleEvents(identifier: "other.session") {
+                continuation.resume()
+            }
+        }
+    }
+
+    @Test func legacyOrphanResponseIsCancelledBeforeBuffering() async throws {
+        let uploader = WhisperBackgroundUploader()
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let url = try #require(URL(string: "https://api.example.com/v1"))
+        let task = session.dataTask(with: url)
+        let response = try #require(HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Length": "999999999"]
+        ))
+
+        let disposition = await withCheckedContinuation { continuation in
+            uploader.urlSession(session, dataTask: task, didReceive: response) {
+                continuation.resume(returning: $0)
+            }
+        }
+
+        #expect(disposition == .cancel)
+    }
+
     @Test func cleanupOrphanedTempFilesRemovesOldFilesAndKeepsNewOnes() async throws {
         try await tempFileTestLock.run {
             let tmp = FileManager.default.temporaryDirectory

@@ -15,6 +15,7 @@ import KurnCore
 final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
 
     static let sessionIdentifier = "ai.kurn.whisper.upload"
+    static let maxLegacyResponseBytes = HTTPPolicy.defaultMaxResponseBytes
     static let shared = WhisperBackgroundUploader()
 
     /// All mutable state below is guarded by `lock`; delegate callbacks arrive
@@ -24,9 +25,14 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
     private var continuations: [Int: CheckedContinuation<(Data, URLResponse), Error>] = [:]
     private var buffers: [Int: Data] = [:]
     private var bodyFiles: [Int: URL] = [:]
-    private var eventsCompletionHandler: (@Sendable () -> Void)?
+    private var terminalErrors: [Int: Error] = [:]
+    private var storedSession: URLSession?
+    private let eventCompletions = BackgroundEventCompletionStore()
 
-    private lazy var session: URLSession = {
+    private var session: URLSession {
+        lock.lock()
+        defer { lock.unlock() }
+        if let storedSession { return storedSession }
         let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
         // Start transfers immediately — the user asked for this transcription;
         // don't let the system defer it for battery/network heuristics.
@@ -36,21 +42,21 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
         // well under an hour on any usable link; without a bound a dead
         // transfer would pin its continuation for the default 7 days.
         config.timeoutIntervalForResource = 3600
-        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
-    }()
+        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        storedSession = session
+        return session
+    }
 
     /// Relaunch hook: iOS calls the app delegate when transfers for this
     /// session finished while the app was dead. Touching `session` recreates
     /// it with the delegate attached so the pending events are delivered;
-    /// the stored completion handler then tells the system we're done.
+    /// the stored completion handlers then tell the system we're done.
     static func handleEvents(identifier: String, completionHandler: @escaping @Sendable () -> Void) {
         guard identifier == sessionIdentifier else {
             completionHandler()
             return
         }
-        shared.lock.lock()
-        shared.eventsCompletionHandler = completionHandler
-        shared.lock.unlock()
+        shared.eventCompletions.append(completionHandler)
         _ = shared.session
     }
 
@@ -160,10 +166,36 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
 
 extension WhisperBackgroundUploader: URLSessionDataDelegate {
 
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        lock.lock()
+        let isAwaited = continuations[dataTask.taskIdentifier] != nil
+        let isOversized = response.expectedContentLength > Int64(Self.maxLegacyResponseBytes)
+        if isAwaited && isOversized {
+            terminalErrors[dataTask.taskIdentifier] = AppError.providerResponseTooLarge
+        }
+        lock.unlock()
+        completionHandler(isAwaited && !isOversized ? .allow : .cancel)
+    }
+
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         lock.lock()
-        buffers[dataTask.taskIdentifier, default: Data()].append(data)
+        let taskID = dataTask.taskIdentifier
+        let currentCount = buffers[taskID]?.count ?? 0
+        let shouldCancel = continuations[taskID] == nil
+            || terminalErrors[taskID] != nil
+            || data.count > Self.maxLegacyResponseBytes - currentCount
+        if !shouldCancel {
+            buffers[taskID, default: Data()].append(data)
+        } else if continuations[taskID] != nil && terminalErrors[taskID] == nil {
+            terminalErrors[taskID] = AppError.providerResponseTooLarge
+        }
         lock.unlock()
+        if shouldCancel { dataTask.cancel() }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
@@ -171,6 +203,7 @@ extension WhisperBackgroundUploader: URLSessionDataDelegate {
         let continuation = continuations.removeValue(forKey: task.taskIdentifier)
         let buffer = buffers.removeValue(forKey: task.taskIdentifier) ?? Data()
         let bodyFile = bodyFiles.removeValue(forKey: task.taskIdentifier)
+        let terminalError = terminalErrors.removeValue(forKey: task.taskIdentifier)
         lock.unlock()
         if let bodyFile {
             try? FileManager.default.removeItem(at: bodyFile)
@@ -183,9 +216,11 @@ extension WhisperBackgroundUploader: URLSessionDataDelegate {
             AppLog.transcription.atInfo.info("bgUpload: orphaned task \(task.taskIdentifier, privacy: .public) completed")
             return
         }
-        if let error {
+        if let terminalError {
+            continuation.resume(throwing: terminalError)
+        } else if let error {
             let urlError = (error as? URLError) ?? URLError(.unknown)
-            AppLog.transcription.atError.error("bgUpload: task=\(task.taskIdentifier, privacy: .public) failed: \(urlError.localizedDescription, privacy: .public) (code=\(urlError.code.rawValue, privacy: .public))")
+            AppLog.transcription.atError.error("bgUpload: task=\(task.taskIdentifier, privacy: .public) failed code=\(urlError.code.rawValue, privacy: .public)")
             continuation.resume(throwing: AppError.networkError(urlError))
         } else if let response = task.response {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -198,12 +233,30 @@ extension WhisperBackgroundUploader: URLSessionDataDelegate {
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        lock.lock()
-        let handler = eventsCompletionHandler
-        eventsCompletionHandler = nil
-        lock.unlock()
-        if let handler {
+        for handler in eventCompletions.drain() {
             DispatchQueue.main.async(execute: handler)
+        }
+    }
+}
+
+final class BackgroundEventCompletionStore: @unchecked Sendable {
+    typealias Handler = @Sendable () -> Void
+
+    private let lock = NSLock()
+    private var handlers: [Handler] = []
+
+    var count: Int {
+        lock.withLock { handlers.count }
+    }
+
+    func append(_ handler: @escaping Handler) {
+        lock.withLock { handlers.append(handler) }
+    }
+
+    func drain() -> [Handler] {
+        lock.withLock {
+            defer { handlers.removeAll() }
+            return handlers
         }
     }
 }
@@ -219,13 +272,10 @@ private final class UploadTaskHolder: @unchecked Sendable {
     func start(_ task: URLSessionUploadTask) {
         lock.lock()
         self.task = task
+        task.resume()
         let cancelled = self.cancelled
         lock.unlock()
-        if cancelled {
-            task.cancel()
-        } else {
-            task.resume()
-        }
+        if cancelled { task.cancel() }
     }
 
     func cancel() {
