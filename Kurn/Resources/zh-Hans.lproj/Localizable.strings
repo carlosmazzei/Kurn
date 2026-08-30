@@ -4,6 +4,7 @@
 "error.no_api_key" = "未为 %@ 配置 API 密钥。请在设置中添加。";
 "error.network" = "网络错误：%@";
 "error.api" = "API 错误 %1$d：%2$@";
+"error.invalid_provider_url" = "提供方 URL 无效或不被允许。请使用不含凭据、查询参数、片段或自定义端口的公共 HTTPS 主机名。";
 "error.transcription" = "转录失败：%@";
 "error.audio" = "音频错误：%@";
 "error.decoding" = "无法读取响应：%@";
@@ -468,7 +469,7 @@
 "settings.provider_name" = "提供方名称";
 "settings.provider_type" = "提供方类型";
 "settings.base_url" = "基础 URL";
-"settings.base_url_footer" = "使用提供方 API 的基础 URL，例如 https://api.openai.com/v1。";
+"settings.base_url_footer" = "请使用不含凭据、查询参数、片段或自定义端口的公共 HTTPS API 主机名。";
 "settings.credentials" = "凭据";
 "settings.delete_provider" = "删除提供方";
 "settings.delete_provider.confirm" = "删除此提供方？";

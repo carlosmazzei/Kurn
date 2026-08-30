@@ -4,6 +4,7 @@
 "error.no_api_key" = "No API key configured for %@. Add one in Settings.";
 "error.network" = "Network error: %@";
 "error.api" = "API error %1$d: %2$@";
+"error.invalid_provider_url" = "The provider URL is invalid or not allowed. Use a public HTTPS hostname without credentials, query parameters, fragments, or custom ports.";
 "error.transcription" = "Transcription failed: %@";
 "error.audio" = "Audio error: %@";
 "error.decoding" = "Could not read the response: %@";
@@ -468,7 +469,7 @@
 "settings.provider_name" = "Provider Name";
 "settings.provider_type" = "Provider Type";
 "settings.base_url" = "Base URL";
-"settings.base_url_footer" = "Use the provider API base URL, for example https://api.openai.com/v1.";
+"settings.base_url_footer" = "Use a public HTTPS API hostname without credentials, query parameters, fragments, or custom ports.";
 "settings.credentials" = "Credentials";
 "settings.delete_provider" = "Delete Provider";
 "settings.delete_provider.confirm" = "Delete this provider?";

@@ -4,6 +4,7 @@
 "error.no_api_key" = "Nenhuma chave de API configurada para %@. Adicione uma nos Ajustes.";
 "error.network" = "Erro de rede: %@";
 "error.api" = "Erro da API %1$d: %2$@";
+"error.invalid_provider_url" = "A URL do provedor é inválida ou não permitida. Use um nome de host HTTPS público sem credenciais, parâmetros de consulta, fragmentos ou portas personalizadas.";
 "error.transcription" = "Falha na transcrição: %@";
 "error.audio" = "Erro de áudio: %@";
 "error.decoding" = "Não foi possível ler a resposta: %@";
@@ -468,7 +469,7 @@
 "settings.provider_name" = "Nome do Provedor";
 "settings.provider_type" = "Tipo de Provedor";
 "settings.base_url" = "URL Base";
-"settings.base_url_footer" = "Use a URL base da API do provedor, por exemplo https://api.openai.com/v1.";
+"settings.base_url_footer" = "Use um nome de host HTTPS público, sem credenciais, parâmetros de consulta, fragmentos ou portas personalizadas.";
 "settings.credentials" = "Credenciais";
 "settings.delete_provider" = "Apagar Provedor";
 "settings.delete_provider.confirm" = "Apagar este provedor?";

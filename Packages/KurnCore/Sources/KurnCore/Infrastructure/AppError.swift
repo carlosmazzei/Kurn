@@ -13,6 +13,7 @@ public enum AppError: LocalizedError, Identifiable {
     case noAPIKey(provider: String)
     case networkError(URLError)
     case apiError(statusCode: Int, message: String)
+    case invalidProviderURL
     case transcriptionFailed(String)
     case transcriptionLanguageUnsupported(MeetingLanguage, TranscriptionEngine)
     case audioError(String)
@@ -47,6 +48,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .noAPIKey: return "missing_api_key"
         case .networkError: return "network"
         case .apiError: return "provider_api"
+        case .invalidProviderURL: return "provider_configuration"
         case .transcriptionFailed: return "transcription"
         case .transcriptionLanguageUnsupported: return "transcription_language_unsupported"
         case .audioError: return "audio"
@@ -88,6 +90,11 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.api", comment: "API failure"),
                 statusCode, message
+            )
+        case .invalidProviderURL:
+            return NSLocalizedString(
+                "error.invalid_provider_url",
+                comment: "Provider URL is not allowed"
             )
         case .transcriptionFailed(let detail):
             return String(

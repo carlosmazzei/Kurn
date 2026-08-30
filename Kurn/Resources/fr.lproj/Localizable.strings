@@ -4,6 +4,7 @@
 "error.no_api_key" = "Aucune clé API configurée pour %@. Ajoutez-en une dans Réglages.";
 "error.network" = "Erreur réseau : %@";
 "error.api" = "Erreur API %1$d : %2$@";
+"error.invalid_provider_url" = "L’URL du fournisseur est invalide ou non autorisée. Utilisez un nom d’hôte HTTPS public sans identifiants, paramètres de requête, fragment ni port personnalisé.";
 "error.transcription" = "Échec de la transcription : %@";
 "error.audio" = "Erreur audio : %@";
 "error.decoding" = "Impossible de lire la réponse : %@";
@@ -468,7 +469,7 @@
 "settings.provider_name" = "Nom du fournisseur";
 "settings.provider_type" = "Type de fournisseur";
 "settings.base_url" = "URL de base";
-"settings.base_url_footer" = "Utilisez l'URL de base de l'API du fournisseur, par exemple https://api.openai.com/v1.";
+"settings.base_url_footer" = "Utilisez un nom d’hôte HTTPS public, sans identifiants, paramètres de requête, fragment ni port personnalisé.";
 "settings.credentials" = "Identifiants";
 "settings.delete_provider" = "Supprimer le fournisseur";
 "settings.delete_provider.confirm" = "Supprimer ce fournisseur ?";

@@ -114,6 +114,30 @@ struct ProviderFactoryTests {
         }
     }
 
+    @Test func factoriesRejectInvalidCustomURLsBeforeReadingCredentials() {
+        let provider = AIProvider.custom(
+            displayName: "Broken",
+            kind: .openAICompatible,
+            baseURLString: "https://127.0.0.1/v1"
+        )
+
+        do {
+            _ = try ProviderFactory.summaryProvider(for: provider, model: "gpt-test")
+            Issue.record("Expected invalidProviderURL for summary")
+        } catch AppError.invalidProviderURL {
+        } catch {
+            Issue.record("Unexpected summary error: \(error)")
+        }
+
+        do {
+            _ = try ProviderFactory.whisperProvider(for: provider, model: "whisper-test")
+            Issue.record("Expected invalidProviderURL for transcription")
+        } catch AppError.invalidProviderURL {
+        } catch {
+            Issue.record("Unexpected transcription error: \(error)")
+        }
+    }
+
     // MARK: - Apple On-Device
 
     /// `SystemLanguageModel.default.availability` can't be forced into a

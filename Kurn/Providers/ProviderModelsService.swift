@@ -94,18 +94,13 @@ struct ProviderModelsService: Sendable {
         configure: (inout URLRequest) -> Void,
         extract: (T) -> [String]
     ) async throws -> [String] {
-        guard let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models") else {
-            throw Self.invalidURL
-        }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: try LLMHTTP.requireEndpoint(provider: provider, path: "models"))
         request.httpMethod = "GET"
         configure(&request)
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
         return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
     }
-
-    private static let invalidURL = AppError.apiError(statusCode: 0, message: "Invalid provider URL")
 
     private func uniqueSorted(_ values: [String]) -> [String] {
         Array(Set(values.filter { !$0.isEmpty })).sorted()

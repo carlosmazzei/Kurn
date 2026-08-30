@@ -4,6 +4,7 @@
 "error.no_api_key" = "Kein API-Schlüssel für %@ konfiguriert. Fügen Sie einen in den Einstellungen hinzu.";
 "error.network" = "Netzwerkfehler: %@";
 "error.api" = "API-Fehler %1$d: %2$@";
+"error.invalid_provider_url" = "Die Anbieter-URL ist ungültig oder nicht zulässig. Verwenden Sie einen öffentlichen HTTPS-Hostnamen ohne Zugangsdaten, Abfrageparameter, Fragmente oder benutzerdefinierte Ports.";
 "error.transcription" = "Transkription fehlgeschlagen: %@";
 "error.audio" = "Audiofehler: %@";
 "error.decoding" = "Antwort konnte nicht gelesen werden: %@";
@@ -468,7 +469,7 @@
 "settings.provider_name" = "Anbietername";
 "settings.provider_type" = "Anbietertyp";
 "settings.base_url" = "Basis-URL";
-"settings.base_url_footer" = "Verwenden Sie die Basis-URL der Anbieter-API, zum Beispiel https://api.openai.com/v1.";
+"settings.base_url_footer" = "Verwenden Sie einen öffentlichen HTTPS-Hostnamen ohne Zugangsdaten, Abfrageparameter, Fragmente oder benutzerdefinierte Ports.";
 "settings.credentials" = "Zugangsdaten";
 "settings.delete_provider" = "Anbieter löschen";
 "settings.delete_provider.confirm" = "Diesen Anbieter löschen?";

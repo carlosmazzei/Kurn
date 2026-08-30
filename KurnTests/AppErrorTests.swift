@@ -32,6 +32,7 @@ struct AppErrorTests {
             .noAPIKey(provider: "OpenAI"),
             .networkError(URLError(.notConnectedToInternet)),
             .apiError(statusCode: 500, message: "boom"),
+            .invalidProviderURL,
             .transcriptionFailed("bad audio"),
             .audioError("mic busy"),
             .decodingError("bad json"),
@@ -57,6 +58,7 @@ struct AppErrorTests {
         let error = AppError.apiError(statusCode: 400, message: "sensitive provider response")
         #expect(error.logCode == "provider_api")
         #expect(!error.logCode.contains("sensitive"))
+        #expect(AppError.invalidProviderURL.logCode == "provider_configuration")
         #expect(AppError.generationTruncated.logCode == "generation_truncated")
         #expect(AppError.documentGenerationFailed("private detail").logCode == "document_generation")
     }

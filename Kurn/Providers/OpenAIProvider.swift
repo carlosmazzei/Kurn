@@ -50,9 +50,8 @@ struct OpenAIProvider: LLMProvider {
     ) async throws -> RawTranscript {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "audio/transcriptions")
-            ?? URL(string: "https://api.openai.com/v1/audio/transcriptions")!
-        AppLog.transcription.atInfo.info("OpenAIProvider: transcribing \(audioData.count, privacy: .public) bytes via \(provider.displayName, privacy: .public) at \(url.absoluteString, privacy: .public), model=\(transcriptionModel, privacy: .public)")
+        let url = try LLMHTTP.requireEndpoint(provider: provider, path: "audio/transcriptions")
+        AppLog.transcription.atInfo.info("OpenAIProvider: transcribing \(audioData.count, privacy: .public) bytes via \(provider.displayName, privacy: .public), model=\(transcriptionModel, privacy: .public)")
 
         do {
             let data = try await send(
@@ -284,7 +283,6 @@ struct OpenAIProvider: LLMProvider {
         try LLMHTTP.jsonRequest(
             provider: provider,
             path: "chat/completions",
-            fallbackURL: "https://api.openai.com/v1/chat/completions",
             timeout: timeout,
             headers: ["Authorization": "Bearer \(apiKey)"],
             body: body
