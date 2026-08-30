@@ -70,7 +70,7 @@ final class RecordingCompactionViewModel {
     /// checkpointed recording is still going to be read by the pipeline, and
     /// swapping the file underneath it would corrupt the resume.
     private static func candidate(for recording: Recording) -> RecordingCompactor.Candidate? {
-        guard recording.transcriptionStatus == .done else { return nil }
+        guard recording.isReadyForConsumption, recording.transcriptionStatus == .done else { return nil }
         return RecordingCompactor.Candidate(
             fileName: recording.fileName,
             duration: recording.duration,
@@ -128,7 +128,8 @@ final class RecordingCompactionViewModel {
         // Index by file name so each result can be written back to its row
         // without holding the model objects across a suspension.
         var byFileName: [String: Recording] = [:]
-        for recording in recordings where recording.transcriptionStatus == .done {
+        for recording in recordings where recording.isReadyForConsumption
+            && recording.transcriptionStatus == .done {
             byFileName[recording.fileName] = recording
         }
         let candidates = compactor.candidates(from: recordings.compactMap(Self.candidate(for:)))

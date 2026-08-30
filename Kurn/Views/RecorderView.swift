@@ -174,7 +174,7 @@ private struct RecorderContent: View {
                 }
             }
         ))
-        .interactiveDismissDisabled(vm.state != .idle)
+        .interactiveDismissDisabled(vm.state != .idle || vm.isStarting)
     }
 
     // MARK: - Subviews

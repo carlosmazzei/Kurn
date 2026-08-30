@@ -56,7 +56,9 @@ struct MeetingShareSelectionView: View {
         self.meeting = meeting
         self.onShare = onShare
         _selectedSummaryIDs = State(initialValue: preselectedSummary.map { [$0.id] } ?? [])
-        let transcribedIDs = meeting.recordings.filter { $0.transcript != nil }.map(\.id)
+        let transcribedIDs = meeting.recordings
+            .filter { $0.isReadyForConsumption && $0.transcript != nil }
+            .map(\.id)
         _selectedRecordingIDs = State(initialValue: Set(transcribedIDs))
     }
 
@@ -70,7 +72,7 @@ struct MeetingShareSelectionView: View {
         meeting.recordings
             .sorted { $0.recordedAt < $1.recordedAt }
             .enumerated()
-            .filter { $0.element.transcript != nil }
+            .filter { $0.element.isReadyForConsumption && $0.element.transcript != nil }
             .map { (index: $0.offset, recording: $0.element) }
     }
 

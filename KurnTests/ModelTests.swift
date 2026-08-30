@@ -276,6 +276,22 @@ struct ModelTests {
         #expect(Recording(fileName: "a.m4a", duration: 1).fileSize == 0)
     }
 
+    @Test func captureStateDefaultsReadyAndRoundTripsRecovery() {
+        let recording = Recording(fileName: "a.m4a", duration: 1)
+        #expect(recording.captureState == .ready)
+        #expect(recording.isReadyForConsumption)
+
+        recording.captureState = .recoveryNeeded
+        recording.captureRecoveryReason = .writeFailed
+        #expect(recording.captureStateRaw == RecordingCaptureState.recoveryNeeded.rawValue)
+        #expect(recording.captureRecoveryReason == .writeFailed)
+        #expect(!recording.isReadyForConsumption)
+
+        recording.captureStateRaw = "unknown-future-state"
+        #expect(recording.captureState == .recoveryNeeded)
+        #expect(!recording.isReadyForConsumption)
+    }
+
     @Test func fileSizePersistsThroughTheStore() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext

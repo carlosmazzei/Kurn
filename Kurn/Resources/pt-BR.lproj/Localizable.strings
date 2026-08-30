@@ -177,11 +177,14 @@
 /* Gravador */
 "recorder.route_changed" = "Gravação pausada: o dispositivo de áudio mudou (ex.: fones desconectados).";
 "recorder.engine_stalled" = "Gravação pausada: o sistema interrompeu a captura de áudio. Toque em retomar para continuar.";
+"recorder.already_active" = "Uma gravação já está sendo iniciada ou está ativa.";
+"recorder.meeting_unavailable" = "A reunião não está mais disponível na biblioteca ativa.";
 "recorder.write_failed" = "Gravação pausada porque não foi possível salvar o áudio. Verifique o espaço disponível e pare para manter a gravação parcial.";
 "recorder.capture_stalled" = "Gravação pausada porque o áudio parou de chegar ao arquivo. Toque em Retomar para tentar novamente ou em Parar para manter a gravação parcial.";
 "recorder.storage_unknown" = "Não foi possível verificar o espaço disponível. A gravação continuará; monitore o armazenamento do dispositivo.";
 "recorder.storage_low" = "Tempo estimado restante de gravação: %@. Libere espaço ou pare para manter a gravação.";
 "recorder.partial_saved" = "Uma gravação parcial foi salva após uma falha na captura de áudio. Verifique o espaço disponível antes de gravar novamente.";
+"recorder.recovery_failed" = "A gravação ainda está indisponível. O áudio foi preservado para que você tente recuperá-lo novamente.";
 "recorder.title" = "Nova Gravação";
 "recorder.add_title" = "Adicionar título…";
 "recorder.pause" = "Pausar";
@@ -402,6 +405,9 @@
 "detail.playback_position" = "Posição da reprodução";
 "detail.playback_speed" = "Velocidade da reprodução";
 "detail.play_recording" = "Reproduzir gravação";
+"detail.recording_recovery_needed" = "A gravação precisa ser recuperada";
+"detail.recording_recovery_message" = "O áudio foi preservado, mas não pode ser usado até que a recuperação seja concluída.";
+"detail.retry_recovery" = "Tentar recuperar";
 "detail.pause_recording" = "Pausar gravação";
 "detail.skip_backward" = "Voltar 15 segundos";
 "detail.skip_forward" = "Avançar 15 segundos";

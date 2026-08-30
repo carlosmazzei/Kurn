@@ -717,7 +717,7 @@ satisfy part of a planned contract.
 | Track              | Status                 | Implemented evidence and remaining contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **H1**             | **In progress**        | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording now preflights 30 minutes of configured-rate headroom, keeps an unavailable capacity query visibly `unknown`, and refreshes runway every five seconds using measured file growth after ten seconds (never below the conservative configured rate). `RecorderViewModel` preserves warned partial output. Provisional rows, authoritative final-file validation, and the process-death/device matrix remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **H1**             | **Core implemented**   | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording preflights and measures storage runway. A `Recording` row now owns a UUID-derived file before open and moves durably through `preparing → recording → finalizing → ready/recoveryNeeded`; re-entry and cross-context ownership fail before capture. One shared finalizer reopens the closed file, measures duration/bytes and applies/verifies protection before `ready`. Launch/foreground recovery reconciles interrupted rows, preserves partial bytes, and exposes explicit retry while playback, transcription, export, compaction and enhancement reject non-ready rows. Focused fault suites and the full simulator suite cover the core; real-device protection, interruption/route, long-background and low-storage scenarios remain the release checklist.                                                                                                                                                                                                                                                               |
 | **H2**             | **Seam only**          | Container creation is injectable through `ModelContainerBootstrap`, but production still terminates with `fatalError`; versioned schemas, migrations, backups, failure classification, and recovery UI remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **H3**             | **Foundation only**    | Recovery preserves some large unreadable orphan files, but unmatched/malformed/small originals can still be deleted and model/file mutations have no journal, trash, quarantine, or typed authoritative JSON corruption path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -747,18 +747,18 @@ The plan builds on these controls rather than replacing them:
 These are verified code paths or direct consequences of them, not hypothetical
 feature requests:
 
-| Item    | Observed seam                                                                                                                                                                                      | Failure if it remains                                                                                                       | Priority              |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| **H1**  | Sink failures, a written-frame watchdog, and configured/measured storage runway are visible; elapsed duration is still wall-clock and there is no provisional capture row or final-file validation | Process death still relies on filename recovery, and an unreadable or empty file can still pass finalization                | **P0**                |
-| **H2**  | Production `ModelContainer` construction ends in `fatalError`; there is no `VersionedSchema`/`SchemaMigrationPlan`                                                                                 | Corruption, incompatible schema, or a locked protected store can create a launch crash loop                                 | **P0**                |
-| **H3**  | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content                                   | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0**                |
-| **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                 | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                    | **P0**                |
-| **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                              | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
-| **H6**  | App-owned large transfers enforce user-selected expensive/constrained flags; FluidAudio is preflight-gated because its internal session is not configurable                                        | A network becoming expensive after a FluidAudio download starts cannot yet be cancelled through the library                 | **P1**                |
-| **H7**  | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally                                                                   | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed                     | **P1**                |
-| **H8**  | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts                                                   | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion            | **P1**                |
-| **H9**  | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription`                                                                             | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended    | **P1**                |
-| **H10** | Clean-path CI does not inject store, filesystem, lock, process-death, route, redirect, or response-loss failures                                                                                   | The contracts above can regress while every ordinary test stays green                                                       | **P0, cross-cutting** |
+| Item    | Observed seam                                                                                                                                                                                                                       | Failure if it remains                                                                                                       | Priority              |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **H1**  | Durable capture ownership, file-measured finalization, recovery rows and ready-only consumer gates are implemented; simulator tests cannot observe iOS Data Protection or reproduce physical route/interruption/background pressure | A device-only regression could still interrupt capture or misclassify protection until the release matrix is executed       | **P0 release gate**   |
+| **H2**  | Production `ModelContainer` construction ends in `fatalError`; there is no `VersionedSchema`/`SchemaMigrationPlan`                                                                                                                  | Corruption, incompatible schema, or a locked protected store can create a launch crash loop                                 | **P0**                |
+| **H3**  | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content                                                                    | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0**                |
+| **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                                                  | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                    | **P0**                |
+| **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                                                               | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
+| **H6**  | App-owned large transfers enforce user-selected expensive/constrained flags; FluidAudio is preflight-gated because its internal session is not configurable                                                                         | A network becoming expensive after a FluidAudio download starts cannot yet be cancelled through the library                 | **P1**                |
+| **H7**  | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally                                                                                                    | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed                     | **P1**                |
+| **H8**  | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts                                                                                    | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion            | **P1**                |
+| **H9**  | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription`                                                                                                              | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended    | **P1**                |
+| **H10** | Clean-path CI does not inject store, filesystem, lock, process-death, route, redirect, or response-loss failures                                                                                                                    | The contracts above can regress while every ordinary test stays green                                                       | **P0, cross-cutting** |
 
 ### H1 · Lossless capture and truthful finalization — P0
 
@@ -776,26 +776,135 @@ feature requests:
    configured-rate headroom above a 10 MB reserve. Capacity is refreshed every
    five seconds; after ten seconds of output, file growth raises the estimate to
    the measured byte rate. Query failure remains a visible `unknown` warning.
-4. Create and durably save a provisional `Recording`/capture operation before
-   opening the file. Move it through `preparing → recording → finalizing → ready`
-   (or `recoveryNeeded`) so process death does not rely only on parsing a file
-   name to rediscover ownership.
-5. On stop, close the encoder, reopen the file, validate readability, actual
-   sample duration, non-zero size, and protection class, then commit `ready`.
-   Keep wall-clock duration only as diagnostic context; the file is authoritative.
-6. Make resume/start failures actionable. If an engine restart fails, retain the
-   partial recording and offer retry input, finish/save, or stop — never a silent
-   no-op.
+4. **Implemented (2026-08-30).** A UUID-backed `Recording`/capture operation is
+   durably saved before file open and moves through `preparing → recording →
+   finalizing → ready` (or `recoveryNeeded`). New filenames bind the meeting and
+   recording identities; filename parsing remains only for legacy orphan recovery.
+5. **Implemented (2026-08-30).** Stop closes the encoder, then one shared finalizer
+   reopens the file, validates readability, measured sample duration, non-zero size
+   and protection before `ready`. Wall-clock duration remains diagnostic only.
+6. **Implemented for the core flow (2026-08-30).** Start is re-entry/cancellation
+   aware; failed or interrupted capture preserves a recovery row and any useful
+   bytes. The detail screen exposes retry/finalize and confirmed deletion while
+   normal consumers reject non-ready rows. Device interruption/route behavior
+   remains in the release matrix.
 
 **Done when.** Every injected write/conversion/disk-full failure is visible within
 a bounded interval; no invalid/empty file is reported as saved; killing the app
 before open, during capture, during close, and during the final SwiftData save
 always converges to either a valid recording or an explicit recoverable artifact.
 
-**Verification.** Add a protocol-backed sink/file writer, deterministic frame and
-clock probes, disk-full/write-failure tests, route/interruption/media-reset tests,
-and a real-device matrix covering screen lock, calls/Siri interruptions,
-Bluetooth disconnect/reconnect, long background capture, and low storage.
+**Verification evidence.** Protocol-backed sink/finalizer seams cover write,
+conversion, stall, final-drain, missing/empty/unreadable/protection failures and
+provisional ownership before file creation. Recovery tests exercise `preparing`,
+`recording`, `finalizing`, explicit acceptance of a validated partial, legacy
+orphans and active-session exclusion. The 2026-08-30 simulator run passed 738
+cases with six intentional skips after excluding the environment-dependent local-
+model inventory suite; 83 KurnCore cases and SwiftLint also passed. Route/
+interruption/media-reset tests and the real-device screen-lock, calls/Siri,
+Bluetooth, long-background and low-storage matrix remain release gates.
+
+#### H1 implementation handoff (2026-08-30)
+
+This is the continuation point for a new engineering session. The implementation
+lives on branch `devin/resilience-h1-capture-lifecycle`, based on the merge of PR
+#152. Inspect the remote branch and GitHub before resuming so a later PR/merge is
+not duplicated.
+
+**Landed in the working tree.**
+
+- `RecordingCaptureState.swift` defines the durable capture lifecycle and stable
+  recovery reasons. `Recording` stores both raw values, defaults legacy rows to
+  `ready`, and fails an unknown future state closed as `recoveryNeeded`.
+- `RecorderViewModel.prepareCaptureOwnership()` inserts and commits a UUID-backed
+  provisional row before `AudioRecorderService` can open its file. The filename
+  contains both meeting and recording IDs. A foreign `ModelContext`, re-entrant
+  start, or provisional-save failure stops before capture.
+- `RecordingLifecycleSaving` is the narrow SwiftData commit seam. Tests inject
+  provisional/final save failures and prove the last committed state remains the
+  authority instead of the in-memory mutation.
+- `AudioRecorderService.start(fileName:)` reserves the destination before async
+  setup, rejects duplicate start, observes task cancellation around session/
+  engine setup, and cleans up a cancelled or failed start. Explicit cancellation
+  during setup cannot later produce a headless recording.
+- `RecordingFileFinalizer` is shared by normal stop and recovery. It requires an
+  existing non-empty readable file, derives duration from samples, and applies/
+  verifies `.completeUnlessOpen` before returning authoritative metadata.
+  Protection readback is intentionally skipped on the simulator because that
+  environment does not expose iOS Data Protection; an injected failure covers
+  the code path and the physical-device matrix covers enforcement.
+- Stop commits `finalizing` before teardown and only commits `ready` after the
+  finalizer succeeds. Sink/stall/validation failures preserve useful bytes as
+  `recoveryNeeded`; a known failed start with zero bytes removes its provisional
+  row instead of creating a false recoverable artifact.
+- `RecordingRecovery` reconciles `preparing`, `recording` and `finalizing` rows at
+  launch/foreground through the same finalizer, keeps the legacy filename scan
+  for pre-lifecycle files, and exposes explicit retry to accept a validated
+  partial recording.
+- Meeting detail renders a recovery row and retry action. Playback,
+  transcription/recovery scheduling, export/share, compaction and enhancement
+  reject non-ready rows. `SegmentPlaybackScrubber` moved to its own file so this
+  UI work did not push `MeetingDetailView` over its serious lint limit.
+- All seven localizations contain the new capture/recovery strings. `CLAUDE.md`
+  records the lifecycle and the single-finalizer rule.
+
+**Verification observed locally.**
+
+- `swiftlint lint --config .swiftlint.yml`: zero serious violations. Remaining
+  warnings are the repository's existing warning-level debt; no new
+  `RecorderViewModel` complexity warning remains.
+- Focused ownership/finalizer/recovery/sink suites pass, including foreign-context,
+  provisional-save, final-save, protection, interrupted-state and legacy-orphan
+  cases.
+- `xcodebuild ... test -skip-testing:KurnTests/WhisperCppModelTests`: 738 passed,
+  zero failed, six intentional skips. The excluded suite inspects models installed
+  on the developer machine and is the already documented environment-dependent
+  local inventory test.
+- `swift test` in `Packages/KurnCore`: 83 passed.
+- Localization key parity/duplicates and `git diff --check`: clean.
+
+The first full run provided useful fault evidence: a `RecordingLauncher` test left
+a pending `Meeting` from a test `ModelContext` in the app-wide singleton, and the
+app UI attempted to use it with the production context. SwiftData aborted in the
+new provisional insert. The capture boundary now rejects that mismatch before
+insert, and `RecorderCaptureOwnershipTests` pins the regression. Durable launcher
+queue ownership/deduplication remains H8 rather than being expanded in this PR.
+
+**Continuation checklist.**
+
+1. Keep the Xcode-generated
+   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` out
+   of this resilience change unless dependency pinning is reviewed separately.
+2. Open or inspect the H1 PR and use its GitHub `iOS CI` result as the final merge
+   source of truth. The local suite excluded only the known model-inventory test;
+   CI starts from a clean runner and should execute its normal configuration.
+3. Keep the real-device H1 matrix open as a release gate: protection readback,
+   lock during capture, calls/Siri, Bluetooth disconnect/reconnect, long
+   background recording and nearly-full storage.
+
+**Next code PR: H2 schema baseline only.** Start it from updated `main` after H1
+merges; do not stack it on the unmerged H1 branch. Keep the first H2 review small:
+
+1. Centralize the complete model list currently embedded in `KurnApp` so
+   production, screenshot containers and `TestModelContainer` cannot diverge.
+2. Declare that graph as the first `VersionedSchema` and add an explicit
+   `SchemaMigrationPlan`; preserve current production bytes and treat local
+   development reset only as a development convenience.
+3. Establish committed synthetic fixtures for the oldest supported released
+   layouts and a migration/open round trip covering relationships, transcript/
+   summary JSON, checkpoints and the new capture recovery state. Investigate and
+   document how the existing unversioned SwiftData store is adopted before
+   changing the production configuration—do not assume it migrates.
+4. Make schema/version selection injectable through `ModelContainerBootstrap`
+   and extend `ModelContainerBootstrapTests`; do not add backup/salvage UI or
+   remove the production `fatalError` in this first PR.
+5. Done means current stores and every committed fixture open without silent
+   reset, the centralized schema is used everywhere, Release and Debug builds
+   pass, and a future model change cannot land without a migration stage/fixture.
+
+The following H2 PR then introduces the boot state machine and failure
+classification; protected backup/restore/salvage/recovery UI remains the third H2
+PR, matching the dependency order below.
 
 ### H2 · Recoverable store bootstrap and explicit migrations — P0
 
@@ -1247,19 +1356,21 @@ migrates.
 
 #### Current next execution order (2026-08-30)
 
-1. **Finish H1 (P0): provisional capture ownership.** Persist the recording/
-   operation before opening audio, then model the lifecycle as
-   `preparing → recording → finalizing → ready/recoveryNeeded` so process death
-   has authoritative ownership.
-2. **Finish H1 (P0): truthful final-file commit.** Reopen and validate readability,
-   non-zero bytes, measured duration and protection before marking the recording
-   ready; keep partial output and recovery actions on restart failure.
-3. **Start H2 (P0): recoverable store bootstrap.** Introduce versioned schemas,
-   migration fixtures, protected backup/salvage and remove production `fatalError`.
-4. **Then H3/H4 (P0): mutation journal and resume identity.** Make destructive
-   file/model changes recoverable before strengthening checkpoint fingerprints and
-   throwing durable chunk commits.
-5. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
+1. **Start H2 (P0): versioned schema baseline.** Declare the current model graph
+   as a `VersionedSchema`, add the migration plan and committed N-1/N-2 fixtures
+   before another additive model change lands.
+2. **Finish H2 (P0): recoverable bootstrap.** Replace production `fatalError` with
+   protected-data/opening/recovery states, then add protected backup, restore,
+   salvage and explicitly confirmed fresh start.
+3. **Then H3 (P0): mutation journal and corruption visibility.** Fail closed on
+   unprotected storage, preserve unmatched originals in quarantine, journal model/
+   file mutations and make authoritative JSON corruption typed.
+4. **Then H4 (P0): resume identity and throwing commits.** Fingerprint source,
+   configuration, model and chunk plan; do not start the next chunk until its
+   checkpoint is durable.
+5. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
+   route, lock/background and low-storage matrix without delaying the next code P0.
+6. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
    dependency; H9 owns dedicated waiting/cancellation presentation.
 
 P0 containment and durability take precedence over new features that widen the

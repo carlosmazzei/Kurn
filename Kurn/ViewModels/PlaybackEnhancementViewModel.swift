@@ -64,6 +64,7 @@ final class PlaybackEnhancementViewModel {
     /// - Parameter onReady: run on success, so the caller can switch playback over
     ///   the moment the copy exists instead of making the user tap a second time.
     func ensureEnhancedAudio(for recording: Recording, onReady: (() -> Void)? = nil) {
+        guard recording.isReadyForConsumption else { return }
         if hasEnhancedAudio(recording) {
             onReady?()
             return

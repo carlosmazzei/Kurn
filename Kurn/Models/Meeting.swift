@@ -139,17 +139,18 @@ final class Meeting {
 
     /// Aggregate transcription status shown as a badge in the list.
     var aggregateStatus: TranscriptionStatus {
-        guard !recordings.isEmpty else { return .none }
-        if recordings.contains(where: { $0.transcriptionStatus == .inProgress }) {
+        let ready = recordings.filter(\.isReadyForConsumption)
+        guard !ready.isEmpty else { return .none }
+        if ready.contains(where: { $0.transcriptionStatus == .inProgress }) {
             return .inProgress
         }
-        if recordings.contains(where: { $0.transcriptionStatus == .pending }) {
+        if ready.contains(where: { $0.transcriptionStatus == .pending }) {
             return .pending
         }
-        if recordings.allSatisfy({ $0.transcriptionStatus == .done }) {
+        if ready.allSatisfy({ $0.transcriptionStatus == .done }) {
             return .done
         }
-        if recordings.contains(where: { $0.transcriptionStatus == .failed }) {
+        if ready.contains(where: { $0.transcriptionStatus == .failed }) {
             return .failed
         }
         return .none

@@ -39,8 +39,11 @@ enum TranscriptionRecovery {
     ) {
         let context = modelContainer.mainContext
         let inProgressRaw = TranscriptionStatus.inProgress.rawValue
+        let readyRaw = RecordingCaptureState.ready.rawValue
         let descriptor = FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.transcriptionStatusRaw == inProgressRaw }
+            predicate: #Predicate {
+                $0.transcriptionStatusRaw == inProgressRaw && $0.captureStateRaw == readyRaw
+            }
         )
         guard let inProgress = try? context.fetch(descriptor) else { return }
         let stale = inProgress.filter { !activeIDs.contains($0.id) }

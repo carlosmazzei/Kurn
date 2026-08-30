@@ -78,6 +78,10 @@ enum AudioFileStore {
         "\(meetingID.uuidString)_\(date.fileTimestamp).m4a"
     }
 
+    static func fileName(meetingID: UUID, recordingID: UUID) -> String {
+        "\(meetingID.uuidString)_\(recordingID.uuidString).m4a"
+    }
+
     /// Resolve a stored file name to its absolute URL, preferring the
     /// protected subdirectory. Pre-migration files still in Documents are
     /// honoured as a fallback so an upgrade-in-progress launch doesn't

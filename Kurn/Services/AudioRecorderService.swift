@@ -33,14 +33,30 @@ struct AudioRecordingResult {
     let captureFailure: AudioSinkFailure?
 }
 
+enum AudioRecorderState: Equatable {
+    case idle
+    case recording
+    case paused
+}
+
+/// Why `pause()` was invoked. Attached to the diagnostic log line so
+/// Console / exported logs show WHY a recording paused — especially for
+/// the automatic triggers that fire without any user interaction.
+enum AudioRecorderPauseReason: String {
+    case userToggle = "user toggled pause (in-app button or Live Activity pill)"
+    case watchCommand = "Watch app pause command"
+    case audioInterruption = "audio session interruption began"
+    case engineRecoveryFailed = "engine recovery failed (tap rebuild after format change)"
+    case engineRestartFailed = "engine recovery failed (engine.start() after rebuild)"
+    case routeChanged = "input route became unavailable (oldDeviceUnavailable)"
+    case sinkFailure = "audio conversion or file write failed"
+    case captureStalled = "no output frames reached the recording file"
+}
+
 @MainActor
 @Observable
 final class AudioRecorderService: NSObject {
-    enum State: Equatable {
-        case idle
-        case recording
-        case paused
-    }
+    typealias State = AudioRecorderState
 
     /// Sample rate every recording is stored at, regardless of what the
     /// microphone route negotiates (typically 48kHz built-in, 16kHz Bluetooth
@@ -115,6 +131,7 @@ final class AudioRecorderService: NSObject {
     /// True while `start` is asynchronously spinning up the engine, to block
     /// re-entrant start attempts during that window.
     @ObservationIgnored private var isStarting = false
+    @ObservationIgnored private var startCancellationRequested = false
 
     private var meterTimer: Timer?
     /// Counts metering ticks so we can log progress without flooding the console.
@@ -178,13 +195,17 @@ final class AudioRecorderService: NSObject {
 
     /// Begin recording into a new file for the given meeting. Throws `AppError`
     /// on permission or session/file failures.
-    func start(meetingID: UUID) async throws {
-        AppLog.recorder.atNotice.notice("start: requested for meeting=\(meetingID, privacy: .public) currentState=\(String(describing: self.state), privacy: .public)")
+    func start(fileName: String) async throws {
+        AppLog.recorder.atNotice.notice("start: requested for file=\(fileName, privacy: .public) currentState=\(String(describing: self.state), privacy: .public)")
         guard state == .idle, !isStarting else {
-            AppLog.recorder.atDebug.debug("start: ignored (not idle or already starting)")
-            return
+            AppLog.recorder.atError.error("start: rejected (not idle or already starting)")
+            throw AppError.audioError(NSLocalizedString(
+                "recorder.already_active",
+                comment: "A recording is already starting or active"
+            ))
         }
         isStarting = true
+        startCancellationRequested = false
         captureFailure = nil
         activeCaptureFailure = nil
         defer { isStarting = false }
@@ -195,8 +216,9 @@ final class AudioRecorderService: NSObject {
         let preferredUID = preferredInputUID
         let directory = AudioFileStore.recordingsDirectoryURL
         try prepareStorageForRecording(bitRate: bitRate, directory: directory)
-        let fileName = AudioFileStore.fileName(meetingID: meetingID)
         let url = directory.appendingPathComponent(fileName)
+        currentFileName = fileName
+        currentFileURL = url
         AppLog.recorder.atDebug.debug("start: writing to \(fileName, privacy: .public)")
 
         do {
@@ -210,21 +232,22 @@ final class AudioRecorderService: NSObject {
                 forceBuiltIn: forceBuiltIn,
                 preferredInputUID: preferredUID
             )
+            try Task.checkCancellation()
+            if startCancellationRequested { throw CancellationError() }
         } catch let error as AppError {
             AppLog.recorder.atError.error("start: setup threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
-            teardownEngine()
-            AudioRecorderEngineSupport.deactivateSession()
+            cleanUpFailedStart(fileName: fileName)
             throw error
+        } catch is CancellationError {
+            cleanUpFailedStart(fileName: fileName)
+            throw CancellationError()
         } catch {
             AppLog.recorder.atError.error("start: setup threw: \(error.localizedDescription, privacy: .public)")
-            teardownEngine()
-            AudioRecorderEngineSupport.deactivateSession()
+            cleanUpFailedStart(fileName: fileName)
             throw AppError.audioError(error.localizedDescription)
         }
 
         // Back on the main actor: publish state and start the metering timer.
-        self.currentFileName = fileName
-        self.currentFileURL = url
         self.accumulated = 0
         self.segmentStart = Date()
         self.elapsed = 0
@@ -250,27 +273,25 @@ final class AudioRecorderService: NSObject {
         forceBuiltIn: Bool,
         preferredInputUID: String?
     ) async throws {
+        try Task.checkCancellation()
         try await AudioRecorderEngineSupport.configureSession(
             pickup: pickup,
             forceBuiltIn: forceBuiltIn,
             preferredInputUID: preferredInputUID
         )
+        try Task.checkCancellation()
         try await beginEngine(writingTo: url, bitRate: bitRate)
+        try Task.checkCancellation()
     }
 
-    /// Why `pause()` was invoked. Attached to the diagnostic log line so
-    /// Console / exported logs show WHY a recording paused — especially for
-    /// the automatic triggers that fire without any user interaction.
-    enum PauseReason: String {
-        case userToggle = "user toggled pause (in-app button or Live Activity pill)"
-        case watchCommand = "Watch app pause command"
-        case audioInterruption = "audio session interruption began"
-        case engineRecoveryFailed = "engine recovery failed (tap rebuild after format change)"
-        case engineRestartFailed = "engine recovery failed (engine.start() after rebuild)"
-        case routeChanged = "input route became unavailable (oldDeviceUnavailable)"
-        case sinkFailure = "audio conversion or file write failed"
-        case captureStalled = "no output frames reached the recording file"
+    private func cleanUpFailedStart(fileName: String) {
+        teardownEngine()
+        AudioFileStore.delete(fileName: fileName)
+        resetRuntimeState()
+        AudioRecorderEngineSupport.deactivateSession()
     }
+
+    typealias PauseReason = AudioRecorderPauseReason
 
     func pause(reason: PauseReason) {
         AppLog.recorder.atNotice.notice("pause: called state=\(String(describing: self.state), privacy: .public) reason=\(reason.rawValue, privacy: .public)")
@@ -358,16 +379,7 @@ final class AudioRecorderService: NSObject {
         let finalCaptureFailure = captureFailure ?? sink.snapshot.firstFailure
         let outcome = finalCaptureFailure == nil ? "ready" : "partial"
         AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
-        self.currentFileName = nil
-        self.currentFileURL = nil
-        self.state = .idle
-        self.level = 0
-        self.elapsed = 0
-        self.accumulated = 0
-        self.segmentStart = nil
-        self.highlights = []
-        notifyStateChanged()
-
+        resetRuntimeState()
         AudioRecorderEngineSupport.deactivateSession()
         return AudioRecordingResult(
             fileName: fileName,
@@ -379,20 +391,28 @@ final class AudioRecorderService: NSObject {
 
     /// Abort the current recording and delete its partial file.
     func cancel() {
+        if isStarting {
+            startCancellationRequested = true
+            return
+        }
         guard let fileName = currentFileName else { return }
         stopMetering()
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)
-        self.currentFileName = nil
-        self.currentFileURL = nil
-        self.state = .idle
-        self.level = 0
-        self.elapsed = 0
-        self.accumulated = 0
-        self.segmentStart = nil
-        self.highlights = []
-        notifyStateChanged()
+        resetRuntimeState()
         AudioRecorderEngineSupport.deactivateSession()
+    }
+
+    private func resetRuntimeState() {
+        currentFileName = nil
+        currentFileURL = nil
+        state = .idle
+        level = 0
+        elapsed = 0
+        accumulated = 0
+        segmentStart = nil
+        highlights = []
+        notifyStateChanged()
     }
 
     // MARK: - Engine
@@ -413,7 +433,7 @@ final class AudioRecorderService: NSObject {
         var format = input.outputFormat(forBus: 0)
         if format.sampleRate <= 0 || format.channelCount <= 0 {
             for _ in 0..<4 {
-                try? await Task.sleep(nanoseconds: 150_000_000)
+                try await Task.sleep(nanoseconds: 150_000_000)
                 format = input.outputFormat(forBus: 0)
                 if format.sampleRate > 0, format.channelCount > 0 { break }
             }

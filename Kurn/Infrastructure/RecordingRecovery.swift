@@ -12,6 +12,7 @@
 import ActivityKit
 import AVFoundation
 import Foundation
+import KurnCore
 import SwiftData
 
 enum RecordingRecovery {
@@ -72,6 +73,33 @@ enum RecordingRecovery {
         recoverOrphanedAudioFiles(context: modelContainer.mainContext)
     }
 
+    @MainActor
+    static func retryRecovery(for recording: Recording, context: ModelContext) -> AppError? {
+        do {
+            let metadata = try RecordingFileFinalizer().finalize(fileName: recording.fileName)
+            recording.duration = metadata.duration
+            recording.fileSize = metadata.fileSize
+            recording.captureState = .ready
+            recording.captureRecoveryReason = nil
+            try context.save()
+            return nil
+        } catch let error as RecordingFileFinalizationError {
+            recording.captureState = .recoveryNeeded
+            recording.captureRecoveryReason = error.recoveryReason
+            do {
+                try context.save()
+            } catch {
+                return .persistenceFailed(error.localizedDescription)
+            }
+            return .audioError(NSLocalizedString(
+                "recorder.recovery_failed",
+                comment: "The recording could not be recovered"
+            ))
+        } catch {
+            return .persistenceFailed(error.localizedDescription)
+        }
+    }
+
     /// Snapshot and asynchronously end every leftover Live Activity.
     /// Deliberately nonisolated: the snapshot is created inside this function,
     /// so it forms a disconnected region that can be sent into the ending task
@@ -95,11 +123,14 @@ enum RecordingRecovery {
         // here rather than in a migration keeps it free: this sweep already runs
         // at launch and on every foreground activation.
         var changedAny = backfillFileSizes(in: existing)
+        if reconcileInterruptedCaptures(in: existing) {
+            changedAny = true
+        }
 
-        guard let items = try? FileManager.default.contentsOfDirectory(
+        let items = (try? FileManager.default.contentsOfDirectory(
             at: AudioFileStore.recordingsDirectoryURL,
             includingPropertiesForKeys: nil
-        ) else { return }
+        )) ?? []
 
         for url in items where url.pathExtension.lowercased() == "m4a" {
             let fileName = url.lastPathComponent
@@ -114,6 +145,44 @@ enum RecordingRecovery {
         // nothing here needs to react further, so it isn't logged a second
         // time, matching every other call site in the app.
         context.saveOrError()
+    }
+
+    private static func reconcileInterruptedCaptures(in recordings: [Recording]) -> Bool {
+        let finalizer = RecordingFileFinalizer()
+        var changed = false
+        for recording in recordings where recording.captureState != .ready {
+            let previousState = recording.captureState
+            do {
+                let metadata = try finalizer.finalize(fileName: recording.fileName)
+                recording.duration = metadata.duration
+                recording.fileSize = metadata.fileSize
+                if previousState == .finalizing, recording.captureRecoveryReason == nil {
+                    recording.captureState = .ready
+                } else {
+                    recording.captureState = .recoveryNeeded
+                    if recording.captureRecoveryReason == nil {
+                        switch previousState {
+                        case .preparing:
+                            recording.captureRecoveryReason = .interruptedBeforeStart
+                        case .recording:
+                            recording.captureRecoveryReason = .interruptedDuringCapture
+                        case .finalizing:
+                            recording.captureRecoveryReason = .interruptedDuringFinalization
+                        case .ready, .recoveryNeeded:
+                            break
+                        }
+                    }
+                }
+            } catch let error as RecordingFileFinalizationError {
+                recording.captureState = .recoveryNeeded
+                recording.captureRecoveryReason = error.recoveryReason
+            } catch {
+                recording.captureState = .recoveryNeeded
+                recording.captureRecoveryReason = .unreadableFile
+            }
+            changed = true
+        }
+        return changed
     }
 
     /// Stat the backing file of every recording whose cached size is still
@@ -153,10 +222,12 @@ enum RecordingRecovery {
             AudioFileStore.delete(fileName: fileName)
             return false
         }
-        let duration = readableDuration(of: url)
-        guard let duration, duration >= 0.5 else {
+        let metadata: FinalizedRecordingFile
+        do {
+            metadata = try RecordingFileFinalizer().finalize(fileName: fileName)
+        } catch {
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-            if duration == nil, size >= Self.keepUnreadableMinBytes {
+            if size >= Self.keepUnreadableMinBytes {
                 AppLog.recorder.atError.error(
                     "recovery: keeping unreadable orphan \(fileName, privacy: .public) (\(size, privacy: .public) bytes) — container not finalized"
                 )
@@ -165,15 +236,19 @@ enum RecordingRecovery {
             AudioFileStore.delete(fileName: fileName)
             return false
         }
+        guard metadata.duration >= 0.5 else {
+            AudioFileStore.delete(fileName: fileName)
+            return false
+        }
         let recording = Recording(
             meeting: meeting,
             fileName: fileName,
-            duration: duration,
-            fileSize: AudioFileStore.byteSize(fileName: fileName)
+            duration: metadata.duration,
+            fileSize: metadata.fileSize
         )
         context.insert(recording)
         AppLog.recorder.atNotice.notice(
-            "recovery: reattached orphaned recording \(fileName, privacy: .public) duration=\(duration, privacy: .public)s"
+            "recovery: reattached orphaned recording \(fileName, privacy: .public) duration=\(metadata.duration, privacy: .public)s"
         )
         return true
     }

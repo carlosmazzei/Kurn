@@ -307,7 +307,8 @@ struct MeetingDetailView: View {
                     onToggleEnhancement: { toggleEnhancement(recording) },
                     onCancelTranscription: { cancelTranscription(recording) },
                     onStopTranscription: { stopTranscription(recording) },
-                    onStartTranscription: { startTranscription(recording) }
+                    onStartTranscription: { startTranscription(recording) },
+                    onRetryCaptureRecovery: { retryCaptureRecovery(recording) }
                 )
                 .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
                 .swipeActions(edge: .trailing) {
@@ -552,6 +553,7 @@ private struct RecordingSegmentRow: View {
     let onCancelTranscription: () -> Void
     let onStopTranscription: () -> Void
     let onStartTranscription: () -> Void
+    let onRetryCaptureRecovery: () -> Void
 
     var body: some View {
         let isLoaded = player.loadedFileName == recording.fileName
@@ -568,7 +570,11 @@ private struct RecordingSegmentRow: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(Theme.fill)
                             .frame(width: 34, height: 34)
-                        if isEnhancing {
+                        if !recording.isReadyForConsumption {
+                            Image(systemName: "waveform.badge.exclamationmark")
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.warning)
+                        } else if isEnhancing {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .controlSize(.small)
@@ -580,13 +586,15 @@ private struct RecordingSegmentRow: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(isEnhancing)
+                .disabled(isEnhancing || !recording.isReadyForConsumption)
                 .accessibilityLabel(
-                    isEnhancing
-                        ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
-                        : ((isLoaded && player.isPlaying)
-                            ? NSLocalizedString("detail.pause_recording", comment: "Pause recording")
-                            : NSLocalizedString("detail.play_recording", comment: "Play recording"))
+                    !recording.isReadyForConsumption
+                        ? NSLocalizedString("detail.recording_recovery_needed", comment: "Recording needs recovery")
+                        : (isEnhancing
+                            ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
+                            : ((isLoaded && player.isPlaying)
+                                ? NSLocalizedString("detail.pause_recording", comment: "Pause recording")
+                                : NSLocalizedString("detail.play_recording", comment: "Play recording")))
                 )
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -599,7 +607,18 @@ private struct RecordingSegmentRow: View {
                 }
                 Spacer(minLength: 8)
 
-                if isTranscribing {
+                if !recording.isReadyForConsumption {
+                    Button {
+                        onRetryCaptureRecovery()
+                    } label: {
+                        Label(
+                            NSLocalizedString("detail.retry_recovery", comment: "Retry recording recovery"),
+                            systemImage: "arrow.clockwise"
+                        )
+                        .font(Theme.captionEmphasized)
+                    }
+                    .buttonStyle(.bordered)
+                } else if isTranscribing {
                     HStack(spacing: 8) {
                         if isCancelling {
                             ProgressView()
@@ -689,7 +708,14 @@ private struct RecordingSegmentRow: View {
                 }
             }
 
-            if isTranscribing {
+            if !recording.isReadyForConsumption {
+                Text(NSLocalizedString(
+                    "detail.recording_recovery_message",
+                    comment: "The recording is preserved but unavailable until recovery succeeds"
+                ))
+                .font(.caption2)
+                .foregroundStyle(Theme.warning)
+            } else if isTranscribing {
                 transcriptionProgressBar(phase: phase, isCancelling: isCancelling)
                 if let phase, !isCancelling {
                     Text(phase.displayName)
@@ -754,145 +780,5 @@ private struct RecordingSegmentRow: View {
                 .tint(Theme.accent)
                 .kurnAnimation(.easeInOut(duration: 0.25), value: fraction)
         }
-    }
-}
-
-private struct SegmentPlaybackScrubber: View {
-    let currentTime: TimeInterval
-    let duration: TimeInterval
-    let isPlaying: Bool
-    let playbackRate: Float
-    let isEnhanced: Bool
-    let enhancementProgress: Double?
-    let onSeek: (TimeInterval) -> Void
-    let onSkip: (TimeInterval) -> Void
-    let onCycleRate: () -> Void
-    let onToggleEnhancement: () -> Void
-
-    private var playableDuration: TimeInterval { max(duration, 0) }
-    private var sliderUpperBound: TimeInterval { max(playableDuration, 1) }
-    private var boundedCurrentTime: TimeInterval {
-        min(max(currentTime, 0), sliderUpperBound)
-    }
-    private var isEnhancing: Bool { enhancementProgress != nil }
-
-    /// "1×", "1.5×", "0.5×" — `%g` drops trailing zeros and the decimal point.
-    private var rateLabel: String {
-        String(format: "%g×", playbackRate)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { proxy in
-                let fraction = sliderUpperBound > 0 ? boundedCurrentTime / sliderUpperBound : 0
-                let markerWidth: CGFloat = 54
-                let markerX = min(
-                    max(markerWidth / 2, proxy.size.width * fraction),
-                    max(markerWidth / 2, proxy.size.width - markerWidth / 2)
-                )
-
-                Text(boundedCurrentTime.clockDisplay)
-                    .font(Theme.caption2Emphasized)
-                    .foregroundStyle(Theme.textPrimary)
-                    .frame(width: markerWidth, height: 22)
-                    .background(Theme.fill, in: Capsule())
-                    .position(x: markerX, y: 11)
-            }
-            .frame(height: 24)
-
-            Slider(
-                value: Binding(
-                    get: { boundedCurrentTime },
-                    set: { onSeek($0) }
-                ),
-                in: 0...sliderUpperBound
-            )
-            .tint(Theme.accent)
-            .disabled(playableDuration <= 0)
-            // VoiceOver's Adjustable rotor acts on the slider itself, so it
-            // needs its own label/value — the container's `.contain` grouping
-            // below keeps this reachable but doesn't supply them on its own.
-            .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
-            .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
-
-            HStack(spacing: 8) {
-                Image(systemName: isPlaying ? "waveform" : "timer")
-                    .font(Theme.caption2Emphasized)
-                    .foregroundStyle(Theme.textTertiary)
-                Text("0:00")
-                Spacer(minLength: 8)
-                Button { onSkip(-AudioPlayerService.skipInterval) } label: {
-                    Image(systemName: "gobackward.15")
-                        .font(Theme.captionEmphasized)
-                        .foregroundStyle(Theme.accent)
-                        .frame(minWidth: 34)
-                        .padding(.vertical, 3)
-                        .background(Theme.fill, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("detail.skip_backward", comment: "Skip back 15 seconds"))
-                Button { onSkip(AudioPlayerService.skipInterval) } label: {
-                    Image(systemName: "goforward.15")
-                        .font(Theme.captionEmphasized)
-                        .foregroundStyle(Theme.accent)
-                        .frame(minWidth: 34)
-                        .padding(.vertical, 3)
-                        .background(Theme.fill, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("detail.skip_forward", comment: "Skip forward 15 seconds"))
-                Button(action: onToggleEnhancement) {
-                    Group {
-                        if isEnhancing {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .scaleEffect(0.5)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(Theme.caption2Emphasized)
-                                .foregroundStyle(isEnhanced ? Theme.accent : Theme.textTertiary)
-                        }
-                    }
-                    .frame(minWidth: 34)
-                    .padding(.vertical, 3)
-                    .background(Theme.fill, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled(isEnhancing)
-                .accessibilityLabel(NSLocalizedString("detail.playback_enhancement", comment: "Enhanced audio"))
-                .accessibilityValue(
-                    isEnhancing
-                        ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
-                        : (isEnhanced
-                            ? NSLocalizedString("common.on", comment: "On")
-                            : NSLocalizedString("common.off", comment: "Off"))
-                )
-                Button(action: onCycleRate) {
-                    Text(rateLabel)
-                        .font(Theme.caption2Emphasized)
-                        .foregroundStyle(Theme.accent)
-                        .frame(minWidth: 34)
-                        .padding(.vertical, 3)
-                        .background(Theme.fill, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("detail.playback_speed", comment: "Playback speed"))
-                .accessibilityValue(rateLabel)
-                Text(playableDuration.clockDisplay)
-            }
-            .font(Theme.caption2)
-            .foregroundStyle(Theme.textTertiary)
-
-            if let enhancementProgress {
-                EnhancementProgressView(progress: enhancementProgress)
-            }
-        }
-        .padding(.leading, 46)
-        // `.contain` rather than `.combine`: combining flattens the children into
-        // one element, which makes the speed and enhancement buttons unreachable
-        // to VoiceOver.
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(NSLocalizedString("detail.playback_position", comment: "Playback position"))
-        .accessibilityValue("\(boundedCurrentTime.clockDisplay) / \(playableDuration.clockDisplay)")
     }
 }

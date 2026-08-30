@@ -83,6 +83,21 @@ enum RecordingProtection {
         apply(protectionType, to: fileURL)
     }
 
+    static func applyAndVerify(to fileURL: URL) throws {
+        let fm = FileManager.default
+        try fm.setAttributes(
+            [.protectionKey: protectionType],
+            ofItemAtPath: fileURL.path
+        )
+        #if !targetEnvironment(simulator)
+        let attributes = try fm.attributesOfItem(atPath: fileURL.path)
+        guard let actual = attributes[.protectionKey] as? FileProtectionType,
+              actual == protectionType else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        #endif
+    }
+
     /// Apply the weaker in-flight class to a transient pipeline artifact.
     static func applyInFlight(to fileURL: URL) {
         apply(inFlightProtectionType, to: fileURL)
