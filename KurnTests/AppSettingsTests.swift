@@ -29,6 +29,8 @@ struct AppSettingsTests {
         "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
         "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
         "settings.whisperCppModel", "settings.whisperCppModelsConsented",
+        "settings.allowsExpensiveNetworkTransfers", "settings.allowsConstrainedNetworkTransfers",
+        "settings.cloudTranscriptionConsentKeys",
         "settings.logLevel", "settings.meetingsSortOrder", "settings.hideLiveActivityMeetingTitle",
         AppSettingsKeys.diagnosticReportsConsented, "settings.usageStats"
     ]
@@ -67,6 +69,65 @@ struct AppSettingsTests {
             #expect(config.diarization == .fluidAudio)
             #expect(config.transcription == .whisperAPI)
             #expect(config.diarizationPreprocessingEnabled == false)
+        }
+    }
+
+    @Test func pipelineCarriesCloudConsentAndLargeTransferPolicy() {
+        withScopedDefaults { settings in
+            let provider = settings.transcriptionProvider
+            settings.recordCloudTranscriptionConsent(for: provider)
+            settings.allowsExpensiveNetworkTransfers = true
+            settings.allowsConstrainedNetworkTransfers = true
+
+            let config = settings.pipelineConfiguration
+            #expect(config.cloudTranscriptionConsented)
+            #expect(config.largeTransferPolicy.allowsExpensiveAccess)
+            #expect(config.largeTransferPolicy.allowsConstrainedAccess)
+        }
+    }
+
+    @Test func cloudConsentIsInvalidatedWhenProviderDestinationChanges() {
+        withScopedDefaults { settings in
+            let first = AIProvider(
+                id: "custom-test",
+                displayName: "Custom",
+                kind: .openAICompatible,
+                baseURLString: "https://one.example.com/v1"
+            )
+            let changed = AIProvider(
+                id: first.id,
+                displayName: first.displayName,
+                kind: first.kind,
+                baseURLString: "https://two.example.com/v1"
+            )
+
+            settings.recordCloudTranscriptionConsent(for: first)
+            #expect(settings.hasCloudTranscriptionConsent(for: first))
+            #expect(!settings.hasCloudTranscriptionConsent(for: changed))
+        }
+    }
+
+    @Test func cloudEngineSelectionWaitsForDestinationConsent() {
+        withScopedDefaults { settings in
+            let controller = CloudTranscriptionConsentController()
+            let downloads = ModelDownloadController()
+
+            controller.selectEngine(
+                .whisperAPI,
+                settings: settings,
+                providers: [.openAI],
+                downloads: downloads
+            )
+            #expect(controller.isPresented)
+            #expect(settings.transcriptionEngine != .whisperAPI)
+
+            controller.confirm(
+                settings: settings,
+                providers: [.openAI],
+                downloads: downloads
+            )
+            #expect(settings.hasCloudTranscriptionConsent(for: .openAI))
+            #expect(settings.transcriptionEngine == .whisperAPI)
         }
     }
 

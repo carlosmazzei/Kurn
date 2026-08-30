@@ -16,7 +16,7 @@ import Testing
 @Suite(.serialized)
 struct ProviderHTTPTests {
 
-    private let sectionsBody = #"{"sections":[{"title":"Recap","body":"We shipped it"}]}"#
+    let sectionsBody = #"{"sections":[{"title":"Recap","body":"We shipped it"}]}"#
 
     // MARK: - OpenAI
 
@@ -84,6 +84,7 @@ struct ProviderHTTPTests {
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString.contains("audio/transcriptions") == true)
         #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
+        #expect(request.value(forHTTPHeaderField: "X-Client-Request-Id") == nil)
         let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
         #expect(bodyString.contains("whisper-1"))
         #expect(bodyString.contains("verbose_json"))
@@ -124,6 +125,7 @@ struct ProviderHTTPTests {
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString == "https://api.groq.com/openai/v1/audio/transcriptions")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer groq-secret")
+        #expect(request.value(forHTTPHeaderField: "X-Client-Request-Id") == nil)
         let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
         #expect(bodyString.contains("whisper-large-v3"))
         #expect(!bodyString.contains("whisper-1"))
@@ -216,34 +218,6 @@ struct ProviderHTTPTests {
         }
     }
 
-    // MARK: - Error mapping & retry (shared LLMHTTP)
-
-    @Test func apiErrorSurfacesStatusAndVendorMessage() async throws {
-        MockURLProtocol.enqueue([
-            MockURLProtocol.json(["error": ["message": "bad key"]], status: 401)
-        ])
-        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
-
-        do {
-            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
-            Issue.record("expected an error")
-        } catch let AppError.apiError(status, message) {
-            #expect(status == 401)
-            #expect(message == "bad key")
-        }
-    }
-
-    @Test func malformedSummaryContentThrowsDecodingError() async {
-        MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": "this is not json"]]]])
-        ])
-        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
-
-        await #expect(throws: AppError.self) {
-            _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
-        }
-    }
-
     // MARK: - Provider models listing (ProviderModelsService)
 
     // Lives in this suite (not its own) because it scripts the process-global
@@ -330,53 +304,6 @@ struct ProviderHTTPTests {
         await #expect(throws: AppError.self) {
             _ = try await service.models(for: .groq)
         }
-    }
-
-    // MARK: - Error mapping & retry (shared LLMHTTP, continued)
-
-    @Test func rateLimitIsRetriedThenSucceeds() async throws {
-        // First a 429 with a short Retry-After, then a success — the shared retry
-        // loop should transparently recover. Retry-After is honored, so the wait
-        // is tiny and the test stays fast.
-        MockURLProtocol.enqueue([
-            .success(
-                status: 429,
-                body: Data(#"{"error":{"message":"slow down"}}"#.utf8),
-                headers: ["Retry-After": "0.05"]
-            ),
-            MockURLProtocol.json(["choices": [["message": ["content": sectionsBody]]]])
-        ])
-        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
-
-        let result = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
-        #expect(result.sections.first?.title == "Recap")
-        #expect(MockURLProtocol.capturedRequests.count == 2)
-    }
-
-    /// Proves the `SleepClock` seam end to end against the one production
-    /// call site that actually sleeps on the retry path: a 429 (with a
-    /// server `Retry-After`, so the delay is exact rather than jittered)
-    /// followed by a 200 completes with the final response, and the injected
-    /// clock (which never really waits) recorded exactly that delay — in
-    /// milliseconds, not real seconds. Lives in this suite, not its own, for
-    /// the same process-global `MockURLProtocol` reason noted below.
-    @Test func sendValidatedBacksOffUsingInjectedClock() async throws {
-        MockURLProtocol.enqueue([
-            .success(status: 429, body: Data(), headers: ["Retry-After": "1"]),
-            MockURLProtocol.json(["ok": true])
-        ])
-        let clock = ManualSleepClock()
-        let request = URLRequest(url: try #require(URL(string: "https://example.com/v1")))
-
-        let (data, response) = try await LLMHTTP.sendValidated(
-            request, session: MockURLProtocol.session(), clock: clock
-        )
-
-        let http = try #require(response as? HTTPURLResponse)
-        #expect(http.statusCode == 200)
-        let body = try JSONSerialization.jsonObject(with: data) as? [String: Bool]
-        #expect(body?["ok"] == true)
-        #expect(clock.durations == [1])
     }
 
     // MARK: - Chat (plain-text LLMProvider.chat)

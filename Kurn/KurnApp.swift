@@ -120,6 +120,7 @@ struct KurnApp: App {
                 AppLog.reliability.atInfo.info("\(event.logLine, privacy: .public)")
             }
         }
+        _ = NetworkPathObserver.shared
 
         let container = modelContainer
         // Build the shared transcription coordinator on the app's main context
@@ -161,8 +162,8 @@ struct KurnApp: App {
         KeychainManager.shared.migrateToBackgroundAccessible()
         RecordingRecovery.recoverOrphans(modelContainer: container)
         // And after one that died mid-transcription: recordings stuck at
-        // `.inProgress` become `.pending` (checkpointed, resumable) or
-        // `.failed`, before the first resume pass below runs.
+        // known on-device `.inProgress` work becomes `.pending`; cloud or
+        // unknown work becomes `.failed` to prevent ambiguous paid replay.
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
         #if canImport(BackgroundTasks)
         // BGTaskScheduler requires all handlers registered before the app
@@ -242,8 +243,8 @@ struct KurnApp: App {
                         // the feature is off or everything is already indexed.
                         Task(priority: .utility) { await semanticIndex.backfill() }
                         // Backfill the LLM-generated wiki for meetings without an
-                        // up-to-date article. Opt-in, key-gated, and batch-limited
-                        // inside the coordinator, so this is a no-op unless the
+                        // up-to-date article. Opt-in, key/circuit-gated, and
+                        // batch-limited inside the coordinator, so this is a no-op unless the
                         // user turned the feature on.
                         Task(priority: .utility) { await wiki.backfill() }
                     }
@@ -255,15 +256,23 @@ struct KurnApp: App {
                     // selected and consented to the on-device engine — keeps
                     // later transcriptions fast and reliable.
                     guard phase == .active, settings.usesFluidAudioModel else { return }
-                    prewarmFluidAudioModel()
+                    prewarmFluidAudioModel(policy: settings.largeTransferPolicy)
                 }
         }
         .modelContainer(modelContainer)
     }
 
-    private func prewarmFluidAudioModel() {
+    private func prewarmFluidAudioModel(policy: LargeTransferPolicy) {
         #if canImport(FluidAudio)
         Task.detached(priority: .utility) {
+            do {
+                try ModelDownloadConsent.validateNetworkIfDownloadNeeded(
+                    for: [.onDeviceASR],
+                    policy: policy
+                )
+            } catch {
+                return
+            }
             await FluidAudioModelStore.shared.prewarm()
         }
         #endif

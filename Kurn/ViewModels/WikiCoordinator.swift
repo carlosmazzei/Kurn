@@ -16,14 +16,22 @@
 
 import Foundation
 import CryptoKit
+import KurnCore
 import Observation
 import SwiftData
 
 @MainActor
 @Observable
 final class WikiCoordinator {
+    enum GenerationOutcome: Equatable {
+        case generated
+        case skipped
+        case failed
+    }
+
     private let modelContext: ModelContext
     private let wikiService = WikiService()
+    private let providerCircuitBreaker: ProviderCircuitBreaker
 
     /// App-wide settings, set by `KurnApp`; the coordinator respects the
     /// `wikiEnabled` toggle and reads the configured provider/model without
@@ -44,8 +52,12 @@ final class WikiCoordinator {
     /// prompt/format changes.
     private static let promptVersion = "wiki-v1"
 
-    init(modelContext: ModelContext) {
+    init(
+        modelContext: ModelContext,
+        providerCircuitBreaker: ProviderCircuitBreaker = .shared
+    ) {
         self.modelContext = modelContext
+        self.providerCircuitBreaker = providerCircuitBreaker
     }
 
     // MARK: - Single meeting
@@ -54,20 +66,31 @@ final class WikiCoordinator {
     /// transcript and generator both match the existing article, so a redundant
     /// trigger is cheap. Best-effort: an offline/no-key/transient failure leaves
     /// any existing article in place and is retried on a later pass.
-    func generate(_ meeting: Meeting) async {
+    @discardableResult
+    func generate(
+        _ meeting: Meeting,
+        trigger: ProviderAutomationTrigger = .automatic,
+        force: Bool = false
+    ) async -> GenerationOutcome {
         let meetingID = meeting.id
-        guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings else { return }
+        guard !generatingMeetingIDs.contains(meetingID), let settings = appSettings else {
+            return .skipped
+        }
 
         let provider = settings.aiProvider
+        guard await providerCircuitBreaker.allows(providerID: provider.id, trigger: trigger) else {
+            AppLog.transcription.atInfo.info("wiki: provider circuit blocked automatic generation")
+            return .skipped
+        }
         let model = settings.summaryModel(for: provider)
         let generator = Self.generatorIdentifier(provider: provider, model: model)
 
         let text = meeting.assembledTranscriptText()
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else { return .skipped }
         let hash = Self.contentHash(text)
-        if let existing = meeting.wikiArticle,
+        if !force, let existing = meeting.wikiArticle,
            existing.sourceContentHash == hash, existing.generatorModelIdentifier == generator {
-            return // already up to date
+            return .skipped // already up to date
         }
 
         generatingMeetingIDs.insert(meetingID)
@@ -79,16 +102,25 @@ final class WikiCoordinator {
                 transcriptText: text, meetingTitle: title, provider: provider, model: model
             )
             try Task.checkCancellation()
-            guard !markdown.isEmpty else { return }
+            guard !markdown.isEmpty, !Task.isCancelled else { return .skipped }
             replaceArticle(
                 of: meeting, markdown: markdown, hash: hash,
                 generator: generator, title: title, date: meeting.createdAt
             )
+            await providerCircuitBreaker.recordSuccess(providerID: provider.id)
             AppLog.transcription.atNotice.notice("wiki: generated meeting \(meetingID, privacy: .public)")
+            return .generated
         } catch is CancellationError {
             // Leave any existing article in place; a later pass retries.
+            return .skipped
         } catch {
-            AppLog.transcription.atError.error("wiki: failed for meeting \(meetingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            await providerCircuitBreaker.recordFailure(
+                providerID: provider.id,
+                failure: ProviderCircuitFailure(error: error)
+            )
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.transcription.atError.error("wiki: failed for meeting \(meetingID, privacy: .public) code=\(code, privacy: .public)")
+            return .failed
         }
     }
 
@@ -113,7 +145,7 @@ final class WikiCoordinator {
         AppLog.transcription.atNotice.notice("wiki: backfill \(stale.count, privacy: .public) meeting(s)")
         for meeting in stale {
             if Task.isCancelled { return }
-            await generate(meeting)
+            if await generate(meeting) == .failed { return }
         }
     }
 
@@ -128,17 +160,16 @@ final class WikiCoordinator {
         persist()
     }
 
-    /// Wipe and regenerate the wiki for every transcribed meeting (Settings →
-    /// Rebuild wiki). User-triggered, so it processes all meetings rather than a
-    /// batch, but still needs a key.
+    /// Regenerate the wiki for every transcribed meeting (Settings → Rebuild
+    /// wiki). Each existing article is replaced only after its new version is
+    /// ready, so cancellation or provider failure never destroys the last copy.
     func rebuildWiki() async {
-        clearWiki()
         guard hasProviderKey else { return }
         let meetings = ((try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? [])
             .filter(\.hasAnyTranscript)
         for meeting in meetings {
             if Task.isCancelled { return }
-            await generate(meeting)
+            if await generate(meeting, trigger: .explicit, force: true) == .failed { return }
         }
     }
 

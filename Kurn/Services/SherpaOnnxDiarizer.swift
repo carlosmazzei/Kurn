@@ -80,7 +80,7 @@ actor SherpaOnnxDiarizer: Diarizing {
     /// models, unavailable models directory — so callers fall back cleanly.
     private func ensureWrapper(speakerCount: Int) {
         guard speakerCount != currentSpeakerCount || wrapper == nil else { return }
-        guard SherpaOnnxModelDownloader.isInstalled else {
+        guard ModelSet.sherpaOnnxDiarization.isInstalled else {
             wrapper = nil
             return
         }

@@ -26,7 +26,7 @@ struct ProviderEditor: View {
     private var canEditDetails: Bool { !provider.isBuiltIn }
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+        LLMHTTP.isValidBaseURL(baseURLString)
     }
 
     var body: some View {
@@ -150,7 +150,7 @@ struct AddProviderView: View {
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        URL(string: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+        LLMHTTP.isValidBaseURL(baseURLString)
     }
 
     var body: some View {

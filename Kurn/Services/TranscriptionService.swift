@@ -128,6 +128,7 @@ struct TranscriptionService {
         let fileDuration = (try? await AVURLAsset(url: fileURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) size=\(fileSize, privacy: .public) bytes duration=\(String(format: "%.1f", fileDuration), privacy: .public)s engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
+        try validateModelTransferPolicy(config)
 
         // 1. Clean the audio (selected preprocessing engine) for the
         // transcription path. If cleanup fails for any reason we fall back to
@@ -229,6 +230,7 @@ struct TranscriptionService {
                 engine: config.transcription,
                 transcriptionProvider: config.transcriptionProvider,
                 transcriptionModel: config.transcriptionModel,
+                cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
                 language: resolvedLanguage,
                 checkpoint: checkpoint,
@@ -257,6 +259,7 @@ struct TranscriptionService {
                 engine: config.transcription,
                 transcriptionProvider: config.transcriptionProvider,
                 transcriptionModel: config.transcriptionModel,
+                cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
                 language: resolvedLanguage,
                 checkpoint: checkpoint,
@@ -377,6 +380,19 @@ struct TranscriptionService {
         }
     }
 
+    private func validateModelTransferPolicy(_ config: PipelineConfiguration) throws {
+        let sets: [ModelSet?] = [
+            config.transcription.requiredModelSet(whisperCppModel: config.whisperCppModel),
+            config.languageDetection.requiredModelSet,
+            config.vad.requiredModelSet,
+            config.effectiveDiarization.requiredModelSet
+        ]
+        try ModelDownloadConsent.validateNetworkIfDownloadNeeded(
+            for: sets.compactMap { $0 },
+            policy: config.largeTransferPolicy
+        )
+    }
+
     // MARK: - VAD-gated transcription
 
     /// Transcribe using the chosen engine, first removing silence via the VAD
@@ -397,6 +413,7 @@ struct TranscriptionService {
         engine: TranscriptionEngine,
         transcriptionProvider: AIProvider = .openAI,
         transcriptionModel: String = "whisper-1",
+        cloudTransfer: CloudTranscriptionTransfer = CloudTranscriptionTransfer(),
         whisperCppModel: WhisperCppModel = .default,
         language: MeetingLanguage,
         checkpoint: TranscriptionCheckpoint? = nil,
@@ -467,11 +484,18 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("transcribe: engine input \(target.lastPathComponent, privacy: .public) size=\(targetSize, privacy: .public) bytes duration=\(String(format: "%.1f", targetDuration), privacy: .public)s compacted=\(compacted, privacy: .public)")
         switch engine {
         case .whisperAPI:
+            guard cloudTransfer.consented else {
+                throw AppError.permissionDenied(NSLocalizedString(
+                    "error.cloud_transcription_consent_required",
+                    comment: "Cloud transcription requires upload consent"
+                ))
+            }
             raw = try await whisperTranscriber.transcribeResumable(
                 url: target,
                 language: language,
                 provider: transcriptionProvider,
                 model: transcriptionModel,
+                transferPolicy: cloudTransfer.policy,
                 cutPoints: cutPoints,
                 resume: resume,
                 onChunkCompleted: checkpointSink,

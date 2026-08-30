@@ -135,7 +135,7 @@ actor WhisperCppTranscriber: Transcribing {
         loadedModel = nil
 
         let path = WhisperCppModelDownloader.fileURL(for: model)
-        guard WhisperCppModelDownloader.isInstalled(model) else {
+        guard ModelSet.whisperCppASR(model).isInstalled else {
             AppLog.transcription.atError.error(
                 "whisperCpp: model \(model.fileName, privacy: .public) is not installed"
             )

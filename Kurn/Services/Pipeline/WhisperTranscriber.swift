@@ -23,13 +23,10 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> RawTranscript {
-        try await transcribeResumable(
-            url: url,
-            language: language,
-            provider: .openAI,
-            model: AIProvider.openAI.defaultTranscriptionModel,
-            onProgress: { progress, _, _ in onProgress(progress) }
-        )
+        throw AppError.permissionDenied(NSLocalizedString(
+            "error.cloud_transcription_consent_required",
+            comment: "Cloud transcription requires upload consent"
+        ))
     }
 
     /// Chunked transcription that can resume from a persisted checkpoint:
@@ -41,12 +38,17 @@ actor WhisperTranscriber: Transcribing {
         language: MeetingLanguage,
         provider transcriptionProvider: AIProvider,
         model: String,
+        transferPolicy: LargeTransferPolicy = .wifiOnly,
         cutPoints: [TimeInterval] = [],
         resume: ChunkedTranscriptionRunner.Progress? = nil,
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
-        let provider = try ProviderFactory.whisperProvider(for: transcriptionProvider, model: model)
+        let provider = try ProviderFactory.whisperProvider(
+            for: transcriptionProvider,
+            model: model,
+            transferPolicy: transferPolicy
+        )
         let vendor = transcriptionProvider.displayName
         let chunks = try await chunker.chunk(url: url, cutPoints: cutPoints)
         let total = chunks.count
@@ -63,7 +65,7 @@ actor WhisperTranscriber: Transcribing {
                 defer { progressPulse.cancel() }
                 let chunkStart = Date()
                 do {
-                    let result = try await Self.withChunkTimeout(seconds: 600) {
+                    let result = try await Self.withChunkTimeout(seconds: LLMHTTP.transcriptionTimeout) {
                         try await provider.transcribe(
                             audioData: data,
                             fileName: chunk.url.lastPathComponent,
@@ -98,9 +100,9 @@ actor WhisperTranscriber: Transcribing {
         return (Double(completed) + inFlightChunkFraction) / Double(totalChunks)
     }
 
-    /// Runs `operation`, cancelling it and throwing `URLError.timedOut` if it
-    /// doesn't complete within `seconds`. `TranscriptionViewModel.isCancellation`
-    /// maps `.timedOut` to `.pending` so a stuck upload retries automatically.
+    /// Runs `operation`, cancelling it and reporting an ambiguous provider result
+    /// if it doesn't complete within `seconds`; the upload is never replayed
+    /// automatically because the provider may already have processed it.
     private static func withChunkTimeout<T: Sendable>(
         seconds: TimeInterval,
         operation: @escaping @Sendable () async throws -> T
@@ -109,8 +111,8 @@ actor WhisperTranscriber: Transcribing {
             group.addTask { try await operation() }
             group.addTask {
                 try await Task.sleep(for: .seconds(seconds))
-                AppLog.transcription.atError.error("whisper: chunk timed out after \(Int(seconds), privacy: .public)s — upload will retry")
-                throw AppError.networkError(URLError(.timedOut))
+                AppLog.transcription.atError.error("whisper: chunk result ambiguous after \(Int(seconds), privacy: .public)s — not retrying automatically")
+                throw AppError.ambiguousProviderResult
             }
             defer { group.cancelAll() }
             let result = try await group.next()!

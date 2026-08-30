@@ -191,14 +191,14 @@ final class ModelDownloadController {
     // MARK: - Confirmed downloads
 
     func confirmLiveTranscriptionASR(settings: AppSettings) {
-        download(.liveTranscriptionASR, recordingAs: .liveTranscription) {
+        download(.liveTranscriptionASR, recordingAs: .liveTranscription, policy: settings.largeTransferPolicy) {
             settings.fluidAudioASRModelsConsented = true
             settings.liveTranscriptionEnabled = true
         }
     }
 
     func confirmBatchASR(settings: AppSettings) {
-        download(.onDeviceASR, recordingAs: .onDeviceLanguage) { [self] in
+        download(.onDeviceASR, recordingAs: .onDeviceLanguage, policy: settings.largeTransferPolicy) { [self] in
             settings.fluidAudioBatchASRModelsConsented = true
             // Apply whichever picker requested the download.
             if let engine = pendingTranscriptionEngine {
@@ -221,7 +221,7 @@ final class ModelDownloadController {
     func confirmDiarization(settings: AppSettings) {
         guard let engine = pendingDiarizationEngine else { return }
         pendingDiarizationEngine = nil
-        download(.diarization, recordingAs: .diarization) {
+        download(.diarization, recordingAs: .diarization, policy: settings.largeTransferPolicy) {
             settings.fluidAudioDiarizationModelsConsented = true
             settings.diarizationEngine = engine
         }
@@ -234,7 +234,7 @@ final class ModelDownloadController {
     func confirmSherpaOnnx(settings: AppSettings) {
         guard let engine = pendingDiarizationEngine else { return }
         pendingDiarizationEngine = nil
-        download(.sherpaOnnxDiarization, recordingAs: .sherpaOnnxDiarization) {
+        download(.sherpaOnnxDiarization, recordingAs: .sherpaOnnxDiarization, policy: settings.largeTransferPolicy) {
             settings.sherpaOnnxModelsConsented = true
             settings.diarizationEngine = engine
         }
@@ -247,7 +247,7 @@ final class ModelDownloadController {
     func confirmVAD(settings: AppSettings) {
         guard let engine = pendingVADEngine else { return }
         pendingVADEngine = nil
-        download(.vad, recordingAs: .vad) {
+        download(.vad, recordingAs: .vad, policy: settings.largeTransferPolicy) {
             settings.fluidAudioVADModelsConsented = true
             settings.vadEngine = engine
         }
@@ -259,7 +259,7 @@ final class ModelDownloadController {
 
     func confirmWhisperCpp(settings: AppSettings) {
         guard let model = pendingWhisperCppModel else { return }
-        download(.whisperCppASR(model), recordingAs: .whisperCpp) { [self] in
+        download(.whisperCppASR(model), recordingAs: .whisperCpp, policy: settings.largeTransferPolicy) { [self] in
             settings.whisperCppModelsConsented = true
             settings.whisperCppModel = model
             // Set only when the engine picker (rather than the variant picker)
@@ -284,6 +284,7 @@ final class ModelDownloadController {
     private func download(
         _ set: ModelSet,
         recordingAs group: ModelStore.ModelGroup,
+        policy: LargeTransferPolicy,
         onSuccess: @escaping @MainActor () -> Void,
         cleanup: @escaping @MainActor () -> Void = {}
     ) {
@@ -295,12 +296,16 @@ final class ModelDownloadController {
             defer { background.end() }
             do {
                 let before = ModelStore.snapshot()
-                try await ModelDownloadConsent.download(set) { [weak self] status in
-                    Task { @MainActor [weak self] in
-                        guard self?.downloadingModel == set else { return }
-                        self?.downloadProgress = status
+                try await ModelDownloadConsent.download(
+                    set,
+                    policy: policy,
+                    onProgress: { [weak self] status in
+                        Task { @MainActor [weak self] in
+                            guard self?.downloadingModel == set else { return }
+                            self?.downloadProgress = status
+                        }
                     }
-                }
+                )
                 ModelStore.recordDownload(for: group, before: before)
                 onSuccess()
             } catch let appError as AppError {

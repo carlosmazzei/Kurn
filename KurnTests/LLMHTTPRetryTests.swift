@@ -75,16 +75,80 @@ struct LLMHTTPRetryTests {
         }
     }
 
+    @Test func injectedJitterMakesBackoffDeterministic() {
+        let delay = LLMHTTP.retryableDelay(
+            attempt: 1,
+            status: 500,
+            urlError: nil,
+            retryAfter: nil,
+            jitter: 0.25
+        )
+        #expect(delay == 1.25)
+    }
+
     @Test func retryAfterHeaderIsHonoredForRateLimiting() {
         // A server Retry-After overrides the computed backoff (clamped to maxDelay).
         let delay = LLMHTTP.retryableDelay(attempt: 0, status: 429, urlError: nil, retryAfter: 2)
         #expect(delay == 2)
     }
 
-    @Test func retryAfterIsClampedToMaxDelay() {
+    @Test func retryAfterIsNotSilentlyClamped() {
+        let requested = LLMHTTP.maxDelay + 100
         let delay = LLMHTTP.retryableDelay(
-            attempt: 0, status: 503, urlError: nil, retryAfter: LLMHTTP.maxDelay + 100
+            attempt: 0, status: 503, urlError: nil, retryAfter: requested
         )
-        #expect(delay == LLMHTTP.maxDelay)
+        #expect(delay == requested)
+    }
+
+    @Test(arguments: [
+        "Sun, 06 Nov 1994 08:49:37 GMT",
+        "Sunday, 06-Nov-94 08:49:37 GMT",
+        "Sun Nov  6 08:49:37 1994"
+    ])
+    func retryAfterHTTPDateFormatsUseInjectedWallClock(_ header: String) throws {
+        let now = try #require(ISO8601DateFormatter().date(from: "1994-11-06T08:47:37Z"))
+        let url = try #require(URL(string: "https://api.example.com/v1"))
+        let response = try #require(HTTPURLResponse(
+            url: url,
+            statusCode: 429,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Retry-After": header]
+        ))
+
+        #expect(LLMHTTP.retryAfterSeconds(from: response, now: now) == 120)
+    }
+
+    @Test func invalidNegativeRetryAfterIsIgnored() throws {
+        let url = try #require(URL(string: "https://api.example.com/v1"))
+        let response = try #require(HTTPURLResponse(
+            url: url,
+            statusCode: 429,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Retry-After": "-1"]
+        ))
+
+        #expect(LLMHTTP.retryAfterSeconds(from: response) == nil)
+    }
+
+    @Test func retryAfterPastDateRequestsImmediateRetry() throws {
+        let now = try #require(ISO8601DateFormatter().date(from: "1994-11-06T08:50:37Z"))
+        let url = try #require(URL(string: "https://api.example.com/v1"))
+        let response = try #require(HTTPURLResponse(
+            url: url,
+            statusCode: 429,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Retry-After": "Sun, 06 Nov 1994 08:49:37 GMT"]
+        ))
+
+        #expect(LLMHTTP.retryAfterSeconds(from: response, now: now) == 0)
+    }
+
+    @Test func automatedPolicyAllowsLongerServerWaitThanInteractive() {
+        let interactive = HTTPPolicy.interactive(totalDeadline: 300)
+        let automated = HTTPPolicy.automated(totalDeadline: 300)
+        #expect(interactive.maximumServerWait == 30)
+        #expect(automated.maximumServerWait == 300)
+        #expect(!interactive.allowsServerWait(31))
+        #expect(automated.allowsServerWait(31))
     }
 }

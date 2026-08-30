@@ -706,7 +706,7 @@ Priorities in this track mean:
 - **P2** — diagnosability, integration polish, and continuous verification that
   make P0/P1 guarantees sustainable.
 
-### Current implementation status (2026-08-29)
+### Current implementation status (2026-08-30)
 
 Status here is evidence-based and deliberately distinguishes an injectable seam
 from the production invariant that will eventually use it. PR
@@ -714,33 +714,33 @@ from the production invariant that will eventually use it. PR
 baseline; later rows include controls that predated that PR where they already
 satisfy part of a planned contract.
 
-| Track              | Status                 | Implemented evidence and remaining contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                  |
-| **H1**             | **In progress**        | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording now preflights 30 minutes of configured-rate headroom, keeps an unavailable capacity query visibly `unknown`, and refreshes runway every five seconds using measured file growth after ten seconds (never below the conservative configured rate). `RecorderViewModel` preserves warned partial output. Provisional rows, authoritative final-file validation, and the process-death/device matrix remain. |
-| **H2**             | **Seam only**          | Container creation is injectable through `ModelContainerBootstrap`, but production still terminates with `fatalError`; versioned schemas, migrations, backups, failure classification, and recovery UI remain.                                                                                                                                                                                                                                                                                                                                                     |
-| **H3**             | **Foundation only**    | Recovery preserves some large unreadable orphan files, but unmatched/malformed/small originals can still be deleted and model/file mutations have no journal, trash, quarantine, or typed authoritative JSON corruption path.                                                                                                                                                                                                                                                                                                                                      |
-| **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                        |
-| **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **H6**             | **Partial, pre-track** | Foreground HTTP has bounded transient retry and delta-seconds `Retry-After`; invalid custom endpoints can still fall through to vendor URLs, and redirect/origin, response-size, background-upload, cooldown, and cost policies remain.                                                                                                                                                                                                                                                                                                                            |
-| **H7**             | **Planned**            | Existing Keychain/model flows work on the clean path, but typed `OSStatus`, explicit credential save, cryptographic model verification, resumable staging, atomic replacement, and health probes remain.                                                                                                                                                                                                                                                                                                                                                           |
-| **H8**             | **Partial, pre-track** | Several long jobs have app-level owners and run IDs, but memory pressure is sticky until relaunch and the scheduler, cancellation truth, Activity race handling, shared Watch protocol, deduplication, timeout, and durable acknowledgements remain.                                                                                                                                                                                                                                                                                                               |
-| **H9**             | **Started**            | `AppError.logCode` and the content-free `ReliabilityEvent` vocabulary are present. Action metadata, per-operation queues/reports, bounded encrypted event storage, health UI, redaction preview, and recovery accessibility coverage remain.                                                                                                                                                                                                                                                                                                                       |
-| **H10**            | **Started**            | Clock, filesystem, store-factory, reliability-event, and audio-sink fakes prove initial seams. The full transition fault matrix, split CI signals, retained failure artifacts, sanitizers/repetition, static policy checks, and device checklist remain.                                                                                                                                                                                                                                                                                                           |
+| Track              | Status                 | Implemented evidence and remaining contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **H1**             | **In progress**        | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording now preflights 30 minutes of configured-rate headroom, keeps an unavailable capacity query visibly `unknown`, and refreshes runway every five seconds using measured file growth after ten seconds (never below the conservative configured rate). `RecorderViewModel` preserves warned partial output. Provisional rows, authoritative final-file validation, and the process-death/device matrix remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **H2**             | **Seam only**          | Container creation is injectable through `ModelContainerBootstrap`, but production still terminates with `fatalError`; versioned schemas, migrations, backups, failure classification, and recovery UI remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **H3**             | **Foundation only**    | Recovery preserves some large unreadable orphan files, but unmatched/malformed/small originals can still be deleted and model/file mutations have no journal, trash, quarantine, or typed authoritative JSON corruption path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **H6**             | **Core implemented**   | Provider URLs fail closed and all new cloud traffic uses one origin-locked, deadline-bounded, 16 MB-capped foreground policy with exact budgeted `Retry-After`. Each logical request owns one UUID reused across attempts; official OpenAI chat requests also send it as the documented correlation header, never as an undocumented idempotency claim. Ambiguous POST timeouts/connection loss stop without automatic replay and surface a typed duplicate-charge warning. Background upload has no creation API or response-buffering state; its synchronized adapter only drains old system tasks. A durable per-provider circuit gates automatic title/wiki/backfill work. Large transfers default to unrestricted Wi-Fi: app-owned audio uploads/model sessions carry native expensive/constrained flags, while FluidAudio downloads fail preflight on a disallowed path. Cloud consent is pinned to provider plus URL and discloses hostname and estimated hourly audio size; model dialogs disclose source and approximate size. Non-blocking follow-ups are dedicated waiting UI under H9, FluidAudio’s unobservable mid-transfer path changes, and measured streaming evaluation. |
+| **H7**             | **Planned**            | Existing Keychain/model flows work on the clean path, but typed `OSStatus`, explicit credential save, cryptographic model verification, resumable staging, atomic replacement, and health probes remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **H8**             | **Partial, pre-track** | Several long jobs have app-level owners and run IDs, but memory pressure is sticky until relaunch and the scheduler, cancellation truth, Activity race handling, shared Watch protocol, deduplication, timeout, and durable acknowledgements remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **H9**             | **Started**            | `AppError.logCode` and the content-free `ReliabilityEvent` vocabulary are present. Action metadata, per-operation queues/reports, bounded encrypted event storage, health UI, redaction preview, and recovery accessibility coverage remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **H10**            | **Started**            | Clock, filesystem, store-factory, reliability-event, and audio-sink fakes prove initial seams. The full transition fault matrix, split CI signals, retained failure artifacts, sanitizers/repetition, static policy checks, and device checklist remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ### Foundation already present
 
 The plan builds on these controls rather than replacing them:
 
-| Area          | Existing control                                                                                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Error domain  | `AppError` provides localized, content-free `logCode`s; `errorAlert` gives views one presentation path                                                         |
-| Capture       | Fixed-format `RecordingSink`, audio interruption/route observers, engine restart, `finalizeIfAbandoned`, protected recording storage, and orphan recovery      |
-| Transcription | Per-chunk checkpoints, ordered pipeline events, foreground and launch recovery sweeps, background task cancellation, and per-recording/global in-flight guards |
-| Pipeline      | Resource checks between heavy stages, temporary-file cleanup, measured WER/DER, and useful fallbacks for optional preprocessing/VAD/diarization stages         |
-| Network       | Central status validation, bounded retry with jitter, request timeouts, background Whisper uploads, and explicit cloud/model consent defaults                  |
-| Diagnostics   | Leveled `os.Logger`, user-exported logs, opt-in local MetricKit crash/hang reports, and no automatic diagnostic upload                                         |
-| Tests         | 600+ Swift Testing cases, provider stubs through `MockURLProtocol`, recovery/resource tests, accessibility audits, and Linux `KurnCore` CI                     |
+| Area          | Existing control                                                                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Error domain  | `AppError` provides localized, content-free `logCode`s; `errorAlert` gives views one presentation path                                                           |
+| Capture       | Fixed-format `RecordingSink`, audio interruption/route observers, engine restart, `finalizeIfAbandoned`, protected recording storage, and orphan recovery        |
+| Transcription | Per-chunk checkpoints, ordered pipeline events, foreground and launch recovery sweeps, background task cancellation, and per-recording/global in-flight guards   |
+| Pipeline      | Resource checks between heavy stages, temporary-file cleanup, measured WER/DER, and useful fallbacks for optional preprocessing/VAD/diarization stages           |
+| Network       | Fail-closed destinations, origin locks, total deadlines, response caps, logical request identity, bounded retry/cooldown, and Wi-Fi-first large-transfer consent |
+| Diagnostics   | Leveled `os.Logger`, user-exported logs, opt-in local MetricKit crash/hang reports, and no automatic diagnostic upload                                           |
+| Tests         | 600+ Swift Testing cases, provider stubs through `MockURLProtocol`, recovery/resource tests, accessibility audits, and Linux `KurnCore` CI                       |
 
 ### Risk register
 
@@ -754,7 +754,7 @@ feature requests:
 | **H3**  | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content                                   | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0**                |
 | **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                 | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                    | **P0**                |
 | **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                              | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
-| **H6**  | `LLMHTTP.jsonRequest` and cloud transcription substitute hard-coded vendor URLs when configured URL construction fails                                                                             | A malformed custom provider can send meeting-derived content to an unintended host, violating I1 and H-I5                   | **P0**                |
+| **H6**  | App-owned large transfers enforce user-selected expensive/constrained flags; FluidAudio is preflight-gated because its internal session is not configurable                                        | A network becoming expensive after a FluidAudio download starts cannot yet be cancelled through the library                 | **P1**                |
 | **H7**  | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally                                                                   | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed                     | **P1**                |
 | **H8**  | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts                                                   | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion            | **P1**                |
 | **H9**  | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription`                                                                             | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended    | **P1**                |
@@ -952,52 +952,72 @@ ASR, each diarizer, fusion, correction and persistence; add invariant/property
 tests for malformed timestamps, empty/oversized responses and fallback
 provenance; keep WER/DER evaluation separate from reliability pass/fail.
 
-### H6 · Exact network boundaries, bounded retry, and cost control — P0/P1
+### H6 · Exact network boundaries, bounded retry, and cost control — Core implemented (P0/P1)
 
 **Plan.**
 
-1. Remove runtime fallback URLs. Validate provider configuration as an absolute
-   URL with allowed scheme and host before it can be saved or used. Built-in
-   providers already carry their exact URL; a malformed custom provider fails
-   closed. Plain HTTP, local hosts, credentials in URLs, and unusual ports need an
-   explicit policy and disclosure rather than accidental `URL(string:)` success.
-2. Pin each logical operation to a destination snapshot. Reject or explicitly
-   reconfirm cross-origin redirects, and never forward an authorization header or
-   meeting body to an unapproved origin.
-3. Centralize foreground and background traffic behind one HTTP policy: typed
-   transport/status/decoding errors, total deadline plus per-attempt timeout,
-   bounded response size, cooperative cancellation, jitter, and a testable clock.
-4. Honor both delta-seconds and HTTP-date `Retry-After` without truncating a
-   provider’s rate-limit instruction to the current eight-second backoff cap.
-   Give interactive and background work different total wait budgets, and make
-   “waiting for rate limit/connectivity” visible and cancellable.
-5. Bring `WhisperBackgroundUploader` onto that policy; it currently drops
-   `Retry-After`. Make session initialization race-free, cap buffered response
-   bytes, and reconcile orphan URLSession tasks by a persisted logical request ID.
-6. Reuse one client-generated request ID across retries. Add an idempotency header
-   only where the provider documents it; where duplicate billing remains
-   ambiguous, expose that fact and avoid unbounded automatic replay.
-7. Persist a per-provider cooldown/circuit state for automated wiki/backfill/title
-   work. Authentication/quota/configuration failures stop immediately; repeated
-   transient failures back off across foreground activations; an explicit user
-   retry can bypass the cooldown.
-8. Add user policy for cellular, expensive and constrained connections,
-   especially model downloads and large cloud audio uploads. Show estimated
-   transfer size/destination before first use of a cloud provider.
-9. Treat streaming as a separate, measured enhancement: it can improve perceived
-   progress, but partial prose/JSON is not final output and must not weaken the
-   atomic commit rules above.
+1. **Implemented (2026-08-30).** Runtime destination fallback URLs are removed. Settings,
+   provider factories, JSON requests, transcription, and model listing share a
+   fail-closed policy requiring a public HTTPS hostname, standard port, and no
+   credentials/query/fragment. HTTP, local and IP-literal destinations remain
+   unsupported until an explicit policy and disclosure exists.
+2. **Implemented (2026-08-30).** Each foreground request snapshots the initial
+   scheme, hostname, and effective port; cross-origin/user-info redirects return
+   `nil`. iOS background sessions cannot enforce this — they always follow
+   redirects — so new Whisper uploads use the origin-locked foreground transport.
+3. **Implemented for active traffic (2026-08-30).** `LLMHTTP` gives every new
+   request typed transport/status/size errors, one total deadline, a remaining
+   per-attempt timeout, a 16 MB incremental cap, cooperative cancellation,
+   bounded jitter/retry, and a monotonic test clock. Background remains disabled.
+4. **Implemented for active traffic (2026-08-30).** Delta-seconds and all HTTP-
+   date `Retry-After` forms are honored exactly when they fit the operation’s
+   explicit wait budget; longer instructions fail as the original provider error
+   instead of being truncated. Interactive work allows 30 seconds, transcription
+   up to 300; sleeps are logged and cancellable. Dedicated waiting UI remains.
+5. **Implemented as foreground-only (2026-08-30).** No background upload entry
+   point or response-buffering state remains because iOS cannot reject redirects.
+   The synchronized legacy adapter only reattaches old system tasks, retains every
+   relaunch completion handler, and cancels all response bodies before buffering.
+6. **Implemented (2026-08-30).** One client-generated UUID identifies every
+   logical request and is reused across attempts and logs. Official OpenAI chat
+   endpoints receive the documented `X-Client-Request-Id` correlation header;
+   no provider receives an undocumented idempotency header. A timeout or lost
+   connection after an ambiguous POST returns a typed warning without auto-replay;
+   the outer chunk deadline also fails instead of becoming auto-resumable. Launch
+   recovery resumes only checkpoints proven on-device; cloud/unknown runs require
+   manual retry. Idempotent reads and explicit HTTP failures retain bounded retries.
+7. **Implemented (2026-08-30).** A content-free per-provider circuit persists in
+   `UserDefaults`. Automatic title, wiki, and foreground backfill consult it;
+   configuration failures require an explicit probe, ambiguous results stay blocked,
+   and repeated transient failures back off from five minutes to one day across app
+   activations. User-triggered wiki rebuild bypasses the gate, stops on first failure,
+   replaces each article only after its successor is ready, and clears provider state
+   only after success.
+8. **Implemented with a documented library boundary (2026-08-30).** Large
+   transfers default to unrestricted Wi-Fi; Settings separately opts into
+   expensive/cellular and constrained/Low Data Mode access. App-owned Whisper,
+   whisper.cpp, and sherpa-onnx sessions use native URLSession policy across path
+   changes and map native policy rejection to a typed error. FluidAudio
+   does not expose its session, so downloads fail a current-path preflight; a path
+   change after start remains visible in the risk register. First cloud use is
+   consented per provider+URL with provider, hostname, and hourly audio estimate;
+   model dialogs disclose Hugging Face and approximate or variant-specific size.
+9. **Deferred evaluation, not a core resilience blocker.** Streaming may improve
+   perceived progress only after measured latency/memory evidence; partial prose/
+   JSON is never final output and must not weaken the atomic commit rules above.
 
-**Done when.** No malformed custom URL produces a request to a default vendor;
+**Core done (2026-08-30).** No malformed custom URL produces a request to a default vendor;
 redirect tests prove credentials/content stay on the approved origin; 401/403
 fail without retry, 429 honors the server, transient 5xx/transport retries stay
 inside one logical operation, cancellation stops waits/transfers, and automated
-paid jobs cannot hammer a broken provider on every activation.
+paid jobs cannot hammer a broken provider on every activation. Waiting-state UX
+continues under H9; the FluidAudio library boundary remains in the risk register.
 
-**Verification.** Extend `ProviderHTTPTests`/`LLMHTTPRetryTests` for malformed and
-relative URLs, cross-origin redirects, response-size limits, lost responses,
-HTTP-date rate limits, cancellation during backoff, connectivity transitions,
-background relaunch, cooldown persistence and provider-specific idempotency.
+**Verification evidence.** Provider URL/transport/rate-limit suites cover malformed
+and relative URLs, redirects, response caps, lost responses, cancellation, stable
+request identity and network-cost flags; dedicated suites cover cooldown persistence,
+consent destination changes, background relaunch handlers and model preflight. Real-
+device path transitions and the FluidAudio mid-transfer boundary remain checklist work.
 
 ### H7 · Credential and model integrity — P1
 
@@ -1215,15 +1235,32 @@ migrates.
    writes gate the next chunk, validate final output, and bound automatic retries.
 5. **Visible degradation and recovery.** Persist stage reports, add actionable
    error UI/health surfaces, previous-artifact preservation and repair actions.
-6. **Network/model lifecycle.** Unify foreground/background HTTP policy,
-   rate-limit/cooldown semantics, request identity, model digest/resume/atomic
-   replacement and explicit network policy.
+6. **Network lifecycle — core done; model integrity continues in H7.** Active
+   traffic is foreground-only with unified destination/retry/cost policy, request
+   identity and cooldown. Model digest, resume and atomic replacement remain.
 7. **External and concurrency hardening.** Resource scheduler, non-cooperative
    cancellation truth, shared Watch protocol, command acknowledgements and
    Activity/intent race handling.
 8. **Continuous release gate.** Split CI signals, retain failure artifacts, run
    migrations/faults/sanitizers/repetition, and record the scorecard alongside
    the existing accuracy history.
+
+#### Current next execution order (2026-08-30)
+
+1. **Finish H1 (P0): provisional capture ownership.** Persist the recording/
+   operation before opening audio, then model the lifecycle as
+   `preparing → recording → finalizing → ready/recoveryNeeded` so process death
+   has authoritative ownership.
+2. **Finish H1 (P0): truthful final-file commit.** Reopen and validate readability,
+   non-zero bytes, measured duration and protection before marking the recording
+   ready; keep partial output and recovery actions on restart failure.
+3. **Start H2 (P0): recoverable store bootstrap.** Introduce versioned schemas,
+   migration fixtures, protected backup/salvage and remove production `fatalError`.
+4. **Then H3/H4 (P0): mutation journal and resume identity.** Make destructive
+   file/model changes recoverable before strengthening checkpoint fingerprints and
+   throwing durable chunk commits.
+5. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
+   dependency; H9 owns dedicated waiting/cancellation presentation.
 
 P0 containment and durability take precedence over new features that widen the
 same surfaces (capture entry points, import, provider work, or filesystem

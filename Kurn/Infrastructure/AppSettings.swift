@@ -52,6 +52,9 @@ final class AppSettings {
         static let whisperCppModel = "settings.whisperCppModel"
         static let whisperCppModelsConsented = "settings.whisperCppModelsConsented"
         static let sherpaOnnxModelsConsented = "settings.sherpaOnnxModelsConsented"
+        static let allowsExpensiveNetworkTransfers = "settings.allowsExpensiveNetworkTransfers"
+        static let allowsConstrainedNetworkTransfers = "settings.allowsConstrainedNetworkTransfers"
+        static let cloudTranscriptionConsentKeys = "settings.cloudTranscriptionConsentKeys"
         static let logLevel = "settings.logLevel"
         static let requireAuthForRecordings = "settings.requireAuthForRecordings"
         static let hideLiveActivityMeetingTitle = "settings.hideLiveActivityMeetingTitle"
@@ -290,6 +293,8 @@ final class AppSettings {
             transcription: transcriptionEngine,
             transcriptionProvider: transcriptionProvider,
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
+            cloudTranscriptionConsented: hasCloudTranscriptionConsent(for: transcriptionProvider),
+            largeTransferPolicy: largeTransferPolicy,
             fluidAudioSpeakerCount: fluidAudioSpeakerCount,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
             whisperCppModel: whisperCppModel,
@@ -350,6 +355,42 @@ final class AppSettings {
     /// for separate engines.
     var sherpaOnnxModelsConsented: Bool {
         didSet { defaults.set(sherpaOnnxModelsConsented, forKey: Keys.sherpaOnnxModelsConsented) }
+    }
+
+    var allowsExpensiveNetworkTransfers: Bool {
+        didSet { defaults.set(allowsExpensiveNetworkTransfers, forKey: Keys.allowsExpensiveNetworkTransfers) }
+    }
+
+    var allowsConstrainedNetworkTransfers: Bool {
+        didSet { defaults.set(allowsConstrainedNetworkTransfers, forKey: Keys.allowsConstrainedNetworkTransfers) }
+    }
+
+    private(set) var cloudTranscriptionConsentKeys: Set<String> {
+        didSet {
+            defaults.set(
+                Array(cloudTranscriptionConsentKeys).sorted(),
+                forKey: Keys.cloudTranscriptionConsentKeys
+            )
+        }
+    }
+
+    var largeTransferPolicy: LargeTransferPolicy {
+        LargeTransferPolicy(
+            allowsExpensiveAccess: allowsExpensiveNetworkTransfers,
+            allowsConstrainedAccess: allowsConstrainedNetworkTransfers
+        )
+    }
+
+    func hasCloudTranscriptionConsent(for provider: AIProvider) -> Bool {
+        cloudTranscriptionConsentKeys.contains(cloudTranscriptionConsentKey(for: provider))
+    }
+
+    func recordCloudTranscriptionConsent(for provider: AIProvider) {
+        cloudTranscriptionConsentKeys.insert(cloudTranscriptionConsentKey(for: provider))
+    }
+
+    private func cloudTranscriptionConsentKey(for provider: AIProvider) -> String {
+        "\(provider.id)|\(provider.baseURLString)"
     }
 
     /// Whether the user has opted in to on-device MetricKit diagnostic reports
@@ -584,6 +625,11 @@ final class AppSettings {
         fluidAudioVADModelsConsented = defaults.bool(forKey: Keys.fluidAudioVADModelsConsented)
         whisperCppModelsConsented = defaults.bool(forKey: Keys.whisperCppModelsConsented)
         sherpaOnnxModelsConsented = defaults.bool(forKey: Keys.sherpaOnnxModelsConsented)
+        allowsExpensiveNetworkTransfers = defaults.bool(forKey: Keys.allowsExpensiveNetworkTransfers)
+        allowsConstrainedNetworkTransfers = defaults.bool(forKey: Keys.allowsConstrainedNetworkTransfers)
+        cloudTranscriptionConsentKeys = Set(
+            defaults.stringArray(forKey: Keys.cloudTranscriptionConsentKeys) ?? []
+        )
         diagnosticReportsConsented = defaults.bool(forKey: AppSettingsKeys.diagnosticReportsConsented)
         // Transcription engine: prefer the stored value; otherwise migrate the
         // legacy `defaultMode` + on-device-multilingual pairing into the new

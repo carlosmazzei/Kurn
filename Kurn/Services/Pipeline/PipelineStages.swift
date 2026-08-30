@@ -76,6 +76,11 @@ protocol TranscriptCorrecting: Sendable {
     ) async -> [TranscriptSegment]
 }
 
+struct CloudTranscriptionTransfer: Sendable, Equatable {
+    var consented = false
+    var policy: LargeTransferPolicy = .wifiOnly
+}
+
 /// One engine choice per pipeline stage. Built from `AppSettings` and passed to
 /// `TranscriptionService.transcribe`. Defaults match the always-available,
 /// no-download engines so a fresh install works offline with no model fetch.
@@ -99,6 +104,14 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// Whisper model requested from `transcriptionProvider` (e.g. `whisper-1`,
     /// `whisper-large-v3`). Ignored by the on-device engines.
     var transcriptionModel: String = "whisper-1"
+    var cloudTranscriptionConsented = false
+    var largeTransferPolicy: LargeTransferPolicy = .wifiOnly
+    var cloudTransfer: CloudTranscriptionTransfer {
+        CloudTranscriptionTransfer(
+            consented: cloudTranscriptionConsented,
+            policy: largeTransferPolicy
+        )
+    }
     /// Exact number of speakers to pin on the FluidAudio diarizer (`0` = let it
     /// decide). Only the `.fluidAudio` engine reads it; a pinned count makes the
     /// pipeline re-cluster the raw speaker embeddings with KMeans instead of

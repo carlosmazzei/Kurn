@@ -27,6 +27,23 @@ enum ModelSet: Sendable, Equatable {
     /// ONNX files). Brings its own downloader, unrelated to FluidAudio's —
     /// same shape as `whisperCppASR`.
     case sherpaOnnxDiarization
+
+    var isInstalled: Bool {
+        switch self {
+        case .whisperCppASR(let model):
+            WhisperCppModelDownloader.isInstalled(model)
+        case .sherpaOnnxDiarization:
+            SherpaOnnxModelDownloader.isInstalled
+        case .liveTranscriptionASR:
+            ModelStore.isInstalled(.liveTranscription)
+        case .onDeviceASR:
+            ModelStore.isInstalled(.onDeviceLanguage)
+        case .diarization:
+            ModelStore.isInstalled(.diarization)
+        case .vad:
+            ModelStore.isInstalled(.vad)
+        }
+    }
 }
 
 enum ModelDownloadPhase: Sendable, Equatable {
@@ -41,15 +58,39 @@ struct ModelDownloadStatus: Sendable, Equatable {
 }
 
 struct ModelDownloadConsent {
+    static func validateNetworkIfDownloadNeeded(
+        for sets: [ModelSet],
+        policy: LargeTransferPolicy,
+        network: some NetworkPathSnapshotProviding = NetworkPathObserver.shared,
+        isInstalled: @escaping @Sendable (ModelSet) -> Bool = { $0.isInstalled }
+    ) throws {
+        if sets.contains(where: { !isInstalled($0) }) {
+            try policy.validate(network.snapshot)
+        }
+    }
+
     static func download(
         _ set: ModelSet,
+        policy: LargeTransferPolicy = .wifiOnly,
+        network: some NetworkPathSnapshotProviding = NetworkPathObserver.shared,
+        isInstalled: @escaping @Sendable (ModelSet) -> Bool = { $0.isInstalled },
         onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
     ) async throws {
+        try validateNetworkIfDownloadNeeded(
+            for: [set],
+            policy: policy,
+            network: network,
+            isInstalled: isInstalled
+        )
         try await ResourceGuard.requireModelDownloadHeadroom()
         // Handled before the FluidAudio branch below: whisper.cpp brings its own
         // downloader, so this set must work in a build without FluidAudio linked.
         if case .whisperCppASR(let model) = set {
-            try await WhisperCppModelDownloader.download(model, onProgress: onProgress)
+            try await WhisperCppModelDownloader.download(
+                model,
+                policy: policy,
+                onProgress: onProgress
+            )
             try await ResourceGuard.requireModelDownloadHeadroom()
             return
         }
@@ -57,7 +98,10 @@ struct ModelDownloadConsent {
         // downloader, unrelated to FluidAudio, so this set must also work in a
         // build without FluidAudio linked.
         if case .sherpaOnnxDiarization = set {
-            try await SherpaOnnxModelDownloader.download(onProgress: onProgress)
+            try await SherpaOnnxModelDownloader.download(
+                policy: policy,
+                onProgress: onProgress
+            )
             try await ResourceGuard.requireModelDownloadHeadroom()
             return
         }
@@ -105,6 +149,9 @@ struct ModelDownloadConsent {
         } catch let appError as AppError {
             throw appError
         } catch {
+            if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+                throw restriction
+            }
             try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }

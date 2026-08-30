@@ -24,6 +24,9 @@ enum ProviderFactory {
             return FoundationModelsProvider(provider: provider)
         }
 
+        guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
+            throw AppError.invalidProviderURL
+        }
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(key, provider: provider)
@@ -52,7 +55,14 @@ enum ProviderFactory {
     /// the `/audio/transcriptions` route, so this resolves the selected provider's
     /// key and base URL independently of the summary provider. Throws `.noAPIKey`
     /// when the chosen provider has no stored key.
-    static func whisperProvider(for provider: AIProvider, model: String) throws -> OpenAIProvider {
+    static func whisperProvider(
+        for provider: AIProvider,
+        model: String,
+        transferPolicy: LargeTransferPolicy = .wifiOnly
+    ) throws -> OpenAIProvider {
+        guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
+            throw AppError.invalidProviderURL
+        }
         let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(key, provider: provider)
@@ -61,15 +71,12 @@ enum ProviderFactory {
             throw error
         }
         let resolvedModel = model.isEmpty ? provider.defaultTranscriptionModel : model
-        AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for Whisper transcription, model=\(resolvedModel, privacy: .public), endpoint=\(provider.baseURLString, privacy: .public)")
-        // Background uploads: chunk transfers keep running when the app is
-        // suspended or the phone is locked, so a long transcription doesn't
-        // need the app to stay in the foreground.
+        AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for Whisper transcription, model=\(resolvedModel, privacy: .public)")
         return OpenAIProvider(
             provider: provider,
             apiKey: key,
             transcriptionModel: resolvedModel,
-            usesBackgroundUploads: true
+            largeTransferPolicy: transferPolicy
         )
     }
 }

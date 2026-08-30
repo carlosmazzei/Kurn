@@ -210,6 +210,11 @@ enum PipelineEvaluationMatrix {
         case .cloud(let provider):
             configuration.transcriptionProvider = provider
             configuration.transcriptionModel = provider.defaultTranscriptionModel
+            configuration.cloudTranscriptionConsented = true
+            configuration.largeTransferPolicy = LargeTransferPolicy(
+                allowsExpensiveAccess: true,
+                allowsConstrainedAccess: true
+            )
             asrLabel = "\(transcription.rawValue):\(provider.id)"
         }
 

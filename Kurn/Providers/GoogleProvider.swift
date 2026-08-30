@@ -129,7 +129,6 @@ struct GoogleProvider: LLMProvider {
         try LLMHTTP.jsonRequest(
             provider: provider,
             path: generateContentPath,
-            fallbackURL: "https://generativelanguage.googleapis.com/v1beta/\(generateContentPath)",
             timeout: timeout,
             headers: ["x-goog-api-key": apiKey],
             body: body

@@ -9,11 +9,11 @@
 /* Begin PBXBuildFile section */
 		2AA9E4B72FECAAE50067BF88 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 2AA9E4B62FECAAE50067BF88 /* FluidAudio */; };
 		2AB0000000000000000000A1 /* whisper in Frameworks */ = {isa = PBXBuildFile; productRef = 2AB0000000000000000000A2 /* whisper */; };
+		2AC0000000000000000000A1 /* Kurn/Resources/Models/GTCRN.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */; };
+		2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */; };
 		2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */ = {isa = PBXBuildFile; productRef = 2AD0000000000000000000A2 /* sherpa-onnx */; };
 		2AE0000000000000000000A1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000A2 /* KurnCore */; };
 		2AE0000000000000000000B1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000B2 /* KurnCore */; };
-		2AC0000000000000000000A1 /* Kurn/Resources/Models/GTCRN.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */; };
-		2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA1000000000000000000162 /* Kurn/Infrastructure/RecordingActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */; };
 		AA1000000000000000000172 /* Kurn/AppIntents/StartRecordingIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000171 /* Kurn/AppIntents/StartRecordingIntent.swift */; };
@@ -21,6 +21,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		1A2E9DC89EDF32444B31E063 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000003 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA30000000000000000000B1;
+			remoteInfo = KurnWatch;
+		};
 		2AD3E5A2300D5CA2003DA9A9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = AA0000000000000000000003 /* Project object */;
@@ -43,13 +50,6 @@
 			remoteInfo = Kurn;
 		};
 		AA3000000000000000000141 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = AA0000000000000000000003 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = AA30000000000000000000B1;
-			remoteInfo = KurnWatch;
-		};
-		1A2E9DC89EDF32444B31E063 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = AA0000000000000000000003 /* Project object */;
 			proxyType = 1;
@@ -87,13 +87,13 @@
 		2AC0000000000000000000B1 /* Kurn/Resources/Models/GTCRN.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = Kurn/Resources/Models/GTCRN.mlpackage; sourceTree = SOURCE_ROOT; };
 		2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Kurn/Resources/Models/gtcrn.json; sourceTree = SOURCE_ROOT; };
 		2AD3E59C300D5CA2003DA9A9 /* KurnUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A40F5A8AB42D975B97D6879D /* KurnWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA00000000000000000000A1 /* Kurn.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kurn.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KurnLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/Infrastructure/RecordingActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
 		AA1000000000000000000171 /* Kurn/AppIntents/StartRecordingIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/AppIntents/StartRecordingIntent.swift; sourceTree = SOURCE_ROOT; };
 		AA20000000000000000000A1 /* KurnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA30000000000000000000A1 /* KurnWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KurnWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A40F5A8AB42D975B97D6879D /* KurnWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -101,7 +101,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				Kurn.entitlements,
 				Resources/Models/gtcrn.json,
 				Resources/Models/GTCRN.mlpackage,
 			);
@@ -125,14 +124,21 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2AD3E59D300D5CA2003DA9A9 /* KurnUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnUITests; sourceTree = "<group>"; };
+		82B2499CCCAA3DB0E20DE3B1 /* KurnWatchUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnWatchUITests; sourceTree = "<group>"; };
 		AA00000000000000000000C1 /* Kurn */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = Kurn; sourceTree = "<group>"; };
 		AA10000000000000000000C1 /* KurnLiveActivityExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KurnLiveActivityExtension; sourceTree = "<group>"; };
 		AA20000000000000000000C1 /* KurnTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnTests; sourceTree = "<group>"; };
 		AA30000000000000000000C1 /* KurnWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA30000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KurnWatch; sourceTree = "<group>"; };
-		82B2499CCCAA3DB0E20DE3B1 /* KurnWatchUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnWatchUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		034D966C3A765439823E1F1A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		2AD3E599300D5CA2003DA9A9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -167,13 +173,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA30000000000000000000F1 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		034D966C3A765439823E1F1A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -492,6 +491,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		84827FCA1EA7974707F328BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AA0000000000000000000101 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -522,13 +528,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		84827FCA1EA7974707F328BD /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -536,6 +535,11 @@
 			isa = PBXTargetDependency;
 			target = AA00000000000000000000B1 /* Kurn */;
 			targetProxy = 2AD3E5A2300D5CA2003DA9A9 /* PBXContainerItemProxy */;
+		};
+		370A03F1E44C271FFDE363B1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA30000000000000000000B1 /* KurnWatch */;
+			targetProxy = 1A2E9DC89EDF32444B31E063 /* PBXContainerItemProxy */;
 		};
 		AA1000000000000000000151 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -552,14 +556,30 @@
 			target = AA30000000000000000000B1 /* KurnWatch */;
 			targetProxy = AA3000000000000000000141 /* PBXContainerItemProxy */;
 		};
-		370A03F1E44C271FFDE363B1 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = AA30000000000000000000B1 /* KurnWatch */;
-			targetProxy = 1A2E9DC89EDF32444B31E063 /* PBXContainerItemProxy */;
-		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		1B0D16313F41631A6B460BF8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.4.1;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.KurnWatchUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = KurnWatch;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 		2AD3E5A5300D5CA2003DA9A9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -747,7 +767,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SHERPA_ONNX_ENABLED";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h;
+				SWIFT_OBJC_BRIDGING_HEADER = "Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -777,7 +797,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "match AppStore ai.kurn.app";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SHERPA_ONNX_ENABLED";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h;
+				SWIFT_OBJC_BRIDGING_HEADER = "Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -813,7 +833,6 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				PROVISIONING_PROFILE_SPECIFIER = "match AppStore ai.kurn.app.LiveActivityExtension";
 				CURRENT_PROJECT_VERSION = 8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = KurnLiveActivityExtension/Info.plist;
@@ -826,6 +845,7 @@
 				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.LiveActivityExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore ai.kurn.app.LiveActivityExtension";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -902,7 +922,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				PROVISIONING_PROFILE_SPECIFIER = "match AppStore ai.kurn.app.watchkitapp";
 				CURRENT_PROJECT_VERSION = 8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -914,6 +933,7 @@
 				MARKETING_VERSION = 1.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore ai.kurn.app.watchkitapp";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -943,27 +963,6 @@
 				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Debug;
-		};
-		1B0D16313F41631A6B460BF8 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.4.1;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.KurnWatchUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				TEST_TARGET_NAME = KurnWatch;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
-			};
-			name = Release;
 		};
 /* End XCBuildConfiguration section */
 

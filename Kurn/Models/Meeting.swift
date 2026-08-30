@@ -167,11 +167,15 @@ final class Meeting {
     /// place; the semantic indexer needs per-recording structure and keeps its
     /// own variant.
     func assembledTranscriptText() -> String {
-        let groups: [(offset: TimeInterval, segments: [TranscriptSegment], highlights: [Highlight])] = recordings
+        let groups = recordings
             .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { recording in
+            .compactMap { recording -> SummaryService.TranscriptGroup? in
                 guard let segments = recording.transcript?.segments, !segments.isEmpty else { return nil }
-                return (offset: startOffset(of: recording), segments: segments, highlights: recording.highlights)
+                return SummaryService.TranscriptGroup(
+                    offset: startOffset(of: recording),
+                    segments: segments,
+                    highlights: recording.highlights
+                )
             }
         return SummaryService.assembleTranscriptText(from: groups)
     }

@@ -98,7 +98,6 @@ struct AnthropicProvider: LLMProvider {
         try LLMHTTP.jsonRequest(
             provider: provider,
             path: "messages",
-            fallbackURL: "https://api.anthropic.com/v1/messages",
             timeout: timeout,
             headers: ["x-api-key": apiKey, "anthropic-version": apiVersion],
             body: body

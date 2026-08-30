@@ -31,7 +31,8 @@ struct ProviderModelsService: Sendable {
         do {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
         } catch {
-            AppLog.transcription.atError.error("ProviderModelsService: cannot load models for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.transcription.atError.error("ProviderModelsService: cannot load models for \(provider.displayName, privacy: .public) code=\(code, privacy: .public)")
             throw error
         }
 
@@ -52,7 +53,8 @@ struct ProviderModelsService: Sendable {
                 AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) /models returned 403, falling back to known model list")
                 return provider.fallbackModels
             } catch {
-                AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                let code = (error as? AppError)?.logCode ?? "unexpected"
+                AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public) code=\(code, privacy: .public)")
                 throw error
             }
             if fetched.isEmpty, !provider.fallbackModels.isEmpty {
@@ -94,18 +96,13 @@ struct ProviderModelsService: Sendable {
         configure: (inout URLRequest) -> Void,
         extract: (T) -> [String]
     ) async throws -> [String] {
-        guard let url = LLMHTTP.endpoint(baseURLString: provider.baseURLString, path: "models") else {
-            throw Self.invalidURL
-        }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: try LLMHTTP.requireEndpoint(provider: provider, path: "models"))
         request.httpMethod = "GET"
         configure(&request)
 
         let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
         return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
     }
-
-    private static let invalidURL = AppError.apiError(statusCode: 0, message: "Invalid provider URL")
 
     private func uniqueSorted(_ values: [String]) -> [String] {
         Array(Set(values.filter { !$0.isEmpty })).sorted()

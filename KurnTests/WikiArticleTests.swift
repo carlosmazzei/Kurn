@@ -67,6 +67,19 @@ struct WikiArticleTests {
         #expect(try context.fetchCount(FetchDescriptor<WikiArticle>()) == 0)
     }
 
+    @Test func rebuildWithoutProviderPreservesExistingArticles() async throws {
+        let context = makeContext()
+        let meeting = Meeting(title: "Planning")
+        context.insert(meeting)
+        context.insert(article(for: meeting, hash: "h1", generator: "g1"))
+        try context.save()
+
+        await WikiCoordinator(modelContext: context).rebuildWiki()
+
+        #expect(meeting.wikiArticle != nil)
+        #expect(try context.fetchCount(FetchDescriptor<WikiArticle>()) == 1)
+    }
+
     @Test func snapshotCarriesMeetingIdentityAndBody() throws {
         let context = makeContext()
         let meeting = Meeting(title: "Raw")

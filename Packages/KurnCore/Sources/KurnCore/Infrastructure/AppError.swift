@@ -13,6 +13,10 @@ public enum AppError: LocalizedError, Identifiable {
     case noAPIKey(provider: String)
     case networkError(URLError)
     case apiError(statusCode: Int, message: String)
+    case invalidProviderURL
+    case providerResponseTooLarge
+    case ambiguousProviderResult
+    case networkPolicyRestricted
     case transcriptionFailed(String)
     case transcriptionLanguageUnsupported(MeetingLanguage, TranscriptionEngine)
     case audioError(String)
@@ -47,6 +51,10 @@ public enum AppError: LocalizedError, Identifiable {
         case .noAPIKey: return "missing_api_key"
         case .networkError: return "network"
         case .apiError: return "provider_api"
+        case .invalidProviderURL: return "provider_configuration"
+        case .providerResponseTooLarge: return "provider_response_too_large"
+        case .ambiguousProviderResult: return "provider_result_ambiguous"
+        case .networkPolicyRestricted: return "network_policy_restricted"
         case .transcriptionFailed: return "transcription"
         case .transcriptionLanguageUnsupported: return "transcription_language_unsupported"
         case .audioError: return "audio"
@@ -88,6 +96,26 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.api", comment: "API failure"),
                 statusCode, message
+            )
+        case .invalidProviderURL:
+            return NSLocalizedString(
+                "error.invalid_provider_url",
+                comment: "Provider URL is not allowed"
+            )
+        case .providerResponseTooLarge:
+            return NSLocalizedString(
+                "error.provider_response_too_large",
+                comment: "Provider response exceeded the safe size limit"
+            )
+        case .ambiguousProviderResult:
+            return NSLocalizedString(
+                "error.ambiguous_provider_result",
+                comment: "Provider result could not be confirmed without risking a duplicate"
+            )
+        case .networkPolicyRestricted:
+            return NSLocalizedString(
+                "error.network_policy_restricted",
+                comment: "Large transfer blocked by the selected network policy"
             )
         case .transcriptionFailed(let detail):
             return String(
