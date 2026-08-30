@@ -56,7 +56,7 @@ struct LegacyStoreAdoptionTests {
 
     /// Folder, tag, meeting and speaker — the core rows every other fixture
     /// below hangs off.
-    private func insertMeetingCore(into context: ModelContext) -> (meeting: Meeting, tag: Tag) {
+    private func insertMeetingCore(into context: ModelContext) -> (meeting: Meeting, tag: Kurn.Tag) {
         let folder = Folder(name: "Legacy Folder", iconName: "folder.fill", colorHex: "#5E5CE6")
         context.insert(folder)
 
@@ -156,7 +156,7 @@ struct LegacyStoreAdoptionTests {
     /// document — the LLM-derived and index artifacts layered on the meeting.
     private func insertDerivedArtifacts(
         for meeting: Meeting,
-        tag: Tag,
+        tag: Kurn.Tag,
         doneRecording: Recording,
         into context: ModelContext
     ) {
