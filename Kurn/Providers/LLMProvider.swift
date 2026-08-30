@@ -90,10 +90,28 @@ struct HTTPPolicy: Equatable, Sendable {
 
     let totalDeadline: TimeInterval
     let maxResponseBytes: Int
+    let maximumServerWait: TimeInterval
 
-    init(totalDeadline: TimeInterval, maxResponseBytes: Int = defaultMaxResponseBytes) {
+    init(
+        totalDeadline: TimeInterval,
+        maxResponseBytes: Int = defaultMaxResponseBytes,
+        maximumServerWait: TimeInterval = 30
+    ) {
         self.totalDeadline = max(0, totalDeadline)
         self.maxResponseBytes = max(0, maxResponseBytes)
+        self.maximumServerWait = min(max(0, maximumServerWait), self.totalDeadline)
+    }
+
+    static func interactive(totalDeadline: TimeInterval) -> Self {
+        Self(totalDeadline: totalDeadline, maximumServerWait: 30)
+    }
+
+    static func automated(totalDeadline: TimeInterval) -> Self {
+        Self(totalDeadline: totalDeadline, maximumServerWait: 300)
+    }
+
+    func allowsServerWait(_ delay: TimeInterval) -> Bool {
+        delay >= 0 && delay <= maximumServerWait
     }
 }
 
@@ -125,7 +143,8 @@ enum LLMHTTP {
     /// Base unit for exponential backoff. Kept small so the UI isn't blocked
     /// long; the user is waiting on a transcription/summary.
     static let baseDelay: TimeInterval = 0.5
-    /// Upper bound on any single backoff wait, including a server `Retry-After`.
+    /// Upper bound on client-computed exponential backoff. Server-directed waits
+    /// are exact and governed by the operation's `HTTPPolicy` instead.
     static let maxDelay: TimeInterval = 8
 
     /// Transport-level `URLError` codes worth retrying — momentary connectivity
@@ -331,9 +350,10 @@ enum LLMHTTP {
         _ request: URLRequest,
         session: URLSession,
         clock: some MonotonicSleepClock = SystemClock(),
-        policy: HTTPPolicy? = nil
+        policy: HTTPPolicy? = nil,
+        wallNow: @escaping @Sendable () -> Date = { Date() }
     ) async throws -> (Data, URLResponse) {
-        let policy = policy ?? HTTPPolicy(totalDeadline: max(request.timeoutInterval, 1))
+        let policy = policy ?? .interactive(totalDeadline: max(request.timeoutInterval, 1))
         let startedAt = clock.now
         var attempt = 0
         while true {
@@ -374,10 +394,13 @@ enum LLMHTTP {
                 try validate(response: result.response, data: result.data)
                 return result
             } catch let AppError.apiError(status, message) {
-                let retryAfter = retryAfterSeconds(from: result.response)
+                let retryAfter = retryAfterSeconds(from: result.response, now: wallNow())
                 guard let delay = retryableDelay(
                     attempt: attempt, status: status, urlError: nil, retryAfter: retryAfter
                 ) else { throw AppError.apiError(statusCode: status, message: message) }
+                if retryAfter != nil, !policy.allowsServerWait(delay) {
+                    throw AppError.apiError(statusCode: status, message: message)
+                }
                 try await backoffWithinDeadline(
                     delay,
                     attempt: attempt,
@@ -457,8 +480,8 @@ enum LLMHTTP {
         guard isTransient else { return nil }
 
         // A server-provided Retry-After wins over our own backoff.
-        if let retryAfter, retryAfter > 0 {
-            return min(retryAfter, maxDelay)
+        if let retryAfter {
+            return max(0, retryAfter)
         }
         let exponential = baseDelay * pow(2, Double(attempt))
         let jitter = jitter.map { min(max($0, 0), baseDelay) }
@@ -489,13 +512,35 @@ enum LLMHTTP {
         try await clock.sleep(seconds: delay)
     }
 
-    /// Parse a `Retry-After` header expressed in delta-seconds. The HTTP-date
-    /// form is permitted by the spec but unused by these vendors, so it's ignored.
-    private static func retryAfterSeconds(from response: URLResponse) -> TimeInterval? {
+    static func retryAfterSeconds(
+        from response: URLResponse,
+        now: Date = Date()
+    ) -> TimeInterval? {
         guard let http = response as? HTTPURLResponse,
-              let raw = http.value(forHTTPHeaderField: "Retry-After"),
-              let seconds = TimeInterval(raw.trimmingCharacters(in: .whitespaces)) else { return nil }
-        return seconds
+              let raw = http.value(forHTTPHeaderField: "Retry-After")?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
+        if raw.utf8.allSatisfy({ (48...57).contains($0) }),
+           let seconds = TimeInterval(raw), seconds.isFinite {
+            return seconds
+        }
+        let formats = [
+            "EEE',' dd MMM yyyy HH':'mm':'ss zzz",
+            "EEEE',' dd-MMM-yy HH':'mm':'ss zzz",
+            "EEE MMM d HH':'mm':'ss yyyy"
+        ]
+        for format in formats {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.isLenient = false
+            formatter.dateFormat = format
+            if let date = formatter.date(from: raw) {
+                return max(0, date.timeIntervalSince(now))
+            }
+        }
+        return nil
     }
 
     private static func decodeErrorMessage(_ data: Data) -> String? {

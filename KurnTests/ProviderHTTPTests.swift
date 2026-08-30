@@ -770,7 +770,7 @@ extension ProviderHTTPTests {
         }
     }
 
-    @Test func totalDeadlineStopsRetryBeforeBackoff() async throws {
+    @Test func serverWaitBeyondPolicyFailsWithoutRetrying() async throws {
         MockURLProtocol.enqueue([
             .success(status: 429, body: Data(), headers: ["Retry-After": "2"]),
             MockURLProtocol.json(["ok": true])
@@ -786,10 +786,10 @@ extension ProviderHTTPTests {
                 policy: HTTPPolicy(totalDeadline: 1, maxResponseBytes: 1_024)
             )
             Issue.record("Expected a total deadline timeout")
-        } catch let AppError.networkError(error) {
-            #expect(error.code == .timedOut)
+        } catch let AppError.apiError(status, _) {
+            #expect(status == 429)
         } catch {
-            Issue.record("Unexpected deadline error: \(error)")
+            Issue.record("Unexpected wait-budget error: \(error)")
         }
 
         #expect(clock.durations.isEmpty)

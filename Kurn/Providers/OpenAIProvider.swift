@@ -123,7 +123,11 @@ struct OpenAIProvider: LLMProvider {
 
         do {
             request.httpBody = body
-            return try await LLMHTTP.sendValidated(request, session: session).0
+            return try await LLMHTTP.sendValidated(
+                request,
+                session: session,
+                policy: .automated(totalDeadline: request.timeoutInterval)
+            ).0
         } catch {
             AppLog.transcription.atError.error("OpenAIProvider: transcription request failed for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw error
