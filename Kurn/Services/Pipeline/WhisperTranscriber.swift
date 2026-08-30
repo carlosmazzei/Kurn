@@ -98,9 +98,9 @@ actor WhisperTranscriber: Transcribing {
         return (Double(completed) + inFlightChunkFraction) / Double(totalChunks)
     }
 
-    /// Runs `operation`, cancelling it and throwing `URLError.timedOut` if it
-    /// doesn't complete within `seconds`. `TranscriptionViewModel.isCancellation`
-    /// maps `.timedOut` to `.pending` so a stuck upload retries automatically.
+    /// Runs `operation`, cancelling it and reporting an ambiguous provider result
+    /// if it doesn't complete within `seconds`; the upload is never replayed
+    /// automatically because the provider may already have processed it.
     private static func withChunkTimeout<T: Sendable>(
         seconds: TimeInterval,
         operation: @escaping @Sendable () async throws -> T
@@ -109,8 +109,8 @@ actor WhisperTranscriber: Transcribing {
             group.addTask { try await operation() }
             group.addTask {
                 try await Task.sleep(for: .seconds(seconds))
-                AppLog.transcription.atError.error("whisper: chunk timed out after \(Int(seconds), privacy: .public)s — upload will retry")
-                throw AppError.networkError(URLError(.timedOut))
+                AppLog.transcription.atError.error("whisper: chunk result ambiguous after \(Int(seconds), privacy: .public)s — not retrying automatically")
+                throw AppError.ambiguousProviderResult
             }
             defer { group.cancelAll() }
             let result = try await group.next()!

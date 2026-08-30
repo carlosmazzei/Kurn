@@ -84,6 +84,7 @@ struct ProviderHTTPTests {
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString.contains("audio/transcriptions") == true)
         #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
+        #expect(request.value(forHTTPHeaderField: "X-Client-Request-Id") == nil)
         let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
         #expect(bodyString.contains("whisper-1"))
         #expect(bodyString.contains("verbose_json"))
@@ -124,6 +125,7 @@ struct ProviderHTTPTests {
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString == "https://api.groq.com/openai/v1/audio/transcriptions")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer groq-secret")
+        #expect(request.value(forHTTPHeaderField: "X-Client-Request-Id") == nil)
         let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
         #expect(bodyString.contains("whisper-large-v3"))
         #expect(!bodyString.contains("whisper-1"))

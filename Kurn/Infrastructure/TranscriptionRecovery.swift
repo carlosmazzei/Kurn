@@ -25,6 +25,8 @@ import SwiftData
 enum TranscriptionRecovery {
 
     /// Reset every recording left `.inProgress` with nobody working on it.
+    /// Only a checkpoint from a known on-device engine resumes automatically;
+    /// cloud or unknown work may have completed remotely and requires manual retry.
     /// - Parameter activeIDs: recordings a live view model is actually
     ///   transcribing right now (empty at launch — a fresh process has no runs
     ///   yet). Works on the main context — the one the view models read — so
@@ -44,14 +46,19 @@ enum TranscriptionRecovery {
         let stale = inProgress.filter { !activeIDs.contains($0.id) }
         guard !stale.isEmpty else { return }
 
-        var withCheckpoint = 0
+        var resumable = 0
         for recording in stale {
-            recording.transcriptionStatus = .pending
-            if recording.transcriptionCheckpointData != nil { withCheckpoint += 1 }
+            if let checkpoint = recording.transcriptionCheckpoint,
+               checkpoint.engineRaw != TranscriptionEngine.whisperAPI.rawValue {
+                recording.transcriptionStatus = .pending
+                resumable += 1
+            } else {
+                recording.transcriptionStatus = .failed
+            }
         }
         do {
             try context.save()
-            AppLog.transcription.atNotice.notice("recovery: swept \(stale.count, privacy: .public) stale transcription(s), \(withCheckpoint, privacy: .public) with checkpoint")
+            AppLog.transcription.atNotice.notice("recovery: swept \(stale.count, privacy: .public) stale transcription(s), \(resumable, privacy: .public) safe to resume")
         } catch {
             AppLog.transcription.atError.error("recovery: sweep save failed: \(error.localizedDescription, privacy: .public)")
         }

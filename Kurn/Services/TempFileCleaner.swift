@@ -68,12 +68,11 @@ enum TempFileCleaner {
             Self.prefixes.contains(where: { name.hasPrefix($0) })
         }
 
-        // Also sweep the upload-body subdirectory, excluding any file a
-        // background upload task is still actively reading from disk.
+        // Also sweep the legacy upload-body subdirectory. Current releases never
+        // create these files; background tasks from older processes own their copy.
         let uploadDir = tmp.appendingPathComponent("WhisperUploadBodies", isDirectory: true)
-        let inFlight = WhisperBackgroundUploader.shared.inFlightBodyFilePaths()
         let uploadResult = sweep(directory: uploadDir, cutoff: cutoff, remove: remove, fileSystem: fileSystem) { file, _ in
-            file.pathExtension == "multipart" && !inFlight.contains(file.path)
+            file.pathExtension == "multipart"
         }
 
         let removed = pipelineResult.files + uploadResult.files

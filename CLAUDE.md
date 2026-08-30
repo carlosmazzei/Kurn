@@ -260,7 +260,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   are mostly `struct`/`actor` types operating on plain values so they stay
   decoupled from SwiftData and safe off the main actor.
 - **Providers/** — cloud LLM clients behind the `LLMProvider` protocol. Shared
-  networking is split by responsibility: `ProviderHTTPPolicy` owns budgets,
+  networking is split by responsibility: `ProviderHTTPPolicy` owns budgets and
+  request/replay semantics,
   `ProviderURLPolicy` owns destination validation, `ProviderHTTPTransport` owns
   bounded execution/retry, and `ProviderResponseParsing` owns decoding contracts.
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and

@@ -16,10 +16,16 @@ extension LLMHTTP {
         session: URLSession,
         clock: some MonotonicSleepClock = SystemClock(),
         policy: HTTPPolicy? = nil,
-        wallNow: @escaping @Sendable () -> Date = { Date() }
+        context: HTTPExecutionContext? = nil
     ) async throws -> (Data, URLResponse) {
+        let context = context ?? .inferred(for: request)
+        let request = context.semantics.applying(to: request)
         let policy = policy ?? .interactive(totalDeadline: max(request.timeoutInterval, 1))
         let startedAt = clock.now
+        let retryContext = RetryContext(
+            deadlineAt: startedAt + policy.totalDeadline,
+            requestID: context.semantics.identity
+        )
         var attempt = 0
         while true {
             try Task.checkCancellation()
@@ -41,6 +47,13 @@ extension LLMHTTP {
                     clock: clock
                 )
             } catch let AppError.networkError(urlError) {
+                if context.semantics.replaySafety == .ambiguous,
+                   ambiguousURLErrorCodes.contains(urlError.code) {
+                    AppLog.transcription.atNotice.notice(
+                        "http: ambiguous result request=\(context.semantics.identity.uuidString, privacy: .public) code=\(urlError.code.rawValue, privacy: .public); not retrying"
+                    )
+                    throw AppError.ambiguousProviderResult
+                }
                 guard let delay = retryableDelay(
                     attempt: attempt, status: nil, urlError: urlError, retryAfter: nil
                 ) else { throw AppError.networkError(urlError) }
@@ -48,7 +61,7 @@ extension LLMHTTP {
                     delay,
                     attempt: attempt,
                     reason: "network \(urlError.code.rawValue)",
-                    deadlineAt: startedAt + policy.totalDeadline,
+                    context: retryContext,
                     clock: clock
                 )
                 attempt += 1
@@ -59,7 +72,7 @@ extension LLMHTTP {
                 try validate(response: result.response, data: result.data)
                 return result
             } catch let AppError.apiError(status, message) {
-                let retryAfter = retryAfterSeconds(from: result.response, now: wallNow())
+                let retryAfter = retryAfterSeconds(from: result.response, now: context.wallNow())
                 guard let delay = retryableDelay(
                     attempt: attempt, status: status, urlError: nil, retryAfter: retryAfter
                 ) else { throw AppError.apiError(statusCode: status, message: message) }
@@ -70,7 +83,7 @@ extension LLMHTTP {
                     delay,
                     attempt: attempt,
                     reason: "HTTP \(status)",
-                    deadlineAt: startedAt + policy.totalDeadline,
+                    context: retryContext,
                     clock: clock
                 )
                 attempt += 1
@@ -154,6 +167,11 @@ extension LLMHTTP {
         return min(exponential + jitter, maxDelay)
     }
 
+    private struct RetryContext {
+        let deadlineAt: TimeInterval
+        let requestID: UUID
+    }
+
     private static var deadlineError: AppError {
         .networkError(URLError(.timedOut))
     }
@@ -162,23 +180,30 @@ extension LLMHTTP {
         _ delay: TimeInterval,
         attempt: Int,
         reason: String,
-        deadlineAt: TimeInterval,
+        context: RetryContext,
         clock: some MonotonicSleepClock
     ) async throws {
-        let remaining = deadlineAt - clock.now
+        let remaining = context.deadlineAt - clock.now
         guard delay < remaining else { throw deadlineError }
-        try await backoff(delay, attempt: attempt, reason: reason, clock: clock)
+        try await backoff(
+            delay,
+            attempt: attempt,
+            reason: reason,
+            requestID: context.requestID,
+            clock: clock
+        )
     }
 
     private static func backoff(
         _ delay: TimeInterval,
         attempt: Int,
         reason: String,
+        requestID: UUID,
         clock: some SleepClock
     ) async throws {
         let seconds = String(format: "%.2f", delay)
         let nextAttempt = attempt + 2
-        AppLog.transcription.atInfo.info("http: retrying after \(seconds, privacy: .public)s (attempt \(nextAttempt, privacy: .public)/\(maxAttempts, privacy: .public), \(reason, privacy: .public))")
+        AppLog.transcription.atInfo.info("http: request=\(requestID.uuidString, privacy: .public) retrying after \(seconds, privacy: .public)s (attempt \(nextAttempt, privacy: .public)/\(maxAttempts, privacy: .public), \(reason, privacy: .public))")
         try await clock.sleep(seconds: delay)
     }
 

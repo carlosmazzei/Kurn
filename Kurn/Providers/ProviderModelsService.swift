@@ -31,7 +31,8 @@ struct ProviderModelsService: Sendable {
         do {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
         } catch {
-            AppLog.transcription.atError.error("ProviderModelsService: cannot load models for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.transcription.atError.error("ProviderModelsService: cannot load models for \(provider.displayName, privacy: .public) code=\(code, privacy: .public)")
             throw error
         }
 
@@ -52,7 +53,8 @@ struct ProviderModelsService: Sendable {
                 AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) /models returned 403, falling back to known model list")
                 return provider.fallbackModels
             } catch {
-                AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                let code = (error as? AppError)?.logCode ?? "unexpected"
+                AppLog.transcription.atError.error("ProviderModelsService: failed to load models from \(provider.displayName, privacy: .public) code=\(code, privacy: .public)")
                 throw error
             }
             if fetched.isEmpty, !provider.fallbackModels.isEmpty {

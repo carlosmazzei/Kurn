@@ -5,6 +5,59 @@
 
 import Foundation
 
+enum HTTPReplaySafety: Equatable, Sendable {
+    case idempotent
+    case ambiguous
+}
+
+struct HTTPRequestSemantics: Sendable {
+    let identity: UUID
+    let replaySafety: HTTPReplaySafety
+    let correlationHeaderName: String?
+
+    init(
+        identity: UUID = UUID(),
+        replaySafety: HTTPReplaySafety,
+        correlationHeaderName: String? = nil
+    ) {
+        self.identity = identity
+        self.replaySafety = replaySafety
+        self.correlationHeaderName = correlationHeaderName
+    }
+
+    static func inferred(for request: URLRequest) -> Self {
+        let idempotentMethods = ["GET", "HEAD", "OPTIONS"]
+        let method = request.httpMethod?.uppercased() ?? "GET"
+        return Self(
+            replaySafety: idempotentMethods.contains(method) ? .idempotent : .ambiguous
+        )
+    }
+
+    func applying(to request: URLRequest) -> URLRequest {
+        guard let correlationHeaderName else { return request }
+        var request = request
+        request.setValue(identity.uuidString, forHTTPHeaderField: correlationHeaderName)
+        return request
+    }
+}
+
+struct HTTPExecutionContext: Sendable {
+    let semantics: HTTPRequestSemantics
+    let wallNow: @Sendable () -> Date
+
+    init(
+        semantics: HTTPRequestSemantics,
+        wallNow: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.semantics = semantics
+        self.wallNow = wallNow
+    }
+
+    static func inferred(for request: URLRequest) -> Self {
+        Self(semantics: .inferred(for: request))
+    }
+}
+
 struct HTTPPolicy: Equatable, Sendable {
     static let defaultMaxResponseBytes = 16 * 1_024 * 1_024
 
@@ -71,6 +124,9 @@ enum LLMHTTP {
     static let retriableURLErrorCodes: Set<URLError.Code> = [
         .timedOut, .networkConnectionLost, .cannotConnectToHost,
         .notConnectedToInternet, .dnsLookupFailed
+    ]
+    static let ambiguousURLErrorCodes: Set<URLError.Code> = [
+        .timedOut, .networkConnectionLost
     ]
     /// HTTP status codes worth retrying: request timeout, rate limiting, and
     /// transient server-side failures. Auth/validation errors (4xx) fail fast.

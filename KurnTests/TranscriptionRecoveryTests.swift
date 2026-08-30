@@ -2,10 +2,9 @@
 //  TranscriptionRecoveryTests.swift
 //  KurnTests
 //
-//  The launch-time sweep turns all recordings a dead process left at `.inProgress`
-//  into `.pending` so every stale run can retry (with its checkpoint when one
-//  exists, or from the beginning otherwise), and must leave every other status
-//  untouched.
+//  The launch-time sweep resumes only stale runs proven to use an on-device
+//  checkpoint. Cloud or unknown work requires manual retry because the process
+//  may have died after a paid request completed remotely.
 //
 
 import Foundation
@@ -20,15 +19,15 @@ struct TranscriptionRecoveryTests {
     private func makeRecording(
         in context: ModelContext,
         status: TranscriptionStatus,
-        withCheckpoint: Bool = false
+        checkpointEngine: TranscriptionEngine? = nil
     ) -> Recording {
         let meeting = Meeting(title: "M")
         context.insert(meeting)
         let recording = Recording(meeting: meeting, fileName: "\(UUID()).m4a", duration: 60)
         recording.transcriptionStatus = status
-        if withCheckpoint {
+        if let checkpointEngine {
             recording.transcriptionCheckpoint = TranscriptionCheckpoint(
-                engineRaw: TranscriptionEngine.whisperAPI.rawValue,
+                engineRaw: checkpointEngine.rawValue,
                 languageRaw: MeetingLanguage.english.rawValue,
                 compacted: false,
                 totalChunks: 4,
@@ -41,10 +40,30 @@ struct TranscriptionRecoveryTests {
         return recording
     }
 
-    @Test func staleInProgressWithCheckpointBecomesPending() throws {
+    @Test func staleCloudCheckpointRequiresManualRetry() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
-        let recording = makeRecording(in: context, status: .inProgress, withCheckpoint: true)
+        let recording = makeRecording(
+            in: context,
+            status: .inProgress,
+            checkpointEngine: .whisperAPI
+        )
+        try context.save()
+
+        TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
+
+        #expect(recording.transcriptionStatus == .failed)
+        #expect(recording.transcriptionCheckpointData != nil)
+    }
+
+    @Test func staleOnDeviceCheckpointBecomesPending() throws {
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let recording = makeRecording(
+            in: context,
+            status: .inProgress,
+            checkpointEngine: .whisperCpp
+        )
         try context.save()
 
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
@@ -53,7 +72,7 @@ struct TranscriptionRecoveryTests {
         #expect(recording.transcriptionCheckpointData != nil)
     }
 
-    @Test func staleInProgressWithoutCheckpointBecomesPending() throws {
+    @Test func staleInProgressWithoutCheckpointRequiresManualRetry() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
         let recording = makeRecording(in: context, status: .inProgress)
@@ -61,7 +80,7 @@ struct TranscriptionRecoveryTests {
 
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
 
-        #expect(recording.transcriptionStatus == .pending)
+        #expect(recording.transcriptionStatus == .failed)
     }
 
     @Test func activeRecordingsAreExcludedFromSweep() throws {
@@ -69,8 +88,8 @@ struct TranscriptionRecoveryTests {
         // process is actually working on — only orphaned `.inProgress` rows.
         let container = TestModelContainer.make()
         let context = container.mainContext
-        let active = makeRecording(in: context, status: .inProgress, withCheckpoint: true)
-        let stale = makeRecording(in: context, status: .inProgress, withCheckpoint: true)
+        let active = makeRecording(in: context, status: .inProgress, checkpointEngine: .whisperCpp)
+        let stale = makeRecording(in: context, status: .inProgress, checkpointEngine: .whisperCpp)
         try context.save()
 
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container, excluding: [active.id])
@@ -84,7 +103,7 @@ struct TranscriptionRecoveryTests {
         let context = container.mainContext
         let done = makeRecording(in: context, status: .done)
         let failed = makeRecording(in: context, status: .failed)
-        let pending = makeRecording(in: context, status: .pending, withCheckpoint: true)
+        let pending = makeRecording(in: context, status: .pending, checkpointEngine: .whisperCpp)
         let none = makeRecording(in: context, status: .none)
         try context.save()
 
@@ -94,5 +113,15 @@ struct TranscriptionRecoveryTests {
         #expect(failed.transcriptionStatus == .failed)
         #expect(pending.transcriptionStatus == .pending)
         #expect(none.transcriptionStatus == .none)
+    }
+
+    @Test func onlyExplicitCancellationCanResumeAutomatically() {
+        #expect(TranscriptionViewModel.isResumableCancellation(
+            .networkError(URLError(.cancelled))
+        ))
+        #expect(!TranscriptionViewModel.isResumableCancellation(
+            .networkError(URLError(.timedOut))
+        ))
+        #expect(!TranscriptionViewModel.isResumableCancellation(.ambiguousProviderResult))
     }
 }

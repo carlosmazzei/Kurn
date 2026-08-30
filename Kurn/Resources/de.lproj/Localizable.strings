@@ -6,6 +6,7 @@
 "error.api" = "API-Fehler %1$d: %2$@";
 "error.invalid_provider_url" = "Die Anbieter-URL ist ungültig oder nicht zulässig. Verwenden Sie einen öffentlichen HTTPS-Hostnamen ohne Zugangsdaten, Abfrageparameter, Fragmente oder benutzerdefinierte Ports.";
 "error.provider_response_too_large" = "Die Anbieterantwort hat das sichere Größenlimit überschritten.";
+"error.ambiguous_provider_result" = "Die Verbindung wurde beendet, bevor das Anbieterergebnis bestätigt werden konnte. Kurn hat nicht automatisch wiederholt, um doppelte Kosten zu vermeiden. Prüfen Sie den Anbieter vor einem erneuten Versuch.";
 "error.transcription" = "Transkription fehlgeschlagen: %@";
 "error.audio" = "Audiofehler: %@";
 "error.decoding" = "Antwort konnte nicht gelesen werden: %@";

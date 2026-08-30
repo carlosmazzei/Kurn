@@ -161,8 +161,8 @@ struct KurnApp: App {
         KeychainManager.shared.migrateToBackgroundAccessible()
         RecordingRecovery.recoverOrphans(modelContainer: container)
         // And after one that died mid-transcription: recordings stuck at
-        // `.inProgress` become `.pending` (checkpointed, resumable) or
-        // `.failed`, before the first resume pass below runs.
+        // known on-device `.inProgress` work becomes `.pending`; cloud or
+        // unknown work becomes `.failed` to prevent ambiguous paid replay.
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
         #if canImport(BackgroundTasks)
         // BGTaskScheduler requires all handlers registered before the app

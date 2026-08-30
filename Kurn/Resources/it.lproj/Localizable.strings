@@ -6,6 +6,7 @@
 "error.api" = "Errore API %1$d: %2$@";
 "error.invalid_provider_url" = "L’URL del provider non è valida o consentita. Usa un nome host HTTPS pubblico senza credenziali, parametri di query, frammenti o porte personalizzate.";
 "error.provider_response_too_large" = "La risposta del provider ha superato il limite di dimensione sicuro.";
+"error.ambiguous_provider_result" = "La connessione è terminata prima di poter confermare il risultato del provider. Kurn non ha riprovato automaticamente per evitare addebiti duplicati. Verifica il provider prima di riprovare.";
 "error.transcription" = "Trascrizione non riuscita: %@";
 "error.audio" = "Errore audio: %@";
 "error.decoding" = "Impossibile leggere la risposta: %@";

@@ -34,6 +34,7 @@ struct AppErrorTests {
             .apiError(statusCode: 500, message: "boom"),
             .invalidProviderURL,
             .providerResponseTooLarge,
+            .ambiguousProviderResult,
             .transcriptionFailed("bad audio"),
             .audioError("mic busy"),
             .decodingError("bad json"),
@@ -61,6 +62,7 @@ struct AppErrorTests {
         #expect(!error.logCode.contains("sensitive"))
         #expect(AppError.invalidProviderURL.logCode == "provider_configuration")
         #expect(AppError.providerResponseTooLarge.logCode == "provider_response_too_large")
+        #expect(AppError.ambiguousProviderResult.logCode == "provider_result_ambiguous")
         #expect(AppError.generationTruncated.logCode == "generation_truncated")
         #expect(AppError.documentGenerationFailed("private detail").logCode == "document_generation")
     }

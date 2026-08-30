@@ -126,10 +126,12 @@ struct OpenAIProvider: LLMProvider {
             return try await LLMHTTP.sendValidated(
                 request,
                 session: session,
-                policy: .automated(totalDeadline: request.timeoutInterval)
+                policy: .automated(totalDeadline: request.timeoutInterval),
+                context: httpContext(for: request)
             ).0
         } catch {
-            AppLog.transcription.atError.error("OpenAIProvider: transcription request failed for \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.transcription.atError.error("OpenAIProvider: transcription request failed for \(provider.displayName, privacy: .public) code=\(code, privacy: .public)")
             throw error
         }
     }
@@ -176,7 +178,7 @@ struct OpenAIProvider: LLMProvider {
             AppLog.transcription.atInfo.info("OpenAIProvider: transcription succeeded for \(provider.displayName, privacy: .public), spans=\(spans.count, privacy: .public)")
             return RawTranscript(spans: spans, language: decoded.language ?? "")
         } catch {
-            AppLog.transcription.atError.error("OpenAIProvider: failed to decode transcription response from \(provider.displayName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("OpenAIProvider: failed to decode transcription response from \(provider.displayName, privacy: .public) code=decode_failed")
             throw AppError.decodingError(error.localizedDescription)
         }
     }
@@ -214,7 +216,11 @@ struct OpenAIProvider: LLMProvider {
             ]
         )
 
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+        let (data, _) = try await LLMHTTP.sendValidated(
+            request,
+            session: session,
+            context: httpContext(for: request)
+        )
 
         return try LLMHTTP.summaryResult(
             from: data,
@@ -253,7 +259,11 @@ struct OpenAIProvider: LLMProvider {
         }
         let request = try makeRequest(timeout: options.timeout, body: body)
 
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+        let (data, _) = try await LLMHTTP.sendValidated(
+            request,
+            session: session,
+            context: httpContext(for: request)
+        )
 
         return try LLMHTTP.textResult(
             from: data,
@@ -268,6 +278,19 @@ struct OpenAIProvider: LLMProvider {
     }
 
     // MARK: - HTTP helpers
+
+    private func httpContext(for request: URLRequest) -> HTTPExecutionContext {
+        let inferred = HTTPRequestSemantics.inferred(for: request)
+        let supportsCorrelationHeader = provider.id == AIProvider.openAI.id
+            && request.url?.path.hasSuffix("/chat/completions") == true
+        let headerName = supportsCorrelationHeader ? "X-Client-Request-Id" : nil
+        return HTTPExecutionContext(
+            semantics: HTTPRequestSemantics(
+                replaySafety: inferred.replaySafety,
+                correlationHeaderName: headerName
+            )
+        )
+    }
 
     /// A Chat Completions request with OpenAI's bearer auth. The transcription
     /// route builds its own multipart request and uses the bounded foreground

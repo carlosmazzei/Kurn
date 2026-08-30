@@ -25,7 +25,62 @@ extension ProviderHTTPTests {
 
         let result = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
         #expect(result.sections.first?.title == "Recap")
-        #expect(MockURLProtocol.capturedRequests.count == 2)
+        let requests = MockURLProtocol.capturedRequests
+        #expect(requests.count == 2)
+        let requestID = requests[0].value(forHTTPHeaderField: "X-Client-Request-Id")
+        #expect(UUID(uuidString: requestID ?? "") != nil)
+        #expect(requests[1].value(forHTTPHeaderField: "X-Client-Request-Id") == requestID)
+    }
+
+    @Test func ambiguousPOSTTimeoutIsNotRetried() async throws {
+        MockURLProtocol.enqueue([
+            .failure(URLError(.timedOut)),
+            MockURLProtocol.json(["ok": true])
+        ])
+        var request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+        request.httpMethod = "POST"
+
+        do {
+            _ = try await LLMHTTP.sendValidated(
+                request,
+                session: MockURLProtocol.session()
+            )
+            Issue.record("Expected ambiguousProviderResult")
+        } catch AppError.ambiguousProviderResult {
+        } catch {
+            Issue.record("Unexpected ambiguous-result error: \(error)")
+        }
+
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+    }
+
+    @Test func idempotentGETReusesIdentityAcrossRetry() async throws {
+        MockURLProtocol.enqueue([
+            .failure(URLError(.timedOut)),
+            MockURLProtocol.json(["ok": true])
+        ])
+        let identity = UUID()
+        var request = URLRequest(url: try #require(URL(string: "https://api.example.com/v1")))
+        request.httpMethod = "GET"
+
+        _ = try await LLMHTTP.sendValidated(
+            request,
+            session: MockURLProtocol.session(),
+            clock: ManualSleepClock(),
+            context: HTTPExecutionContext(
+                semantics: HTTPRequestSemantics(
+                    identity: identity,
+                    replaySafety: .idempotent,
+                    correlationHeaderName: "X-Test-Request-Id"
+                )
+            )
+        )
+
+        let requests = MockURLProtocol.capturedRequests
+        #expect(requests.count == 2)
+        #expect(requests.allSatisfy {
+            $0.value(forHTTPHeaderField: "X-Test-Request-Id") == identity.uuidString
+        })
     }
 
     /// Proves the `SleepClock` seam end to end against the one production

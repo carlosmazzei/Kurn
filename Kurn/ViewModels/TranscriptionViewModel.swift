@@ -323,7 +323,7 @@ final class TranscriptionViewModel {
             finishCancelled(recording, id: recordingID)
         } catch let appError as AppError {
             await drainEvents()
-            if isCancellation(appError) {
+            if Self.isResumableCancellation(appError) {
                 finishCancelled(recording, id: recordingID)
             } else {
                 // Failed — but the checkpoint is kept, so a manual retry
@@ -496,15 +496,11 @@ final class TranscriptionViewModel {
     }
 
     /// Whether an `AppError` should pause transcription (→ `.pending`) rather
-    /// than fail it. Covers two cases:
-    /// - `.cancelled`: the Swift task was cancelled (background-task expiry,
-    ///   user-initiated pause, or stop).
-    /// - `.timedOut`: the per-chunk 600 s deadline fired because OpenAI never
-    ///   responded (TCP stall, server issue). Retrying is safe — the audio file
-    ///   is intact and the chunk runner will re-upload from the checkpoint.
-    private func isCancellation(_ error: AppError) -> Bool {
+    /// than fail it. Only explicit task cancellation is resumable; a timeout can
+    /// mean the provider processed a paid request whose response was lost.
+    static func isResumableCancellation(_ error: AppError) -> Bool {
         if case .networkError(let urlError) = error {
-            return urlError.code == .cancelled || urlError.code == .timedOut
+            return urlError.code == .cancelled
         }
         return false
     }
