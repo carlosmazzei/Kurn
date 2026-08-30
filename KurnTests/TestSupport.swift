@@ -49,10 +49,10 @@ let tempFileTestLock = TempFileTestLocker()
 @MainActor
 enum TestModelContainer {
     static func make() -> ModelContainer {
-        let schema = Schema([
-            Meeting.self, Recording.self, Speaker.self, Summary.self, Transcript.self, Folder.self,
-            Tag.self, SmartFolder.self, SemanticChunk.self, WikiArticle.self, GeneratedDocument.self
-        ])
+        // Reads the same centralized model list production uses
+        // (`KurnModelGraph`) so this container cannot silently diverge from
+        // what `KurnApp` actually persists.
+        let schema = Schema(KurnModelGraph.currentModels)
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [configuration])

@@ -66,30 +66,25 @@ struct KurnApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    /// One container for the whole app, persisted on disk.
+    /// One container for the whole app, persisted on disk. `KurnSchema.swift`
+    /// (`KurnModelGraph`) is the single centralized listing of the model
+    /// graph — production, the screenshot container below, and
+    /// `TestModelContainer` all read it instead of each declaring their own,
+    /// so the three cannot silently diverge.
     let modelContainer: ModelContainer = {
-        let schema = Schema([
-            Meeting.self,
-            Recording.self,
-            Transcript.self,
-            Speaker.self,
-            Summary.self,
-            Folder.self,
-            Tag.self,
-            SmartFolder.self,
-            SemanticChunk.self,
-            WikiArticle.self,
-            GeneratedDocument.self
-        ])
         #if DEBUG
         // App Store screenshot automation (fastlane `snapshot` + KurnUITests):
         // an in-memory store pre-populated with mock meetings/transcripts/
         // summaries, never touching the real on-disk store. Compiled out of
         // Release builds entirely, so this can never ship to the App Store.
         if ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots") {
-            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            let configuration = ModelConfiguration(schema: KurnModelGraph.schema, isStoredInMemoryOnly: true)
             do {
-                let container = try ModelContainer(for: schema, configurations: [configuration])
+                let container = try ModelContainer(
+                    for: KurnModelGraph.schema,
+                    migrationPlan: KurnModelGraph.migrationPlan,
+                    configurations: [configuration]
+                )
                 ScreenshotSeedData.seed(into: container.mainContext)
                 return container
             } catch {
@@ -98,7 +93,7 @@ struct KurnApp: App {
         }
         #endif
         do {
-            return try ModelContainerBootstrap.makeStore(schema: schema)
+            return try ModelContainerBootstrap.makeStore()
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

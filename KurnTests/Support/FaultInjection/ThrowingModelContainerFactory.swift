@@ -20,7 +20,11 @@ struct ThrowingModelContainerFactory: ModelContainerFactory {
         self.error = error
     }
 
-    func makeContainer(schema: Schema, configurations: [ModelConfiguration]) throws -> ModelContainer {
+    func makeContainer(
+        schema: Schema,
+        migrationPlan: (any SchemaMigrationPlan.Type)?,
+        configurations: [ModelConfiguration]
+    ) throws -> ModelContainer {
         throw error
     }
 }
