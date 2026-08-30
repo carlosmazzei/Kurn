@@ -682,6 +682,12 @@ locked background launch, process death, a broken route, or a malformed provider
 behaves safely until that failure is injected. As with accuracy under I3,
 resilience must be measured rather than inferred from clean-path tests.
 
+The execution sequence, PR boundaries, dependencies, acceptance gates, and
+cross-session handoff are maintained in
+[`docs/resilience-megaplan.md`](resilience-megaplan.md). This section remains the
+source of truth for product invariants, risks, and H1–H10 contracts; keep the two
+synchronized when evidence changes.
+
 ### Reliability invariants
 
 The five product invariants at the top of this document still apply. Hardening
@@ -807,9 +813,9 @@ Bluetooth, long-background and low-storage matrix remain release gates.
 #### H1 implementation handoff (2026-08-30)
 
 This is the continuation point for a new engineering session. The implementation
-lives on branch `devin/resilience-h1-capture-lifecycle`, based on the merge of PR
-#152. Inspect the remote branch and GitHub before resuming so a later PR/merge is
-not duplicated.
+was merged by PR #153 as commit `458a502`, following the H6 work in PR #152.
+Start subsequent code work from updated `main`; do not recreate the deleted H1
+branch or duplicate the merged lifecycle changes.
 
 **Landed in the working tree.**
 
