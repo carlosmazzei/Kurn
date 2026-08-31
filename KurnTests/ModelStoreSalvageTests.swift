@@ -13,15 +13,16 @@ import SwiftData
 import Testing
 @testable import Kurn
 
-// Serialized: each test opens its own real ModelContainer against a file on
-// disk, and this suite specifically exercises corrupt/unreadable store
-// paths — exactly the case SwiftData's own concurrent-container handling is
-// least tested against. Running these one at a time removes this suite as a
-// contributor to any cross-test SwiftData concurrency issue, regardless of
-// whether it turns out to be the actual cause.
-@Suite(.serialized)
+// Nested inside `SwiftDataConcurrencySensitiveTests` (Support/) rather than
+// a bare `@Suite(.serialized)` at the top level: each test here opens its
+// own real, on-disk ModelContainer, including against corrupt/unreadable
+// store paths — exactly the case SwiftData's own concurrent-container
+// handling is least tested against — and it must never run concurrently
+// with `ModelStoreBootCoordinatorTests` either. See that parent type's
+// header comment.
+extension SwiftDataConcurrencySensitiveTests {
 @MainActor
-struct ModelStoreSalvageTests {
+struct SalvageTests {
 
     private func withTempAppSupport(_ body: (URL) throws -> Void) throws {
         let directory = FileManager.default.temporaryDirectory
@@ -78,4 +79,5 @@ struct ModelStoreSalvageTests {
             #expect(markdown == nil)
         }
     }
+}
 }

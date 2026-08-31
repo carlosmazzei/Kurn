@@ -16,7 +16,8 @@
 //  PR 4 added the salvage/export-diagnostics/start-fresh actions; this file
 //  only asserts they render (real app content still never shows underneath),
 //  not their full file-manipulation behavior — that's
-//  `ModelStoreBackupManagerTests`/`ModelStoreSalvageTests`. The confirmation
+//  `ModelStoreBackupManagerTests`/`SwiftDataConcurrencySensitiveTests.SalvageTests`.
+//  The confirmation
 //  dialogs use the shared `kurnDialog` component, which has no per-call
 //  accessibility identifiers, so exercising the confirm/cancel flow itself
 //  is left to those lower-level tests rather than a fragile text-match here.

@@ -24,15 +24,14 @@ import SwiftData
 import Testing
 @testable import Kurn
 
-// Serialized: nearly every test here opens a real in-memory ModelContainer,
-// several per run. Running them one at a time removes this suite as a
-// contributor to any cross-test SwiftData concurrency issue (CI has hit an
-// intermittent "ModelContext.reset" crash elsewhere in the suite while this
-// PR's tests were running), regardless of whether it turns out to be the
-// actual cause.
-@Suite(.serialized)
+// Nested inside `SwiftDataConcurrencySensitiveTests` (Support/) rather than
+// a bare `@Suite(.serialized)` at the top level: that trait only serializes
+// tests *within* one suite, not across sibling suites, and this suite's real
+// in-memory `ModelContainer`s need to never run concurrently with
+// `ModelStoreSalvageTests`'s either — see that parent type's header comment.
+extension SwiftDataConcurrencySensitiveTests {
 @MainActor
-struct ModelStoreBootCoordinatorTests {
+struct BootCoordinatorTests {
 
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema([Meeting.self])
@@ -234,4 +233,5 @@ struct ModelStoreBootCoordinatorTests {
             #expect(coordinator.container == nil)
         }
     }
+}
 }
