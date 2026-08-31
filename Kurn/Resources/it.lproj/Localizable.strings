@@ -810,3 +810,21 @@
 "store_recovery.start_fresh_button" = "Ricomincia da capo";
 "store_recovery.start_fresh_confirm_title" = "Ricominciare da capo?";
 "store_recovery.start_fresh_confirm_message" = "I tuoi dati esistenti verranno spostati, non eliminati, e verrà creata una nuova libreria vuota.";
+
+/* Protected storage / recording quarantine (H3) */
+"error.protected_storage" = "L'archiviazione protetta non è disponibile: %@";
+"quarantine.section" = "Registrazioni Preservate";
+"quarantine.footer" = "I file audio che Kurn non è riuscito a collocare sono stati preservati qui invece di essere eliminati. Puoi recuperarli nella libreria, esportare il file originale o eliminarli definitivamente.";
+"quarantine.recover" = "Recupera registrazione";
+"quarantine.export" = "Esporta registrazione";
+"quarantine.delete" = "Elimina registrazione";
+"quarantine.delete_confirm" = "Eliminare questa registrazione preservata?";
+"quarantine.delete_message" = "Questo file audio verrà eliminato definitivamente. L'operazione non può essere annullata.";
+"quarantine.recover_unreadable" = "Questo file audio preservato non può essere letto. È stato mantenuto al suo posto.";
+"quarantine.recovered_meeting_title" = "Registrazione Recuperata";
+"quarantine.reason.unparsable" = "Nome file non riconosciuto";
+"quarantine.reason.meeting_not_found" = "La riunione non esiste più";
+"quarantine.reason.unreadable" = "Il file audio non può essere letto";
+"quarantine.reason.too_short" = "Registrazione troppo breve";
+"quarantine.reason.collision" = "Conflitto di nome durante la migrazione";
+"quarantine.reason.unknown" = "Motivo sconosciuto";

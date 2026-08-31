@@ -12,6 +12,7 @@
 //  non-private — an extension in another file cannot see `private` ones.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 
@@ -35,6 +36,11 @@ struct StorageSettingsView: View {
     /// Created lazily in `.task` because it needs the environment's model context.
     @State var compaction: RecordingCompactionViewModel?
     @State var showingCompactConfirm = false
+    /// Originals preserved by `RecordingQuarantine` instead of deleted.
+    @State var quarantineItems: [QuarantinedRecording] = []
+    @State var pendingQuarantineDeletion: QuarantinedRecording?
+    @State var quarantineShareItem: ShareItem?
+    @State var quarantineError: AppError?
 
     var body: some View {
         Form {
@@ -87,6 +93,7 @@ struct StorageSettingsView: View {
 
             compactionSection
             largestMeetingsSection
+            quarantineSection
             modelsSection
         }
         .navigationTitle(NSLocalizedString("settings.storage", comment: "Storage"))
@@ -98,8 +105,35 @@ struct StorageSettingsView: View {
             refreshStorage()
             cacheCleanupPreview = await loadCacheCleanupPreview()
             enhancedAudioBytes = await loadEnhancedAudioBytes()
+            quarantineItems = await loadQuarantineItems()
             downloads.refreshInstalledModels()
         }
+        .errorAlert($quarantineError)
+        .sheet(item: $quarantineShareItem) { item in
+            ActivityView(items: item.urls)
+        }
+        .kurnDialog(
+            isPresented: Binding(
+                get: { pendingQuarantineDeletion != nil },
+                set: { if !$0 { pendingQuarantineDeletion = nil } }
+            ),
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("quarantine.delete_confirm", comment: "Confirm quarantine delete"),
+            message: NSLocalizedString("quarantine.delete_message", comment: "Deleting is permanent"),
+            primaryTitle: NSLocalizedString("common.delete", comment: "Delete"),
+            primaryRole: .destructive,
+            primaryAction: {
+                if let item = pendingQuarantineDeletion {
+                    RecordingQuarantine.delete(item)
+                    Task { @MainActor in
+                        quarantineItems = await loadQuarantineItems()
+                        refreshStorage()
+                    }
+                }
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
+        )
         .errorAlert(Binding(
             get: { compaction?.error },
             set: { compaction?.error = $0 }
@@ -274,5 +308,30 @@ struct StorageSettingsView: View {
         await Task.detached(priority: .utility) {
             AudioFileStore.enhancedAudioBytes()
         }.value
+    }
+
+    func loadQuarantineItems() async -> [QuarantinedRecording] {
+        await Task.detached(priority: .utility) {
+            RecordingQuarantine.items()
+        }.value
+    }
+
+    func recoverQuarantined(_ item: QuarantinedRecording) {
+        if let error = RecordingQuarantine.recover(item, context: modelContext) {
+            quarantineError = error
+            return
+        }
+        Task { @MainActor in
+            quarantineItems = await loadQuarantineItems()
+            refreshStorage()
+        }
+    }
+
+    func exportQuarantined(_ item: QuarantinedRecording) {
+        do {
+            quarantineShareItem = ShareItem(urls: [try RecordingQuarantine.exportURL(for: item)])
+        } catch {
+            quarantineError = .audioError(error.localizedDescription)
+        }
     }
 }

@@ -59,6 +59,57 @@ extension StorageSettingsView {
         }
     }
 
+    /// Originals `RecordingQuarantine` preserved instead of deleting: the user
+    /// can put one back into the library, export the raw file, or confirm its
+    /// deletion. Hidden entirely while the quarantine is empty.
+    @ViewBuilder
+    var quarantineSection: some View {
+        if !quarantineItems.isEmpty {
+            Section {
+                ForEach(quarantineItems) { item in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.quarantinedAt, format: .dateTime.year().month().day().hour().minute())
+                                .lineLimit(1)
+                            Text(item.reason.localizedDescription)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer()
+                        Text(AudioFileStore.formattedSize(item.byteSize))
+                            .foregroundStyle(Theme.textSecondary)
+                        Button {
+                            recoverQuarantined(item)
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(NSLocalizedString("quarantine.recover", comment: "Recover recording"))
+                        Button {
+                            exportQuarantined(item)
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(NSLocalizedString("quarantine.export", comment: "Export recording"))
+                        Button {
+                            pendingQuarantineDeletion = item
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .tint(.red)
+                        .accessibilityLabel(NSLocalizedString("quarantine.delete", comment: "Delete recording"))
+                    }
+                }
+            } header: {
+                Text(NSLocalizedString("quarantine.section", comment: "Preserved recordings"))
+            } footer: {
+                Text(NSLocalizedString("quarantine.footer", comment: "Explains the quarantine"))
+            }
+        }
+    }
+
     /// Which meetings the audio actually belongs to, so the user can delete the
     /// outliers themselves. Informational only — deletion stays in the library,
     /// where the meeting's transcript and summary are visible alongside it.

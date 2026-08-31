@@ -41,7 +41,7 @@ struct AudioFileStoreTests {
 
     @Test func byteSizeReportsTheBytesOnDisk() throws {
         let fileName = "kurn-test-\(UUID().uuidString).m4a"
-        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+        let url = try AudioFileStore.ensureRecordingsDirectory().appendingPathComponent(fileName)
         let payload = Data(repeating: 0x41, count: 4096)
         try payload.write(to: url)
         defer { AudioFileStore.delete(fileName: fileName) }

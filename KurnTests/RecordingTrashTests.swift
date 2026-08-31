@@ -13,6 +13,7 @@ struct RecordingTrashTests {
 
     private func makeAudioFile(in directory: URL) throws -> (name: String, url: URL) {
         let name = "kurn-trash-test-\(UUID().uuidString).m4a"
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent(name)
         try Data([0x00, 0x01, 0x02, 0x03]).write(to: url)
         return (name, url)

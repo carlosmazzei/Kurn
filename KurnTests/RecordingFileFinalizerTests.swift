@@ -12,7 +12,7 @@ struct RecordingFileFinalizerTests {
 
     @Test func emptyFileIsRejected() throws {
         let fileName = "empty-\(UUID().uuidString).m4a"
-        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+        let url = try AudioFileStore.ensureRecordingsDirectory().appendingPathComponent(fileName)
         try Data().write(to: url)
         defer { AudioFileStore.delete(fileName: fileName) }
 

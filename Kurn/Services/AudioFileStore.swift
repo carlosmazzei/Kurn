@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum AudioFileStore {
     /// The app's Documents directory in the current container.
@@ -18,14 +19,28 @@ enum AudioFileStore {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    /// The protected subdirectory that holds every `.m4a`. Creating it on
-    /// access keeps every code path that produces or consumes a recording
-    /// honouring the protection class without spreading the setup call.
+    /// The protected subdirectory that holds every `.m4a`.
+    /// **Computed only — this does not create or re-stamp anything.**
+    /// Writers must go through `ensureRecordingsDirectory()` so that a
+    /// recording is never written into a directory whose protection class
+    /// could not be created or verified; readers and delete paths can use
+    /// this path directly because a missing directory simply yields a
+    /// missing file.
     static var recordingsDirectoryURL: URL {
-        if let url = try? RecordingProtection.ensureProtectedDirectory(at: documentsURL) {
-            return url
+        documentsURL.appendingPathComponent(RecordingProtection.directoryName, isDirectory: true)
+    }
+
+    /// Same directory, created and protection-stamped, for writers. Throws a
+    /// typed error instead of falling back to an unverified path: if the
+    /// protected directory cannot be established, no privacy-sensitive write
+    /// may proceed.
+    @discardableResult
+    static func ensureRecordingsDirectory(fileManager: FileManager = .default) throws -> URL {
+        do {
+            return try RecordingProtection.ensureProtectedDirectory(at: documentsURL, fileManager: fileManager)
+        } catch {
+            throw AppError.protectedStorageUnavailable(error.localizedDescription)
         }
-        return documentsURL.appendingPathComponent(RecordingProtection.directoryName, isDirectory: true)
     }
 
     /// Directory holding the derived enhanced listening copies, nested inside the
@@ -38,29 +53,30 @@ enum AudioFileStore {
     /// every shallow directory scan in the app — see
     /// `RecordingProtection.enhancedDirectoryName` for why that matters.
     ///
-    /// Every read and delete path uses this rather than `ensureEnhancedDirectory`.
-    /// `recordingsDirectoryURL` creates the directory and re-applies its
-    /// protection attribute on *every* access, and `delete(fileName:)` runs in a
-    /// loop when a meeting goes away — doing that filesystem work for a path that
-    /// only needs to be computed is waste, and it puts concurrent attribute writes
-    /// on a directory other code is writing audio into.
+    /// Every read and delete path uses this rather than `ensureEnhancedDirectory`,
+    /// which performs filesystem work only writers need.
     static var enhancedDirectoryPath: URL {
         documentsURL
             .appendingPathComponent(RecordingProtection.directoryName, isDirectory: true)
             .appendingPathComponent(RecordingProtection.enhancedDirectoryName, isDirectory: true)
     }
 
-    /// Same directory, created and protection-stamped. Only the writer needs this.
+    /// Same directory, created and protection-stamped. Only the writer needs
+    /// this. Fail-closed like `ensureRecordingsDirectory()`: a derived copy is
+    /// still meeting audio and must not land outside verified protected
+    /// storage.
     @discardableResult
-    static func ensureEnhancedDirectory() -> URL {
-        let parent = recordingsDirectoryURL
-        if let url = try? RecordingProtection.ensureProtectedDirectory(
-            named: RecordingProtection.enhancedDirectoryName,
-            in: parent
-        ) {
-            return url
+    static func ensureEnhancedDirectory(fileManager: FileManager = .default) throws -> URL {
+        let parent = try ensureRecordingsDirectory(fileManager: fileManager)
+        do {
+            return try RecordingProtection.ensureProtectedDirectory(
+                named: RecordingProtection.enhancedDirectoryName,
+                in: parent,
+                fileManager: fileManager
+            )
+        } catch {
+            throw AppError.protectedStorageUnavailable(error.localizedDescription)
         }
-        return enhancedDirectoryPath
     }
 
     /// Absolute URL of a recording's enhanced copy, whether or not it exists yet.

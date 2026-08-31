@@ -214,7 +214,7 @@ final class AudioRecorderService: NSObject {
         let bitRate = audioBitRate
         let forceBuiltIn = forceBuiltInMic
         let preferredUID = preferredInputUID
-        let directory = AudioFileStore.recordingsDirectoryURL
+        let directory = try AudioFileStore.ensureRecordingsDirectory()
         try prepareStorageForRecording(bitRate: bitRate, directory: directory)
         let url = directory.appendingPathComponent(fileName)
         currentFileName = fileName
