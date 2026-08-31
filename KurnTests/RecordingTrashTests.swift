@@ -87,7 +87,7 @@ struct RecordingTrashTests {
 
     @Test func restoreAlsoRecoversTheEnhancedCopy() throws {
         let file = try makeAudioFile(in: AudioFileStore.recordingsDirectoryURL)
-        AudioFileStore.ensureEnhancedDirectory()
+        try AudioFileStore.ensureEnhancedDirectory()
         let enhancedURL = AudioFileStore.enhancedURL(fileName: file.name)
         try Data([0x09]).write(to: enhancedURL)
         let operationID = UUID()
