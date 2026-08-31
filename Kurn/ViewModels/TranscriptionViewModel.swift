@@ -257,15 +257,11 @@ final class TranscriptionViewModel {
 
         // Progress persisted by an earlier interrupted run; the pipeline skips
         // already-transcribed chunks when it still matches. A checkpoint that
-        // fails to decode or verify is surfaced as such rather than silently
-        // treated as "never checkpointed": this run starts from the beginning,
-        // but the discard is explicit and logged, never an accident of a
-        // lenient decode.
+        // fails to decode or verify starts this run from the beginning, but
+        // the discard is explicit and logged, never a lenient decode's nil.
         let checkpointOutcome = recording.transcriptionCheckpointOutcome
         if checkpointOutcome.isCorrupted {
-            AppLog.transcription.atError.error(
-                "VM: checkpoint corrupted id=\(recordingID, privacy: .public), starting over"
-            )
+            AppLog.transcription.atError.error("VM: checkpoint corrupted id=\(recordingID, privacy: .public), starting over")
         }
         let checkpoint = checkpointOutcome.decodedValue
         if let checkpoint {
