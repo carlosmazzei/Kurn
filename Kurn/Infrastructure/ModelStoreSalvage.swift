@@ -58,38 +58,57 @@ enum ModelStoreSalvage {
         }
 
         let copyURL = workDirectory.appendingPathComponent(ModelStoreProtection.baseName)
-        // A file that isn't even SQLite must never reach `ModelContainer`:
-        // asking CoreData's NSPersistentStoreCoordinator to open one doesn't
-        // just throw — on this SwiftData version it can leave a *different*,
-        // unrelated context's backing data in a bad state process-wide
-        // (`ModelContext.reset`), crashing the whole process instead of
-        // failing just this attempt. A genuinely SwiftData-incompatible
-        // store (migration mismatch) is still valid SQLite and passes this
-        // check untouched — this only screens out something that was never
-        // SwiftData's file format to begin with.
+        // Screen out a file that was never SQLite to begin with, so CoreData
+        // is only ever asked to open something structurally plausible and a
+        // junk file is classified here rather than by interpreting whatever
+        // `NSPersistentStoreCoordinator` happens to throw. A genuinely
+        // SwiftData-incompatible store (a migration mismatch) is still valid
+        // SQLite, passes this check untouched, and is handled below.
+        //
+        // This is cheap insurance, not the fix for the `ModelContext.reset`
+        // crash an earlier revision of this comment blamed on it — that was
+        // a misdiagnosis; see `recoverReadOnly` for the actual cause.
         guard isLikelySQLiteDatabase(at: copyURL) else {
             return (.failed(.corruptOrUnknown), nil)
         }
-        if let meetings = try? openReadOnly(
+        if let recovered = try? recoverReadOnly(
             at: copyURL, schema: KurnModelGraph.schema, migrationPlan: KurnModelGraph.migrationPlan
         ) {
-            return (.recovered(meetingCount: meetings.count), exportMarkdown(for: meetings))
+            return recovered
         }
         do {
-            let meetings = try openReadOnly(
+            return try recoverReadOnly(
                 at: copyURL, schema: Schema(KurnModelGraph.currentModels), migrationPlan: nil
             )
-            return (.recovered(meetingCount: meetings.count), exportMarkdown(for: meetings))
         } catch {
             return (.failed(ModelStoreOpenFailureClassifier.classify(error)), nil)
         }
     }
 
-    private static func openReadOnly(
+    /// Opens the copy, reads everything needed out of it, and returns only
+    /// **value types**.
+    ///
+    /// The export has to happen in here, not in the caller. A fetched
+    /// `Meeting` is owned by `container.mainContext`, and SwiftData resets
+    /// that context when the container deallocates — which, for a container
+    /// held in a local like this one, is the moment this function returns.
+    /// Handing `[Meeting]` back to the caller therefore handed back objects
+    /// that were already destroyed, and the first property read on one
+    /// (`exportMarkdown` reaching for `title`/`notes`/`summaries`) trapped
+    /// the whole process:
+    ///
+    ///   SwiftData/BackingData.swift:844: Fatal error: This model instance
+    ///   was destroyed by calling ModelContext.reset and is no longer usable.
+    ///
+    /// That crash landed on the recovery screen — the one place in the app
+    /// that exists precisely because something already went wrong — so the
+    /// rule this encodes is worth keeping: never let a `@Model` instance
+    /// outlive the `ModelContainer` it was fetched from.
+    private static func recoverReadOnly(
         at url: URL,
         schema: Schema,
         migrationPlan: (any SchemaMigrationPlan.Type)?
-    ) throws -> [Meeting] {
+    ) throws -> (result: ModelStoreSalvageResult, exportMarkdown: String?) {
         let configuration = ModelConfiguration(schema: schema, url: url, allowsSave: false)
         let container: ModelContainer
         if let migrationPlan {
@@ -97,7 +116,15 @@ enum ModelStoreSalvage {
         } else {
             container = try ModelContainer(for: schema, configurations: [configuration])
         }
-        return try container.mainContext.fetch(FetchDescriptor<Meeting>())
+        // `withExtendedLifetime` rather than relying on the closure's own
+        // capture: ARC is free to release `container` after its last use
+        // (the fetch), which would destroy the very objects the export is
+        // about to read.
+        return try withExtendedLifetime(container) { () throws -> (result: ModelStoreSalvageResult, exportMarkdown: String?) in
+            let meetings = try container.mainContext.fetch(FetchDescriptor<Meeting>())
+            let markdown = Self.exportMarkdown(for: meetings)
+            return (.recovered(meetingCount: meetings.count), markdown)
+        }
     }
 
     /// SQLite database files begin with the fixed 16-byte magic header
