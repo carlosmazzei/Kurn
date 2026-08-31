@@ -29,14 +29,31 @@ final class Transcript {
     ) {
         self.id = id
         self.recording = recording
-        self.segmentsData = JSONStorage.encode(segments)
+        // `?? Data()` only ever applies to the `= []` default here, which
+        // trivially encodes; a real payload that fails to encode goes
+        // through `TranscriptionViewModel.saveTranscript`'s explicit
+        // pre-check instead, which fails the save rather than reaching this
+        // fallback. See `JSONStorage.encodeAuthoritative`.
+        self.segmentsData = JSONStorage.encodeAuthoritative(segments) ?? Data()
         self.language = language
         self.createdAt = createdAt
     }
 
     var segments: [TranscriptSegment] {
-        get { JSONStorage.decode([TranscriptSegment].self, from: segmentsData) }
-        set { segmentsData = JSONStorage.encode(newValue) }
+        get { JSONStorage.decodeAuthoritative([TranscriptSegment].self, from: segmentsData).decodedValue ?? [] }
+        // A failed encode leaves the previously-stored bytes untouched
+        // rather than blanking them — losing a transcript to a rare
+        // encoding failure on an in-place edit would be worse than keeping
+        // the pre-edit content.
+        set { segmentsData = JSONStorage.encodeAuthoritative(newValue) ?? segmentsData }
+    }
+
+    /// Whether the stored segments failed to decode or verify — distinct
+    /// from a genuinely empty transcript, which `segments` alone cannot
+    /// tell apart from corruption. Surfaced in `MeetingDetailView`'s
+    /// transcript tab rather than rendered as "no speech detected".
+    var isSegmentsDataCorrupted: Bool {
+        JSONStorage.decodeAuthoritative([TranscriptSegment].self, from: segmentsData).isCorrupted
     }
 
     /// Flattened plain text, one line per segment, for sharing/export.

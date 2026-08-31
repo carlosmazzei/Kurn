@@ -319,7 +319,7 @@ final class TranscriptionViewModel {
             )
             await drainEvents()
 
-            saveTranscript(output, for: recording)
+            try saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
             appSettings?.recordTranscriptionEngineUsed(config.transcription)
             if let settings = appSettings {
@@ -439,7 +439,22 @@ final class TranscriptionViewModel {
 
     /// Persist a finished pipeline run: replace any existing transcript, mark
     /// the recording done, and drop its resume checkpoint.
-    private func saveTranscript(_ output: TranscriptionService.Output, for recording: Recording) {
+    ///
+    /// Throws `AppError.persistenceFailed` if the new segments can't even be
+    /// encoded (see `JSONStorage.encodeAuthoritative`) — checked *before*
+    /// touching the existing transcript, so a pipeline run that produced
+    /// unencodable content (a NaN confidence/timestamp) never destroys a
+    /// still-valid previous transcript on its way to failing to save the new
+    /// one. The caller's existing `catch let appError as AppError` clause
+    /// marks the recording `.failed` and surfaces the error, exactly as it
+    /// already does for every other pipeline failure.
+    private func saveTranscript(_ output: TranscriptionService.Output, for recording: Recording) throws {
+        guard let segmentsData = JSONStorage.encodeAuthoritative(output.segments) else {
+            throw AppError.persistenceFailed(NSLocalizedString(
+                "error.transcript_encode_failed", comment: "Transcript could not be encoded for storage"
+            ))
+        }
+
         // Replace any existing transcript. Detach the old one first: a
         // `delete` isn't applied to the relationship until the next save, so
         // without this `recording.transcript` still points at the old
@@ -451,12 +466,11 @@ final class TranscriptionViewModel {
         }
         // Assigning `recording` in the initializer establishes the
         // relationship (SwiftData maintains the inverse `recording.transcript`),
-        // so no manual back-assignment is needed.
-        let transcript = Transcript(
-            recording: recording,
-            segments: output.segments,
-            language: output.language
-        )
+        // so no manual back-assignment is needed. `segments` is left at its
+        // `[]` default and overwritten with the already-encoded, pre-checked
+        // bytes below, rather than encoding `output.segments` a second time.
+        let transcript = Transcript(recording: recording, language: output.language)
+        transcript.segmentsData = segmentsData
         modelContext.insert(transcript)
         recording.transcriptionStatus = .done
         recording.transcriptionCheckpointData = nil
@@ -855,13 +869,24 @@ final class TranscriptionViewModel {
                 }
             )
             try Task.checkCancellation()
+            // Checked before constructing the summary, same reasoning as
+            // `saveTranscript`: `sections` is left at its `[]` default and
+            // overwritten with the already-encoded, pre-checked bytes below
+            // rather than encoding `result.sections` a second time. The
+            // `catch let appError as AppError` clause below surfaces this
+            // exactly like any other summary-generation failure.
+            guard let sectionsData = JSONStorage.encodeAuthoritative(result.sections) else {
+                throw AppError.persistenceFailed(NSLocalizedString(
+                    "error.summary_encode_failed", comment: "Summary could not be encoded for storage"
+                ))
+            }
             let summary = Summary(
                 meeting: meeting,
-                sections: result.sections,
                 templateName: template.displayName,
                 provider: provider,
                 model: model
             )
+            summary.sectionsData = sectionsData
             modelContext.insert(summary)
             persist()
             AppLog.transcription.atNotice.notice("VM: summary done")

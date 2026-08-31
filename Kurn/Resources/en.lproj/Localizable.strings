@@ -21,6 +21,8 @@
 "error.decoding" = "Could not read the response: %@";
 "error.permission" = "Permission denied: %@";
 "error.persistence" = "Could not save your changes: %@";
+"error.transcript_encode_failed" = "The transcript could not be prepared for saving.";
+"error.summary_encode_failed" = "The summary could not be prepared for saving.";
 "error.recognizer_timeout" = "On-device speech recognition timed out.";
 "error.recorder_start" = "The recorder could not start.";
 "error.recorder_engine" = "The audio engine could not start.";
@@ -432,6 +434,9 @@
 "detail.transcript.failed.subtitle" = "Retry from the Recordings tab.";
 "detail.transcript.no_speech.title" = "No speech detected";
 "detail.transcript.no_speech.subtitle" = "This recording didn't contain any detectable speech.";
+"detail.transcript.corrupted.title" = "Transcript unreadable";
+"detail.transcript.corrupted.subtitle" = "The saved transcript appears damaged. Re-transcribing this recording will replace it.";
+"detail.transcript.corrupted_banner" = "This recording's transcript appears damaged and could not be loaded.";
 "detail.summary.empty.title" = "No summary yet";
 "detail.section" = "Section";
 "tab.recordings" = "Recordings";

@@ -354,6 +354,9 @@ struct MeetingDetailView: View {
         let transcribed = sortedRecordings.filter { $0.transcript?.segments.isEmpty == false }
         VStack(alignment: .leading, spacing: 12) {
             ForEach(sortedRecordings, id: \.id) { recording in
+                if recording.transcript?.isSegmentsDataCorrupted == true {
+                    transcriptCorruptedBanner
+                }
                 if let warning = txVM?.diarizationWarnings[recording.id] {
                     diarizationWarningBanner(warning)
                 }
@@ -374,13 +377,24 @@ struct MeetingDetailView: View {
     }
 
     /// Which empty-state copy to show when no recording has a real (non-empty)
-    /// transcript: distinguishes "never attempted", "failed" (so a stale or
-    /// zero-segment transcript from a previous run never leaves the tab stuck
-    /// blank instead of reverting here), and "done but no speech detected" (a
-    /// legitimately silent recording, not a failure).
+    /// transcript: distinguishes "corrupted" (checked first — a transcript
+    /// that failed its integrity check is a more specific, more actionable
+    /// diagnosis than any of the states below, which is why it takes
+    /// priority even though every one of them would also technically match
+    /// on a corrupted transcript's `segments == []`), "never attempted",
+    /// "failed" (so a stale or zero-segment transcript from a previous run
+    /// never leaves the tab stuck blank instead of reverting here), and
+    /// "done but no speech detected" (a legitimately silent recording, not
+    /// a failure).
     @ViewBuilder
     private var transcriptEmptyPlaceholder: some View {
-        if sortedRecordings.contains(where: { $0.transcriptionStatus == .failed }) {
+        if sortedRecordings.contains(where: { $0.transcript?.isSegmentsDataCorrupted == true }) {
+            placeholder(
+                icon: "exclamationmark.triangle",
+                title: NSLocalizedString("detail.transcript.corrupted.title", comment: ""),
+                subtitle: NSLocalizedString("detail.transcript.corrupted.subtitle", comment: "")
+            )
+        } else if sortedRecordings.contains(where: { $0.transcriptionStatus == .failed }) {
             placeholder(
                 icon: "exclamationmark.triangle",
                 title: NSLocalizedString("detail.transcript.failed.title", comment: ""),
@@ -399,6 +413,23 @@ struct MeetingDetailView: View {
                 subtitle: NSLocalizedString("detail.transcript.empty.subtitle", comment: "")
             )
         }
+    }
+
+    /// Shown per recording (like `diarizationWarningBanner` below) rather
+    /// than only in `transcriptEmptyPlaceholder`: a meeting with several
+    /// recordings shows the transcript tab's normal content the moment any
+    /// *one* of them decodes cleanly, so a corrupted sibling would never
+    /// reach that all-empty placeholder at all without its own banner here.
+    private var transcriptCorruptedBanner: some View {
+        Label(
+            NSLocalizedString("detail.transcript.corrupted_banner", comment: "This recording's transcript could not be loaded"),
+            systemImage: "exclamationmark.triangle.fill"
+        )
+        .font(.footnote)
+        .foregroundStyle(Theme.warning)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func diarizationWarningBanner(_ message: String) -> some View {

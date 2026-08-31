@@ -21,6 +21,8 @@
 "error.decoding" = "Antwort konnte nicht gelesen werden: %@";
 "error.permission" = "Zugriff verweigert: %@";
 "error.persistence" = "Änderungen konnten nicht gespeichert werden: %@";
+"error.transcript_encode_failed" = "Das Transkript konnte nicht zum Speichern vorbereitet werden.";
+"error.summary_encode_failed" = "Die Zusammenfassung konnte nicht zum Speichern vorbereitet werden.";
 "error.recognizer_timeout" = "Die Spracherkennung auf dem Gerät hat das Zeitlimit überschritten.";
 "error.recorder_start" = "Die Aufnahme konnte nicht gestartet werden.";
 "error.recorder_engine" = "Die Audio-Engine konnte nicht gestartet werden.";
@@ -432,6 +434,9 @@
 "detail.transcript.failed.subtitle" = "Versuchen Sie es erneut über den Tab „Aufnahmen“.";
 "detail.transcript.no_speech.title" = "Keine Sprache erkannt";
 "detail.transcript.no_speech.subtitle" = "Diese Aufnahme enthielt keine erkennbare Sprache.";
+"detail.transcript.corrupted.title" = "Transkript nicht lesbar";
+"detail.transcript.corrupted.subtitle" = "Das gespeicherte Transkript scheint beschädigt zu sein. Eine erneute Transkription dieser Aufnahme ersetzt es.";
+"detail.transcript.corrupted_banner" = "Das Transkript dieser Aufnahme scheint beschädigt zu sein und konnte nicht geladen werden.";
 "detail.summary.empty.title" = "Noch keine Zusammenfassung";
 "detail.section" = "Bereich";
 "tab.recordings" = "Aufnahmen";
