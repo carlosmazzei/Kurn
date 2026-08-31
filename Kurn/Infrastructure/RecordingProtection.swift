@@ -34,6 +34,14 @@ enum RecordingProtection {
     /// duplicate.
     static let enhancedDirectoryName = "Enhanced"
 
+    /// Subdirectory of the recordings directory holding files moved aside by
+    /// `RecordingTrash` during a delete that has not yet committed (or has
+    /// committed but not yet been purged). Same shallow-scan invisibility as
+    /// `enhancedDirectoryName` above, for the same reason: every sweep filters
+    /// by `.m4a` extension, so a directory entry here is skipped by
+    /// construction rather than by each sweep learning a new exclusion.
+    static let trashDirectoryName = "Trash"
+
     /// Protection class applied to the recordings directory. `.completeUnlessOpen`
     /// is chosen over `.complete` so that an in-progress recording survives the
     /// screen locking mid-meeting — the file stays writable while it is open,

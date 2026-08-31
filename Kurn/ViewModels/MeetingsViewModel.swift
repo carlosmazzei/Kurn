@@ -43,20 +43,41 @@ final class MeetingsViewModel {
     }
 
     /// Delete a meeting and remove all of its audio files from disk.
+    ///
+    /// Files move into a protected trash before the model mutation runs,
+    /// rather than being deleted outright: a `save()` failure restores them
+    /// immediately, and a process death between the move and the purge below
+    /// leaves a trash folder `RecordingTrash.sweep(context:)` reconciles on
+    /// the next launch or foreground activation. See `RecordingTrash`'s
+    /// header comment for why this closes the "audio gone, row survives"
+    /// window the previous delete-then-delete order left open.
     func delete(_ meeting: Meeting) {
-        for recording in meeting.recordings {
-            AudioFileStore.delete(fileName: recording.fileName)
-        }
+        let operationID = UUID()
+        RecordingTrash.trash(fileNames: meeting.recordings.map(\.fileName), operationID: operationID)
+
         modelContext.delete(meeting)
-        if let failure = modelContext.saveOrError() { error = failure }
+        if let failure = modelContext.saveOrError() {
+            RecordingTrash.restore(operationID: operationID)
+            error = failure
+            return
+        }
+        RecordingTrash.purge(operationID: operationID)
     }
 
-    /// Delete a single recording segment: remove its audio file from disk, then
-    /// the model. Keeping this here (rather than in the view) makes the
-    /// file-cleanup behavior unit-testable.
+    /// Delete a single recording segment: move its audio file into a
+    /// protected trash, then delete the model. Keeping this here (rather
+    /// than in the view) makes the file-cleanup behavior unit-testable. See
+    /// `delete(_:)`'s doc comment for why this is trash-then-purge.
     func deleteRecording(_ recording: Recording) {
-        AudioFileStore.delete(fileName: recording.fileName)
+        let operationID = UUID()
+        RecordingTrash.trash(fileNames: [recording.fileName], operationID: operationID)
+
         modelContext.delete(recording)
-        if let failure = modelContext.saveOrError() { error = failure }
+        if let failure = modelContext.saveOrError() {
+            RecordingTrash.restore(operationID: operationID)
+            error = failure
+            return
+        }
+        RecordingTrash.purge(operationID: operationID)
     }
 }
