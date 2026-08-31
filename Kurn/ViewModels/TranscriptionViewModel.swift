@@ -256,8 +256,18 @@ final class TranscriptionViewModel {
         diarizationWarnings[recordingID] = nil
 
         // Progress persisted by an earlier interrupted run; the pipeline skips
-        // already-transcribed chunks when it still matches.
-        let checkpoint = recording.transcriptionCheckpoint
+        // already-transcribed chunks when it still matches. A checkpoint that
+        // fails to decode or verify is surfaced as such rather than silently
+        // treated as "never checkpointed": this run starts from the beginning,
+        // but the discard is explicit and logged, never an accident of a
+        // lenient decode.
+        let checkpointOutcome = recording.transcriptionCheckpointOutcome
+        if checkpointOutcome.isCorrupted {
+            AppLog.transcription.atError.error(
+                "VM: checkpoint corrupted id=\(recordingID, privacy: .public), starting over"
+            )
+        }
+        let checkpoint = checkpointOutcome.decodedValue
         if let checkpoint {
             AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) engine=\(checkpoint.engineRaw, privacy: .public) lang=\(checkpoint.languageRaw, privacy: .public) compacted=\(checkpoint.compacted, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public) spans=\(checkpoint.spans.count, privacy: .public)")
         }

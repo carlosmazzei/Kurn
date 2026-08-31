@@ -11,11 +11,14 @@
 //  - `encode`/`decode` are lenient — a decode failure returns an empty
 //    array/`nil`, matching what a genuinely-never-written property already
 //    looks like. Fine for content that is either regenerable (highlights,
-//    voiceprints, a resumable checkpoint) or a saved search predicate: losing
-//    it degrades a feature, it doesn't destroy the user's own words.
+//    voiceprints) or a saved search predicate: losing it degrades a feature,
+//    it doesn't destroy the user's own words.
 //  - `encodeAuthoritative`/`decodeAuthoritative` are for content where that
 //    conflation is the bug: a corrupted transcript or summary must never
-//    render identically to a legitimately empty one. See their doc comments.
+//    render identically to a legitimately empty one, and a corrupted
+//    transcription checkpoint must never look like "never checkpointed"
+//    (which silently redoes — for cloud engines, re-pays for — completed
+//    work). See their doc comments.
 //
 
 import Foundation

@@ -83,6 +83,23 @@ struct TranscriptionRecoveryTests {
         #expect(recording.transcriptionStatus == .failed)
     }
 
+    @Test func staleCorruptedCheckpointRequiresManualRetry() throws {
+        // A checkpoint that fails to decode or verify can't prove what engine
+        // produced it, so it must never auto-resume — and the corrupted bytes
+        // are preserved for diagnostics, not blanked.
+        let container = TestModelContainer.make()
+        let context = container.mainContext
+        let recording = makeRecording(in: context, status: .inProgress, checkpointEngine: .whisperCpp)
+        let garbage = Data([0x7B, 0x22, 0xFF, 0x00])
+        recording.transcriptionCheckpointData = garbage
+        try context.save()
+
+        TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
+
+        #expect(recording.transcriptionStatus == .failed)
+        #expect(recording.transcriptionCheckpointData == garbage)
+    }
+
     @Test func activeRecordingsAreExcludedFromSweep() throws {
         // The foreground sweep must not touch a run some view model in this
         // process is actually working on — only orphaned `.inProgress` rows.

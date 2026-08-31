@@ -51,8 +51,18 @@ enum TranscriptionRecovery {
 
         var resumable = 0
         for recording in stale {
-            if let checkpoint = recording.transcriptionCheckpoint,
-               checkpoint.engineRaw != TranscriptionEngine.whisperAPI.rawValue {
+            let outcome = recording.transcriptionCheckpointOutcome
+            if outcome.isCorrupted {
+                // A checkpoint that fails to decode or verify cannot say what
+                // engine produced it, so it gets the same treatment as cloud
+                // or unknown work: manual retry, never an automatic resume
+                // spliced from unverifiable progress.
+                AppLog.transcription.atError.error(
+                    "recovery: corrupted checkpoint id=\(recording.id, privacy: .public), requires manual retry"
+                )
+                recording.transcriptionStatus = .failed
+            } else if let checkpoint = outcome.decodedValue,
+                      checkpoint.engineRaw != TranscriptionEngine.whisperAPI.rawValue {
                 recording.transcriptionStatus = .pending
                 resumable += 1
             } else {
