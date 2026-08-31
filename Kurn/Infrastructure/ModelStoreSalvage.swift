@@ -58,6 +58,18 @@ enum ModelStoreSalvage {
         }
 
         let copyURL = workDirectory.appendingPathComponent(ModelStoreProtection.baseName)
+        // A file that isn't even SQLite must never reach `ModelContainer`:
+        // asking CoreData's NSPersistentStoreCoordinator to open one doesn't
+        // just throw — on this SwiftData version it can leave a *different*,
+        // unrelated context's backing data in a bad state process-wide
+        // (`ModelContext.reset`), crashing the whole process instead of
+        // failing just this attempt. A genuinely SwiftData-incompatible
+        // store (migration mismatch) is still valid SQLite and passes this
+        // check untouched — this only screens out something that was never
+        // SwiftData's file format to begin with.
+        guard isLikelySQLiteDatabase(at: copyURL) else {
+            return (.failed(.corruptOrUnknown), nil)
+        }
         if let meetings = try? openReadOnly(
             at: copyURL, schema: KurnModelGraph.schema, migrationPlan: KurnModelGraph.migrationPlan
         ) {
@@ -86,6 +98,17 @@ enum ModelStoreSalvage {
             container = try ModelContainer(for: schema, configurations: [configuration])
         }
         return try container.mainContext.fetch(FetchDescriptor<Meeting>())
+    }
+
+    /// SQLite database files begin with the fixed 16-byte magic header
+    /// `"SQLite format 3\0"`. Cheap and exact — far simpler than trying to
+    /// classify whatever `ModelContainer` throws (or doesn't) after the
+    /// fact, and it runs before any CoreData API touches the file at all.
+    private static func isLikelySQLiteDatabase(at url: URL) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: url.path) else { return false }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 16), header.count == 16 else { return false }
+        return header == Data("SQLite format 3\0".utf8)
     }
 
     private static func exportMarkdown(for meetings: [Meeting]) -> String {
