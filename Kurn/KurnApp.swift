@@ -246,6 +246,9 @@ struct KurnApp: App {
             RecordingRecovery.recoverOrphansOnActivate(modelContainer: environment.modelContainer)
             // Same reconciliation as at launch, so a delete interrupted by a
             // background death doesn't wait for the next cold launch either.
+            // Journaled operations replay from their recorded state first;
+            // the sweep only handles pre-journal leftovers.
+            RecordingOperationJournal.replay(context: environment.modelContainer.mainContext)
             RecordingTrash.sweep(context: environment.modelContainer.mainContext)
             // Sweep again on every activation, not just at launch: a
             // background relaunch while the device was locked can't read the
@@ -358,9 +361,13 @@ struct KurnApp: App {
         // Clean up after a process that died mid-recording (orphaned Live
         // Activity + an unsaved audio file with no matching `Recording` row).
         RecordingRecovery.recoverOrphans(modelContainer: container)
-        // Reconcile any delete whose trash-then-purge was interrupted by a
-        // process death: restore files whose row survived, purge folders
-        // whose row is gone. See `RecordingTrash`'s header comment.
+        // Reconcile any delete or replace whose trash-then-purge was
+        // interrupted by a process death. Journaled operations resolve from
+        // their own durable record (replay forward past a committed mutation,
+        // roll back an uncommitted one — see `RecordingOperationJournal`'s
+        // header comment); the sweep remains as the heuristic fallback for
+        // pre-journal trash folders.
+        RecordingOperationJournal.replay(context: container.mainContext)
         RecordingTrash.sweep(context: container.mainContext)
         // And after one that died mid-transcription: recordings stuck at
         // known on-device `.inProgress` work becomes `.pending`; cloud or

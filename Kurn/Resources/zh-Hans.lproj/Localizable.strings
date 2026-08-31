@@ -592,6 +592,7 @@
 "settings.delete_all" = "删除所有数据";
 "settings.delete_all.confirm" = "删除所有会议和录音？";
 "settings.delete_all.message" = "这将永久删除所有会议、转录内容和音频文件，此操作无法撤销。";
+"settings.delete_all.residual" = "%d 个音频文件无法删除，仍保留在设备上。请重试或释放空间后再试。";
 "settings.diarization_engine" = "说话人分离引擎";
 "settings.diarization_speaker_count" = "发言人数";
 "settings.diarization_speaker_count_auto" = "自动";

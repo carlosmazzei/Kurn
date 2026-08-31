@@ -592,6 +592,7 @@
 "settings.delete_all" = "Elimina Tutti i Dati";
 "settings.delete_all.confirm" = "Eliminare tutte le riunioni e le registrazioni?";
 "settings.delete_all.message" = "Questo rimuove permanentemente ogni riunione, trascrizione e file audio. Non è possibile annullare l'operazione.";
+"settings.delete_all.residual" = "%d file audio non sono stati rimossi e restano sul dispositivo. Riprova o libera spazio.";
 "settings.diarization_engine" = "Motore di Diarizzazione";
 "settings.diarization_speaker_count" = "Numero di Speaker";
 "settings.diarization_speaker_count_auto" = "Automatico";

@@ -48,6 +48,11 @@ enum RecordingProtection {
     /// shallow-scan invisibility as `trashDirectoryName`, for the same reason.
     static let quarantineDirectoryName = "Quarantine"
 
+    /// Subdirectory of the recordings directory holding
+    /// `RecordingOperationJournal`'s durable operation records. Same
+    /// shallow-scan invisibility as `trashDirectoryName`, for the same reason.
+    static let journalDirectoryName = "Journal"
+
     /// Protection class applied to the recordings directory. `.completeUnlessOpen`
     /// is chosen over `.complete` so that an in-progress recording survives the
     /// screen locking mid-meeting — the file stays writable while it is open,

@@ -147,9 +147,13 @@ struct RecordingCompactor: Sendable {
         // recordings directory, so the file is never briefly readable without
         // the passcode.
         RecordingProtection.apply(to: tempURL)
+        // Journal the swap's intent so a death right after `replaceItemAt`
+        // still replays the post-swap protection re-stamp on next launch.
+        let operationID = RecordingOperationJournal.beginReplace(fileName: fileName)
         do {
             _ = try FileManager.default.replaceItemAt(originalURL, withItemAt: tempURL)
         } catch {
+            RecordingOperationJournal.finishReplace(operationID)
             AppLog.recorder.atError.error("compact: swap failed for \(fileName, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return 0
         }
@@ -158,6 +162,7 @@ struct RecordingCompactor: Sendable {
         // attribute across, and a recording without it would be readable from a
         // backup extraction.
         RecordingProtection.apply(to: AudioFileStore.resolveURL(fileName: fileName))
+        RecordingOperationJournal.finishReplace(operationID)
 
         let saved = originalSize - Int64(newSize)
         AppLog.recorder.atNotice.notice("compact: \(fileName, privacy: .public) \(originalSize, privacy: .public) -> \(newSize, privacy: .public) bytes (saved \(saved, privacy: .public))")
