@@ -55,10 +55,15 @@ enum ModelStoreProtection {
     /// is nothing to verify.
     static func applyAndVerify(appSupportOverride: URL? = nil) throws {
         let fm = FileManager.default
-        let appSupport = appSupportOverride ?? (try fm.url(
-            for: .applicationSupportDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: true
-        ))
+        let appSupport: URL
+        if let appSupportOverride {
+            appSupport = appSupportOverride
+        } else {
+            appSupport = try fm.url(
+                for: .applicationSupportDirectory, in: .userDomainMask,
+                appropriateFor: nil, create: true
+            )
+        }
         for suffix in [""] + sidecarSuffixes {
             let url = appSupport.appendingPathComponent(baseName + suffix)
             guard fm.fileExists(atPath: url.path) else { continue }
