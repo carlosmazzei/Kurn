@@ -35,11 +35,15 @@ enum RecordingRecovery {
         // Migrate any legacy `.m4a` left in Documents into the protected
         // recordings directory before scanning for orphans, so the scan and
         // every subsequent file access happens against the post-migration
-        // layout.
-        RecordingProtection.migrateLegacyRecordings(
-            documentsURL: AudioFileStore.documentsURL,
-            recordingsURL: AudioFileStore.recordingsDirectoryURL
-        )
+        // layout. Skipped fail-closed when the protected directory cannot be
+        // established: legacy files stay put in Documents, still resolvable
+        // via `AudioFileStore.resolveURL`.
+        if let recordingsURL = try? AudioFileStore.ensureRecordingsDirectory() {
+            RecordingProtection.migrateLegacyRecordings(
+                documentsURL: AudioFileStore.documentsURL,
+                recordingsURL: recordingsURL
+            )
+        }
 
         // Snapshot the activities synchronously, here at launch, BEFORE any
         // recording UI exists. Anything running now is by definition orphaned.
@@ -65,10 +69,12 @@ enum RecordingRecovery {
         guard !RecordingCommandRouter.shared.hasActiveSession else { return }
         // Same pre-scan migration as the launch path (idempotent and cheap),
         // so the orphan scan below always sees the post-migration layout.
-        RecordingProtection.migrateLegacyRecordings(
-            documentsURL: AudioFileStore.documentsURL,
-            recordingsURL: AudioFileStore.recordingsDirectoryURL
-        )
+        if let recordingsURL = try? AudioFileStore.ensureRecordingsDirectory() {
+            RecordingProtection.migrateLegacyRecordings(
+                documentsURL: AudioFileStore.documentsURL,
+                recordingsURL: recordingsURL
+            )
+        }
         endOrphanedActivities()
         recoverOrphanedAudioFiles(context: modelContainer.mainContext)
     }
@@ -199,45 +205,31 @@ enum RecordingRecovery {
         return changed
     }
 
-    /// Unreadable orphans at or above this size are kept on disk instead of
-    /// deleted: a large `.m4a` whose container was never finalized (the writer
-    /// was torn down without `stop()`) fails to open here, but it is the only
-    /// copy of the user's audio — deleting it destroys a potentially long
-    /// meeting with no recourse, while keeping it costs a little disk and
-    /// leaves repair/manual extraction possible.
-    static let keepUnreadableMinBytes = 1_000_000
-
-    /// - Returns: whether `fileName` was reattached to a `Recording`. Files that
-    ///   can't be matched to a meeting never get a second chance, so they're
-    ///   deleted instead of lingering in Documents forever; unreadable files
-    ///   are only deleted when they're too small to plausibly matter.
+    /// - Returns: whether `fileName` was reattached to a `Recording`. Files
+    ///   that can't be placed — unparsable name, missing meeting, unreadable
+    ///   container, negligible duration — are moved to `RecordingQuarantine`
+    ///   rather than deleted: they are the only copy of the user's audio,
+    ///   and Settings exposes recover/export/delete for each.
     private static func recover(fileName: String, at url: URL, context: ModelContext) -> Bool {
         guard let meetingID = meetingID(from: fileName) else {
-            AudioFileStore.delete(fileName: fileName)
+            RecordingQuarantine.quarantine(fileAt: url, reason: .unparsableFileName)
             return false
         }
         var descriptor = FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == meetingID })
         descriptor.fetchLimit = 1
         guard let meeting = try? context.fetch(descriptor).first else {
-            AudioFileStore.delete(fileName: fileName)
+            RecordingQuarantine.quarantine(fileAt: url, reason: .meetingNotFound)
             return false
         }
         let metadata: FinalizedRecordingFile
         do {
             metadata = try RecordingFileFinalizer().finalize(fileName: fileName)
         } catch {
-            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-            if size >= Self.keepUnreadableMinBytes {
-                AppLog.recorder.atError.error(
-                    "recovery: keeping unreadable orphan \(fileName, privacy: .public) (\(size, privacy: .public) bytes) — container not finalized"
-                )
-                return false
-            }
-            AudioFileStore.delete(fileName: fileName)
+            RecordingQuarantine.quarantine(fileAt: url, reason: .unreadableContainer)
             return false
         }
         guard metadata.duration >= 0.5 else {
-            AudioFileStore.delete(fileName: fileName)
+            RecordingQuarantine.quarantine(fileAt: url, reason: .negligibleDuration)
             return false
         }
         let recording = Recording(

@@ -810,3 +810,21 @@
 "store_recovery.start_fresh_button" = "重新开始";
 "store_recovery.start_fresh_confirm_title" = "要重新开始吗?";
 "store_recovery.start_fresh_confirm_message" = "你现有的数据将被移至一旁而非删除,并创建一个新的空库。";
+
+/* Protected storage / recording quarantine (H3) */
+"error.protected_storage" = "受保护的存储不可用：%@";
+"quarantine.section" = "已保留的录音";
+"quarantine.footer" = "Kurn 无法归位的音频文件被保留在此处而不是被删除。你可以将其恢复到资料库、导出原始文件，或永久删除。";
+"quarantine.recover" = "恢复录音";
+"quarantine.export" = "导出录音";
+"quarantine.delete" = "删除录音";
+"quarantine.delete_confirm" = "删除此保留的录音？";
+"quarantine.delete_message" = "此音频文件将被永久删除。此操作无法撤销。";
+"quarantine.recover_unreadable" = "无法读取此保留的音频文件。它已被保留在原处。";
+"quarantine.recovered_meeting_title" = "已恢复的录音";
+"quarantine.reason.unparsable" = "无法识别的文件名";
+"quarantine.reason.meeting_not_found" = "会议已不存在";
+"quarantine.reason.unreadable" = "无法读取音频文件";
+"quarantine.reason.too_short" = "录音过短";
+"quarantine.reason.collision" = "迁移期间的名称冲突";
+"quarantine.reason.unknown" = "未知原因";

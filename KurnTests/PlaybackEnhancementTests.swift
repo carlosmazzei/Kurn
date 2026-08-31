@@ -75,7 +75,7 @@ struct PlaybackEnhancementTests {
     @Test func failedRenderLeavesNoTempFile() async throws {
         try await tempFileTestLock.run {
             let fileName = "kurn-test-\(UUID().uuidString).caf"
-            let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+            let url = try AudioFileStore.ensureRecordingsDirectory().appendingPathComponent(fileName)
             try Data([0x00, 0x01, 0x02]).write(to: url)
             defer { AudioFileStore.delete(fileName: fileName) }
 
@@ -223,7 +223,7 @@ struct PlaybackEnhancementTests {
     /// what removes it — rendering real audio for them would couple them to the
     /// DSP and cost two offline render passes each.
     private static func seedEnhancedFile(fileName: String) throws {
-        AudioFileStore.ensureEnhancedDirectory()
+        try AudioFileStore.ensureEnhancedDirectory()
         try Data([0x00, 0x01]).write(to: AudioFileStore.enhancedURL(fileName: fileName))
     }
 

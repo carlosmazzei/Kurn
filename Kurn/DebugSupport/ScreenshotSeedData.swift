@@ -375,7 +375,8 @@ enum ScreenshotSeedData {
     /// to a real, playable file via `AudioFileStore` instead of a dangling
     /// path — avoids bundling a binary asset just for screenshot automation.
     private static func writeSilentAudioFile(fileName: String) {
-        let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
+        guard let directory = try? AudioFileStore.ensureRecordingsDirectory() else { return }
+        let url = directory.appendingPathComponent(fileName)
         guard let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1) else { return }
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,

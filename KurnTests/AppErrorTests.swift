@@ -41,6 +41,7 @@ struct AppErrorTests {
             .decodingError("bad json"),
             .permissionDenied("speech"),
             .persistenceFailed("disk full"),
+            .protectedStorageUnavailable("attribute rejected"),
             .modelDownloadRequired("diarization"),
             .modelDownloadFailed("network unavailable"),
             .resourceUnavailable("low memory"),

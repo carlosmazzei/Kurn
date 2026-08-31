@@ -42,6 +42,12 @@ enum RecordingProtection {
     /// construction rather than by each sweep learning a new exclusion.
     static let trashDirectoryName = "Trash"
 
+    /// Subdirectory of the recordings directory holding originals moved aside
+    /// by `RecordingQuarantine` instead of being deleted: unmatched orphans,
+    /// unreadable containers, and legacy-migration collisions. Same
+    /// shallow-scan invisibility as `trashDirectoryName`, for the same reason.
+    static let quarantineDirectoryName = "Quarantine"
+
     /// Protection class applied to the recordings directory. `.completeUnlessOpen`
     /// is chosen over `.complete` so that an in-progress recording survives the
     /// screen locking mid-meeting — the file stays writable while it is open,
@@ -51,16 +57,20 @@ enum RecordingProtection {
     /// Create the directory if needed and apply the protection attribute.
     /// Returns the directory URL. Idempotent: safe to call on every launch.
     @discardableResult
-    static func ensureProtectedDirectory(at parent: URL) throws -> URL {
-        try ensureProtectedDirectory(named: directoryName, in: parent)
+    static func ensureProtectedDirectory(at parent: URL, fileManager: FileManager = .default) throws -> URL {
+        try ensureProtectedDirectory(named: directoryName, in: parent, fileManager: fileManager)
     }
 
     /// Same, for an arbitrary child directory — used for the enhanced-audio
     /// subdirectory, which needs the identical protection class.
     @discardableResult
-    static func ensureProtectedDirectory(named name: String, in parent: URL) throws -> URL {
+    static func ensureProtectedDirectory(
+        named name: String,
+        in parent: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL {
         let url = parent.appendingPathComponent(name, isDirectory: true)
-        let fm = FileManager.default
+        let fm = fileManager
         if !fm.fileExists(atPath: url.path) {
             try fm.createDirectory(
                 at: url,
@@ -143,7 +153,11 @@ enum RecordingProtection {
             for legacy in items where legacy.pathExtension.lowercased() == "m4a" {
                 let destination = recordingsURL.appendingPathComponent(legacy.lastPathComponent)
                 if fm.fileExists(atPath: destination.path) {
-                    try? fm.removeItem(at: legacy)
+                    if fm.contentsEqual(atPath: legacy.path, andPath: destination.path) {
+                        try? fm.removeItem(at: legacy)
+                    } else {
+                        RecordingQuarantine.quarantine(fileAt: legacy, reason: .legacyCollision)
+                    }
                     continue
                 }
                 do {

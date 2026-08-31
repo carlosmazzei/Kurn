@@ -103,6 +103,12 @@ enum AudioFixtures {
         settings: [String: Any],
         to url: URL
     ) throws -> URL {
+        // A fixture aimed at the protected recordings directory must not fail
+        // just because no writer has created it yet in this container.
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         // `AVAudioFile` has no `close()`. An MP4 container's `moov` atom is
         // written when the *writer deallocates*, so a fixture handed to a test
         // before that happens is a truncated file with no duration — which is

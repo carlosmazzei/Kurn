@@ -32,11 +32,16 @@ struct RecordingRecoveryTests {
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
-    @Test func deletesOrphanedFileWithNoMatchingMeeting() throws {
+    @Test func quarantinesOrphanedFileWithNoMatchingMeeting() throws {
         let container = TestModelContainer.make()
 
         let fileName = AudioFileStore.fileName(meetingID: UUID())
         _ = try Self.makeToneFile(named: fileName, seconds: 1.0)
+        defer {
+            for item in RecordingQuarantine.items() where item.fileName == fileName {
+                RecordingQuarantine.delete(item)
+            }
+        }
 
         RecordingRecovery.recoverOrphansOnActivate(modelContainer: container)
 
@@ -44,6 +49,9 @@ struct RecordingRecoveryTests {
         #expect(recordings.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName).path))
         #expect(!FileManager.default.fileExists(atPath: AudioFileStore.documentsURL.appendingPathComponent(fileName).path))
+        let item = try #require(RecordingQuarantine.items().first { $0.fileName == fileName })
+        #expect(item.reason == .meetingNotFound)
+        #expect(FileManager.default.fileExists(atPath: item.fileURL.path))
     }
 
     @Test func leavesAlreadyKnownFilesUntouched() throws {

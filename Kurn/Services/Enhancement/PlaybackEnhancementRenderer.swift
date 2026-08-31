@@ -197,7 +197,7 @@ struct PlaybackEnhancementRenderer: Sendable {
         guard size > 0 else { throw failure }
 
         RecordingProtection.apply(to: tempURL)
-        AudioFileStore.ensureEnhancedDirectory()
+        try AudioFileStore.ensureEnhancedDirectory()
         let destination = AudioFileStore.enhancedURL(fileName: fileName)
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: tempURL, to: destination)

@@ -23,6 +23,7 @@ public enum AppError: LocalizedError, Identifiable {
     case decodingError(String)
     case permissionDenied(String)
     case persistenceFailed(String)
+    case protectedStorageUnavailable(String)
     case modelDownloadRequired(String)
     case modelDownloadFailed(String)
     case resourceUnavailable(String)
@@ -61,6 +62,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .decodingError: return "decoding"
         case .permissionDenied: return "permission"
         case .persistenceFailed: return "persistence"
+        case .protectedStorageUnavailable: return "protected_storage"
         case .modelDownloadRequired: return "model_download_required"
         case .modelDownloadFailed: return "model_download"
         case .resourceUnavailable: return "resource"
@@ -146,6 +148,11 @@ public enum AppError: LocalizedError, Identifiable {
         case .persistenceFailed(let detail):
             return String(
                 format: NSLocalizedString("error.persistence", comment: "Save failure"),
+                detail
+            )
+        case .protectedStorageUnavailable(let detail):
+            return String(
+                format: NSLocalizedString("error.protected_storage", comment: "Protected storage unavailable"),
                 detail
             )
         case .modelDownloadRequired(let detail):

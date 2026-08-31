@@ -810,3 +810,21 @@
 "store_recovery.start_fresh_button" = "Start Fresh";
 "store_recovery.start_fresh_confirm_title" = "Start fresh?";
 "store_recovery.start_fresh_confirm_message" = "Your existing data will be moved aside, not deleted, and a new empty library will be created.";
+
+/* Protected storage / recording quarantine (H3) */
+"error.protected_storage" = "Protected storage is unavailable: %@";
+"quarantine.section" = "Preserved Recordings";
+"quarantine.footer" = "Audio files Kurn could not place were preserved here instead of being deleted. You can recover them into your library, export the raw file, or delete them permanently.";
+"quarantine.recover" = "Recover recording";
+"quarantine.export" = "Export recording";
+"quarantine.delete" = "Delete recording";
+"quarantine.delete_confirm" = "Delete this preserved recording?";
+"quarantine.delete_message" = "This audio file will be permanently deleted. This cannot be undone.";
+"quarantine.recover_unreadable" = "This preserved audio file could not be read. It was kept in place.";
+"quarantine.recovered_meeting_title" = "Recovered Recording";
+"quarantine.reason.unparsable" = "File name not recognized";
+"quarantine.reason.meeting_not_found" = "Meeting no longer exists";
+"quarantine.reason.unreadable" = "Audio file could not be read";
+"quarantine.reason.too_short" = "Recording too short";
+"quarantine.reason.collision" = "Name conflict during migration";
+"quarantine.reason.unknown" = "Unknown reason";
