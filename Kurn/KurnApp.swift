@@ -69,10 +69,14 @@ struct KurnApp: App {
     /// transcript, where the fallback to the heuristic engine is visible, and
     /// two controllers each holding their own `isDownloading` would disagree.
     @State private var downloads = ModelDownloadController()
-    /// The H2 boot state machine. Its default value (below) already resolves
-    /// any DEBUG-only synthetic-failure launch arguments before `init()`'s
-    /// body runs, exactly like `settings`/`accessGate`/`downloads` above.
-    @State private var boot = KurnApp.makeBootCoordinator()
+    /// The H2 boot state machine. Assigned explicitly in `init()`, like
+    /// `recoveryViewModel` below, rather than via a default-value expression:
+    /// both need the *same* coordinator instance, and reading `self.boot`
+    /// to build `recoveryViewModel` before `recoveryViewModel` itself is
+    /// initialized is illegal for a struct's stored properties — Swift
+    /// disallows any access to `self` until every stored property without a
+    /// default has been assigned.
+    @State private var boot: ModelStoreBootCoordinator
     /// `nil` until boot reaches `.ready`; every store-dependent coordinator
     /// lives here instead of as separate top-level `@State` properties, since
     /// none of them can exist before a container does.
@@ -104,10 +108,12 @@ struct KurnApp: App {
         }
         _ = NetworkPathObserver.shared
 
-        // Captured once, here: used to register the background launch
-        // handler below and to give the recovery view model a retry
-        // callback, without either needing `self` before it's fully formed.
-        let bootCoordinator = boot
+        // Built once, here, as a local value rather than read from `self`:
+        // `boot` and `recoveryViewModel` both need this exact instance, and
+        // neither is initialized yet, so nothing below may touch `self` until
+        // both `_boot` and `_recoveryViewModel` are explicitly assigned.
+        let bootCoordinator = KurnApp.makeBootCoordinator()
+        _boot = State(initialValue: bootCoordinator)
 
         #if canImport(BackgroundTasks)
         // Registered before the app finishes launching, and — per the H2 boot
