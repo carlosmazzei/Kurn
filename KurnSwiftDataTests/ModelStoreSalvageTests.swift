@@ -46,17 +46,15 @@ struct SalvageTests {
             let schema = KurnModelGraph.schema
             let configuration = ModelConfiguration(schema: schema, url: storeURL)
 
-            // Scoped so the container is fully released — and, with it,
-            // CoreData's persistent store coordinator for this file — before
-            // salvage runs. Production never has a live container open at
-            // this point: ModelStoreSalvage only ever runs from the recovery
-            // screen, which only exists because the live open already
-            // failed. Keeping the original container alive through the
-            // copy-and-reopen below meant two ModelContainers over
-            // overlapping files at once, a scenario that can't happen in
-            // production and that reproduced a real SwiftData crash in CI
-            // (its own async background housekeeping racing the file copy —
-            // not anything wrong with the salvage logic itself).
+            // Scoped to match production, where salvage only ever runs from
+            // the recovery screen — which exists because the live open
+            // already failed, so no live container is open at this point.
+            //
+            // Scoping it does not, on its own, make this test pass: it was
+            // tried for that and did not help. The crash this test kept
+            // hitting was `ModelStoreSalvage` returning fetched `Meeting`s
+            // out of the scope of the container it fetched them from, and
+            // the fix is there, not here.
             do {
                 let container = try ModelContainer(
                     for: schema, migrationPlan: KurnModelGraph.migrationPlan, configurations: [configuration]
