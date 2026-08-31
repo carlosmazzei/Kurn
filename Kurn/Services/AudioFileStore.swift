@@ -189,10 +189,14 @@ enum AudioFileStore {
     }
 
     /// Delete every `.m4a` from the protected directory and from Documents
-    /// (used by "Delete All Data").
-    static func deleteAllAudio() {
-        let fm = FileManager.default
+    /// (used by "Delete All Data"). Returns the number of audio files that
+    /// could not be removed and are still on disk, so the caller can report
+    /// residuals accurately instead of implying a clean wipe.
+    @discardableResult
+    static func deleteAllAudio(fileManager: FileManager = .default) -> Int {
+        let fm = fileManager
         deleteAllEnhancedAudio()
+        var residual = 0
         for directory in [recordingsDirectoryURL, documentsURL] {
             guard let items = try? fm.contentsOfDirectory(
                 at: directory,
@@ -201,8 +205,10 @@ enum AudioFileStore {
             ) else { continue }
             for url in items where url.pathExtension.lowercased() == "m4a" {
                 try? fm.removeItem(at: url)
+                if fm.fileExists(atPath: url.path) { residual += 1 }
             }
         }
+        return residual
     }
 
     /// Human-readable byte count, e.g. "12.4 MB".

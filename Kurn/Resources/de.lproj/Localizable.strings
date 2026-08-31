@@ -592,6 +592,7 @@
 "settings.delete_all" = "Alle Daten löschen";
 "settings.delete_all.confirm" = "Alle Meetings und Aufnahmen löschen?";
 "settings.delete_all.message" = "Dadurch werden alle Meetings, Transkripte und Audiodateien dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.";
+"settings.delete_all.residual" = "%d Audiodatei(en) konnten nicht entfernt werden und verbleiben auf dem Gerät. Versuchen Sie es erneut oder schaffen Sie Speicherplatz.";
 "settings.diarization_engine" = "Diarisierungs-Engine";
 "settings.diarization_speaker_count" = "Anzahl Sprecher";
 "settings.diarization_speaker_count_auto" = "Automatisch";

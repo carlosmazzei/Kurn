@@ -107,11 +107,12 @@ Last updated: 2026-08-31.
 2. H2 is done: PR #155/#156/#157/#158 (schema baseline, boot state machine,
    and backup/restore/salvage/recovery UI) are merged into `main`. H3
    (`docs/roadmap.md`'s "H3 · Atomic model/file mutations and non-destructive
-   reconciliation") is underway: PR #159 (trash-then-purge deletion) and
-   PR #160 (authoritative JSON encode/decode) are merged, and PR #162
-   (fail-closed protected storage and quarantine, the "PR 5" boundary) is in
-   review; the remaining H3 scope is in the status snapshot below. Continue
-   from updated `main`.
+   reconciliation") is underway: PR #159 (trash-then-purge deletion),
+   PR #160 (authoritative JSON encode/decode), and PR #162 (fail-closed
+   protected storage and quarantine, the "PR 5" boundary) are merged, and the
+   durable operation journal (`RecordingOperationJournal`, the "PR 6" boundary)
+   is implemented; the remaining H3 scope is in the status snapshot below.
+   Continue from updated `main`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -148,7 +149,7 @@ Last updated: 2026-08-31.
 | ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
-| H3    | PR 1 and PR 2 merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. Still open: the general operation journal (PR 6 below) and versioned authoritative JSON envelopes beyond transcript/summary (PR 7 below). |
+| H3    | PR 1, PR 2, PR 5, and PR 6 landed | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. Still open: versioned authoritative JSON envelopes beyond transcript/summary (PR 7 below). |
 | H4    | Partial                | Full source/config/model/chunk fingerprint, throwing checkpoint commits, explicit operation states, and bounded recovery.            |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |

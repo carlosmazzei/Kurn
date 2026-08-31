@@ -592,6 +592,7 @@
 "settings.delete_all" = "Delete All Data";
 "settings.delete_all.confirm" = "Delete all meetings and recordings?";
 "settings.delete_all.message" = "This permanently removes every meeting, transcript, and audio file. This cannot be undone.";
+"settings.delete_all.residual" = "%d audio file(s) could not be removed and remain on disk. Try again, or free up space and retry.";
 "settings.diarization_engine" = "Diarization Engine";
 "settings.diarization_speaker_count" = "Number of Speakers";
 "settings.diarization_speaker_count_auto" = "Auto";

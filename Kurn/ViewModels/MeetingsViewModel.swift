@@ -44,40 +44,30 @@ final class MeetingsViewModel {
 
     /// Delete a meeting and remove all of its audio files from disk.
     ///
-    /// Files move into a protected trash before the model mutation runs,
-    /// rather than being deleted outright: a `save()` failure restores them
-    /// immediately, and a process death between the move and the purge below
-    /// leaves a trash folder `RecordingTrash.sweep(context:)` reconciles on
-    /// the next launch or foreground activation. See `RecordingTrash`'s
-    /// header comment for why this closes the "audio gone, row survives"
-    /// window the previous delete-then-delete order left open.
+    /// Runs as a journaled trash → model commit → purge operation: intent is
+    /// durable before any file moves, a `save()` failure restores the files
+    /// immediately, and a process death at any boundary is replayed or rolled
+    /// back from the journal record on the next launch. See
+    /// `RecordingOperationJournal`'s header comment.
     func delete(_ meeting: Meeting) {
-        let operationID = UUID()
-        RecordingTrash.trash(fileNames: meeting.recordings.map(\.fileName), operationID: operationID)
-
-        modelContext.delete(meeting)
-        if let failure = modelContext.saveOrError() {
-            RecordingTrash.restore(operationID: operationID)
+        let fileNames = meeting.recordings.map(\.fileName)
+        if let failure = RecordingOperationJournal.performDelete(fileNames: fileNames, commit: {
+            modelContext.delete(meeting)
+            return modelContext.saveOrError()
+        }) {
             error = failure
-            return
         }
-        RecordingTrash.purge(operationID: operationID)
     }
 
-    /// Delete a single recording segment: move its audio file into a
-    /// protected trash, then delete the model. Keeping this here (rather
-    /// than in the view) makes the file-cleanup behavior unit-testable. See
-    /// `delete(_:)`'s doc comment for why this is trash-then-purge.
+    /// Delete a single recording segment through the same journaled
+    /// trash → commit → purge path as `delete(_:)`. Keeping this here (rather
+    /// than in the view) makes the file-cleanup behavior unit-testable.
     func deleteRecording(_ recording: Recording) {
-        let operationID = UUID()
-        RecordingTrash.trash(fileNames: [recording.fileName], operationID: operationID)
-
-        modelContext.delete(recording)
-        if let failure = modelContext.saveOrError() {
-            RecordingTrash.restore(operationID: operationID)
+        if let failure = RecordingOperationJournal.performDelete(fileNames: [recording.fileName], commit: {
+            modelContext.delete(recording)
+            return modelContext.saveOrError()
+        }) {
             error = failure
-            return
         }
-        RecordingTrash.purge(operationID: operationID)
     }
 }

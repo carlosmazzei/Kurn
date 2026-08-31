@@ -63,6 +63,13 @@ extension SettingsView {
             dataError = .persistenceFailed(error.localizedDescription)
             return
         }
-        AudioFileStore.deleteAllAudio()
+        let residual = AudioFileStore.deleteAllAudio()
+        if residual > 0 {
+            AppLog.persistence.atError.error("Delete all left \(residual, privacy: .public) audio file(s) on disk")
+            dataError = .audioError(String(
+                format: NSLocalizedString("settings.delete_all.residual", comment: "Files left after delete all"),
+                residual
+            ))
+        }
     }
 }
