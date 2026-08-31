@@ -440,19 +440,12 @@ final class TranscriptionViewModel {
     /// Persist a finished pipeline run: replace any existing transcript, mark
     /// the recording done, and drop its resume checkpoint.
     ///
-    /// Throws `AppError.persistenceFailed` if the new segments can't even be
-    /// encoded (see `JSONStorage.encodeAuthoritative`) — checked *before*
-    /// touching the existing transcript, so a pipeline run that produced
-    /// unencodable content (a NaN confidence/timestamp) never destroys a
-    /// still-valid previous transcript on its way to failing to save the new
-    /// one. The caller's existing `catch let appError as AppError` clause
-    /// marks the recording `.failed` and surfaces the error, exactly as it
-    /// already does for every other pipeline failure.
+    /// Throws if the new segments can't be encoded (`JSONStorage.
+    /// encodeAuthoritative`), checked before touching the existing
+    /// transcript so a bad result can't destroy a still-valid one.
     private func saveTranscript(_ output: TranscriptionService.Output, for recording: Recording) throws {
         guard let segmentsData = JSONStorage.encodeAuthoritative(output.segments) else {
-            throw AppError.persistenceFailed(NSLocalizedString(
-                "error.transcript_encode_failed", comment: "Transcript could not be encoded for storage"
-            ))
+            throw AppError.persistenceFailed(NSLocalizedString("error.transcript_encode_failed", comment: "Encode failed"))
         }
 
         // Replace any existing transcript. Detach the old one first: a
@@ -464,11 +457,9 @@ final class TranscriptionViewModel {
             recording.transcript = nil
             modelContext.delete(existing)
         }
-        // Assigning `recording` in the initializer establishes the
-        // relationship (SwiftData maintains the inverse `recording.transcript`),
-        // so no manual back-assignment is needed. `segments` is left at its
-        // `[]` default and overwritten with the already-encoded, pre-checked
-        // bytes below, rather than encoding `output.segments` a second time.
+        // Assigning `recording` establishes the relationship; `segments`
+        // stays at its `[]` default, overwritten below with the
+        // already-encoded, pre-checked bytes.
         let transcript = Transcript(recording: recording, language: output.language)
         transcript.segmentsData = segmentsData
         modelContext.insert(transcript)
@@ -869,16 +860,10 @@ final class TranscriptionViewModel {
                 }
             )
             try Task.checkCancellation()
-            // Checked before constructing the summary, same reasoning as
-            // `saveTranscript`: `sections` is left at its `[]` default and
-            // overwritten with the already-encoded, pre-checked bytes below
-            // rather than encoding `result.sections` a second time. The
-            // `catch let appError as AppError` clause below surfaces this
-            // exactly like any other summary-generation failure.
+            // Same reasoning as `saveTranscript`: fail before constructing
+            // the summary, and reuse the existing `catch` below.
             guard let sectionsData = JSONStorage.encodeAuthoritative(result.sections) else {
-                throw AppError.persistenceFailed(NSLocalizedString(
-                    "error.summary_encode_failed", comment: "Summary could not be encoded for storage"
-                ))
+                throw AppError.persistenceFailed(NSLocalizedString("error.summary_encode_failed", comment: "Encode failed"))
             }
             let summary = Summary(
                 meeting: meeting,
