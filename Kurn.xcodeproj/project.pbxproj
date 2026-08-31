@@ -56,6 +56,13 @@
 			remoteGlobalIDString = AA30000000000000000000B1;
 			remoteInfo = KurnWatch;
 		};
+		AA4000000000000000000141 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000003 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA00000000000000000000B1;
+			remoteInfo = Kurn;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -93,6 +100,7 @@
 		AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/Infrastructure/RecordingActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
 		AA1000000000000000000171 /* Kurn/AppIntents/StartRecordingIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/AppIntents/StartRecordingIntent.swift; sourceTree = SOURCE_ROOT; };
 		AA20000000000000000000A1 /* KurnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA40000000000000000000A1 /* KurnSwiftDataTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnSwiftDataTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA30000000000000000000A1 /* KurnWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KurnWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -128,6 +136,7 @@
 		AA00000000000000000000C1 /* Kurn */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA00000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = Kurn; sourceTree = "<group>"; };
 		AA10000000000000000000C1 /* KurnLiveActivityExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA10000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KurnLiveActivityExtension; sourceTree = "<group>"; };
 		AA20000000000000000000C1 /* KurnTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnTests; sourceTree = "<group>"; };
+		AA40000000000000000000C1 /* KurnSwiftDataTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KurnSwiftDataTests; sourceTree = "<group>"; };
 		AA30000000000000000000C1 /* KurnWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AA30000000000000000000E1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KurnWatch; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -179,6 +188,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA40000000000000000000F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -208,6 +224,7 @@
 				AA30000000000000000000C1 /* KurnWatch */,
 				82B2499CCCAA3DB0E20DE3B1 /* KurnWatchUITests */,
 				AA20000000000000000000C1 /* KurnTests */,
+				AA40000000000000000000C1 /* KurnSwiftDataTests */,
 				2AD3E59D300D5CA2003DA9A9 /* KurnUITests */,
 				2AA9E32B2FEA18F40067BF88 /* Frameworks */,
 				AA0000000000000000000002 /* Products */,
@@ -223,6 +240,7 @@
 				AA30000000000000000000A1 /* KurnWatch.app */,
 				A40F5A8AB42D975B97D6879D /* KurnWatchUITests.xctest */,
 				AA20000000000000000000A1 /* KurnTests.xctest */,
+				AA40000000000000000000A1 /* KurnSwiftDataTests.xctest */,
 				2AD3E59C300D5CA2003DA9A9 /* KurnUITests.xctest */,
 			);
 			name = Products;
@@ -325,6 +343,29 @@
 			productReference = AA20000000000000000000A1 /* KurnTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		AA40000000000000000000B1 /* KurnSwiftDataTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA40000000000000000000D2 /* Build configuration list for PBXNativeTarget "KurnSwiftDataTests" */;
+			buildPhases = (
+				AA4000000000000000000101 /* Sources */,
+				AA40000000000000000000F1 /* Frameworks */,
+				AA4000000000000000000111 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA4000000000000000000151 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA40000000000000000000C1 /* KurnSwiftDataTests */,
+			);
+			name = KurnSwiftDataTests;
+			packageProductDependencies = (
+			);
+			productName = KurnSwiftDataTests;
+			productReference = AA40000000000000000000A1 /* KurnSwiftDataTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		AA30000000000000000000B1 /* KurnWatch */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AA30000000000000000000D2 /* Build configuration list for PBXNativeTarget "KurnWatch" */;
@@ -392,6 +433,10 @@
 						CreatedOnToolsVersion = 26.5;
 						TestTargetID = AA00000000000000000000B1;
 					};
+					AA40000000000000000000B1 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = AA00000000000000000000B1;
+					};
 					AA30000000000000000000B1 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -431,6 +476,7 @@
 				AA30000000000000000000B1 /* KurnWatch */,
 				EBBBD6334193D0EC90187C56 /* KurnWatchUITests */,
 				AA20000000000000000000B1 /* KurnTests */,
+				AA40000000000000000000B1 /* KurnSwiftDataTests */,
 				2AD3E59B300D5CA2003DA9A9 /* KurnUITests */,
 			);
 		};
@@ -468,6 +514,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA3000000000000000000111 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA4000000000000000000111 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -528,6 +581,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA4000000000000000000101 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -555,6 +615,11 @@
 			isa = PBXTargetDependency;
 			target = AA30000000000000000000B1 /* KurnWatch */;
 			targetProxy = AA3000000000000000000141 /* PBXContainerItemProxy */;
+		};
+		AA4000000000000000000151 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA00000000000000000000B1 /* Kurn */;
+			targetProxy = AA4000000000000000000141 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -891,6 +956,44 @@
 			};
 			name = Release;
 		};
+		AA4000000000000000000211 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.4.1;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.KurnSwiftDataTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kurn.app/Kurn";
+			};
+			name = Debug;
+		};
+		AA4000000000000000000212 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.4.1;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.kurn.app.KurnSwiftDataTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kurn.app/Kurn";
+			};
+			name = Release;
+		};
 		AA3000000000000000000211 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1008,6 +1111,15 @@
 			buildConfigurations = (
 				AA2000000000000000000211 /* Debug */,
 				AA2000000000000000000212 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA40000000000000000000D2 /* Build configuration list for PBXNativeTarget "KurnSwiftDataTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA4000000000000000000211 /* Debug */,
+				AA4000000000000000000212 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

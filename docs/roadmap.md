@@ -1178,15 +1178,40 @@ volume). Two mitigations were tried:
   complexity (a new project-artifact type, a scheme resolution-mode change)
   is worse than the status quo when it demonstrably doesn't fix the problem
   it was added for, so it was reverted rather than left in place.
+- **A separate `KurnSwiftDataTests` test target** (tried): after multiple
+  runs kept marking unrelated files (`AudioChunkerTests`,
+  `PlaybackEnhancementTests`, and others) as "failing" purely because
+  xcodebuild's crash-restart only re-runs a small subset of the tests that
+  were mid-flight — verified directly in CI logs (zero explicit
+  `recorded an issue`/assertion failures anywhere; every "failing" test had
+  `started` but never `passed`/`failed` before the crash, and the retry
+  after restart only covered ~5 of the dozens interrupted) — two other
+  documented xcodebuild levers were researched and ruled out first:
+  `-retry-tests-on-failure` deliberately excludes crashes ("to ensure app
+  crash errors are surfaced without confusion"), and `-only-testing`/
+  `-skip-testing` have documented Swift Testing compatibility gaps (a
+  suite-level identifier can silently select zero tests rather than fail
+  loud). A genuinely separate Xcode *target* (not a suite filter) sidesteps
+  both: each test target gets its own host-app process launch even when
+  sharing the same `TEST_HOST`, which is well-documented xcodebuild
+  behavior, not suite-level filtering with known gaps. `ModelStoreBootCoordinatorTests`,
+  `ModelStoreSalvageTests` and the `SwiftDataConcurrencySensitiveTests`
+  parent moved from `KurnTests/` to a new `KurnSwiftDataTests/` folder and
+  target (`project.pbxproj`, mirroring `KurnTests`' existing target
+  structure; the scheme lists it last in both `BuildAction` and
+  `TestAction`). If this target's process still crashes on some runs, the
+  damage is now contained to its own ~2 files instead of taking unrelated
+  ones down as collateral, and the rest of the ~150-file suite keeps
+  reporting real results regardless.
 
-**Current status**: the production code and its own tests are sound: the
-suite nesting is a legitimate, working improvement and is kept; CI is
-re-run periodically since the crash is nondeterministic and a share of runs
-pass without it firing. A durable fix (if one is wanted beyond periodic
-re-runs) would need either a real Xcode/device session to experiment with
-test-plan parallelization settings interactively, or a broader refactor of
-how the whole ~150-file suite obtains `ModelContainer`s — both outside this
-PR's practical reach from a remote-only session.
+**Current status**: the production code and its own tests are sound. All
+three CI mitigations are documented here for what they actually achieved;
+the separate-target attempt is the newest and awaits CI confirmation. If
+the crash still occurs even isolated to its own process, that is itself
+useful evidence about the failure's actual trigger. A fully durable fix (if
+still wanted beyond this) would need a real Xcode/device session to
+experiment interactively, or a broader refactor of how the whole suite
+obtains `ModelContainer`s.
 
 **Landed in the working tree.**
 
@@ -1223,14 +1248,17 @@ PR's practical reach from a remote-only session.
   automatic.
 - **Tests.** `KurnTests/ModelStoreBackupManagerTests.swift` exercises backup,
   rate-limiting, pruning, restore and quarantine against a real temporary
-  directory with synthetic store files. `KurnTests/ModelStoreSalvageTests.swift`
+  directory with synthetic store files. `ModelStoreSalvageTests.swift`
   proves salvage recovers a real `Meeting` from a real store copy without
   touching the live container, and fails without crashing on an unreadable
-  file. `KurnTests/ModelStoreBootCoordinatorTests.swift` gained coverage for
+  file. `ModelStoreBootCoordinatorTests.swift` gained coverage for
   the new backup-before-open and verify-after-open wiring — and every
   existing PR 3 test now passes an explicit temporary `appSupportDirectory`,
   since PR 4 added real filesystem I/O to `attemptOpen()` that would
-  otherwise touch the test runner's actual on-disk state.
+  otherwise touch the test runner's actual on-disk state. Both, plus the
+  `SwiftDataConcurrencySensitiveTests` parent suite, now live in their own
+  `KurnSwiftDataTests/` target rather than `KurnTests/` — see the CI
+  investigation above for why.
   `KurnUITests/ModelStoreRecoveryUITests.swift` gained a test that the new
   action buttons render and that salvage resolves without crashing when
   launched against a synthetic failure with no real store on disk.

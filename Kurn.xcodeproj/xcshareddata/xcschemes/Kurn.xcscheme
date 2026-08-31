@@ -48,6 +48,20 @@
                ReferencedContainer = "container:Kurn.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "AA40000000000000000000B1"
+               BuildableName = "KurnSwiftDataTests.xctest"
+               BlueprintName = "KurnSwiftDataTests"
+               ReferencedContainer = "container:Kurn.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -85,6 +99,27 @@
                   Identifier = "ScreenshotUITests">
                </Test>
             </SkippedTests>
+         </TestableReference>
+         <!-- KurnSwiftDataTests is a separate test target (not just a
+              separate suite) so it gets its own, freshly-launched host app
+              process, distinct from KurnTests' — see
+              docs/resilience-megaplan.md's H2 PR 4 handoff for why: a known
+              SwiftData concurrency crash (FB14089213-class) kept hitting
+              CI, and per-target process isolation is the one mechanism
+              confirmed to actually separate it from the rest of the ~150
+              file KurnTests suite, rather than just reordering or
+              serializing within one shared process. Listed last so the bulk
+              of the suite finishes (and reports real results) even on a run
+              where this target's process crashes. -->
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "AA40000000000000000000B1"
+               BuildableName = "KurnSwiftDataTests.xctest"
+               BlueprintName = "KurnSwiftDataTests"
+               ReferencedContainer = "container:Kurn.xcodeproj">
+            </BuildableReference>
          </TestableReference>
       </Testables>
    </TestAction>
