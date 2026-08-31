@@ -27,11 +27,7 @@ enum ModelStoreProtection {
     /// Support can't be resolved.
     static func apply(appSupportOverride: URL? = nil) {
         let fm = FileManager.default
-        let appSupport = appSupportOverride ?? (try? fm.url(
-            for: .applicationSupportDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: true
-        ))
-        guard let appSupport else { return }
+        guard let appSupport = try? resolvedAppSupportDirectory(override: appSupportOverride) else { return }
         let base = appSupport.appendingPathComponent(baseName)
         if !fm.fileExists(atPath: base.path) {
             // Expected on a fresh install (nothing to protect yet) or the
@@ -55,19 +51,22 @@ enum ModelStoreProtection {
     /// is nothing to verify.
     static func applyAndVerify(appSupportOverride: URL? = nil) throws {
         let fm = FileManager.default
-        let appSupport: URL
-        if let appSupportOverride {
-            appSupport = appSupportOverride
-        } else {
-            appSupport = try fm.url(
-                for: .applicationSupportDirectory, in: .userDomainMask,
-                appropriateFor: nil, create: true
-            )
-        }
+        let appSupport = try resolvedAppSupportDirectory(override: appSupportOverride)
         for suffix in [""] + sidecarSuffixes {
             let url = appSupport.appendingPathComponent(baseName + suffix)
             guard fm.fileExists(atPath: url.path) else { continue }
             try RecordingProtection.applyAndVerify(to: url)
         }
+    }
+
+    /// `override`, or the real Application Support directory — the one
+    /// resolution `apply` (best-effort, swallows the throw into a no-op) and
+    /// `applyAndVerify` (propagates it) share, so there is exactly one place
+    /// that knows how to find Application Support.
+    private static func resolvedAppSupportDirectory(override: URL?) throws -> URL {
+        if let override { return override }
+        return try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+        )
     }
 }
