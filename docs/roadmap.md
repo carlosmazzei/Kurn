@@ -725,7 +725,7 @@ satisfy part of a planned contract.
 | Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **H1**             | **Core implemented**   | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording preflights and measures storage runway. A `Recording` row now owns a UUID-derived file before open and moves durably through `preparing → recording → finalizing → ready/recoveryNeeded`; re-entry and cross-context ownership fail before capture. One shared finalizer reopens the closed file, measures duration/bytes and applies/verifies protection before `ready`. Launch/foreground recovery reconciles interrupted rows, preserves partial bytes, and exposes explicit retry while playback, transcription, export, compaction and enhancement reject non-ready rows. Focused fault suites and the full simulator suite cover the core; real-device protection, interruption/route, long-background and low-storage scenarios remain the release checklist.                                                                                                                                                                                                                                                               |
 | **H2**             | **Done, merged (PR #155, #157, #158)** | `KurnSchemaV1`/`KurnSchemaMigrationPlan`, `ModelStoreBootCoordinator`, `ModelStoreBackupManager` (protected, bounded-generation backups + quarantine), `ModelStoreSalvage` (best-effort read-only recovery), `ModelStoreProtection.applyAndVerify`, and an expanded `ModelStoreRecoveryView` (restore/salvage/diagnostics/confirmed-fresh-start) are all on `main`. The recoverable production `fatalError` is gone, background-task registration runs before the store is ever opened, and a real use-after-free found during PR #158 (fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen) is fixed. See the H2 handoffs above the H2 plan for the full history. |
-| **H3**             | **PR 1 in progress**   | The risk register's deletion hazard is fixed on branch `claude/plano-resiliencia-xe25b2`: `RecordingTrash` makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. The rest of the track — general operation journal, quarantine for unmatched originals, migration collision handling, the unprotected `recordingsDirectoryURL` fallback, and typed JSON corruption — is not yet started. |
+| **H3**             | **PR 1 merged, PR 2 in progress** | PR 1 ([#159](https://github.com/carlosmazzei/Kurn/pull/159), merged) fixed the risk register's deletion hazard: `RecordingTrash` makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. PR 2, on branch `claude/plano-resiliencia-xe25b2`, fixes the JSON-corruption hazard for `Transcript.segments`/`Summary.sections` — see the H3 PR 2 handoff above the H4 plan. The rest of the track — general operation journal, quarantine for unmatched originals, migration collision handling, and the unprotected `recordingsDirectoryURL` fallback — is not yet started. |
 | **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **H6**             | **Core implemented**   | Provider URLs fail closed and all new cloud traffic uses one origin-locked, deadline-bounded, 16 MB-capped foreground policy with exact budgeted `Retry-After`. Each logical request owns one UUID reused across attempts; official OpenAI chat requests also send it as the documented correlation header, never as an undocumented idempotency claim. Ambiguous POST timeouts/connection loss stop without automatic replay and surface a typed duplicate-charge warning. Background upload has no creation API or response-buffering state; its synchronized adapter only drains old system tasks. A durable per-provider circuit gates automatic title/wiki/backfill work. Large transfers default to unrestricted Wi-Fi: app-owned audio uploads/model sessions carry native expensive/constrained flags, while FluidAudio downloads fail preflight on a disallowed path. Cloud consent is pinned to provider plus URL and discloses hostname and estimated hourly audio size; model dialogs disclose source and approximate size. Non-blocking follow-ups are dedicated waiting UI under H9, FluidAudio’s unobservable mid-transfer path changes, and measured streaming evaluation. |
@@ -757,7 +757,7 @@ feature requests:
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **H1**  | Durable capture ownership, file-measured finalization, recovery rows and ready-only consumer gates are implemented; simulator tests cannot observe iOS Data Protection or reproduce physical route/interruption/background pressure | A device-only regression could still interrupt capture or misclassify protection until the release matrix is executed       | **P0 release gate**   |
 | **H2**  | A `VersionedSchema`/`SchemaMigrationPlan` exists, the recoverable production `fatalError` is replaced by a classified boot state machine, and protected backup, restore, salvage, and confirmed-fresh-start are all merged (PR #155, #157, #158) | An open failure no longer crash-loops; only a genuinely un-migratable/corrupt store can strand the user beyond what salvage and restore already offer | **Done**               |
-| **H3**  | Deletion no longer removes audio before the SwiftData save commits (PR 1, in progress); recovery still deletes some unmatched files, and `JSONStorage` still turns decode failure into empty content | A partial failure during a non-delete mutation, an unmatched original, or corrupt authoritative JSON can still lose or misrepresent data | **P0**                |
+| **H3**  | Deletion no longer removes audio before the SwiftData save commits (PR 1, merged); a corrupted transcript/summary is no longer indistinguishable from an empty one (PR 2, in progress); recovery still deletes some unmatched files | A partial failure during a non-delete mutation or an unmatched original can still lose or misrepresent data | **P0**                |
 | **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                                                  | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                    | **P0**                |
 | **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                                                               | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
 | **H6**  | App-owned large transfers enforce user-selected expensive/constrained flags; FluidAudio is preflight-gated because its internal session is not configurable                                                                         | A network becoming expensive after a FluidAudio download starts cannot yet be cancelled through the library                 | **P1**                |
@@ -1427,6 +1427,80 @@ permission/full-disk failures, legacy collision fixtures, JSON corruption and
 schema-version fixtures, plus row-without-file/file-without-row reconciliation
 tests.
 
+**Progress.** Split into narrowly-scoped PRs rather than landed as one large
+change, the same way H2 split into four:
+
+- **PR 1 (item 2, deletion trash-then-purge) — done, merged in
+  [PR #159](https://github.com/carlosmazzei/Kurn/pull/159).** `RecordingTrash`
+  moves every file aside before the model mutation and purges only once it
+  commits, with launch/foreground reconciliation for an interrupted delete.
+- **PR 2 (item 6, typed JSON corruption) — in progress on branch
+  `claude/plano-resiliencia-xe25b2`.** Scoped to exactly the two properties
+  the risk register itself names — `Transcript.segments` and
+  `Summary.sections` — not every `JSONStorage` consumer; see the handoff
+  below for why and what stays on the lenient contract. `Recording.
+  transcriptionCheckpoint` is deliberately excluded too: its decode already
+  degrades safely (a failed decode means "no checkpoint, restart the chunk
+  plan", never wrong-but-successful content), so it doesn't share the
+  transcript/summary failure mode this item exists to close.
+- **Items 1, 3, 4, 5, 7 — not started.**
+
+#### H3 PR 2 handoff: typed JSON corruption for transcript/summary
+
+`JSONStorage.encode`/`decode` had one failure contract for everything they
+touch: a decode failure returns `[]`/`nil`, identical to a property that was
+simply never written. For `Recording.highlights`/`speakerVoiceprints`, a
+resumable `transcriptionCheckpoint`, or a `SmartFolder`'s saved-search
+predicate, that's an acceptable, even correct, degrade — the content is
+regenerable or the failure mode is already safe (see above). For
+`Transcript.segments` and `Summary.sections` it is the exact bug the risk
+register names: corrupted bytes on disk render as a legitimately empty
+transcript, with nothing to tell a user or the code apart the two.
+
+`encodeAuthoritative`/`decodeAuthoritative` (`JSONStorage.swift`) add a
+second contract for exactly that content. Encoding wraps the payload in a
+versioned envelope carrying an FNV-1a checksum of the payload bytes — chosen
+over Swift's `Hasher`, which is deliberately randomized per process launch
+and so cannot verify anything written by an earlier launch — and returns
+`nil` on an encode failure (chiefly a NaN/infinite floating-point field,
+which `JSONEncoder` cannot represent; a pipeline confidence score or
+timestamp could in principle produce one) instead of the old `?? Data()`.
+Decoding returns a `JSONDecodeOutcome<T>` — `.empty` for zero stored bytes,
+`.value` for a successful envelope-and-checksum decode, `.corrupted` (still
+carrying the original bytes, for a future recovery/diagnostic path) for
+anything else — and, critically, still accepts a successful decode of the
+*old*, un-enveloped format as `.value`: every row on a real device predates
+this format, and without that fallback every one of them would appear
+corrupted the moment this shipped. Only a payload that fails *both* reads is
+`.corrupted`.
+
+`Transcript.segments`/`Summary.sections` keep their existing `[T]` getter
+signature (falling back to `[]` for both `.empty` and `.corrupted`, same as
+before) so no other call site in the app has to change; a sibling
+`isSegmentsDataCorrupted`/`isSectionsDataCorrupted` is the typed signal a
+caller checks instead. `MeetingDetailView`'s transcript tab is the one
+surfaced consumer: a per-recording banner (mirroring the existing
+diarization-fallback banner, since a multi-recording meeting can have one
+corrupted transcript alongside other good ones that would otherwise never
+let the all-empty placeholder run at all) plus a dedicated branch in that
+placeholder for the all-corrupted case, both ahead of the existing
+"failed"/"no speech"/"never attempted" branches since corruption is the more
+specific, more actionable diagnosis. `Summary` gets the same backend fix and
+`isSectionsDataCorrupted` signal but no new UI in this PR — the risk
+register names the transcript case specifically, and a summary-tab banner is
+a small, natural follow-up rather than something this PR's scope requires.
+
+The plan's "encoding must fail the operation rather than persist `Data()`"
+half is handled at the two real call sites, both in
+`TranscriptionViewModel.swift`: `saveTranscript` and the summary-generation
+step each pre-check `encodeAuthoritative` *before* touching the existing
+transcript/summary, so a pipeline run that produced unencodable content
+can't destroy still-valid prior content on its way to failing to save the
+new one, and each throws `AppError.persistenceFailed` into their existing
+`catch let appError as AppError` clause — reusing the exact handling every
+other pipeline failure already gets (mark `.failed`, persist, surface the
+error) rather than adding a new path.
+
 ### H4 · Checkpoint identity and durable operation state — P0
 
 **Plan.**
@@ -1824,28 +1898,37 @@ migrates.
    `ModelContainer` they came from). See the H2 backup/restore/salvage/
    recovery-UI handoff above the H2 plan for the full investigation, what
    shipped, and the known salvage limitations.
-4. **H3 (P0), PR 1 of several: trash-then-purge deletion — in progress on
-   branch `claude/plano-resiliencia-xe25b2`.** The risk register's most
-   concrete H3 hazard ("meeting/recording deletion removes audio before the
-   SwiftData save") is fixed: `RecordingTrash` moves every file aside into a
-   protected trash folder before the model mutation runs, purges it once
-   `save()` commits, and restores it immediately on a synchronous save
-   failure; `RecordingTrash.sweep(context:)` reconciles any trash folder a
-   process death left behind, at launch and on foreground activation,
-   against durable truth (whether a `Recording` row referencing that file
-   still exists) rather than inferred state. Scoped deliberately narrow, the
-   same way H2 split into four PRs: the remaining H3 plan items — a general
-   operation journal for create/finalize/replace (not just delete), quarantine
-   for unmatched originals instead of deletion, legacy-migration collision
-   handling, removing `recordingsDirectoryURL`'s unprotected fallback, and
-   typed JSON corruption for `Transcript.segments`/`Summary.sections` — are
-   separate follow-up PRs, not yet started.
-5. **Then H4 (P0): resume identity and throwing commits.** Fingerprint source,
+4. **H3 (P0), PR 1 of several: trash-then-purge deletion — done, merged in
+   [PR #159](https://github.com/carlosmazzei/Kurn/pull/159).** The risk
+   register's most concrete H3 hazard ("meeting/recording deletion removes
+   audio before the SwiftData save") is fixed: `RecordingTrash` moves every
+   file aside into a protected trash folder before the model mutation runs,
+   purges it once `save()` commits, and restores it immediately on a
+   synchronous save failure; `RecordingTrash.sweep(context:)` reconciles any
+   trash folder a process death left behind, at launch and on foreground
+   activation, against durable truth (whether a `Recording` row referencing
+   that file still exists) rather than inferred state.
+5. **H3 PR 2 of several: typed JSON corruption — in progress on branch
+   `claude/plano-resiliencia-xe25b2`.** The risk register's other named H3
+   hazard ("`JSONStorage` turns decode failure into empty content") is fixed
+   for `Transcript.segments`/`Summary.sections`: a versioned, checksummed
+   envelope plus a typed `.empty`/`.value`/`.corrupted` decode outcome
+   replace the old "decode failure silently means empty" contract, with a
+   fallback that still accepts every pre-existing row's un-enveloped format
+   as real content rather than corruption. See the H3 PR 2 handoff above the
+   H4 plan for what's in scope and what stays on the old, lenient contract.
+   Scoped deliberately narrow, the same way H2 split into four PRs and H3 PR 1
+   before it: the remaining H3 plan items — a general operation journal for
+   create/finalize/replace (not just delete), quarantine for unmatched
+   originals instead of deletion, legacy-migration collision handling, and
+   removing `recordingsDirectoryURL`'s unprotected fallback — are separate
+   follow-up PRs, not yet started.
+6. **Then H4 (P0): resume identity and throwing commits.** Fingerprint source,
    configuration, model and chunk plan; do not start the next chunk until its
    checkpoint is durable.
-6. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
+7. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
    route, lock/background and low-storage matrix without delaying the next code P0.
-7. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
+8. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
    dependency; H9 owns dedicated waiting/cancellation presentation.
 
 P0 containment and durability take precedence over new features that widen the
