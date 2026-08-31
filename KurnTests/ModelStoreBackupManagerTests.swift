@@ -89,7 +89,8 @@ struct ModelStoreBackupManagerTests {
             // pruning must not care why a generation exists, only how many.
             for index in 0..<3 {
                 try writeLiveStoreFiles(in: directory, content: "live")
-                let generation = try #require(manager.createBackupIfLiveStoreExists())
+                let created = try manager.createBackupIfLiveStoreExists()
+                let generation = try #require(created)
                 // Force the next call to not be rate-limited by rewriting
                 // that generation's metadata with a different app version.
                 try rewriteAppVersion(of: generation, in: directory, to: "fabricated-\(index)")
@@ -106,7 +107,8 @@ struct ModelStoreBackupManagerTests {
         try withTempAppSupport { directory in
             try writeLiveStoreFiles(in: directory, content: "original")
             let manager = ModelStoreBackupManager(appSupportDirectory: directory)
-            let generation = try #require(manager.createBackupIfLiveStoreExists())
+            let created = try manager.createBackupIfLiveStoreExists()
+            let generation = try #require(created)
 
             // Simulate the live store having moved on since the backup was
             // taken (e.g. new meetings recorded).
@@ -136,7 +138,9 @@ struct ModelStoreBackupManagerTests {
             .appendingPathComponent("Backups", isDirectory: true)
             .appendingPathComponent(generation.id, isDirectory: true)
             .appendingPathComponent("metadata.json")
-        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: metadataURL)) as? [String: Any])
+        let metadataData = try Data(contentsOf: metadataURL)
+        let parsed = try JSONSerialization.jsonObject(with: metadataData) as? [String: Any]
+        var json = try #require(parsed)
         json["appVersion"] = version
         let data = try JSONSerialization.data(withJSONObject: json)
         try data.write(to: metadataURL, options: .atomic)
