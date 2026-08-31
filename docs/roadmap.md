@@ -1204,14 +1204,35 @@ volume). Two mitigations were tried:
   ones down as collateral, and the rest of the ~150-file suite keeps
   reporting real results regardless.
 
+**The isolation confirmed something important.** Once `KurnSwiftDataTests`
+ran as its own process, `KurnTests` (~150 files) and `KurnUITests` both
+passed cleanly and completely on the same run — no collateral damage,
+exactly as intended. But the crash still fired, now fully reproducible in
+total isolation (two tests, fully serialized, nothing else running
+concurrently), which rules out whole-suite concurrency as *this specific
+instance's* cause. That pointed at the failing test's own setup instead:
+`recoversMeetingsFromARealStoreWithoutTouchingTheLiveFiles` kept a real,
+open, writable `ModelContainer` alive for the *entire* test, including
+while `ModelStoreSalvage.attempt` copied the same files and opened a
+second, read-only `ModelContainer` against the copy — two SwiftData
+stacks over overlapping files at once. That scenario cannot happen in
+production: salvage only ever runs from the recovery screen, which only
+exists because the live open already failed, so nothing holds the store
+open when salvage's copy step runs. The test was exercising an
+artificial, production-impossible race, and it matches Apple's documented
+failure mode for this exact crash (async background housekeeping still in
+flight when the same files are touched again). Fixed by scoping the
+original container so it's released before salvage runs, then reopening
+a fresh one afterward to verify the live bytes survived untouched —
+awaiting CI confirmation.
+
 **Current status**: the production code and its own tests are sound. All
-three CI mitigations are documented here for what they actually achieved;
-the separate-target attempt is the newest and awaits CI confirmation. If
-the crash still occurs even isolated to its own process, that is itself
-useful evidence about the failure's actual trigger. A fully durable fix (if
-still wanted beyond this) would need a real Xcode/device session to
-experiment interactively, or a broader refactor of how the whole suite
-obtains `ModelContainer`s.
+four CI mitigations are documented here for what they actually achieved.
+If the crash still recurs even after this fix, that would mean either a
+second, distinct trigger exists, or the fix doesn't fully close the
+window — worth knowing either way. A fully durable fix beyond this would
+need a real Xcode/device session to experiment interactively, or a
+broader refactor of how the whole suite obtains `ModelContainer`s.
 
 **Landed in the working tree.**
 
