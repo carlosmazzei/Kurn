@@ -791,3 +791,17 @@
 "store_recovery.reason_migration_incompatible" = "Esta versão do Kurn não consegue ler seus dados existentes. Atualize o app ou contate o suporte.";
 "store_recovery.reason_corrupt_or_unknown" = "Algo deu errado ao abrir seus dados. Suas gravações não foram excluídas.";
 "store_launch.opening" = "Abrindo";
+
+/* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
+"store_recovery.reason_protection_verification_failed" = "O Kurn não conseguiu confirmar que seus dados estão criptografados em repouso.";
+"store_recovery.backups_title" = "Restaurar de um backup";
+"store_recovery.restore_button" = "Restaurar";
+"store_recovery.restore_confirm_title" = "Restaurar este backup?";
+"store_recovery.restore_confirm_message" = "Seus dados atuais serão movidos para um local à parte, não excluídos, e substituídos por este backup.";
+"store_recovery.salvage_button" = "Tentar recuperar dados";
+"store_recovery.salvage_result_recovered" = "%d reunião(ões) recuperada(s). Toque em Compartilhar para salvá-las.";
+"store_recovery.salvage_result_none" = "Não foi possível recuperar nenhum dado.";
+"store_recovery.export_diagnostics_button" = "Exportar diagnóstico";
+"store_recovery.start_fresh_button" = "Começar do zero";
+"store_recovery.start_fresh_confirm_title" = "Começar do zero?";
+"store_recovery.start_fresh_confirm_message" = "Seus dados existentes serão movidos para um local à parte, não excluídos, e uma nova biblioteca vazia será criada.";

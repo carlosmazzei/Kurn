@@ -791,3 +791,17 @@
 "store_recovery.reason_migration_incompatible" = "Diese Version von Kurn kann deine vorhandenen Daten nicht lesen. Aktualisiere die App oder wende dich an den Support.";
 "store_recovery.reason_corrupt_or_unknown" = "Beim Öffnen deiner Daten ist ein Fehler aufgetreten. Deine Aufnahmen wurden nicht gelöscht.";
 "store_launch.opening" = "Wird geöffnet";
+
+/* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
+"store_recovery.reason_protection_verification_failed" = "Kurn konnte nicht bestätigen, dass deine Daten im Ruhezustand verschlüsselt sind.";
+"store_recovery.backups_title" = "Aus Backup wiederherstellen";
+"store_recovery.restore_button" = "Wiederherstellen";
+"store_recovery.restore_confirm_title" = "Dieses Backup wiederherstellen?";
+"store_recovery.restore_confirm_message" = "Deine aktuellen Daten werden verschoben, nicht gelöscht, und durch dieses Backup ersetzt.";
+"store_recovery.salvage_button" = "Datenrettung versuchen";
+"store_recovery.salvage_result_recovered" = "%d Besprechung(en) wiederhergestellt. Tippe auf Teilen, um sie zu speichern.";
+"store_recovery.salvage_result_none" = "Es konnten keine Daten wiederhergestellt werden.";
+"store_recovery.export_diagnostics_button" = "Diagnose exportieren";
+"store_recovery.start_fresh_button" = "Neu beginnen";
+"store_recovery.start_fresh_confirm_title" = "Neu beginnen?";
+"store_recovery.start_fresh_confirm_message" = "Deine vorhandenen Daten werden verschoben, nicht gelöscht, und eine neue leere Bibliothek wird erstellt.";

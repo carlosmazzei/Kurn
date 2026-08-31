@@ -44,4 +44,25 @@ enum ModelStoreProtection {
             RecordingProtection.apply(to: appSupport.appendingPathComponent(baseName + suffix))
         }
     }
+
+    /// The H2 PR 4 "make store/file protection verification part of
+    /// bootstrap" requirement: unlike `apply(appSupportOverride:)`, this
+    /// throws when the store file exists but could not be verified as
+    /// protected, so a directory or sidecar that silently failed to be
+    /// stamped is a visible boot failure rather than an unprotected fallback
+    /// path. A store that doesn't exist yet (fresh install, or the file
+    /// hasn't been created by `ModelContainer` yet) is not an error — there
+    /// is nothing to verify.
+    static func applyAndVerify(appSupportOverride: URL? = nil) throws {
+        let fm = FileManager.default
+        let appSupport = appSupportOverride ?? (try fm.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: true
+        ))
+        for suffix in [""] + sidecarSuffixes {
+            let url = appSupport.appendingPathComponent(baseName + suffix)
+            guard fm.fileExists(atPath: url.path) else { continue }
+            try RecordingProtection.applyAndVerify(to: url)
+        }
+    }
 }

@@ -791,3 +791,17 @@
 "store_recovery.reason_migration_incompatible" = "This version of Kurn can't read your existing data. Update the app or contact support.";
 "store_recovery.reason_corrupt_or_unknown" = "Something went wrong opening your data. Your recordings were not deleted.";
 "store_launch.opening" = "Opening";
+
+/* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
+"store_recovery.reason_protection_verification_failed" = "Kurn couldn't confirm your data is encrypted at rest.";
+"store_recovery.backups_title" = "Restore from Backup";
+"store_recovery.restore_button" = "Restore";
+"store_recovery.restore_confirm_title" = "Restore this backup?";
+"store_recovery.restore_confirm_message" = "Your current data will be moved aside, not deleted, and replaced with this backup.";
+"store_recovery.salvage_button" = "Attempt Data Recovery";
+"store_recovery.salvage_result_recovered" = "%d meeting(s) recovered. Tap Share to save them.";
+"store_recovery.salvage_result_none" = "No data could be recovered.";
+"store_recovery.export_diagnostics_button" = "Export Diagnostics";
+"store_recovery.start_fresh_button" = "Start Fresh";
+"store_recovery.start_fresh_confirm_title" = "Start fresh?";
+"store_recovery.start_fresh_confirm_message" = "Your existing data will be moved aside, not deleted, and a new empty library will be created.";

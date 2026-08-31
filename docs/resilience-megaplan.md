@@ -57,6 +57,26 @@ Last updated: 2026-08-30.
   NSError mappings unverified against a real device failure; PR 3's UI tests
   are a Debug-configuration launch, not a true Release-configuration device
   run) and what remains for PR 4.
+- **On branch `claude/plano-resiliencia-xe25b2`, on top of merged `main`
+  (not yet pushed as a PR):** PR 4, H2 protected backup, restore, salvage,
+  and recovery UI. `ModelStoreBackupManager`
+  (`Kurn/Infrastructure/ModelStoreBackupManager.swift`) backs up the live
+  store before every open attempt (rate-limited to once per app
+  version+build), retains 3 generations, and quarantines (never deletes)
+  the live store before a restore or confirmed fresh start.
+  `ModelStoreSalvage` (`ModelStoreSalvage.swift`) attempts a read-only open
+  of a copy of the live store, exported as Markdown on success.
+  `ModelStoreProtection.applyAndVerify` and `ModelStoreBootCoordinator`'s new
+  `.protectionVerificationFailed` reason cover item 4 (protection
+  verification during bootstrap). `ModelStoreRecoveryViewModel` and an
+  expanded `ModelStoreRecoveryView` wire all four actions into the recovery
+  shell. Not yet run through SwiftLint/`xcodebuild`/the simulator suite in
+  this session — pushing the branch and opening a PR is the next step. See
+  "PR 4 — H2 protected backup, restore, salvage, and recovery UI" below for
+  the known gaps (salvage is best-effort and cannot recover from a
+  genuinely un-migratable schema mismatch or real corruption; "N-1/N-2
+  fixtures" is satisfied the same way PR 2 satisfied it — no earlier
+  released schema exists to fabricate).
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -67,8 +87,11 @@ Last updated: 2026-08-30.
 1. Read this file and the `Reliability and resilience track` section of
    `docs/roadmap.md`.
 2. PR #155/#156/#157 (H2 schema baseline and boot state machine) are merged
-   into `main`. PR 4 (backup/restore/salvage/recovery UI) is next, from
-   updated `main`.
+   into `main`. PR 4 (backup/restore/salvage/recovery UI) is implemented on
+   `claude/plano-resiliencia-xe25b2` — if it hasn't been pushed/opened as a
+   PR yet, do that first rather than redoing the work; once it merges, H3
+   (`docs/roadmap.md`'s "H3 · Atomic model/file mutations and non-destructive
+   reconciliation") is next, from updated `main`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -104,7 +127,7 @@ Last updated: 2026-08-30.
 | Track | Status                 | Remaining contract                                                                                                                   |
 | ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
-| H2    | Schema baseline (PR #155) and boot state machine (PR #157) merged | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, and `ModelStoreBootCoordinator` (replacing the production `fatalError`) are all on `main`. Protected backup, restore, salvage, and recovery UI remain (H2 PR 4, not yet started). |
+| H2    | Schema baseline (PR #155) and boot state machine (PR #157) merged; backup/restore/salvage/recovery UI implemented, pending CI | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, and `ModelStoreBootCoordinator` (replacing the production `fatalError`) are all on `main`. `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` (H2 PR 4) are on branch `claude/plano-resiliencia-xe25b2`. |
 | H3    | Foundation only        | Protected fail-closed storage, quarantine/trash, mutation journal, and typed authoritative JSON corruption.                          |
 | H4    | Partial                | Full source/config/model/chunk fingerprint, throwing checkpoint commits, explicit operation states, and bounded recovery.            |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
@@ -245,22 +268,57 @@ Acceptance:
 
 #### PR 4 — H2 protected backup, restore, salvage, and recovery UI
 
+Status: implemented on branch `claude/plano-resiliencia-xe25b2`, on top of
+merged `main`; not yet pushed as a PR or CI-verified — see "Current handoff"
+above.
+
 Objective: preserve original store bytes while giving the user explicit recovery
 choices.
 
 Scope:
 
 1. Back up the store plus WAL/SHM consistently before migration.
+   **Delivered as `ModelStoreBackupManager.createBackupIfLiveStoreExists`**,
+   called before every open attempt (not only when a migration is known to be
+   needed — there is no cheap way to know that in advance without opening the
+   store), rate-limited to once per app version+build so an ordinary launch
+   doesn't re-copy the whole store every time.
 2. Protect backups and retain bounded generations with app/schema metadata.
+   **Delivered**: each generation is `RecordingProtection`-stamped, carries a
+   `metadata.json` (schema version, app version/build, timestamp), and
+   `pruneOldGenerations` keeps the newest 3.
 3. Offer retry after unlock/free-space, diagnostics export, restore, salvage to
-   a separate container, and confirmed fresh start.
+   a separate container, and confirmed fresh start. **Delivered**, with one
+   scoping note on salvage: it tries the production schema/migration plan
+   first, then a bare unversioned schema with no migration plan, both against
+   an isolated read-only (`allowsSave: false`) copy — this recovers data when
+   the live failure was transient/environmental or a migration-plan
+   bookkeeping issue, but a genuinely corrupt SQLite file or a real
+   un-migratable schema mismatch fails salvage exactly as it failed live.
+   That is inherent to what "salvage" can mean without a corpus of real
+   corrupt stores to test repair heuristics against, not a shortfall of this
+   implementation specifically.
 4. Verify protection on the store directory and sidecars during bootstrap.
+   **Delivered** as `ModelStoreProtection.applyAndVerify`, wired into
+   `ModelStoreBootCoordinator.attemptOpen()` after a successful `makeStore()`;
+   a verification failure discards the just-opened container and routes to
+   `.recoveryRequired(.protectionVerificationFailed)` rather than handing out
+   an unverified store.
 
 Acceptance:
 
-- Backup/restore and salvage fault points preserve the original bytes.
-- Fresh start is never automatic.
-- N-1/N-2 fixtures preserve relationships and recovery state.
+- Backup/restore and salvage fault points preserve the original bytes. Backup
+  only ever copies; restore and confirmed fresh start quarantine (move, never
+  delete) the live store before replacing it — proven in
+  `ModelStoreBackupManagerTests` against a real temporary directory.
+- Fresh start is never automatic — only reachable from the recovery view's
+  explicit, double-confirmed (`kurnDialog`) action.
+- N-1/N-2 fixtures preserve relationships and recovery state. Satisfied the
+  same way PR 2 satisfied it: this is still the app's first-ever versioned
+  schema, so there is no earlier released layout to fabricate as an N-1/N-2
+  fixture — `LegacyStoreAdoptionTests` (PR 2) remains the adoption proof, and
+  `ModelStoreBackupManagerTests`/`ModelStoreSalvageTests` prove this PR's new
+  mechanisms independently.
 
 #### PR 5 — H3 fail-closed protected storage and quarantine
 
