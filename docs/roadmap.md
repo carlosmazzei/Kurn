@@ -724,7 +724,7 @@ satisfy part of a planned contract.
 | ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Baseline and seams | **In progress**        | `OperationID`/`ReliabilityEvent`, injectable `SleepClock`, scoped `FileSystem`, `ModelContainerFactory`, `AudioSinkWriting`, and deterministic fakes are present. Filesystem/store/network coverage is still intentionally narrow, and there is no complete fault-matrix harness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **H1**             | **Core implemented**   | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording preflights and measures storage runway. A `Recording` row now owns a UUID-derived file before open and moves durably through `preparing → recording → finalizing → ready/recoveryNeeded`; re-entry and cross-context ownership fail before capture. One shared finalizer reopens the closed file, measures duration/bytes and applies/verifies protection before `ready`. Launch/foreground recovery reconciles interrupted rows, preserves partial bytes, and exposes explicit retry while playback, transcription, export, compaction and enhancement reject non-ready rows. Focused fault suites and the full simulator suite cover the core; real-device protection, interruption/route, long-background and low-storage scenarios remain the release checklist.                                                                                                                                                                                                                                                               |
-| **H2**             | **Schema baseline (PR #155) and boot state machine (PR #157) merged; backup/restore/salvage/recovery UI code-complete and CI-verified for compile/logic correctness, blocked on an unrelated CI flake before merge** | `KurnSchemaV1`/`KurnSchemaMigrationPlan` and `ModelStoreBootCoordinator` are all on `main`; the recoverable production `fatalError` is gone and background-task registration runs before the store is ever opened. On branch `claude/plano-resiliencia-xe25b2`: `ModelStoreBackupManager` (protected, bounded-generation backups + quarantine), `ModelStoreSalvage` (best-effort read-only recovery, including a real bug fixed during this PR — see the handoff), `ModelStoreProtection.applyAndVerify`, and an expanded `ModelStoreRecoveryView` (restore/salvage/diagnostics/confirmed-fresh-start). CI has repeatedly hit an intermittent SwiftData "ModelContext.reset" crash unrelated to this PR's own code (a known Apple bug, FB14089213-class) — see the H2 backup/restore/salvage/recovery-UI handoff above the H2 plan for the full investigation, what shipped, and known gaps.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **H2**             | **Schema baseline (PR #155) and boot state machine (PR #157) merged; backup/restore/salvage/recovery UI CI-green on PR #158, awaiting human review** | `KurnSchemaV1`/`KurnSchemaMigrationPlan` and `ModelStoreBootCoordinator` are all on `main`; the recoverable production `fatalError` is gone and background-task registration runs before the store is ever opened. On branch `claude/plano-resiliencia-xe25b2`: `ModelStoreBackupManager` (protected, bounded-generation backups + quarantine), `ModelStoreSalvage` (best-effort read-only recovery), `ModelStoreProtection.applyAndVerify`, and an expanded `ModelStoreRecoveryView` (restore/salvage/diagnostics/confirmed-fresh-start). The long-running CI crash turned out to be a real use-after-free in `ModelStoreSalvage` (fetched `Meeting`s outliving their `ModelContainer`) that would have crashed users on the recovery screen — fixed, and CI is green. See the H2 backup/restore/salvage/recovery-UI handoff above the H2 plan for the full investigation, what shipped, and known gaps.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **H3**             | **Foundation only**    | Recovery preserves some large unreadable orphan files, but unmatched/malformed/small originals can still be deleted and model/file mutations have no journal, trash, quarantine, or typed authoritative JSON corruption path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **H4**             | **Partial, pre-track** | Per-chunk checkpoints and recovery sweeps exist, but identity is not a full source/configuration/model/chunk-plan fingerprint and checkpoint persistence does not yet gate forward progress with a throwing durable commit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -756,7 +756,7 @@ feature requests:
 | Item    | Observed seam                                                                                                                                                                                                                       | Failure if it remains                                                                                                       | Priority              |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **H1**  | Durable capture ownership, file-measured finalization, recovery rows and ready-only consumer gates are implemented; simulator tests cannot observe iOS Data Protection or reproduce physical route/interruption/background pressure | A device-only regression could still interrupt capture or misclassify protection until the release matrix is executed       | **P0 release gate**   |
-| **H2**  | A `VersionedSchema`/`SchemaMigrationPlan` exists and the recoverable production `fatalError` is replaced by a classified boot state machine (merged, PR #157); protected backup, restore, salvage, and confirmed-fresh-start are code-complete on branch, blocked on an unrelated intermittent CI test-infrastructure crash (see the H2 PR 4 handoff) rather than a code defect | An open failure no longer crash-loops; once backup/restore/salvage merges, only a genuinely un-migratable/corrupt store can strand the user beyond what salvage and restore already offer | **P0**                |
+| **H2**  | A `VersionedSchema`/`SchemaMigrationPlan` exists and the recoverable production `fatalError` is replaced by a classified boot state machine (merged, PR #157); protected backup, restore, salvage, and confirmed-fresh-start are complete and CI-green on PR #158, awaiting human review (see the H2 PR 4 handoff) | An open failure no longer crash-loops; once backup/restore/salvage merges, only a genuinely un-migratable/corrupt store can strand the user beyond what salvage and restore already offer | **P0**                |
 | **H3**  | Meeting/recording deletion removes audio before the SwiftData save; recovery deletes some unmatched files; `JSONStorage` turns decode failure into empty content                                                                    | A partial failure can lose the only audio, resurrect/delete the wrong state, or hide data corruption as an empty transcript | **P0**                |
 | **H4**  | A checkpoint identifies provider but not the cloud model, source content, full pipeline configuration/version, or exact chunk plan                                                                                                  | Resume can splice spans produced from a different model/file/VAD map when superficial fields still match                    | **P0**                |
 | **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                                                               | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
@@ -1129,39 +1129,76 @@ nil-coalescing expression, a struct definite-initialization ordering bug in
 none of that iteration is unusual for a from-scratch feature with no local
 verification, and all of it is resolved.
 
-**The remaining CI blocker is not a defect in this PR's code.** CI
-repeatedly hits an intermittent crash, always the same signature:
+**The CI blocker was a real, production-affecting bug in this PR's own
+code, and it is now fixed.** CI repeatedly hit a crash, always the same
+signature:
 
 ```
 SwiftData/BackingData.swift:844: Fatal error: This model instance was
 destroyed by calling ModelContext.reset and is no longer usable.
+PersistentIdentifier(... <x-coredata://.../Meeting/p1>)
 ```
 
-The first occurrence *was* a real bug this PR introduced and fixed:
-`ModelStoreSalvage.attempt` was handing a copy of a possibly-unreadable
-store file straight to `ModelContainer` without checking it was actually
-SQLite first, and asking CoreData's `NSPersistentStoreCoordinator` to open a
-non-SQLite file crashed the whole process instead of throwing. A cheap,
-exact pre-check for SQLite's 16-byte magic header before ever constructing a
-`ModelContainer` fixed that specific case for good.
+The cause was a use-after-free of SwiftData model objects in
+`ModelStoreSalvage`. Its `openReadOnly` helper created a `ModelContainer`
+in a **local**, fetched `[Meeting]` from that container's `mainContext`,
+and returned the model objects. The container therefore deallocated the
+moment the function returned — and SwiftData resets a container's
+`mainContext` when the container goes away, destroying every instance
+registered in it. The caller then passed those already-dead objects to
+`exportMarkdown`, whose first property read (`title`/`notes`/`summaries`)
+trapped the process. `Meeting/p1` in the message was simply the first row
+fetched.
 
-Every subsequent occurrence (five, across several CI runs) traced to a
-different cause: a known, radar-tracked SwiftData issue (FB14089213-class,
-also documented on Apple Developer Forums) where a `ModelContainer`'s
-asynchronous background housekeeping can still be in flight when the
-container/context that owns it is deallocated — not specific to this app's
-code. Swift Testing runs the whole ~150-file `KurnTests` suite in one
-process by default (unlike XCTest's one-process-per-test model), so this is
-exposed by the sheer volume of concurrently-alive `ModelContainer`s across
-the suite; two of the five crash instances happened nowhere near this PR's
-own tests, confirming it as a whole-suite-scale, pre-existing risk rather
-than something this PR's tests specifically trigger (though the tests this
-PR adds — several more `ModelContainer`-creating tests — do add to that
-volume). Two mitigations were tried:
+**This would have crashed real users**, on the recovery screen — the one
+screen that exists precisely because something already went wrong — for
+anyone whose store contained meetings. It was never a test-environment
+artifact.
+
+The fix (`recoverReadOnly`) does the fetch *and* the export inside the
+container's lifetime and returns only value types, wrapped in
+`withExtendedLifetime` so ARC cannot release the container after the fetch
+but before the export reads. The rule worth carrying forward: **never let
+a `@Model` instance outlive the `ModelContainer` it was fetched from.**
+`ModelStoreSalvage` was the only place in the app returning fetched models
+out of their container's scope.
+
+**Four observations this explains that the earlier theories did not**, and
+which are the reason the investigation took as long as it did:
+
+| Observation | Explanation |
+| --- | --- |
+| Only `recoversMeetingsFromARealStoreWithoutTouchingTheLiveFiles` crashed | The only test where the fetch returns a non-empty array *and* the export then dereferences it. `returnsUnavailableWhenNoLiveStoreExists` never opens a container; `failsWithoutCrashingOnAnUnreadableStoreFile` is rejected by the SQLite header guard before any fetch. |
+| The crash fired 10–70 ms after the test started | Create/insert/save is fast; the crash is in salvage immediately afterward — it only *looked* like it might precede salvage. |
+| Releasing the **test's** container first changed nothing | The dangling container was the **salvage** one, inside production code. |
+| `meetings.count` was fine but the export was not | `count` is `Array.count`; it never touches backing data. |
+
+**The earlier diagnosis recorded here was wrong, and is kept as a warning.**
+It attributed the crash to a known, radar-tracked SwiftData concurrency
+issue (FB14089213-class: a container's async background housekeeping still
+in flight when its owner deallocates). That reading was superficially
+plausible — the crash signature matches, and Swift Testing runs the whole
+~150-file suite in one process, unlike XCTest — but it was wrong, and
+being wrong in the direction of "a framework bug, not ours" is what made it
+expensive: it justified four rounds of test-infrastructure work instead of
+one careful read of the failing code path. A crash that is fully
+reproducible in isolation is a deterministic bug, not a race, and should
+have been read that way much sooner.
+
+An earlier occurrence *was* separately fixed and remains fixed:
+`ModelStoreSalvage.attempt` handed a copy of a possibly-unreadable store
+file straight to `ModelContainer` without checking it was SQLite first. The
+16-byte magic-header pre-check stays as cheap input validation, but note it
+was **not** the fix for the crash above — an earlier revision of this
+document and of the code's own comments claimed otherwise.
+
+Four mitigations were tried before the root cause was found. None of them
+fixed it (nothing test-level could have), but two are worth keeping:
 
 - **Suite nesting** (kept): `ModelStoreBootCoordinatorTests` and
   `ModelStoreSalvageTests` are both nested under a new, purely-organizational
-  `SwiftDataConcurrencySensitiveTests` suite (`KurnTests/Support/`) carrying
+  `SwiftDataConcurrencySensitiveTests` suite (since moved to
+  `KurnSwiftDataTests/`, see below) carrying
   `@Suite(.serialized)`. Swift Testing documents that `.serialized` is
   inherited recursively by nested suites (unlike two independent top-level
   `@Suite(.serialized)` types, which still run concurrently *with each
@@ -1204,52 +1241,32 @@ volume). Two mitigations were tried:
   ones down as collateral, and the rest of the ~150-file suite keeps
   reporting real results regardless.
 
-**The isolation confirmed something important.** Once `KurnSwiftDataTests`
-ran as its own process, `KurnTests` (~150 files) and `KurnUITests` both
-passed cleanly and completely on the same run — no collateral damage,
-exactly as intended. But the crash still fired, now fully reproducible in
-total isolation (two tests, fully serialized, nothing else running
-concurrently), which rules out whole-suite concurrency as *this specific
-instance's* cause. That pointed at the failing test's own setup instead:
-`recoversMeetingsFromARealStoreWithoutTouchingTheLiveFiles` kept a real,
-open, writable `ModelContainer` alive for the *entire* test, including
-while `ModelStoreSalvage.attempt` copied the same files and opened a
-second, read-only `ModelContainer` against the copy — two SwiftData
-stacks over overlapping files at once. That scenario cannot happen in
-production: salvage only ever runs from the recovery screen, which only
-exists because the live open already failed, so nothing holds the store
-open when salvage's copy step runs. The test was exercising an
-artificial, production-impossible race, and it matches Apple's documented
-failure mode for this exact crash (async background housekeeping still in
-flight when the same files are touched again). Scoped the original
-container so it's released before salvage runs, then reopened a fresh one
-afterward to verify the live bytes survived untouched.
+**The isolation is what made the root cause findable.** Once
+`KurnSwiftDataTests` ran as its own process, `KurnTests` (~150 files) and
+`KurnUITests` both passed cleanly and completely — no collateral damage,
+exactly as intended — and the failure list collapsed to exactly one
+honest entry instead of ~25 false ones. That single reproducible failure,
+in isolation, is what finally made the bug legible as deterministic. The
+target is worth keeping for that property alone, independent of this
+crash.
 
-**That fix did not resolve it.** The crash recurred at the exact same
-point twice in a row on the next CI run — once on the first attempt, then
-identically on xcodebuild's own retry, which then gave up entirely
-("Early unexpected exit... no restart will be attempted"). This is a
-useful negative result, not a wasted one: it disproves the specific
-hypothesis. Releasing the Swift-level `ModelContainer` reference before
-salvage runs changed nothing, which means the actual trigger is something
-SwiftData schedules asynchronously (autosave/merge/notification
-machinery) that isn't necessarily cancelled or awaited just because the
-wrapper object is deallocated — still consistent with Apple's description
-of this bug class, but not something closeable from calling code alone
-without deeper, interactive debugging.
+The intermediate hypothesis (that the *test* held two `ModelContainer`s
+over overlapping files at once, and that scoping the first would help) was
+disproved by CI: the crash recurred at the identical point twice in a row.
+That negative result was the useful signal that the dangling container was
+in production code, not the test.
 
-**Current status**: the production code and its own tests are sound. All
-four CI mitigations are documented here for what they actually achieved,
-including the one that didn't work, so the next person doesn't re-try it.
-The isolation (separate target) remains genuinely valuable on its own —
-`KurnTests` (~150 files) and `KurnUITests` pass cleanly and completely on
-every run regardless of this test's outcome, and the crash, when it
-fires, is now honest and contained to this one known-flaky test rather
-than collateral damage across unrelated files. The crash itself remains
-unresolved as a from-scratch fix; closing it fully would need a real
-Xcode/device session to inspect what SwiftData is actually doing across
-the crash, or a broader refactor of how the whole suite obtains
-`ModelContainer`s.
+**Current status: green.** CI run 608 on `1ef02af` passed end to end —
+`build-and-test` and `kurncore-linux` both green, `** TEST SUCCEEDED **`,
+with `SalvageTests` explicitly passing:
+
+```
+✔ Test recoversMeetingsFromARealStoreWithoutTouchingTheLiveFiles() passed after 0.649 seconds.
+✔ Suite SalvageTests passed after 0.653 seconds.
+✔ Test run with 13 tests in 3 suites passed after 1.348 seconds.
+```
+
+plus `KurnUITests` 12/12. The PR is unblocked and awaiting human review.
 
 **Landed in the working tree.**
 
@@ -1795,17 +1812,18 @@ migrates.
    registration now runs before the store is ever opened. `build-and-test`
    and `kurncore-linux` both passed on the first push. See the H2 boot state
    machine handoff above the H2 plan for what shipped.
-3. **H2 protected backup, restore, salvage, recovery UI — code-complete on
-   [PR #158](https://github.com/carlosmazzei/Kurn/pull/158), blocked on an
-   unrelated CI test-infrastructure flake.** `ModelStoreBackupManager`
-   preserves original store bytes (copy-only backup, quarantine-not-delete
-   restore/fresh-start); `ModelStoreSalvage` offers best-effort read-only
-   recovery (a real bug found and fixed during this PR — see the handoff);
+3. **H2 protected backup, restore, salvage, recovery UI — CI green on
+   [PR #158](https://github.com/carlosmazzei/Kurn/pull/158), awaiting human
+   review.** `ModelStoreBackupManager` preserves original store bytes
+   (copy-only backup, quarantine-not-delete restore/fresh-start);
+   `ModelStoreSalvage` offers best-effort read-only recovery;
    `ModelStoreProtection.applyAndVerify` covers bootstrap protection
-   verification. CI intermittently hits a known, unrelated SwiftData crash
-   (FB14089213-class) rather than a defect in this PR's code. See the H2
-   backup/restore/salvage/recovery-UI handoff above the H2 plan for the full
-   investigation, what shipped, and the known salvage limitations.
+   verification. Two real bugs were found and fixed during this PR, the
+   second of which would have crashed users on the recovery screen (a
+   SwiftData use-after-free: fetched `Meeting`s outliving the
+   `ModelContainer` they came from). See the H2 backup/restore/salvage/
+   recovery-UI handoff above the H2 plan for the full investigation, what
+   shipped, and the known salvage limitations.
 4. **Then H3 (P0): mutation journal and corruption visibility — next PR to
    start, from updated `main` after this PR merges.** Fail closed on
    unprotected storage, preserve unmatched originals in quarantine, journal model/
