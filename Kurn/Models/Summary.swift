@@ -17,7 +17,11 @@ final class Summary {
     /// multi-summary feature shipped is linked through this property.
     var owningMeeting: Meeting?
     /// JSON-encoded `[SummarySection]` — the template-driven summary body.
-    private var sectionsData: Data = Data()
+    /// Not `private`: `TranscriptionViewModel.generateSummary` writes it
+    /// directly with an already-encoded, pre-checked payload rather than
+    /// encoding `sections` a second time through the setter below. Matches
+    /// `Transcript.segmentsData`'s access level for the same reason.
+    var sectionsData: Data = Data()
     /// Display name of the template used to generate this summary, if any.
     var templateName: String?
     var providerRaw: String
@@ -37,7 +41,11 @@ final class Summary {
     ) {
         self.id = id
         self.owningMeeting = meeting
-        self.sectionsData = JSONStorage.encode(sections)
+        // `?? Data()` only ever applies to the `= []` default here; a real
+        // payload that fails to encode goes through
+        // `TranscriptionViewModel.generateSummary`'s explicit pre-check
+        // instead, which fails the save. See `JSONStorage.encodeAuthoritative`.
+        self.sectionsData = JSONStorage.encodeAuthoritative(sections) ?? Data()
         self.templateName = templateName
         self.providerRaw = provider.rawValue
         self.modelRaw = model
@@ -51,8 +59,16 @@ final class Summary {
         // return, which would otherwise render as a literal "\n". Every consumer
         // (views, export) reads through this getter, so the fix reaches all of
         // them without a migration.
-        get { JSONStorage.decode([SummarySection].self, from: sectionsData).map { $0.normalizedWhitespace() } }
-        set { sectionsData = JSONStorage.encode(newValue) }
+        get { (JSONStorage.decodeAuthoritative([SummarySection].self, from: sectionsData).decodedValue ?? []).map { $0.normalizedWhitespace() } }
+        // A failed encode leaves the previously-stored bytes untouched
+        // rather than blanking them — see `Transcript.segments`'s setter.
+        set { sectionsData = JSONStorage.encodeAuthoritative(newValue) ?? sectionsData }
+    }
+
+    /// Whether the stored sections failed to decode or verify — see
+    /// `Transcript.isSegmentsDataCorrupted`.
+    var isSectionsDataCorrupted: Bool {
+        JSONStorage.decodeAuthoritative([SummarySection].self, from: sectionsData).isCorrupted
     }
 
     var provider: AIProvider {

@@ -21,6 +21,8 @@
 "error.decoding" = "Impossibile leggere la risposta: %@";
 "error.permission" = "Permesso negato: %@";
 "error.persistence" = "Impossibile salvare le modifiche: %@";
+"error.transcript_encode_failed" = "Impossibile preparare la trascrizione per il salvataggio.";
+"error.summary_encode_failed" = "Impossibile preparare il riassunto per il salvataggio.";
 "error.recognizer_timeout" = "Il riconoscimento vocale sul dispositivo è scaduto.";
 "error.recorder_start" = "Impossibile avviare la registrazione.";
 "error.recorder_engine" = "Impossibile avviare il motore audio.";
@@ -432,6 +434,9 @@
 "detail.transcript.failed.subtitle" = "Riprova dalla scheda Registrazioni.";
 "detail.transcript.no_speech.title" = "Nessun parlato rilevato";
 "detail.transcript.no_speech.subtitle" = "Questa registrazione non conteneva parlato rilevabile.";
+"detail.transcript.corrupted.title" = "Trascrizione illeggibile";
+"detail.transcript.corrupted.subtitle" = "La trascrizione salvata sembra danneggiata. Ritrascrivere questa registrazione la sostituirà.";
+"detail.transcript.corrupted_banner" = "La trascrizione di questa registrazione sembra danneggiata e non è stato possibile caricarla.";
 "detail.summary.empty.title" = "Ancora nessun riassunto";
 "detail.section" = "Sezione";
 "tab.recordings" = "Registrazioni";

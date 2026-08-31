@@ -21,6 +21,8 @@
 "error.decoding" = "无法读取响应：%@";
 "error.permission" = "权限被拒绝：%@";
 "error.persistence" = "无法保存您的更改：%@";
+"error.transcript_encode_failed" = "无法准备转录内容以便保存。";
+"error.summary_encode_failed" = "无法准备摘要以便保存。";
 "error.recognizer_timeout" = "设备端语音识别超时。";
 "error.recorder_start" = "无法启动录音。";
 "error.recorder_engine" = "无法启动音频引擎。";
@@ -432,6 +434,9 @@
 "detail.transcript.failed.subtitle" = "请在「录音」标签页重试。";
 "detail.transcript.no_speech.title" = "未检测到语音";
 "detail.transcript.no_speech.subtitle" = "此录音未包含可检测到的语音。";
+"detail.transcript.corrupted.title" = "转录内容无法读取";
+"detail.transcript.corrupted.subtitle" = "已保存的转录内容似乎已损坏。重新转录此录音将替换它。";
+"detail.transcript.corrupted_banner" = "此录音的转录内容似乎已损坏，无法加载。";
 "detail.summary.empty.title" = "暂无摘要";
 "detail.section" = "板块";
 "tab.recordings" = "录音";

@@ -319,7 +319,7 @@ final class TranscriptionViewModel {
             )
             await drainEvents()
 
-            saveTranscript(output, for: recording)
+            try saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
             appSettings?.recordTranscriptionEngineUsed(config.transcription)
             if let settings = appSettings {
@@ -439,7 +439,15 @@ final class TranscriptionViewModel {
 
     /// Persist a finished pipeline run: replace any existing transcript, mark
     /// the recording done, and drop its resume checkpoint.
-    private func saveTranscript(_ output: TranscriptionService.Output, for recording: Recording) {
+    ///
+    /// Throws if the new segments can't be encoded (`JSONStorage.
+    /// encodeAuthoritative`), checked before touching the existing
+    /// transcript so a bad result can't destroy a still-valid one.
+    private func saveTranscript(_ output: TranscriptionService.Output, for recording: Recording) throws {
+        guard let segmentsData = JSONStorage.encodeAuthoritative(output.segments) else {
+            throw AppError.persistenceFailed(NSLocalizedString("error.transcript_encode_failed", comment: "Encode failed"))
+        }
+
         // Replace any existing transcript. Detach the old one first: a
         // `delete` isn't applied to the relationship until the next save, so
         // without this `recording.transcript` still points at the old
@@ -449,14 +457,11 @@ final class TranscriptionViewModel {
             recording.transcript = nil
             modelContext.delete(existing)
         }
-        // Assigning `recording` in the initializer establishes the
-        // relationship (SwiftData maintains the inverse `recording.transcript`),
-        // so no manual back-assignment is needed.
-        let transcript = Transcript(
-            recording: recording,
-            segments: output.segments,
-            language: output.language
-        )
+        // Assigning `recording` establishes the relationship; `segments`
+        // stays at its `[]` default, overwritten below with the
+        // already-encoded, pre-checked bytes.
+        let transcript = Transcript(recording: recording, language: output.language)
+        transcript.segmentsData = segmentsData
         modelContext.insert(transcript)
         recording.transcriptionStatus = .done
         recording.transcriptionCheckpointData = nil
@@ -855,13 +860,18 @@ final class TranscriptionViewModel {
                 }
             )
             try Task.checkCancellation()
+            // Same reasoning as `saveTranscript`: fail before constructing
+            // the summary, and reuse the existing `catch` below.
+            guard let sectionsData = JSONStorage.encodeAuthoritative(result.sections) else {
+                throw AppError.persistenceFailed(NSLocalizedString("error.summary_encode_failed", comment: "Encode failed"))
+            }
             let summary = Summary(
                 meeting: meeting,
-                sections: result.sections,
                 templateName: template.displayName,
                 provider: provider,
                 model: model
             )
+            summary.sectionsData = sectionsData
             modelContext.insert(summary)
             persist()
             AppLog.transcription.atNotice.notice("VM: summary done")

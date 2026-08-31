@@ -153,6 +153,66 @@ struct ModelTests {
         #expect(remaining.count == 1)
     }
 
+    @Test func freshTranscriptIsNotCorrupted() {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Hello")]
+        )
+        #expect(transcript.isSegmentsDataCorrupted == false)
+        #expect(transcript.segments.count == 1)
+    }
+
+    @Test func emptyTranscriptIsNotCorrupted() {
+        // A transcript with no segments yet is a legitimate state (not
+        // attempted, or genuinely silent), not corruption — the whole point
+        // of the H3 fix is to keep these two distinguishable.
+        let transcript = Transcript()
+        #expect(transcript.isSegmentsDataCorrupted == false)
+        #expect(transcript.segments.isEmpty)
+    }
+
+    @Test func garbledSegmentsDataIsReportedAsCorruptedRatherThanEmpty() {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Hello")]
+        )
+        // Simulate on-disk corruption: valid, non-empty bytes that are
+        // neither a valid envelope nor valid bare JSON.
+        transcript.segmentsData = Data("not json at all".utf8)
+
+        #expect(transcript.isSegmentsDataCorrupted == true)
+        // The getter still degrades to an empty array rather than crashing —
+        // isSegmentsDataCorrupted is what a caller checks to tell this apart
+        // from a real empty transcript.
+        #expect(transcript.segments.isEmpty)
+    }
+
+    @Test func tamperedChecksumIsReportedAsCorrupted() {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Hello")]
+        )
+        // Flip one byte deep enough in the envelope to land inside the
+        // payload/text without breaking JSON syntax — a bit-level corruption
+        // a plain decode (with no checksum) would silently accept.
+        var bytes = [UInt8](transcript.segmentsData)
+        let flipIndex = bytes.count - 10
+        bytes[flipIndex] ^= 0xFF
+        transcript.segmentsData = Data(bytes)
+
+        #expect(transcript.isSegmentsDataCorrupted == true)
+    }
+
+    @Test func legacyUnenvelopedSegmentsDataStillDecodesAsNotCorrupted() {
+        // Every row written before this format existed has bare JSON with no
+        // envelope or checksum. Decoding it must be treated as real content,
+        // not corruption, or every existing transcript on a user's device
+        // would appear corrupted the moment they update.
+        let transcript = Transcript()
+        let segments = [TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Legacy")]
+        transcript.segmentsData = JSONStorage.encode(segments)
+
+        #expect(transcript.isSegmentsDataCorrupted == false)
+        #expect(transcript.segments == segments)
+    }
+
     @Test func languagePropertyRoundTripsThroughRawValue() {
         let meeting = Meeting(title: "Standup", language: .portuguese)
         #expect(meeting.language == .portuguese)
@@ -187,6 +247,34 @@ struct ModelTests {
 
         summary.sections = [SummarySection(title: "Updated", items: ["d"])]
         #expect(summary.sections == [SummarySection(title: "Updated", items: ["d"])])
+    }
+
+    @Test func freshSummaryIsNotCorrupted() {
+        let summary = Summary(sections: [SummarySection(title: "Overview", body: "body")], provider: .openAI)
+        #expect(summary.isSectionsDataCorrupted == false)
+    }
+
+    @Test func emptySummaryIsNotCorrupted() {
+        let summary = Summary(provider: .openAI)
+        #expect(summary.isSectionsDataCorrupted == false)
+        #expect(summary.sections.isEmpty)
+    }
+
+    @Test func garbledSectionsDataIsReportedAsCorruptedRatherThanEmpty() {
+        let summary = Summary(sections: [SummarySection(title: "Overview", body: "body")], provider: .openAI)
+        summary.sectionsData = Data("not json at all".utf8)
+
+        #expect(summary.isSectionsDataCorrupted == true)
+        #expect(summary.sections.isEmpty)
+    }
+
+    @Test func legacyUnenvelopedSectionsDataStillDecodesAsNotCorrupted() {
+        let summary = Summary(provider: .openAI)
+        let sections = [SummarySection(title: "Overview", body: "body")]
+        summary.sectionsData = JSONStorage.encode(sections)
+
+        #expect(summary.isSectionsDataCorrupted == false)
+        #expect(summary.sections == sections)
     }
 
     @Test func providerPropertyRoundTripsThroughRawValue() {

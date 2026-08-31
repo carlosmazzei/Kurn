@@ -21,6 +21,8 @@
 "error.decoding" = "No se pudo leer la respuesta: %@";
 "error.permission" = "Permiso denegado: %@";
 "error.persistence" = "No se pudieron guardar los cambios: %@";
+"error.transcript_encode_failed" = "No se pudo preparar la transcripción para guardarla.";
+"error.summary_encode_failed" = "No se pudo preparar el resumen para guardarlo.";
 "error.recognizer_timeout" = "El reconocimiento de voz en el dispositivo agotó el tiempo de espera.";
 "error.recorder_start" = "No se pudo iniciar la grabadora.";
 "error.recorder_engine" = "No se pudo iniciar el motor de audio.";
@@ -432,6 +434,9 @@
 "detail.transcript.failed.subtitle" = "Vuelve a intentarlo desde la pestaña Grabaciones.";
 "detail.transcript.no_speech.title" = "No se detectó voz";
 "detail.transcript.no_speech.subtitle" = "Esta grabación no contenía voz detectable.";
+"detail.transcript.corrupted.title" = "Transcripción ilegible";
+"detail.transcript.corrupted.subtitle" = "La transcripción guardada parece estar dañada. Volver a transcribir esta grabación la reemplazará.";
+"detail.transcript.corrupted_banner" = "La transcripción de esta grabación parece estar dañada y no se pudo cargar.";
 "detail.summary.empty.title" = "Todavía no hay resumen";
 "detail.section" = "Sección";
 "tab.recordings" = "Grabaciones";

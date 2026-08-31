@@ -21,6 +21,8 @@
 "error.decoding" = "Impossible de lire la réponse : %@";
 "error.permission" = "Autorisation refusée : %@";
 "error.persistence" = "Impossible d'enregistrer vos modifications : %@";
+"error.transcript_encode_failed" = "Impossible de préparer la transcription pour l'enregistrement.";
+"error.summary_encode_failed" = "Impossible de préparer le résumé pour l'enregistrement.";
 "error.recognizer_timeout" = "La reconnaissance vocale sur l'appareil a expiré.";
 "error.recorder_start" = "Impossible de démarrer l'enregistrement.";
 "error.recorder_engine" = "Impossible de démarrer le moteur audio.";
@@ -432,6 +434,9 @@
 "detail.transcript.failed.subtitle" = "Réessayez depuis l'onglet Enregistrements.";
 "detail.transcript.no_speech.title" = "Aucune parole détectée";
 "detail.transcript.no_speech.subtitle" = "Cet enregistrement ne contenait aucune parole détectable.";
+"detail.transcript.corrupted.title" = "Transcription illisible";
+"detail.transcript.corrupted.subtitle" = "La transcription enregistrée semble endommagée. Retranscrire cet enregistrement la remplacera.";
+"detail.transcript.corrupted_banner" = "La transcription de cet enregistrement semble endommagée et n'a pas pu être chargée.";
 "detail.summary.empty.title" = "Aucun résumé pour l'instant";
 "detail.section" = "Section";
 "tab.recordings" = "Enregistrements";
