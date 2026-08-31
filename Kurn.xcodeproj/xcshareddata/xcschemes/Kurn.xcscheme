@@ -55,38 +55,21 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
-      <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "AA20000000000000000000B1"
-               BuildableName = "KurnTests.xctest"
-               BlueprintName = "KurnTests"
-               ReferencedContainer = "container:Kurn.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2AD3E59B300D5CA2003DA9A9"
-               BuildableName = "KurnUITests.xctest"
-               BlueprintName = "KurnUITests"
-               ReferencedContainer = "container:Kurn.xcodeproj">
-            </BuildableReference>
-            <!-- ScreenshotUITests is deliberately excluded from the default
-                 `xcodebuild test` run: it needs fastlane's snapshot setup and
-                 is meant to run via `bundle exec fastlane screenshots`
-                 (see ScreenshotUITests.swift's header comment). Only the
-                 accessibility audit runs as part of `iOS CI`. -->
-            <SkippedTests>
-               <Test
-                  Identifier = "ScreenshotUITests">
-               </Test>
-            </SkippedTests>
-         </TestableReference>
-      </Testables>
+      <!-- Moved off the legacy Testables list into Kurn.xctestplan (repo root)
+           so KurnTests can be marked non-parallelizable — see that file and
+           docs/resilience-megaplan.md's H2 PR 4 handoff for why: Swift Testing
+           runs the whole suite in one process by default, and CI was
+           repeatedly hitting a known SwiftData concurrency crash
+           (radar-tracked, e.g. FB14089213) under that default. The
+           ScreenshotUITests skip (needs fastlane's snapshot setup; see that
+           file's header comment) now lives in the test plan's
+           `skippedTests`. -->
+      <TestPlans>
+         <TestPlanReference
+            reference = "container:Kurn.xctestplan"
+            default = "YES">
+         </TestPlanReference>
+      </TestPlans>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
