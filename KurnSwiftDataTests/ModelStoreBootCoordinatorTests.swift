@@ -1,6 +1,6 @@
 //
 //  ModelStoreBootCoordinatorTests.swift
-//  KurnTests
+//  KurnSwiftDataTests
 //
 //  Drives the H2 boot state machine (docs/resilience-megaplan.md, PR 3 and
 //  PR 4) through injected `makeStore`/`isProtectedDataAvailable` seams — the
