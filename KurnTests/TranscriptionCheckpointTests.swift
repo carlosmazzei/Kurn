@@ -60,6 +60,76 @@ struct TranscriptionCheckpointTests {
         #expect(recording.transcriptionCheckpointData == nil)
     }
 
+    @Test func recordingWritesCheckpointAsVersionedEnvelope() throws {
+        // The stored bytes must decode through the authoritative envelope
+        // path, not only as bare legacy JSON.
+        let recording = Recording(fileName: "a.m4a", duration: 10)
+        recording.transcriptionCheckpoint = sampleCheckpoint()
+
+        let data = try #require(recording.transcriptionCheckpointData)
+        // Envelope-wrapped bytes are not bare checkpoint JSON…
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(TranscriptionCheckpoint.self, from: data)
+        }
+        // …but read back correctly through the authoritative path.
+        #expect(recording.transcriptionCheckpointOutcome.decodedValue?.completedChunks == 2)
+    }
+
+    @Test func legacyBareCheckpointStillDecodes() throws {
+        // Rows written before the envelope existed store bare
+        // `TranscriptionCheckpoint` JSON; they are real content, not corruption.
+        let recording = Recording(fileName: "a.m4a", duration: 10)
+        recording.transcriptionCheckpointData = try JSONEncoder().encode(sampleCheckpoint())
+
+        #expect(recording.transcriptionCheckpoint?.completedChunks == 2)
+        #expect(!recording.transcriptionCheckpointOutcome.isCorrupted)
+    }
+
+    @Test func corruptedCheckpointIsDistinctFromAbsentAndPreservesBytes() {
+        let recording = Recording(fileName: "a.m4a", duration: 10)
+        let garbage = Data([0x7B, 0x22, 0xFF, 0x00])
+        recording.transcriptionCheckpointData = garbage
+
+        #expect(recording.transcriptionCheckpoint == nil)
+        #expect(recording.transcriptionCheckpointOutcome.isCorrupted)
+        #expect(recording.transcriptionCheckpointData == garbage)
+
+        recording.transcriptionCheckpointData = nil
+        if case .empty = recording.transcriptionCheckpointOutcome {} else {
+            Issue.record("absent checkpoint must be .empty, not .corrupted")
+        }
+    }
+
+    @Test func tamperedEnvelopeChecksumIsCorruption() throws {
+        // A bit-level change that still parses as valid JSON must be caught
+        // by the checksum, not silently accepted.
+        let recording = Recording(fileName: "a.m4a", duration: 10)
+        recording.transcriptionCheckpoint = sampleCheckpoint()
+        var data = try #require(recording.transcriptionCheckpointData)
+        let text = try #require(String(data: data, encoding: .utf8))
+        let tampered = text.replacingOccurrences(of: "\"payloadChecksum\":", with: "\"payloadChecksum\":1")
+        data = Data(tampered.utf8)
+        recording.transcriptionCheckpointData = data
+
+        #expect(recording.transcriptionCheckpointOutcome.isCorrupted)
+        #expect(recording.transcriptionCheckpoint == nil)
+    }
+
+    @Test func encodeFailureKeepsThePreviousCheckpoint() {
+        // JSON has no representation for a non-finite Double; the setter must
+        // keep the older resumable point rather than blank or corrupt it.
+        let recording = Recording(fileName: "a.m4a", duration: 10)
+        recording.transcriptionCheckpoint = sampleCheckpoint()
+        let stored = recording.transcriptionCheckpointData
+
+        var bad = sampleCheckpoint()
+        bad.spans = [.init(text: "x", start: .nan, end: .infinity, confidence: nil)]
+        recording.transcriptionCheckpoint = bad
+
+        #expect(recording.transcriptionCheckpointData == stored)
+        #expect(recording.transcriptionCheckpoint?.completedChunks == 2)
+    }
+
     @Test func matchesRequiresSameEngineLanguageAndCompaction() {
         let checkpoint = sampleCheckpoint()
         #expect(checkpoint.matches(engine: .whisperAPI, language: .english, compacted: true))

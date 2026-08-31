@@ -121,13 +121,29 @@ final class Recording {
     }
 
     var transcriptionCheckpoint: TranscriptionCheckpoint? {
-        get {
-            guard let data = transcriptionCheckpointData else { return nil }
-            return JSONStorage.decode(TranscriptionCheckpoint.self, from: data)
-        }
+        get { transcriptionCheckpointOutcome.decodedValue }
         set {
-            transcriptionCheckpointData = newValue.map(JSONStorage.encode)
+            if let newValue {
+                // A failed encode keeps the previous checkpoint bytes: an
+                // older resumable point is strictly better than none. Clearing
+                // is always the explicit `transcriptionCheckpointData = nil`.
+                transcriptionCheckpointData =
+                    JSONStorage.encodeAuthoritative(newValue) ?? transcriptionCheckpointData
+            } else {
+                transcriptionCheckpointData = nil
+            }
         }
+    }
+
+    /// The checkpoint decode with corruption kept distinct from absence: a
+    /// checkpoint that fails to decode or verify must never be treated as "no
+    /// checkpoint" and silently spliced over or redone — for cloud engines
+    /// that ambiguity is repeated paid work. The corrupted bytes stay in
+    /// `transcriptionCheckpointData` (until the next run overwrites them) so
+    /// diagnostics have something to work with.
+    var transcriptionCheckpointOutcome: JSONDecodeOutcome<TranscriptionCheckpoint> {
+        guard let data = transcriptionCheckpointData else { return .empty }
+        return JSONStorage.decodeAuthoritative(TranscriptionCheckpoint.self, from: data)
     }
 
     var highlights: [Highlight] {
