@@ -32,6 +32,13 @@ enum ModelStoreDebugInjection {
             return NSError(domain: NSCocoaErrorDomain, code: NSPersistentStoreIncompatibleVersionHashError)
         case .corruptOrUnknown:
             return NSError(domain: "ai.kurn.debug.syntheticStoreOpenFailure", code: -1)
+        case .protectionVerificationFailed:
+            // Not reachable via the classifier — ModelStoreBootCoordinator
+            // produces this reason directly when its post-open
+            // `verifyProtectionAfterOpen` step throws, never from a thrown
+            // `makeStore()` error. Included only so this switch stays
+            // exhaustive as `ModelStoreOpenFailureReason` grows.
+            return NSError(domain: "ai.kurn.debug.syntheticStoreOpenFailure", code: -2)
         }
     }
 }
