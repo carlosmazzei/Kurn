@@ -77,6 +77,12 @@ struct KurnApp: App {
     /// lives here instead of as separate top-level `@State` properties, since
     /// none of them can exist before a container does.
     @State private var appEnvironment: AppEnvironment?
+    /// Backs `ModelStoreRecoveryView`'s restore/salvage/diagnostics/fresh-start
+    /// actions (H2 PR 4). Assigned in `init()` via the underscore pattern,
+    /// like `appEnvironment`, because it needs `boot`'s `appSupportDirectory`
+    /// and a retry callback — neither available to a bare default-value
+    /// expression before `self` exists.
+    @State private var recoveryViewModel: ModelStoreRecoveryViewModel
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -98,15 +104,24 @@ struct KurnApp: App {
         }
         _ = NetworkPathObserver.shared
 
+        // Captured once, here: used to register the background launch
+        // handler below and to give the recovery view model a retry
+        // callback, without either needing `self` before it's fully formed.
+        let bootCoordinator = boot
+
         #if canImport(BackgroundTasks)
         // Registered before the app finishes launching, and — per the H2 boot
         // state machine — before the store has even been opened: the launch
         // handler only reads `bootCoordinator.container` when a task actually
         // fires, never at registration time, so a background-only launch that
         // never gets past `.waitingForProtectedData` still registers cleanly.
-        let bootCoordinator = boot
         TranscriptionScheduler.register(containerProvider: { [bootCoordinator] in bootCoordinator.container })
         #endif
+
+        _recoveryViewModel = State(initialValue: ModelStoreRecoveryViewModel(
+            appSupportDirectory: bootCoordinator.appSupportDirectory,
+            onStoreReplaced: { [bootCoordinator] in bootCoordinator.retryIfNeeded() }
+        ))
 
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
@@ -179,7 +194,7 @@ struct KurnApp: App {
                 )
                 .modelContainer(appEnvironment.modelContainer)
         } else if case .recoveryRequired(let failure) = boot.state {
-            ModelStoreRecoveryView(failure: failure) { boot.retryIfNeeded() }
+            ModelStoreRecoveryView(failure: failure, retry: { boot.retryIfNeeded() }, viewModel: recoveryViewModel)
         } else {
             // `.waitingForProtectedData`, `.opening`, or (transiently, on the
             // deferred path only) `.ready` with `appEnvironment` not yet

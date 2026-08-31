@@ -791,3 +791,17 @@
 "store_recovery.reason_migration_incompatible" = "此版本的 Kurn 无法读取你现有的数据。请更新应用或联系支持。";
 "store_recovery.reason_corrupt_or_unknown" = "打开数据时出现问题。你的录音未被删除。";
 "store_launch.opening" = "正在打开";
+
+/* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
+"store_recovery.reason_protection_verification_failed" = "Kurn 无法确认你的数据已进行静态加密。";
+"store_recovery.backups_title" = "从备份恢复";
+"store_recovery.restore_button" = "恢复";
+"store_recovery.restore_confirm_title" = "恢复此备份?";
+"store_recovery.restore_confirm_message" = "你当前的数据将被移至一旁而非删除,并替换为此备份。";
+"store_recovery.salvage_button" = "尝试数据恢复";
+"store_recovery.salvage_result_recovered" = "已恢复 %d 个会议。点按“分享”以保存它们。";
+"store_recovery.salvage_result_none" = "未能恢复任何数据。";
+"store_recovery.export_diagnostics_button" = "导出诊断信息";
+"store_recovery.start_fresh_button" = "重新开始";
+"store_recovery.start_fresh_confirm_title" = "要重新开始吗?";
+"store_recovery.start_fresh_confirm_message" = "你现有的数据将被移至一旁而非删除,并创建一个新的空库。";

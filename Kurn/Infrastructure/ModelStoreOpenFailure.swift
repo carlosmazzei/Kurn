@@ -22,13 +22,17 @@ import Foundation
 import Darwin
 #endif
 
-/// The four launch-blocking reasons a store can fail to open, per the
-/// megaplan's "Classify open failures without guessing" requirement.
+/// The launch-blocking reasons a store can fail to open, per the megaplan's
+/// "Classify open failures without guessing" requirement. `protectionVerificationFailed`
+/// is H2 PR 4's addition (`ModelStoreProtection.applyAndVerify`) — produced
+/// directly by `ModelStoreBootCoordinator`, not by the classifier below,
+/// since it is never something `ModelContainer` itself throws.
 enum ModelStoreOpenFailureReason: String, Sendable, CaseIterable {
     case protectedDataUnavailable
     case storageFull
     case migrationIncompatible
     case corruptOrUnknown
+    case protectionVerificationFailed
 }
 
 /// A classified store-open failure. Deliberately carries no free-text

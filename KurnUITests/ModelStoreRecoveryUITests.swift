@@ -13,6 +13,14 @@
 //  run in this scheme; a true Release-configuration device run remains a
 //  release-checklist item, the same status H1's real-device matrix carries.
 //
+//  PR 4 added the salvage/export-diagnostics/start-fresh actions; this file
+//  only asserts they render (real app content still never shows underneath),
+//  not their full file-manipulation behavior — that's
+//  `ModelStoreBackupManagerTests`/`ModelStoreSalvageTests`. The confirmation
+//  dialogs use the shared `kurnDialog` component, which has no per-call
+//  accessibility identifiers, so exercising the confirm/cancel flow itself
+//  is left to those lower-level tests rather than a fragile text-match here.
+//
 
 import XCTest
 
@@ -61,6 +69,21 @@ final class ModelStoreRecoveryUITests: XCTestCase {
         // the shell must still be showing, not a crash and not stale
         // content from a half-completed transition.
         assertRecoveryShellAppears(app)
+    }
+
+    func testRecoveryActionsRenderWithoutCrashing() {
+        let app = launchedApp(reasonRawValue: "corruptOrUnknown")
+        assertRecoveryShellAppears(app)
+
+        XCTAssertTrue(app.buttons["storeRecovery.salvageButton"].exists)
+        XCTAssertTrue(app.buttons["storeRecovery.exportDiagnosticsButton"].exists)
+        XCTAssertTrue(app.buttons["storeRecovery.startFreshButton"].exists)
+
+        // Salvage against a launch with no real store on disk must resolve
+        // (not hang, not crash) and report nothing recovered.
+        app.buttons["storeRecovery.salvageButton"].tap()
+        XCTAssertTrue(app.staticTexts.element(matching: NSPredicate(format: "label CONTAINS[c] %@", "recover"))
+            .waitForExistence(timeout: 5))
     }
 
     func testLockedBackgroundLaunchShowsProgressShellWithoutCrashing() {
