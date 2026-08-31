@@ -8,7 +8,7 @@ resume the track in another engineering session.
 
 ## Current handoff
 
-Last updated: 2026-08-30.
+Last updated: 2026-08-31.
 
 - PR #151 established the initial reliability vocabulary and injectable seams.
 - PR #152 completed the core H6 network-boundary contract and the first H1
@@ -57,9 +57,9 @@ Last updated: 2026-08-30.
   NSError mappings unverified against a real device failure; PR 3's UI tests
   are a Debug-configuration launch, not a true Release-configuration device
   run) and what remains for PR 4.
-- **On branch `claude/plano-resiliencia-xe25b2`, on top of merged `main`
-  (not yet pushed as a PR):** PR 4, H2 protected backup, restore, salvage,
-  and recovery UI. `ModelStoreBackupManager`
+- **[PR #158](https://github.com/carlosmazzei/Kurn/pull/158), `H2 PR 4:
+  protected backup, restore, salvage, and recovery UI`, merged into
+  `main`** (recorded in commit `e46ded2`). `ModelStoreBackupManager`
   (`Kurn/Infrastructure/ModelStoreBackupManager.swift`) backs up the live
   store before every open attempt (rate-limited to once per app
   version+build), retains 3 generations, and quarantines (never deletes)
@@ -70,13 +70,23 @@ Last updated: 2026-08-30.
   `.protectionVerificationFailed` reason cover item 4 (protection
   verification during bootstrap). `ModelStoreRecoveryViewModel` and an
   expanded `ModelStoreRecoveryView` wire all four actions into the recovery
-  shell. Not yet run through SwiftLint/`xcodebuild`/the simulator suite in
-  this session — pushing the branch and opening a PR is the next step. See
+  shell. During PR #158's CI rounds a real use-after-free was found and fixed
+  (fetched `Meeting`s outliving their `ModelContainer` on the recovery
+  screen, commit `d3b4a25`). See
   "PR 4 — H2 protected backup, restore, salvage, and recovery UI" below for
   the known gaps (salvage is best-effort and cannot recover from a
   genuinely un-migratable schema mismatch or real corruption; "N-1/N-2
   fixtures" is satisfied the same way PR 2 satisfied it — no earlier
   released schema exists to fabricate).
+- **[PR #159](https://github.com/carlosmazzei/Kurn/pull/159), H3 PR 1,
+  merged into `main`** (as commit `097adaa`): `RecordingTrash` makes
+  meeting/recording deletion trash-then-purge instead of delete-then-delete,
+  with launch/foreground reconciliation for an interrupted delete.
+- **[PR #160](https://github.com/carlosmazzei/Kurn/pull/160), H3 PR 2,
+  merged into `main`** (as commit `317d665`):
+  `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` close the
+  corrupted-transcript-renders-as-empty hazard for
+  `Transcript.segments`/`Summary.sections`.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -86,12 +96,12 @@ Last updated: 2026-08-30.
 
 1. Read this file and the `Reliability and resilience track` section of
    `docs/roadmap.md`.
-2. PR #155/#156/#157 (H2 schema baseline and boot state machine) are merged
-   into `main`. PR 4 (backup/restore/salvage/recovery UI) is implemented on
-   `claude/plano-resiliencia-xe25b2` — if it hasn't been pushed/opened as a
-   PR yet, do that first rather than redoing the work; once it merges, H3
+2. H2 is done: PR #155/#156/#157/#158 (schema baseline, boot state machine,
+   and backup/restore/salvage/recovery UI) are merged into `main`. H3
    (`docs/roadmap.md`'s "H3 · Atomic model/file mutations and non-destructive
-   reconciliation") is next, from updated `main`.
+   reconciliation") is underway: PR #159 (trash-then-purge deletion) and
+   PR #160 (authoritative JSON encode/decode) are merged; the remaining H3
+   scope is in the status snapshot below. Continue from updated `main`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -268,9 +278,9 @@ Acceptance:
 
 #### PR 4 — H2 protected backup, restore, salvage, and recovery UI
 
-Status: implemented on branch `claude/plano-resiliencia-xe25b2`, on top of
-merged `main`; not yet pushed as a PR or CI-verified — see "Current handoff"
-above.
+Status: merged into `main` as
+[PR #158](https://github.com/carlosmazzei/Kurn/pull/158) — see "Current
+handoff" above.
 
 Objective: preserve original store bytes while giving the user explicit recovery
 choices.

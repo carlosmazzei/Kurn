@@ -79,8 +79,8 @@ enum SherpaOnnxModelDownloader {
 
     /// Whether both model files are on disk and large enough to be complete.
     static var isInstalled: Bool {
-        installedSize(of: segmentationModelURL) >= segmentationMinimumPlausibleBytes
-            && installedSize(of: embeddingModelURL) >= embeddingMinimumPlausibleBytes
+        ModelFileDownloader.installedSize(of: segmentationModelURL) >= segmentationMinimumPlausibleBytes
+            && ModelFileDownloader.installedSize(of: embeddingModelURL) >= embeddingMinimumPlausibleBytes
     }
 
     /// Download both model files unless already installed. Progress is
@@ -98,179 +98,25 @@ enum SherpaOnnxModelDownloader {
         }
 
         onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
-        try await fetch(
+        try await ModelFileDownloader.fetch(
             url: segmentationDownloadURL,
             destination: segmentationModelURL,
             minimumPlausibleBytes: segmentationMinimumPlausibleBytes,
-            policy: policy
+            policy: policy,
+            logLabel: "sherpaOnnxDownload"
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: fraction * 0.5, phase: .downloading))
         }
-        try await fetch(
+        try await ModelFileDownloader.fetch(
             url: embeddingDownloadURL,
             destination: embeddingModelURL,
             minimumPlausibleBytes: embeddingMinimumPlausibleBytes,
-            policy: policy
+            policy: policy,
+            logLabel: "sherpaOnnxDownload"
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: 0.5 + fraction * 0.5, phase: .downloading))
         }
         onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
         AppLog.transcription.atNotice.notice("sherpaOnnxDownload: both models installed")
-    }
-
-    private static func installedSize(of url: URL) -> Int64 {
-        guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else { return 0 }
-        return Int64(size)
-    }
-
-    private static func fetch(
-        url: URL,
-        destination: URL,
-        minimumPlausibleBytes: Int64,
-        policy: LargeTransferPolicy,
-        onProgress: @escaping @Sendable (Double) -> Void
-    ) async throws {
-        guard installedSize(of: destination) < minimumPlausibleBytes else { return }
-        AppLog.transcription.atNotice.notice("sherpaOnnxDownload: fetching \(destination.lastPathComponent, privacy: .public)")
-        let temporaryURL: URL
-        do {
-            temporaryURL = try await Downloader().download(
-                from: url,
-                policy: policy,
-                onProgress: onProgress
-            )
-        } catch let appError as AppError {
-            throw appError
-        } catch {
-            if let restriction = LargeTransferPolicy.restrictionError(for: error) {
-                throw restriction
-            }
-            AppLog.transcription.atError.error("sherpaOnnxDownload: failed code=download_failed")
-            try ResourceGuard.rethrowIfResourceFailure(error)
-            throw AppError.modelDownloadFailed(error.localizedDescription)
-        }
-        try install(temporaryURL, at: destination)
-    }
-
-    /// Move the finished transfer into place. The move is the last step, so an
-    /// interrupted download never leaves a partial file where `isInstalled`
-    /// would find it.
-    private static func install(_ downloadedURL: URL, at destination: URL) throws {
-        let fm = FileManager.default
-        do {
-            let folder = destination.deletingLastPathComponent()
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            // Models are re-downloadable, so they must not travel in the
-            // user's iCloud backup.
-            excludeFromBackup(folder)
-            if fm.fileExists(atPath: destination.path) {
-                try fm.removeItem(at: destination)
-            }
-            try fm.moveItem(at: downloadedURL, to: destination)
-        } catch {
-            try? fm.removeItem(at: downloadedURL)
-            try ResourceGuard.rethrowIfResourceFailure(error)
-            throw AppError.modelDownloadFailed(error.localizedDescription)
-        }
-    }
-
-    private static func excludeFromBackup(_ url: URL) {
-        var mutable = url
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try? mutable.setResourceValues(values)
-    }
-}
-
-/// Bridges `URLSessionDownloadTask` (delegate-based, with byte progress) into
-/// async/await. One instance per download; the session is invalidated on
-/// completion so the delegate reference cycle is broken.
-///
-/// Duplicated from `WhisperCppModelDownloader`'s private `Downloader` rather
-/// than shared — both are small, file-private, and neither downloader depends
-/// on the other.
-private final class Downloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-
-    private var continuation: CheckedContinuation<URL, Error>?
-    private var onProgress: (@Sendable (Double) -> Void)?
-    private var session: URLSession?
-    /// Guards the continuation, which the delegate callbacks touch from the
-    /// session's own queue.
-    private let lock = NSLock()
-
-    func download(
-        from url: URL,
-        policy: LargeTransferPolicy,
-        onProgress: @escaping @Sendable (Double) -> Void
-    ) async throws -> URL {
-        self.onProgress = onProgress
-        let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 60
-        configuration.timeoutIntervalForResource = 3600
-        policy.apply(to: configuration)
-        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
-        self.session = session
-
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                lock.lock()
-                self.continuation = continuation
-                lock.unlock()
-                session.downloadTask(with: url).resume()
-            }
-        } onCancel: {
-            session.invalidateAndCancel()
-        }
-    }
-
-    /// Deliver the result exactly once — `didFinishDownloadingTo` and
-    /// `didCompleteWithError` both fire for a successful download.
-    private func finish(_ result: Result<URL, Error>) {
-        lock.lock()
-        let continuation = self.continuation
-        self.continuation = nil
-        lock.unlock()
-        guard let continuation else { return }
-        session?.finishTasksAndInvalidate()
-        continuation.resume(with: result)
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) {
-        // `location` is deleted as soon as this method returns, so the file has
-        // to be moved out synchronously, before handing it to the caller.
-        let staged = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kurn_sherpa_\(UUID().uuidString).onnx")
-        if let response = downloadTask.response as? HTTPURLResponse,
-           !(200...299).contains(response.statusCode) {
-            finish(.failure(AppError.modelDownloadFailed("HTTP \(response.statusCode)")))
-            return
-        }
-        do {
-            try FileManager.default.moveItem(at: location, to: staged)
-            finish(.success(staged))
-        } catch {
-            finish(.failure(error))
-        }
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
-        totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
-    ) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        onProgress?(min(1, max(0, fraction)))
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let error else { return }
-        finish(.failure(error))
     }
 }

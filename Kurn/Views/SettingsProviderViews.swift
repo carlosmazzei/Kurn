@@ -203,83 +203,15 @@ struct SummaryModelPicker: View {
     let provider: AIProvider
     let revision: Int
 
-    @State private var models: [String] = []
-    @State private var isLoading = false
-    @State private var errorText: String?
-
-    private var selectedModel: String {
-        settings.summaryModel(for: provider)
-    }
-
-    private var pickerModels: [String] {
-        let selected = selectedModel
-        guard !selected.isEmpty else { return models }
-        return models.contains(selected) ? models : [selected] + models
-    }
-
     var body: some View {
-        Picker(
-            NSLocalizedString("settings.model", comment: "Model"),
+        ProviderModelPicker(
+            provider: provider,
+            revision: revision,
             selection: Binding(
                 get: { settings.summaryModel(for: provider) },
                 set: { settings.setSummaryModel($0, for: provider) }
             )
-        ) {
-            if pickerModels.isEmpty {
-                Text(NSLocalizedString("settings.no_models", comment: "No models")).tag("")
-            } else {
-                ForEach(pickerModels, id: \.self) { Text($0).tag($0) }
-            }
-        }
-        .disabled(pickerModels.isEmpty)
-        .task(id: "\(provider.id)-\(revision)") {
-            await loadModels()
-        }
-
-        if isLoading {
-            HStack {
-                ProgressView()
-                Text(NSLocalizedString("settings.loading_models", comment: "Loading models"))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        } else if let errorText {
-            Text(errorText)
-                .font(Theme.caption)
-                .foregroundStyle(Theme.textSecondary)
-        }
-
-        Button {
-            Task { await loadModels() }
-        } label: {
-            Label(NSLocalizedString("settings.refresh_models", comment: "Refresh models"), systemImage: "arrow.clockwise")
-        }
-        .disabled(isLoading || !KeychainManager.shared.hasValue(for: provider.keychainAccount))
-    }
-
-    @MainActor
-    private func loadModels() async {
-        guard KeychainManager.shared.hasValue(for: provider.keychainAccount) else {
-            models = []
-            errorText = NSLocalizedString("settings.models_need_key", comment: "Configure key to load models")
-            return
-        }
-
-        isLoading = true
-        errorText = nil
-        do {
-            let loaded = try await ProviderModelsService().models(for: provider)
-            models = loaded
-            if settings.summaryModel(for: provider).isEmpty, let first = loaded.first {
-                settings.setSummaryModel(first, for: provider)
-            }
-            if loaded.isEmpty {
-                errorText = NSLocalizedString("settings.no_models_loaded", comment: "No models loaded")
-            }
-        } catch {
-            models = []
-            errorText = error.localizedDescription
-        }
-        isLoading = false
+        )
     }
 }
 
@@ -291,16 +223,39 @@ struct TranscriptionModelPicker: View {
     let provider: AIProvider
     let revision: Int
 
+    var body: some View {
+        ProviderModelPicker(
+            provider: provider,
+            revision: revision,
+            selection: Binding(
+                get: { settings.transcriptionModel(for: provider) },
+                set: { settings.setTranscriptionModel($0, for: provider) }
+            ),
+            filter: { loaded in
+                let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
+                return whisperModels.isEmpty ? loaded : whisperModels
+            }
+        )
+    }
+}
+
+/// Shared model picker for a provider's remote model list: loads the list via
+/// `ProviderModelsService`, keeps the current selection visible even when the
+/// list doesn't contain it, defaults an empty selection to the first loaded
+/// model, and offers a refresh button. `filter` narrows the loaded list
+/// (e.g. to Whisper-family models for transcription).
+private struct ProviderModelPicker: View {
+    let provider: AIProvider
+    let revision: Int
+    let selection: Binding<String>
+    var filter: (@MainActor ([String]) -> [String])?
+
     @State private var models: [String] = []
     @State private var isLoading = false
     @State private var errorText: String?
 
-    private var selectedModel: String {
-        settings.transcriptionModel(for: provider)
-    }
-
     private var pickerModels: [String] {
-        let selected = selectedModel
+        let selected = selection.wrappedValue
         guard !selected.isEmpty else { return models }
         return models.contains(selected) ? models : [selected] + models
     }
@@ -308,10 +263,7 @@ struct TranscriptionModelPicker: View {
     var body: some View {
         Picker(
             NSLocalizedString("settings.model", comment: "Model"),
-            selection: Binding(
-                get: { settings.transcriptionModel(for: provider) },
-                set: { settings.setTranscriptionModel($0, for: provider) }
-            )
+            selection: selection
         ) {
             if pickerModels.isEmpty {
                 Text(NSLocalizedString("settings.no_models", comment: "No models")).tag("")
@@ -356,12 +308,9 @@ struct TranscriptionModelPicker: View {
         errorText = nil
         do {
             let loaded = try await ProviderModelsService().models(for: provider)
-            // Prefer Whisper-family models; fall back to the full list when the
-            // provider doesn't tag them recognizably.
-            let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
-            models = whisperModels.isEmpty ? loaded : whisperModels
-            if settings.transcriptionModel(for: provider).isEmpty, let first = models.first {
-                settings.setTranscriptionModel(first, for: provider)
+            models = filter?(loaded) ?? loaded
+            if selection.wrappedValue.isEmpty, let first = models.first {
+                selection.wrappedValue = first
             }
             if models.isEmpty {
                 errorText = NSLocalizedString("settings.no_models_loaded", comment: "No models loaded")
