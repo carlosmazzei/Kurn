@@ -1,6 +1,6 @@
 //
 //  SwiftDataConcurrencySensitiveTests.swift
-//  KurnTests
+//  KurnSwiftDataTests
 //
 //  Purely organizational: an empty parent suite that exists only so its
 //  `.serialized` trait recursively applies to every nested suite below it
