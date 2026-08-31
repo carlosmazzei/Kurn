@@ -1221,18 +1221,35 @@ exists because the live open already failed, so nothing holds the store
 open when salvage's copy step runs. The test was exercising an
 artificial, production-impossible race, and it matches Apple's documented
 failure mode for this exact crash (async background housekeeping still in
-flight when the same files are touched again). Fixed by scoping the
-original container so it's released before salvage runs, then reopening
-a fresh one afterward to verify the live bytes survived untouched —
-awaiting CI confirmation.
+flight when the same files are touched again). Scoped the original
+container so it's released before salvage runs, then reopened a fresh one
+afterward to verify the live bytes survived untouched.
+
+**That fix did not resolve it.** The crash recurred at the exact same
+point twice in a row on the next CI run — once on the first attempt, then
+identically on xcodebuild's own retry, which then gave up entirely
+("Early unexpected exit... no restart will be attempted"). This is a
+useful negative result, not a wasted one: it disproves the specific
+hypothesis. Releasing the Swift-level `ModelContainer` reference before
+salvage runs changed nothing, which means the actual trigger is something
+SwiftData schedules asynchronously (autosave/merge/notification
+machinery) that isn't necessarily cancelled or awaited just because the
+wrapper object is deallocated — still consistent with Apple's description
+of this bug class, but not something closeable from calling code alone
+without deeper, interactive debugging.
 
 **Current status**: the production code and its own tests are sound. All
-four CI mitigations are documented here for what they actually achieved.
-If the crash still recurs even after this fix, that would mean either a
-second, distinct trigger exists, or the fix doesn't fully close the
-window — worth knowing either way. A fully durable fix beyond this would
-need a real Xcode/device session to experiment interactively, or a
-broader refactor of how the whole suite obtains `ModelContainer`s.
+four CI mitigations are documented here for what they actually achieved,
+including the one that didn't work, so the next person doesn't re-try it.
+The isolation (separate target) remains genuinely valuable on its own —
+`KurnTests` (~150 files) and `KurnUITests` pass cleanly and completely on
+every run regardless of this test's outcome, and the crash, when it
+fires, is now honest and contained to this one known-flaky test rather
+than collateral damage across unrelated files. The crash itself remains
+unresolved as a from-scratch fix; closing it fully would need a real
+Xcode/device session to inspect what SwiftData is actually doing across
+the crash, or a broader refactor of how the whole suite obtains
+`ModelContainer`s.
 
 **Landed in the working tree.**
 
