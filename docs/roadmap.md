@@ -1667,7 +1667,9 @@ configuration.
   concrete need for the richer states (e.g. a visible "retrying in 2
   minutes" UI) shows up — this PR does not attempt it speculatively.
 - **PR 10 (item 6, the same durable multi-step pattern applied to summary and
-  wiki generation) — implemented.** `SummaryMapCheckpoint`
+  wiki generation) — implemented, merged into `main` as
+  [PR #167](https://github.com/carlosmazzei/Kurn/pull/167).**
+  `SummaryMapCheckpoint`
   (`Models/SummaryMapCheckpoint.swift`) records a staged (map-reduce) summary
   or wiki run's map-stage progress: a SHA-256 digest of the transcript text
   fed to the map stage, the provider id and exact model, the plan's block
