@@ -712,7 +712,7 @@ Priorities in this track mean:
 - **P2** — diagnosability, integration polish, and continuous verification that
   make P0/P1 guarantees sustainable.
 
-### Current implementation status (2026-08-30)
+### Current implementation status (2026-09-01)
 
 Status here is evidence-based and deliberately distinguishes an injectable seam
 from the production invariant that will eventually use it. PR
@@ -726,8 +726,8 @@ satisfy part of a planned contract.
 | **H1**             | **Core implemented**   | `RecordingSink` latches write-path failures and exposes frame progress; a two-second watchdog pauses stalled capture with retry/stop actions. Recording preflights and measures storage runway. A `Recording` row now owns a UUID-derived file before open and moves durably through `preparing → recording → finalizing → ready/recoveryNeeded`; re-entry and cross-context ownership fail before capture. One shared finalizer reopens the closed file, measures duration/bytes and applies/verifies protection before `ready`. Launch/foreground recovery reconciles interrupted rows, preserves partial bytes, and exposes explicit retry while playback, transcription, export, compaction and enhancement reject non-ready rows. Focused fault suites and the full simulator suite cover the core; real-device protection, interruption/route, long-background and low-storage scenarios remain the release checklist.                                                                                                                                                                                                                                                               |
 | **H2**             | **Done, merged (PR #155, #157, #158)** | `KurnSchemaV1`/`KurnSchemaMigrationPlan`, `ModelStoreBootCoordinator`, `ModelStoreBackupManager` (protected, bounded-generation backups + quarantine), `ModelStoreSalvage` (best-effort read-only recovery), `ModelStoreProtection.applyAndVerify`, and an expanded `ModelStoreRecoveryView` (restore/salvage/diagnostics/confirmed-fresh-start) are all on `main`. The recoverable production `fatalError` is gone, background-task registration runs before the store is ever opened, and a real use-after-free found during PR #158 (fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen) is fixed. See the H2 handoffs above the H2 plan for the full history. |
 | **H3**             | **Done, merged (PR #159, #160, #162, plus the PR 6/PR 7 boundaries)** | PR 1 ([#159](https://github.com/carlosmazzei/Kurn/pull/159)) fixed the risk register's deletion hazard: `RecordingTrash` makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. PR 2 ([#160](https://github.com/carlosmazzei/Kurn/pull/160)) fixes the JSON-corruption hazard for `Transcript.segments`/`Summary.sections` — see the H3 PR 2 handoff above the H4 plan. PR 3 ([#162](https://github.com/carlosmazzei/Kurn/pull/162), the megaplan's "PR 5" boundary) removes the unprotected `recordingsDirectoryURL` fallback (writers throw `AppError.protectedStorageUnavailable`), quarantines unmatched/malformed/unreadable/too-short originals and legacy-migration collisions in `RecordingQuarantine` with size/date/reason metadata and recover/export/confirmed-delete in Storage Settings. The megaplan's "PR 6" boundary adds `RecordingOperationJournal`: durable delete/replace intent written before any file moves, launch/foreground replay/rollback from the record's own state ahead of the heuristic trash sweep, a journaled compaction swap, and accurate residual-file reporting for "Delete All Data". The megaplan's "PR 7" boundary extends the versioned authoritative envelope to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (a failed encode keeps the previous resumable point), `transcriptionCheckpointOutcome` distinguishes `.corrupted` from `.empty` while legacy bare payloads still decode and corrupted bytes are preserved, and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5) and adopt the envelope when introduced. All boundaries are merged into `main`, closing the H3 track scope. |
-| **H4**             | **PR 8 merged ([#165](https://github.com/carlosmazzei/Kurn/pull/165)), PR 9 open** | `TranscriptionPipelineFingerprint` and `TranscriptionCheckpoint.isStructurallyValid` (PR 8, items 1–2 of the plan) replace the old engine/language/compaction/provider-only match with source size/duration/content-digest, effective preprocessing/VAD, exact ASR provider+model, a compaction-map digest, and a separately-checked exact chunk-plan digest. PR 9 (items 1, 2, 4) makes `ChunkedTranscriptionRunner`'s chunk-completion callback `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past a chunk that was never made durable, and bounds automatic (unattended) resume attempts per recording (`Recording.automaticResumeAttempts`, reset by any manual retry) so a systemic failure can't retry forever — or, for a cloud engine, keep re-paying — every time the app launches or foregrounds. See the "Progress" note under H4 for what shipped in each PR and the one deliberate PR 8 compatibility break. Item 3 (the full explicit operation-state enum with reason codes/`nextAttemptAt`) and item 6 (the same durable-job pattern for summary/wiki/document/correction generation — the megaplan's PR 10 boundary) are not started.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **H5**             | **Planned**            | Useful stage fallbacks exist, but typed degradation, persisted pipeline reports, integrity gates, and previous-artifact preservation are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **H4**             | **Done, merged (PR [#165](https://github.com/carlosmazzei/Kurn/pull/165), [#166](https://github.com/carlosmazzei/Kurn/pull/166), [#167](https://github.com/carlosmazzei/Kurn/pull/167))** | `TranscriptionPipelineFingerprint` and `TranscriptionCheckpoint.isStructurallyValid` (PR 8, items 1–2 of the plan) replace the old engine/language/compaction/provider-only match with source size/duration/content-digest, effective preprocessing/VAD, exact ASR provider+model, a compaction-map digest, and a separately-checked exact chunk-plan digest. PR 9 (items 1, 2, 4) makes `ChunkedTranscriptionRunner`'s chunk-completion callback `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past a chunk that was never made durable, and bounds automatic (unattended) resume attempts per recording (`Recording.automaticResumeAttempts`, reset by any manual retry) so a systemic failure can't retry forever — or, for a cloud engine, keep re-paying — every time the app launches or foregrounds. See the "Progress" note under H4 for what shipped in each PR and the one deliberate PR 8 compatibility break. PR 10 (item 6) extends the same gated-durable-progress contract to the map stage of staged summary and wiki generation (`SummaryMapCheckpoint`/`SummaryMapRunner`, one shared `Meeting.summaryMapCheckpointData`); `DocumentGenerationService` is deliberately excluded, since a document can span several meetings and has no single `Meeting` to checkpoint against. Only item 3 (the full explicit operation-state enum with reason codes/`nextAttemptAt`) remains, deliberately deferred.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **H5**             | **In progress (PR 11 open in [#168](https://github.com/carlosmazzei/Kurn/pull/168))** | Typed stage outcomes and a pipeline report persisted in `Transcript.pipelineReportData` are implemented for every stage (plan items 1–2 and the durable half of item 3). Integrity gates and previous-artifact preservation (items 4–5, PR 12) and the completed-with-warnings UI with stage-specific retry (PR 13) remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **H6**             | **Core implemented**   | Provider URLs fail closed and all new cloud traffic uses one origin-locked, deadline-bounded, 16 MB-capped foreground policy with exact budgeted `Retry-After`. Each logical request owns one UUID reused across attempts; official OpenAI chat requests also send it as the documented correlation header, never as an undocumented idempotency claim. Ambiguous POST timeouts/connection loss stop without automatic replay and surface a typed duplicate-charge warning. Background upload has no creation API or response-buffering state; its synchronized adapter only drains old system tasks. A durable per-provider circuit gates automatic title/wiki/backfill work. Large transfers default to unrestricted Wi-Fi: app-owned audio uploads/model sessions carry native expensive/constrained flags, while FluidAudio downloads fail preflight on a disallowed path. Cloud consent is pinned to provider plus URL and discloses hostname and estimated hourly audio size; model dialogs disclose source and approximate size. Non-blocking follow-ups are dedicated waiting UI under H9, FluidAudio’s unobservable mid-transfer path changes, and measured streaming evaluation. |
 | **H7**             | **Planned**            | Existing Keychain/model flows work on the clean path, but typed `OSStatus`, explicit credential save, cryptographic model verification, resumable staging, atomic replacement, and health probes remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **H8**             | **Partial, pre-track** | Several long jobs have app-level owners and run IDs, but memory pressure is sticky until relaunch and the scheduler, cancellation truth, Activity race handling, shared Watch protocol, deduplication, timeout, and durable acknowledgements remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -757,8 +757,8 @@ feature requests:
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **H1**  | Durable capture ownership, file-measured finalization, recovery rows and ready-only consumer gates are implemented; simulator tests cannot observe iOS Data Protection or reproduce physical route/interruption/background pressure | A device-only regression could still interrupt capture or misclassify protection until the release matrix is executed       | **P0 release gate**   |
 | **H2**  | A `VersionedSchema`/`SchemaMigrationPlan` exists, the recoverable production `fatalError` is replaced by a classified boot state machine, and protected backup, restore, salvage, and confirmed-fresh-start are all merged (PR #155, #157, #158) | An open failure no longer crash-loops; only a genuinely un-migratable/corrupt store can strand the user beyond what salvage and restore already offer | **Done**               |
-| **H3**  | Deletion no longer removes audio before the SwiftData save commits (PR 1, merged); a corrupted transcript/summary is no longer indistinguishable from an empty one (PR 2, merged); recovery quarantines unmatched originals instead of deleting them and writers fail closed on protected storage (PR 3, [#162](https://github.com/carlosmazzei/Kurn/pull/162)) | A partial failure during a non-delete mutation can still lose or misrepresent data until the operation journal lands | **P0**                |
-| **H4**  | A checkpoint fingerprints source content, preprocessing/VAD, exact ASR provider/model, the compaction map, and the exact chunk plan (PR 8); a checkpoint save is now awaited and gates the next chunk, and automatic resume attempts are bounded per recording (PR 9); it still doesn't use the plan's full explicit operation-state enum (reason codes, `nextAttemptAt`) | Bounded automatic recovery and a throwing durable commit are both in place; a richer operation-state model remains open if a concrete need for it shows up | **P0 → mostly closed** |
+| **H3**  | Deletion no longer removes audio before the SwiftData save commits (PR 1, merged); a corrupted transcript/summary is no longer indistinguishable from an empty one (PR 2, merged); recovery quarantines unmatched originals instead of deleting them and writers fail closed on protected storage (PR 3, [#162](https://github.com/carlosmazzei/Kurn/pull/162), merged); `RecordingOperationJournal` records delete/replace intent before any file moves and replays or rolls it back on launch/foreground (PR 6, `d7e3dee`), and the versioned authoritative envelope now covers the transcription checkpoint (PR 7, `e7a156a`) | A non-delete mutation interrupted mid-flight now converges from its own recorded intent instead of inferred state; operation reports adopt the same envelope when H5 introduces them | **Done**              |
+| **H4**  | A checkpoint fingerprints source content, preprocessing/VAD, exact ASR provider/model, the compaction map, and the exact chunk plan (PR 8); a checkpoint save is now awaited and gates the next chunk, and automatic resume attempts are bounded per recording (PR 9); the map stage of staged summary/wiki generation checkpoints the same way (PR 10); it still doesn't use the plan's full explicit operation-state enum (reason codes, `nextAttemptAt`) | Bounded automatic recovery and a throwing durable commit are both in place; a richer operation-state model remains open if a concrete need for it shows up | **P0 → closed except item 3** |
 | **H5**  | VAD, language detection, and diarizers intentionally return normal-looking fallback values on failure                                                                                                                               | A transcript can be marked done with whole-file VAD or one-speaker diarization and no durable indication of degradation     | **P1**                |
 | **H6**  | App-owned large transfers enforce user-selected expensive/constrained flags; FluidAudio is preflight-gated because its internal session is not configurable                                                                         | A network becoming expensive after a FluidAudio download starts cannot yet be cancelled through the library                 | **P1**                |
 | **H7**  | Keychain writes/deletes ignore `OSStatus`; app-managed models are accepted by loose size bounds and replaced non-transactionally                                                                                                    | The UI can claim a key/model is ready when it is missing, corrupt, or an older valid copy was destroyed                     | **P1**                |
@@ -1117,7 +1117,7 @@ before a migration, offer restore/salvage/confirmed-fresh-start, and verify
 protection on the store directory and sidecars during bootstrap (item 6
 above). Start it from updated `main` after this PR merges.
 
-#### H2 backup/restore/salvage/recovery-UI PR — code-complete, blocked by a CI test-infrastructure flake (2026-08-31)
+#### H2 backup/restore/salvage/recovery-UI PR — merged (2026-08-31)
 
 Branch `claude/plano-resiliencia-xe25b2`, on top of merged `main`
 (`12850ae`), PR #158. This session has no macOS/Xcode toolchain, so nothing
@@ -1266,7 +1266,8 @@ with `SalvageTests` explicitly passing:
 ✔ Test run with 13 tests in 3 suites passed after 1.348 seconds.
 ```
 
-plus `KurnUITests` 12/12. The PR is unblocked and awaiting human review.
+plus `KurnUITests` 12/12. [PR #158](https://github.com/carlosmazzei/Kurn/pull/158)
+merged into `main` on that basis (recorded in commit `e46ded2`).
 
 **Landed in the working tree.**
 
@@ -1444,8 +1445,8 @@ change, the same way H2 split into four:
   plan", never wrong-but-successful content), so it doesn't share the
   transcript/summary failure mode this item exists to close.
 - **PR 3 (items 3, 4, 5 — quarantine, collision handling, fail-closed
-  writers) — implemented in
-  [PR #162](https://github.com/carlosmazzei/Kurn/pull/162).**
+  writers) — done, merged in
+  [PR #162](https://github.com/carlosmazzei/Kurn/pull/162) (`fd4b417`).**
   `AudioFileStore.recordingsDirectoryURL` is a pure computed path; writers go
   through throwing `ensureRecordingsDirectory()`/`ensureEnhancedDirectory()`
   that surface `AppError.protectedStorageUnavailable` instead of falling back
@@ -1458,9 +1459,28 @@ change, the same way H2 split into four:
   never quarantined — holds by construction. A fault during quarantine leaves
   the original in place; a missing sidecar degrades the listing, never drops
   the audio.
-- **Items 1 (operation journal) and the remainder of items 6/7
-  (versioned envelopes, separate derived-copy reconciliation) — not
-  started.**
+- **PR 6 (item 1, the durable operation journal) — done, merged into `main`
+  as commit `d7e3dee`.** `RecordingOperationJournal` records durable
+  delete/replace intent before any file moves, replays or rolls back
+  unfinished operations from their own recorded state at launch/foreground
+  (ahead of the heuristic trash sweep, which remains only for pre-journal
+  leftovers), journals compaction's in-place swap, and makes "Delete All
+  Data" report residual audio files instead of implying a clean wipe.
+- **PR 7 (the remainder of item 6, versioned authoritative envelopes) —
+  done, merged into `main` as commit `e7a156a`.**
+  `Recording.transcriptionCheckpoint` now writes
+  `JSONStorage.encodeAuthoritative` envelopes (an encode failure keeps the
+  previous resumable point), reads distinguish `.corrupted` from `.empty`
+  via `transcriptionCheckpointOutcome` — legacy bare payloads still decode,
+  corrupted bytes are preserved rather than blanked — and both the
+  transcribe path and `TranscriptionRecovery`'s stale sweep treat a
+  corrupted checkpoint as an explicit non-resumable state instead of "never
+  checkpointed". Operation reports do not exist yet (H5); they adopt the
+  envelope when introduced.
+- **Item 7's separate derived-copy reconciliation — still open.** Derived
+  enhanced copies stay separately disposable and are never quarantined (that
+  much holds by construction, per PR 3), but they have no reconciliation pass
+  of their own.
 
 #### H3 PR 2 handoff: typed JSON corruption for transcript/summary
 
@@ -1558,8 +1578,9 @@ configuration.
 
 **Progress.** Split into PRs the same way H2 and H3 were:
 
-- **PR 8 (items 1–2, pipeline fingerprint and checkpoint validation) —
-  implemented.** `TranscriptionPipelineFingerprint`
+- **PR 8 (items 1–2, pipeline fingerprint and checkpoint validation) — done,
+  merged in [PR #165](https://github.com/carlosmazzei/Kurn/pull/165)
+  (`08a0192`).** `TranscriptionPipelineFingerprint`
   (`Models/TranscriptionPipelineFingerprint.swift`) replaces the old
   engine/language/compacted/provider-only match with source file size,
   rounded duration, a SHA-256 digest of the *original* recording's bytes
@@ -1604,7 +1625,8 @@ configuration.
   updated across this change; a completed or not-yet-started transcription
   carries no checkpoint to break.
 - **PR 9 (items 1, 2, 4 of the plan — throwing chunk commits and bounded
-  automatic recovery) — implemented.** `ChunkedTranscriptionRunner.run`'s
+  automatic recovery) — done, merged in
+  [PR #166](https://github.com/carlosmazzei/Kurn/pull/166) (`4efe374`).** `ChunkedTranscriptionRunner.run`'s
   `onChunkCompleted` is now `async throws` and **awaited** before the loop
   advances to the next chunk, rather than fired-and-forgotten; a thrown error
   propagates out of `run` and stops the loop with whatever was last durably
@@ -1667,7 +1689,9 @@ configuration.
   concrete need for the richer states (e.g. a visible "retrying in 2
   minutes" UI) shows up — this PR does not attempt it speculatively.
 - **PR 10 (item 6, the same durable multi-step pattern applied to summary and
-  wiki generation) — implemented.** `SummaryMapCheckpoint`
+  wiki generation) — done, merged into `main` as
+  [PR #167](https://github.com/carlosmazzei/Kurn/pull/167) (`663ab09`).**
+  `SummaryMapCheckpoint`
   (`Models/SummaryMapCheckpoint.swift`) records a staged (map-reduce) summary
   or wiki run's map-stage progress: a SHA-256 digest of the transcript text
   fed to the map stage, the provider id and exact model, the plan's block
@@ -1733,7 +1757,7 @@ configuration.
   does not revisit it. With PR 10 landed, H4's plan is fully addressed except
   item 3.
 
-### H5 · Typed degradation and output-integrity gates — P1
+### H5 · Typed degradation and output-integrity gates — P1, in progress
 
 Fallback is valuable: preprocessing can use the original and a transcript is
 usually better than no transcript because diarization failed. The defect is not
@@ -1771,6 +1795,26 @@ possible.
 ASR, each diarizer, fusion, correction and persistence; add invariant/property
 tests for malformed timestamps, empty/oversized responses and fallback
 provenance; keep WER/DER evaluation separate from reliability pass/fail.
+
+**Progress — items 1–3 (the PR 11 boundary), on branch
+`claude/resiliencia-roadmap-e69zyy`
+([PR #168](https://github.com/carlosmazzei/Kurn/pull/168)).** `PipelineReport`
+and friends live in KurnCore, carrying only closed vocabularies and engine
+`rawValue`s — no free-text field, so a provider message or file name cannot
+reach a persisted, exportable report. `TranscriptionService` records one entry
+per stage (preprocessing's fall back to the original audio, a detector
+returning the caller's hint rather than a detection, compaction declining
+versus failing, an empty transcription over detected speech, diarization
+stepping down for missing model consent versus falling back to a synthetic
+whole-clip turn, fusion losing every span, and correction's typed
+`TranscriptCorrectionResult`), and `Transcript.pipelineReportData` persists the
+aggregate in the same save as the segments — `nil` meaning *unknown*, never
+*clean*. Cancellation is untouched: it still throws out of the pipeline and is
+never recorded as an outcome. Item 3's UI half ("completed with warnings" plus
+stage-specific re-run actions) is deliberately left to PR 13, and items 4–5
+(the integrity gate and previous-artifact preservation) to PR 12 — the report
+is durable now, and nothing reads it yet. See the megaplan's "PR 11" section
+for the file-level detail.
 
 ### H6 · Exact network boundaries, bounded retry, and cost control — Core implemented (P0/P1)
 
@@ -2065,7 +2109,7 @@ migrates.
    migrations/faults/sanitizers/repetition, and record the scorecard alongside
    the existing accuracy history.
 
-#### Current next execution order (2026-08-30)
+#### Current next execution order (2026-09-01)
 
 1. **H2 versioned schema baseline — done, merged in [PR #155](https://github.com/carlosmazzei/Kurn/pull/155).** The
    current model graph is now a `VersionedSchema` (`KurnSchemaV1`) with a
@@ -2111,19 +2155,33 @@ migrates.
    fallback that still accepts every pre-existing row's un-enveloped format
    as real content rather than corruption. See the H3 PR 2 handoff above the
    H4 plan for what's in scope and what stays on the old, lenient contract.
-   Scoped deliberately narrow, the same way H2 split into four PRs and H3 PR 1
-   before it: the remaining H3 plan items — a general operation journal for
-   create/finalize/replace (not just delete), quarantine for unmatched
-   originals instead of deletion, legacy-migration collision handling, and
-   removing `recordingsDirectoryURL`'s unprotected fallback — are separate
-   follow-up PRs, not yet started.
-6. **Then H4 (P0): resume identity and throwing commits.** Fingerprint source,
-   configuration, model and chunk plan; do not start the next chunk until its
-   checkpoint is durable.
-7. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
+6. **H3 (P0) closed out — fail-closed protected storage and quarantine
+   ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)), the durable
+   operation journal (`d7e3dee`), and the versioned authoritative envelope
+   for the transcription checkpoint (`e7a156a`) are all merged.** Item 7's
+   separate reconciliation pass for derived copies is the one H3 plan item
+   still open; see the H3 "Progress" list.
+7. **H4 (P0) done — merged in
+   [PR #165](https://github.com/carlosmazzei/Kurn/pull/165) (pipeline
+   fingerprint and checkpoint validation),
+   [PR #166](https://github.com/carlosmazzei/Kurn/pull/166) (throwing chunk
+   commits and bounded automatic recovery), and
+   [PR #167](https://github.com/carlosmazzei/Kurn/pull/167) (durable,
+   resumable map-stage checkpointing shared by summary and wiki
+   generation).** Item 3, the full explicit operation-state enum, is
+   deliberately deferred until a concrete need for the richer states shows up.
+8. **In flight: H5 (P1), typed stage outcomes and the persisted pipeline
+   report** (`docs/resilience-megaplan.md`'s PR 11 boundary, implemented in
+   [PR #168](https://github.com/carlosmazzei/Kurn/pull/168)), then the final
+   integrity gate and atomic artifact replacement (PR 12). Every stage now
+   returns requested/effective engine plus a
+   `succeeded`/`degraded`/`skipped`/`failed` outcome with a stable reason, and
+   the aggregate report persists beside the transcript so "completed with
+   warnings" is durable rather than inferred — surfacing it in the UI is PR 13.
+9. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
    route, lock/background and low-storage matrix without delaying the next code P0.
-8. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
-   dependency; H9 owns dedicated waiting/cancellation presentation.
+10. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
+    dependency; H9 owns dedicated waiting/cancellation presentation.
 
 P0 containment and durability take precedence over new features that widen the
 same surfaces (capture entry points, import, provider work, or filesystem

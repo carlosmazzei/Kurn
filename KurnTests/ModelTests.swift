@@ -213,6 +213,28 @@ struct ModelTests {
         #expect(transcript.segments == segments)
     }
 
+    @Test func pipelineReportRoundTripsThroughStoredData() {
+        var builder = PipelineReportBuilder()
+        builder.record(.diarization, .degraded, requested: "fluidAudio", effective: "heuristic", reason: .notConsented)
+        let transcript = Transcript(pipelineReportData: JSONStorage.encodeAuthoritative(builder.report))
+
+        let stored = transcript.pipelineReport
+        #expect(stored?.overall == .degraded)
+        #expect(stored?[.diarization]?.requestedEngine == "fluidAudio")
+        #expect(stored?[.diarization]?.effectiveEngine == "heuristic")
+        #expect(stored?[.diarization]?.reason == .notConsented)
+    }
+
+    @Test func missingOrUnreadableReportIsNilRatherThanACleanRun() {
+        // Both must read as "unknown". A caller that treated either as an
+        // empty (therefore warning-free) report would show a degraded run as
+        // a clean one, which is exactly what the report exists to prevent.
+        #expect(Transcript().pipelineReport == nil)
+
+        let transcript = Transcript(pipelineReportData: Data("not json at all".utf8))
+        #expect(transcript.pipelineReport == nil)
+    }
+
     @Test func languagePropertyRoundTripsThroughRawValue() {
         let meeting = Meeting(title: "Standup", language: .portuguese)
         #expect(meeting.language == .portuguese)

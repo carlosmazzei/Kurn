@@ -27,10 +27,20 @@ struct DiarizationOutcome: Sendable {
     var turns: [SpeakerTurn]
     /// Speaker label → L2-normalized mean embedding.
     var voiceprints: [String: [Float]]
+    /// Why these turns are not what the requested engine was supposed to
+    /// produce, or `nil` when they are. Carried out of the engine because a
+    /// single whole-clip turn is indistinguishable from a genuine
+    /// one-speaker meeting once it reaches fusion (H5 PR 11).
+    var degradation: PipelineStageReason?
 
-    init(turns: [SpeakerTurn], voiceprints: [String: [Float]] = [:]) {
+    init(
+        turns: [SpeakerTurn],
+        voiceprints: [String: [Float]] = [:],
+        degradation: PipelineStageReason? = nil
+    ) {
         self.turns = turns
         self.voiceprints = voiceprints
+        self.degradation = degradation
     }
 }
 
@@ -154,7 +164,10 @@ actor FluidAudioDiarizer: Diarizing {
             } catch {
                 AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
                 onDownloadFailure?(error.localizedDescription)
-                return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
+                return DiarizationOutcome(
+                    turns: [Self.fallbackTurn(for: url)],
+                    degradation: .modelPreparationFailed
+                )
             }
         }
         onProgress?(0)
@@ -166,14 +179,14 @@ actor FluidAudioDiarizer: Diarizing {
                 try await self.processAndMapTurns(url: url, onProgress: onProgress)
             }
             return outcome.turns.isEmpty
-                ? DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
+                ? DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .noInput)
                 : outcome
         } catch {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
             // which would mislead the user into re-consenting for no reason.
             AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
-            return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
+            return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .engineFailed)
         }
     }
 
@@ -338,7 +351,7 @@ actor FluidAudioDiarizer: Diarizing {
         AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)
         onProgress?(1)
-        return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)])
+        return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .engineUnavailable)
     }
 }
 

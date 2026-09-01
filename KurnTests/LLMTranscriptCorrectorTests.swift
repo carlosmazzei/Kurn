@@ -184,7 +184,52 @@ struct LLMTranscriptCorrectorTests {
         let result = await NoOpTranscriptCorrector().correct(
             segments: segments, language: .autoDetect, provider: .openAI, model: "", onProgress: { _ in }
         )
-        #expect(result.map(\.id) == segments.map(\.id))
-        #expect(result.map(\.text) == segments.map(\.text))
+        #expect(result.segments.map(\.id) == segments.map(\.id))
+        #expect(result.segments.map(\.text) == segments.map(\.text))
+        // "No corrector ran" must read as skipped, never as a clean pass of a
+        // stage that was never asked to do anything.
+        #expect(result.outcome == .skipped)
+        #expect(result.reason == .notRequested)
+    }
+
+    // MARK: - Correction stage report (H5 PR 11)
+
+    /// Correction the user asked for that `effectiveCorrection` stepped down
+    /// runs the no-op corrector, which reports "not requested" because from
+    /// where it stands that is true. The stage report is the only place the
+    /// difference between "off" and "wanted but unusable" survives.
+    @Test func steppedDownCorrectionIsDegradedRatherThanSkipped() async throws {
+        var config = PipelineConfiguration()
+        config.correction = .llm
+        config.correctionConsented = false
+
+        let step = try await TranscriptionService().correctIfRequested(
+            segments: [segment(text: "hello", confidence: 0.3)],
+            language: .english,
+            config: config,
+            onPhase: { _ in }
+        )
+
+        #expect(step.stage.outcome == .degraded)
+        #expect(step.stage.reason == .providerUnavailable)
+        #expect(step.stage.fellBack)
+        #expect(step.segments.count == 1)
+    }
+
+    @Test func correctionNobodyAskedForIsSkippedAndNotAWarning() async throws {
+        var config = PipelineConfiguration()
+        config.correction = .none
+
+        let step = try await TranscriptionService().correctIfRequested(
+            segments: [segment(text: "hello", confidence: 0.3)],
+            language: .english,
+            config: config,
+            onPhase: { _ in }
+        )
+
+        #expect(step.stage.outcome == .skipped)
+        #expect(step.stage.reason == .notRequested)
+        #expect(!step.stage.isWarning)
+        #expect(!step.stage.fellBack)
     }
 }

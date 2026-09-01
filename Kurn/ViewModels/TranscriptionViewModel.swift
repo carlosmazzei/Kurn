@@ -493,6 +493,15 @@ final class TranscriptionViewModel {
         // already-encoded, pre-checked bytes.
         let transcript = Transcript(recording: recording, language: output.language)
         transcript.segmentsData = segmentsData
+        // Written in the same save as the segments, so a transcript can never
+        // be durable while the record of how it was produced is missing. A
+        // failed encode leaves it `nil` — "unknown", which is what a reader
+        // must not be able to mistake for "clean" — instead of failing the
+        // save and losing the transcript over a diagnostic payload.
+        transcript.pipelineReportData = JSONStorage.encodeAuthoritative(output.report)
+        if transcript.pipelineReportData == nil {
+            AppLog.transcription.atError.error("VM: pipeline report encode failed; transcript stored without a run report")
+        }
         modelContext.insert(transcript)
         recording.transcriptionStatus = .done
         recording.transcriptionCheckpointData = nil

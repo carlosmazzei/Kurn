@@ -18,6 +18,16 @@ final class Transcript {
     var segmentsData: Data
     /// Detected BCP-47 locale, e.g. "pt-BR".
     var language: String
+    /// JSON-encoded `PipelineReport`: which engine each stage was asked for,
+    /// which one ran, and whether it succeeded, degraded, was skipped or
+    /// failed. Optional because transcripts written before H5 PR 11 have no
+    /// report and because a run may legitimately produce none — `nil` means
+    /// "unknown", never "clean".
+    ///
+    /// Only the closed vocabularies in `PipelineReport` are stored here: no
+    /// provider message, file name, URL, or transcript text ever reaches this
+    /// field, so it stays safe to export in a diagnostics bundle.
+    var pipelineReportData: Data?
     var createdAt: Date
 
     init(
@@ -25,6 +35,7 @@ final class Transcript {
         recording: Recording? = nil,
         segments: [TranscriptSegment] = [],
         language: String = "",
+        pipelineReportData: Data? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -36,7 +47,17 @@ final class Transcript {
         // fallback. See `JSONStorage.encodeAuthoritative`.
         self.segmentsData = JSONStorage.encodeAuthoritative(segments) ?? Data()
         self.language = language
+        self.pipelineReportData = pipelineReportData
         self.createdAt = createdAt
+    }
+
+    /// The stored run report, or `nil` when this transcript predates reporting
+    /// or its bytes no longer decode — the two are indistinguishable to a
+    /// reader, and both mean the same thing: nothing can be claimed about how
+    /// the run went.
+    var pipelineReport: PipelineReport? {
+        guard let pipelineReportData else { return nil }
+        return JSONStorage.decodeAuthoritative(PipelineReport.self, from: pipelineReportData).decodedValue
     }
 
     var segments: [TranscriptSegment] {

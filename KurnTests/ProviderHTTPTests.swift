@@ -511,4 +511,28 @@ struct ProviderHTTPTests {
         )
         #expect(corrections.isEmpty)
     }
+
+    /// H5 PR 11: no corrections is the right answer for a transcript that
+    /// needed none, so it cannot be the failure signal — the batch reports its
+    /// own failure separately or the stage report calls a clean pass failed.
+    @Test func llmTranscriptCorrectorReportsBatchFailureApartFromEmptyCorrections() async {
+        let a = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 1, text: "this is fine", confidence: 0.3)
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["choices": [["message": ["content": #"{"segments":[]}"#]]]]),
+            MockURLProtocol.json(["choices": [["message": ["content": "I cannot help with that."]]]]),
+            .failure(URLError(.notConnectedToInternet))
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+        let corrector = LLMTranscriptCorrector()
+
+        let clean = await corrector.requestBatch(for: [a], vocabulary: [], language: .english, llm: provider)
+        #expect(clean.corrections.isEmpty)
+        #expect(clean.failed == false)
+
+        let unparseable = await corrector.requestBatch(for: [a], vocabulary: [], language: .english, llm: provider)
+        #expect(unparseable.failed)
+
+        let transportError = await corrector.requestBatch(for: [a], vocabulary: [], language: .english, llm: provider)
+        #expect(transportError.failed)
+    }
 }
