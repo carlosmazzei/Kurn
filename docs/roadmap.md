@@ -1666,9 +1666,72 @@ configuration.
   actually requires today. A future session should revisit item 3 only if a
   concrete need for the richer states (e.g. a visible "retrying in 2
   minutes" UI) shows up — this PR does not attempt it speculatively.
-- **Item 6 (the same durable multi-step pattern applied to summary/wiki/
-  document/correction jobs) — not started.** This is the megaplan's PR 10
-  boundary.
+- **PR 10 (item 6, the same durable multi-step pattern applied to summary and
+  wiki generation) — implemented.** `SummaryMapCheckpoint`
+  (`Models/SummaryMapCheckpoint.swift`) records a staged (map-reduce) summary
+  or wiki run's map-stage progress: a SHA-256 digest of the transcript text
+  fed to the map stage, the provider id and exact model, the plan's block
+  count, and the notes condensed so far. `matches(...)` is the exact-identity
+  resume check (content + provider + model + block count, mirroring the
+  quality-mixing protection `TranscriptionPipelineFingerprint` already gives
+  transcription checkpoints) and `isStructurallyValid` is the same
+  "completed work can never exceed the plan" sanity check
+  `TranscriptionCheckpoint.isStructurallyValid` already has for chunk counts.
+  `SummaryMapRunner` (`Services/SummaryMapRunner.swift`) is the block loop,
+  built the same way as `ChunkedTranscriptionRunner`: independent of
+  `LLMProvider` so the resume/skip logic is unit-testable without a network
+  mock. It resumes from `resume.completedNotes` only when the checkpoint is
+  structurally valid and its identity matches the plan about to run, then for
+  every new block `try await`s `onStageCompleted` with the updated checkpoint
+  before moving to the next block — the exact "not durable until this
+  returns" contract PR 9 established for `ChunkedTranscriptionRunner
+  .run`'s `onChunkCompleted`, so a checkpoint-save failure stops the run at
+  the last committed block instead of risking the next block's cost on top
+  of unsaved progress.
+- **One checkpoint field on `Meeting`, shared by Summary and Wiki, not one
+  per artifact.** `Meeting.summaryMapCheckpointData` persists the same way
+  `Recording.transcriptionCheckpointData` does — JSON `Data` behind
+  `JSONStorage.encodeAuthoritative`/`decodeAuthoritative`, with the same
+  corrupted-vs-empty distinction via `summaryMapCheckpointOutcome`. It is
+  shared because `WikiService.generate` delegates its map stage to
+  `SummaryService.generate`'s own `notesTemplate` regardless of caller, so
+  for a given meeting's content, Summary and Wiki generation produce
+  byte-identical map-stage notes. A Summary run and a Wiki run racing on the
+  same meeting can therefore share or briefly overwrite each other's
+  progress with no correctness risk — worst case, one already-completed
+  block is redone, never spliced or incorrect notes — since both run on the
+  same `@MainActor` context that already serializes `modelContext.save()`.
+  `TranscriptionViewModel.generateSummary` (moved into the new
+  `ViewModels/TranscriptionViewModel+Summary.swift` to keep
+  `TranscriptionViewModel.swift` under SwiftLint's file-length limit, the
+  same reason `TranscriptionViewModel+ResumeBudget.swift` exists) and
+  `WikiCoordinator.generate` both read the checkpoint as a resume seed
+  (only if `isStructurallyValid`), pass a `storeSummaryMapCheckpointDurably`
+  closure through as `onMapStageCompleted`, and clear the checkpoint once the
+  full run — map and reduce — succeeds. Both `storeSummaryMapCheckpointDurably`
+  implementations key on the meeting's `UUID` rather than the `Meeting`
+  itself and re-fetch it via `FetchDescriptor`, because `Meeting` is a
+  SwiftData `@Model` (not `Sendable`) and the closure is the `@Sendable`
+  `onMapStageCompleted` parameter — the same pattern
+  `TranscriptionViewModel+ResumeBudget.swift`'s `activeRecordings` lookup and
+  `RecordingRecovery.swift` already use for a cross-closure model lookup.
+- **Deliberately excluded: `DocumentGenerationService`.** A `GeneratedDocument`
+  can synthesize from multiple meetings' transcripts in one map-reduce run,
+  so there is no single `Meeting` to persist a checkpoint against — the same
+  reason `GeneratedDocument` already snapshots its sources rather than
+  relating to them. Left out of scope rather than inventing a second,
+  document-scoped checkpoint location speculatively; a future session should
+  revisit only if a concrete need for document-generation resumability shows
+  up.
+- **"Partial prose or JSON is never displayed as final" was already true
+  before this PR.** `TranscriptionViewModel.generateSummary` only inserts a
+  `Summary` row after `SummaryService.generate` fully succeeds, and
+  `WikiCoordinator.replaceArticle` is only called after `WikiService.generate`
+  returns non-empty markdown — confirmed by reading both call sites, no
+  change needed for that half of the PR 10 acceptance criteria.
+- **Item 3 remains not started**, per PR 9's own handoff above — this PR
+  does not revisit it. With PR 10 landed, H4's plan is fully addressed except
+  item 3.
 
 ### H5 · Typed degradation and output-integrity gates — P1
 

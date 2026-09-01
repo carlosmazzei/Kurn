@@ -36,13 +36,15 @@ final class TranscriptionViewModel {
     /// Kept separate from `phases` so the recording can honestly show `.done`
     /// instead of holding the transcription bar at "Finalizing".
     private(set) var postTranscriptionPhases: [UUID: PostTranscriptionPhase] = [:]
-    private(set) var isSummarizing = false
+    /// Not `private(set)` — `TranscriptionViewModel+Summary.swift` needs to
+    /// set these from its own file.
+    var isSummarizing = false
     /// True after the user asks to cancel a summary while the provider request
     /// is still unwinding.
-    private(set) var isCancellingSummary = false
+    var isCancellingSummary = false
     /// Staged-summary progress as (stage, total) when a long transcript is
     /// being summarized in parts; nil for single-pass summaries.
-    private(set) var summaryProgress: (stage: Int, total: Int)?
+    var summaryProgress: (stage: Int, total: Int)?
     var error: AppError?
     /// Non-fatal diarization failures (e.g. a FluidAudio model download error),
     /// keyed by recording so concurrent transcriptions of different recordings
@@ -79,7 +81,8 @@ final class TranscriptionViewModel {
     /// Not `private` — `TranscriptionViewModel+ResumeBudget.swift` needs it.
     var activeRecordings: [UUID: Recording] = [:]
     /// Active summary task, owned here so the detail screen can cancel it.
-    private var summaryTask: Task<Void, Never>?
+    /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
+    var summaryTask: Task<Void, Never>?
     /// Recordings in flight across ALL instances — `MeetingDetailView` creates
     /// a view model per screen and the app-level resume coordinator has its
     /// own, and a recording must never transcribe twice concurrently.
@@ -93,7 +96,8 @@ final class TranscriptionViewModel {
     /// Not `private` — `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift` needs it.
     let modelContext: ModelContext
     private let transcriptionService = TranscriptionService()
-    private let summaryService = SummaryService()
+    /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
+    let summaryService = SummaryService()
     private let aiTitleCoordinator: AITitleCoordinator
     /// App-wide settings, set by `KurnApp` so title generation can use the
     /// configured LLM provider without passing settings through every call site.
@@ -782,112 +786,5 @@ final class TranscriptionViewModel {
         // diarizer's `turnSpeakers`/`speakers` log lines).
         let finalLabels = claimedLabels.sorted()
         AppLog.transcription.atNotice.notice("VM: syncSpeakers final=\(finalLabels.count, privacy: .public) [\(finalLabels.joined(separator: ", "), privacy: .public)] added=\(addedLabels.count, privacy: .public) removed=\(removed, privacy: .public) byVoice=\(byVoiceCount, privacy: .public) keptNamed=\(keptNamed, privacy: .public)")
-    }
-
-    // MARK: - Summary
-
-    func startSummary(
-        for meeting: Meeting,
-        provider: AIProvider,
-        model: String,
-        template: SummaryTemplate
-    ) {
-        guard !isSummarizing else { return }
-        isSummarizing = true
-        isCancellingSummary = false
-        summaryProgress = nil
-        summaryTask = Task { [weak self, meeting] in
-            await self?.generateSummary(
-                for: meeting,
-                provider: provider,
-                model: model,
-                template: template
-            )
-        }
-    }
-
-    func cancelSummary() {
-        guard isSummarizing else { return }
-        isCancellingSummary = true
-        summaryTask?.cancel()
-    }
-
-    private func generateSummary(
-        for meeting: Meeting,
-        provider: AIProvider,
-        model: String,
-        template: SummaryTemplate
-    ) async {
-        // Assemble transcript text on the main actor (reads SwiftData). Each
-        // group carries the recording's absolute start offset so the timestamps
-        // stay chronological across multiple segments.
-        let groups = meeting.recordings
-            .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { recording -> SummaryService.TranscriptGroup? in
-                guard let segments = recording.transcript?.segments else { return nil }
-                return SummaryService.TranscriptGroup(
-                    offset: meeting.startOffset(of: recording),
-                    segments: segments,
-                    highlights: recording.highlights
-                )
-            }
-        let transcriptText = SummaryService.assembleTranscriptText(from: groups)
-        let title = meeting.title
-
-        defer {
-            isSummarizing = false
-            isCancellingSummary = false
-            summaryProgress = nil
-            summaryTask = nil
-        }
-
-        guard !transcriptText.isEmpty else {
-            error = .transcriptionFailed(
-                NSLocalizedString("error.no_transcript", comment: "No transcript to summarize")
-            )
-            return
-        }
-
-        AppLog.transcription.atNotice.notice("VM: summary start provider=\(provider.rawValue, privacy: .public) chars=\(transcriptText.count, privacy: .public)")
-        do {
-            let result = try await summaryService.generate(
-                transcriptText: transcriptText,
-                meetingTitle: title,
-                provider: provider,
-                model: model,
-                template: template,
-                onProgress: { [weak self] stage, total in
-                    // Reported off the main actor; hop back before mutating state.
-                    Task { @MainActor in self?.summaryProgress = (stage, total) }
-                }
-            )
-            try Task.checkCancellation()
-            // Same reasoning as `saveTranscript`: fail before constructing
-            // the summary, and reuse the existing `catch` below.
-            guard let sectionsData = JSONStorage.encodeAuthoritative(result.sections) else {
-                throw AppError.persistenceFailed(NSLocalizedString("error.summary_encode_failed", comment: "Encode failed"))
-            }
-            let summary = Summary(
-                meeting: meeting,
-                templateName: template.displayName,
-                provider: provider,
-                model: model
-            )
-            summary.sectionsData = sectionsData
-            modelContext.insert(summary)
-            persist()
-            AppLog.transcription.atNotice.notice("VM: summary done")
-            appSettings?.recordSummaryTemplateUsed(template.id)
-        } catch is CancellationError {
-            AppLog.transcription.atNotice.notice("VM: summary cancelled")
-        } catch let AppError.networkError(urlError) where urlError.code == .cancelled || Task.isCancelled || isCancellingSummary {
-            AppLog.transcription.atNotice.notice("VM: summary cancelled")
-        } catch let appError as AppError {
-            error = appError
-            AppLog.transcription.atError.error("VM: summary failed code=\(appError.logCode, privacy: .public)")
-        } catch {
-            self.error = .apiError(statusCode: 0, message: error.localizedDescription)
-            AppLog.transcription.atError.error("VM: summary failed code=unexpected")
-        }
     }
 }

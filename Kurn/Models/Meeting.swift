@@ -68,6 +68,17 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \WikiArticle.meeting)
     var wikiArticle: WikiArticle?
 
+    /// JSON-encoded `SummaryMapCheckpoint` while a staged (map-reduce) summary
+    /// or wiki generation is in flight for this meeting (SwiftData can't store
+    /// arbitrary `Codable` values directly). Cleared on success; kept on
+    /// failure/interruption so the next attempt resumes from the last
+    /// completed map block instead of re-condensing — for a cloud provider,
+    /// re-paying for — every block from the start. Summary and wiki
+    /// generation share this one field: `WikiService` delegates to
+    /// `SummaryService`'s own `notesTemplate` for the map stage, so the two
+    /// produce identical notes for the same meeting content (H4).
+    var summaryMapCheckpointData: Data?
+
     init(
         id: UUID = UUID(),
         title: String,
@@ -95,6 +106,30 @@ final class Meeting {
 
     /// Convenience: whether the meeting is currently archived.
     var isArchived: Bool { archivedAt != nil }
+
+    var summaryMapCheckpoint: SummaryMapCheckpoint? {
+        get { summaryMapCheckpointOutcome.decodedValue }
+        set {
+            if let newValue {
+                // A failed encode keeps the previous checkpoint bytes: an
+                // older resumable point is strictly better than none.
+                // Clearing is always the explicit `summaryMapCheckpointData = nil`.
+                summaryMapCheckpointData =
+                    JSONStorage.encodeAuthoritative(newValue) ?? summaryMapCheckpointData
+            } else {
+                summaryMapCheckpointData = nil
+            }
+        }
+    }
+
+    /// The checkpoint decode with corruption kept distinct from absence, same
+    /// reasoning as `Recording.transcriptionCheckpointOutcome`: a checkpoint
+    /// that fails to decode or verify must never be silently treated as "no
+    /// checkpoint" and redone — for a cloud provider that's repeated paid work.
+    var summaryMapCheckpointOutcome: JSONDecodeOutcome<SummaryMapCheckpoint> {
+        guard let data = summaryMapCheckpointData else { return .empty }
+        return JSONStorage.decodeAuthoritative(SummaryMapCheckpoint.self, from: data)
+    }
 
     /// Most recently generated summary, used as the default selection when
     /// the summary tab is shown.

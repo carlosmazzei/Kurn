@@ -97,12 +97,25 @@ final class WikiCoordinator {
         defer { generatingMeetingIDs.remove(meetingID) }
 
         let title = meeting.aiTitle ?? meeting.title
+        // A checkpoint from an earlier interrupted staged run (H4), shared
+        // with summary generation since both delegate the map stage to the
+        // same `SummaryService.notesTemplate` — see `SummaryMapCheckpoint`'s
+        // header. A structurally invalid one is treated the same as none.
+        let resumeCheckpoint = meeting.summaryMapCheckpoint.flatMap { $0.isStructurallyValid ? $0 : nil }
         do {
             let markdown = try await wikiService.generate(
-                transcriptText: text, meetingTitle: title, provider: provider, model: model
+                transcriptText: text, meetingTitle: title, provider: provider, model: model,
+                resume: resumeCheckpoint,
+                onMapStageCompleted: { [weak self] checkpoint in
+                    try await self?.storeSummaryMapCheckpointDurably(checkpoint, forMeetingID: meetingID)
+                }
             )
             try Task.checkCancellation()
             guard !markdown.isEmpty, !Task.isCancelled else { return .skipped }
+            // The staged run (if any) is fully done, so the checkpoint that
+            // got it here no longer describes work still owed (H4).
+            // `replaceArticle` below persists this alongside the new article.
+            meeting.summaryMapCheckpoint = nil
             replaceArticle(
                 of: meeting, markdown: markdown, hash: hash,
                 generator: generator, title: title, date: meeting.createdAt
@@ -245,6 +258,29 @@ final class WikiCoordinator {
             try modelContext.save()
         } catch {
             AppLog.persistence.atError.error("wiki: persist failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Persist a staged wiki run's map-stage progress so an interruption
+    /// resumes from the last completed block instead of re-condensing — for
+    /// a cloud provider, re-paying for — every block from the start (H4).
+    /// Throws (rather than merely logging, as `persist()` above does) so a
+    /// save failure gates forward progress: `SummaryMapRunner` awaits this
+    /// before starting the next block, and a thrown error stops the run at
+    /// the last durably-committed one — the same contract
+    /// `TranscriptionViewModel`'s own `storeSummaryMapCheckpointDurably` has.
+    ///
+    /// Takes the meeting's id rather than the `Meeting` itself: `Meeting`
+    /// isn't `Sendable`, and this is called from the `@Sendable` closure
+    /// `generate` hands to `WikiService.generate`.
+    private func storeSummaryMapCheckpointDurably(_ checkpoint: SummaryMapCheckpoint, forMeetingID meetingID: UUID) throws {
+        let descriptor = FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == meetingID })
+        guard let meeting = try? modelContext.fetch(descriptor).first else { return }
+        meeting.summaryMapCheckpoint = checkpoint
+        do {
+            try modelContext.save()
+        } catch {
+            throw AppError.persistenceFailed(error.localizedDescription)
         }
     }
 }

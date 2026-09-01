@@ -226,6 +226,66 @@ struct ModelTests {
         #expect(meeting.language == .autoDetect)
     }
 
+    // MARK: - Meeting.summaryMapCheckpoint (H4)
+
+    private func sampleSummaryMapCheckpoint() -> SummaryMapCheckpoint {
+        SummaryMapCheckpoint(
+            contentDigest: "abc123",
+            providerID: AIProvider.openAI.id,
+            model: "gpt-4o",
+            totalBlocks: 3,
+            completedNotes: ["note 1", "note 2"]
+        )
+    }
+
+    @Test func meetingStoresSummaryMapCheckpointAsData() {
+        let meeting = Meeting(title: "Standup")
+        #expect(meeting.summaryMapCheckpoint == nil)
+
+        meeting.summaryMapCheckpoint = sampleSummaryMapCheckpoint()
+        #expect(meeting.summaryMapCheckpointData != nil)
+        #expect(meeting.summaryMapCheckpoint?.completedNotes.count == 2)
+
+        meeting.summaryMapCheckpoint = nil
+        #expect(meeting.summaryMapCheckpointData == nil)
+    }
+
+    @Test func meetingWritesSummaryMapCheckpointAsVersionedEnvelope() throws {
+        let meeting = Meeting(title: "Standup")
+        meeting.summaryMapCheckpoint = sampleSummaryMapCheckpoint()
+
+        let data = try #require(meeting.summaryMapCheckpointData)
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(SummaryMapCheckpoint.self, from: data)
+        }
+        #expect(meeting.summaryMapCheckpointOutcome.decodedValue?.totalBlocks == 3)
+    }
+
+    @Test func meetingSummaryMapCheckpointGarbledDataIsCorruptedNotEmpty() {
+        let meeting = Meeting(title: "Standup")
+        meeting.summaryMapCheckpointData = Data("not json at all".utf8)
+
+        #expect(meeting.summaryMapCheckpoint == nil)
+        #expect(meeting.summaryMapCheckpointOutcome.isCorrupted)
+
+        meeting.summaryMapCheckpointData = nil
+        if case .empty = meeting.summaryMapCheckpointOutcome {} else {
+            Issue.record("absent checkpoint must be .empty, not .corrupted")
+        }
+    }
+
+    @Test func meetingSummaryMapCheckpointOverwritesWithANewerRun() {
+        let meeting = Meeting(title: "Standup")
+        meeting.summaryMapCheckpoint = sampleSummaryMapCheckpoint()
+
+        meeting.summaryMapCheckpoint = SummaryMapCheckpoint(
+            contentDigest: "def456", providerID: AIProvider.groq.id, model: "other",
+            totalBlocks: 1, completedNotes: ["different"]
+        )
+        #expect(meeting.summaryMapCheckpoint?.contentDigest == "def456")
+        #expect(meeting.summaryMapCheckpoint?.completedNotes == ["different"])
+    }
+
     // MARK: - Speaker
 
     @Test func displayNameFallsBackToLabelWhenNameIsEmpty() {

@@ -8,7 +8,7 @@ resume the track in another engineering session.
 
 ## Current handoff
 
-Last updated: 2026-08-31.
+Last updated: 2026-09-01.
 
 - PR #151 established the initial reliability vocabulary and injectable seams.
 - PR #152 completed the core H6 network-boundary contract and the first H1
@@ -119,7 +119,7 @@ Last updated: 2026-08-31.
   fails to decode under the new shape and is treated as `.corrupted`, same
   as bit-level corruption — never as a false match).
 - **H4 PR 9 (throwing chunk commits and bounded automatic recovery,
-  items 1, 2, 4 of the plan) implemented**, pending push/CI/review.
+  items 1, 2, 4 of the plan), merged into `main`.**
   `ChunkedTranscriptionRunner.run`'s `onChunkCompleted` — and
   `TranscriptionService.CheckpointHandler`/`checkpointSink` above it — are
   now `async throws` and awaited before the next chunk starts, so a
@@ -137,6 +137,19 @@ Last updated: 2026-08-31.
   `resetAutomaticResumeBudget`. See "PR 9 — H4 throwing chunk commits and
   bounded operation states" below for what's covered and what's deliberately
   deferred (item 3's full explicit operation-state enum).
+- **H4 PR 10 (durable, resumable map-stage checkpointing for staged
+  summary/wiki generation, item 6 of the plan) implemented**, pending
+  push/CI/review. `SummaryMapCheckpoint` (`Models/SummaryMapCheckpoint.swift`)
+  and `SummaryMapRunner` (`Services/SummaryMapRunner.swift`) give the
+  map-reduce loop behind long summaries and wikis the same
+  checkpoint-gates-forward-progress contract PR 9 gave transcription chunks.
+  `Meeting.summaryMapCheckpointData` is one field shared by Summary and Wiki
+  generation — both delegate their map stage to `SummaryService`'s
+  `notesTemplate`, so they produce byte-identical notes for the same meeting
+  content and can safely share (or briefly re-do a block of) one checkpoint.
+  `DocumentGenerationService` is deliberately excluded: it spans multiple
+  meetings, so there is no single `Meeting` to persist a checkpoint against.
+  See "PR 10 — H4 expensive generated-artifact operation state" below.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -158,12 +171,17 @@ Last updated: 2026-08-31.
    planned H3 boundaries; see the status snapshot below.
    H4 (checkpoint identity and durable operation state) is underway:
    [PR #165](https://github.com/carlosmazzei/Kurn/pull/165) (pipeline
-   fingerprint and checkpoint validation, the "PR 8" boundary) is merged into
-   `main` (commit `08a0192`). PR 9 (throwing chunk commits and bounded
-   automatic recovery) is implemented on branch
+   fingerprint and checkpoint validation, the "PR 8" boundary) and
+   [PR #166](https://github.com/carlosmazzei/Kurn/pull/166) (throwing chunk
+   commits and bounded automatic recovery, the "PR 9" boundary) are both
+   merged into `main`. PR 10 (durable, resumable map-stage checkpointing
+   shared between summary and wiki generation) is implemented on branch
    `claude/resiliencia-roadmap-e69zyy`, pending push/CI/review. Continue from
-   there (or from updated `main` once it merges) with PR 10 (the same
-   durable-job pattern for summary/wiki/document/correction generation).
+   there (or from updated `main` once it merges) with H5 (typed degradation
+   and output-integrity gates, the "PR 11"/"PR 12" boundaries) — H4's plan
+   items are now fully addressed except item 3 (the full explicit
+   operation-state enum), left deliberately deferred; see the H4 status
+   snapshot row and "PR 10" below for the document-generation exclusion.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -201,7 +219,7 @@ Last updated: 2026-08-31.
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
 | H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
-| H4    | PR 8 merged, PR 9 implemented | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, implemented). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3), and the same durable-job pattern for summary/wiki/document/correction generation (PR 10 below). |
+| H4    | PR 8 and PR 9 merged, PR 10 implemented | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, implemented). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
@@ -585,8 +603,7 @@ bounded operation states.** Started from updated `main`, per below.
 
 Objective: make durable checkpoint state gate forward progress.
 
-Status: implemented on branch `claude/resiliencia-roadmap-e69zyy`, pending
-push/CI/review.
+Status: implemented, merged into `main` as [PR #166](https://github.com/carlosmazzei/Kurn/pull/166).
 
 Scope:
 
@@ -727,19 +744,142 @@ rather than attempted speculatively).
   correctly for the *progress-reset* half of the logic, even without
   per-fingerprint bookkeeping.
 
-**Next code work: H4 PR 10 — the same durable multi-step pattern applied to
-summary/wiki/document/correction generation jobs.** Start it from updated
-`main` after this PR merges.
-
 #### PR 10 — H4 expensive generated-artifact operation state
 
 Objective: apply durable multi-step semantics selectively to summary, wiki,
 document, and correction jobs.
 
+Status: implemented on branch `claude/resiliencia-roadmap-e69zyy`, pending
+push/CI/review.
+
 Acceptance:
 
 - Completed safe map stages may resume; otherwise restart is explicit.
 - Partial prose or JSON is never displayed as final.
+
+**What shipped.** "Partial prose or JSON is never displayed as final" was
+already true before this PR: `TranscriptionViewModel.generateSummary` only
+inserts a `Summary` row after `SummaryService.generate` returns successfully,
+and `WikiCoordinator.replaceArticle` is only called after `WikiService.generate`
+returns non-empty markdown — a failed or cancelled run leaves whatever
+existed before untouched in both cases. The actual gap was resumability: the
+staged map-reduce loop behind long summaries and wikis had none, so an
+interrupted staged run always re-condensed every block — for a cloud
+provider, re-paying for all of them — from scratch.
+
+`SummaryMapCheckpoint` (`Models/SummaryMapCheckpoint.swift`) is the durable
+progress record: a content digest (SHA-256 of the exact transcript text fed
+to the map stage), provider id, exact model, the plan's block count, and the
+notes condensed so far. `matches(...)` is the resume identity check and
+`isStructurallyValid` the same "can never describe more blocks than the plan
+has" sanity check `TranscriptionCheckpoint` already has for chunk counts.
+`SummaryMapRunner` (`Services/SummaryMapRunner.swift`) is the loop itself,
+built the same way `ChunkedTranscriptionRunner` was: kept independent of
+`LLMProvider` (the condense call is injected) so the resume/skip logic is
+unit-testable without a network mock. It seeds from `resume.completedNotes`
+only when `resume.isStructurallyValid && resume.matches(...)` the exact plan
+about to run, then condenses only the remaining blocks; after each new block
+it builds an updated checkpoint and `try await`s `onStageCompleted` before
+starting the next one — the same "not durable until this returns" contract
+`ChunkedTranscriptionRunner.run`'s `onChunkCompleted` established in PR 9,
+so a checkpoint-save failure stops the run at the last committed block
+instead of risking the next block's cost on top of unsaved progress.
+
+**One checkpoint field on `Meeting`, shared by Summary and Wiki.**
+`Meeting.summaryMapCheckpointData` (`Models/Meeting.swift`, JSON `Data`, the
+same pattern as `Recording.transcriptionCheckpointData`) is read/written
+through `summaryMapCheckpoint`/`summaryMapCheckpointOutcome` computed
+properties using `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` —
+the same versioned-envelope, corrupted-vs-empty distinction H3 PR 7
+established for `Recording.transcriptionCheckpoint`. It is not per-artifact
+because it doesn't need to be: `WikiService.generate` delegates to
+`SummaryService.generate` using that service's own `notesTemplate` for the
+map stage regardless of which caller triggered it, so for a given meeting's
+content the map stage produces byte-identical notes whether a Summary run or
+a Wiki run is condensing it. A Summary run and a Wiki run racing on the same
+meeting can therefore share, or briefly overwrite, each other's progress
+with no correctness risk — the worst case is redoing one already-completed
+block, never spliced or incorrect notes, because both run on the same
+`@MainActor` context that already serializes `modelContext.save()` calls.
+`SummaryService.generate`/`mapReduce` gained `resume: SummaryMapCheckpoint?`
+and `onMapStageCompleted` parameters threaded straight through to
+`SummaryMapRunner.run`; `WikiService.generate` gained the same two
+parameters and passes them straight through to `SummaryService.generate`
+unchanged.
+
+`TranscriptionViewModel.generateSummary` (moved to the new
+`ViewModels/TranscriptionViewModel+Summary.swift`, see below) and
+`WikiCoordinator.generate` both read `meeting.summaryMapCheckpoint` (only if
+`isStructurallyValid`) as the resume seed before calling into
+`SummaryService`/`WikiService`, pass a `storeSummaryMapCheckpointDurably`
+closure as `onMapStageCompleted`, and clear `meeting.summaryMapCheckpoint =
+nil` once the whole run — map and reduce — succeeds. Both
+`storeSummaryMapCheckpointDurably` implementations take the meeting's `id`
+rather than the `Meeting` itself and re-fetch it via
+`FetchDescriptor<Meeting>(predicate: #Predicate { $0.id == meetingID })`:
+`Meeting` is a SwiftData `@Model` and therefore not `Sendable`, and this
+closure is the `@Sendable (SummaryMapCheckpoint) async throws -> Void`
+`onMapStageCompleted` parameter — capturing the model object directly would
+fail Swift 6 strict concurrency checking, the same reason
+`TranscriptionViewModel+ResumeBudget.swift` and
+`RecordingRecovery.swift` key their own cross-closure lookups on `UUID`
+rather than the model instance.
+
+**Deliberately excluded: `DocumentGenerationService`.** A `GeneratedDocument`
+can be synthesized from multiple meetings' transcripts (by tag, by folder, or
+an explicit multi-meeting selection) map-reduced into one run, so there is no
+single `Meeting` to persist a checkpoint against — the same reason
+`GeneratedDocument` already snapshots its sources instead of relating to
+them (see `docs/CLAUDE.md`'s "Derived artifacts" section). Left out of scope
+for this PR rather than inventing a second, document-scoped checkpoint
+location speculatively.
+
+**Split into a new file to stay under SwiftLint's file-length limit.**
+This PR's additions would have pushed `TranscriptionViewModel.swift` past
+907 lines, over the 900-line error threshold PR 9 already left it one PR
+away from. The entire `// MARK: - Summary` section (`startSummary`,
+`cancelSummary`, `generateSummary`, and the new
+`storeSummaryMapCheckpointDurably`) moved to
+`ViewModels/TranscriptionViewModel+Summary.swift`, the same extraction
+pattern as `TranscriptionViewModel+ResumeBudget.swift` and
+`TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`. `isSummarizing`,
+`isCancellingSummary`, `summaryProgress`, `summaryTask`, and `summaryService`
+each dropped their `private`/`private(set)` access modifier (with a comment
+saying why) so the new extension file can reach them.
+
+**Tests.** `KurnTests/SummaryMapCheckpointTests.swift` covers `matches`'s
+exact-identity requirement and `isStructurallyValid`'s bounds check, plus a
+`Codable` round trip. `KurnTests/SummaryMapRunnerTests.swift` mirrors
+`ChunkedTranscriptionRunnerTests`: resuming skips already-condensed blocks;
+a mismatched content digest, provider, or structurally invalid resume all
+restart from zero; a fully-completed resume condenses nothing; and
+`checkpointSaveFailureStopsTheRunBeforeTheNextBlock` proves a throwing
+`onStageCompleted` stops the loop at the block it failed on. `KurnTests/
+ModelTests.swift` gained a "Meeting.summaryMapCheckpoint" section verifying
+the versioned-envelope write, the corrupted-vs-empty distinction on garbled
+data, and that a newer run's checkpoint fully overwrites an older one.
+
+**Known gaps, stated plainly.**
+
+- **No end-to-end test exercises `TranscriptionViewModel.generateSummary` or
+  `WikiCoordinator.generate` resuming an interrupted staged run against a
+  real (mocked) `LLMProvider`.** `SummaryMapRunnerTests` proves the loop
+  itself is correct in isolation, the same gap PR 9 stated for
+  `storeCheckpointDurably`'s own save-failure path — the throw-and-stop
+  mechanism is covered generically rather than through the concrete
+  view-model/coordinator call sites, since neither `SummaryService` nor
+  `WikiService` is behind an injectable seam today.
+- **The narrow concurrent Summary+Wiki race on one meeting is reasoned about,
+  not tested.** Both writers run on the same `@MainActor`, so there is no
+  interleaving that produces a torn or spliced write, but no test forces the
+  two generations to actually overlap and inspects the resulting checkpoint.
+- **`DocumentGenerationService` has no durable map-stage resumability.** See
+  above — deliberately out of scope, not forgotten.
+
+**Next code work: H5 — typed stage outcomes, pipeline report, and the final
+integrity gate (PRs 11–12 below).** Start it from updated `main` after this
+PR merges. H4's plan is otherwise closed except item 3 (the full explicit
+operation-state enum), left deliberately deferred per PR 9's own handoff.
 
 ### Phase B — Visible degradation and integrity
 
