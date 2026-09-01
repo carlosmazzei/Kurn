@@ -102,8 +102,8 @@ Last updated: 2026-08-31.
   see `docs/roadmap.md`'s H3 section for what shipped. This backfills the
   handoff bullet these two commits should have gotten at the time; they were
   not previously called out here by PR number.
-- **H4 PR 8 (pipeline fingerprint and checkpoint validation) implemented** on
-  branch `claude/resiliencia-roadmap-e69zyy`, pending push/CI/review.
+- **[PR #165](https://github.com/carlosmazzei/Kurn/pull/165), H4 PR 8
+  (pipeline fingerprint and checkpoint validation), open, pending CI/review.**
   `TranscriptionPipelineFingerprint` (`Models/TranscriptionPipelineFingerprint.swift`)
   and `Infrastructure/PipelineDigest.swift` replace `TranscriptionCheckpoint`'s
   old engine/language/compaction/provider-only match with source
@@ -138,11 +138,11 @@ Last updated: 2026-08-31.
    "PR 6" boundary, commit `d7e3dee`), and the versioned checkpoint envelope
    (the "PR 7" boundary, commit `e7a156a`) are all on `main`, closing the
    planned H3 boundaries; see the status snapshot below.
-   H4 (checkpoint identity and durable operation state) is underway: PR 8
-   (pipeline fingerprint and checkpoint validation) is implemented on branch
-   `claude/resiliencia-roadmap-e69zyy`. Continue from there (or from updated
-   `main` once it merges) with PR 9 (throwing chunk commits and bounded
-   operation states).
+   H4 (checkpoint identity and durable operation state) is underway:
+   [PR #165](https://github.com/carlosmazzei/Kurn/pull/165) (pipeline
+   fingerprint and checkpoint validation, the "PR 8" boundary) is open.
+   Continue from updated `main` once it merges with PR 9 (throwing chunk
+   commits and bounded operation states).
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -434,11 +434,11 @@ Acceptance:
 
 Objective: prevent incompatible transcription work from being spliced together.
 
-Status: implemented on branch `claude/resiliencia-roadmap-e69zyy`, pending
-push/CI/review — this session has no macOS/Xcode toolchain, so per
+Status: [PR #165](https://github.com/carlosmazzei/Kurn/pull/165) open,
+pending CI/review — this session has no macOS/Xcode toolchain, so per
 "Verifying without a local macOS/Xcode toolchain" nothing here is claimed to
-compile or pass locally; the GitHub `iOS CI` result is the source of truth
-once pushed.
+compile or pass locally; the GitHub `iOS CI` result on the PR is the source
+of truth.
 
 Scope:
 
