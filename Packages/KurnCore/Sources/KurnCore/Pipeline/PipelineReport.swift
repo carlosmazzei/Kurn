@@ -31,6 +31,23 @@ public enum PipelineStage: String, Codable, Sendable, CaseIterable {
     /// `TranscriptFusion`: text spans + speaker turns → attributed segments.
     case fusion
     case correction
+
+    /// Localized, user-facing name — the display seam for a stage named in a
+    /// completed-with-warnings banner (H5 PR 13). `.transcription` and
+    /// `.correction` reuse existing Settings labels rather than duplicating
+    /// them under a second key.
+    public var displayName: String {
+        switch self {
+        case .preprocessing: return NSLocalizedString("pipeline.stage.preprocessing", comment: "Preprocessing")
+        case .languageDetection: return NSLocalizedString("pipeline.stage.language_detection", comment: "Language Detection")
+        case .voiceActivityDetection: return NSLocalizedString("pipeline.stage.voice_activity_detection", comment: "Speech Detection")
+        case .compaction: return NSLocalizedString("pipeline.stage.compaction", comment: "Silence Removal")
+        case .transcription: return NSLocalizedString("settings.transcription", comment: "Transcription")
+        case .diarization: return NSLocalizedString("pipeline.stage.diarization", comment: "Speaker Separation")
+        case .fusion: return NSLocalizedString("pipeline.stage.fusion", comment: "Transcript Assembly")
+        case .correction: return NSLocalizedString("correction.llm", comment: "AI Correction")
+        }
+    }
 }
 
 /// How a stage finished.

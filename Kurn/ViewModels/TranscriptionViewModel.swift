@@ -55,6 +55,10 @@ final class TranscriptionViewModel {
     /// meeting — staged, never silently applied. See
     /// `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`.
     var pendingCrossMeetingMatches: [CrossMeetingSpeakerMatch] = []
+    /// Recordings whose correction stage is currently being retried in
+    /// isolation (H5 PR 13). Not `private(set)` —
+    /// `TranscriptionViewModel+CorrectionRetry.swift` needs to mutate it.
+    var correctionRetryIDs: Set<UUID> = []
 
     /// Task handles for transcriptions started via `startTranscription`, so
     /// they can be cancelled (by the user or by the background window expiring).
@@ -95,7 +99,10 @@ final class TranscriptionViewModel {
 
     /// Not `private` — `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift` needs it.
     let modelContext: ModelContext
-    private let transcriptionService = TranscriptionService()
+    /// Not `private` — `TranscriptionViewModel+CorrectionRetry.swift` needs
+    /// it to retry just the correction stage without repeating the rest of
+    /// the pipeline.
+    let transcriptionService = TranscriptionService()
     /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
     let summaryService = SummaryService()
     private let aiTitleCoordinator: AITitleCoordinator

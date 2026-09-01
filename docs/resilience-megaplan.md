@@ -161,11 +161,18 @@ Last updated: 2026-09-01.
   full contract; this bullet only records the merge. This document previously
   said PR #168 was docs-only and PR 11 was still open — it grew into the PR
   11 implementation itself before merging, and this bullet corrects that.
-- H5 PR 12 (final integrity gate for a run's fused/corrected output, so a
-  structurally broken result can never replace an existing transcript) is
-  implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 12"
-  below for what shipped. CI is the verification of record, per "Verifying
-  without a local macOS/Xcode toolchain" in `CLAUDE.md`.
+- **[PR #169](https://github.com/carlosmazzei/Kurn/pull/169), H5 PR 12
+  (final integrity gate for a run's fused/corrected output, so a
+  structurally broken result can never replace an existing transcript),
+  merged into `main`** (commit `e3c1c54`). CI (`build-and-test`,
+  `kurncore-linux`) was green on the first push; see "PR 12" below for the
+  full contract.
+- H5 PR 13 (surfacing "completed with warnings" in the Transcript tab, and
+  retrying the correction stage in isolation where the architecture allows
+  it) is implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see
+  "PR 13" below for what shipped. Per the user's explicit request, this PR
+  bundles its own docs status corrections (recording PR 12 as merged) rather
+  than shipping as a trailing docs-only follow-up.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -196,8 +203,11 @@ Last updated: 2026-09-01.
    `663ab09`). H5 is now in flight: the "PR 11" boundary (typed stage
    outcomes and the persisted pipeline report) merged into `main` as
    [PR #168](https://github.com/carlosmazzei/Kurn/pull/168) (commit
-   `d9f5120`). "PR 12" (the final integrity gate and atomic artifact
-   replacement) is implemented next, on branch
+   `d9f5120`), and the "PR 12" boundary (the final integrity gate and
+   correction-identity check) merged into `main` as
+   [PR #169](https://github.com/carlosmazzei/Kurn/pull/169) (commit
+   `e3c1c54`). "PR 13" (surfacing completed-with-warnings and retrying the
+   correction stage in isolation) is implemented next, on branch
    `claude/resilience-roadmap-plan-fn23ki` — H4's plan
    items are now fully addressed except item 3 (the full explicit
    operation-state enum), left deliberately deferred; see the H4 status
@@ -240,7 +250,7 @@ Last updated: 2026-09-01.
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
 | H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
 | H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
-| H5    | In progress (PR 11 merged in [PR #168](https://github.com/carlosmazzei/Kurn/pull/168); PR 12 implemented) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, implemented). Remaining: the completed-with-warnings UI plus stage-specific retry (PR 13). |
+| H5    | In progress (PR 11 merged in [PR #168](https://github.com/carlosmazzei/Kurn/pull/168); PR 12 merged in [PR #169](https://github.com/carlosmazzei/Kurn/pull/169); PR 13 implemented) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab now shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, implemented). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
 | H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
@@ -974,8 +984,10 @@ Validate source readability, span bounds/order, speech/text consistency, speaker
 attribution, and correction identity. Keep the previous transcript, summary, and
 index until the replacement is valid and durable.
 
-Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
-the verification of record, per "Verifying without a local macOS/Xcode
+Status: merged into `main` as
+[PR #169](https://github.com/carlosmazzei/Kurn/pull/169) (commit `e3c1c54`);
+CI (`build-and-test`, `kurncore-linux`) was green on the first push — the
+verification of record, per "Verifying without a local macOS/Xcode
 toolchain" in `CLAUDE.md`.
 
 **What shipped.** Two gaps existed before this PR. First,
@@ -1095,6 +1107,111 @@ position, and a changed timestamp, speaker label, or confidence.
 Expose completed-with-warnings and retry the degraded stage without repeating
 unrelated work where the architecture allows it. Integrate with H9 rather than
 creating a second error system.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**What shipped.** `Transcript.pipelineReportData` (H5 PR 11) has been durable
+since it landed, but nothing read it until this PR — a transcript could
+complete with a degraded or failed stage and the UI would show it exactly the
+same as a clean run. `MeetingDetailView`'s Transcript tab now renders a
+`pipelineWarningsBanner(for:)` per recording whenever
+`recording.transcript?.pipelineReport?.hasWarnings` is true: one line naming
+every warning's stage (`PipelineStage.displayName`, new — the localization
+seam for a stage named outside a code comment for the first time) joined by
+comma, e.g. "Completed with warnings in: Speaker Separation, AI Correction."
+This is deliberately a single sentence over `report.warnings`, not one row
+per stage — `PipelineStageReason`'s eleven cases would have needed their own
+localized phrase each to explain *why*, at real translation cost across seven
+languages for detail a screenshot of the banner's retry action already
+implies; naming the stage is enough to be actionable.
+
+**Stage-specific retry, honestly scoped to where it's actually cheap.**
+Every other stage in `TranscriptionService.transcribe` needs the original
+audio, an upstream stage's output, or both — preprocessing fixed VAD's input,
+VAD fixed the transcriber's input, diarization needs the audio file directly,
+fusion needs both ASR spans and diarizer turns. None of those can be re-run
+in isolation without either re-deriving or re-caching everything upstream of
+them, which is exactly the kind of new durable intermediate state H4 already
+weighed and left out of scope. **Correction is the one exception**: `TranscriptCorrecting.correct(segments:language:...)` takes only the already-fused segments and the meeting's language — nothing about the source audio,
+ASR, or diarization. `TranscriptionViewModel.retryCorrection(_:language:config:)`
+(`ViewModels/TranscriptionViewModel+CorrectionRetry.swift`, new — the same
+file-length-driven extraction pattern as its `+ResumeBudget`/`+Summary`/
+`+CrossMeetingSpeakerMatch` siblings) calls
+`TranscriptionService.correctIfRequested` directly over the stored
+transcript's current segments, guarded by a new `correctionRetryIDs: Set<UUID>`
+so the same recording can't have two retries racing. Every other warning in
+the banner falls back to the existing full re-transcribe action
+(`pendingRetranscribe`'s confirmation dialog, unchanged) — repeating the rest
+of the pipeline is unavoidable there, which the roadmap's own "where the
+architecture allows it" already anticipated rather than promising universally.
+
+**The retry path gets the same fail-closed guarantee PR 12 gave the main
+pipeline, derived rather than re-verified against the source file.**
+`correctIfRequested` already enforces `TranscriptIntegrityGate
+.correctionPreservedIdentity` before trusting its own result (PR 12), so
+whatever it returns here is either the original segments unchanged or the
+original segments with only `.text` fields replaced — every timestamp is
+therefore already known to be valid, because it's the same timestamp that
+was already in the stored transcript. `retryCorrection` still calls
+`TranscriptIntegrityGate.validate` before persisting, using
+`original.map(\.endTime).max()` as the duration bound rather than re-reading
+the recording's audio file: since identity preservation means the result's
+timestamps can only be exactly the ones already in `original`, that bound is
+sufficient without adding a second source-of-truth for "what counts as the
+recording's duration" or paying to re-open the file for a retry that never
+touches it. A gate failure surfaces `AppError.transcriptIntegrityFailed` and
+leaves the stored transcript untouched, the same as the main pipeline. On
+success, only the `.correction` entry of the transcript's `PipelineReport` is
+replaced (`PipelineReportBuilder` seeded from the existing report, then one
+new record call) — every other stage's history from the original run is
+preserved, since nothing else ran.
+
+**A stale-write guard, not a lock.** Before writing back,
+`retryCorrection` re-checks `recording.transcript?.segments == original`
+(captured at the start of the retry): if the recording was fully
+re-transcribed while the correction retry was in flight, the retry's result
+is silently discarded rather than overwriting the newer transcript with a
+correction of stale content. `[TranscriptSegment]`'s existing `Hashable`
+conformance (H1) is what makes this a plain equality check rather than new
+machinery.
+
+**Explicitly not attempted: integrating with H9.** The roadmap text says
+"integrate with H9 rather than creating a second error system," but H9
+(`docs/roadmap.md`'s "Started" row: `AppError.logCode` and the content-free
+`ReliabilityEvent` vocabulary exist; action metadata, per-operation queues,
+and a health/recovery UI do not yet) has no operation-report or recovery-action
+model to integrate with today. This PR's banner reuses the *existing*
+`AppError`/warning-banner presentation `diarizationWarningBanner` already
+established, rather than inventing a second, parallel warning system of its
+own — which is the concrete, buildable half of "don't create a second error
+system" available before H9 itself exists. Revisit when H9's action-metadata
+model lands.
+
+**Known gaps, stated plainly.**
+
+- **No end-to-end test exercises `retryCorrection` against a real (mocked)
+  `LLMProvider`, or the banner's conditional rendering.** Same gap PR 9, PR
+  10, and PR 12 each stated for their own view-model/UI glue: neither
+  `TranscriptionService` nor `TranscriptionViewModel` is behind an injectable
+  seam that would let a unit test exercise this without a live SwiftUI
+  hierarchy and a mocked provider. `TranscriptIntegrityGate` and
+  `PipelineStage.displayName` are otherwise covered by existing/adjacent
+  `KurnCoreTests` and manual review; a `displayName` computed property has no
+  existing test precedent in this codebase either (checked before deciding
+  not to add one here).
+- **The banner shows one combined sentence, not a per-stage reason.** A
+  reader can see *which* stages warned but not *why* without opening
+  Diagnostics — a deliberate scope cut against `PipelineStageReason`'s
+  eleven-case translation cost, not an oversight. Revisit if user feedback
+  says the stage name alone isn't actionable enough.
+- **Retrying correction when the current settings no longer request it
+  (e.g. the user turned AI Correction off since the failed run) re-runs
+  `NoOpTranscriptCorrector` and reports `.skipped`/`.notRequested` rather than
+  fixing anything.** This mirrors `retranscribeAll`/`retranscribe`, which
+  already always use the *current* settings rather than the ones the failed
+  run used — consistent with the rest of the app, not a new inconsistency.
 
 ### Phase C — Credentials and models
 

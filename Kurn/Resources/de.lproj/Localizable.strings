@@ -74,6 +74,14 @@
 "langdetect.by_transcriber" = "Durch Transkriptor";
 "langdetect.fluid_lid" = "FluidAudio-Erkennung";
 
+/* Anzeigenamen der Pipeline-Phasen */
+"pipeline.stage.preprocessing" = "Vorverarbeitung";
+"pipeline.stage.language_detection" = "Sprachenerkennung";
+"pipeline.stage.voice_activity_detection" = "Sprachaktivitätserkennung";
+"pipeline.stage.compaction" = "Stille entfernen";
+"pipeline.stage.diarization" = "Sprechertrennung";
+"pipeline.stage.fusion" = "Transkripterstellung";
+
 /* Sprachen */
 "lang.auto" = "Automatisch erkennen";
 "lang.pt" = "Portugiesisch";
@@ -423,6 +431,7 @@
 "speaker.cross_meeting_match.dismiss" = "Nicht jetzt";
 "detail.add_segment" = "Abschnitt hinzufügen";
 "detail.retranscribe" = "Neu transkribieren";
+"detail.retry_correction" = "Korrektur wiederholen";
 "detail.retranscribe.confirm.title" = "Diese Aufnahme neu transkribieren?";
 "detail.retranscribe.confirm.message" = "Dies ersetzt das vorhandene Transkript durch ein neues aus dem Originalaudio. Dies kann nicht rückgängig gemacht werden.";
 "detail.retranscribe_all" = "Alle neu transkribieren";
@@ -438,6 +447,7 @@
 "detail.transcript.corrupted.title" = "Transkript nicht lesbar";
 "detail.transcript.corrupted.subtitle" = "Das gespeicherte Transkript scheint beschädigt zu sein. Eine erneute Transkription dieser Aufnahme ersetzt es.";
 "detail.transcript.corrupted_banner" = "Das Transkript dieser Aufnahme scheint beschädigt zu sein und konnte nicht geladen werden.";
+"detail.transcript.warnings_banner" = "Abgeschlossen mit Warnungen bei: %@";
 "detail.summary.empty.title" = "Noch keine Zusammenfassung";
 "detail.section" = "Bereich";
 "tab.recordings" = "Aufnahmen";
