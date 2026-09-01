@@ -18,11 +18,14 @@ import SwiftUI // for Color.speakerHex palette helper
 final class TranscriptionViewModel {
     /// An ordered update emitted by the transcription pipeline's `@Sendable`
     /// callbacks and applied on the main actor in emission order (see
-    /// `transcribe(_:language:config:)`).
+    /// `transcribe(_:language:config:)`). Checkpoints are deliberately not
+    /// routed through this channel (see `onCheckpoint` below, H4): a
+    /// checkpoint must be durably saved — and its save failure must stop the
+    /// pipeline — before the next chunk starts, which a fire-and-forget
+    /// `continuation.yield` cannot do.
     private enum PipelineEvent: Sendable {
         case phase(TranscriptionPhase)
         case diarizationWarning(String)
-        case checkpoint(TranscriptionCheckpoint)
     }
 
     /// IDs of recordings currently transcribing, for per-row spinners.
@@ -73,7 +76,8 @@ final class TranscriptionViewModel {
     private(set) var cancellingIDs: Set<UUID> = []
     /// Recordings this instance is transcribing, so `@Sendable` pipeline
     /// callbacks can reach the model by ID after hopping to the main actor.
-    private var activeRecordings: [UUID: Recording] = [:]
+    /// Not `private` — `TranscriptionViewModel+ResumeBudget.swift` needs it.
+    var activeRecordings: [UUID: Recording] = [:]
     /// Active summary task, owned here so the detail screen can cancel it.
     private var summaryTask: Task<Void, Never>?
     /// Recordings in flight across ALL instances — `MeetingDetailView` creates
@@ -267,6 +271,16 @@ final class TranscriptionViewModel {
         if let checkpoint {
             AppLog.transcription.atNotice.notice("VM: checkpoint found id=\(recordingID, privacy: .public) engine=\(checkpoint.engineRaw, privacy: .public) lang=\(checkpoint.languageRaw, privacy: .public) compacted=\(checkpoint.compacted, privacy: .public) chunks=\(checkpoint.completedChunks, privacy: .public)/\(checkpoint.totalChunks, privacy: .public) spans=\(checkpoint.spans.count, privacy: .public)")
         }
+        // Baseline for the automatic-resume budget (H4): captured once, before
+        // this attempt does anything, so "did this attempt make progress" is
+        // judged against where it *started* — not against whatever happens to
+        // be currently stored. That distinction matters when the pipeline
+        // configuration changed since the last attempt: a mismatched
+        // fingerprint restarts the chunk plan from zero, so the freshly
+        // restarted run's own first saved chunk must still count as progress
+        // even though its `completedChunks` (1) is lower than the abandoned
+        // old run's (which could be much higher).
+        let completedChunksAtAttemptStart = checkpoint?.completedChunks ?? 0
 
         // Long transcriptions (especially the chunked Whisper path) would
         // otherwise be aborted when the app is backgrounded and the system
@@ -281,14 +295,16 @@ final class TranscriptionViewModel {
         }
         defer { background.end() }
 
-        // Pipeline callbacks fire off the main actor. Route every one through a
+        // Phase/warning callbacks fire off the main actor. Route them through a
         // single ordered channel (rather than spawning an independent
         // `Task { @MainActor }` per callback, which has no ordering guarantee)
-        // so phase/warning/checkpoint updates apply in emission order and are
-        // fully drained before the completion/error path mutates the recording.
-        // Without this, a checkpoint enqueued near the end of the run could land
-        // *after* `saveTranscript`/the stop path clears the checkpoint, leaving a
-        // stale checkpoint on a finished recording and corrupting resume state.
+        // so they apply in emission order and are fully drained before the
+        // completion/error path mutates the recording. Checkpoints skip this
+        // channel entirely (see `onCheckpoint` below): they are awaited and
+        // saved synchronously inline with the pipeline, so by the time
+        // `transcribe` returns every checkpoint save has already completed —
+        // there is no "enqueued but not yet applied" checkpoint state left to
+        // race against `saveTranscript`/the stop path clearing it.
         let (events, continuation) = AsyncStream<PipelineEvent>.makeStream()
         let consumer = Task { @MainActor [weak self] in
             for await event in events {
@@ -296,7 +312,6 @@ final class TranscriptionViewModel {
                 switch event {
                 case .phase(let phase): self.phases[recordingID] = phase
                 case .diarizationWarning(let message): self.diarizationWarnings[recordingID] = message
-                case .checkpoint(let checkpoint): self.storeCheckpoint(checkpoint, for: recordingID)
                 }
             }
         }
@@ -321,7 +336,13 @@ final class TranscriptionViewModel {
                 checkpoint: checkpoint,
                 onPhase: { continuation.yield(.phase($0)) },
                 onDiarizationWarning: { continuation.yield(.diarizationWarning($0)) },
-                onCheckpoint: { continuation.yield(.checkpoint($0)) }
+                onCheckpoint: { [weak self] checkpoint in
+                    try await self?.storeCheckpointDurably(
+                        checkpoint,
+                        for: recordingID,
+                        completedChunksAtAttemptStart: completedChunksAtAttemptStart
+                    )
+                }
             )
             await drainEvents()
 
@@ -530,34 +551,6 @@ final class TranscriptionViewModel {
         }
     }
 
-    /// Persist chunk progress reported by the pipeline so an interruption at
-    /// any point resumes from the last completed chunk.
-    private func storeCheckpoint(_ checkpoint: TranscriptionCheckpoint, for id: UUID) {
-        guard let recording = activeRecordings[id] else { return }
-        recording.transcriptionCheckpoint = checkpoint
-        persist()
-    }
-
-    /// Start every recording left `.pending` — interrupted mid-transcription
-    /// with its progress checkpointed. Called when the app becomes active;
-    /// safe to call repeatedly (in-flight recordings are skipped by the
-    /// re-entrancy guards).
-    func resumePendingTranscriptions(settings: AppSettings) {
-        let pendingRaw = TranscriptionStatus.pending.rawValue
-        let descriptor = FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.transcriptionStatusRaw == pendingRaw }
-        )
-        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else { return }
-        AppLog.transcription.atNotice.notice("VM: resuming \(pending.count, privacy: .public) pending transcription(s)")
-        for recording in pending {
-            startTranscription(
-                recording,
-                language: recording.meeting?.language ?? .autoDetect,
-                config: settings.pipelineConfiguration
-            )
-        }
-    }
-
     /// Re-transcribe every recording of a meeting, in chronological order. Each
     /// segment runs through `transcribe`, which replaces its existing transcript,
     /// so the whole meeting is reprocessed (e.g. after the pipeline settings
@@ -570,6 +563,9 @@ final class TranscriptionViewModel {
         config: PipelineConfiguration
     ) async {
         for recording in meeting.recordings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
+            // A deliberate user action, so it gets a fresh automatic-resume
+            // budget the same as any other manual retry (H4).
+            resetAutomaticResumeBudget(for: recording)
             // Through the task registry (not a bare `transcribe`) so the
             // background-window expiration handler can pause these runs too.
             startTranscription(recording, language: language, config: config)

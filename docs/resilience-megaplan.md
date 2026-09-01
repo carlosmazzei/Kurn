@@ -103,7 +103,9 @@ Last updated: 2026-08-31.
   handoff bullet these two commits should have gotten at the time; they were
   not previously called out here by PR number.
 - **[PR #165](https://github.com/carlosmazzei/Kurn/pull/165), H4 PR 8
-  (pipeline fingerprint and checkpoint validation), open, pending CI/review.**
+  (pipeline fingerprint and checkpoint validation), merged into `main`**
+  (2026-09-01, commit `08a0192`, after a CI-caught fix for a duration-rounding
+  bug — see "PR 8 — H4 pipeline fingerprint and checkpoint validation" below).
   `TranscriptionPipelineFingerprint` (`Models/TranscriptionPipelineFingerprint.swift`)
   and `Infrastructure/PipelineDigest.swift` replace `TranscriptionCheckpoint`'s
   old engine/language/compaction/provider-only match with source
@@ -112,13 +114,29 @@ Last updated: 2026-08-31.
   chunk-plan digest (`ChunkedTranscriptionRunner.Progress.planDigest`).
   `TranscriptionCheckpoint.isStructurallyValid` covers item 2's span/bounds
   validation and gates both the transcribe-path resume check and
-  `TranscriptionRecovery`'s launch/foreground sweep. See "PR 8 — H4 pipeline
-  fingerprint and checkpoint validation" below for the deliberate one-time
-  compatibility break (a pre-PR-8 in-flight checkpoint fails to decode under
-  the new shape and is treated as `.corrupted`, same as bit-level corruption
-  — never as a false match). Items 3–6 of the H4 plan (throwing checkpoint
-  commits, explicit operation states, bounded recovery, and the same pattern
-  for generated-artifact jobs — PR 9 and PR 10 below) are not started.
+  `TranscriptionRecovery`'s launch/foreground sweep. See below for the
+  deliberate one-time compatibility break (a pre-PR-8 in-flight checkpoint
+  fails to decode under the new shape and is treated as `.corrupted`, same
+  as bit-level corruption — never as a false match).
+- **H4 PR 9 (throwing chunk commits and bounded automatic recovery,
+  items 1, 2, 4 of the plan) implemented**, pending push/CI/review.
+  `ChunkedTranscriptionRunner.run`'s `onChunkCompleted` — and
+  `TranscriptionService.CheckpointHandler`/`checkpointSink` above it — are
+  now `async throws` and awaited before the next chunk starts, so a
+  checkpoint-save failure stops the run at the last durably-committed chunk.
+  `TranscriptionViewModel`'s `onCheckpoint` no longer goes through the
+  fire-and-forget `AsyncStream` it shared with phase/warning updates; the new
+  `storeCheckpointDurably` (`ViewModels/TranscriptionViewModel+ResumeBudget.swift`,
+  split out to stay under the file-length limit) saves inline and throws
+  `AppError.persistenceFailed` on failure. `Recording.automaticResumeAttempts`
+  bounds unattended resume attempts (`TranscriptionViewModel
+  .maxAutomaticResumeAttemptsWithoutProgress`, 3) via
+  `resumePendingTranscriptions`'s `admitAutomaticResume` gate; an exhausted
+  row is marked `.failed` (checkpoint intact) instead of retried again, and
+  every manual entry point resets the budget through the new
+  `resetAutomaticResumeBudget`. See "PR 9 — H4 throwing chunk commits and
+  bounded operation states" below for what's covered and what's deliberately
+  deferred (item 3's full explicit operation-state enum).
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -140,9 +158,12 @@ Last updated: 2026-08-31.
    planned H3 boundaries; see the status snapshot below.
    H4 (checkpoint identity and durable operation state) is underway:
    [PR #165](https://github.com/carlosmazzei/Kurn/pull/165) (pipeline
-   fingerprint and checkpoint validation, the "PR 8" boundary) is open.
-   Continue from updated `main` once it merges with PR 9 (throwing chunk
-   commits and bounded operation states).
+   fingerprint and checkpoint validation, the "PR 8" boundary) is merged into
+   `main` (commit `08a0192`). PR 9 (throwing chunk commits and bounded
+   automatic recovery) is implemented on branch
+   `claude/resiliencia-roadmap-e69zyy`, pending push/CI/review. Continue from
+   there (or from updated `main` once it merges) with PR 10 (the same
+   durable-job pattern for summary/wiki/document/correction generation).
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -180,7 +201,7 @@ Last updated: 2026-08-31.
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
 | H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
-| H4    | PR 8 implemented       | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one. Still open: throwing checkpoint commits, explicit operation states, bounded automatic recovery, and the same durable-job pattern for summary/wiki/document/correction generation (PR 9, PR 10 below). |
+| H4    | PR 8 merged, PR 9 implemented | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, implemented). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3), and the same durable-job pattern for summary/wiki/document/correction generation (PR 10 below). |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
@@ -434,11 +455,16 @@ Acceptance:
 
 Objective: prevent incompatible transcription work from being spliced together.
 
-Status: [PR #165](https://github.com/carlosmazzei/Kurn/pull/165) open,
-pending CI/review — this session has no macOS/Xcode toolchain, so per
-"Verifying without a local macOS/Xcode toolchain" nothing here is claimed to
-compile or pass locally; the GitHub `iOS CI` result on the PR is the source
-of truth.
+Status: merged as [PR #165](https://github.com/carlosmazzei/Kurn/pull/165)
+(commit `08a0192`) — this session has no macOS/Xcode toolchain, so per
+"Verifying without a local macOS/Xcode toolchain" nothing here was claimed
+to compile or pass locally before merge; the GitHub `iOS CI` result on the
+PR was the source of truth. `build-and-test` failed once on the first push
+(a real bug: `TranscriptionPipelineFingerprint`'s duration-jitter tolerance
+was applied only in the initializer, so a value set after construction — as
+the test itself does, and as synthesized `Codable` decode also does — stored
+the raw unrounded duration); the fix moved the hundredths-rounding into
+`==` instead of the initializer, and the next push was green.
 
 Scope:
 
@@ -552,12 +578,15 @@ construction terse across the three test files that build one directly
 (`TranscriptionCheckpointTests`, `TranscriptionRecoveryTests`,
 `LegacyStoreAdoptionTests`).
 
-**Next code work: H4 PR 9 — throwing chunk commits and bounded operation
-states.** Start it from updated `main` after this PR merges.
+**Next code work after PR 8 merged: H4 PR 9 — throwing chunk commits and
+bounded operation states.** Started from updated `main`, per below.
 
 #### PR 9 — H4 throwing chunk commits and bounded operation states
 
 Objective: make durable checkpoint state gate forward progress.
+
+Status: implemented on branch `claude/resiliencia-roadmap-e69zyy`, pending
+push/CI/review.
 
 Scope:
 
@@ -572,6 +601,135 @@ Acceptance:
 - A checkpoint save failure stops the run.
 - Process death loses at most the in-flight chunk.
 - Foreground activation cannot create endless or repeated paid work.
+
+**What shipped (items 1, 2, 4).** `ChunkedTranscriptionRunner.Progress`'s
+consumer, `onChunkCompleted`, changed from `(@Sendable (Progress) -> Void)?`
+to `(@Sendable (Progress) async throws -> Void)?` and the loop now does
+`try await onChunkCompleted?(state)` instead of firing it and moving on —
+item 1 and, directly, item 2: a thrown error propagates out of `run` and the
+`for` loop never reaches chunk N+1. `TranscriptionService.CheckpointHandler`
+and the `checkpointSink` closure built in `transcribeGated` carry the same
+`async throws` shape up to `TranscriptionViewModel`. There,
+`onCheckpoint` no longer does `continuation.yield(.checkpoint($0))` into the
+`AsyncStream` it shared with phase/warning updates (removed —
+`PipelineEvent` dropped its `.checkpoint` case entirely); it calls the new
+`storeCheckpointDurably(_:for:completedChunksAtAttemptStart:)` directly,
+which sets `recording.transcriptionCheckpoint` and calls
+`modelContext.save()` inline, throwing `AppError.persistenceFailed` on a
+save failure. Since the pipeline already awaits this before continuing, a
+save failure is caught by `transcribe(_:language:config:)`'s existing
+`catch let appError as AppError` block — same handling as every other
+pipeline failure — marking the recording `.failed` with its checkpoint
+intact, rather than the old behavior (log to `self.error`, keep going with
+whatever was last in memory). Removing the `AsyncStream` path for
+checkpoints also removes a subtlety instead of adding one: by the time
+`transcriptionService.transcribe(...)` returns, every checkpoint save has
+already completed inline, so there's no "enqueued but not yet applied"
+checkpoint state left to race against `saveTranscript` clearing it on
+success — the comment above the `AsyncStream` setup in
+`TranscriptionViewModel.swift` was updated to say so.
+
+**Bounded automatic recovery (item 4).** `Recording.automaticResumeAttempts`
+(`Int`, defaulted to `0` — no migration needed, same pattern as `fileSize`)
+counts consecutive *automatic* resume attempts that made no forward
+progress. `TranscriptionViewModel.resumePendingTranscriptions` — the one
+choke point both the foreground-activation and `BGProcessingTask` resume
+paths call — gates every row through the new `admitAutomaticResume`: under
+`TranscriptionViewModel.maxAutomaticResumeAttemptsWithoutProgress` (3), the
+counter increments and is persisted *before* `startTranscription` runs (so a
+crash mid-attempt still counts against it on the next launch) and the
+resume proceeds; at the limit, the row is marked `.failed` instead —
+checkpoint kept, so a manual retry still resumes from the last completed
+chunk — which is the acceptance criterion "foreground activation cannot
+create endless or repeated paid work" directly. `storeCheckpointDurably`
+resets the counter to `0` the first time an attempt saves a chunk beyond
+`completedChunksAtAttemptStart` — a baseline captured once, in
+`transcribe(_:language:config:)`, before the attempt does anything, **not**
+read fresh from whatever's currently stored. That distinction matters
+because a checkpoint written before this PR — or one whose
+`TranscriptionPipelineFingerprint` no longer matches after a settings change
+— makes `transcribeGated` restart the chunk plan from zero; the freshly
+restarted run's own first saved chunk (`completedChunks == 1`) must still
+count as progress even though it's numerically lower than the abandoned
+prior run's stored value. Comparing against a fixed attempt-start baseline
+gets this right; comparing against "whatever `recording.transcriptionCheckpoint`
+currently says" (an earlier version of this change) would not have.
+
+The bound itself is a pure, unit-tested static function —
+`TranscriptionViewModel.canAttemptAutomaticResume(afterPriorAttempts:)` —
+the same shape `isResumableCancellation` already established, so the
+threshold is testable without a `Recording`/`ModelContext`.
+`TranscriptionViewModel.resetAutomaticResumeBudget(for:)` is called from
+every manual entry point (`MeetingDetailActions.startTranscription`, and
+`TranscriptionViewModel.retranscribeAll` per recording) so a deliberate user
+action always gets a fresh budget regardless of how many unattended
+attempts already failed — the plan's "eventually requires user action" half.
+
+**Split into a new file to stay under SwiftLint's file-length limit.**
+PR 8 already left `TranscriptionViewModel.swift` at 897 lines, one PR away
+from the 900-line error threshold; this PR's additions would have pushed it
+to 993. The new checkpoint/budget methods
+(`storeCheckpointDurably`, `admitAutomaticResume`, `resetAutomaticResumeBudget`,
+`resumePendingTranscriptions` — moved along with its `admitAutomaticResume`
+call site — and the two `static` bound helpers) live in
+`Kurn/ViewModels/TranscriptionViewModel+ResumeBudget.swift`, the same reason
+`TranscriptionViewModel+CrossMeetingSpeakerMatch.swift` exists. `activeRecordings`
+lost its `private` (now plain `internal`, with a comment saying why) so the
+new file can reach it, the same treatment `modelContext` already had for the
+`CrossMeetingSpeakerMatch` split.
+
+**Tests.** `KurnTests/ChunkedTranscriptionRunnerTests.swift` gained
+`checkpointSaveFailureStopsTheRunBeforeTheNextChunk`, proving a throwing
+`onChunkCompleted` stops the loop at the chunk it failed on and never
+reaches the next one. `KurnTests/TranscriptionResumeBudgetTests.swift` is
+new: the pure bound's boundary (attempts under/at/over the max),
+`resetAutomaticResumeBudget` zeroing the counter, an exhausted-budget
+recording ending `.failed` with its checkpoint intact without a background
+pipeline task ever starting (safe and deterministic because
+`admitAutomaticResume` returns `false` before `startTranscription` is
+called), and an under-budget recording's counter incrementing before
+`resumePendingTranscriptions` returns. The last two tests use
+`captureState: .ready`/`.recoveryNeeded` deliberately: an exhausted row
+never reaches `startTranscription`'s `isReadyForConsumption` gate regardless
+of capture state, while the under-budget row is built `.recoveryNeeded` so
+`startTranscription` is a synchronous no-op — this isolates both tests to
+the budget bookkeeping itself, without racing a real `TranscriptionService`
+pipeline against a nonexistent audio file inside a unit test (`TranscriptionService`
+is a concrete, non-injectable dependency of `TranscriptionViewModel`, so an
+end-to-end test of the "under budget, pipeline actually runs" path isn't
+feasible here without a larger refactor to inject it — left as a known gap
+rather than attempted speculatively).
+
+**Known gaps, stated plainly.**
+
+- **Item 3 (the full explicit operation-state enum) is not implemented.**
+  This PR's three acceptance criteria are met on top of the existing
+  `TranscriptionStatus` enum plus the new `automaticResumeAttempts` counter,
+  which is materially simpler than "queued/running/paused-by-user/
+  deferred-by-system/retry-scheduled/permanent-failure/completed with reason
+  codes, attempt count, and `nextAttemptAt`." Revisit only if a concrete need
+  for the richer model shows up (e.g. a "retrying in 2 minutes" UI needing an
+  actual scheduled time, not just a counter).
+- **`storeCheckpointDurably`'s own save-failure path is not directly unit
+  tested.** `TranscriptionViewModel.modelContext` is a concrete `ModelContext`,
+  not behind an injectable seam the way `RecordingLifecycleSaving` makes H1's
+  SwiftData commits fault-injectable — adding that seam here was judged
+  out of scope for this PR. The throw-and-stop *mechanism* is covered
+  generically at the `ChunkedTranscriptionRunner` level instead
+  (`checkpointSaveFailureStopsTheRunBeforeTheNextChunk`).
+- **Bound retries "by stage and fingerprint" (item 4) is implemented per
+  recording, not per (stage, fingerprint) pair.** In practice a recording
+  only ever has one in-flight fingerprint at a time, so this distinction
+  doesn't currently matter, but it means the counter doesn't independently
+  track "this specific configuration has failed N times" if the pipeline
+  configuration changes between exhausted attempts — see the attempt-start
+  baseline reasoning above for why a configuration change is still handled
+  correctly for the *progress-reset* half of the logic, even without
+  per-fingerprint bookkeeping.
+
+**Next code work: H4 PR 10 — the same durable multi-step pattern applied to
+summary/wiki/document/correction generation jobs.** Start it from updated
+`main` after this PR merges.
 
 #### PR 10 — H4 expensive generated-artifact operation state
 

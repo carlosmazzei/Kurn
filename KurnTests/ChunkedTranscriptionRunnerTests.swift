@@ -165,6 +165,38 @@ struct ChunkedTranscriptionRunnerTests {
         #expect(progressValues.allSatisfy { $0.total == 3 })
     }
 
+    @Test func checkpointSaveFailureStopsTheRunBeforeTheNextChunk() async throws {
+        // H4: chunk N+1 must not start until chunk N's checkpoint is durably
+        // committed. A throwing `onChunkCompleted` (simulating a failed
+        // SwiftData save) must stop the loop at chunk N and rethrow, rather
+        // than continuing on with in-memory-only progress.
+        let transcribedIndexes = TranscribedIndexes()
+        struct SimulatedSaveFailure: Error {}
+
+        await #expect(throws: SimulatedSaveFailure.self) {
+            _ = try await ChunkedTranscriptionRunner.run(
+                chunks: chunks([0, 600, 1200]),
+                planDigest: planDigest([0, 600, 1200]),
+                resume: nil,
+                transcribeChunk: { _, index in
+                    await transcribedIndexes.record(index)
+                    return RawTranscript(
+                        spans: [TranscribedSpan(text: "x", start: 0, end: 1, confidence: nil)],
+                        language: "en"
+                    )
+                },
+                onChunkCompleted: { progress in
+                    if progress.completedChunks == 1 {
+                        throw SimulatedSaveFailure()
+                    }
+                }
+            )
+        }
+
+        // Only the first chunk ran; the second and third never started.
+        #expect(await transcribedIndexes.values == [0])
+    }
+
     @Test func completedResumeTranscribesNothing() async throws {
         let resume = ChunkedTranscriptionRunner.Progress(
             totalChunks: 1,

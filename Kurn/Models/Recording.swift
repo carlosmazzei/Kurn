@@ -28,6 +28,16 @@ final class Recording {
     /// Cleared on success; kept on failure/interruption so the next attempt
     /// resumes from the last completed chunk instead of starting over.
     var transcriptionCheckpointData: Data?
+    /// Consecutive automatic (unattended) resume attempts that made no forward
+    /// progress on this recording's checkpoint since the last completed chunk
+    /// or explicit user retry. Bounds `TranscriptionViewModel.resumePendingTranscriptions`
+    /// so a systemic failure — a chunk that always crashes, a full disk — can't
+    /// retry forever, or for a cloud engine keep re-paying, every time the app
+    /// launches or foregrounds (H4); an explicit user retry always resets it via
+    /// `TranscriptionViewModel.resetAutomaticResumeBudget`. Defaulted, like
+    /// `fileSize`/`enhancedAudioVersion` below, so SwiftData migrates the store
+    /// lightly instead of needing a migration plan.
+    var automaticResumeAttempts: Int = 0
     /// Size of the backing file in bytes, cached so storage UI and the recording
     /// compactor can rank meetings without stat-ing every file. `0` means
     /// "unknown" — rows created before this field existed, refreshed lazily by
