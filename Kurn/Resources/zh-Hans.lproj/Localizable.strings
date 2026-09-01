@@ -22,6 +22,7 @@
 "error.permission" = "权限被拒绝：%@";
 "error.persistence" = "无法保存您的更改：%@";
 "error.transcript_encode_failed" = "无法准备转录内容以便保存。";
+"error.transcript_integrity_failed" = "新的转录未通过完整性检查（%@），因此未被保存。您之前的转录（如果有）保持不变。";
 "error.summary_encode_failed" = "无法准备摘要以便保存。";
 "error.recognizer_timeout" = "设备端语音识别超时。";
 "error.recorder_start" = "无法启动录音。";

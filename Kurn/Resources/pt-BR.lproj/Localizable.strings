@@ -22,6 +22,7 @@
 "error.permission" = "Permissão negada: %@";
 "error.persistence" = "Não foi possível salvar as alterações: %@";
 "error.transcript_encode_failed" = "Não foi possível preparar a transcrição para salvar.";
+"error.transcript_integrity_failed" = "A nova transcrição não passou em uma verificação de integridade (%@) e não foi salva. Sua transcrição anterior, se houver, permanece inalterada.";
 "error.summary_encode_failed" = "Não foi possível preparar o resumo para salvar.";
 "error.recognizer_timeout" = "O reconhecimento de fala no dispositivo expirou.";
 "error.recorder_start" = "Não foi possível iniciar a gravação.";

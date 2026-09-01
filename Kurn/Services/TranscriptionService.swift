@@ -309,8 +309,9 @@ struct TranscriptionService {
             maxSegmentDuration: maxSegmentDuration
         )
         // Fusion is pure and cannot fail; losing every span here when the
-        // engine produced some is the one outcome worth recording. PR 12's
-        // integrity gate is what will reject such output instead of storing it.
+        // engine produced some is the one outcome worth recording. The
+        // integrity gate below (H5 PR 12) is what rejects such output instead
+        // of storing it.
         reportBuilder.record(
             .fusion,
             segments.isEmpty && !raw.spans.isEmpty ? .failed : .succeeded,
@@ -327,6 +328,23 @@ struct TranscriptionService {
         )
         let correctedSegments = correction.segments
         reportBuilder.record(correction.stage)
+
+        // 7. Final integrity gate (H5 PR 12). Everything above — the engine,
+        // fusion, correction — is pure and cannot throw, so nothing upstream
+        // stops a structurally broken result from reaching the save path on
+        // its own. Rejecting it here, before `Output` is ever returned, is
+        // what keeps a bad run from being able to replace a still-valid
+        // transcript: `TranscriptionViewModel.saveTranscript` only deletes the
+        // existing transcript after this function has already returned
+        // successfully, so throwing here leaves it untouched.
+        if let failure = TranscriptIntegrityGate.validate(
+            segments: correctedSegments,
+            sourceDuration: fileDuration,
+            hadTranscribedInput: !raw.spans.isEmpty
+        ) {
+            AppLog.transcription.atError.error("transcribe: integrity gate rejected output: \(failure.rawValue, privacy: .public)")
+            throw AppError.transcriptIntegrityFailed(failure.rawValue)
+        }
 
         var labels: [String] = []
         for segment in correctedSegments where !labels.contains(segment.speakerLabel) {

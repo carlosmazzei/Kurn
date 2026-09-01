@@ -559,6 +559,8 @@ final class TranscriptionViewModel {
             return "decoding error: \(detail)"
         case .resourceUnavailable(let detail):
             return "resource unavailable: \(detail)"
+        case .transcriptIntegrityFailed(let reason):
+            return "integrity gate rejected output: \(reason)"
         default:
             return error.errorDescription ?? "unknown"
         }

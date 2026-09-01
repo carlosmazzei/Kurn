@@ -27,7 +27,14 @@ extension TranscriptionService {
     /// `TranscriptCorrecting` conformers never throw and always return
     /// `segments.count` segments in order, so a failure here degrades to "no
     /// correction ran" instead of failing the transcription — the returned
-    /// report entry is what records which of the two happened.
+    /// report entry is what records which of the two happened. That contract
+    /// is documented on the protocol but not enforced by the type system, so
+    /// (H5 PR 12) this also verifies it at runtime with
+    /// `TranscriptIntegrityGate.correctionPreservedIdentity` before trusting
+    /// the corrector's output: a conformer that violates it — wrong count,
+    /// reordered, dropped, or duplicated segments — has its result discarded
+    /// in favor of the pre-correction segments, the same way an unusable
+    /// provider already degrades rather than failing the run.
     func correctIfRequested(
         segments: [TranscriptSegment],
         language: MeetingLanguage,
@@ -57,14 +64,32 @@ extension TranscriptionService {
         // degradation the corrector itself never sees: it was handed the no-op
         // engine and correctly reports "not requested".
         let steppedDown = config.correction != .none && engine == .none
+
+        let identityPreserved = TranscriptIntegrityGate.correctionPreservedIdentity(
+            original: segments,
+            corrected: correction.segments
+        )
+        if !identityPreserved {
+            AppLog.transcription.atError.error("correctIfRequested: corrector violated its identity contract; discarding its output")
+        }
+        let resultSegments = identityPreserved ? correction.segments : segments
+        let outcome: PipelineStageOutcome = steppedDown ? .degraded : (identityPreserved ? correction.outcome : .degraded)
+        let reason: PipelineStageReason?
+        if steppedDown {
+            reason = .providerUnavailable
+        } else if !identityPreserved {
+            reason = .correctionContractViolated
+        } else {
+            reason = correction.reason
+        }
         return CorrectionStep(
-            segments: correction.segments,
+            segments: resultSegments,
             stage: PipelineStageReport(
                 stage: .correction,
-                outcome: steppedDown ? .degraded : correction.outcome,
+                outcome: outcome,
                 requestedEngine: config.correction.rawValue,
                 effectiveEngine: engine.rawValue,
-                reason: steppedDown ? .providerUnavailable : correction.reason
+                reason: reason
             )
         )
     }

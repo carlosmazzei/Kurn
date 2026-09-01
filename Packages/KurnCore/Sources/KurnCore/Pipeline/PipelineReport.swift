@@ -82,6 +82,11 @@ public enum PipelineStageReason: String, Codable, Sendable {
     /// No usable provider for a stage that needs one (missing key, unusable
     /// on-device model).
     case providerUnavailable
+    /// A `TranscriptCorrecting` conformer returned output that violated its
+    /// contract (wrong segment count, reordered, dropped, or duplicated
+    /// segments) — its result was discarded and the pre-correction segments
+    /// were kept instead (H5 PR 12, `TranscriptIntegrityGate`).
+    case correctionContractViolated
 }
 
 /// The outcome of one stage, including which engine was asked for versus which
