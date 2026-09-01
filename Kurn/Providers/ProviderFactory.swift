@@ -27,7 +27,7 @@ enum ProviderFactory {
         guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
             throw AppError.invalidProviderURL
         }
-        let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
+        let key = KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(key, provider: provider)
         } catch {
@@ -63,7 +63,7 @@ enum ProviderFactory {
         guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
             throw AppError.invalidProviderURL
         }
-        let key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
+        let key = KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(key, provider: provider)
         } catch {

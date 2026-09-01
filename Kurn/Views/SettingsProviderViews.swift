@@ -7,6 +7,7 @@
 //  the add-provider sheet, and the summary-model picker.
 //
 
+import KurnCore
 import SwiftUI
 
 /// Editor for a provider's non-secret config plus API key.
@@ -21,7 +22,12 @@ struct ProviderEditor: View {
     @State private var kind = AIProviderKind.openAICompatible
     @State private var baseURLString = ""
     @State private var key = ""
+    /// The key as last read from (or written to) the Keychain, so Save only
+    /// touches the Keychain when the field actually changed (H7 PR 14) —
+    /// editing just the name/URL must not risk failing over an untouched key.
+    @State private var originalKey = ""
     @State private var showingDeleteConfirm = false
+    @State private var saveError: AppError?
 
     private var canEditDetails: Bool { !provider.isBuiltIn }
     private var canSave: Bool {
@@ -74,10 +80,10 @@ struct ProviderEditor: View {
 
                 if !key.isEmpty {
                     Section {
+                        // Clears the field only — the Keychain isn't touched
+                        // until Save, same as every other field here (H7 PR 14).
                         Button(role: .destructive) {
                             key = ""
-                            KeychainManager.shared.delete(provider.keychainAccount)
-                            onChange()
                         } label: {
                             Text(NSLocalizedString("settings.remove_key", comment: "Remove key"))
                         }
@@ -101,12 +107,7 @@ struct ProviderEditor: View {
             if canEditDetails {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.save", comment: "Save")) {
-                        var updated = provider
-                        updated.displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        updated.kind = kind
-                        updated.baseURLString = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onSave(updated)
-                        dismiss()
+                        commitAndSave()
                     }
                     .disabled(!canSave)
                 }
@@ -116,12 +117,26 @@ struct ProviderEditor: View {
             name = provider.displayName
             kind = provider.kind
             baseURLString = provider.baseURLString
-            key = KeychainManager.shared.get(provider.keychainAccount) ?? ""
+            switch KeychainManager.shared.get(provider.keychainAccount) {
+            case .found(let value):
+                key = value
+                originalKey = value
+            case .absent:
+                key = ""
+                originalKey = ""
+            case .failed(let reason):
+                // Leaves the field blank rather than claiming "no key" — a
+                // locked/denied/transient read must not read the same as
+                // "never configured" (H7 PR 14). Editing another field and
+                // saving still works: `commitAndSave` only touches the
+                // Keychain when `key != originalKey`, so an unread key is
+                // never clobbered by a Save the user didn't intend to touch it.
+                key = ""
+                originalKey = ""
+                saveError = .keychainAccessFailed(reason.rawValue)
+            }
         }
-        .onChange(of: key) { _, newValue in
-            KeychainManager.shared.set(newValue, for: provider.keychainAccount)
-            onChange()
-        }
+        .errorAlert($saveError)
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
             iconSystemName: "trash.fill",
@@ -136,6 +151,35 @@ struct ProviderEditor: View {
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
+    }
+
+    /// Commits every field on explicit Save (H7 PR 14) — the Keychain write
+    /// only happens here, only when `key` actually changed, and only after
+    /// `canSave` has already confirmed the URL is valid. A failed write
+    /// surfaces `saveError` and leaves the sheet open (no `onSave`/`dismiss`)
+    /// so the user can retry without losing their other edits — the same
+    /// "keep the previous state until the replacement is durable" shape H5
+    /// PR 12 established for transcripts.
+    private func commitAndSave() {
+        if key != originalKey {
+            let outcome: KeychainWriteOutcome = key.isEmpty
+                ? KeychainManager.shared.delete(provider.keychainAccount)
+                : KeychainManager.shared.set(key, for: provider.keychainAccount)
+            guard case .success = outcome else {
+                if case .failed(let reason) = outcome {
+                    saveError = .keychainAccessFailed(reason.rawValue)
+                }
+                return
+            }
+            originalKey = key
+            onChange()
+        }
+        var updated = provider
+        updated.displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.kind = kind
+        updated.baseURLString = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        onSave(updated)
+        dismiss()
     }
 }
 

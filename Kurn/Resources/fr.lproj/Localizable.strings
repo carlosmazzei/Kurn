@@ -48,6 +48,7 @@
 "error.resource_memory_pressure" = "l'appareil signale un manque de mémoire. Fermez d'autres apps ou libérez de l'espace, puis réessayez.";
 "error.authentication_required" = "Une authentification est requise pour accéder à vos enregistrements.";
 "error.authentication_failed" = "Échec de l'authentification : %@";
+"error.keychain_access_failed" = "Impossible d'accéder à votre identifiant enregistré pour le moment (%@). Réessayez.";
 
 /* Modes de transcription */
 "mode.on_device" = "Sur l'appareil";

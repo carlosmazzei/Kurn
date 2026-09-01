@@ -48,6 +48,7 @@
 "error.resource_memory_pressure" = "il dispositivo segnala poca memoria disponibile. Chiudi altre app o libera spazio, poi riprova.";
 "error.authentication_required" = "È richiesta l'autenticazione per accedere alle tue registrazioni.";
 "error.authentication_failed" = "Autenticazione non riuscita: %@";
+"error.keychain_access_failed" = "Impossibile accedere alla credenziale salvata in questo momento (%@). Riprova.";
 
 /* Modalità di trascrizione */
 "mode.on_device" = "Sul dispositivo";

@@ -45,6 +45,12 @@ public enum AppError: LocalizedError, Identifiable {
     /// The associated string is a closed-vocabulary `TranscriptIntegrityFailure`
     /// raw value, never free text.
     case transcriptIntegrityFailed(String)
+    /// A Keychain read or write for a provider credential didn't simply
+    /// succeed (H7 PR 14) — retryable, and never a sign the credential is
+    /// missing. The associated string is a closed-vocabulary
+    /// `KeychainFailureReason` raw value ("locked"/"denied"/"transient"),
+    /// never a raw `OSStatus` or free text.
+    case keychainAccessFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     public var id: String { errorDescription ?? "AppError" }
@@ -85,6 +91,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .documentGenerationFailed: return "document_generation"
         case .onDeviceModelUnavailable: return "on_device_model_unavailable"
         case .transcriptIntegrityFailed: return "transcript_integrity"
+        case .keychainAccessFailed: return "keychain_access"
         }
     }
 
@@ -244,6 +251,11 @@ public enum AppError: LocalizedError, Identifiable {
         case .transcriptIntegrityFailed(let reason):
             return String(
                 format: NSLocalizedString("error.transcript_integrity_failed", comment: "Transcript failed its integrity check"),
+                reason
+            )
+        case .keychainAccessFailed(let reason):
+            return String(
+                format: NSLocalizedString("error.keychain_access_failed", comment: "Keychain access failed"),
                 reason
             )
         }

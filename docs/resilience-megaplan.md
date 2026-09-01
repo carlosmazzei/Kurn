@@ -167,12 +167,18 @@ Last updated: 2026-09-01.
   merged into `main`** (commit `e3c1c54`). CI (`build-and-test`,
   `kurncore-linux`) was green on the first push; see "PR 12" below for the
   full contract.
-- H5 PR 13 (surfacing "completed with warnings" in the Transcript tab, and
-  retrying the correction stage in isolation where the architecture allows
-  it) is implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see
-  "PR 13" below for what shipped. Per the user's explicit request, this PR
-  bundles its own docs status corrections (recording PR 12 as merged) rather
-  than shipping as a trailing docs-only follow-up.
+- **[PR #170](https://github.com/carlosmazzei/Kurn/pull/170), H5 PR 13
+  (completed-with-warnings UI and correction retry), merged into `main`**
+  (commit `b5d2233`). CI green on the first push; bundled its own docs status
+  corrections (recording PR 12/#169 as merged) per the user's explicit
+  request to avoid a trailing docs-only PR. **H5's plan is now fully
+  addressed** — see "PR 13" below for what shipped and the H5 status snapshot
+  row.
+- H7 PR 14 (typed Keychain outcomes, an accessibility-migration fix, and
+  explicit-Save for provider credentials) is implemented on branch
+  `claude/resilience-roadmap-plan-fn23ki`; see "PR 14" below for what
+  shipped. Docs status corrections for this and PR 13 are bundled in this
+  same PR, per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -200,18 +206,21 @@ Last updated: 2026-09-01.
    [PR #167](https://github.com/carlosmazzei/Kurn/pull/167) (durable,
    resumable map-stage checkpointing shared between summary and wiki
    generation, the "PR 10" boundary) are all merged into `main` (commit
-   `663ab09`). H5 is now in flight: the "PR 11" boundary (typed stage
-   outcomes and the persisted pipeline report) merged into `main` as
+   `663ab09`) — H4's plan items are now fully addressed except item 3 (the
+   full explicit operation-state enum), left deliberately deferred; see the
+   H4 status snapshot row and "PR 10" below for the document-generation
+   exclusion. **H5 is done**: "PR 11" (typed stage outcomes and the
+   persisted pipeline report) merged as
    [PR #168](https://github.com/carlosmazzei/Kurn/pull/168) (commit
-   `d9f5120`), and the "PR 12" boundary (the final integrity gate and
-   correction-identity check) merged into `main` as
+   `d9f5120`); "PR 12" (the final integrity gate and correction-identity
+   check) merged as
    [PR #169](https://github.com/carlosmazzei/Kurn/pull/169) (commit
-   `e3c1c54`). "PR 13" (surfacing completed-with-warnings and retrying the
-   correction stage in isolation) is implemented next, on branch
-   `claude/resilience-roadmap-plan-fn23ki` — H4's plan
-   items are now fully addressed except item 3 (the full explicit
-   operation-state enum), left deliberately deferred; see the H4 status
-   snapshot row and "PR 10" below for the document-generation exclusion.
+   `e3c1c54`); "PR 13" (completed-with-warnings UI and correction retry)
+   merged as [PR #170](https://github.com/carlosmazzei/Kurn/pull/170)
+   (commit `b5d2233`). **H7 is now in flight**: "PR 14" (typed Keychain
+   outcomes, the accessibility-migration fix, and explicit-Save for
+   provider credentials) is implemented next, on branch
+   `claude/resilience-roadmap-plan-fn23ki`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -250,9 +259,9 @@ Last updated: 2026-09-01.
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
 | H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
 | H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
-| H5    | In progress (PR 11 merged in [PR #168](https://github.com/carlosmazzei/Kurn/pull/168); PR 12 merged in [PR #169](https://github.com/carlosmazzei/Kurn/pull/169); PR 13 implemented) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab now shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, implemented). |
+| H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
-| H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
+| H7    | In progress (PR 14 implemented) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, implemented). Remaining: verified/resumable model staging, atomic replacement, and health probes (PR 15/16).           |
 | H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
 | H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
@@ -1220,6 +1229,115 @@ model lands.
 Add a `KeychainAccessing` seam, preserve `OSStatus` privately, classify absent vs
 locked/denied/transient, finish accessibility migration only after success, and
 commit provider edits only on explicit Save after URL validation.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**What shipped.** `KeychainManager` (`Kurn/Infrastructure/KeychainManager.swift`)
+used to collapse every Security-framework failure into the same value as "not
+configured": `get` returned `nil` for a locked device exactly as it did for a
+key that was never stored, and `set`/`delete` discarded their `OSStatus`
+outright. That ambiguity is what let `migrateToBackgroundAccessible()` mark
+itself permanently complete after a *failed* fetch — a locked device at first
+launch (or any transient Security-framework error) looked identical to
+"nothing to migrate," so the migration silently never ran for that device
+again.
+
+- **`KeychainAccessing`** (new protocol, mirroring `CloudSettingsSync.swift`'s
+  `CloudKeyValueStore` seam over `NSUbiquitousKeyValueStore`) declares
+  `get(_:) -> KeychainReadOutcome`, `set(_:for:) -> KeychainWriteOutcome`,
+  `delete(_:) -> KeychainWriteOutcome`. `KeychainReadOutcome` is
+  `.found(String)` / `.absent` / `.failed(KeychainFailureReason)`;
+  `KeychainWriteOutcome` is `.success` / `.failed(KeychainFailureReason)`.
+  `KeychainFailureReason` (`.locked` / `.denied` / `.transient`) is the only
+  thing that ever leaves the type — `KeychainManager.classify(_:)` maps the
+  raw `OSStatus` (`errSecInteractionNotAllowed` → `.locked`;
+  `errSecAuthFailed`/`errSecNotAvailable` → `.denied`; everything else →
+  `.transient`) and the `OSStatus` itself never escapes this one function, per
+  the plan's "preserve `OSStatus` privately."
+- **The many read-only call sites** (`ProviderFactory.summaryProvider`/
+  `whisperProvider`, `ProviderModelsService.models`, `FoundationModelsProvider
+  .isUsable`, `ProviderRow`'s configured/not-configured dot) don't need the
+  classification — they only ever asked "do we have a key." A
+  `KeychainAccessing` extension gives them `value(for:) -> String?` and
+  `hasValue(for:) -> Bool`, both collapsing any failure to the same shape as
+  absent, same as the old API's behavior — so none of them changed logic,
+  only the method name at the call site (`get` → `value(for:)`).
+- **`migrateToBackgroundAccessible()` rewritten** to only set the
+  `"ai.kurn.keychain.migratedAfterFirstUnlock"` `UserDefaults` flag after a
+  *confirmed* outcome: `errSecItemNotFound` (nothing to migrate — trivially
+  complete) or every fetched item's re-save reporting `.success`. Any other
+  fetch status, or any one item's re-save failing, leaves the flag unset so
+  the next launch retries — exactly the "finish accessibility migration only
+  after success" item, and the concrete fix for the ambiguity the header
+  comment above describes.
+- **Explicit-Save for provider credentials.** `ProviderEditor`
+  (`Kurn/Views/SettingsProviderViews.swift`) used to write to the Keychain on
+  every keystroke (`.onChange(of: key)`, independent of the toolbar Save
+  button and of `canSave`'s URL validation) and delete immediately from a
+  separate "Remove key" button. Both are gone: the key field is buffered in
+  `@State` like every other field, `commitAndSave()` only reaches the
+  Keychain when `key != originalKey` (so editing just the name/URL never
+  touches a key the user didn't change), and only after the toolbar Save
+  button — already disabled by `canSave` until `LLMHTTP.isValidBaseURL`
+  passes — is tapped. `AddProviderView`'s flow already buffered the key and
+  deferred the write to its own Save button; `ProvidersSettingsView`'s
+  `onAdd` handler now also captures the write's outcome. A failed write in
+  either flow surfaces the new `AppError.keychainAccessFailed(String)`
+  (associated value is the closed-vocabulary `KeychainFailureReason` raw
+  value, never a raw `OSStatus` or free text) via the existing `.errorAlert`
+  pattern, and in `ProviderEditor` specifically leaves the sheet open (no
+  `onSave`/`dismiss`) so the user can retry without losing their other
+  edits — the same "keep the previous state until the replacement is
+  durable" shape H5 PR 12 established for transcripts, applied here to a
+  Settings form instead of a transcript.
+- **`ProviderEditor.onAppear`'s own read** now switches on the full
+  `KeychainReadOutcome` rather than collapsing to `?? ""`: a `.failed` read
+  leaves the field blank (the same as before) but also surfaces
+  `AppError.keychainAccessFailed` immediately, rather than silently
+  presenting "no key configured" when the real state is "couldn't check
+  right now." `commitAndSave`'s `key != originalKey` guard means this can't
+  cause data loss — an unread key is never overwritten by a Save the user
+  didn't intend to touch it, since `originalKey` is also left blank
+  alongside `key` in that branch.
+
+**Tests.** `KurnTests/KeychainManagerTests.swift` (new): a `FakeKeychainAccessing`
+proves the `KeychainAccessing` seam is genuinely usable as a mockable
+abstraction — including that a forced `.failed` outcome is never silently
+collapsed to `.absent` at the raw `get(_:)` level, only by the convenience
+extension that documents doing so on purpose; `KeychainManager.classify(_:)`
+is pinned against literal `OSStatus` values
+(`errSecInteractionNotAllowed`/`errSecAuthFailed`/`errSecNotAvailable`/an
+arbitrary other value); and the concrete `KeychainManager` is round-tripped
+against the real Keychain (set → get → overwrite → get → delete → get, empty
+value deletes, deleting an absent account is still `.success`) using a
+dedicated test-only account so this suite doesn't need `.serialized` against
+`ProviderFactoryTests`. `ProviderFactoryTests.swift`'s `withClearedKey`/
+`withKey` helpers were updated for the new `get` signature (renamed to
+`.value(for:)` at the two call sites that only needed the old `String?`
+shape) with no behavior change.
+
+**Known gaps, stated plainly.**
+
+- **No locked-device migration test.** The simulator cannot simulate a
+  locked Keychain any more than H1 could simulate iOS Data Protection —
+  `migrateToBackgroundAccessible()`'s locked/denied/transient branches are
+  verified by reading the code and by the `classify(_:)` unit tests, not by
+  an end-to-end test that actually locks the device mid-migration. Same
+  category of gap H1 named for its own physical-protection matrix.
+- **No end-to-end UI test exercises `ProviderEditor.commitAndSave`'s
+  Keychain-failure path or `saveError`'s alert presentation.** Same
+  known-gap pattern H5 PR 12/13 each stated for their own view/view-model
+  glue: `ProviderEditor` calls `KeychainManager.shared` directly rather than
+  through an injected `KeychainAccessing`, so a UI test can't force a
+  Keychain failure deterministically without a larger dependency-injection
+  change to the Settings views, which was judged out of scope here. The
+  `KeychainAccessing` seam itself (item 1's actual ask) is proven usable via
+  `FakeKeychainAccessing` in isolation instead.
+- **Items 3–7 of H7's plan (model download consolidation, pinned revisions,
+  atomic staging/replacement, storage-inventory verification, owned
+  download tasks) are PR 15/16's scope, not touched here.**
 
 #### PR 15 — H7 verified model staging, resume, and replacement
 

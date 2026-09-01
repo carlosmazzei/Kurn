@@ -48,6 +48,7 @@
 "error.resource_memory_pressure" = "设备内存不足。请关闭其他应用或释放空间后重试。";
 "error.authentication_required" = "访问您的录音需要进行身份验证。";
 "error.authentication_failed" = "身份验证失败：%@";
+"error.keychain_access_failed" = "暂时无法访问已保存的凭据（%@）。请重试。";
 
 /* 转录模式 */
 "mode.on_device" = "设备端";

@@ -48,6 +48,7 @@
 "error.resource_memory_pressure" = "el dispositivo indicó poca memoria disponible. Cierra otras apps o libera espacio e inténtalo de nuevo.";
 "error.authentication_required" = "Se requiere autenticación para acceder a tus grabaciones.";
 "error.authentication_failed" = "Error de autenticación: %@";
+"error.keychain_access_failed" = "No se pudo acceder a tu credencial guardada en este momento (%@). Inténtalo de nuevo.";
 
 /* Modos de transcripción */
 "mode.on_device" = "En el dispositivo";

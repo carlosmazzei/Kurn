@@ -48,6 +48,7 @@
 "error.resource_memory_pressure" = "das Gerät meldet wenig Arbeitsspeicher. Schließen Sie andere Apps oder geben Sie Speicherplatz frei und versuchen Sie es erneut.";
 "error.authentication_required" = "Für den Zugriff auf Ihre Aufnahmen ist eine Authentifizierung erforderlich.";
 "error.authentication_failed" = "Authentifizierung fehlgeschlagen: %@";
+"error.keychain_access_failed" = "Ihre gespeicherten Zugangsdaten konnten gerade nicht abgerufen werden (%@). Versuchen Sie es erneut.";
 
 /* Transkriptionsmodi */
 "mode.on_device" = "Auf dem Gerät";

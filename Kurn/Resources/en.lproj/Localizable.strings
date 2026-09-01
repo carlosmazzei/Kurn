@@ -48,6 +48,7 @@
 "error.resource_memory_pressure" = "the device reported low memory. Close other apps or free storage, then try again.";
 "error.authentication_required" = "Authentication is required to access your recordings.";
 "error.authentication_failed" = "Authentication failed: %@";
+"error.keychain_access_failed" = "Could not access your saved credential right now (%@). Try again.";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
