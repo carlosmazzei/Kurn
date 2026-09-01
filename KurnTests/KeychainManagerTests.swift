@@ -8,8 +8,13 @@
 //  `KeychainFailureReason` classification, and round-trips the concrete
 //  `KeychainManager` against the real Keychain the same way
 //  `ProviderFactoryTests` already does for provider resolution. Uses its own
-//  dedicated account strings (never `.openAI`/`.anthropic`/`.google`/`.groq`)
-//  so it doesn't need to serialize against `ProviderFactoryTests`.
+//  dedicated account string (never `.openAI`/`.anthropic`/`.google`/`.groq`),
+//  so it doesn't need to serialize against `ProviderFactoryTests` — but is
+//  itself `.serialized` for the same reason that suite already documents:
+//  the three `realManagerXXX` tests below share that one account, and Swift
+//  Testing parallelizes sibling tests by default, so without it they raced
+//  on set/get/delete of the same Keychain item and failed intermittently in
+//  CI.
 //
 
 import Security
@@ -46,6 +51,10 @@ private final class FakeKeychainAccessing: KeychainAccessing, @unchecked Sendabl
     }
 }
 
+// Serialized because the `realManagerXXX` tests below share one Keychain
+// account and mutate the real, process-wide Keychain — the same precaution
+// `ProviderFactoryTests` takes for the same reason.
+@Suite(.serialized)
 struct KeychainManagerTests {
 
     // MARK: - The seam itself, via a fake
