@@ -27,7 +27,7 @@ struct ProviderModelsService: Sendable {
         // There is exactly one on-device model and no `/models` endpoint to ask.
         guard provider.kind != .appleOnDevice else { return [provider.defaultModel] }
 
-        let apiKey = apiKey ?? KeychainManager.shared.get(provider.keychainAccount) ?? ""
+        let apiKey = apiKey ?? KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
         do {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
         } catch {

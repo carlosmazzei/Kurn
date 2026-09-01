@@ -21,7 +21,7 @@ struct ProviderFactoryTests {
 
     @discardableResult
     private func withClearedKey<R>(_ key: KeychainKey, _ body: () throws -> R) rethrows -> R {
-        let original = KeychainManager.shared.get(key)
+        let original = KeychainManager.shared.value(for: key)
         KeychainManager.shared.delete(key)
         defer {
             if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }
@@ -31,7 +31,7 @@ struct ProviderFactoryTests {
 
     @discardableResult
     private func withKey<R>(_ key: KeychainKey, value: String, _ body: () throws -> R) rethrows -> R {
-        let original = KeychainManager.shared.get(key)
+        let original = KeychainManager.shared.value(for: key)
         KeychainManager.shared.set(value, for: key)
         defer {
             if let original { KeychainManager.shared.set(original, for: key) } else { KeychainManager.shared.delete(key) }

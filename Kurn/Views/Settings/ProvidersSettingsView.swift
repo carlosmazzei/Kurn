@@ -7,6 +7,7 @@
 //  this screen only edits the non-secret config around them.
 //
 
+import KurnCore
 import SwiftUI
 
 struct ProvidersSettingsView: View {
@@ -18,6 +19,7 @@ struct ProvidersSettingsView: View {
     @Binding var keyRevision: Int
 
     @State private var showingAddProvider = false
+    @State private var keychainError: AppError?
 
     var body: some View {
         Form {
@@ -48,12 +50,21 @@ struct ProvidersSettingsView: View {
             }
         }
         .navigationTitle(NSLocalizedString("settings.providers", comment: "AI Providers"))
+        .errorAlert($keychainError)
         .sheet(isPresented: $showingAddProvider) {
             NavigationStack {
                 AddProviderView { provider, key in
+                    // The provider config itself is added either way — a
+                    // Keychain failure here means "added without a key yet",
+                    // not "add failed", and is surfaced rather than silently
+                    // leaving the row looking unconfigured with no explanation
+                    // (H7 PR 14).
                     settings.addProvider(provider)
                     if !key.isEmpty {
-                        KeychainManager.shared.set(key, for: provider.keychainAccount)
+                        let outcome = KeychainManager.shared.set(key, for: provider.keychainAccount)
+                        if case .failed(let reason) = outcome {
+                            keychainError = .keychainAccessFailed(reason.rawValue)
+                        }
                     }
                     keyRevision += 1
                     showingAddProvider = false
