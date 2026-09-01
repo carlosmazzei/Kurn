@@ -9,6 +9,7 @@
 //  notes (map), then the notes are summarized with the user's template (reduce).
 //
 
+import CryptoKit
 import Foundation
 import KurnCore
 
@@ -60,15 +61,24 @@ struct SummaryService {
     ///   - meetingTitle: included for light context in the prompt.
     ///   - provider: which vendor to use (resolved to a key via ProviderFactory).
     ///   - template: shapes the persona/focus and the summary's sections.
+    ///   - resume: a map-stage checkpoint from an interrupted staged run
+    ///     (H4); ignored on the single-pass path and unless its identity
+    ///     matches this run's exactly (see `SummaryMapCheckpoint.matches`).
     ///   - onProgress: staged-path progress as (stage, totalStages); reported
     ///     off the main actor, single-pass summaries never call it.
+    ///   - onMapStageCompleted: staged-path durable-progress sink, awaited
+    ///     after every completed map block (H4); the caller persists it so an
+    ///     interrupted run can resume instead of re-condensing — for a cloud
+    ///     provider, re-paying for — every block from the start.
     func generate(
         transcriptText: String,
         meetingTitle: String,
         provider: AIProvider,
         model: String,
         template: SummaryTemplate,
-        onProgress: (@Sendable (Int, Int) -> Void)? = nil
+        resume: SummaryMapCheckpoint? = nil,
+        onProgress: (@Sendable (Int, Int) -> Void)? = nil,
+        onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)? = nil
     ) async throws -> SummaryResult {
         let trimmed = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -95,10 +105,13 @@ struct SummaryService {
 
         return try await mapReduce(
             llm: llm,
+            model: model,
             transcript: trimmed,
             meetingTitle: meetingTitle,
             template: template,
-            onProgress: onProgress
+            resume: resume,
+            onProgress: onProgress,
+            onMapStageCompleted: onMapStageCompleted
         )
     }
 
@@ -107,35 +120,49 @@ struct SummaryService {
     /// Condense each transcript block into detailed intermediate notes, then
     /// summarize the combined notes with the user's chosen template. Blocks run
     /// sequentially to stay clear of vendor rate limits; the first failure
-    /// aborts the whole summary with its original error.
+    /// aborts the whole summary with its original error. The block loop itself
+    /// is `SummaryMapRunner` (H4): given a matching `resume` checkpoint it
+    /// skips already-condensed blocks, and `onMapStageCompleted` is awaited
+    /// after each new block so a save failure stops the run there instead of
+    /// risking the next block's cost on top of unsaved progress.
     private func mapReduce(
         llm: LLMProvider,
+        model: String,
         transcript: String,
         meetingTitle: String,
         template: SummaryTemplate,
-        onProgress: (@Sendable (Int, Int) -> Void)?
+        resume: SummaryMapCheckpoint?,
+        onProgress: (@Sendable (Int, Int) -> Void)?,
+        onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)?
     ) async throws -> SummaryResult {
         let blocks = Self.splitTranscript(transcript, maxChars: Self.mapBlockChars(for: llm.provider))
         let totalStages = blocks.count + 1
+        let contentDigest = Self.contentDigest(transcript)
         AppLog.transcription.atNotice.notice("summary: staged path blocks=\(blocks.count, privacy: .public) chars=\(transcript.count, privacy: .public)")
 
-        var notes: [String] = []
-        for (index, block) in blocks.enumerated() {
-            try Task.checkCancellation()
-            onProgress?(index + 1, totalStages)
-            let userPrompt = """
-            Meeting title: \(meetingTitle)
+        let notes = try await SummaryMapRunner.run(
+            blocks: blocks,
+            contentDigest: contentDigest,
+            providerID: llm.provider.id,
+            model: model,
+            resume: resume,
+            condenseBlock: { block, index in
+                onProgress?(index + 1, totalStages)
+                let userPrompt = """
+                Meeting title: \(meetingTitle)
 
-            Transcript (part \(index + 1) of \(blocks.count)):
-            \(block)
-            """
-            let partial = try await llm.summarize(
-                systemPrompt: SummaryPrompt.system(for: Self.notesTemplate),
-                userPrompt: userPrompt
-            )
-            notes.append(Self.markdownText(from: partial.sections))
-            AppLog.transcription.atInfo.info("summary: map block \(index + 1, privacy: .public)/\(blocks.count, privacy: .public) done")
-        }
+                Transcript (part \(index + 1) of \(blocks.count)):
+                \(block)
+                """
+                let partial = try await llm.summarize(
+                    systemPrompt: SummaryPrompt.system(for: Self.notesTemplate),
+                    userPrompt: userPrompt
+                )
+                AppLog.transcription.atInfo.info("summary: map block \(index + 1, privacy: .public)/\(blocks.count, privacy: .public) done")
+                return Self.markdownText(from: partial.sections)
+            },
+            onStageCompleted: onMapStageCompleted
+        )
 
         try Task.checkCancellation()
         onProgress?(totalStages, totalStages)
@@ -156,6 +183,12 @@ struct SummaryService {
             systemPrompt: SummaryPrompt.system(for: template),
             userPrompt: reducePrompt
         )
+    }
+
+    /// SHA-256 of a map-reduce run's transcript text, part of
+    /// `SummaryMapCheckpoint`'s identity (H4).
+    static func contentDigest(_ text: String) -> String {
+        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Internal template for the map stage. Runs through the same

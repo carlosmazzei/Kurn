@@ -22,18 +22,28 @@ struct WikiService {
     /// Build the condensed wiki markdown for a meeting's transcript. Uses the
     /// summary map-stage notes template for both stages, so the output is
     /// factual notes rather than a persona-styled summary.
+    ///
+    /// `resume`/`onMapStageCompleted` pass straight through to
+    /// `SummaryService.generate` (H4): because the map stage always uses
+    /// `notesTemplate` regardless of caller, a checkpoint written by a
+    /// summary run over the same meeting content is just as valid a resume
+    /// seed here, and vice versa — see `SummaryMapCheckpoint`'s header.
     func generate(
         transcriptText: String,
         meetingTitle: String,
         provider: AIProvider,
-        model: String
+        model: String,
+        resume: SummaryMapCheckpoint? = nil,
+        onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)? = nil
     ) async throws -> String {
         let result = try await summaryService.generate(
             transcriptText: transcriptText,
             meetingTitle: meetingTitle,
             provider: provider,
             model: model,
-            template: SummaryService.notesTemplate
+            template: SummaryService.notesTemplate,
+            resume: resume,
+            onMapStageCompleted: onMapStageCompleted
         )
         return SummaryService.markdownText(from: result.sections)
     }
