@@ -74,6 +74,14 @@
 "langdetect.by_transcriber" = "By transcriber";
 "langdetect.fluid_lid" = "FluidAudio detection";
 
+/* Pipeline stage display names */
+"pipeline.stage.preprocessing" = "Preprocessing";
+"pipeline.stage.language_detection" = "Language Detection";
+"pipeline.stage.voice_activity_detection" = "Speech Detection";
+"pipeline.stage.compaction" = "Silence Removal";
+"pipeline.stage.diarization" = "Speaker Separation";
+"pipeline.stage.fusion" = "Transcript Assembly";
+
 /* Languages */
 "lang.auto" = "Auto-detect";
 "lang.pt" = "Portuguese";
@@ -423,6 +431,7 @@
 "speaker.cross_meeting_match.dismiss" = "Not now";
 "detail.add_segment" = "Add segment";
 "detail.retranscribe" = "Re-transcribe";
+"detail.retry_correction" = "Retry Correction";
 "detail.retranscribe.confirm.title" = "Re-transcribe this recording?";
 "detail.retranscribe.confirm.message" = "This replaces the existing transcript with a new one from the original audio. This can't be undone.";
 "detail.retranscribe_all" = "Re-transcribe all";
@@ -438,6 +447,7 @@
 "detail.transcript.corrupted.title" = "Transcript unreadable";
 "detail.transcript.corrupted.subtitle" = "The saved transcript appears damaged. Re-transcribing this recording will replace it.";
 "detail.transcript.corrupted_banner" = "This recording's transcript appears damaged and could not be loaded.";
+"detail.transcript.warnings_banner" = "Completed with warnings in: %@";
 "detail.summary.empty.title" = "No summary yet";
 "detail.section" = "Section";
 "tab.recordings" = "Recordings";

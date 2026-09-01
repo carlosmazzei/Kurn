@@ -360,6 +360,7 @@ struct MeetingDetailView: View {
                 if let warning = txVM?.diarizationWarnings[recording.id] {
                     diarizationWarningBanner(warning)
                 }
+                pipelineWarningsBanner(for: recording)
             }
             if transcribed.isEmpty {
                 transcriptEmptyPlaceholder
@@ -461,6 +462,61 @@ struct MeetingDetailView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    /// "Completed with warnings" for `recording`'s durable `PipelineReport`
+    /// (H5 PR 13) — distinct from `diarizationWarningBanner` above, which is
+    /// transient in-memory state for the run that just finished. This reads
+    /// from what was actually persisted, so it still shows after navigating
+    /// away and back, or for a transcript from an earlier session. Correction
+    /// is the one stage cheap enough to retry in isolation (see
+    /// `TranscriptionViewModel.retryCorrection`); every other warning falls
+    /// back to the existing full re-transcribe confirmation.
+    @ViewBuilder
+    private func pipelineWarningsBanner(for recording: Recording) -> some View {
+        if let report = recording.transcript?.pipelineReport, report.hasWarnings {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(
+                    String(
+                        format: NSLocalizedString(
+                            "detail.transcript.warnings_banner",
+                            comment: "Completed with warnings in: %@"
+                        ),
+                        report.warnings.map { $0.stage.displayName }.joined(separator: ", ")
+                    ),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.footnote)
+                .foregroundStyle(Theme.warning)
+                HStack(spacing: 8) {
+                    if report.warnings.contains(where: { $0.stage == .correction }) {
+                        let isRetrying = txVM?.correctionRetryIDs.contains(recording.id) == true
+                        Button {
+                            txVM?.retryCorrection(recording, language: meeting.language, config: settings.pipelineConfiguration)
+                        } label: {
+                            if isRetrying {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text(NSLocalizedString("detail.retry_correction", comment: "Retry Correction"))
+                                    .font(.footnote.weight(.semibold))
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isRetrying)
+                    }
+                    Button {
+                        pendingRetranscribe = recording
+                    } label: {
+                        Text(NSLocalizedString("detail.retranscribe", comment: "Re-transcribe"))
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
     }
 
     // MARK: - Section picker

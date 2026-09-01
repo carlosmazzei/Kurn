@@ -74,6 +74,14 @@
 "langdetect.by_transcriber" = "Dal trascrittore";
 "langdetect.fluid_lid" = "Rilevamento FluidAudio";
 
+/* Nomi visualizzati delle fasi della pipeline */
+"pipeline.stage.preprocessing" = "Pre-elaborazione";
+"pipeline.stage.language_detection" = "Rilevamento della lingua";
+"pipeline.stage.voice_activity_detection" = "Rilevamento vocale";
+"pipeline.stage.compaction" = "Rimozione dei silenzi";
+"pipeline.stage.diarization" = "Separazione dei parlanti";
+"pipeline.stage.fusion" = "Assemblaggio della trascrizione";
+
 /* Lingue */
 "lang.auto" = "Rilevamento automatico";
 "lang.pt" = "Portoghese";
@@ -423,6 +431,7 @@
 "speaker.cross_meeting_match.dismiss" = "Non ora";
 "detail.add_segment" = "Aggiungi segmento";
 "detail.retranscribe" = "Ritrascrivi";
+"detail.retry_correction" = "Riprova correzione";
 "detail.retranscribe.confirm.title" = "Ritrascrivere questa registrazione?";
 "detail.retranscribe.confirm.message" = "Questo sostituisce la trascrizione esistente con una nuova, ottenuta dall'audio originale. Non è possibile annullare l'operazione.";
 "detail.retranscribe_all" = "Ritrascrivi tutto";
@@ -438,6 +447,7 @@
 "detail.transcript.corrupted.title" = "Trascrizione illeggibile";
 "detail.transcript.corrupted.subtitle" = "La trascrizione salvata sembra danneggiata. Ritrascrivere questa registrazione la sostituirà.";
 "detail.transcript.corrupted_banner" = "La trascrizione di questa registrazione sembra danneggiata e non è stato possibile caricarla.";
+"detail.transcript.warnings_banner" = "Completato con avvisi in: %@";
 "detail.summary.empty.title" = "Ancora nessun riassunto";
 "detail.section" = "Sezione";
 "tab.recordings" = "Registrazioni";

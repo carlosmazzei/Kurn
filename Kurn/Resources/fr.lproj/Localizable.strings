@@ -74,6 +74,14 @@
 "langdetect.by_transcriber" = "Par le transcripteur";
 "langdetect.fluid_lid" = "Détection FluidAudio";
 
+/* Noms d'affichage des étapes du pipeline */
+"pipeline.stage.preprocessing" = "Prétraitement";
+"pipeline.stage.language_detection" = "Détection de la langue";
+"pipeline.stage.voice_activity_detection" = "Détection de la parole";
+"pipeline.stage.compaction" = "Suppression des silences";
+"pipeline.stage.diarization" = "Séparation des locuteurs";
+"pipeline.stage.fusion" = "Assemblage de la transcription";
+
 /* Langues */
 "lang.auto" = "Détection automatique";
 "lang.pt" = "Portugais";
@@ -423,6 +431,7 @@
 "speaker.cross_meeting_match.dismiss" = "Pas maintenant";
 "detail.add_segment" = "Ajouter un segment";
 "detail.retranscribe" = "Retranscrire";
+"detail.retry_correction" = "Réessayer la correction";
 "detail.retranscribe.confirm.title" = "Retranscrire cet enregistrement ?";
 "detail.retranscribe.confirm.message" = "Cela remplace la transcription existante par une nouvelle, à partir de l'audio d'origine. Cette action est irréversible.";
 "detail.retranscribe_all" = "Tout retranscrire";
@@ -438,6 +447,7 @@
 "detail.transcript.corrupted.title" = "Transcription illisible";
 "detail.transcript.corrupted.subtitle" = "La transcription enregistrée semble endommagée. Retranscrire cet enregistrement la remplacera.";
 "detail.transcript.corrupted_banner" = "La transcription de cet enregistrement semble endommagée et n'a pas pu être chargée.";
+"detail.transcript.warnings_banner" = "Terminé avec des avertissements pour : %@";
 "detail.summary.empty.title" = "Aucun résumé pour l'instant";
 "detail.section" = "Section";
 "tab.recordings" = "Enregistrements";
