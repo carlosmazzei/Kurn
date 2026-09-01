@@ -127,6 +127,9 @@ extension MeetingDetailView {
 
     func startTranscription(_ recording: Recording) {
         guard recording.isReadyForConsumption else { return }
+        // A deliberate user action gets a fresh automatic-resume budget,
+        // regardless of how many unattended attempts already failed (H4).
+        txVM?.resetAutomaticResumeBudget(for: recording)
         // Routed through the view model's task registry so the run can be
         // cancelled (by the user or when the background grace window expires).
         txVM?.startTranscription(

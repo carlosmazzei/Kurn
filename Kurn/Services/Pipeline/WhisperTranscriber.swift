@@ -41,7 +41,7 @@ actor WhisperTranscriber: Transcribing {
         transferPolicy: LargeTransferPolicy = .wifiOnly,
         cutPoints: [TimeInterval] = [],
         resume: ChunkedTranscriptionRunner.Progress? = nil,
-        onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)? = nil,
+        onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) async throws -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         let provider = try ProviderFactory.whisperProvider(

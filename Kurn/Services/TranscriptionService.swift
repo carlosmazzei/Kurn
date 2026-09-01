@@ -55,9 +55,12 @@ struct TranscriptionService {
     /// download error). Transcription still succeeds with a fallback turn.
     typealias DiarizationWarningHandler = @Sendable (String) -> Void
     /// Durable-progress sink invoked after every completed chunk on the
-    /// resumable engines. The receiver persists the checkpoint so an
-    /// interrupted transcription can continue instead of starting over.
-    typealias CheckpointHandler = @Sendable (TranscriptionCheckpoint) -> Void
+    /// resumable engines, and awaited before the next chunk starts (H4): the
+    /// receiver must actually persist the checkpoint before returning, and
+    /// throw if that persistence fails, so a save failure stops the run
+    /// rather than letting the pipeline continue past a chunk that was never
+    /// made durable.
+    typealias CheckpointHandler = @Sendable (TranscriptionCheckpoint) async throws -> Void
 
     struct Output: Sendable {
         var segments: [TranscriptSegment]
@@ -512,10 +515,10 @@ struct TranscriptionService {
             AppLog.transcription.atNotice.notice("transcribe: checkpoint mismatch stored(engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) provider=\(cp.providerID ?? "-", privacy: .public) totalChunks=\(cp.totalChunks, privacy: .public)) != current(engine=\(engine.rawValue, privacy: .public) lang=\(language.rawValue, privacy: .public) compacted=\(compacted, privacy: .public) provider=\(checkpointProviderID ?? "-", privacy: .public)), starting over")
             return nil
         }
-        let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?
+        let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) async throws -> Void)?
         if let onCheckpoint {
             checkpointSink = { progress in
-                onCheckpoint(TranscriptionCheckpoint(fingerprint: fingerprint, progress: progress))
+                try await onCheckpoint(TranscriptionCheckpoint(fingerprint: fingerprint, progress: progress))
             }
         } else {
             checkpointSink = nil

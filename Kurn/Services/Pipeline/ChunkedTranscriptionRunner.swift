@@ -40,7 +40,12 @@ enum ChunkedTranscriptionRunner {
     ///     `planDigest` matches this run's plan exactly.
     ///   - transcribeChunk: transcribes one chunk (given its zero-based index)
     ///     into chunk-local spans.
-    ///   - onChunkCompleted: durable-progress sink invoked after each chunk.
+    ///   - onChunkCompleted: durable-progress sink invoked after each chunk and
+    ///     awaited before the next one starts (H4): a checkpoint is not
+    ///     durable until this returns, so the loop must not risk the next
+    ///     chunk's work — or, for a cloud engine, its cost — on top of
+    ///     progress that was never actually saved. A thrown error stops the
+    ///     run at the last durably-committed chunk instead of continuing.
     ///   - onProgress: 0...1 fraction of chunks completed, plus the current
     ///     chunk number and total (the current chunk is clamped to `1...total`).
     static func run(
@@ -48,7 +53,7 @@ enum ChunkedTranscriptionRunner {
         planDigest: String,
         resume: Progress?,
         transcribeChunk: @Sendable (AudioChunker.Chunk, Int) async throws -> RawTranscript,
-        onChunkCompleted: (@Sendable (Progress) -> Void)? = nil,
+        onChunkCompleted: (@Sendable (Progress) async throws -> Void)? = nil,
         onProgress: @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         var state: Progress
@@ -95,7 +100,13 @@ enum ChunkedTranscriptionRunner {
                 )
             }
             state.completedChunks = index + 1
-            onChunkCompleted?(state)
+            // Awaited, not fired-and-forgotten: chunk N+1 must not start
+            // before chunk N's progress is durably committed (H4). A thrown
+            // error here propagates out of `run`, stopping the loop with the
+            // in-memory `state` discarded — the caller's last *durable*
+            // checkpoint remains whatever `onChunkCompleted` last returned
+            // from successfully.
+            try await onChunkCompleted?(state)
             // Advance after each chunk completes so the bar reaches 100% when
             // the last chunk lands (rather than stalling at (total-1)/total).
             // The current chunk is the next one in flight (or the last one if
