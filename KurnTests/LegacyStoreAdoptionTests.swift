@@ -137,14 +137,13 @@ struct LegacyStoreAdoptionTests {
             captureRecoveryReason: .writeFailed,
             fileSize: 1_800_000
         )
-        recoveringRecording.transcriptionCheckpoint = TranscriptionCheckpoint(
-            engineRaw: TranscriptionEngine.appleSpeech.rawValue,
-            languageRaw: MeetingLanguage.english.rawValue,
+        recoveringRecording.transcriptionCheckpoint = .fixture(
+            engine: .appleSpeech,
+            language: .english,
             compacted: false,
             totalChunks: 4,
             completedChunks: 2,
             detectedLanguage: "en",
-            providerID: nil,
             spans: [
                 TranscriptionCheckpoint.Span(text: "First chunk.", start: 0, end: 30, confidence: 0.8)
             ]

@@ -52,11 +52,13 @@ actor WhisperTranscriber: Transcribing {
         let vendor = transcriptionProvider.displayName
         let chunks = try await chunker.chunk(url: url, cutPoints: cutPoints)
         let total = chunks.count
+        let planDigest = PipelineDigest.sha256Hex(of: chunks.map(\.offset))
         AppLog.transcription.atInfo.info("whisper: uploading \(total, privacy: .public) chunk(s) via \(vendor, privacy: .public)")
         defer { Task { await chunker.cleanup(chunks) } }
 
         return try await ChunkedTranscriptionRunner.run(
             chunks: chunks,
+            planDigest: planDigest,
             resume: resume,
             transcribeChunk: { chunk, index in
                 let data = try Data(contentsOf: chunk.url)

@@ -67,6 +67,7 @@ actor WhisperCppTranscriber: Transcribing {
 
         let chunks = try await chunker.chunkByDuration(url: url, cutPoints: cutPoints)
         let total = chunks.count
+        let planDigest = PipelineDigest.sha256Hex(of: chunks.map(\.offset))
         AppLog.transcription.atInfo.info(
             "whisperCpp: \(total, privacy: .public) chunk(s) with \(model.fileName, privacy: .public)"
         )
@@ -74,6 +75,7 @@ actor WhisperCppTranscriber: Transcribing {
 
         return try await ChunkedTranscriptionRunner.run(
             chunks: chunks,
+            planDigest: planDigest,
             resume: resume,
             transcribeChunk: { chunk, index in
                 try await self.transcribeChunk(

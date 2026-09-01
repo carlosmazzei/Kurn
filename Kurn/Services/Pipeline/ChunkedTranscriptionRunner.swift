@@ -22,6 +22,11 @@ enum ChunkedTranscriptionRunner {
         var totalChunks: Int
         var completedChunks: Int
         var detectedLanguage: String
+        /// SHA-256 over this run's exact chunk plan (`PipelineDigest`). Part of
+        /// H4's fingerprinting: two plans with the same chunk *count* can still
+        /// be cut at different offsets, and resuming into the wrong one would
+        /// silently misalign every completed span's timestamps.
+        var planDigest: String
         /// Spans of completed chunks, offset to the input file's timeline.
         var spans: [TranscribedSpan]
     }
@@ -29,8 +34,10 @@ enum ChunkedTranscriptionRunner {
     /// Run the chunk loop, optionally resuming from prior progress.
     /// - Parameters:
     ///   - chunks: the (re-)derived chunk plan for the input file.
-    ///   - resume: progress from an interrupted run; ignored when its chunk
-    ///     count doesn't match the current plan.
+    ///   - planDigest: `PipelineDigest.sha256Hex(of: chunks.map(\.offset))` —
+    ///     computed by the caller since only it knows how the plan was cut.
+    ///   - resume: progress from an interrupted run; ignored unless its own
+    ///     `planDigest` matches this run's plan exactly.
     ///   - transcribeChunk: transcribes one chunk (given its zero-based index)
     ///     into chunk-local spans.
     ///   - onChunkCompleted: durable-progress sink invoked after each chunk.
@@ -38,13 +45,14 @@ enum ChunkedTranscriptionRunner {
     ///     chunk number and total (the current chunk is clamped to `1...total`).
     static func run(
         chunks: [AudioChunker.Chunk],
+        planDigest: String,
         resume: Progress?,
         transcribeChunk: @Sendable (AudioChunker.Chunk, Int) async throws -> RawTranscript,
         onChunkCompleted: (@Sendable (Progress) -> Void)? = nil,
         onProgress: @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
         var state: Progress
-        if let resume, resume.totalChunks == chunks.count,
+        if let resume, resume.planDigest == planDigest, resume.totalChunks == chunks.count,
            (0...chunks.count).contains(resume.completedChunks) {
             state = resume
             AppLog.transcription.atNotice.notice("chunked: resuming at chunk \(resume.completedChunks + 1, privacy: .public)/\(chunks.count, privacy: .public)")
@@ -52,7 +60,7 @@ enum ChunkedTranscriptionRunner {
             if resume != nil {
                 AppLog.transcription.atNotice.notice("chunked: checkpoint plan mismatch, starting over")
             }
-            state = Progress(totalChunks: chunks.count, completedChunks: 0, detectedLanguage: "", spans: [])
+            state = Progress(totalChunks: chunks.count, completedChunks: 0, detectedLanguage: "", planDigest: planDigest, spans: [])
         }
 
         let total = max(1, chunks.count)
@@ -104,20 +112,15 @@ enum ChunkedTranscriptionRunner {
 
 extension TranscriptionCheckpoint {
     init(
-        engine: TranscriptionEngine,
-        language: MeetingLanguage,
-        compacted: Bool,
-        providerID: String? = nil,
+        fingerprint: TranscriptionPipelineFingerprint,
         progress: ChunkedTranscriptionRunner.Progress
     ) {
         self.init(
-            engineRaw: engine.rawValue,
-            languageRaw: language.rawValue,
-            compacted: compacted,
+            fingerprint: fingerprint,
+            chunkPlanDigest: progress.planDigest,
             totalChunks: progress.totalChunks,
             completedChunks: progress.completedChunks,
             detectedLanguage: progress.detectedLanguage,
-            providerID: providerID,
             spans: progress.spans.map {
                 Span(text: $0.text, start: $0.start, end: $0.end, confidence: $0.confidence)
             }
@@ -129,6 +132,7 @@ extension TranscriptionCheckpoint {
             totalChunks: totalChunks,
             completedChunks: completedChunks,
             detectedLanguage: detectedLanguage,
+            planDigest: chunkPlanDigest,
             spans: spans.map {
                 TranscribedSpan(text: $0.text, start: $0.start, end: $0.end, confidence: $0.confidence)
             }

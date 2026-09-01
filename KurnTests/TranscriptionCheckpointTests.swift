@@ -5,8 +5,8 @@
 //  The checkpoint is the durable state that lets an interrupted chunked
 //  transcription resume instead of starting over: it must round-trip through
 //  its JSON encoding on `Recording`, seed the chunk runner correctly, and be
-//  rejected whenever the re-derived plan doesn't match the one it was saved
-//  against.
+//  rejected whenever its pipeline fingerprint (H4) doesn't match the run being
+//  attempted, or its own spans don't pass structural sanity.
 //
 
 import Foundation
@@ -17,9 +17,9 @@ import Testing
 struct TranscriptionCheckpointTests {
 
     private func sampleCheckpoint() -> TranscriptionCheckpoint {
-        TranscriptionCheckpoint(
-            engineRaw: TranscriptionEngine.whisperAPI.rawValue,
-            languageRaw: MeetingLanguage.english.rawValue,
+        .fixture(
+            engine: .whisperAPI,
+            language: .english,
             compacted: true,
             totalChunks: 3,
             completedChunks: 2,
@@ -27,8 +27,13 @@ struct TranscriptionCheckpointTests {
             spans: [
                 .init(text: "hello", start: 0, end: 1.5, confidence: 0.9),
                 .init(text: "world", start: 601, end: 603, confidence: nil)
-            ]
+            ],
+            sourceDuration: 700
         )
+    }
+
+    private func fingerprint(of checkpoint: TranscriptionCheckpoint) -> TranscriptionPipelineFingerprint {
+        checkpoint.fingerprint
     }
 
     @Test func codableRoundTripPreservesEverything() throws {
@@ -39,6 +44,7 @@ struct TranscriptionCheckpointTests {
         #expect(decoded.engineRaw == original.engineRaw)
         #expect(decoded.languageRaw == original.languageRaw)
         #expect(decoded.compacted == original.compacted)
+        #expect(decoded.chunkPlanDigest == original.chunkPlanDigest)
         #expect(decoded.totalChunks == 3)
         #expect(decoded.completedChunks == 2)
         #expect(decoded.detectedLanguage == "en")
@@ -130,12 +136,24 @@ struct TranscriptionCheckpointTests {
         #expect(recording.transcriptionCheckpoint?.completedChunks == 2)
     }
 
+    // MARK: - Fingerprint matching (H4)
+
     @Test func matchesRequiresSameEngineLanguageAndCompaction() {
         let checkpoint = sampleCheckpoint()
-        #expect(checkpoint.matches(engine: .whisperAPI, language: .english, compacted: true))
-        #expect(!checkpoint.matches(engine: .appleSpeech, language: .english, compacted: true))
-        #expect(!checkpoint.matches(engine: .whisperAPI, language: .portuguese, compacted: true))
-        #expect(!checkpoint.matches(engine: .whisperAPI, language: .english, compacted: false))
+        let base = fingerprint(of: checkpoint)
+        #expect(checkpoint.matches(base))
+
+        var wrongEngine = base
+        wrongEngine.engineRaw = TranscriptionEngine.appleSpeech.rawValue
+        #expect(!checkpoint.matches(wrongEngine))
+
+        var wrongLanguage = base
+        wrongLanguage.languageRaw = MeetingLanguage.portuguese.rawValue
+        #expect(!checkpoint.matches(wrongLanguage))
+
+        var wrongCompaction = base
+        wrongCompaction.compacted = false
+        #expect(!checkpoint.matches(wrongCompaction))
     }
 
     @Test func matchesRequiresSameTranscriptionProvider() {
@@ -143,13 +161,97 @@ struct TranscriptionCheckpointTests {
         // resume for a different provider (which would stitch two vendors'
         // chunks together). A legacy checkpoint (providerID nil) also won't
         // match a provider-scoped resume.
-        let openAICheckpoint = TranscriptionCheckpoint(
-            engine: .whisperAPI, language: .english, compacted: true, providerID: AIProvider.openAI.id,
-            progress: sampleCheckpoint().runnerProgress
+        let openAICheckpoint = TranscriptionCheckpoint.fixture(
+            engine: .whisperAPI, language: .english, compacted: true,
+            totalChunks: 3, completedChunks: 2, detectedLanguage: "en",
+            spans: [], providerID: AIProvider.openAI.id
         )
-        #expect(openAICheckpoint.matches(engine: .whisperAPI, language: .english, compacted: true, providerID: AIProvider.openAI.id))
-        #expect(!openAICheckpoint.matches(engine: .whisperAPI, language: .english, compacted: true, providerID: AIProvider.groq.id))
-        #expect(!openAICheckpoint.matches(engine: .whisperAPI, language: .english, compacted: true, providerID: nil))
+        let base = fingerprint(of: openAICheckpoint)
+        #expect(openAICheckpoint.matches(base))
+
+        var groqFingerprint = base
+        groqFingerprint.providerID = AIProvider.groq.id
+        #expect(!openAICheckpoint.matches(groqFingerprint))
+
+        var noProviderFingerprint = base
+        noProviderFingerprint.providerID = nil
+        #expect(!openAICheckpoint.matches(noProviderFingerprint))
+    }
+
+    @Test func matchesRequiresSameSourceDigest() {
+        // Same everything else, different source bytes: a re-recorded or
+        // replaced file must never resume from another file's spans.
+        let checkpoint = sampleCheckpoint()
+        var mutatedSource = fingerprint(of: checkpoint)
+        mutatedSource.sourceDigest = "different-source"
+        #expect(!checkpoint.matches(mutatedSource))
+    }
+
+    @Test func matchesRequiresSamePreprocessingVADAndCompactionDigest() {
+        let checkpoint = sampleCheckpoint()
+        let base = fingerprint(of: checkpoint)
+
+        var differentPreprocessing = base
+        differentPreprocessing.preprocessingRaw = PreprocessingEngine.none.rawValue
+        #expect(!checkpoint.matches(differentPreprocessing))
+
+        var differentVAD = base
+        differentVAD.vadRaw = VADEngine.fluidAudio.rawValue
+        #expect(!checkpoint.matches(differentVAD))
+
+        var differentCompactionMap = base
+        differentCompactionMap.compactionDigest = "a-different-map"
+        #expect(!checkpoint.matches(differentCompactionMap))
+    }
+
+    @Test func unverifiedSourceNeverMatchesAnything() {
+        // A fingerprint with no digest (an unreadable/unvalidated source)
+        // must never match, including another equally unverified one.
+        let checkpoint = TranscriptionCheckpoint.fixture(
+            engine: .whisperAPI, language: .english, compacted: false,
+            totalChunks: 1, completedChunks: 0, detectedLanguage: "",
+            spans: [], sourceDigest: nil
+        )
+        var attempted = checkpoint.fingerprint
+        attempted.sourceDigest = nil
+        #expect(!checkpoint.matches(attempted))
+    }
+
+    // MARK: - Structural validity (H4)
+
+    @Test func structurallyValidCheckpointPassesValidation() {
+        #expect(sampleCheckpoint().isStructurallyValid)
+    }
+
+    @Test func negativeOrOutOfBoundsCompletedChunksIsInvalid() {
+        var checkpoint = sampleCheckpoint()
+        checkpoint.completedChunks = -1
+        #expect(!checkpoint.isStructurallyValid)
+
+        checkpoint = sampleCheckpoint()
+        checkpoint.completedChunks = checkpoint.totalChunks + 1
+        #expect(!checkpoint.isStructurallyValid)
+    }
+
+    @Test func nonFiniteOrNegativeSpanTimestampsAreInvalid() {
+        var checkpoint = sampleCheckpoint()
+        checkpoint.spans = [.init(text: "x", start: .nan, end: 1, confidence: nil)]
+        #expect(!checkpoint.isStructurallyValid)
+
+        checkpoint = sampleCheckpoint()
+        checkpoint.spans = [.init(text: "x", start: -5, end: 1, confidence: nil)]
+        #expect(!checkpoint.isStructurallyValid)
+
+        checkpoint = sampleCheckpoint()
+        checkpoint.spans = [.init(text: "x", start: 5, end: 1, confidence: nil)]
+        #expect(!checkpoint.isStructurallyValid)
+    }
+
+    @Test func spanBeyondSourceDurationIsInvalid() {
+        var checkpoint = sampleCheckpoint()
+        // sampleCheckpoint's source duration is 700s; far beyond any slack.
+        checkpoint.spans = [.init(text: "x", start: 10_000, end: 10_001, confidence: nil)]
+        #expect(!checkpoint.isStructurallyValid)
     }
 
     @Test func runnerProgressBridgesBothWays() {
@@ -157,14 +259,14 @@ struct TranscriptionCheckpointTests {
         let progress = checkpoint.runnerProgress
         #expect(progress.totalChunks == 3)
         #expect(progress.completedChunks == 2)
+        #expect(progress.planDigest == checkpoint.chunkPlanDigest)
         #expect(progress.spans.count == 2)
         #expect(progress.spans[0].text == "hello")
 
-        let rebuilt = TranscriptionCheckpoint(
-            engine: .whisperAPI, language: .english, compacted: true, progress: progress
-        )
+        let rebuilt = TranscriptionCheckpoint(fingerprint: checkpoint.fingerprint, progress: progress)
         #expect(rebuilt.totalChunks == checkpoint.totalChunks)
         #expect(rebuilt.completedChunks == checkpoint.completedChunks)
+        #expect(rebuilt.chunkPlanDigest == checkpoint.chunkPlanDigest)
         #expect(rebuilt.spans.count == checkpoint.spans.count)
     }
 }

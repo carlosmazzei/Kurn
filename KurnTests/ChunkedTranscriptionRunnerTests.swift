@@ -4,8 +4,8 @@
 //
 //  The chunk runner is the shared loop behind the resumable engines: it must
 //  offset chunk-local spans to the input timeline, skip already-completed
-//  chunks when resuming, discard a resume whose plan doesn't match, and report
-//  durable progress after every chunk.
+//  chunks when resuming, discard a resume whose plan doesn't match — by count
+//  or by exact cut points — and report durable progress after every chunk.
 //
 
 import Foundation
@@ -24,9 +24,14 @@ struct ChunkedTranscriptionRunnerTests {
         }
     }
 
+    private func planDigest(_ offsets: [TimeInterval]) -> String {
+        PipelineDigest.sha256Hex(of: offsets)
+    }
+
     @Test func offsetsChunkLocalSpansToInputTimeline() async throws {
         let result = try await ChunkedTranscriptionRunner.run(
             chunks: chunks([0, 600]),
+            planDigest: planDigest([0, 600]),
             resume: nil,
             transcribeChunk: { _, index in
                 RawTranscript(
@@ -49,6 +54,7 @@ struct ChunkedTranscriptionRunnerTests {
             totalChunks: 3,
             completedChunks: 2,
             detectedLanguage: "pt",
+            planDigest: planDigest([0, 600, 1200]),
             spans: [
                 TranscribedSpan(text: "earlier", start: 0, end: 1, confidence: nil),
                 TranscribedSpan(text: "work", start: 600, end: 601, confidence: nil)
@@ -57,6 +63,7 @@ struct ChunkedTranscriptionRunnerTests {
 
         let result = try await ChunkedTranscriptionRunner.run(
             chunks: chunks([0, 600, 1200]),
+            planDigest: planDigest([0, 600, 1200]),
             resume: resume,
             transcribeChunk: { _, index in
                 await transcribedIndexes.record(index)
@@ -75,18 +82,48 @@ struct ChunkedTranscriptionRunnerTests {
         #expect(result.language == "pt")
     }
 
-    @Test func mismatchedResumePlanStartsOver() async throws {
+    @Test func mismatchedResumePlanCountStartsOver() async throws {
         let transcribedIndexes = TranscribedIndexes()
         // Saved against a 5-chunk plan; the current plan has 2 chunks.
         let resume = ChunkedTranscriptionRunner.Progress(
             totalChunks: 5,
             completedChunks: 3,
             detectedLanguage: "pt",
+            planDigest: planDigest([0, 100, 200, 300, 400]),
             spans: [TranscribedSpan(text: "stale", start: 0, end: 1, confidence: nil)]
         )
 
         let result = try await ChunkedTranscriptionRunner.run(
             chunks: chunks([0, 600]),
+            planDigest: planDigest([0, 600]),
+            resume: resume,
+            transcribeChunk: { _, index in
+                await transcribedIndexes.record(index)
+                return RawTranscript(spans: [], language: "en")
+            }
+        )
+
+        #expect(await transcribedIndexes.values == [0, 1])
+        #expect(result.spans.isEmpty)
+        #expect(result.language == "en")
+    }
+
+    @Test func mismatchedResumePlanDigestStartsOverEvenWithSameChunkCount() async throws {
+        // Same chunk *count* (2) as the current plan, but cut at different
+        // offsets — e.g. VAD/compaction found different silence this time.
+        // The old count-only check would have wrongly accepted this resume.
+        let transcribedIndexes = TranscribedIndexes()
+        let resume = ChunkedTranscriptionRunner.Progress(
+            totalChunks: 2,
+            completedChunks: 1,
+            detectedLanguage: "pt",
+            planDigest: planDigest([0, 500]),
+            spans: [TranscribedSpan(text: "stale", start: 0, end: 1, confidence: nil)]
+        )
+
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: chunks([0, 600]),
+            planDigest: planDigest([0, 600]),
             resume: resume,
             transcribeChunk: { _, index in
                 await transcribedIndexes.record(index)
@@ -105,6 +142,7 @@ struct ChunkedTranscriptionRunnerTests {
 
         _ = try await ChunkedTranscriptionRunner.run(
             chunks: chunks([0, 600, 1200]),
+            planDigest: planDigest([0, 600, 1200]),
             resume: nil,
             transcribeChunk: { _, _ in
                 RawTranscript(
@@ -132,11 +170,13 @@ struct ChunkedTranscriptionRunnerTests {
             totalChunks: 1,
             completedChunks: 1,
             detectedLanguage: "en",
+            planDigest: planDigest([0]),
             spans: [TranscribedSpan(text: "all done", start: 0, end: 1, confidence: nil)]
         )
 
         let result = try await ChunkedTranscriptionRunner.run(
             chunks: chunks([0]),
+            planDigest: planDigest([0]),
             resume: resume,
             transcribeChunk: { _, _ in
                 Issue.record("should not transcribe any chunk")

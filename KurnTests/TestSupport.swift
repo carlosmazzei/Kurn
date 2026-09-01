@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 @testable import Kurn
 
@@ -42,6 +43,53 @@ actor TempFileTestLocker {
 }
 
 let tempFileTestLock = TempFileTestLocker()
+
+extension TranscriptionCheckpoint {
+    /// Test-only convenience: builds a checkpoint from the loose identity
+    /// fields most fixtures care about (engine/language/compaction/provider),
+    /// filling in the rest of `TranscriptionPipelineFingerprint` with
+    /// deterministic placeholder source/chunk-plan identity. Two fixtures
+    /// built with the same arguments compare equal under `matches`; changing
+    /// any one argument is enough to make them differ, which is what the H4
+    /// fingerprint tests exercise.
+    static func fixture(
+        engine: TranscriptionEngine,
+        language: MeetingLanguage,
+        compacted: Bool,
+        totalChunks: Int,
+        completedChunks: Int,
+        detectedLanguage: String,
+        spans: [Span],
+        providerID: String? = nil,
+        sourceFileSize: Int64 = 1_000,
+        sourceDuration: TimeInterval = 60,
+        sourceDigest: String? = "fixture-source",
+        preprocessing: PreprocessingEngine = .standardDSP,
+        vad: VADEngine = .energyThreshold,
+        compactionDigest: String? = nil,
+        chunkPlanDigest: String = "fixture-plan"
+    ) -> TranscriptionCheckpoint {
+        TranscriptionCheckpoint(
+            fingerprint: TranscriptionPipelineFingerprint(
+                sourceFileSize: sourceFileSize,
+                sourceDuration: sourceDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: preprocessing,
+                vad: vad,
+                language: language,
+                engine: engine,
+                providerID: providerID,
+                compacted: compacted,
+                compactionDigest: compactionDigest
+            ),
+            chunkPlanDigest: chunkPlanDigest,
+            totalChunks: totalChunks,
+            completedChunks: completedChunks,
+            detectedLanguage: detectedLanguage,
+            spans: spans
+        )
+    }
+}
 
 /// Shared helper for tests that need real SwiftData relationship behavior
 /// (inverse relationships are only guaranteed once objects are inserted into
