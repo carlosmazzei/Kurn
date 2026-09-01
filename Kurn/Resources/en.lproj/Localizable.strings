@@ -22,6 +22,7 @@
 "error.permission" = "Permission denied: %@";
 "error.persistence" = "Could not save your changes: %@";
 "error.transcript_encode_failed" = "The transcript could not be prepared for saving.";
+"error.transcript_integrity_failed" = "The new transcript failed a safety check (%@) and was not saved. Your previous transcript, if any, is unchanged.";
 "error.summary_encode_failed" = "The summary could not be prepared for saving.";
 "error.recognizer_timeout" = "On-device speech recognition timed out.";
 "error.recorder_start" = "The recorder could not start.";

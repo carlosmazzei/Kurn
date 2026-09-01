@@ -40,6 +40,11 @@ public enum AppError: LocalizedError, Identifiable {
     case wikiUnavailable
     case documentGenerationFailed(String)
     case onDeviceModelUnavailable(String)
+    /// A finished transcription run failed the final integrity gate (H5 PR
+    /// 12) and was discarded before it could replace an existing transcript.
+    /// The associated string is a closed-vocabulary `TranscriptIntegrityFailure`
+    /// raw value, never free text.
+    case transcriptIntegrityFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     public var id: String { errorDescription ?? "AppError" }
@@ -79,6 +84,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .wikiUnavailable: return "wiki_unavailable"
         case .documentGenerationFailed: return "document_generation"
         case .onDeviceModelUnavailable: return "on_device_model_unavailable"
+        case .transcriptIntegrityFailed: return "transcript_integrity"
         }
     }
 
@@ -234,6 +240,11 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.on_device_model_unavailable", comment: "On-device model unavailable"),
                 detail
+            )
+        case .transcriptIntegrityFailed(let reason):
+            return String(
+                format: NSLocalizedString("error.transcript_integrity_failed", comment: "Transcript failed its integrity check"),
+                reason
             )
         }
     }

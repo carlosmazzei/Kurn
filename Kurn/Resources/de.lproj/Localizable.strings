@@ -22,6 +22,7 @@
 "error.permission" = "Zugriff verweigert: %@";
 "error.persistence" = "Änderungen konnten nicht gespeichert werden: %@";
 "error.transcript_encode_failed" = "Das Transkript konnte nicht zum Speichern vorbereitet werden.";
+"error.transcript_integrity_failed" = "Das neue Transkript hat eine Sicherheitsprüfung (%@) nicht bestanden und wurde nicht gespeichert. Ihr vorheriges Transkript, falls vorhanden, bleibt unverändert.";
 "error.summary_encode_failed" = "Die Zusammenfassung konnte nicht zum Speichern vorbereitet werden.";
 "error.recognizer_timeout" = "Die Spracherkennung auf dem Gerät hat das Zeitlimit überschritten.";
 "error.recorder_start" = "Die Aufnahme konnte nicht gestartet werden.";

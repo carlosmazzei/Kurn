@@ -88,7 +88,10 @@ struct TranscriptCorrectionResult: Sendable {
 /// segment's text is kept, and the returned outcome says so. Runs after
 /// `TranscriptFusion.segments`, never before: a pre-fusion hook risks
 /// perturbing `splitCoarseSpan`'s word-count-based proportional
-/// speaker-handover split.
+/// speaker-handover split. The contract is verified at runtime, not just
+/// documented: `TranscriptionServiceCorrection.correctIfRequested` checks it
+/// with `TranscriptIntegrityGate.correctionPreservedIdentity` and discards a
+/// conformer's output rather than trusting a violation (H5 PR 12).
 protocol TranscriptCorrecting: Sendable {
     func correct(
         segments: [TranscriptSegment],
