@@ -79,6 +79,20 @@ struct TranscriptionService {
         /// diarizers. This is the raw signal that lets an evaluation harness
         /// score both and tell which stage a regression belongs to.
         var turns: [SpeakerTurn] = []
+        /// What each stage actually did: requested versus effective engine and
+        /// a typed outcome/reason, so a run that fell back is distinguishable
+        /// from one that ran as asked (H5). Persisted beside the transcript by
+        /// `TranscriptionViewModel.saveTranscript`.
+        var report = PipelineReport()
+    }
+
+    /// A completed engine pass plus the stage reports produced along the way
+    /// (compaction and transcription), returned together because
+    /// `transcribeGated` can run concurrently with diarization — its reports
+    /// travel back as values instead of mutating shared state.
+    private struct GatedTranscription: Sendable {
+        var raw: RawTranscript
+        var stages: [PipelineStageReport]
     }
 
     /// Cap on a single fused segment's spoken duration before it's split.
@@ -126,6 +140,7 @@ struct TranscriptionService {
         onCheckpoint: CheckpointHandler? = nil
     ) async throws -> Output {
         let started = Date()
+        var reportBuilder = PipelineReportBuilder()
         TempFileCleaner.cleanupOrphanedTempFiles()
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let fileDuration = (try? await AVURLAsset(url: fileURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
@@ -144,28 +159,20 @@ struct TranscriptionService {
             ? try? PipelineDigest.sha256Hex(ofFileAt: fileURL)
             : nil
 
-        // 1. Clean the audio (selected preprocessing engine) for the
-        // transcription path. If cleanup fails for any reason we fall back to
-        // the original so transcription never breaks.
-        onPhase(.preprocessing)
+        // 1–3. Audio cleanup, language detection, and VAD, with the typed
+        // report entry each of them produces — see
+        // `TranscriptionServiceInputPreparation.swift`.
+        let prepared = try await prepareInput(
+            fileURL: fileURL,
+            config: config,
+            language: language,
+            onPhase: onPhase
+        )
+        let cleanedURL = prepared.cleanedURL
+        let resolvedLanguage = prepared.language
+        let regions = prepared.regions
+        reportBuilder.record(contentsOf: prepared.stages)
         let preprocessor = resolvePreprocessor(config.preprocessing)
-        AppLog.transcription.atDebug.debug("transcribe: preprocessing (\(config.preprocessing.rawValue, privacy: .public))…")
-        let preStart = Date()
-        let cleanedURL: URL
-        do {
-            cleanedURL = try await preprocessor.process(url: fileURL)
-            AppLog.transcription.atDebug.debug("transcribe: preprocessing done in \(Date().timeIntervalSince(preStart), privacy: .public)s")
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch let appError as AppError {
-            if case .resourceUnavailable = appError { throw appError }
-            cleanedURL = fileURL
-            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(appError.localizedDescription, privacy: .public)")
-        } catch {
-            try ResourceGuard.rethrowIfResourceFailure(error)
-            cleanedURL = fileURL
-            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
-        }
         defer {
             // `defer` can't `await`, so the async temp-file cleanup is fired as a
             // detached step; `TempFileCleaner` sweeps anything left if it's lost.
@@ -174,31 +181,6 @@ struct TranscriptionService {
                 Task { await preprocessor.cleanup(url) }
             }
         }
-        try await ResourceGuard.requireTranscriptionHeadroom()
-
-        // 2. Detect the language (selected engine) to refine the hint. The
-        // default no-op detector returns the hint unchanged, deferring to the
-        // transcription engine's own detection — so only surface the phase when a
-        // real detector runs, otherwise the bar would flash a stage that does no
-        // work.
-        if config.languageDetection != .byTranscriber {
-            onPhase(.detectingLanguage)
-        }
-        let detector = resolveLanguageDetector(config.languageDetection)
-        let resolvedLanguage = await detector.detect(url: cleanedURL, hint: language)
-        try Task.checkCancellation()
-        if resolvedLanguage != language {
-            AppLog.transcription.atInfo.info("transcribe: language refined \(language.rawValue, privacy: .public) -> \(resolvedLanguage.rawValue, privacy: .public)")
-        }
-        try await ResourceGuard.requireTranscriptionHeadroom()
-
-        // 3. Detect speech regions with the selected VAD engine. They drive both
-        // the heuristic diarizer's segmentation and the silence-gating of the
-        // audio fed to transcription.
-        onPhase(.detectingSpeech)
-        let regions = await resolveVAD(config.vad).detectSpeech(url: cleanedURL)
-        try Task.checkCancellation()
-        AppLog.transcription.atDebug.debug("transcribe: VAD (\(config.vad.rawValue, privacy: .public)) regions=\(regions.count, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
 
         // 4. Transcription and diarization are independent. Cloud transcription
@@ -233,7 +215,7 @@ struct TranscriptionService {
 
         onPhase(.transcribing(progress: nil))
         let txStart = Date()
-        let raw: RawTranscript
+        let gated: GatedTranscription
         let diarization: DiarizationOutcome
         let diarizationProgress = DiarizationPhaseRelay(onPhase: onPhase)
         if config.transcription == .whisperAPI {
@@ -265,14 +247,14 @@ struct TranscriptionService {
                 onWarning: onDiarizationWarning,
                 onProgress: diarizationProgress.update
             )
-            raw = try await rawTranscript
-            AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(raw.spans.count, privacy: .public) — waiting for diarization")
+            gated = try await rawTranscript
+            AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(gated.raw.spans.count, privacy: .public) — waiting for diarization")
             diarizationProgress.reveal()
             diarization = try await speakerOutcome
             AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(diarization.turns.count, privacy: .public)")
         } else {
             AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
-            raw = try await transcribeGated(
+            gated = try await transcribeGated(
                 cleanedURL: cleanedURL,
                 regions: regions,
                 engine: config.transcription,
@@ -302,6 +284,13 @@ struct TranscriptionService {
             )
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
+        let raw = gated.raw
+        reportBuilder.record(contentsOf: gated.stages)
+        reportBuilder.record(diarizationStageReport(
+            requested: config.diarization,
+            effective: diarizationEngine,
+            outcome: diarization
+        ))
         let turns = diarization.turns
         // Distinct speakers in the raw diarizer turns, BEFORE fusion. Comparing
         // this against the post-fusion `speakers=` count below isolates whether a
@@ -319,27 +308,25 @@ struct TranscriptionService {
             turns: turns,
             maxSegmentDuration: maxSegmentDuration
         )
+        // Fusion is pure and cannot fail; losing every span here when the
+        // engine produced some is the one outcome worth recording. PR 12's
+        // integrity gate is what will reject such output instead of storing it.
+        reportBuilder.record(
+            .fusion,
+            segments.isEmpty && !raw.spans.isEmpty ? .failed : .succeeded,
+            reason: segments.isEmpty && !raw.spans.isEmpty ? .noInput : nil
+        )
 
-        // 6. Optionally correct transcription errors (spelling, punctuation,
-        // homophones, obvious ASR mistakes) via the opt-in LLM stage, on the
-        // already-fused, speaker-attributed segments. `TranscriptCorrecting`
-        // conformers never throw and always return `segments.count` segments in
-        // order — on any failure this degrades to "no correction ran", never to
-        // a failed transcription.
-        let correctionEngine = config.effectiveCorrection
-        if correctionEngine != .none {
-            onPhase(.correcting(progress: nil))
-        }
-        let correctedSegments = await resolveCorrector(correctionEngine).correct(
+        // 6. Optionally correct transcription errors via the opt-in LLM stage —
+        // see `TranscriptionServiceCorrection.swift`.
+        let correction = try await correctIfRequested(
             segments: segments,
             language: resolvedLanguage,
-            provider: config.correctionProvider,
-            model: config.correctionModel,
-            onProgress: { progress in
-                guard correctionEngine != .none else { return }
-                onPhase(.correcting(progress: progress))
-            }
+            config: config,
+            onPhase: onPhase
         )
+        let correctedSegments = correction.segments
+        reportBuilder.record(correction.stage)
 
         var labels: [String] = []
         for segment in correctedSegments where !labels.contains(segment.speakerLabel) {
@@ -356,14 +343,48 @@ struct TranscriptionService {
             language: raw.language.isEmpty ? (resolvedLanguage.localeIdentifier ?? raw.language) : raw.language,
             speakerLabels: labels,
             speakerVoiceprints: voiceprints,
-            turns: turns
+            turns: turns,
+            report: reportBuilder.report
+        )
+    }
+
+    /// Map a finished diarization pass to its stage report. Three different
+    /// things can make the speaker layer not what was asked for, and they need
+    /// to stay distinguishable: the selection stepping down without model
+    /// consent, the engine falling back to one synthetic whole-clip turn, and
+    /// an engine that returned nothing at all.
+    private func diarizationStageReport(
+        requested: DiarizationEngine,
+        effective: DiarizationEngine,
+        outcome: DiarizationOutcome
+    ) -> PipelineStageReport {
+        let reason: PipelineStageReason?
+        if requested != effective {
+            reason = .notConsented
+        } else if let degradation = outcome.degradation {
+            reason = degradation == .noInput ? .syntheticSingleTurn : degradation
+        } else if outcome.turns.isEmpty {
+            reason = .noInput
+        } else {
+            reason = nil
+        }
+        return PipelineStageReport(
+            stage: .diarization,
+            outcome: reason == nil ? .succeeded : .degraded,
+            requestedEngine: requested.rawValue,
+            effectiveEngine: effective.rawValue,
+            reason: reason
         )
     }
 
     // MARK: - Per-stage engine selectors
 
+    // The three selectors below are not `private` only so
+    // `TranscriptionServiceInputPreparation.swift`'s extension can reach them;
+    // nothing outside this type is meant to call them.
+
     /// Map a `PreprocessingEngine` to its (already instantiated) engine.
-    private func resolvePreprocessor(_ engine: PreprocessingEngine) -> any AudioPreprocessing {
+    func resolvePreprocessor(_ engine: PreprocessingEngine) -> any AudioPreprocessing {
         switch engine {
         case .standardDSP: return standardPreprocessor
         case .none: return passthroughPreprocessor
@@ -371,7 +392,7 @@ struct TranscriptionService {
     }
 
     /// Map a `LanguageDetectionEngine` to its engine.
-    private func resolveLanguageDetector(_ engine: LanguageDetectionEngine) -> any LanguageDetecting {
+    func resolveLanguageDetector(_ engine: LanguageDetectionEngine) -> any LanguageDetecting {
         switch engine {
         case .byTranscriber: return noOpLanguageDetector
         case .fluidAudioLID: return fluidAudioLanguageDetector
@@ -389,7 +410,7 @@ struct TranscriptionService {
     }
 
     /// Map a `VADEngine` to its engine.
-    private func resolveVAD(_ engine: VADEngine) -> any VoiceActivityDetecting {
+    func resolveVAD(_ engine: VADEngine) -> any VoiceActivityDetecting {
         switch engine {
         case .energyThreshold: return energyVAD
         case .fluidAudio: return fluidAudioVAD
@@ -397,7 +418,7 @@ struct TranscriptionService {
     }
 
     /// Map a `CorrectionEngine` to its engine.
-    private func resolveCorrector(_ engine: CorrectionEngine) -> any TranscriptCorrecting {
+    func resolveCorrector(_ engine: CorrectionEngine) -> any TranscriptCorrecting {
         switch engine {
         case .none: return noOpCorrector
         case .llm: return llmCorrector
@@ -448,17 +469,30 @@ struct TranscriptionService {
         checkpoint: TranscriptionCheckpoint? = nil,
         onPhase: @escaping PhaseHandler,
         onCheckpoint: CheckpointHandler? = nil
-    ) async throws -> RawTranscript {
+    ) async throws -> GatedTranscription {
         try await ResourceGuard.requireTranscriptionHeadroom()
+        var stages: [PipelineStageReport] = []
         let compaction: CompactionResult?
         do {
             compaction = try await vadCompactor.compact(url: cleanedURL, regions: regions)
+            // A `nil` result is the compactor declining (nothing worth
+            // removing), which is not a failure and must not read as one.
+            stages.append(PipelineStageReport(
+                stage: .compaction,
+                outcome: compaction == nil ? .skipped : .succeeded,
+                reason: compaction == nil ? .noInput : nil
+            ))
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             try ResourceGuard.rethrowIfResourceFailure(error)
             AppLog.transcription.atError.error("transcribe: VAD compaction failed: \(error.localizedDescription, privacy: .public)")
             compaction = nil
+            stages.append(PipelineStageReport(
+                stage: .compaction,
+                outcome: .degraded,
+                reason: .engineFailed
+            ))
         }
         if let compaction {
             AppLog.transcription.atInfo.info("transcribe: compaction applied, target \(compaction.url.lastPathComponent, privacy: .public)")
@@ -577,7 +611,16 @@ struct TranscriptionService {
             )
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
-        guard let map = compaction?.map else { return raw }
+        // The engine either produced spans or threw; no spans at all from a
+        // clip the VAD found speech in is the one silent-failure shape left.
+        stages.append(PipelineStageReport(
+            stage: .transcription,
+            outcome: raw.spans.isEmpty && !regions.isEmpty ? .degraded : .succeeded,
+            requestedEngine: engine.rawValue,
+            effectiveEngine: engine.rawValue,
+            reason: raw.spans.isEmpty && !regions.isEmpty ? .noInput : nil
+        ))
+        guard let map = compaction?.map else { return GatedTranscription(raw: raw, stages: stages) }
 
         // Remap compacted-timeline spans back to the original timeline.
         let spans = raw.spans.map { span -> TranscribedSpan in
@@ -585,7 +628,7 @@ struct TranscriptionService {
             let end = VADAudioCompactor.remap(span.end, map: map)
             return TranscribedSpan(text: span.text, start: start, end: max(start, end), confidence: span.confidence)
         }
-        return RawTranscript(spans: spans, language: raw.language)
+        return GatedTranscription(raw: RawTranscript(spans: spans, language: raw.language), stages: stages)
     }
 
     /// Dispatch to the chosen diarization engine. Both engines satisfy

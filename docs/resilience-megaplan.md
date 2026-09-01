@@ -187,8 +187,11 @@ Last updated: 2026-09-01.
    [PR #167](https://github.com/carlosmazzei/Kurn/pull/167) (durable,
    resumable map-stage checkpointing shared between summary and wiki
    generation, the "PR 10" boundary) are all merged into `main` (commit
-   `663ab09`). No code boundary is in flight: continue with H5 (typed degradation and
-   output-integrity gates, the "PR 11"/"PR 12" boundaries below) — H4's plan
+   `663ab09`). H5 is now in flight: the "PR 11" boundary below (typed stage
+   outcomes and the persisted pipeline report) is implemented on branch
+   `claude/resiliencia-roadmap-e69zyy`
+   ([PR #168](https://github.com/carlosmazzei/Kurn/pull/168)); "PR 12" (the
+   final integrity gate) is the next boundary after it — H4's plan
    items are now fully addressed except item 3 (the full explicit
    operation-state enum), left deliberately deferred; see the H4 status
    snapshot row and "PR 10" below for the document-generation exclusion.
@@ -230,7 +233,7 @@ Last updated: 2026-09-01.
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
 | H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
 | H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
-| H5    | Next (PR 11/12)        | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
+| H5    | In progress (PR 11 open in [PR #168](https://github.com/carlosmazzei/Kurn/pull/168)) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments. Remaining: the final integrity gate, previous-artifact preservation (PR 12), and the completed-with-warnings UI plus stage-specific retry (PR 13). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
 | H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
@@ -903,11 +906,60 @@ operation-state enum), left deliberately deferred per PR 9's own handoff.
 
 #### PR 11 — H5 typed stage outcomes and pipeline report
 
-Status: next boundary, not started.
+Status: implemented on branch `claude/resiliencia-roadmap-e69zyy`
+([PR #168](https://github.com/carlosmazzei/Kurn/pull/168)); CI is the
+verification of record, since the Apple toolchain is unavailable in the agent
+environment.
 
 Add requested/effective engine, succeeded/degraded/skipped/failed outcome, stable
 reason, and safe diagnostics to every pipeline stage. Cancellation stays
 throwing. Persist the aggregate report beside the transcript.
+
+What landed:
+
+- `Packages/KurnCore/Sources/KurnCore/Pipeline/PipelineReport.swift` —
+  `PipelineStage`, `PipelineStageOutcome`, `PipelineStageReason`,
+  `PipelineStageReport`, `PipelineReport` and `PipelineReportBuilder`. Pure,
+  `Codable`, `Sendable`. There is deliberately **no** free-text or
+  `underlyingError` field: the report is persisted and is a diagnostics-export
+  candidate, so a provider message, file name or URL must not be able to reach
+  it — a stage needing more detail adds a `PipelineStageReason` case instead.
+  `skipped` and `degraded` stay distinct (a stage nobody asked for is not a
+  warning; a requested stage that stepped down is), and `overall` takes the
+  worst outcome.
+- `TranscriptionService` builds one report per run:
+  `TranscriptionServiceInputPreparation.swift` reports preprocessing (including
+  the fall back to the original audio, which the returned URL alone does not
+  reveal), language detection (a detector returning the caller's hint is its
+  only "could not detect" signal, so that is recorded as the hint being used,
+  never as successful detection) and VAD; `transcribeGated` reports compaction
+  (declining to compact is `skipped`, a thrown failure is `degraded`) and
+  transcription, returning them as values because it can run concurrently with
+  diarization; diarization maps the three ways its result can differ from the
+  request (selection stepped down without model consent, engine fallback to a
+  synthetic whole-clip turn, empty output) to distinct reasons.
+- `FluidAudioDiarizer.DiarizationOutcome` carries a `degradation` reason, so a
+  single synthetic turn is no longer indistinguishable from a genuine
+  one-speaker meeting.
+- `TranscriptCorrecting` returns `TranscriptCorrectionResult` (segments +
+  outcome + reason) instead of a bare array, because "no usable provider",
+  "nothing eligible" and "ran clean" were previously the same value. Every
+  correction batch coming back empty is `failed`; some of them is `degraded`.
+  Cancellation is unchanged and still stops the run by throwing further up the
+  pipeline — it is never turned into an outcome in the report.
+- `Transcript.pipelineReportData` persists the encoded report in the same save
+  as the segments, so a durable transcript can never exist without the record
+  of how it was produced. It is optional: `nil` means *unknown* (a transcript
+  predating this field, or bytes that no longer decode), never *clean*.
+- Tests: `PipelineReportTests` (KurnCore) pin the Codable round trip, ordering
+  and replacement semantics, `skipped` not being a warning, the worst-outcome
+  aggregate, fallback engine preservation, and that the encoded form contains
+  only closed-vocabulary values — the check that fails if a free-text field is
+  ever added. `ModelTests` pin the stored round trip and the
+  unknown-is-not-clean rule.
+
+Still open for PR 13 rather than here: surfacing completed-with-warnings in the
+UI. The report is durable now; nothing reads it yet.
 
 #### PR 12 — H5 final integrity gate and atomic artifact replacement
 

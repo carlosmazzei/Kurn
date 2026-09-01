@@ -22,8 +22,8 @@ struct NoOpTranscriptCorrector: TranscriptCorrecting {
         provider: AIProvider,
         model: String,
         onProgress: @escaping @Sendable (Double) -> Void
-    ) async -> [TranscriptSegment] {
-        segments
+    ) async -> TranscriptCorrectionResult {
+        TranscriptCorrectionResult(segments: segments, outcome: .skipped, reason: .notRequested)
     }
 }
 
@@ -90,9 +90,17 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     /// parser `SummaryJSON.parse` uses). Any JSON failure yields an empty map
     /// so the caller fails open for that whole batch.
     static func parseCorrections(from reply: String) -> [UUID: String] {
+        parsedCorrections(from: reply) ?? [:]
+    }
+
+    /// Pure. As `parseCorrections`, but `nil` for a reply that could not be
+    /// parsed at all, which the empty map cannot express — a well-formed reply
+    /// correcting nothing is a clean pass, an unparseable one is a failed
+    /// batch, and the report has to tell them apart (H5 PR 11).
+    static func parsedCorrections(from reply: String) -> [UUID: String]? {
         guard let data = try? ModelJSON.objectData(from: reply),
               let decoded = try? JSONDecoder().decode(CorrectionResponseJSON.self, from: data) else {
-            return [:]
+            return nil
         }
         var result: [UUID: String] = [:]
         for item in decoded.segments {
@@ -127,9 +135,11 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         provider: AIProvider,
         model: String,
         onProgress: @escaping @Sendable (Double) -> Void
-    ) async -> [TranscriptSegment] {
+    ) async -> TranscriptCorrectionResult {
         let candidates = segments.filter(Self.isEligible)
-        guard !candidates.isEmpty else { return segments }
+        guard !candidates.isEmpty else {
+            return TranscriptCorrectionResult(segments: segments, outcome: .skipped, reason: .noInput)
+        }
 
         let vocabulary = MeetingVocabularyExtractor.extract(from: segments)
 
@@ -138,19 +148,46 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
             llm = try ProviderFactory.summaryProvider(for: provider, model: model)
         } catch {
             AppLog.transcription.atNotice.notice("correct: no usable provider (\(error.localizedDescription, privacy: .public)); skipping correction")
-            return segments
+            return TranscriptCorrectionResult(
+                segments: segments,
+                outcome: .degraded,
+                reason: .providerUnavailable
+            )
         }
 
         var result = segments
         var done = 0
+        // A batch that failed still leaves the original text in place, which is
+        // also what a batch that found nothing to fix leaves — so the failure
+        // is counted here rather than inferred from the segments afterwards.
+        var failedBatches = 0
+        var batchCount = 0
         for batch in Self.batches(candidates, maxChars: Self.maxBatchChars, maxCount: Self.maxSegmentsPerBatch) {
             guard !Task.isCancelled else { break }
-            let corrections = await requestCorrections(for: batch, vocabulary: vocabulary, language: language, llm: llm)
-            result = Self.apply(corrections: corrections, to: result)
+            batchCount += 1
+            let outcome = await requestBatch(for: batch, vocabulary: vocabulary, language: language, llm: llm)
+            if outcome.failed { failedBatches += 1 }
+            result = Self.apply(corrections: outcome.corrections, to: result)
             done += batch.count
             onProgress(Double(done) / Double(candidates.count))
         }
-        return result
+        // Every batch failing means the stage produced nothing; some of them
+        // failing means it ran but covered only part of the transcript.
+        if batchCount > 0 && failedBatches == batchCount {
+            return TranscriptCorrectionResult(segments: result, outcome: .failed, reason: .engineFailed)
+        }
+        if failedBatches > 0 {
+            return TranscriptCorrectionResult(segments: result, outcome: .degraded, reason: .engineFailed)
+        }
+        return TranscriptCorrectionResult(segments: result)
+    }
+
+    /// One batch's corrections and whether producing them failed. Both are
+    /// needed: a failed batch and a batch the model had nothing to fix for
+    /// both yield no corrections.
+    struct BatchOutcome: Sendable {
+        var corrections: [UUID: String]
+        var failed: Bool
     }
 
     /// Not `private` so tests can call it directly with an injected
@@ -161,13 +198,22 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         language: MeetingLanguage,
         llm: LLMProvider
     ) async -> [UUID: String] {
+        await requestBatch(for: batch, vocabulary: vocabulary, language: language, llm: llm).corrections
+    }
+
+    func requestBatch(
+        for batch: [TranscriptSegment],
+        vocabulary: [String],
+        language: MeetingLanguage,
+        llm: LLMProvider
+    ) async -> BatchOutcome {
         let payload = CorrectionRequestJSON(
             vocabulary: vocabulary,
             segments: batch.map { .init(id: $0.id.uuidString, text: $0.text) }
         )
         guard let bodyData = try? JSONEncoder().encode(payload),
               let bodyText = String(data: bodyData, encoding: .utf8) else {
-            return [:]
+            return BatchOutcome(corrections: [:], failed: true)
         }
         do {
             let reply = try await llm.chat(
@@ -175,10 +221,14 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
                 messages: [ChatMessage(role: .user, content: "Segments JSON:\n\(bodyText)")],
                 options: .document
             )
-            return Self.parseCorrections(from: reply)
+            guard let corrections = Self.parsedCorrections(from: reply) else {
+                AppLog.transcription.atNotice.notice("correct: batch of \(batch.count, privacy: .public) segment(s) returned an unparseable reply, keeping originals")
+                return BatchOutcome(corrections: [:], failed: true)
+            }
+            return BatchOutcome(corrections: corrections, failed: false)
         } catch {
             AppLog.transcription.atNotice.notice("correct: batch of \(batch.count, privacy: .public) segment(s) failed, keeping originals: \(error.localizedDescription, privacy: .public)")
-            return [:]
+            return BatchOutcome(corrections: [:], failed: true)
         }
     }
 

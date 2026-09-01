@@ -57,15 +57,38 @@ protocol Transcribing: Sendable {
 
 // `Diarizing` is declared in TranscriptionTypes.swift and is reused unchanged.
 
+/// What a correction pass produced, plus whether it actually ran.
+///
+/// The segments alone cannot answer that: "no text changed" is the correct
+/// result for a clean transcript *and* what an unusable provider or a failed
+/// batch leaves behind, so the outcome has to be reported rather than
+/// inferred (H5 PR 11).
+struct TranscriptCorrectionResult: Sendable {
+    var segments: [TranscriptSegment]
+    var outcome: PipelineStageOutcome
+    var reason: PipelineStageReason?
+
+    init(
+        segments: [TranscriptSegment],
+        outcome: PipelineStageOutcome = .succeeded,
+        reason: PipelineStageReason? = nil
+    ) {
+        self.segments = segments
+        self.outcome = outcome
+        self.reason = reason
+    }
+}
+
 /// Opt-in LLM-based post-processing that corrects transcription errors
 /// (spelling, punctuation, homophones, obvious ASR mistakes) on already-fused,
 /// speaker-attributed segments. Implementations must never throw and must
 /// return exactly `segments.count` segments, in the same order, with every
 /// field except `text` unchanged — on any failure (missing key, network
 /// error, malformed reply, or a rewrite the guardrail rejects) the original
-/// segment's text is kept. Runs after `TranscriptFusion.segments`, never
-/// before: a pre-fusion hook risks perturbing `splitCoarseSpan`'s
-/// word-count-based proportional speaker-handover split.
+/// segment's text is kept, and the returned outcome says so. Runs after
+/// `TranscriptFusion.segments`, never before: a pre-fusion hook risks
+/// perturbing `splitCoarseSpan`'s word-count-based proportional
+/// speaker-handover split.
 protocol TranscriptCorrecting: Sendable {
     func correct(
         segments: [TranscriptSegment],
@@ -73,7 +96,7 @@ protocol TranscriptCorrecting: Sendable {
         provider: AIProvider,
         model: String,
         onProgress: @escaping @Sendable (Double) -> Void
-    ) async -> [TranscriptSegment]
+    ) async -> TranscriptCorrectionResult
 }
 
 struct CloudTranscriptionTransfer: Sendable, Equatable {

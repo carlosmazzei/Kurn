@@ -314,7 +314,12 @@ similar collections are encoded to/from JSON `Data` via computed properties
 `Recording(meeting:)`) — SwiftData maintains the inverse, so never append to the
 parent collection manually. `Recording.transcriptionCheckpointData` uses the same
 JSON-`Data` pattern to persist a `TranscriptionCheckpoint` (see "Resumable
-transcription" below).
+transcription" below), and `Transcript.pipelineReportData` to persist the run's
+`PipelineReport` (H5 PR 11) — which engine each stage was asked for, which one
+ran, and whether it succeeded, degraded, was skipped or failed. It is optional
+and `nil` means *unknown*, never *clean*: transcripts written before it existed
+have no report. It carries only closed vocabularies and engine `rawValue`s, no
+free text, so it stays exportable in diagnostics.
 
 Organization is layered on top of `Meeting` rather than replacing the aggregate
 root:
@@ -688,6 +693,12 @@ always return `segments.count` segments in the same order, and only ever touch
 `.text`.** A correction stage that could drop, merge or reorder segments would
 invalidate every timestamp, speaker attribution and `[mm:ss]` citation
 downstream of it, so those properties are not left to the prompt.
+
+Since H5 PR 11 it returns a `TranscriptCorrectionResult` rather than a bare
+array: the segments plus a `PipelineStageOutcome`/`PipelineStageReason`, because
+"no provider", "nothing eligible" and "ran clean" used to be the same value
+(the input, unchanged) and therefore indistinguishable in the stored
+transcript.
 
 - **Enablement is a pair**, like `effectiveDiarization`: `effectiveCorrection`
   returns `.llm` only when `correction == .llm` *and* `correctionConsented`. The
