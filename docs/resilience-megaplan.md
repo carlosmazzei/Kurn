@@ -88,8 +88,8 @@ Last updated: 2026-09-01.
   corrupted-transcript-renders-as-empty hazard for
   `Transcript.segments`/`Summary.sections`.
 - **[PR #162](https://github.com/carlosmazzei/Kurn/pull/162), the "PR 5"
-  boundary below (H3 fail-closed protected storage and quarantine), in
-  review**: `AudioFileStore` writers throw
+  boundary below (H3 fail-closed protected storage and quarantine), merged
+  into `main`** (as commit `fd4b417`): `AudioFileStore` writers throw
   `AppError.protectedStorageUnavailable` instead of falling back outside
   verified protected storage, and `RecordingQuarantine` preserves
   unmatched/malformed/unreadable/too-short originals and ambiguous
@@ -118,8 +118,9 @@ Last updated: 2026-09-01.
   deliberate one-time compatibility break (a pre-PR-8 in-flight checkpoint
   fails to decode under the new shape and is treated as `.corrupted`, same
   as bit-level corruption — never as a false match).
-- **H4 PR 9 (throwing chunk commits and bounded automatic recovery,
-  items 1, 2, 4 of the plan), merged into `main`.**
+- **[PR #166](https://github.com/carlosmazzei/Kurn/pull/166), H4 PR 9
+  (throwing chunk commits and bounded automatic recovery, items 1, 2, 4 of
+  the plan), merged into `main`** (commit `4efe374`).
   `ChunkedTranscriptionRunner.run`'s `onChunkCompleted` — and
   `TranscriptionService.CheckpointHandler`/`checkpointSink` above it — are
   now `async throws` and awaited before the next chunk starts, so a
@@ -154,6 +155,11 @@ Last updated: 2026-09-01.
   `DocumentGenerationService` is deliberately excluded: it spans multiple
   meetings, so there is no single `Meeting` to persist a checkpoint against.
   See "PR 10 — H4 expensive generated-artifact operation state" below.
+- [PR #168](https://github.com/carlosmazzei/Kurn/pull/168), a docs-only
+  follow-up recording PR #167 as merged, is open against `main`; this document
+  sync (H3/H4 boundary statuses, the stale "in review"/"not started" wording
+  in `docs/roadmap.md`, and the next-execution-order section) rides on the same
+  branch.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -181,7 +187,7 @@ Last updated: 2026-09-01.
    [PR #167](https://github.com/carlosmazzei/Kurn/pull/167) (durable,
    resumable map-stage checkpointing shared between summary and wiki
    generation, the "PR 10" boundary) are all merged into `main` (commit
-   `663ab09`). Continue from updated `main` with H5 (typed degradation and
+   `663ab09`). No code boundary is in flight: continue with H5 (typed degradation and
    output-integrity gates, the "PR 11"/"PR 12" boundaries below) — H4's plan
    items are now fully addressed except item 3 (the full explicit
    operation-state enum), left deliberately deferred; see the H4 status
@@ -223,8 +229,8 @@ Last updated: 2026-09-01.
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
 | H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
-| H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, implemented). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
-| H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
+| H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
+| H5    | Next (PR 11/12)        | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
 | H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
@@ -416,6 +422,9 @@ Acceptance:
 
 #### PR 5 — H3 fail-closed protected storage and quarantine
 
+Status: merged as [PR #162](https://github.com/carlosmazzei/Kurn/pull/162)
+(`fd4b417`) — see "Current handoff" above.
+
 Objective: stop automatic loss or unprotected placement of original audio.
 
 Scope:
@@ -434,6 +443,8 @@ Acceptance:
 - Collision and filesystem fault fixtures preserve all ambiguous copies.
 
 #### PR 6 — H3 durable mutation journal and protected trash
+
+Status: merged into `main` as commit `d7e3dee`.
 
 Objective: coordinate SwiftData and filesystem changes without pretending they
 share a transaction.
@@ -455,6 +466,10 @@ Acceptance:
 - Replaying any operation multiple times is safe.
 
 #### PR 7 — H3 versioned authoritative JSON envelopes
+
+Status: merged into `main` as commit `e7a156a`, extending the envelope to the
+transcription checkpoint. Operation reports do not exist yet (H5); they adopt
+the envelope when introduced.
 
 Objective: distinguish corruption from legitimate empty content.
 
@@ -833,7 +848,7 @@ can be synthesized from multiple meetings' transcripts (by tag, by folder, or
 an explicit multi-meeting selection) map-reduced into one run, so there is no
 single `Meeting` to persist a checkpoint against — the same reason
 `GeneratedDocument` already snapshots its sources instead of relating to
-them (see `docs/CLAUDE.md`'s "Derived artifacts" section). Left out of scope
+them (see `CLAUDE.md`'s "Derived artifacts" section). Left out of scope
 for this PR rather than inventing a second, document-scoped checkpoint
 location speculatively.
 
@@ -880,13 +895,15 @@ data, and that a newer run's checkpoint fully overwrites an older one.
   above — deliberately out of scope, not forgotten.
 
 **Next code work: H5 — typed stage outcomes, pipeline report, and the final
-integrity gate (PRs 11–12 below).** Start it from updated `main` after this
-PR merges. H4's plan is otherwise closed except item 3 (the full explicit
+integrity gate (PRs 11–12 below).** PR 10 merged as commit `663ab09`, so H5
+starts from updated `main`. H4's plan is otherwise closed except item 3 (the full explicit
 operation-state enum), left deliberately deferred per PR 9's own handoff.
 
 ### Phase B — Visible degradation and integrity
 
 #### PR 11 — H5 typed stage outcomes and pipeline report
+
+Status: next boundary, not started.
 
 Add requested/effective engine, succeeded/degraded/skipped/failed outcome, stable
 reason, and safe diagnostics to every pipeline stage. Cancellation stays
