@@ -26,9 +26,9 @@ struct TranscriptionRecoveryTests {
         let recording = Recording(meeting: meeting, fileName: "\(UUID()).m4a", duration: 60)
         recording.transcriptionStatus = status
         if let checkpointEngine {
-            recording.transcriptionCheckpoint = TranscriptionCheckpoint(
-                engineRaw: checkpointEngine.rawValue,
-                languageRaw: MeetingLanguage.english.rawValue,
+            recording.transcriptionCheckpoint = .fixture(
+                engine: checkpointEngine,
+                language: .english,
                 compacted: false,
                 totalChunks: 4,
                 completedChunks: 2,

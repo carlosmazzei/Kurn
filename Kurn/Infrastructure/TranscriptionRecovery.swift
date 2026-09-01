@@ -63,8 +63,18 @@ enum TranscriptionRecovery {
                 recording.transcriptionStatus = .failed
             } else if let checkpoint = outcome.decodedValue,
                       checkpoint.engineRaw != TranscriptionEngine.whisperAPI.rawValue {
-                recording.transcriptionStatus = .pending
-                resumable += 1
+                // A checkpoint that decoded and verified but fails its own
+                // structural sanity check (H4) is just as unsafe to resume
+                // from as a corrupted one — it just happens to still parse.
+                if checkpoint.isStructurallyValid {
+                    recording.transcriptionStatus = .pending
+                    resumable += 1
+                } else {
+                    AppLog.transcription.atError.error(
+                        "recovery: structurally invalid checkpoint id=\(recording.id, privacy: .public), requires manual retry"
+                    )
+                    recording.transcriptionStatus = .failed
+                }
             } else {
                 recording.transcriptionStatus = .failed
             }

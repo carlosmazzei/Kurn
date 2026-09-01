@@ -95,6 +95,30 @@ Last updated: 2026-08-31.
   unmatched/malformed/unreadable/too-short originals and ambiguous
   legacy-migration collisions with size/date/reason metadata plus
   recover/export/confirmed-delete in Storage Settings.
+- The "PR 6" boundary (H3 durable mutation journal and protected trash,
+  `RecordingOperationJournal`) and the "PR 7" boundary (H3 versioned
+  authoritative envelope for the transcription checkpoint) both landed on
+  `main` (commits `d7e3dee` and `e7a156a`), closing the full H3 track scope —
+  see `docs/roadmap.md`'s H3 section for what shipped. This backfills the
+  handoff bullet these two commits should have gotten at the time; they were
+  not previously called out here by PR number.
+- **H4 PR 8 (pipeline fingerprint and checkpoint validation) implemented** on
+  branch `claude/resiliencia-roadmap-e69zyy`, pending push/CI/review.
+  `TranscriptionPipelineFingerprint` (`Models/TranscriptionPipelineFingerprint.swift`)
+  and `Infrastructure/PipelineDigest.swift` replace `TranscriptionCheckpoint`'s
+  old engine/language/compaction/provider-only match with source
+  size/duration/content-digest, effective preprocessing/VAD, exact ASR
+  provider+model, a compaction-map digest, and a separately-checked exact
+  chunk-plan digest (`ChunkedTranscriptionRunner.Progress.planDigest`).
+  `TranscriptionCheckpoint.isStructurallyValid` covers item 2's span/bounds
+  validation and gates both the transcribe-path resume check and
+  `TranscriptionRecovery`'s launch/foreground sweep. See "PR 8 — H4 pipeline
+  fingerprint and checkpoint validation" below for the deliberate one-time
+  compatibility break (a pre-PR-8 in-flight checkpoint fails to decode under
+  the new shape and is treated as `.corrupted`, same as bit-level corruption
+  — never as a false match). Items 3–6 of the H4 plan (throwing checkpoint
+  commits, explicit operation states, bounded recovery, and the same pattern
+  for generated-artifact jobs — PR 9 and PR 10 below) are not started.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -107,13 +131,18 @@ Last updated: 2026-08-31.
 2. H2 is done: PR #155/#156/#157/#158 (schema baseline, boot state machine,
    and backup/restore/salvage/recovery UI) are merged into `main`. H3
    (`docs/roadmap.md`'s "H3 · Atomic model/file mutations and non-destructive
-   reconciliation") is underway: PR #159 (trash-then-purge deletion),
-   PR #160 (authoritative JSON encode/decode), and PR #162 (fail-closed
-   protected storage and quarantine, the "PR 5" boundary) are merged, and the
-   durable operation journal (`RecordingOperationJournal`, the "PR 6" boundary)
-   and the versioned checkpoint envelope (the "PR 7" boundary) are implemented,
-   closing the planned H3 boundaries; see the status snapshot below.
-   Continue from updated `main` with the next track (H4 onward).
+   reconciliation") is fully done and merged into `main`: PR #159
+   (trash-then-purge deletion), PR #160 (authoritative JSON encode/decode),
+   PR #162 (fail-closed protected storage and quarantine, the "PR 5"
+   boundary), the durable operation journal (`RecordingOperationJournal`, the
+   "PR 6" boundary, commit `d7e3dee`), and the versioned checkpoint envelope
+   (the "PR 7" boundary, commit `e7a156a`) are all on `main`, closing the
+   planned H3 boundaries; see the status snapshot below.
+   H4 (checkpoint identity and durable operation state) is underway: PR 8
+   (pipeline fingerprint and checkpoint validation) is implemented on branch
+   `claude/resiliencia-roadmap-e69zyy`. Continue from there (or from updated
+   `main` once it merges) with PR 9 (throwing chunk commits and bounded
+   operation states).
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -150,8 +179,8 @@ Last updated: 2026-08-31.
 | ----- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | H1    | Core merged in PR #153 | Physical protection, route, interruption, background, and low-storage release matrix remains.                                        |
 | H2    | Done, merged (PR #155, #157, #158) | `KurnSchemaV1`/`KurnSchemaMigrationPlan`/`KurnModelGraph`, an injectable `ModelContainerBootstrap`, `ModelStoreBootCoordinator` (replacing the production `fatalError`), `ModelStoreBackupManager`/`ModelStoreSalvage`/`ModelStoreRecoveryViewModel` are all on `main`. A real use-after-free found during PR #158 — fetched `Meeting`s outliving their `ModelContainer`, which would have crashed users on the recovery screen — is fixed; see docs/roadmap.md's H2 handoffs. |
-| H3    | PR 1, PR 2, PR 5, and PR 6 landed | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
-| H4    | Partial                | Full source/config/model/chunk fingerprint, throwing checkpoint commits, explicit operation states, and bounded recovery.            |
+| H3    | Done, all PR boundaries merged | `RecordingTrash` ([PR #159](https://github.com/carlosmazzei/Kurn/pull/159)) makes meeting/recording deletion move-then-purge instead of delete-then-delete, with launch/foreground reconciliation for an interrupted delete. `JSONStorage.encodeAuthoritative`/`decodeAuthoritative` ([PR #160](https://github.com/carlosmazzei/Kurn/pull/160)) close the corrupted-transcript-renders-as-empty hazard for `Transcript.segments`/`Summary.sections`. Fail-closed protected storage and `RecordingQuarantine` for unmatched originals and migration collisions ([PR #162](https://github.com/carlosmazzei/Kurn/pull/162)) remove the unprotected `recordingsDirectoryURL` fallback and every automatic-deletion path in the recovery sweep. `RecordingOperationJournal` (the PR 6 boundary below) records durable delete/replace intent before any file moves, replays or rolls back unfinished operations from their own recorded state on launch/foreground (ahead of the heuristic trash sweep, which remains only for pre-journal leftovers), journals compaction's in-place swap, and makes "Delete All Data" report residual audio files instead of implying a clean wipe. The PR 7 boundary below extends the versioned envelope beyond transcript/summary to the transcription checkpoint: `Recording.transcriptionCheckpoint` writes `JSONStorage.encodeAuthoritative` envelopes (encode failure keeps the previous resumable point), reads distinguish `.corrupted` from `.empty` via `transcriptionCheckpointOutcome` (legacy bare payloads still decode; corrupted bytes are preserved, not blanked), and both the transcribe path and `TranscriptionRecovery`'s stale sweep treat a corrupted checkpoint as an explicit non-resumable state instead of "never checkpointed". Operation reports do not exist yet (H5); they adopt the envelope when introduced. |
+| H4    | PR 8 implemented       | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one. Still open: throwing checkpoint commits, explicit operation states, bounded automatic recovery, and the same durable-job pattern for summary/wiki/document/correction generation (PR 9, PR 10 below). |
 | H5    | Planned                | Typed stage degradation, persisted pipeline report, integrity gate, and previous-artifact preservation.                              |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Planned                | Typed Keychain results, explicit credential save, verified/resumable model staging, atomic replacement, and health probes.           |
@@ -405,6 +434,12 @@ Acceptance:
 
 Objective: prevent incompatible transcription work from being spliced together.
 
+Status: implemented on branch `claude/resiliencia-roadmap-e69zyy`, pending
+push/CI/review — this session has no macOS/Xcode toolchain, so per
+"Verifying without a local macOS/Xcode toolchain" nothing here is claimed to
+compile or pass locally; the GitHub `iOS CI` result is the source of truth
+once pushed.
+
 Scope:
 
 1. Fingerprint source ID/size/duration/digest, preprocessing, VAD, language,
@@ -418,6 +453,107 @@ Acceptance:
 - Mutating any fingerprint component invalidates reuse without touching source
   audio.
 - Corrupt checkpoint structure never reaches fusion.
+
+**What shipped.** `TranscriptionPipelineFingerprint`
+(`Kurn/Models/TranscriptionPipelineFingerprint.swift`) covers item 1: source
+file size, duration (rounded to hundredths so two `AVURLAsset` loads of the
+same file can't jitter into a spurious mismatch), a SHA-256 digest of the
+*original* recording's bytes, the effective preprocessing engine, VAD engine,
+language, transcription engine, the exact provider/model axis
+(`checkpointProviderID`, unchanged from before this PR — the cloud provider id
+for `.whisperAPI`, the weight-file variant for `.whisperCpp`), whether
+VAD-compaction ran, and a SHA-256 digest of the compaction map itself (so two
+runs that agree on "compaction ran" but produced a different map still
+differ). `algorithmVersion` is a manual version constant to bump if a future
+change to fusion's input shape or chunking semantics would make an old
+checkpoint's spans unsafe even though every field above still matches — item 1's
+"algorithm versions."
+`Kurn/Infrastructure/PipelineDigest.swift` is the SHA-256 helper (`CryptoKit`,
+so it lives in the app target rather than `KurnCore`, which has to stay
+Linux-buildable): a streamed file digest via `FileHandle` (never holds a
+multi-hour recording fully in memory), and order-sensitive digests over
+`[TimeInterval]` (chunk-plan offsets) and `[TimelineSegment]` (the compaction
+map).
+
+**Item 2's "cache it only with validated metadata"** is satisfied narrowly:
+the source digest is computed once per `transcribe()` call — not per chunk,
+not per resume attempt within that call — and only when `fileSize > 0` and
+`fileDuration` is finite and positive; an unreadable or malformed file gets
+`sourceDigest = nil` instead of a digest of garbage or a partial read. This
+session did not add a cross-launch persisted cache of the digest (e.g. on
+`Recording`) — hashing a recording once per transcription attempt is cheap
+relative to the chunk that follows it (single-digit milliseconds to low
+seconds for a multi-hour recording at local disk speeds), so the "compute
+incrementally" half of item 2 is met, but nothing here avoids recomputing it
+across separate app launches that each resume the same interrupted run. If
+that ever shows up as measurable overhead, the natural place to cache it is
+next to `Recording.fileSize` (same "cheap to recompute, safe to leave stale
+until refreshed" shape).
+
+**The exact chunk plan is deliberately not inside the fingerprint struct.**
+It can't be known until chunking has actually run — which happens inside
+`WhisperTranscriber`/`WhisperCppTranscriber`, one layer below where the
+fingerprint is built in `TranscriptionService.transcribeGated`. Instead,
+`TranscriptionCheckpoint.chunkPlanDigest` (a `PipelineDigest.sha256Hex(of:
+chunks.map(\.offset))`) is threaded through
+`ChunkedTranscriptionRunner.Progress.planDigest`, and `ChunkedTranscriptionRunner.run`
+requires `resume.planDigest == planDigest` before accepting a resume — item 3's
+"exact chunk-plan identity." This is strictly tighter than the old
+`resume.totalChunks == chunks.count` check: two plans with the same chunk
+*count* can still be cut at different offsets (different VAD/compaction
+output), and the old check would have wrongly accepted that resume
+(`ChunkedTranscriptionRunnerTests.mismatchedResumePlanDigestStartsOverEvenWithSameChunkCount`
+pins this).
+
+**Item 3's span validation** is `TranscriptionCheckpoint.isStructurallyValid`:
+`completedChunks` within `0...totalChunks`, and every span finite,
+non-negative, end ≥ start, within the *original* recording's duration plus a
+30-second slack, and not jumping backwards by more than that slack. The slack
+is deliberate and documented in the type: spans live on the engine-input
+timeline (shorter than the original when compaction removed silence), so this
+bound is a gross-corruption catcher, not an exact re-derivation of the
+compacted timeline. `transcribeGated`'s resume gate and
+`TranscriptionRecovery.sweepStaleTranscriptions` both check this before
+trusting a checkpoint; a structurally invalid checkpoint is treated the same
+as `.corrupted` (manual retry), never silently repaired or partially trusted.
+
+**Item 4, restart-safety, has two concrete mechanisms.** First,
+`TranscriptionPipelineFingerprint.==` requires *both* sides to carry a
+non-`nil` `sourceDigest` before comparing anything else — an unverifiable
+source (unreadable file, non-finite duration) can never match, including
+against another equally-unverifiable fingerprint, which is what stops two
+different unverifiable runs from accidentally looking identical. Second, and
+stated plainly as a one-time cost: `TranscriptionCheckpoint`'s Codable shape
+changed (most fields moved under a new `fingerprint` property, plus the new
+`chunkPlanDigest`), so a checkpoint written by any pre-PR-8 app version fails
+to decode under the new type. `JSONStorage.decodeAuthoritative` already
+has exactly the right fallback chain for this (H3 PR 2): try the envelope,
+then try a legacy bare decode, and only call it `.corrupted` when both fail —
+an old-shaped bare payload fails both, so it becomes `.corrupted`, not a
+false "never checkpointed" or a spliced resume. The audio file is untouched;
+a manual retry re-transcribes from scratch. This only affects a device with a
+transcription genuinely in flight at the exact moment it updates across this
+change.
+
+**Tests.** `KurnTests/TranscriptionPipelineFingerprintTests.swift` (equality
+requires every field including a non-nil, matching digest; mutating any one
+field invalidates it; an unverified fingerprint never matches even itself;
+Codable round-trip). `KurnTests/PipelineDigestTests.swift` (deterministic,
+content- and order-sensitive, stable across read-buffer sizes, throws on a
+missing file). `KurnTests/TranscriptionCheckpointTests.swift` gained
+fingerprint-mismatch cases (source digest, preprocessing, VAD, compaction
+digest) alongside the existing engine/language/compaction/provider ones, plus
+`isStructurallyValid` cases (out-of-bounds `completedChunks`, non-finite/
+negative/inverted span timestamps, a span far beyond the source duration).
+`KurnTests/ChunkedTranscriptionRunnerTests.swift` gained the same-count/
+different-offsets case above. A shared `TranscriptionCheckpoint.fixture(...)`
+test helper (`KurnTests/TestSupport.swift`) keeps the now-larger checkpoint
+construction terse across the three test files that build one directly
+(`TranscriptionCheckpointTests`, `TranscriptionRecoveryTests`,
+`LegacyStoreAdoptionTests`).
+
+**Next code work: H4 PR 9 — throwing chunk commits and bounded operation
+states.** Start it from updated `main` after this PR merges.
 
 #### PR 9 — H4 throwing chunk commits and bounded operation states
 

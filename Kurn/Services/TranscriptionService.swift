@@ -130,6 +130,17 @@ struct TranscriptionService {
         try await ResourceGuard.requireTranscriptionHeadroom()
         try validateModelTransferPolicy(config)
 
+        // H4 pipeline fingerprint: identity of the *source* recording, so a
+        // checkpoint from an earlier run can only resume this exact file, not
+        // one that happens to share a size or duration. Only computed when the
+        // basic metadata above is itself sane — an unreadable or malformed file
+        // never gets a digest, which is what makes it never match anything on
+        // resume rather than accidentally matching another equally-unverified
+        // run (see `TranscriptionPipelineFingerprint.==`).
+        let sourceDigest: String? = (fileSize > 0 && fileDuration.isFinite && fileDuration > 0)
+            ? try? PipelineDigest.sha256Hex(ofFileAt: fileURL)
+            : nil
+
         // 1. Clean the audio (selected preprocessing engine) for the
         // transcription path. If cleanup fails for any reason we fall back to
         // the original so transcription never breaks.
@@ -233,6 +244,11 @@ struct TranscriptionService {
                 cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
                 language: resolvedLanguage,
+                sourceFileSize: Int64(fileSize),
+                sourceDuration: fileDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: config.preprocessing,
+                vad: config.vad,
                 checkpoint: checkpoint,
                 onPhase: onPhase,
                 onCheckpoint: onCheckpoint
@@ -262,6 +278,11 @@ struct TranscriptionService {
                 cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
                 language: resolvedLanguage,
+                sourceFileSize: Int64(fileSize),
+                sourceDuration: fileDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: config.preprocessing,
+                vad: config.vad,
                 checkpoint: checkpoint,
                 onPhase: onPhase,
                 onCheckpoint: onCheckpoint
@@ -416,6 +437,11 @@ struct TranscriptionService {
         cloudTransfer: CloudTranscriptionTransfer = CloudTranscriptionTransfer(),
         whisperCppModel: WhisperCppModel = .default,
         language: MeetingLanguage,
+        sourceFileSize: Int64 = 0,
+        sourceDuration: TimeInterval = 0,
+        sourceDigest: String? = nil,
+        preprocessing: PreprocessingEngine = .standardDSP,
+        vad: VADEngine = .energyThreshold,
         checkpoint: TranscriptionCheckpoint? = nil,
         onPhase: @escaping PhaseHandler,
         onCheckpoint: CheckpointHandler? = nil
@@ -459,8 +485,27 @@ struct TranscriptionService {
         case .whisperCpp: checkpointProviderID = "whispercpp:\(whisperCppModel.rawValue)"
         case .appleSpeech, .fluidAudioParakeet: checkpointProviderID = nil
         }
+        // H4: the compaction map's own identity, not just "compaction ran" —
+        // two runs can agree on VAD engine and still compact differently.
+        let compactionDigest = compaction.map { PipelineDigest.sha256Hex(of: $0.map) }
+        let fingerprint = TranscriptionPipelineFingerprint(
+            sourceFileSize: sourceFileSize,
+            sourceDuration: sourceDuration,
+            sourceDigest: sourceDigest,
+            preprocessing: preprocessing,
+            vad: vad,
+            language: language,
+            engine: engine,
+            providerID: checkpointProviderID,
+            compacted: compacted,
+            compactionDigest: compactionDigest
+        )
         let resume = checkpoint.flatMap { cp -> ChunkedTranscriptionRunner.Progress? in
-            if cp.matches(engine: engine, language: language, compacted: compacted, providerID: checkpointProviderID) {
+            guard cp.isStructurallyValid else {
+                AppLog.transcription.atError.error("transcribe: checkpoint failed structural validation, starting over")
+                return nil
+            }
+            if cp.matches(fingerprint) {
                 AppLog.transcription.atNotice.notice("transcribe: checkpoint matches engine=\(cp.engineRaw, privacy: .public) lang=\(cp.languageRaw, privacy: .public) compacted=\(cp.compacted, privacy: .public) chunks=\(cp.totalChunks, privacy: .public)/\(cp.completedChunks, privacy: .public)")
                 return cp.runnerProgress
             }
@@ -470,9 +515,7 @@ struct TranscriptionService {
         let checkpointSink: (@Sendable (ChunkedTranscriptionRunner.Progress) -> Void)?
         if let onCheckpoint {
             checkpointSink = { progress in
-                onCheckpoint(
-                    TranscriptionCheckpoint(engine: engine, language: language, compacted: compacted, providerID: checkpointProviderID, progress: progress)
-                )
+                onCheckpoint(TranscriptionCheckpoint(fingerprint: fingerprint, progress: progress))
             }
         } else {
             checkpointSink = nil
