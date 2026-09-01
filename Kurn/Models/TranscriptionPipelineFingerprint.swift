@@ -30,9 +30,13 @@ struct TranscriptionPipelineFingerprint: Codable, Sendable, Equatable {
     var algorithmVersion: Int
     /// Byte size of the original, unprocessed recording file.
     var sourceFileSize: Int64
-    /// Duration of the original recording, seconds, rounded to hundredths so
-    /// float jitter between two `AVURLAsset` loads of the same file can't
-    /// turn into a spurious mismatch.
+    /// Duration of the original recording, seconds, stored at full precision
+    /// but compared rounded to hundredths (see `==`) so float jitter between
+    /// two `AVURLAsset` loads of the same file can't turn into a spurious
+    /// mismatch. Rounding lives in the comparison rather than at
+    /// construction time so it also covers a value set after construction
+    /// (mutating this `var` directly) or decoded from JSON (synthesized
+    /// `Codable` sets stored properties directly, bypassing `init`).
     var sourceDuration: TimeInterval
     /// SHA-256 of the original recording's bytes, or `nil` when the file
     /// couldn't be validated (unreadable, or a non-finite/zero duration).
@@ -72,7 +76,7 @@ struct TranscriptionPipelineFingerprint: Codable, Sendable, Equatable {
     ) {
         self.algorithmVersion = algorithmVersion
         self.sourceFileSize = sourceFileSize
-        self.sourceDuration = (sourceDuration * 100).rounded() / 100
+        self.sourceDuration = sourceDuration
         self.sourceDigest = sourceDigest
         self.preprocessingRaw = preprocessing.rawValue
         self.vadRaw = vad.rawValue
@@ -94,7 +98,7 @@ struct TranscriptionPipelineFingerprint: Codable, Sendable, Equatable {
         }
         return lhs.algorithmVersion == rhs.algorithmVersion
             && lhs.sourceFileSize == rhs.sourceFileSize
-            && lhs.sourceDuration == rhs.sourceDuration
+            && (lhs.sourceDuration * 100).rounded() == (rhs.sourceDuration * 100).rounded()
             && lhs.preprocessingRaw == rhs.preprocessingRaw
             && lhs.vadRaw == rhs.vadRaw
             && lhs.languageRaw == rhs.languageRaw
