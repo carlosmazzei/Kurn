@@ -10,16 +10,6 @@
 
 import Foundation
 
-/// Mirrors the command set the Watch app can send over WatchConnectivity.
-/// Duplicated (not shared) on the watchOS target since the two targets don't
-/// share source files.
-enum WatchCommand: String, Sendable {
-    case pause
-    case resume
-    case stop
-    case highlight
-}
-
 @MainActor
 final class RecordingCommandRouter {
     static let shared = RecordingCommandRouter()
@@ -27,8 +17,23 @@ final class RecordingCommandRouter {
     private var onTogglePause: (() -> Void)?
     private var onPause: (() -> Void)?
     private var onResume: (() -> Void)?
-    private var onStop: (() -> Void)?
+    /// Returns whether the recording was durably finalized to disk (`true`)
+    /// or only reached a recovery-needed state (`false`) — `stopAndSave()`
+    /// runs entirely synchronously (including file finalization), so this is
+    /// known by the time the closure returns, not discovered later. Backs
+    /// the Watch command reply's `WatchAckPhase` (H8 PR 20).
+    private var onStop: (() -> Bool)?
     private var onHighlight: (() -> Void)?
+
+    /// Recently handled Watch command IDs, oldest first, so a redelivered
+    /// duplicate (the watch retrying after a lost reply) replays the cached
+    /// outcome instead of pausing/stopping/highlighting a second time for
+    /// one user action (H8 PR 20, item 7's "deduplication"). Bounded rather
+    /// than time-based: commands are issued one at a time by hand, so a
+    /// small fixed window comfortably covers any realistic retry without
+    /// growing unbounded over a long recording.
+    private var recentCommands: [(id: String, handled: Bool, phase: WatchAckPhase)] = []
+    private let recentCommandCapacity = 20
 
     private init() {}
 
@@ -42,7 +47,7 @@ final class RecordingCommandRouter {
         onTogglePause: @escaping () -> Void,
         onPause: @escaping () -> Void,
         onResume: @escaping () -> Void,
-        onStop: @escaping () -> Void,
+        onStop: @escaping () -> Bool,
         onHighlight: @escaping () -> Void
     ) {
         self.onTogglePause = onTogglePause
@@ -58,6 +63,7 @@ final class RecordingCommandRouter {
         onResume = nil
         onStop = nil
         onHighlight = nil
+        recentCommands.removeAll()
     }
 
     func handle(_ url: URL) {
@@ -69,7 +75,7 @@ final class RecordingCommandRouter {
             onTogglePause?()
         case "/stop":
             AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity stop received")
-            onStop?()
+            _ = onStop?()
         case "/highlight":
             AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity highlight received")
             onHighlight?()
@@ -78,37 +84,54 @@ final class RecordingCommandRouter {
         }
     }
 
-    /// Apply a command issued from the Watch app. Returns false if no
-    /// recorder session is currently registered to handle it.
+    /// Apply a command issued from the Watch app, deduplicated by
+    /// `commandID`. Returns whether a recorder session handled it and which
+    /// lifecycle phase the phone actually reached.
     @discardableResult
-    func handleWatchCommand(_ command: WatchCommand) -> Bool {
+    func handleWatchCommand(_ command: WatchCommand, commandID: String) -> (handled: Bool, phase: WatchAckPhase) {
+        if let cached = recentCommands.first(where: { $0.id == commandID }) {
+            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: replaying cached result for duplicate Watch command \(commandID, privacy: .public)")
+            return (cached.handled, cached.phase)
+        }
+        let result = performWatchCommand(command)
+        recentCommands.append((commandID, result.handled, result.phase))
+        if recentCommands.count > recentCommandCapacity {
+            recentCommands.removeFirst(recentCommands.count - recentCommandCapacity)
+        }
+        return result
+    }
+
+    private func performWatchCommand(_ command: WatchCommand) -> (handled: Bool, phase: WatchAckPhase) {
         AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Watch command received: \(command.rawValue, privacy: .public)")
         switch command {
         case .pause:
             guard let onPause else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch pause ignored, no active session")
-                return false
+                return (false, .received)
             }
             onPause()
+            return (true, .stateChanged)
         case .resume:
             guard let onResume else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch resume ignored, no active session")
-                return false
+                return (false, .received)
             }
             onResume()
+            return (true, .stateChanged)
         case .stop:
             guard let onStop else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch stop ignored, no active session")
-                return false
+                return (false, .received)
             }
-            onStop()
+            let finalized = onStop()
+            return (true, finalized ? .finalized : .stateChanged)
         case .highlight:
             guard let onHighlight else {
                 AppLog.recorderUI.atError.error("RecordingCommandRouter: Watch highlight ignored, no active session")
-                return false
+                return (false, .received)
             }
             onHighlight()
+            return (true, .stateChanged)
         }
-        return true
     }
 }

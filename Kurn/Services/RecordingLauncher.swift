@@ -44,8 +44,21 @@ final class RecordingLauncher {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.requestAutoStart() }
+            Task { @MainActor in self?.handleAutoStartRequest() }
         }
+    }
+
+    /// H8 PR 20, item 8: replies to `StartRecordingIntent.perform()` with
+    /// whether the request could actually be queued, so the intent reports
+    /// that outcome truthfully instead of assuming success the instant it
+    /// posted the request.
+    private func handleAutoStartRequest() {
+        let accepted = requestAutoStart()
+        NotificationCenter.default.post(
+            name: .kurnStartRecordingRequestHandled,
+            object: nil,
+            userInfo: ["accepted": accepted]
+        )
     }
 
     /// Called once from `KurnApp.init()`, alongside the app's other app-wide
@@ -58,13 +71,23 @@ final class RecordingLauncher {
 
     /// Create a meeting to record into and queue it for `MeetingsListView` to
     /// present. A no-op while a recording is already in progress, so a
-    /// double-invocation (e.g. tapping the control twice) re-surfaces the
-    /// in-progress session instead of creating a second `Meeting`.
-    func requestAutoStart() {
-        guard !RecordingCommandRouter.shared.hasActiveSession else { return }
-        guard let modelContext, let settings else { return }
+    /// double-invocation (e.g. tapping the control twice) doesn't create a
+    /// second `Meeting` — still a legitimate "accepted" outcome, not a
+    /// failure, since the request's intent (a recording being in progress)
+    /// already holds. Returns `false` only when the app genuinely couldn't
+    /// act on the request — `configure()` hasn't run yet, a cold-launch race
+    /// `StartRecordingIntent` needs to report truthfully rather than assume
+    /// (H8 PR 20, item 8).
+    @discardableResult
+    func requestAutoStart() -> Bool {
+        guard !RecordingCommandRouter.shared.hasActiveSession else { return true }
+        guard let modelContext, let settings else {
+            AppLog.recorderUI.atError.error("RecordingLauncher: auto-start requested before configure() ran")
+            return false
+        }
         let viewModel = MeetingsViewModel(modelContext: modelContext)
         pendingAutoStartMeeting = viewModel.createMeeting(title: "", language: settings.defaultLanguage)
+        return true
     }
 
     /// Consumes the pending meeting so it is only presented once.

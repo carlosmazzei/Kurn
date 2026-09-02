@@ -33,6 +33,18 @@ final class MeetingChatViewModel {
     private let chatService = MeetingChatService()
     private var task: Task<Void, Never>?
 
+    /// H8 PR 20, item 1's "chat/search tasks cancel on dismissal": this view
+    /// model is owned by `MeetingChatView`'s `@State`, so SwiftUI deallocates
+    /// it when the chat tab/sheet leaves the hierarchy — but nothing
+    /// previously cancelled `task` when that happened, so a reply already in
+    /// flight (a paid cloud LLM call) kept running to completion in the
+    /// background after the user navigated away. `deinit` is the reliable
+    /// backstop regardless of which dismissal path was taken; `Task.cancel()`
+    /// is safe to call from any isolation, including a nonisolated `deinit`.
+    deinit {
+        task?.cancel()
+    }
+
     /// Send `question`. When `transcriptText` is non-nil the scope is a single
     /// meeting (full-transcript grounding, falling back to retrieval over
     /// `candidates` only for very long meetings); when nil the scope is the whole

@@ -11,19 +11,36 @@ import Foundation
 import Observation
 import WatchConnectivity
 
-/// Mirrors RecordingCommandRouter's command set on the iOS target.
-/// Duplicated rather than shared since the two targets don't share sources.
-enum WatchCommand: String, Sendable {
-    case pause
-    case resume
-    case stop
-    case highlight
-}
-
 enum RemoteRecordingState: Equatable {
     case idle
     case recording(meetingTitle: String, referenceDate: Date, accumulatedElapsed: TimeInterval, highlightCount: Int)
     case paused(meetingTitle: String, accumulatedElapsed: TimeInterval, highlightCount: Int)
+}
+
+/// Resumes a `WatchCommand` reply continuation exactly once, whichever of
+/// `WCSession`'s replyHandler/errorHandler or the local timeout fires first
+/// (H8 PR 20). Mirrors the resume-exactly-once shape
+/// `RecorderViewModel.storeMicChoiceContinuation` established for the same
+/// class of problem: multiple independent completion sources racing to
+/// settle one continuation, with a lock (not actor isolation) guarding it
+/// since the callbacks arrive off the main actor.
+private final class WatchCommandReplyBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    func store(_ continuation: CheckedContinuation<Bool, Never>) {
+        lock.lock()
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func resume(with result: Bool) {
+        lock.lock()
+        let toResume = continuation
+        continuation = nil
+        lock.unlock()
+        toResume?.resume(returning: result)
+    }
 }
 
 private struct WatchRecordingContext: Sendable {
@@ -86,22 +103,36 @@ final class WatchConnectivityManager: NSObject {
     }
     #endif
 
+    /// How long to wait for the phone's reply before giving up locally (H8
+    /// PR 20, item 7's "timeout"). `WCSession.sendMessage`'s own
+    /// replyHandler/errorHandler contract isn't a hard guarantee that one of
+    /// them always fires promptly — without a local bound, a remote-control
+    /// button could spin forever waiting on a phone that never answers.
+    private static let commandTimeout: Duration = .seconds(10)
+
     @discardableResult
     func send(_ command: WatchCommand) async -> Bool {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated else {
             lastCommandFailed = true
             return false
         }
-        let ok = await withCheckedContinuation { continuation in
+        let commandID = UUID().uuidString
+        let box = WatchCommandReplyBox()
+        let ok = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            box.store(continuation)
             WCSession.default.sendMessage(
-                [WatchSessionKey.command: command.rawValue],
+                [WatchSessionKey.command: command.rawValue, WatchSessionKey.commandID: commandID],
                 replyHandler: { @Sendable reply in
-                    continuation.resume(returning: (reply[WatchSessionKey.ok] as? Bool) ?? false)
+                    box.resume(with: (reply[WatchSessionKey.ok] as? Bool) ?? false)
                 },
                 errorHandler: { @Sendable _ in
-                    continuation.resume(returning: false)
+                    box.resume(with: false)
                 }
             )
+            Task {
+                try? await Task.sleep(for: Self.commandTimeout)
+                box.resume(with: false)
+            }
         }
         lastCommandFailed = !ok
         return ok
