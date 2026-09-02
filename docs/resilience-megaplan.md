@@ -245,14 +245,28 @@ Last updated: 2026-09-01.
   recording's transcription failure clobber or misattribute another's),
   merged into `main`** (commit `674687c`). CI green on the first push. See
   "PR 21" below for the full contract.
-- H9 PR 22 (a bounded, protected local buffer for `ReliabilityEvent`s;
-  widening their adoption to `TranscriptionViewModel.transcribe`, the
-  app's single most important resilience path; removing the four exact
-  sites where an `AppError`'s raw `errorDescription` was logged at
-  `.public`; and a redaction-preview/export screen) is implemented on
-  branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 22" below for
-  what shipped. Docs status corrections for H9 PR 21 are bundled in this
-  same PR, per the same standing request.
+- **[PR #179](https://github.com/carlosmazzei/Kurn/pull/179), H9 PR 22
+  (a bounded, protected local buffer for `ReliabilityEvent`s; widening
+  their adoption to `TranscriptionViewModel.transcribe`, the app's single
+  most important resilience path; removing the four exact sites where an
+  `AppError`'s raw `errorDescription` was logged at `.public`; and a
+  redaction-preview/export screen), merged into `main`** (commit
+  `0765891`, merge commit `ea6eae8`). CI green on the first push. See
+  "PR 22" below for the full contract. Docs status corrections for H9
+  PR 21 were bundled in this same PR, per the standing request.
+- H9 PR 23 (a single "Health & Recovery" screen aggregating six
+  conditions already tracked individually elsewhere — pending capture
+  recovery, quarantined audio, degraded transcripts, failed/deferred
+  transcription jobs, corrupt on-device models, and recent reliability
+  failure codes — so a user does not need to know which of six different
+  screens to check; every action dispatches to the exact same recovery
+  function its existing per-item UI already calls) is implemented on
+  branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 23" below for
+  what shipped. Docs status corrections for H9 PR 22 are bundled in this
+  same PR, per the same standing request. **This closes out H9's plan
+  except items 2 and 4** (contextual recovery-action UI buttons and
+  optimistic-UI rollback), which were explicitly deferred as known gaps
+  in PR 21's own write-up and remain out of scope here.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -321,8 +335,15 @@ Last updated: 2026-09-01.
    [PR #178](https://github.com/carlosmazzei/Kurn/pull/178) (commit
    `674687c`); "PR 22" (a bounded protected local event buffer, wider
    `ReliabilityEvent` adoption, removing four public raw-error-description
-   log sites, and a redaction-preview export screen) is implemented next,
-   on branch `claude/resilience-roadmap-plan-fn23ki`.
+   log sites, and a redaction-preview export screen) merged as
+   [PR #179](https://github.com/carlosmazzei/Kurn/pull/179) (commit
+   `0765891`, merge commit `ea6eae8`); "PR 23" (a "Health & Recovery"
+   screen aggregating pending recovery, quarantine, degraded transcripts,
+   failed/deferred jobs, model verification, and recent failure codes
+   behind one screen, dispatching to existing recovery actions) is
+   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki`.
+   **This closes out H9's plan** except items 2 and 4, deliberately
+   deferred as known gaps in PR 21's own write-up.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -365,7 +386,7 @@ Last updated: 2026-09-01.
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Done, merged (PR 14/15/16) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
 | H8    | Done, plan fully addressed (PR 17/18/19/20 merged) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). `LockScreenRecordingController` now closes the ActivityKit start/end race: a `runID` generation counter, bumped by both `start()` and `end()`, is checked synchronously by the queued start task immediately before the one non-cancellable call (`Activity.request`, which is `throws` but not `async`) that creates a Live Activity nothing would otherwise be tracking to end (item 6, PR 19). `WatchCommand`/`WatchSessionKey` now compile from one file shared into both the `Kurn` and `KurnWatch` targets instead of two independently-typed copies; Watch commands carry a `commandID` the phone deduplicates against (a redelivered duplicate replays its cached outcome instead of re-running the action), a bounded local timeout on the Watch side, and a three-phase `WatchAckPhase` reply (`received`/`stateChanged`/`finalized`) since every command handler in this app already runs synchronously to completion — `stop`'s file finalization included — before its caller learns the outcome; the phone also reconciles a stale application-context recording state on every `WCSession` (re)activation, since a live session never survives process termination (item 7, PR 20). `StartRecordingIntent` gets the same "accepted, not actual capture" semantics: it now awaits `RecordingLauncher`'s acceptance reply (bounded by a timeout) instead of claiming success the instant it posted the request, closing a cold-launch race where an unconfigured `RecordingLauncher` silently swallowed the request (item 8, PR 20). Item 1 (general operation ownership/run IDs) was audited against its own named examples: `MeetingsListView`'s semantic-search debounce already cancels correctly via SwiftUI's `.task(id:)`; `MeetingChatViewModel`'s reply `Task` did not cancel when its owning view was dismissed, now fixed with a `deinit` (PR 20). H8's plan is now fully addressed. |
-| H9    | In progress (PR 21 merged, PR 22 implemented) | `AppErrorCategory`/`AppErrorSeverity`/`AppErrorRecoveryAction` and a `privateContext` field extend `AppError` with the presentation metadata item 1 asks for (`Packages/KurnCore/.../AppErrorMetadata.swift`). `TranscriptionViewModel.errorsByRecording` fixes the one concrete "concurrent operations clobber a shared error" case found: the view model is a single app-wide shared instance, so two recordings' transcription failures used to be able to overwrite or misattribute each other through one `error` property; `MeetingDetailView`'s alert now binds to the per-recording accessor instead (PR 21). `ReliabilityEventStore` gives the pre-existing content-free `ReliabilityEvent`/`ReliabilityLog` vocabulary a bounded, protected on-device buffer (item 6); `TranscriptionViewModel.transcribe` gets its own instrumentation, correlated by one `OperationID` per attempt; the four exact sites logging an `AppError`'s raw `errorDescription` at `.public` now log `logCode`/`privateContext` instead; and `ReliabilityEventsListView` (Settings → Diagnostics) lists and shares recent events — every field content-free by construction, so displaying them verbatim already is the redaction preview item 6 asks for (PR 22). Remaining: item 2 (contextual recovery-action UI), item 4 (optimistic-UI rollback), a reference ID surfaced in the UI error dialog, `persist()`'s own error surface (still shared, not recording-scoped), the broader non-`AppError` raw-log-description sweep, and items 7–8 (health/recovery center, accessibility) are PR 23's scope. |
+| H9    | In progress (PR 21, PR 22 merged; PR 23 implemented) | `AppErrorCategory`/`AppErrorSeverity`/`AppErrorRecoveryAction` and a `privateContext` field extend `AppError` with the presentation metadata item 1 asks for (`Packages/KurnCore/.../AppErrorMetadata.swift`). `TranscriptionViewModel.errorsByRecording` fixes the one concrete "concurrent operations clobber a shared error" case found: the view model is a single app-wide shared instance, so two recordings' transcription failures used to be able to overwrite or misattribute each other through one `error` property; `MeetingDetailView`'s alert now binds to the per-recording accessor instead (PR 21). `ReliabilityEventStore` gives the pre-existing content-free `ReliabilityEvent`/`ReliabilityLog` vocabulary a bounded, protected on-device buffer (item 6); `TranscriptionViewModel.transcribe` gets its own instrumentation, correlated by one `OperationID` per attempt; the four exact sites logging an `AppError`'s raw `errorDescription` at `.public` now log `logCode`/`privateContext` instead; and `ReliabilityEventsListView` (Settings → Diagnostics) lists and shares recent events — every field content-free by construction, so displaying them verbatim already is the redaction preview item 6 asks for (PR 22). `HealthRecoveryView` (Settings → Health & Recovery) aggregates six conditions already tracked individually elsewhere — pending capture recovery, quarantined audio, degraded transcripts, failed/deferred transcription jobs, corrupt on-device models, and recent reliability failure codes — behind one screen, dispatching every action to the exact same recovery function its existing per-item UI already calls rather than reimplementing recovery logic (items 7–8, PR 23). Remaining: item 2 (contextual recovery-action UI), item 4 (optimistic-UI rollback), a reference ID surfaced in the UI error dialog, `persist()`'s own error surface (still shared, not recording-scoped), and the broader non-`AppError` raw-log-description sweep — all deliberately deferred, out of scope for this track. |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
 
 ## Completed H1 boundary
@@ -2363,9 +2384,9 @@ Standardize content-free operation events, remove public raw error descriptions
 from resilience paths, keep a protected bounded local buffer, and provide a
 redaction preview plus short reference ID. Nothing uploads automatically.
 
-Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
-the verification of record, per "Verifying without a local macOS/Xcode
-toolchain" in `CLAUDE.md`.
+Status: merged into `main` as
+[PR #179](https://github.com/carlosmazzei/Kurn/pull/179) (commit `0765891`,
+merge commit `ea6eae8`). CI green on the first push.
 
 **The bounded, protected local buffer (item 6).** `ReliabilityEvent`/
 `ReliabilityLog` already existed (an earlier "Baseline and seams" step) as
@@ -2456,6 +2477,74 @@ Aggregate pending recovery, quarantine, degraded transcripts, failed/deferred
 jobs, model verification, and recent safe codes. Reuse existing recovery actions
 and cover VoiceOver, Dynamic Type, offline, low-storage, permission, degraded,
 quarantine, and store-recovery states.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**"Repair surface, not analytics."** `Kurn/Views/Settings/HealthRecoveryView.swift`
+(new, split into `HealthRecoveryView+Sections.swift` to stay under
+SwiftLint's `type_body_length` warning) is one screen — Settings → Health &
+Recovery — that answers "does anything need my attention" without the user
+having to already know which of six different screens tracks which
+condition. Every action it exposes calls the *exact same* recovery function
+its existing per-item counterpart already calls: `RecordingRecovery
+.retryRecovery(for:context:)` (the same call `MeetingDetailView`'s
+`RecordingSegmentRow` retry button makes), `TranscriptionViewModel
+.startTranscription`/`.retryCorrection` (the same calls `MeetingDetailActions`
+makes), and `RecordingQuarantine.recover`/`.delete`/`.exportURL` and
+`ModelDownloadController.deleteModel` (the same calls `StorageSettingsView`
+already makes, given full recover/export/delete parity here). This screen
+only aggregates and dispatches — there is no second implementation of any
+recovery behavior to keep in sync with the first.
+
+**What is aggregated, and how.** Three of the six sections reuse an
+existing aggregation wholesale (`RecordingQuarantine.items()`,
+`ModelDownloadController.installedModels` filtered to `.corrupt`,
+`ReliabilityEventStore.recentEvents(limit:)` filtered to `.failed`). The
+other three needed a new cross-library query, run in `refresh()`: pending
+capture recovery is a `FetchDescriptor<Recording>` on
+`captureStateRaw == RecordingCaptureState.recoveryNeeded.rawValue`; stalled
+transcriptions is a `FetchDescriptor<Recording>` on
+`captureStateRaw == .ready && transcriptionStatusRaw ∈ {.failed, .pending}`;
+degraded transcripts fetches every `Transcript`, decodes its
+`pipelineReport`, and keeps the ones with `hasWarnings == true` alongside
+their recording — `pipelineReportData` is opaque JSON, so this can't be
+expressed as a `#Predicate` and every transcript is decoded instead. Every
+enum `.rawValue` is pre-extracted into a local `let` before the `#Predicate`
+closure, matching this codebase's existing convention. A degraded item's
+retry button only appears when the warning is on the `.correction` stage,
+the one stage cheap enough to retry without repeating audio/ASR/diarization
+— matching the existing per-transcript warning banner's own rule.
+
+**Row interaction.** Each row is two independent sibling `Button`s (a
+label-wrapping `Button` with `.buttonStyle(.plain)` for navigation to
+`MeetingDetailView`, and a separate `Button` with `.buttonStyle(.borderless)`
+for the retry/recover/delete action) rather than a row-level tap gesture
+with a button nested inside it, which risks the outer gesture swallowing the
+inner button's own taps in a `List`.
+
+**Known gaps, stated plainly.**
+
+- **No new test coverage.** Every action this screen exposes calls an
+  already-tested recovery function; the screen's own contribution is
+  aggregation (six queries/filters) and dispatch (a thin wrapper per
+  action), neither of which introduces new recovery *logic* to verify. Adding
+  `HealthRecoveryView`-specific tests would mostly re-test
+  `RecordingRecovery`/`RecordingQuarantine`/`TranscriptionViewModel`'s
+  existing coverage under a different call site.
+- **The reference ID PR 22 deferred here is still not built.** PR 22's
+  known gaps named this PR as the natural place for a short reference ID
+  surfaced in both the UI error dialog and the events list; this PR's
+  "Recent Failure Codes" section reuses the existing `ReliabilityEventsListView`
+  and `ReliabilityEvent.logLine` rather than adding a new ID scheme —
+  `errorAlert`'s shared `Binding<AppError?>` signature would still need
+  widening at 19+ call sites to carry one, which remains its own design
+  pass and stays deferred.
+- **Items 2 and 4 remain out of scope**, as PR 21 originally stated:
+  contextual recovery-action UI buttons wired to `AppErrorRecoveryAction`,
+  and optimistic-UI rollback. Neither is implied by "aggregate and dispatch
+  to existing actions."
 
 ### Phase F — Continuous verification
 

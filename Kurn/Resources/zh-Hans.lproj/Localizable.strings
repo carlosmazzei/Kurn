@@ -798,6 +798,21 @@
 "error.on_device_model_unavailable" = "设备端模型不可用：%@";
 "error.on_device_generation_timeout" = "设备端生成超时。";
 
+/* Health & Recovery (H9 PR 23) */
+"health.title" = "状态与恢复";
+"health.all_clear" = "一切正常，无需处理";
+"health.untitled_meeting" = "未命名会议";
+"health.recovery_needed" = "待恢复项";
+"health.recovery_needed_footer" = "在 Kurn 写入完成前采集被中断的录音。重试会执行 Kurn 在启动时已自动尝试的相同恢复流程。";
+"health.stalled_transcriptions" = "失败或延迟的转录";
+"health.stalled_transcriptions_footer" = "转录失败或尚未开始的录音。重试会用当前设置重新开始转录。";
+"health.degraded_transcripts" = "已完成但有警告";
+"health.degraded_transcripts_footer" = "某个处理阶段降级或回退的转录记录。重试仅适用于支持该操作的阶段。";
+"health.model_verification" = "模型验证";
+"health.model_verification_footer" = "验证失败的设备端模型。移除后，Kurn 会在下次使用该功能时重新下载模型。";
+"health.recent_failures" = "最近的失败代码";
+"health.view_all_events" = "查看所有可靠性事件";
+
 "intent.startRecording.title" = "开始录音";
 "intent.startRecording.description" = "无需打开应用即可开始一段新的 Kurn 录音。";
 "intent.startRecording.shortTitle" = "开始录音";
