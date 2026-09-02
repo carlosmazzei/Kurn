@@ -23,13 +23,32 @@ actor FluidAudioVAD: VoiceActivityDetecting {
 
     /// Lazily loaded and reused across recordings — model load is expensive.
     private var manager: VadManager?
-    private let timeout: TimeInterval = 120
+    /// Processing budget — reported, not enforced (H8 PR 18). FluidAudio's
+    /// `VadManager` checks no cancellation anywhere in its per-chunk loop and
+    /// its CoreML call is synchronous, so there is no engine hook to abort
+    /// an in-flight call. This used to be raced against `segment(url:)` in a
+    /// `TaskGroup` and called a "timeout" — but a `TaskGroup` cannot return
+    /// until every child task finishes, cancelled or not, so that race never
+    /// actually bounded wall-clock time: it blocked for `segment`'s full
+    /// real duration and then discarded a valid, just-slow result for a
+    /// fabricated timeout error. Calling `segment` directly has identical
+    /// real-world latency but keeps the result and reports slowness
+    /// truthfully instead of pretending to have aborted anything.
+    private let budget: TimeInterval = 120
 
     func detectSpeech(url: URL) async -> [SpeechRegion] {
+        guard !Task.isCancelled else {
+            AppLog.transcription.atNotice.notice("FluidAudioVAD: cancelled before starting")
+            return [Self.fallbackRegion(for: url)]
+        }
         do {
-            return try await Self.withTimeout(seconds: timeout) {
-                try await self.segment(url: url)
+            let started = Date()
+            let regions = try await segment(url: url)
+            let elapsed = Date().timeIntervalSince(started)
+            if elapsed > budget {
+                AppLog.transcription.atNotice.notice("FluidAudioVAD: exceeded its \(Int(budget))s budget (took \(String(format: "%.1f", elapsed), privacy: .public)s) — FluidAudio's VadManager exposes no abort hook, so processing ran to completion rather than being interrupted")
             }
+            return regions
         } catch is CancellationError {
             // The non-throwing protocol still requires a value. The pipeline's
             // cancellation barrier immediately after VAD will discard it.
@@ -73,23 +92,6 @@ actor FluidAudioVAD: VoiceActivityDetecting {
             duration = 0
         }
         return SpeechRegion(start: 0, end: max(0, duration))
-    }
-
-    private static func withTimeout<T: Sendable>(
-        seconds: TimeInterval,
-        operation: @escaping @Sendable () async throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                try await Task.sleep(for: .seconds(seconds))
-                throw AppError.modelDownloadFailed(
-                    NSLocalizedString("error.model_download_timeout", comment: "Model download/processing timed out")
-                )
-            }
-            defer { group.cancelAll() }
-            return try await group.next()!
-        }
     }
 }
 

@@ -46,6 +46,16 @@ final class WhisperBackgroundUploader: NSObject, @unchecked Sendable {
         shared.eventCompletions.append(completionHandler)
         _ = shared.session
     }
+
+    #if DEBUG
+    /// Test-only: `session` itself is `private` (nothing outside this file
+    /// needs it) — this lets `KurnTests` prove concurrent first-accesses
+    /// resolve to the same `URLSession` instance instead of racing to
+    /// construct it twice, the exact hole H8 PR 18's "background uploader
+    /// under synchronization rather than a racing lazy property" already
+    /// closed (see the file header) but that had no test proving it.
+    var sessionForTesting: URLSession { session }
+    #endif
 }
 
 extension WhisperBackgroundUploader: URLSessionDataDelegate {

@@ -12,7 +12,14 @@ import Foundation
 
 @MainActor
 final class LockScreenRecordingController {
-    nonisolated(unsafe) private var activity: Activity<RecordingActivityAttributes>?
+    // H8 PR 18: was `nonisolated(unsafe)`. The whole type is already
+    // `@MainActor`, and every read/write site (`start`, `update`, `end`) is
+    // inside a `Task { }`/`Task { @MainActor in }` created from a
+    // `@MainActor` method — which inherits `@MainActor` isolation by
+    // default, not `.detached` — so access was already serialized through
+    // the main actor before this change; the annotation wasn't protecting
+    // anything the actor didn't already guarantee.
+    private var activity: Activity<RecordingActivityAttributes>?
 
     private var title = ""
     private var state: AudioRecorderService.State = .idle

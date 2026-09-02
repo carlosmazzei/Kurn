@@ -201,7 +201,7 @@ final class RecorderViewModel {
             if inputs.count > 1 {
                 AppLog.recorderUI.atDebug.debug("prepareToRecord: \(inputs.count, privacy: .public) inputs available, asking user")
                 let uid = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-                    micChoiceContinuation = continuation
+                    storeMicChoiceContinuation(continuation)
                     micChoices = inputs.map {
                         MicInputOption(id: $0.uid, name: $0.portName, isBuiltIn: $0.portType == .builtInMic)
                     }
@@ -220,6 +220,29 @@ final class RecorderViewModel {
         micChoiceContinuation?.resume(returning: uid)
         micChoiceContinuation = nil
     }
+
+    /// Stores `continuation` as the pending mic choice, first resolving any
+    /// continuation already pending (to `nil`, "use the system default") so
+    /// a second concurrent request can never silently leak the first —
+    /// nothing would otherwise ever resume it, hanging that earlier call
+    /// forever (H8 PR 18). `internal` rather than `private` so `KurnTests`
+    /// can drive it directly: the real trigger
+    /// (`AVAudioSession.availableInputs.count > 1`) isn't reproducible
+    /// against the simulator's single built-in mic.
+    func storeMicChoiceContinuation(_ continuation: CheckedContinuation<String?, Never>) {
+        if let stale = micChoiceContinuation {
+            AppLog.recorderUI.atNotice.notice("prepareToRecord: a mic choice was already pending; resolving it to the default before starting a new one")
+            stale.resume(returning: nil)
+        }
+        micChoiceContinuation = continuation
+    }
+
+    #if DEBUG
+    /// Test-only: whether a mic-choice continuation is currently pending,
+    /// so a test can poll for it to actually be stored before simulating a
+    /// second concurrent request, instead of guessing a fixed delay.
+    var hasPendingMicChoiceContinuationForTesting: Bool { micChoiceContinuation != nil }
+    #endif
 
     func prepareCaptureOwnership() throws -> Recording {
         guard meeting.modelContext === modelContext else {

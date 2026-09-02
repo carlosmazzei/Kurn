@@ -84,11 +84,33 @@ actor SherpaOnnxDiarizer: Diarizing {
         }
 
         let duration = Self.audioDuration(of: url)
-        let timeout = Self.processTimeout(forAudioDuration: duration)
-        AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s timeout=\(String(format: "%.1f", timeout), privacy: .public)s")
+        let budget = Self.processTimeout(forAudioDuration: duration)
+        AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s budget=\(String(format: "%.1f", budget), privacy: .public)s")
+        guard !Task.isCancelled else {
+            AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: cancelled before starting")
+            return [Self.fallbackTurn(for: url)]
+        }
         do {
-            let turns = try await Self.withTimeout(seconds: timeout) {
+            // H8 PR 18: this used to race `processSynchronously` against a
+            // sleeping timer in a `TaskGroup` and call it a "timeout" — but
+            // `processSynchronously` is a single blocking C call (sherpa-onnx
+            // exposes no progress/abort hook for it) with no `async` suspension
+            // point of its own, so `group.cancelAll()` marked the losing child
+            // cancelled without actually stopping it. A `TaskGroup` cannot
+            // return until every child task finishes, cancelled or not, so
+            // that "timeout" never actually returned early — it blocked for
+            // the call's full real duration and then discarded a valid,
+            // just-slow result in favor of a fabricated timeout error. Running
+            // it directly, off the actor, and reporting slowness truthfully
+            // (instead of pretending to have aborted anything) has identical
+            // real-world latency but keeps the result and tells the truth.
+            let started = Date()
+            let turns = try await Task.detached(priority: .userInitiated) {
                 try Self.processSynchronously(url: url, wrapper: wrapper)
+            }.value
+            let elapsed = Date().timeIntervalSince(started)
+            if elapsed > budget {
+                AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: exceeded its \(String(format: "%.1f", budget), privacy: .public)s budget (took \(String(format: "%.1f", elapsed), privacy: .public)s) — sherpa-onnx exposes no abort hook, so processing ran to completion rather than being interrupted")
             }
             guard !turns.isEmpty else { return [Self.fallbackTurn(for: url)] }
             let smoothed = SpeakerTurnSmoothing.smooth(turns)
@@ -147,23 +169,6 @@ actor SherpaOnnxDiarizer: Diarizing {
             return SpeakerTurn(speakerLabel: label, start: TimeInterval(segment.start), end: TimeInterval(segment.end))
         }
     }
-
-    private static func withTimeout<T: Sendable>(
-        seconds: TimeInterval,
-        operation: @escaping @Sendable () throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try operation() }
-            group.addTask {
-                try await Task.sleep(for: .seconds(seconds))
-                throw AppError.modelDownloadFailed(
-                    NSLocalizedString("error.model_download_timeout", comment: "Model download/processing timed out")
-                )
-            }
-            defer { group.cancelAll() }
-            return try await group.next()!
-        }
-    }
 }
 
 #else
@@ -210,10 +215,12 @@ extension SherpaOnnxDiarizer {
         return Double(file.length) / file.processingFormat.sampleRate
     }
 
-    /// Processing budget scaled to the recording. Deliberately more generous
-    /// than `FluidAudioDiarizer.processTimeout`'s `duration * 0.5`: that
-    /// budget assumes ANE-accelerated inference ("runs well under real time
-    /// on the ANE"), which this CPU-only ONNX Runtime engine has no
+    /// Processing budget scaled to the recording — reported, not enforced
+    /// (H8 PR 18): sherpa-onnx exposes no way to abort an in-flight call, so
+    /// exceeding this only logs, it never cancels. Deliberately more
+    /// generous than `FluidAudioDiarizer.processTimeout`'s `duration * 0.5`:
+    /// that budget assumes ANE-accelerated inference ("runs well under real
+    /// time on the ANE"), which this CPU-only ONNX Runtime engine has no
     /// equivalent guarantee for. This multiplier is a placeholder pending
     /// real device measurement (see the public-dataset evaluation harness,
     /// `docs/roadmap.md` D4) — tune it once that data exists rather than
