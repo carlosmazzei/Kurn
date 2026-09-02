@@ -41,6 +41,10 @@ actor AudioPreprocessor: AudioPreprocessing {
     /// its URL. The caller owns the file and should `cleanup` it when done.
     func process(url: URL) async throws -> URL {
         try await ResourceGuard.requireTranscriptionHeadroom()
+        // H8 PR 17: global weight budget shared with the other pipeline
+        // stages — see `ResourceScheduler`'s header.
+        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.preprocessing.weight)
+        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.preprocessing.weight) } }
         let started = Date()
         AppLog.transcription.atDebug.debug("preprocess: open \(url.lastPathComponent, privacy: .public)")
 

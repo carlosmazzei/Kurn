@@ -136,6 +136,11 @@ actor WhisperCppTranscriber: Transcribing {
     /// `WhisperContext.init` is a blocking C call, so this runs detached
     /// rather than on whatever actor happened to call it.
     static func verifyModelLoads(at path: URL) async throws {
+        // H8 PR 17: same global weight budget as a real transcription's
+        // load, so a health probe racing an in-flight transcription can't
+        // stack memory with it either.
+        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
+        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
         try await Task.detached(priority: .utility) {
             _ = try WhisperContext(modelPath: path.path)
         }.value

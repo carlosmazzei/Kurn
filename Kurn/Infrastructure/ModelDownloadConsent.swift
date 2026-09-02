@@ -107,6 +107,12 @@ struct ModelDownloadConsent {
         }
         #if canImport(FluidAudio)
         do {
+            // H8 PR 17: acquired for the whole download+load, released
+            // whichever way this `do` block exits (including the `catch`
+            // below, since a thrown error propagates out of this scope
+            // before the `catch` runs) — see `ResourceScheduler`'s header.
+            try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
+            defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
             onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
             switch set {
             case .liveTranscriptionASR:

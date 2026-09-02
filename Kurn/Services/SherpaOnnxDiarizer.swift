@@ -53,6 +53,11 @@ actor SherpaOnnxDiarizer: Diarizing {
     /// diarization runs. Constructing the wrapper is a blocking C call (CPU
     /// ONNX Runtime, loading two graphs), so this runs detached.
     static func verifyModelsLoad() async throws {
+        // H8 PR 17: same global weight budget as a real diarization run's
+        // load — see `WhisperCppTranscriber.verifyModelLoads(at:)`'s own
+        // comment for why.
+        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
+        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
         try await Task.detached(priority: .utility) {
             guard SherpaOnnxOfflineSpeakerDiarizationWrapper(
                 segmentationModelPath: SherpaOnnxModelDownloader.segmentationModelURL.path,

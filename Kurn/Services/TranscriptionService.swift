@@ -489,6 +489,17 @@ struct TranscriptionService {
         onCheckpoint: CheckpointHandler? = nil
     ) async throws -> GatedTranscription {
         try await ResourceGuard.requireTranscriptionHeadroom()
+        // H8 PR 17: a global weight budget so two concurrent transcriptions
+        // (different recordings) picking the same heavy on-device engine
+        // can't both pass this preflight and then both hold that engine's
+        // inference activations in memory at once — the cross-recording
+        // analogue of why this file already never runs one recording's own
+        // on-device ASR concurrently with its diarizer. `defer` can't
+        // `await`, so the release is fired as a detached step, same as the
+        // preprocessed-file cleanup above.
+        let resourceWeight = ResourceWorkKind.transcription(engine).weight
+        try await ResourceScheduler.shared.acquire(weight: resourceWeight)
+        defer { Task { await ResourceScheduler.shared.release(weight: resourceWeight) } }
         var stages: [PipelineStageReport] = []
         let compaction: CompactionResult?
         do {
@@ -680,6 +691,13 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("diarize: start file=\(originalURL.lastPathComponent, privacy: .public) engine=\(engine.rawValue, privacy: .public) size=\(originalSize, privacy: .public) bytes duration=\(String(format: "%.1f", originalDuration), privacy: .public)s")
         onProgress(0)
         try await ResourceGuard.requireTranscriptionHeadroom()
+        // H8 PR 17: same reasoning as `transcribeGated`'s own acquire above
+        // — a global budget across concurrent recordings, not a
+        // replacement for this file's existing single-recording sequential/
+        // concurrent branch.
+        let resourceWeight = ResourceWorkKind.diarization(engine).weight
+        try await ResourceScheduler.shared.acquire(weight: resourceWeight)
+        defer { Task { await ResourceScheduler.shared.release(weight: resourceWeight) } }
         let diarURL: URL
         let cleanupURL: URL?
         if diarizationPreprocessingEnabled {

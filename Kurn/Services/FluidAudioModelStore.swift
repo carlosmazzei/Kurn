@@ -57,6 +57,11 @@ actor FluidAudioModelStore {
 
         let task = Task<AsrManager, Error> {
             try await ResourceGuard.requireModelDownloadHeadroom()
+            // H8 PR 17: acquired once for the whole coalesced load, not per
+            // caller — concurrent callers already await this one `Task`
+            // rather than each starting their own.
+            try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
+            defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
             let models = try await AsrModels.downloadAndLoad(version: .v3)
             return AsrManager(config: Self.transcriptionConfig, models: models)
         }

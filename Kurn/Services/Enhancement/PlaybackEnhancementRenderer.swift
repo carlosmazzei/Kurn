@@ -57,6 +57,10 @@ struct PlaybackEnhancementRenderer: Sendable {
         onProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> Int64 {
         try await ResourceGuard.requireTranscriptionHeadroom()
+        // H8 PR 17: global weight budget shared with the other pipeline
+        // stages — see `ResourceScheduler`'s header.
+        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.enhancement.weight)
+        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.enhancement.weight) } }
         onProgress?(0)
         let started = Date()
         let sourceURL = AudioFileStore.resolveURL(fileName: fileName)
