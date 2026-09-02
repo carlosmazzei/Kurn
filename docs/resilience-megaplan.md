@@ -208,11 +208,21 @@ Last updated: 2026-09-01.
   file, then `5ba261d` raising `appleSpeech`'s weight so the weight table
   actually satisfied the invariant its own regression test checked). See
   "PR 17" below for the full contract.
-- H8 PR 18 (a full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`
+- **[PR #175](https://github.com/carlosmazzei/Kurn/pull/175), H8 PR 18
+  (a full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`
   /continuation bridge, fixing two "false timeouts," a leaked continuation,
-  and an unsynchronized mutable property) is implemented on branch
-  `claude/resilience-roadmap-plan-fn23ki`; see "PR 18" below for what
-  shipped. Docs status corrections for PR 17 are bundled in this same PR,
+  and an unsynchronized mutable property), merged into `main`** (commit
+  `3b31bf7`, plus two follow-up CI fixes — `94f3f79` restoring
+  `nonisolated(unsafe)` on `LockScreenRecordingController.activity` after a
+  removal attempt failed with a Swift 6 "sending" error, then `18755f8`
+  adding an explicit `self.` for an actor-isolated property captured in a
+  `Logger` interpolation). See "PR 18" below for the full contract.
+- H8 PR 19 (an ActivityKit start/end race fix using a `runID` generation
+  counter, closing the hole where an untracked `start()` task could create
+  a Live Activity nothing would ever end if it happened to run after a
+  same-instant `end()`'s task) is implemented on branch
+  `claude/resilience-roadmap-plan-fn23ki`; see "PR 19" below for what
+  shipped. Docs status corrections for PR 18 are bundled in this same PR,
   per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
@@ -266,7 +276,10 @@ Last updated: 2026-09-01.
    recheck memory pressure and a global actor-based weight scheduler)
    merged as [PR #174](https://github.com/carlosmazzei/Kurn/pull/174)
    (commit `283d330`); "PR 18" (the `@unchecked Sendable`/`nonisolated
-   (unsafe)`/continuation-bridge audit) is implemented next, on branch
+   (unsafe)`/continuation-bridge audit) merged as
+   [PR #175](https://github.com/carlosmazzei/Kurn/pull/175) (commit
+   `3b31bf7`); "PR 19" (ActivityKit start/end race fix via a `runID`
+   generation counter) is implemented next, on branch
    `claude/resilience-roadmap-plan-fn23ki`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
@@ -309,7 +322,7 @@ Last updated: 2026-09-01.
 | H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Done, merged (PR 14/15/16) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
-| H8    | In progress (PR 17 merged, PR 18 implemented) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). Remaining: items 1 and 6–8 (operation ownership/run IDs, ActivityKit lifecycle, shared Watch protocol, F3 intent semantics) are PR 19–20's scope. |
+| H8    | In progress (PR 17/18 merged, PR 19 implemented) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). `LockScreenRecordingController` now closes the ActivityKit start/end race: a `runID` generation counter, bumped by both `start()` and `end()`, is checked synchronously by the queued start task immediately before the one non-cancellable call (`Activity.request`, which is `throws` but not `async`) that creates a Live Activity nothing would otherwise be tracking to end (item 6, PR 19). Remaining: items 1, 7 and 8 (operation ownership/run IDs generalized beyond ActivityKit, shared Watch protocol, F3 intent semantics) are PR 20's scope. |
 | H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
 
@@ -1805,8 +1818,10 @@ callback bridge. Add exactly-once assertions/stress tests. Use real engine abort
 hooks where available; otherwise report deferred cancellation instead of a false
 timeout.
 
-Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
-the verification of record, per "Verifying without a local macOS/Xcode
+Status: merged into `main` as
+[PR #175](https://github.com/carlosmazzei/Kurn/pull/175) (commit `3b31bf7`,
+plus two follow-up CI fixes — see the status snapshot entry above for both).
+CI green after those two fixes, per "Verifying without a local macOS/Xcode
 toolchain" in `CLAUDE.md`.
 
 **The audit itself.** Every `@unchecked Sendable` (20 sites) and
@@ -1958,6 +1973,72 @@ so the suite can't be flaky under CI load.
 Serialize start/update/end on one actor, retain/cancel the start task, bind every
 mutation to recording/run ID, and ensure start-immediate-end cannot create a late
 orphan.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**The race.** `LockScreenRecordingController.start()` fired an untracked
+`Task { }` that unconditionally called `Activity.request(...)` and stored the
+result once it ran. `Activity.request` is `throws` but not `async` — a fully
+synchronous ActivityKit call with no internal suspension point — so once that
+task actually started running, there was nothing for a concurrent `end()` to
+interleave on *inside* it. The real race was scheduling order between the
+`start()` task and an `end()` task created afterward (e.g. a start-immediate-
+stop sequence): Swift's concurrency model does not guarantee that two
+independently-created unstructured tasks on the same actor run in call order.
+If `end()`'s task happened to run first, it would find `activity == nil` (the
+start task hasn't run yet) and correctly do nothing; the start task, running
+later, would then still create a real Live Activity and store it — and since
+`end()` already ran and decided there was nothing to end, nothing would ever
+end it. The result is an orphaned Live Activity on the Lock Screen/Dynamic
+Island for a recording that has already stopped, left until the system
+eventually evicts it on its own schedule.
+
+**The fix.** `runID: UUID`, bumped by both `start()` and `end()`, replaces
+"does `activity` exist" as the source of truth for whether a given `start()`
+call is still the one that should proceed. `start()` captures the id it just
+assigned and, once its `Task` actually runs, checks `runID` again —
+synchronously, with no `await` between the check and `Activity.request` — and
+skips creating anything if a later `end()` (or a later `start()`) has already
+superseded it. Because `Activity.request` has no internal suspension point,
+that single pre-check is sufficient: nothing can run between the check and the
+call that would invalidate it. `update()` gained the same check (capture
+`runID` before firing its `Task`, compare on entry) as stale-work hygiene,
+though it is not orphan-critical the way `start()`'s check is — a stale
+`update()` on a still-live activity is merely a wasted, possibly-out-of-order
+UI refresh, not a leak. `startTask: Task<Void, Never>?` is retained so `end()`
+can also explicitly `.cancel()` it, matching the plan's literal "retain/cancel
+the start task" wording; `runID`, not the cancellation, is what's structurally
+load-bearing, since a bare `Task.cancel()` can't interrupt `Activity.request`
+itself (a synchronous foreign call with no cancellation checkpoint) — it can
+only signal intent to code that checks `Task.isCancelled`, which is exactly
+what the `runID` check already does more precisely.
+
+**Tests.** None added. `Activity<RecordingActivityAttributes>` and
+`ActivityAuthorizationInfo` are concrete ActivityKit types with no protocol
+seam in this codebase to substitute a fake behind, and the simulator does not
+support genuine Live Activity authorization — a unit test exercising the real
+race would need to control the *scheduling order* of two independently-created
+`Task { }`s relative to each other, which Swift's concurrency runtime
+provides no supported way to force deterministically. This is a known gap in
+this PR's coverage, not a claim that the fix is unverifiable in principle:
+`runID` is the same generation-counter pattern already used and tested
+elsewhere in this codebase for exactly this class of problem (e.g.
+`storeMicChoiceContinuation` in PR 18), and the fix is verified by CI
+compiling and passing the existing suite, not by a new test proving the race
+is closed.
+
+**Known gaps, stated plainly.**
+
+- **No automated test proves the orphan race is actually closed** — see
+  "Tests" above. Manual verification (rapid start/stop on a real device,
+  watching for an orphaned Live Activity) is the only way to observe this
+  today.
+- **Item 1 of H8's plan** (operation ownership/run IDs as a *general*
+  mechanism, beyond this one ActivityKit-specific application) **and items 7–8**
+  (shared Watch protocol, F3 intent semantics) **remain PR 20's scope, not
+  touched here.**
 
 #### PR 20 — H8 shared Watch protocol and idempotent external commands
 

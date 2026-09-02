@@ -2090,7 +2090,7 @@ routine re-hash; `isExcludedFromBackup` reconciliation can't reach
 FluidAudio's own cache directory; whisper.cpp's revision pinning is still
 open).
 
-### H8 · Operation ownership, resource recovery, and external controls — P1, items 2–5 done
+### H8 · Operation ownership, resource recovery, and external controls — P1, items 2–6 done
 
 **Plan.**
 
@@ -2177,8 +2177,8 @@ thresholds are first-cut estimates — no memory-cost benchmark exists
 anywhere in this codebase to calibrate them against). Items 1 and 4–8
 remain PR 18–20's scope.
 
-**Progress — items 4–5 (the PR 18 boundary), implemented on branch
-`claude/resilience-roadmap-plan-fn23ki`.** Every `@unchecked Sendable`
+**Progress — items 4–5 (the PR 18 boundary), merged as
+[PR #175](https://github.com/carlosmazzei/Kurn/pull/175).** Every `@unchecked Sendable`
 (20 sites) and `nonisolated(unsafe)` (12 sites) in non-test source, and
 every continuation/callback bridge (11 sites), was read and classified;
 most were already correctly justified (a lock, actor isolation, or a
@@ -2224,6 +2224,38 @@ in the project; three duplicated `nonisolated(unsafe)` logging-handler
 globals share one unreasoned-about pattern; `FoundationModelsProvider`'s
 timeout wraps a closed-source Apple framework call that couldn't be
 verified either way). Items 1 and 6–8 remain PR 19–20's scope.
+
+**Progress — item 6 (the PR 19 boundary), implemented on branch
+`claude/resilience-roadmap-plan-fn23ki`.**
+`LockScreenRecordingController.start()` used to fire an untracked `Task { }`
+that unconditionally created and stored a Live Activity once it ran, with
+nothing checking whether a same-instant `end()` had already decided there
+was nothing to end. `Activity.request` is `throws` but not `async` — a fully
+synchronous ActivityKit call — so the only real race was *scheduling order*
+between independently-created `start()`/`end()` tasks on the same actor,
+which Swift's concurrency model does not guarantee matches call order: if
+`end()`'s task ran first, it correctly found `activity == nil` and did
+nothing, and the later-running `start()` task would then create a real
+activity nothing would ever end — an orphan on the Lock Screen/Dynamic
+Island until the system evicted it on its own schedule. A `runID: UUID`,
+bumped by both `start()` and `end()`, closes it: the queued start task
+checks `runID` again synchronously, immediately before `Activity.request`,
+with no intervening `await` for anything to invalidate the check in between
+— a superseded `start()` skips creating an activity nothing would manage,
+rather than creating one and only then discovering it's orphaned. `update()`
+gained the same check as stale-work hygiene (not orphan-critical the way
+`start()`'s is). `startTask` is retained so `end()` can also explicitly
+cancel it, matching item 6's literal "track and cancel the in-flight
+ActivityKit start task" — `runID`, not the cancellation, is what's
+structurally load-bearing, since `Task.cancel()` cannot interrupt
+`Activity.request` itself. See the megaplan's "PR 19" section for the full
+contract and the known gap (no automated test proves the race is closed —
+`Activity<RecordingActivityAttributes>` has no protocol seam to fake, and
+forcing two unstructured tasks' relative scheduling order deterministically
+isn't something Swift's concurrency runtime supports; verified by CI
+compiling and the existing suite passing, and by the same `runID`
+generation-counter pattern already proven elsewhere in this codebase, e.g.
+PR 18's mic-choice continuation). Items 1, 7 and 8 remain PR 20's scope.
 
 ### H9 · Actionable error UX and privacy-safe diagnostics — P1/P2
 
@@ -2469,7 +2501,7 @@ migrates.
    whisper.cpp to an immutable revision (no network path to HuggingFace to
    obtain a real one in either PR's environment) is the one piece of H7's
    plan still open.
-10. **In flight: H8 (P1), items 2–5 implemented.** The PR 17 boundary
+10. **In flight: H8 (P1), items 2–6 implemented.** The PR 17 boundary
     (`docs/resilience-megaplan.md`'s "PR 17") replaces the sticky
     memory-warning latch — a boolean set once and never cleared for the
     rest of the process's life — with `MemoryPressureState`, an
@@ -2491,10 +2523,18 @@ migrates.
     error, now fixed to run the work directly and report slowness
     truthfully instead; a leaked mic-picker continuation
     (`RecorderViewModel`) and an unsynchronized mutable property
-    (`CloudSettingsSync`) were fixed the same way — implemented on branch
-    `claude/resilience-roadmap-plan-fn23ki`. Items 1 and 6–8 (operation
-    ownership/run IDs, ActivityKit lifecycle, shared Watch protocol, F3
-    intent semantics) remain PR 19–20's scope.
+    (`CloudSettingsSync`) were fixed the same way — merged as
+    [PR #175](https://github.com/carlosmazzei/Kurn/pull/175). The PR 19
+    boundary closes an ActivityKit start/end race: an untracked `start()`
+    task could still create a Live Activity after a same-instant `end()`
+    had already run and found nothing to end, orphaning it on the Lock
+    Screen/Dynamic Island. A `runID` generation counter, checked
+    synchronously immediately before the one non-cancellable call
+    (`Activity.request`, `throws` but not `async`) that creates the
+    activity, closes it — implemented on branch
+    `claude/resilience-roadmap-plan-fn23ki`. Items 1, 7 and 8 (operation
+    ownership/run IDs generalized beyond ActivityKit, shared Watch
+    protocol, F3 intent semantics) remain PR 20's scope.
 11. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
     route, lock/background and low-storage matrix without delaying the next code P0.
 12. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
