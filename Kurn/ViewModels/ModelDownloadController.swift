@@ -79,6 +79,12 @@ final class ModelDownloadController {
     /// disable on this so two screens can't start competing downloads.
     var isDownloading: Bool { downloadingModel != nil }
 
+    /// The in-flight download, so it can be cancelled (H7 PR 15). Not stored
+    /// as part of `download(...)`'s local scope because cancellation has to
+    /// be reachable from outside that function, by whichever screen is
+    /// showing `downloadProgress`.
+    private var activeDownloadTask: Task<Void, Never>?
+
     // MARK: - Engine selection (consent gates)
 
     /// Apply a transcription-engine choice, intercepting the FluidAudio engine
@@ -290,7 +296,7 @@ final class ModelDownloadController {
     ) {
         downloadingModel = set
         downloadProgress = ModelDownloadStatus(fractionCompleted: 0, phase: .preparing)
-        Task {
+        activeDownloadTask = Task {
             let background = BackgroundActivity()
             background.begin(name: "ai.kurn.modelDownload")
             defer { background.end() }
@@ -308,6 +314,11 @@ final class ModelDownloadController {
                 )
                 ModelStore.recordDownload(for: group, before: before)
                 onSuccess()
+            } catch is CancellationError {
+                // Silent — the user asked for this. `ModelFileDownloader`
+                // keeps resume data for whatever transfer was in flight, so
+                // re-triggering the same consent flow continues rather than
+                // restarting from byte zero (H7 PR 15).
             } catch let appError as AppError {
                 self.error = appError
             } catch {
@@ -316,8 +327,17 @@ final class ModelDownloadController {
             cleanup()
             downloadingModel = nil
             downloadProgress = nil
+            activeDownloadTask = nil
             refreshInstalledModels()
         }
+    }
+
+    /// Cancel the in-flight download, if any. `ModelFileDownloader` captures
+    /// resume data when the transfer had already started, so retrying (by
+    /// re-triggering the same consent flow) continues instead of starting
+    /// over (H7 PR 15).
+    func cancelDownload() {
+        activeDownloadTask?.cancel()
     }
 
     // MARK: - Installed models

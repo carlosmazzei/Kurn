@@ -174,11 +174,19 @@ Last updated: 2026-09-01.
   request to avoid a trailing docs-only PR. **H5's plan is now fully
   addressed** — see "PR 13" below for what shipped and the H5 status snapshot
   row.
-- H7 PR 14 (typed Keychain outcomes, an accessibility-migration fix, and
-  explicit-Save for provider credentials) is implemented on branch
-  `claude/resilience-roadmap-plan-fn23ki`; see "PR 14" below for what
-  shipped. Docs status corrections for this and PR 13 are bundled in this
-  same PR, per the same standing request.
+- **[PR #171](https://github.com/carlosmazzei/Kurn/pull/171), H7 PR 14
+  (typed Keychain outcomes, an accessibility-migration fix, and
+  explicit-Save for provider credentials), merged into `main`** (commit
+  `de8b551`, plus a follow-up CI fix `ae5d63f` serializing
+  `KeychainManagerTests` against a real-Keychain race the first push
+  exposed). See "PR 14" below for the full contract.
+- H7 PR 15 (an injectable `ModelDownloading` seam unifying the whisper.cpp
+  and sherpa-onnx downloaders, exact-size plus opportunistic-SHA-256
+  verification, atomic install with backup/rollback, resume data, and
+  cancellation) is implemented on branch
+  `claude/resilience-roadmap-plan-fn23ki`; see "PR 15" below for what
+  shipped and its stated known gap. Docs status corrections for PR 14 are
+  bundled in this same PR, per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -219,8 +227,10 @@ Last updated: 2026-09-01.
    merged as [PR #170](https://github.com/carlosmazzei/Kurn/pull/170)
    (commit `b5d2233`). **H7 is now in flight**: "PR 14" (typed Keychain
    outcomes, the accessibility-migration fix, and explicit-Save for
-   provider credentials) is implemented next, on branch
-   `claude/resilience-roadmap-plan-fn23ki`.
+   provider credentials) merged as
+   [PR #171](https://github.com/carlosmazzei/Kurn/pull/171) (commit
+   `de8b551`); "PR 15" (verified model staging, resume, and replacement) is
+   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -261,7 +271,7 @@ Last updated: 2026-09-01.
 | H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
 | H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
-| H7    | In progress (PR 14 implemented) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, implemented). Remaining: verified/resumable model staging, atomic replacement, and health probes (PR 15/16).           |
+| H7    | In progress (PR 14 merged, PR 15 implemented) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, implemented). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment PR 15 was authored in — see PR 15's stated known gap), plus storage-inventory verification and a post-install health probe (PR 16).           |
 | H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
 | H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
@@ -1345,6 +1355,144 @@ Unify app-managed whisper.cpp and sherpa-onnx download mechanics: immutable
 revision, exact size, SHA-256/manifest, protected staging, retry, cancellation,
 resume data, network policy, validation, and atomic replacement. Preserve the
 previous valid model on every failure.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**What shipped.** `WhisperCppModelDownloader` and `SherpaOnnxModelDownloader`
+used to call a bare enum of static functions (`ModelFileDownloader.fetch`)
+that trusted a downloaded file the moment it cleared a loose "roughly half
+the expected size" floor, and installed it by deleting whatever was there
+first and then moving the new file in — a crash or a `replaceItemAt` failure
+between those two steps left no model installed at all, not a corrupt one.
+
+- **`ModelDownloading`** (`Kurn/Services/ModelFileDownloader.swift`, new
+  protocol) is the injectable seam, mirroring the shape
+  `KeychainAccessing` (PR 14) and `CloudKeyValueStore` give their own system
+  dependencies. `ModelFileDownloader` is now an `actor` conforming to it
+  (`.shared` for production; `init(protocolClasses:)` lets a test construct
+  its own instance wired to `MockURLProtocol`) rather than a bare enum,
+  because it needs to hold resume data between one interrupted attempt and
+  the next for the same destination — mutable state that has to be
+  protected from concurrent access. Both downloaders take a `downloader:
+  any ModelDownloading = ModelFileDownloader.shared` parameter now, so
+  production call sites are unchanged and tests can substitute a fake.
+- **Verification is exact, not a loose floor.** `verify(_:minimumPlausibleBytes:)`
+  checks the downloaded byte count against the server's own declared
+  `Content-Length` exactly (falling back to the previous loose plausibility
+  floor only when the server doesn't report a length at all) and, when the
+  origin volunteers one, the file's SHA-256 against it.
+  `linkedHashHex(from:)` reads HuggingFace's `X-Linked-ETag` header — set on
+  an LFS-backed file's response to the raw hex Git LFS object ID, which for
+  every binary model file this app fetches is a SHA-256 — and requires
+  exactly 64 hex characters before trusting it as one, so a plain `ETag`
+  (typically a quoted Git blob SHA-1, or an opaque cache key) is never
+  mistaken for a checksum to verify against.
+- **Atomic install, with a real rollback.** `install(_:at:expectedHashHex:)`
+  uses `FileManager.replaceItemAt(_:withItemAt:backupItemName:)` to swap a
+  verified download in atomically when something already exists at the
+  destination, keeping the replaced file as a backup. If a hash was checked
+  during download, the *installed* file is re-hashed too — a cheap re-check
+  reusing the same digest, guarding against the move itself corrupting an
+  already-verified transfer — and a mismatch restores the backup rather than
+  just deleting it. A failure at transfer, verification, or install now
+  always leaves the previous valid model exactly as it was, never absent and
+  never silently corrupt, closing the item 3/5 "atomic staging directory" /
+  "preserve the previous valid model on every failure" asks.
+- **Resume data.** `Downloader` (the `URLSessionDownloadDelegate` bridge to
+  async/await) captures resume data both from `URLSessionDownloadTask
+  .cancel(byProducingResumeData:)` (user-initiated cancellation) and from
+  `NSURLSessionDownloadTaskResumeData` in a `didCompleteWithError` failure's
+  `userInfo` (a dropped connection). `ModelFileDownloader` keeps the most
+  recent resume data per destination in memory and passes it to the next
+  `fetch` call for that destination, so retrying — by re-triggering the same
+  consent flow — continues the transfer instead of restarting from byte
+  zero. In-memory only, so a relaunch (not just a backgrounding) loses it;
+  see known gaps.
+- **Cancellation.** `ModelDownloadController` now stores its download
+  `Task` (`activeDownloadTask`) instead of firing an unstored one, adds a
+  `cancelDownload()` that cancels it, and swallows `CancellationError`
+  silently (the user asked for this, not a failure to surface). `Downloader
+  .download`'s `onCancel` handler calls `task.cancel(byProducingResumeData:)`
+  rather than `session.invalidateAndCancel()` — the latter was tried first
+  and reverted, because it could race and tear the session down before the
+  resume-data completion closure fired. `ModelDownloadProgressRow` gained an
+  optional `onCancel` closure (`nil` renders no button, the row's previous
+  shape) and all three call sites (`RecordingSettingsView`,
+  `TranscriptionSettingsView` ×2) now pass `downloads.cancelDownload`,
+  reusing the existing `common.cancel` localization key already present in
+  all seven locales — closing item 7's "owned task and cancel/pause action."
+- **Orphan cleanup.** A completed-but-not-yet-installed download is staged
+  under a `kurn_model_` prefix in the temporary directory (mirroring
+  `kurn_clean_`/`kurn_vad_`/etc.); `TempFileCleaner.prefixes` now includes
+  it, so a crash between download and install is swept the same way every
+  other pipeline temp file already is.
+
+**What deliberately did not ship, and why: immutable revision pinning.**
+Item 4 asks to "pin immutable model revisions ... before install." This PR
+does **not** hardcode a pinned commit SHA or release digest for
+`WhisperCppModel.downloadURL`, which still resolves against HuggingFace's
+mutable `resolve/main` branch. Doing that responsibly requires fetching the
+real, current commit SHA from HuggingFace to pin against, and this PR was
+authored in an environment with no network path to `huggingface.co` (or
+`api.github.com`) — confirmed by testing directly: both `curl` and
+`WebFetch` against `huggingface.co` returned `EGRESS_BLOCKED`/403 through
+the environment's proxy. A wrong hardcoded commit SHA, or one that stops
+existing, would be worse than the status quo: every future download would
+fail outright instead of merely being under-verified against a live
+transfer. `sherpa-onnx`'s two models were *already* pinned before this PR
+(the segmentation model's URL names an exact commit SHA,
+`9403a6902bb58e3d5ae8c7e77c3422de279db2e0`, and the embedding model's URL
+names an exact GitHub release tag) — that part of item 4 was pre-existing,
+not new work here. What this PR adds instead, for both downloaders, is
+verification against whatever integrity signal the origin volunteers *for
+that transfer*, over HTTPS — exact size always, opportunistic SHA-256 when
+offered — which the plan's own wording allows for ("verify a published
+exact size plus SHA-256, **or a stronger signed manifest**"). A follow-up
+authored with real network access to HuggingFace should still pin
+whisper.cpp's revision; nothing here blocks that.
+
+**Tests.** `KurnTests/ModelFileDownloaderTests.swift` (new) drives the real
+`fetch` → `verify` → `install` sequence against `MockURLProtocol` (no real
+network involved): a matching declared `Content-Length` installs, a
+mismatched one is rejected and leaves nothing behind; a matching
+`X-Linked-ETag` SHA-256 installs, a mismatched one is rejected, and a plain
+short `ETag` is correctly never treated as a hash to check; an existing
+file is replaced atomically with no leftover backup sibling; a verification
+failure against an *existing* installed file leaves that original file
+exactly as it was; and an already-plausible file on disk short-circuits
+`fetch` with no network call at all (asserted via
+`MockURLProtocol.capturedRequests.isEmpty`).
+
+**Known gaps, stated plainly.**
+
+- **Immutable revision pinning for whisper.cpp is not done** — see "What
+  deliberately did not ship" above. This is the plan's item 4, half-closed
+  (exact-size + opportunistic-hash verification shipped; the pinned-commit
+  half needs real network access this environment does not have).
+- **Resume data does not survive a relaunch**, only a backgrounding —
+  it's held in `ModelFileDownloader`'s in-memory dictionary, never
+  persisted. A force-quit or crash mid-transfer restarts from byte zero on
+  the next attempt rather than resuming, unlike `TranscriptionCheckpoint`'s
+  on-disk persistence for the transcription pipeline itself. Apple's own
+  documentation is clear that resume data is best-effort across long gaps
+  regardless, so this is a narrower gap than it might first appear, but it
+  is real.
+- **No automatic retry-with-backoff loop**, unlike `LLMHTTP.sendValidated`'s
+  exponential backoff for provider calls. A failed or cancelled download
+  only continues on the *next* explicit `fetch` call (i.e. the user
+  re-opening the same consent flow); nothing here retries on its own after
+  a transient failure.
+- **No post-install health probe** (item 5's "then loading a small health
+  probe") and **no storage-inventory verification of digest/version/
+  protection/backup exclusion** (item 6) — both are PR 16's scope, not
+  touched here. A model that installs cleanly is trusted to be usable; PR 16
+  is what tells "verified installation" apart from "consented and present."
+- **No cancellation-timing test.** `MockURLProtocol` has no "hang forever"
+  stub type, so the resume-data-on-cancel path is exercised by code review
+  and the `Downloader`/`ModelFileDownloader` design (see "What shipped"),
+  not by an automated test that cancels mid-transfer.
 
 FluidAudio remains a capability-limited adapter with preflight only until its
 library exposes session/path-change control.
