@@ -190,12 +190,21 @@ Last updated: 2026-09-01.
   network double from `MockURLProtocol`'s process-global state, which a
   first push had raced against `ProviderHTTPTests` and friends). See
   "PR 15" below for the full contract and its stated known gap.
-- H7 PR 16 (a third persisted fact — verified installation — distinct from
-  consent and from bytes-on-disk; post-install health probes for
-  whisper.cpp and sherpa-onnx; and a storage-inventory pass) is implemented
-  on branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 16" below for
-  what shipped. Docs status corrections for PR 15 are bundled in this same
-  PR, per the same standing request.
+- **[PR #173](https://github.com/carlosmazzei/Kurn/pull/173), H7 PR 16
+  (a third persisted fact — verified installation — distinct from consent
+  and from bytes-on-disk; post-install health probes for whisper.cpp and
+  sherpa-onnx; and a storage-inventory pass), merged into `main`** (commit
+  `060276b`, via merge commit `b75462c`). CI green on the first push. See
+  "PR 16" below for the full contract. **H7's plan is now fully addressed**
+  except pinning whisper.cpp's revision, which needs network access neither
+  PR 15 nor PR 16's authoring environment had — see the note at the end of
+  "PR 16" below.
+- H8 PR 17 (an observed-at/cooldown/recheck replacement for the sticky
+  memory-pressure latch, plus a global actor-based weight scheduler
+  admitting preprocessing/ASR/diarization/enhancement/model-loading) is
+  implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 17"
+  below for what shipped. Docs status corrections for PR 16 are bundled in
+  this same PR, per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -240,10 +249,13 @@ Last updated: 2026-09-01.
    [PR #171](https://github.com/carlosmazzei/Kurn/pull/171) (commit
    `de8b551`); "PR 15" (verified model staging, resume, and replacement)
    merged as [PR #172](https://github.com/carlosmazzei/Kurn/pull/172)
-   (commit `d66c10f`). "PR 16" (model inventory and health probes) is
-   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki` —
-   **H7's plan is now fully addressed** except pinning whisper.cpp to an
-   immutable revision, stated as a known gap in both PR 15 and PR 16.
+   (commit `d66c10f`); "PR 16" (model inventory and health probes) merged as
+   [PR #173](https://github.com/carlosmazzei/Kurn/pull/173) (commit
+   `060276b`). **H7's plan is now fully addressed** except pinning
+   whisper.cpp to an immutable revision, stated as a known gap in both PR 15
+   and PR 16. **H8 is now in flight**: "PR 17" (observed-at/cooldown/
+   recheck memory pressure and a global actor-based weight scheduler) is
+   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -284,8 +296,8 @@ Last updated: 2026-09-01.
 | H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
 | H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
-| H7    | In progress (PR 14/15 merged, PR 16 implemented) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, implemented). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
-| H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
+| H7    | Done, merged (PR 14/15/16) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
+| H8    | In progress (PR 17 implemented) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (item 2 and item 3, PR 17, implemented). Remaining: items 1 and 4–8 (operation ownership/run IDs, `@unchecked Sendable`/bridge audit, timeout truthfulness, ActivityKit lifecycle, shared Watch protocol, F3 intent semantics) are PR 18–20's scope. |
 | H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
 
@@ -1662,6 +1674,117 @@ own downloader.
 Replace sticky memory pressure with observed-at/cooldown/recheck state and add a
 global actor-based permit/weight scheduler for preprocessing, ASR, diarization,
 enhancement, and model loading.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**What shipped.** `ResourcePressureMonitor` (`Kurn/Infrastructure/ResourceGuard.swift`)
+used to set a single boolean the first time `UIApplication
+.didReceiveMemoryWarningNotification` fired and never clear it — every
+transcription/model-download/enhancement preflight from that point until the
+user force-quit and relaunched saw a permanently unhealthy device, regardless
+of how much memory had since been freed. That is item 2's "sticky resource
+state," and the roadmap's own H8 status row named it directly.
+
+- **`MemoryPressureState`** (new, pure value type, mirroring
+  `SecurityCoverState`'s shape) replaces the boolean with an
+  observed-at/cooldown/recheck model: `lastWarningObservedAt: TimeInterval?`
+  plus the device's current `ProcessInfo.ThermalState`.
+  `isHealthy(now:)` pauses new heavy work for `cooldownInterval` (60s) after
+  the *last* observed warning, then re-admits automatically — no explicit
+  "reset" call needed, unlike the old `resetMemoryWarning()` that nothing in
+  production ever actually called (removed as dead code). Thermal state is a
+  second, live signal checked independently: `.serious`/`.critical` blocks
+  admission with no cooldown of its own, and clears itself the instant
+  `ProcessInfo` next reports the device has cooled — `.fair` is deliberately
+  not blocking, since it's iOS's normal state during any real transcription.
+  `ResourcePressureMonitor` is now the thin OS-facing shell recording
+  `lastWarningObservedAt` (via an injected `MonotonicSleepClock`, so a
+  cooldown boundary is testable without a real wait); `ResourceGuard
+  .requireNoMemoryPressure(clock:)` builds a `MemoryPressureState` from it
+  plus `ProcessInfo.processInfo.thermalState` on every call — closing item
+  2's "later admission reevaluates memory, thermal state and storage instead
+  of disabling work until relaunch" exactly (storage was already
+  reevaluated dynamically; only memory pressure was sticky).
+- **`ResourceScheduler`** (new, `Kurn/Infrastructure/ResourceScheduler.swift`)
+  is item 3's global actor-based permit/weight scheduler. A single shared
+  weight budget (`defaultTotalWeight = 100`); `ResourceWorkKind` gives each
+  of the five named categories — preprocessing, transcription (per engine),
+  diarization (per engine), enhancement, model loading — a weight.
+  `acquire(weight:)`/`release(weight:)` are cancellation-safe
+  (`withTaskCancellationHandler`, the same idiom H7 PR 15's `Downloader
+  .download` already established for this codebase), and a request that
+  doesn't currently fit queues rather than failing outright; `release`
+  admits every queued waiter that now fits the freed budget, not only the
+  one at the front, so one heavy queued request can't starve a lighter one
+  behind it.
+- **Wired into all five categories at their existing funnel points**, not
+  into every low-level file: `TranscriptionService.transcribeGated`/
+  `.diarize` (every transcription and diarization engine already passes
+  through these two), `AudioPreprocessor.process`,
+  `PlaybackEnhancementRenderer.render`, `FluidAudioModelStore`'s coalesced
+  load, `ModelDownloadConsent.download`'s FluidAudio branch, and (since they
+  also load a model into memory) H7 PR 16's two post-install health probes,
+  `WhisperCppTranscriber.verifyModelLoads(at:)` and `SherpaOnnxDiarizer
+  .verifyModelsLoad()`.
+- **Deliberately does not touch or duplicate**
+  `TranscriptionService.transcribe`'s existing compile-time sequential/
+  concurrent branch (cloud transcription runs concurrently with
+  diarization; every on-device engine runs strictly sequentially before
+  it, for exactly the jetsam reason this PR generalizes). The weight table
+  was chosen so the scheduler *agrees* with that branch rather than
+  fighting it: cloud transcription's weight (5) fits alongside any
+  diarization engine's, matching the branch's own concurrent case; any
+  on-device transcription engine's weight (35–60) never fits alongside
+  FluidAudio's or sherpa-onnx's diarization weight (50), matching the
+  branch's own sequential case — both pinned as regression tests (see
+  below). What the scheduler adds is the case that branch never covered:
+  two *different* recordings' heavy stages contending for memory at once,
+  which nothing previously gated.
+
+**Tests.** `KurnTests/ResourceGuardTests.swift` gained `MemoryPressureState`
+coverage: no warning is always healthy; a recent warning stays unhealthy
+within the cooldown and recovers once it elapses (and well past it, proving
+it isn't merely "sticky at a different fixed point"); `.serious`/`.critical`
+block even with no warning at all; `.fair` alone does not; thermal blocking
+is a live signal that clears the moment the state changes, with no cooldown
+memory of its own. `KurnTests/ResourceSchedulerTests.swift` (new) drives the
+real actor: an acquire under budget succeeds immediately; one over budget
+queues and is admitted once the holder releases; a lighter queued waiter is
+admitted ahead of a heavier one still stuck at the front once it fits;
+cancelling a queued acquire throws `CancellationError` and reserves nothing
+(provable via a fresh full-budget acquire succeeding right after); and the
+two weight-table invariants described above are pinned directly against
+`TranscriptionService`'s own engine enums, so a future weight change that
+silently breaks either invariant fails a test instead of only surfacing on
+a device. Waiting for a waiter to actually be enqueued polls a `#if DEBUG`-only
+`waiterCountForTesting` with `Task.yield()` (bounded), never a fixed
+`Task.sleep`, so the suite can't be flaky under CI load.
+
+**Known gaps, stated plainly.**
+
+- **The weight table is a first-cut estimate, not a measurement.** No
+  benchmark or memory-profiling data exists anywhere in this codebase
+  quantifying relative cost per pipeline stage/engine (confirmed by
+  research before writing this PR); the numbers were chosen only to
+  preserve the two invariants against `TranscriptionService`'s existing
+  behavior described above. A follow-up with access to real devices should
+  replace them with measured figures, the same caveat H5's on-device-LLM
+  char/token thresholds already carry in `docs/roadmap.md`'s F1 section.
+- **The cooldown interval (60s) and thermal-blocking states
+  (`.serious`/`.critical`) are likewise unmeasured defaults**, not tuned
+  against real low-memory/thermal-throttling device behavior.
+- **`ResourceScheduler` only gates the five named categories at their
+  funnel points** — it does not reach into `VADAudioCompactor`,
+  `DiarizationPreprocessor`, or `OfflineAudioRenderer` individually; those
+  already run *inside* a category's held permit (e.g. diarization
+  preprocessing runs inside `diarize`'s acquired weight), so they are
+  covered, just not separately weighted.
+- **Items 1, 4–8 of H8's plan** (operation ownership/run IDs,
+  `@unchecked Sendable`/bridge audit, timeout truthfulness, ActivityKit
+  lifecycle, shared Watch protocol, F3 intent semantics) **are PR 18–20's
+  scope, not touched here.**
 
 #### PR 18 — H8 cancellation truth and bridge audit
 

@@ -36,9 +36,22 @@ enum ResourceGuard {
         try requireFreeStorage(atLeast: minimumFreeStorage)
     }
 
-    static func requireNoMemoryPressure() async throws {
+    /// H8 PR 17: a memory warning used to set a boolean that never cleared for
+    /// the rest of the process's life — the first warning of a session
+    /// permanently blocked every later transcription/download/enhancement,
+    /// no matter how long ago it happened or how much memory has since been
+    /// freed. `MemoryPressureState.isHealthy(now:)` replaces that with a
+    /// cooldown: new heavy work pauses for a measured interval after the
+    /// *last* observed warning, then admission re-evaluates. `clock` is
+    /// injectable so a cooldown boundary is testable without a real wait —
+    /// production always uses `SystemClock()`.
+    static func requireNoMemoryPressure(clock: some MonotonicSleepClock = SystemClock()) async throws {
         #if canImport(UIKit)
-        if await ResourcePressureMonitor.shared.didReceiveMemoryWarning {
+        let state = MemoryPressureState(
+            lastWarningObservedAt: await ResourcePressureMonitor.shared.lastWarningObservedAt,
+            thermalState: ProcessInfo.processInfo.thermalState
+        )
+        guard state.isHealthy(now: clock.now) else {
             throw AppError.resourceUnavailable(
                 NSLocalizedString("error.resource_memory_pressure", comment: "Low memory")
             )
@@ -242,15 +255,67 @@ struct RecordingStorageMonitor: Sendable {
     }
 }
 
+/// The pure decision behind `ResourceGuard.requireNoMemoryPressure()`: whether
+/// new heavy work should be admitted right now, given how long ago the last
+/// memory warning was observed and the device's current thermal state.
+/// Mirrors `SecurityCoverState`'s shape — a pure function of its inputs,
+/// unit-tested without touching `UIApplication`/`ProcessInfo` directly.
+///
+/// Thermal state is a *live* signal, deliberately not latched the way the
+/// old boolean was: it clears itself the moment `ProcessInfo` next reports
+/// the device has cooled, with no cooldown of its own, because thermal
+/// throttling is already the OS's own recheck-as-you-go signal.
+struct MemoryPressureState: Equatable, Sendable {
+    /// How long after a memory warning new heavy work stays paused before
+    /// admission re-evaluates current conditions — the "measured interval"
+    /// H8's plan asks for in place of a permanent, until-relaunch block.
+    /// A first-cut estimate, not measured against real device behavior; see
+    /// PR 17's stated known gap.
+    static let cooldownInterval: TimeInterval = 60
+
+    var lastWarningObservedAt: TimeInterval?
+    var thermalState: ProcessInfo.ThermalState
+
+    /// Whether the thermal state alone is severe enough to pause new heavy
+    /// work, even with no recent memory warning. `.fair` is deliberately
+    /// not blocking — it is iOS's normal "working hard" state during any
+    /// real transcription, and treating it as pressure would fire on
+    /// nearly every long recording.
+    private var isThermallyBlocked: Bool {
+        switch thermalState {
+        case .serious, .critical: return true
+        case .nominal, .fair: return false
+        @unknown default: return false
+        }
+    }
+
+    /// Whether new heavy work should be admitted right now. `now` must come
+    /// from the same monotonic clock `lastWarningObservedAt` was recorded
+    /// from (`ProcessInfo.processInfo.systemUptime`, via `MonotonicSleepClock`)
+    /// — never wall-clock `Date()`, which a clock change could move backward.
+    func isHealthy(now: TimeInterval) -> Bool {
+        guard !isThermallyBlocked else { return false }
+        guard let lastWarningObservedAt else { return true }
+        return now - lastWarningObservedAt >= Self.cooldownInterval
+    }
+}
+
 #if canImport(UIKit)
 @MainActor
 final class ResourcePressureMonitor {
     static let shared = ResourcePressureMonitor()
 
-    private(set) var didReceiveMemoryWarning = false
+    /// Monotonic timestamp of the most recent memory warning, or `nil` if
+    /// none has been observed this process. Never reset to `nil` once set —
+    /// `MemoryPressureState`'s cooldown is what lets admission recover, not
+    /// forgetting the warning happened.
+    private(set) var lastWarningObservedAt: TimeInterval?
     private var observer: NSObjectProtocol?
+    private let clock: any MonotonicSleepClock
 
-    private init() {}
+    init(clock: any MonotonicSleepClock = SystemClock()) {
+        self.clock = clock
+    }
 
     func start() {
         guard observer == nil else { return }
@@ -260,19 +325,16 @@ final class ResourcePressureMonitor {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.didReceiveMemoryWarning = true
+                guard let self else { return }
+                self.lastWarningObservedAt = self.clock.now
                 AppLog.transcription.atError.error("resource: received memory warning")
             }
         }
     }
 
-    func resetMemoryWarning() {
-        didReceiveMemoryWarning = false
-    }
-
     #if DEBUG
-    func markMemoryWarningForTesting() {
-        didReceiveMemoryWarning = true
+    func markMemoryWarningForTesting(at time: TimeInterval? = nil) {
+        lastWarningObservedAt = time ?? clock.now
     }
     #endif
 }

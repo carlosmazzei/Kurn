@@ -157,6 +157,55 @@ struct ResourceGuardTests {
         #expect(abs(estimate.bytesPerSecond - 20_000) < 0.001)
     }
 
+    // MARK: - H8 PR 17: cooldown/recheck memory pressure
+
+    @Test func noWarningIsAlwaysHealthy() {
+        let state = MemoryPressureState(lastWarningObservedAt: nil, thermalState: .nominal)
+        #expect(state.isHealthy(now: 1_000_000))
+    }
+
+    @Test func recentWarningStaysUnhealthyWithinTheCooldown() {
+        let state = MemoryPressureState(lastWarningObservedAt: 100, thermalState: .nominal)
+        #expect(!state.isHealthy(now: 100 + MemoryPressureState.cooldownInterval - 1))
+    }
+
+    @Test func warningRecoversOnceTheCooldownElapses() {
+        let state = MemoryPressureState(lastWarningObservedAt: 100, thermalState: .nominal)
+        #expect(state.isHealthy(now: 100 + MemoryPressureState.cooldownInterval))
+    }
+
+    @Test func warningIsNotSticky() {
+        // The old boolean latch never recovered no matter how much later
+        // admission was rechecked; the cooldown model must recover well
+        // past the boundary too, not just exactly at it.
+        let state = MemoryPressureState(lastWarningObservedAt: 100, thermalState: .nominal)
+        #expect(state.isHealthy(now: 100 + MemoryPressureState.cooldownInterval * 10))
+    }
+
+    @Test func seriousOrCriticalThermalStateBlocksEvenWithNoWarning() {
+        let serious = MemoryPressureState(lastWarningObservedAt: nil, thermalState: .serious)
+        let critical = MemoryPressureState(lastWarningObservedAt: nil, thermalState: .critical)
+        #expect(!serious.isHealthy(now: 0))
+        #expect(!critical.isHealthy(now: 0))
+    }
+
+    @Test func fairThermalStateAloneIsNotBlocking() {
+        // .fair is iOS's normal "working hard" state during any real
+        // transcription — treating it as blocking would fire on nearly
+        // every long recording.
+        let state = MemoryPressureState(lastWarningObservedAt: nil, thermalState: .fair)
+        #expect(state.isHealthy(now: 0))
+    }
+
+    @Test func thermalStateIsALiveSignalNotLatched() {
+        // Unlike the warning cooldown, a thermal check has no memory of its
+        // own: cooling down clears it on the very next evaluation.
+        var state = MemoryPressureState(lastWarningObservedAt: nil, thermalState: .critical)
+        #expect(!state.isHealthy(now: 0))
+        state.thermalState = .nominal
+        #expect(state.isHealthy(now: 0))
+    }
+
     @Test func pipelineBoundaryRejectsAnAlreadyCancelledTask() async {
         let stopped = await Task { () -> Bool in
             withUnsafeCurrentTask { $0?.cancel() }
