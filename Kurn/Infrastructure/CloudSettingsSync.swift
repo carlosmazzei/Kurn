@@ -29,7 +29,23 @@ protocol CloudKeyValueStore: AnyObject, Sendable {
 final class CloudSettingsSync: CloudKeyValueStore, @unchecked Sendable {
     static let shared = CloudSettingsSync()
 
-    var didChangeExternally: (([String]) -> Void)?
+    // H8 PR 18: this used to be a plain mutable `var`, with the only
+    // protection a comment claiming "set once, from the main actor, by
+    // `AppSettings.init`" — true in practice (the sole writer is
+    // `AppSettings.init`, the sole reader is this file's own notification
+    // callback, and both happen to run on the main queue), but nothing
+    // enforced it: the type is `@unchecked Sendable`, so any code on any
+    // thread could legally set this property without the compiler noticing.
+    // A lock makes the "single, safe" claim executable instead of only
+    // documented, matching every other mutable-state `@unchecked Sendable`
+    // in this codebase (`RecordingSink`, `NetworkPathObserver`,
+    // `ModelFileDownloader.Downloader`, …).
+    private let lock = NSLock()
+    private var storedDidChangeExternally: (([String]) -> Void)?
+    var didChangeExternally: (([String]) -> Void)? {
+        get { lock.withLock { storedDidChangeExternally } }
+        set { lock.withLock { storedDidChangeExternally = newValue } }
+    }
 
     private let store = NSUbiquitousKeyValueStore.default
     private var observer: NSObjectProtocol?

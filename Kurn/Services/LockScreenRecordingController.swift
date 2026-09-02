@@ -12,7 +12,19 @@ import Foundation
 
 @MainActor
 final class LockScreenRecordingController {
-    nonisolated(unsafe) private var activity: Activity<RecordingActivityAttributes>?
+    // H8 PR 18 audit: this `nonisolated(unsafe)` was checked and kept, not
+    // removed. The whole type is `@MainActor` and every access site is
+    // already serialized through it (`start`/`update`/`end` all run inside
+    // a `Task { }`/`Task { @MainActor in }` that inherits the creating
+    // method's `@MainActor` isolation, not `.detached`), so the annotation
+    // was never guarding against real concurrent *access* — but removing it
+    // fails the build: `Activity<T>.update(_:)`/`.end(_:dismissalPolicy:)`
+    // are `nonisolated` async methods in ActivityKit's own API, and passing
+    // a main-actor-isolated value into a `nonisolated` call is exactly what
+    // Swift 6's region-based "sending" check exists to catch, regardless of
+    // whether the value is genuinely raced on. Confirmed by CI, which is
+    // the point of this audit item: this one is load-bearing, kept as-is.
+    private nonisolated(unsafe) var activity: Activity<RecordingActivityAttributes>?
 
     private var title = ""
     private var state: AudioRecorderService.State = .idle

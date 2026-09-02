@@ -199,12 +199,21 @@ Last updated: 2026-09-01.
   except pinning whisper.cpp's revision, which needs network access neither
   PR 15 nor PR 16's authoring environment had — see the note at the end of
   "PR 16" below.
-- H8 PR 17 (an observed-at/cooldown/recheck replacement for the sticky
+- **[PR #174](https://github.com/carlosmazzei/Kurn/pull/174), H8 PR 17
+  (an observed-at/cooldown/recheck replacement for the sticky
   memory-pressure latch, plus a global actor-based weight scheduler
-  admitting preprocessing/ASR/diarization/enhancement/model-loading) is
-  implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 17"
-  below for what shipped. Docs status corrections for PR 16 are bundled in
-  this same PR, per the same standing request.
+  admitting preprocessing/ASR/diarization/enhancement/model-loading),
+  merged into `main`** (commit `283d330`, plus two follow-up CI fixes —
+  `3891573` importing `KurnCore` for `TranscriptionEngine` in the new test
+  file, then `5ba261d` raising `appleSpeech`'s weight so the weight table
+  actually satisfied the invariant its own regression test checked). See
+  "PR 17" below for the full contract.
+- H8 PR 18 (a full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`
+  /continuation bridge, fixing two "false timeouts," a leaked continuation,
+  and an unsynchronized mutable property) is implemented on branch
+  `claude/resilience-roadmap-plan-fn23ki`; see "PR 18" below for what
+  shipped. Docs status corrections for PR 17 are bundled in this same PR,
+  per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -254,8 +263,11 @@ Last updated: 2026-09-01.
    `060276b`). **H7's plan is now fully addressed** except pinning
    whisper.cpp to an immutable revision, stated as a known gap in both PR 15
    and PR 16. **H8 is now in flight**: "PR 17" (observed-at/cooldown/
-   recheck memory pressure and a global actor-based weight scheduler) is
-   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki`.
+   recheck memory pressure and a global actor-based weight scheduler)
+   merged as [PR #174](https://github.com/carlosmazzei/Kurn/pull/174)
+   (commit `283d330`); "PR 18" (the `@unchecked Sendable`/`nonisolated
+   (unsafe)`/continuation-bridge audit) is implemented next, on branch
+   `claude/resilience-roadmap-plan-fn23ki`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -297,7 +309,7 @@ Last updated: 2026-09-01.
 | H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Done, merged (PR 14/15/16) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
-| H8    | In progress (PR 17 implemented) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (item 2 and item 3, PR 17, implemented). Remaining: items 1 and 4–8 (operation ownership/run IDs, `@unchecked Sendable`/bridge audit, timeout truthfulness, ActivityKit lifecycle, shared Watch protocol, F3 intent semantics) are PR 18–20's scope. |
+| H8    | In progress (PR 17 merged, PR 18 implemented) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). Remaining: items 1 and 6–8 (operation ownership/run IDs, ActivityKit lifecycle, shared Watch protocol, F3 intent semantics) are PR 19–20's scope. |
 | H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
 
@@ -1792,6 +1804,154 @@ Audit every `@unchecked Sendable`, `nonisolated(unsafe)`, continuation, and
 callback bridge. Add exactly-once assertions/stress tests. Use real engine abort
 hooks where available; otherwise report deferred cancellation instead of a false
 timeout.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**The audit itself.** Every `@unchecked Sendable` (20 sites) and
+`nonisolated(unsafe)` (12 sites) in `Kurn`/`KurnCore` non-test source, and
+every `withCheckedContinuation`/`withCheckedThrowingContinuation`/
+`withTaskCancellationHandler` bridge (11 sites), was read in full and
+classified: what mutable state it protects (if any) and what actually
+synchronizes access to it. Most were already correctly justified — a lock
+(`ProviderHTTPTransport`'s `BoundedHTTPDataDelegate`, `ModelFileDownloader`
+'s `Downloader`, `RecordingSink`, `NetworkPathObserver`, …), actor isolation
+the annotation merely routes around a spurious `Sendable` check for
+(`FluidAudioDiarizer.manager`), or a synchronously-invoked `@Sendable`
+closure that never actually crosses threads despite its type
+(`RecordingSink.ConverterInput`, `VADAudioCompactor`'s feed-once flag) — and
+those are left exactly as they were, per the plan's own "keep the justified
+lock/queue wrappers." Five things worth reporting came out of it: three
+real bugs, fixed here; one annotation that looked removable, checked, and
+turned out to be necessary for a different reason than its own comment
+gave; and one plan item that was already fixed before this PR started.
+
+- **Two "false timeouts," found and fixed.** `SherpaOnnxDiarizer` and
+  `FluidAudioVAD` each raced their real work against a sleeping child task
+  in a `withThrowingTaskGroup` and called the loser "timeout" — but the
+  real work in both cases is a call neither engine exposes any way to
+  interrupt (sherpa-onnx's C API has no progress/abort parameter;
+  FluidAudio's `VadManager` checks no cancellation anywhere in its per-chunk
+  loop and calls CoreML's synchronous `model.prediction(from:)` directly).
+  `group.cancelAll()` marks the loser cancelled without stopping it, and —
+  the part that makes this worse than merely misleading — a `TaskGroup`
+  cannot return until *every* child task finishes, cancelled or not. So the
+  "timeout" never actually bounded wall-clock time at all: the call still
+  blocked for the real operation's full duration, and only then discarded a
+  valid, just-slow result in favor of a fabricated timeout error. Both now
+  call the real work directly (`SherpaOnnxDiarizer` still off-actor, via
+  `Task.detached`, so the actor stays free for other callers; `FluidAudioVAD`
+  already ran inline on its own actor either way) and log a notice if it
+  exceeded the stated budget, instead of throwing an error and discarding
+  the result — identical real-world latency, but honest about what
+  happened, exactly item 5's "report deferred cancellation truthfully."
+  `WhisperTranscriber`'s cloud-upload timeout and `FluidAudioDiarizer`'s
+  diarization timeout were audited too and left alone: the former
+  genuinely cancels the underlying `URLSessionDataTask`
+  (`ProviderHTTPTransport.swift`'s `onCancel` handler calls `task?.cancel()`
+  ), and the latter's FluidAudio call chain calls `Task.checkCancellation()`
+  between chunk/prediction/batch boundaries (verified against the pinned
+  FluidAudio 0.15.6 source) — real, if only boundary-granular, not false.
+  `FoundationModelsProvider`'s timeout wraps a closed-source Apple
+  framework call and couldn't be verified either way; left alone and noted
+  below. `WhisperCppTranscriber` doesn't use this pattern at all — it has a
+  genuine engine abort hook (whisper.cpp's `abort_callback`, polled by
+  ggml's compute threads) already wired to Swift task cancellation, and is
+  the model item 5 asks other engines to match where possible.
+- **A continuation leak, found and fixed.** `RecorderViewModel
+  .prepareToRecord()`'s pending mic-choice `CheckedContinuation` was a
+  plain property with nothing stopping a second concurrent call from
+  silently overwriting it — leaking the first continuation, which nothing
+  would ever resume, hanging that earlier call forever. The store operation
+  is now `storeMicChoiceContinuation(_:)`: it resolves any already-pending
+  continuation to `nil` ("use the system default", the same outcome
+  `chooseMic(uid: nil)` produces) before storing the new one, so every
+  stored continuation is resumed exactly once.
+- **An unsynchronized mutable `var`, found and fixed.** `CloudSettingsSync
+  .didChangeExternally` was a plain settable property on an
+  `@unchecked Sendable` type, with its only protection a comment claiming
+  "set once, from the main actor, by `AppSettings.init`" — true in
+  practice, enforced by nothing. It's now guarded by the same `NSLock`
+  pattern every other mutable-state `@unchecked Sendable` in this codebase
+  already uses, making the claim executable instead of only documented.
+- **A `nonisolated(unsafe)` checked, and confirmed necessary for a
+  different reason than its own comment gave.**
+  `LockScreenRecordingController.activity`'s annotation looked
+  unnecessary at first read — the whole type is `@MainActor`, and every
+  access site is inside a `Task { }`/`Task { @MainActor in }` created from
+  a `@MainActor` method (inheriting that isolation, not `.detached`), so
+  access was never racing across real threads. Removing it was tried and
+  reverted: CI's first push failed with two Swift 6 "sending... risks
+  causing data races" errors, because `Activity<T>.update(_:)`/
+  `.end(_:dismissalPolicy:)` are `nonisolated` async methods in
+  ActivityKit's own API — passing a main-actor-isolated value into a
+  `nonisolated` call is exactly what Swift 6's region-based "sending"
+  check exists to catch, independent of whether the value is genuinely
+  shared across threads. The annotation is load-bearing after all, just
+  not for the reason its own comment stated; it's kept, with a comment
+  now explaining the real reason and citing that CI confirmed it.
+- **The "racing lazy property" item 4 names for the background uploader
+  session was already fixed before this PR** — `git log -p` on
+  `WhisperBackgroundUploader.swift` shows an earlier commit
+  (`797c578`) replaced the `lazy var session: URLSession` the plan
+  describes with the current `NSLock`-guarded `storedSession` check-and-set,
+  landing before H8 PR 17 branched. That fix had no test proving it holds
+  under real concurrent access, though — this PR adds one.
+
+**Tests.** `KurnTests/RecorderMicChoiceTests.swift` (new): drives
+`storeMicChoiceContinuation(_:)` directly rather than through
+`prepareToRecord()` (the real trigger,
+`AVAudioSession.availableInputs.count > 1`, isn't reproducible against the
+simulator's single built-in mic) — a second pending request resolves the
+first to `nil` instead of leaking it, and the ordinary single-request path
+still resolves normally. `KurnTests/WhisperBackgroundUploaderTests.swift`
+(new): 20 concurrent first-accesses of a dedicated (non-`.shared`)
+uploader's session all resolve to the same `URLSession` instance — the
+"new coverage, not a fix" test the pre-existing lock never had. Both use
+a `#if DEBUG`-only test accessor (`hasPendingMicChoiceContinuationForTesting`,
+`sessionForTesting`) rather than widening the real API. `RecorderMicChoiceTests`
+polls the pending-continuation flag with `Task.yield()` (bounded), never a
+fixed `Task.sleep`, matching `ResourceSchedulerTests`' established pattern
+so the suite can't be flaky under CI load.
+
+**Known gaps, stated plainly.**
+
+- **No Thread Sanitizer configuration exists anywhere in the project** —
+  the `Kurn.xcscheme`'s `TestAction` has no diagnostics flag set, so H8's
+  own "Verification" line ("Thread Sanitizer runs for first-party bridges")
+  remains entirely unimplemented, not merely incomplete. Not attempted here:
+  enabling TSan repo-wide risks materially slowing or destabilizing the
+  whole CI suite, and that tradeoff deserves its own decision rather than
+  a side effect of this PR.
+- **Three duplicated `nonisolated(unsafe) static var` handler globals**
+  (`AppLog.minimumLevel`, `KurnCore`'s `TranscriptQualityFilter.logHandler`,
+  `ReliabilityEvent.handler`) share one unreasoned-about pattern — a global
+  mutable static with no lock, explicitly modeled on each other rather than
+  independently justified. Left as-is: consolidating them into one shared
+  thread-safe wrapper is a real improvement but touches cross-cutting
+  logging/diagnostics infrastructure, out of scope for this pass.
+- **`SherpaOnnxOfflineSpeakerDiarizationWrapper`'s single-owner-at-a-time
+  contract is a comment, not an enforced invariant** — nothing in the type
+  itself prevents concurrent misuse if `SherpaOnnxDiarizer`'s own
+  actor-serialized usage pattern is ever violated by a future caller. Left
+  as-is; would need wrapping the type itself, a larger change.
+- **`AudioRecorderService`'s `onAudioBuffer` callback property is settable
+  from any isolation with no lock**, read from the real-time audio render
+  thread. Benign today because it's set once at wiring time before
+  recording starts, but unenforced. Left alone — this is deep in the
+  recording hot path and any change there needs device-level audio testing
+  this environment can't do, not just a CI-verified compile.
+- **`FoundationModelsProvider`'s timeout could not be verified either way**
+  — it wraps `FoundationModels.LanguageModelSession`, a closed-source Apple
+  framework call. At minimum it participates in structured concurrency
+  normally (so `group.cancelAll()` marks it cancelled), but whether Apple's
+  implementation checks cancellation internally and aborts promptly isn't
+  something this repo can confirm from source. Left as-is rather than
+  guessed at.
+- **Items 1 and 6–8 of H8's plan** (operation ownership/run IDs,
+  ActivityKit lifecycle, shared Watch protocol, F3 intent semantics)
+  **remain PR 19–20's scope, not touched here.**
 
 #### PR 19 — H8 ActivityKit authoritative lifecycle
 
