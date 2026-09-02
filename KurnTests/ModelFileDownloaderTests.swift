@@ -6,9 +6,19 @@
 //  as documented — exact-size verification against the server's declared
 //  `Content-Length`, opportunistic SHA-256 verification via `X-Linked-ETag`,
 //  atomic replacement of an existing file, and preservation of the previous
-//  file whenever verification or install fails — against `MockURLProtocol`
-//  rather than a real host. Serialized because `MockURLProtocol`'s scripted
-//  state is process-global (see its own header).
+//  file whenever verification or install fails.
+//
+//  Uses a dedicated `StubDownloadProtocol` rather than the shared
+//  `MockURLProtocol`: five other files already share that one's
+//  process-global stub queue and are each `.serialized` only *within* their
+//  own suite, which does not stop Swift Testing from running two different
+//  suites concurrently — a first version of this file used `MockURLProtocol`
+//  and, in CI, a request from this suite was captured and consumed by a
+//  `ProviderHTTPTests` assertion running at the same moment (and vice
+//  versa). A private protocol with its own storage, touched by nothing but
+//  this file, removes that cross-suite race instead of trying to serialize
+//  the whole test target. `@Suite(.serialized)` is kept because tests
+//  within *this* suite still share `StubDownloadProtocol`'s one static stub.
 //
 
 import CryptoKit
@@ -17,11 +27,63 @@ import KurnCore
 import Testing
 @testable import Kurn
 
+/// A single-stub `URLProtocol` double, private to this file. Supports both
+/// data and download tasks (the URL Loading System buffers a protocol's
+/// `didLoad` data and writes it to a temp file for a download task
+/// automatically), which is all `ModelFileDownloader` needs.
+private final class StubDownloadProtocol: URLProtocol {
+    struct Stub {
+        var status: Int = 200
+        var body: Data
+        var headers: [String: String] = [:]
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var stub: Stub?
+    nonisolated(unsafe) private static var requestCount = 0
+
+    static func enqueue(_ newStub: Stub?) {
+        lock.lock()
+        stub = newStub
+        requestCount = 0
+        lock.unlock()
+    }
+
+    static var capturedRequestCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestCount
+    }
+
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.lock.lock()
+        Self.requestCount += 1
+        let stub = Self.stub
+        Self.lock.unlock()
+
+        guard let stub, let url = request.url,
+              let response = HTTPURLResponse(
+                  url: url, statusCode: stub.status, httpVersion: "HTTP/1.1", headerFields: stub.headers
+              ) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unknown))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: stub.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @Suite(.serialized)
 struct ModelFileDownloaderTests {
 
     private func makeDownloader() -> ModelFileDownloader {
-        ModelFileDownloader(protocolClasses: [MockURLProtocol.self])
+        ModelFileDownloader(protocolClasses: [StubDownloadProtocol.self])
     }
 
     private func tempDestination() -> URL {
@@ -47,9 +109,7 @@ struct ModelFileDownloaderTests {
         defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
 
         let body = Data(repeating: 0x41, count: 1_000)
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: body, headers: ["Content-Length": "\(body.count)"])
-        ])
+        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
 
         try await downloader.fetch(
             url: URL(string: "https://example.com/model.bin")!,
@@ -71,9 +131,7 @@ struct ModelFileDownloaderTests {
 
         let body = Data(repeating: 0x41, count: 1_000)
         // Declare a length longer than the body actually delivered.
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: body, headers: ["Content-Length": "\(body.count + 500)"])
-        ])
+        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count + 500)"]))
 
         await #expect(throws: AppError.self) {
             try await downloader.fetch(
@@ -98,12 +156,10 @@ struct ModelFileDownloaderTests {
 
         let body = Data(repeating: 0x7A, count: 2_048)
         let hex = sha256Hex(of: body)
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: body, headers: [
-                "Content-Length": "\(body.count)",
-                "X-Linked-ETag": hex
-            ])
-        ])
+        StubDownloadProtocol.enqueue(.init(body: body, headers: [
+            "Content-Length": "\(body.count)",
+            "X-Linked-ETag": hex
+        ]))
 
         try await downloader.fetch(
             url: URL(string: "https://example.com/model.bin")!,
@@ -124,12 +180,10 @@ struct ModelFileDownloaderTests {
 
         let body = Data(repeating: 0x7A, count: 2_048)
         let wrongHex = String(repeating: "0", count: 64)
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: body, headers: [
-                "Content-Length": "\(body.count)",
-                "X-Linked-ETag": wrongHex
-            ])
-        ])
+        StubDownloadProtocol.enqueue(.init(body: body, headers: [
+            "Content-Length": "\(body.count)",
+            "X-Linked-ETag": wrongHex
+        ]))
 
         await #expect(throws: AppError.self) {
             try await downloader.fetch(
@@ -153,12 +207,10 @@ struct ModelFileDownloaderTests {
         let body = Data(repeating: 0x11, count: 512)
         // A short, quoted git-blob-style ETag: not 64 hex characters, so it
         // must be ignored rather than compared against as a checksum.
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: body, headers: [
-                "Content-Length": "\(body.count)",
-                "ETag": "\"abc123\""
-            ])
-        ])
+        StubDownloadProtocol.enqueue(.init(body: body, headers: [
+            "Content-Length": "\(body.count)",
+            "ETag": "\"abc123\""
+        ]))
 
         try await downloader.fetch(
             url: URL(string: "https://example.com/model.bin")!,
@@ -186,9 +238,7 @@ struct ModelFileDownloaderTests {
         try original.write(to: destination)
 
         let replacement = Data(repeating: 0x02, count: 1_500)
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: replacement, headers: ["Content-Length": "\(replacement.count)"])
-        ])
+        StubDownloadProtocol.enqueue(.init(body: replacement, headers: ["Content-Length": "\(replacement.count)"]))
 
         try await downloader.fetch(
             url: URL(string: "https://example.com/model.bin")!,
@@ -222,11 +272,11 @@ struct ModelFileDownloaderTests {
         try original.write(to: destination)
 
         let replacement = Data(repeating: 0x02, count: 1_500)
-        MockURLProtocol.enqueue([
-            // Declared length disagrees with the actual body, so verification
-            // must fail before install ever touches the destination.
-            .success(status: 200, body: replacement, headers: ["Content-Length": "\(replacement.count + 100)"])
-        ])
+        // Declared length disagrees with the actual body, so verification
+        // must fail before install ever touches the destination.
+        StubDownloadProtocol.enqueue(
+            .init(body: replacement, headers: ["Content-Length": "\(replacement.count + 100)"])
+        )
 
         await #expect(throws: AppError.self) {
             try await downloader.fetch(
@@ -255,7 +305,7 @@ struct ModelFileDownloaderTests {
         )
         try Data(repeating: 0x01, count: 1_000).write(to: destination)
 
-        MockURLProtocol.enqueue([]) // any request would fail with no stub to consume
+        StubDownloadProtocol.enqueue(nil) // any request would fail with no stub to answer it
 
         try await downloader.fetch(
             url: URL(string: "https://example.com/model.bin")!,
@@ -265,7 +315,7 @@ struct ModelFileDownloaderTests {
             logLabel: "test"
         ) { _ in }
 
-        #expect(MockURLProtocol.capturedRequests.isEmpty)
+        #expect(StubDownloadProtocol.capturedRequestCount == 0)
     }
 }
 
