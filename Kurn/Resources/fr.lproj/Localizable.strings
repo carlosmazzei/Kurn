@@ -572,6 +572,9 @@
 "settings.diagnostic_reports.empty" = "Aucun rapport de diagnostic pour l'instant";
 "settings.diagnostic_reports.crash" = "Plantage";
 "settings.diagnostic_reports.hang" = "Blocage";
+"settings.reliability_events.view" = "Afficher les événements de fiabilité";
+"settings.reliability_events.empty" = "Aucun événement de fiabilité pour l'instant";
+"settings.reliability_events_footer" = "Un enregistrement sans contenu du déroulement d'opérations comme la transcription — démarrage, succès, échec ou annulation — avec un code mais jamais une transcription, un titre ou un message du fournisseur. Rien n'est jamais envoyé automatiquement — les événements ne quittent l'appareil que si vous appuyez sur Partager.";
 "log_level.off" = "Désactivé";
 "log_level.error" = "Erreurs uniquement";
 "log_level.notice" = "Standard";

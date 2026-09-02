@@ -268,7 +268,14 @@ final class TranscriptionViewModel {
               !Self.globalActiveIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id
+        // H9 PR 22, item 5: one id correlates every `ReliabilityEvent` this
+        // attempt produces (started through its terminal outcome), the same
+        // "operation run" grouping `DocumentGenerationViewModel` already
+        // established for its own operation.
+        let runID = OperationID()
+        let startedAt = Date()
         AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public)")
+        ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "transcription", outcome: .started))
 
         cancelPostTranscriptionWork(for: recording.meeting?.id)
         transcribingIDs.insert(recordingID)
@@ -293,12 +300,19 @@ final class TranscriptionViewModel {
         if usesAppleSpeech {
             let authorized = await ensureSpeechAuthorization()
             guard authorized else {
-                AppLog.transcription.atError.error("VM: speech permission denied")
+                AppLog.transcription.atError.error("VM: speech permission denied id=\(recordingID, privacy: .public)")
                 recording.transcriptionStatus = .failed
                 persist()
-                error = .permissionDenied(
+                // H9 PR 22: recording-scoped like the two failure paths
+                // below (PR 21) — this is also a per-attempt failure tied
+                // to one recording, not a `persist()`-shaped generic one.
+                errorsByRecording[recordingID] = .permissionDenied(
                     NSLocalizedString("error.speech_permission", comment: "Speech permission")
                 )
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "transcription", outcome: .failed,
+                    elapsedSeconds: Date().timeIntervalSince(startedAt), code: AppError.permissionDenied("").logCode
+                ))
                 return
             }
         }
@@ -397,16 +411,28 @@ final class TranscriptionViewModel {
 
             try saveTranscript(output, for: recording)
             AppLog.transcription.atNotice.notice("VM: transcribe succeeded id=\(recordingID, privacy: .public) segments=\(output.segments.count, privacy: .public)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "transcription", outcome: .succeeded,
+                elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             appSettings?.recordTranscriptionEngineUsed(config.transcription)
             if let settings = appSettings {
                 startPostTranscriptionWork(for: recording, settings: settings)
             }
         } catch is CancellationError {
             await drainEvents()
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "transcription", outcome: .cancelled,
+                elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             finishCancelled(recording, id: recordingID)
         } catch let appError as AppError {
             await drainEvents()
             if Self.isResumableCancellation(appError) {
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "transcription", outcome: .cancelled,
+                    elapsedSeconds: Date().timeIntervalSince(startedAt)
+                ))
                 finishCancelled(recording, id: recordingID)
             } else {
                 // Failed — but the checkpoint is kept, so a manual retry
@@ -415,14 +441,30 @@ final class TranscriptionViewModel {
                 persist()
                 errorsByRecording[recordingID] = appError
                 let context = Self.logContext(for: appError)
-                AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public) context=\(context, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
+                // H9 PR 22, item 5: log the content-free `logCode`, never
+                // `errorDescription` — several `AppError` cases interpolate a
+                // raw underlying error's own `localizedDescription` into
+                // their safe user-facing text, which would otherwise reach
+                // this `.public` line unredacted. The detail stays available
+                // at `.private` for a developer with Console access and the
+                // private-data profile, never in the default log stream.
+                AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public) context=\(context, privacy: .public) code=\(appError.logCode, privacy: .public) detail=\(appError.privateContext ?? "", privacy: .private)")
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "transcription", outcome: .failed,
+                    elapsedSeconds: Date().timeIntervalSince(startedAt), code: appError.logCode
+                ))
             }
         } catch {
             await drainEvents()
             recording.transcriptionStatus = .failed
             persist()
-            errorsByRecording[recordingID] = .transcriptionFailed(error.localizedDescription)
-            AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            let wrapped = AppError.transcriptionFailed(error.localizedDescription)
+            errorsByRecording[recordingID] = wrapped
+            AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public) code=\(wrapped.logCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "transcription", outcome: .failed,
+                elapsedSeconds: Date().timeIntervalSince(startedAt), code: wrapped.logCode
+            ))
         }
     }
 

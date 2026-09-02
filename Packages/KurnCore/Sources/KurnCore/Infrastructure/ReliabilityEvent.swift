@@ -24,7 +24,7 @@ import Foundation
 
 /// A short, opaque identifier for one run of an operation, threaded through
 /// every event that run produces so they can be correlated in a log stream.
-public struct OperationID: Hashable, Sendable, CustomStringConvertible {
+public struct OperationID: Hashable, Sendable, Codable, CustomStringConvertible {
     public let value: String
 
     /// Generates a fresh id, matching the `String(UUID().uuidString.prefix(8))`
@@ -45,8 +45,8 @@ public struct OperationID: Hashable, Sendable, CustomStringConvertible {
 
 /// One point-in-time fact about an operation's progress: it started, it
 /// succeeded, it failed, it was cancelled, or it is being retried.
-public struct ReliabilityEvent: Sendable {
-    public enum Outcome: String, Sendable {
+public struct ReliabilityEvent: Sendable, Codable {
+    public enum Outcome: String, Sendable, Codable {
         case started
         case succeeded
         case failed
@@ -71,6 +71,11 @@ public struct ReliabilityEvent: Sendable {
     /// A content-free diagnostic code, typically `AppError.logCode` — never
     /// `localizedDescription` or any other raw, potentially private string.
     public let code: String?
+    /// When this event was recorded. `os_log` (via `logLine`) already
+    /// timestamps every line itself, so this exists for a persisted store
+    /// (H9 PR 22's `ReliabilityEventStore`), which has no other record of
+    /// when an event happened.
+    public let recordedAt: Date
 
     public init(
         operationID: OperationID,
@@ -79,7 +84,8 @@ public struct ReliabilityEvent: Sendable {
         outcome: Outcome,
         attempt: Int = 0,
         elapsedSeconds: TimeInterval? = nil,
-        code: String? = nil
+        code: String? = nil,
+        recordedAt: Date = Date()
     ) {
         self.operationID = operationID
         self.operation = operation
@@ -88,6 +94,7 @@ public struct ReliabilityEvent: Sendable {
         self.attempt = attempt
         self.elapsedSeconds = elapsedSeconds
         self.code = code
+        self.recordedAt = recordedAt
     }
 
     /// A single-line, content-free rendering safe to hand to `os_log` (or any

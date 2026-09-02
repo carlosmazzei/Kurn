@@ -572,6 +572,9 @@
 "settings.diagnostic_reports.empty" = "Nenhum relatório de diagnóstico ainda";
 "settings.diagnostic_reports.crash" = "Falha";
 "settings.diagnostic_reports.hang" = "Travamento";
+"settings.reliability_events.view" = "Ver Eventos de Confiabilidade";
+"settings.reliability_events.empty" = "Nenhum evento de confiabilidade ainda";
+"settings.reliability_events_footer" = "Um registro sem conteúdo de como operações como a transcrição ocorreram — início, sucesso, falha ou cancelamento — com um código, mas nunca uma transcrição, título ou mensagem do provedor. Nada é enviado automaticamente — os eventos só saem do dispositivo se você tocar em Compartilhar.";
 "log_level.off" = "Desligado";
 "log_level.error" = "Apenas erros";
 "log_level.notice" = "Padrão";

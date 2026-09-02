@@ -62,11 +62,20 @@ struct DiagnosticsSettingsView: View {
                         systemImage: "exclamationmark.triangle"
                     )
                 }
+                NavigationLink {
+                    ReliabilityEventsListView()
+                } label: {
+                    Label(
+                        NSLocalizedString("settings.reliability_events.view", comment: "View reliability events"),
+                        systemImage: "checklist"
+                    )
+                }
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels"))
                     Text(NSLocalizedString("settings.export_logs_footer", comment: "Explains log export"))
                     Text(NSLocalizedString("settings.diagnostic_reports_footer", comment: "Explains diagnostic reports"))
+                    Text(NSLocalizedString("settings.reliability_events_footer", comment: "Explains reliability events"))
                 }
             }
         }

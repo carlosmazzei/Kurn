@@ -572,6 +572,9 @@
 "settings.diagnostic_reports.empty" = "暂无诊断报告";
 "settings.diagnostic_reports.crash" = "崩溃";
 "settings.diagnostic_reports.hang" = "卡死";
+"settings.reliability_events.view" = "查看可靠性事件";
+"settings.reliability_events.empty" = "暂无可靠性事件";
+"settings.reliability_events_footer" = "关于转录等操作进展情况的无内容记录——开始、成功、失败或取消——只包含代码，绝不包含转录内容、标题或提供方消息。不会自动发送到任何地方——只有当你点击「分享」时，事件才会离开设备。";
 "log_level.off" = "关闭";
 "log_level.error" = "仅错误";
 "log_level.notice" = "标准";
