@@ -103,6 +103,20 @@ enum ModelStore {
         /// work together, so those stay a single row.
         var listsFoldersSeparately: Bool { self == .whisperCpp }
 
+        /// Whether this group's own downloader already runs a post-install
+        /// health probe and records its own `ModelVerification` entry
+        /// (`WhisperCppModelDownloader`, `SherpaOnnxModelDownloader` — H7
+        /// PR 16). The four FluidAudio-backed groups have no downloader of
+        /// their own; `ModelDownloadController` records their verification
+        /// once `ModelDownloadConsent.download` returns, since loading the
+        /// model is already an unavoidable part of that call succeeding.
+        var isSelfVerifying: Bool {
+            switch self {
+            case .whisperCpp, .sherpaOnnxDiarization: return true
+            case .liveTranscription, .onDeviceLanguage, .diarization, .vad: return false
+            }
+        }
+
         /// Name for one folder when the group lists its folders separately.
         func displayName(forFolder folder: String) -> String {
             guard let model = WhisperCppModel.allCases.first(where: { $0.folderName == folder }) else {
@@ -118,6 +132,10 @@ enum ModelStore {
         let displayName: String
         let folderNames: [String]
         let size: Int64
+        /// H7 PR 16: whether a health probe has proven this model loads, as
+        /// of the last check. `.unverified` for every "other" (unclaimed)
+        /// folder — those have no group, so no probe or record applies.
+        var verificationState: ModelVerificationState = .unverified
 
         var isOther: Bool { group == nil }
     }
@@ -176,7 +194,9 @@ enum ModelStore {
 
     /// Delete a group's model folders. Missing folders are ignored.
     static func delete(_ group: ModelGroup) {
-        delete(folders: folders(for: group), in: group.root)
+        let targetFolders = folders(for: group)
+        delete(folders: targetFolders, in: group.root)
+        clearVerification(for: group, folders: targetFolders)
         var registry = folderRegistry()
         registry[group.rawValue] = nil
         setFolderRegistry(registry)
@@ -187,9 +207,23 @@ enum ModelStore {
         // unclaimed folders in FluidAudio's cache.
         delete(folders: model.folderNames, in: model.group?.root ?? modelsDirectory)
         if let group = model.group {
+            clearVerification(for: group, folders: model.folderNames)
             var registry = folderRegistry()
             registry[group.rawValue] = nil
             setFolderRegistry(registry)
+        }
+    }
+
+    /// Drop any `ModelVerification` record(s) for a group's folders, so a
+    /// later re-download starts from `.unverified` instead of comparing
+    /// fresh bytes against a record describing files that no longer exist.
+    private static func clearVerification(for group: ModelGroup, folders: [String]) {
+        guard group.listsFoldersSeparately else {
+            ModelVerification.clear(id: ModelVerification.recordID(for: group))
+            return
+        }
+        for folder in folders {
+            ModelVerification.clear(id: ModelVerification.recordID(for: group, folder: folder))
         }
     }
 
@@ -205,27 +239,34 @@ enum ModelStore {
             let groupFolders = folders(for: group).filter { present.contains($0) }
             guard !groupFolders.isEmpty else { continue }
             if group.root == modelsDirectory { claimed.formUnion(groupFolders) }
+            reapplyBackupExclusionIfNeeded(for: group, folders: groupFolders)
             guard group.listsFoldersSeparately else {
+                let id = ModelVerification.recordID(for: group)
+                let size = sizeOnDisk(group)
                 models.append(
                     InstalledModel(
-                        id: group.rawValue,
+                        id: id,
                         group: group,
                         displayName: group.displayName,
                         folderNames: groupFolders.sorted(),
-                        size: sizeOnDisk(group)
+                        size: size,
+                        verificationState: ModelVerification.state(id: id, currentSize: size)
                     )
                 )
                 continue
             }
             // One row per folder, each independently deletable.
             for folder in groupFolders.sorted() {
+                let id = ModelVerification.recordID(for: group, folder: folder)
+                let size = directorySize(group.root.appendingPathComponent(folder, isDirectory: true))
                 models.append(
                     InstalledModel(
-                        id: "\(group.rawValue).\(folder)",
+                        id: id,
                         group: group,
                         displayName: group.displayName(forFolder: folder),
                         folderNames: [folder],
-                        size: directorySize(group.root.appendingPathComponent(folder, isDirectory: true))
+                        size: size,
+                        verificationState: ModelVerification.state(id: id, currentSize: size)
                     )
                 )
             }
@@ -265,6 +306,28 @@ enum ModelStore {
         let fm = FileManager.default
         for folder in folders {
             try? fm.removeItem(at: root.appendingPathComponent(folder, isDirectory: true))
+        }
+    }
+
+    /// H7 PR 16, item 6's "verify `isExcludedFromBackup` ... during storage
+    /// inventory": `ModelFileDownloader.install` already sets this at
+    /// install time for whisper.cpp/sherpa-onnx, but a storage-inventory
+    /// pass is the place to catch it having been unset some other way
+    /// (iOS itself clearing the flag on a restore, a future code path that
+    /// forgets to) and quietly repair it, the same "verify and fix" shape
+    /// `ModelStoreProtection.applyAndVerify` already uses for the app's
+    /// SwiftData store. FluidAudio's own cache directory is deliberately
+    /// untouched here — this app's code never writes there, so there is
+    /// nothing to verify or fix; see PR 16's stated known gap.
+    private static func reapplyBackupExclusionIfNeeded(for group: ModelGroup, folders: [String]) {
+        guard group == .whisperCpp || group == .sherpaOnnxDiarization else { return }
+        for folder in folders {
+            var url = group.root.appendingPathComponent(folder, isDirectory: true)
+            let excluded = (try? url.resourceValues(forKeys: [.isExcludedFromBackupKey]))?.isExcludedFromBackup
+            guard excluded != true else { continue }
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try? url.setResourceValues(values)
         }
     }
 

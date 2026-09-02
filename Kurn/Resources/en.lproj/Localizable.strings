@@ -663,6 +663,7 @@
 "settings.models.delete" = "Delete Model";
 "settings.models.delete_confirm" = "Delete this model?";
 "settings.models.delete_message" = "It will be removed from this device. You can download it again later by re-enabling the feature.";
+"settings.models.corrupt" = "Failed verification — remove and re-download.";
 
 /* Recordings security */
 "settings.require_auth_for_recordings" = "Require Authentication";

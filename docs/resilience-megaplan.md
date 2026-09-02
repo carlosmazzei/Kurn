@@ -180,13 +180,22 @@ Last updated: 2026-09-01.
   `de8b551`, plus a follow-up CI fix `ae5d63f` serializing
   `KeychainManagerTests` against a real-Keychain race the first push
   exposed). See "PR 14" below for the full contract.
-- H7 PR 15 (an injectable `ModelDownloading` seam unifying the whisper.cpp
-  and sherpa-onnx downloaders, exact-size plus opportunistic-SHA-256
+- **[PR #172](https://github.com/carlosmazzei/Kurn/pull/172), H7 PR 15
+  (an injectable `ModelDownloading` seam unifying the whisper.cpp and
+  sherpa-onnx downloaders, exact-size plus opportunistic-SHA-256
   verification, atomic install with backup/rollback, resume data, and
-  cancellation) is implemented on branch
-  `claude/resilience-roadmap-plan-fn23ki`; see "PR 15" below for what
-  shipped and its stated known gap. Docs status corrections for PR 14 are
-  bundled in this same PR, per the same standing request.
+  cancellation), merged into `main`** (commit `d66c10f`, squash-merged from
+  three pushes — the second and third were CI fixes: importing `KurnCore`
+  for `AppError` in the new test file, then isolating that test file's
+  network double from `MockURLProtocol`'s process-global state, which a
+  first push had raced against `ProviderHTTPTests` and friends). See
+  "PR 15" below for the full contract and its stated known gap.
+- H7 PR 16 (a third persisted fact — verified installation — distinct from
+  consent and from bytes-on-disk; post-install health probes for
+  whisper.cpp and sherpa-onnx; and a storage-inventory pass) is implemented
+  on branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 16" below for
+  what shipped. Docs status corrections for PR 15 are bundled in this same
+  PR, per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -229,8 +238,12 @@ Last updated: 2026-09-01.
    outcomes, the accessibility-migration fix, and explicit-Save for
    provider credentials) merged as
    [PR #171](https://github.com/carlosmazzei/Kurn/pull/171) (commit
-   `de8b551`); "PR 15" (verified model staging, resume, and replacement) is
-   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki`.
+   `de8b551`); "PR 15" (verified model staging, resume, and replacement)
+   merged as [PR #172](https://github.com/carlosmazzei/Kurn/pull/172)
+   (commit `d66c10f`). "PR 16" (model inventory and health probes) is
+   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki` —
+   **H7's plan is now fully addressed** except pinning whisper.cpp to an
+   immutable revision, stated as a known gap in both PR 15 and PR 16.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -271,7 +284,7 @@ Last updated: 2026-09-01.
 | H4    | Done, PR 8/9/10 merged | `TranscriptionPipelineFingerprint`/`PipelineDigest` give checkpoint matching a full source-digest + preprocessing/VAD + exact provider/model + compaction-map + chunk-plan identity, and `TranscriptionCheckpoint.isStructurallyValid` validates span/bounds sanity before a resume or the recovery sweep trusts one (PR 8, merged). `ChunkedTranscriptionRunner`'s chunk-completion callback is `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past an undurable chunk; `Recording.automaticResumeAttempts` bounds unattended resume attempts per recording, reset by any manual retry (PR 9, merged). `SummaryMapCheckpoint`/`SummaryMapRunner` extend the same gated-durable-progress contract to the map stage of staged summary and wiki generation, sharing one `Meeting.summaryMapCheckpointData` field since both artifacts condense byte-identical map notes for the same meeting content (PR 10, merged). Still open: the full explicit operation-state enum with reason codes/`nextAttemptAt` (item 3, deliberately deferred), and durable map-stage resumability for `DocumentGenerationService`, which spans multiple meetings and has no single `Meeting` to checkpoint against (deliberately excluded from PR 10, not planned elsewhere). |
 | H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
-| H7    | In progress (PR 14 merged, PR 15 implemented) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, implemented). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment PR 15 was authored in — see PR 15's stated known gap), plus storage-inventory verification and a post-install health probe (PR 16).           |
+| H7    | In progress (PR 14/15 merged, PR 16 implemented) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, implemented). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
 | H8    | Partial                | Resource cooldown/scheduler, cancellation truth, Activity races, shared Watch protocol, deduplication, and durable acknowledgements. |
 | H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
@@ -1356,9 +1369,18 @@ revision, exact size, SHA-256/manifest, protected staging, retry, cancellation,
 resume data, network policy, validation, and atomic replacement. Preserve the
 previous valid model on every failure.
 
-Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
-the verification of record, per "Verifying without a local macOS/Xcode
-toolchain" in `CLAUDE.md`.
+Status: merged into `main` as
+[PR #172](https://github.com/carlosmazzei/Kurn/pull/172) (commit `d66c10f`).
+CI was green after two rounds of fixes pushed to the same PR, both caught by
+CI rather than locally, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`: the first push omitted `import KurnCore` in the
+new test file (`AppError` lives there, not in the `Kurn` target); the second
+push's test suite shared `MockURLProtocol`'s process-global stub queue with
+five pre-existing suites that only serialize against themselves, and CI
+caught the resulting cross-suite race (a request from this suite's tests
+was captured and consumed by a `ProviderHTTPTests` assertion running at the
+same moment, and vice versa) — fixed by giving the new suite its own
+private `URLProtocol` double instead.
 
 **What shipped.** `WhisperCppModelDownloader` and `SherpaOnnxModelDownloader`
 used to call a bare enum of static functions (`ModelFileDownloader.fetch`)
@@ -1502,6 +1524,136 @@ library exposes session/path-change control.
 Separate consent, download state, verified installation, and runtime usability.
 Verify digest/version/protection/backup exclusion and run a small post-install
 health probe. Offer redownload for corruption.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**What shipped.** Before this PR, an installed model had exactly two facts:
+consent (an `AppSettings` flag) and "installed" (`ModelStore.isInstalled`, a
+byte-count check PR 15 already made exact at transfer time). Neither proves
+the file is *usable* — a bit flip after install, or a corruption PR 15's
+checks don't cover, would read as "installed" forever and only surface the
+first time a real transcription or diarization run tried to load it.
+
+- **`ModelVerification`** (new, `Kurn/Services/ModelVerification.swift`)
+  persists a third fact per model id: `.unverified` (no record — the honest
+  state of every model installed before this PR, not a failure),
+  `.verified(Date)` (a health probe proved it loads, and its size hasn't
+  changed since), or `.corrupt(reason:)` (a probe failed, or the on-disk
+  size has drifted since the last successful verification). Drift is a
+  cheap size comparison, not a routine re-hash — re-reading gigabytes of
+  model weights on every Settings→Storage visit would be its own cost, and
+  nothing in this app ever grows or shrinks an installed model file in
+  place, so any size difference already means the bytes changed by some
+  means other than this app's own verified install path.
+- **Two real health probes, both cheap.** whisper.cpp's `WhisperContext.init`
+  and sherpa-onnx's `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?` were
+  already failable — `nil`/a thrown error on a corrupt file — but neither
+  downloader called them until the first real transcription/diarization run
+  did. `WhisperCppTranscriber.verifyModelLoads(at:)` and
+  `SherpaOnnxDiarizer.verifyModelsLoad()` (new static functions, `#if
+  canImport(whisper)` / `#if SHERPA_ONNX_ENABLED` with a no-op `#else` stub
+  each, matching the existing split in both files) now call exactly those
+  same already-failable initializers once, right after
+  `WhisperCppModelDownloader.download`/`SherpaOnnxModelDownloader.download`
+  install the bytes, and discard the result — proving the file loads
+  without keeping a model in memory. Both are blocking C calls (loading a
+  GGML file / two ONNX graphs), so both run inside `Task.detached` rather
+  than on whatever actor's `download` call happened to reach them. A probe
+  failure deletes the just-installed file(s) and rethrows as
+  `AppError.modelDownloadFailed`, the same "leave nothing installed on
+  failure" shape PR 15 already established for a bad transfer — this simply
+  extends "verified" to include "loads correctly," not just "bytes match
+  what the server declared."
+- **The four FluidAudio-backed sets get the same fact for free.** Their
+  models have no downloader of this app's own — `ModelDownloadConsent
+  .download`'s FluidAudio branch calls straight into the package's own
+  `AsrModels.downloadAndLoad`/`OfflineDiarizerModels.load`/`VadManager.init`/
+  `loadModels`, which *download and fully load* the model (CoreML/ANE
+  compilation included) as one inseparable operation — a successful return
+  already **is** a passed health probe, previously just discarded rather
+  than recorded. `ModelDownloadController`'s shared `download(...)` now
+  calls `ModelVerification.record(...)` right after
+  `ModelStore.recordDownload` succeeds, for exactly the groups that don't
+  already record their own (`ModelGroup.isSelfVerifying` — true only for
+  `.whisperCpp`/`.sherpaOnnxDiarization`, which record a precise per-variant
+  id from inside their own downloaders and would otherwise be shadowed by a
+  coarser group-level record here).
+- **Storage inventory** (item 6): `ModelStore.installedModels()` now looks up
+  `ModelVerification.state(id:currentSize:)` for every row it builds — using
+  the exact same id scheme (`ModelVerification.recordID(for:folder:)`) the
+  UI's `InstalledModel.id` already used, so a record always lines up with
+  the row it describes — and quietly re-applies `isExcludedFromBackup` on
+  whisper.cpp/sherpa-onnx folders if it's ever found unset, the same
+  "verify and fix" shape `ModelStoreProtection.applyAndVerify` already uses
+  for the app's SwiftData store. `ModelStore.delete(_:)` clears the
+  corresponding record(s) so a later re-download starts from `.unverified`
+  rather than comparing fresh bytes against a description of files that no
+  longer exist.
+- **Settings → Storage** (`StorageSettingsView.modelsSection`) renders the
+  new fact: a small green checkmark next to a verified model's name, and a
+  red warning line ("Failed verification — remove and re-download," new key
+  `settings.models.corrupt` in all seven locales) under a corrupt one.
+  "Offer redownload for corruption" is the existing delete button, not a
+  new bespoke flow: `ModelDownloadController.deleteModel` already reverts
+  the affected engine/consent flag when the deleted group is active, so
+  removing a corrupt model naturally leaves the feature in its no-download
+  fallback state, ready to be re-enabled (which re-triggers the consent +
+  download + probe flow) exactly like a deliberate manual delete already
+  does today. `.unverified` renders with no badge at all — deliberately: it
+  is the state of every model installed before this PR, and a new warning
+  icon on every existing user's already-working setup would be alarming for
+  no reason.
+
+**Tests.** `KurnTests/ModelVerificationTests.swift` (new) drives
+`ModelVerification`'s pure state logic against a randomly-suffixed
+`UserDefaults` suite per test (never `.standard`): no record reads as
+`.unverified`; a matching size reads as `.verified` with the recorded date;
+a size mismatch reads as `.corrupt`; `clear` reverts to `.unverified` and is
+scoped to one id, leaving a sibling's record untouched; `recordID` folds in
+the folder only for `.whisperCpp` (the one group that lists folders
+separately) and ignores a folder argument for every other group; and
+`ModelGroup.isSelfVerifying` is pinned to exactly the two groups with their
+own downloader.
+
+**Known gaps, stated plainly.**
+
+- **Retroactive verification is out of scope.** A model installed before
+  this PR, or one whose engine is already consented and selected (so the
+  picker never re-enters the consent/download flow), stays `.unverified`
+  until it happens to be deleted and re-downloaded. Probing it automatically
+  at launch was considered and rejected: for the three FluidAudio-backed
+  groups that would mean unconditional CoreML/ANE compilation on every
+  launch, which is exactly the expensive, foreground-gated-only cost
+  `KurnApp.prewarmFluidAudioModel` already exists to avoid paying
+  unconditionally. A manual "Verify now" action per row would close this
+  without that cost, but was judged separate scope from what H7's plan
+  actually asks for ("Done when" only requires the fact to exist and be
+  reported, not that every legacy install retroactively acquire it) and is
+  not planned elsewhere in this document.
+- **Digest verification is whisper.cpp/sherpa-onnx only, and is size-based
+  drift detection, not a routine re-hash.** `ModelVerification.Record`
+  stores the size at the moment a probe last succeeded, not a SHA-256 — a
+  full re-digest on every Settings→Storage appearance would mean rereading
+  gigabytes of model weights on every visit. The four FluidAudio-backed
+  groups get no digest at all, not even at record time: their models are
+  multi-file CoreML packages this app never downloads directly, so there is
+  no single hash to compute against, and the load-time probe already proves
+  usability more directly than a digest would.
+- **`isExcludedFromBackup` reconciliation only covers this app's own model
+  roots** (whisper.cpp, sherpa-onnx). FluidAudio's cache directory
+  (`Application Support/FluidAudio/Models`) is written entirely by the
+  FluidAudio package, never by this app's code — there is nothing here to
+  verify or fix, and no seam to fix it through. Unchanged from the gap PR
+  15 already stated: "FluidAudio remains a capability-limited adapter with
+  preflight only until its library exposes session/path-change control."
+- **Pinning whisper.cpp's mutable `resolve/main` source to an immutable
+  revision (item 4's other half) remains open**, for the same reason PR 15
+  stated it: no network path to `huggingface.co` in the environment either
+  PR was authored in to obtain a real commit SHA to pin, and a wrong or
+  stale hardcoded one would fail every future download outright. This is
+  the one piece of H7's plan neither PR 15 nor PR 16 closes.
 
 ### Phase D — Ownership, resources, and integrations
 

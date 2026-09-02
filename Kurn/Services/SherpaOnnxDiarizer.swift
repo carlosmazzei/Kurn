@@ -45,6 +45,26 @@ actor SherpaOnnxDiarizer: Diarizing {
     private var currentSpeakerCount = 0
     private var modelsReady = false
 
+    /// Proves the two downloaded model files actually load, without keeping
+    /// the pipeline around — used by `SherpaOnnxModelDownloader` right after
+    /// install (H7 PR 16). Unlike `diarize(url:)`, this throws: a fresh
+    /// install that fails to load is a download failure, not something to
+    /// silently degrade into a one-speaker fallback the first time real
+    /// diarization runs. Constructing the wrapper is a blocking C call (CPU
+    /// ONNX Runtime, loading two graphs), so this runs detached.
+    static func verifyModelsLoad() async throws {
+        try await Task.detached(priority: .utility) {
+            guard SherpaOnnxOfflineSpeakerDiarizationWrapper(
+                segmentationModelPath: SherpaOnnxModelDownloader.segmentationModelURL.path,
+                embeddingModelPath: SherpaOnnxModelDownloader.embeddingModelURL.path,
+                numSpeakers: 1,
+                numThreads: 1
+            ) != nil else {
+                throw AppError.modelDownloadFailed("sherpa-onnx models failed to load — the downloaded files may be corrupt")
+            }
+        }.value
+    }
+
     func diarize(url: URL) async -> [SpeakerTurn] {
         await diarize(url: url, speakerCount: 0)
     }
@@ -147,6 +167,12 @@ actor SherpaOnnxDiarizer: Diarizing {
 /// back to a single speaker turn so `TranscriptionService` keeps working
 /// exactly as if this engine were never selected.
 actor SherpaOnnxDiarizer: Diarizing {
+    /// Nothing to verify without the bridging header/compilation condition
+    /// (as in `KurnTests`) — a no-op rather than a throw, since
+    /// `SherpaOnnxModelDownloader.download` must still succeed in this
+    /// configuration (it only fetches bytes over HTTP).
+    static func verifyModelsLoad() async throws {}
+
     func diarize(url: URL) async -> [SpeakerTurn] {
         await diarize(url: url, speakerCount: 0)
     }
