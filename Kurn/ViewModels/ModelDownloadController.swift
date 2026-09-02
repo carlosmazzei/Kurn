@@ -313,6 +313,19 @@ final class ModelDownloadController {
                     }
                 )
                 ModelStore.recordDownload(for: group, before: before)
+                // H7 PR 16: whisper.cpp/sherpa-onnx already probed and
+                // recorded their own verification inside `downloader.fetch`'s
+                // caller (`WhisperCppModelDownloader`/`SherpaOnnxModelDownloader`)
+                // — a coarser group-level record here would just be a stray,
+                // unread entry for those. For the four FluidAudio-backed
+                // sets, `ModelDownloadConsent.download` just above already
+                // loaded the model as an unavoidable part of succeeding
+                // (CoreML compilation is how those sets download), so a
+                // successful return here already *is* a passed health
+                // probe — recording it is all that's left to do.
+                if !group.isSelfVerifying {
+                    ModelVerification.record(id: ModelVerification.recordID(for: group), size: ModelStore.sizeOnDisk(group))
+                }
                 onSuccess()
             } catch is CancellationError {
                 // Silent — the user asked for this. `ModelFileDownloader`

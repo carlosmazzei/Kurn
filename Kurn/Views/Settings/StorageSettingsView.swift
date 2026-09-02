@@ -268,7 +268,27 @@ struct StorageSettingsView: View {
             } else {
                 ForEach(downloads.installedModels) { model in
                     HStack {
-                        Text(model.displayName)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Text(model.displayName)
+                                if case .verified = model.verificationState {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                            if case .corrupt = model.verificationState {
+                                Label {
+                                    Text(NSLocalizedString("settings.models.corrupt", comment: "Model failed verification"))
+                                } icon: {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .accessibilityHidden(true)
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                            }
+                        }
                         Spacer()
                         Text(AudioFileStore.formattedSize(model.size))
                             .foregroundStyle(Theme.textSecondary)

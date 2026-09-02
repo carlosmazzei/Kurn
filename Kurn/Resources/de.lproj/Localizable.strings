@@ -663,6 +663,7 @@
 "settings.models.delete" = "Modell löschen";
 "settings.models.delete_confirm" = "Dieses Modell löschen?";
 "settings.models.delete_message" = "Es wird von diesem Gerät entfernt. Sie können es später erneut herunterladen, indem Sie die Funktion wieder aktivieren.";
+"settings.models.corrupt" = "Überprüfung fehlgeschlagen — entfernen und erneut herunterladen.";
 
 /* Sicherheit der Aufnahmen */
 "settings.require_auth_for_recordings" = "Authentifizierung erforderlich";

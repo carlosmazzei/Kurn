@@ -663,6 +663,7 @@
 "settings.models.delete" = "Excluir Modelo";
 "settings.models.delete_confirm" = "Excluir este modelo?";
 "settings.models.delete_message" = "Ele será removido deste dispositivo. Você pode baixá-lo novamente depois, reativando o recurso.";
+"settings.models.corrupt" = "Falha na verificação — remova e baixe novamente.";
 
 /* Segurança das gravações */
 "settings.require_auth_for_recordings" = "Exigir autenticação";

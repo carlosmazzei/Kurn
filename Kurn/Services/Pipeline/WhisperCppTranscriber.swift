@@ -129,6 +129,18 @@ actor WhisperCppTranscriber: Transcribing {
         return result
     }
 
+    /// Proves a downloaded weight file actually loads, without keeping the
+    /// context around — used by `WhisperCppModelDownloader` right after
+    /// install (H7 PR 16) so a corrupt/truncated file is caught immediately
+    /// instead of waiting for the first real transcription to fail.
+    /// `WhisperContext.init` is a blocking C call, so this runs detached
+    /// rather than on whatever actor happened to call it.
+    static func verifyModelLoads(at path: URL) async throws {
+        try await Task.detached(priority: .utility) {
+            _ = try WhisperContext(modelPath: path.path)
+        }.value
+    }
+
     private func loadedContext(for model: WhisperCppModel) throws -> WhisperContext {
         if let context, loadedModel == model { return context }
         // Dropping the old context frees its weights before the new ones are
@@ -441,6 +453,12 @@ private final class CallbackBox: @unchecked Sendable {
 /// on-device Whisper engine is unavailable and says so rather than failing
 /// somewhere deeper in the pipeline.
 actor WhisperCppTranscriber: Transcribing {
+    /// Nothing to verify without the package linked (as in `KurnTests`) — a
+    /// no-op rather than a throw, since `WhisperCppModelDownloader.download`
+    /// must still succeed in this configuration (it only fetches bytes, and
+    /// never links `whisper` itself).
+    static func verifyModelLoads(at path: URL) async throws {}
+
     func transcribe(
         url: URL,
         language: MeetingLanguage,

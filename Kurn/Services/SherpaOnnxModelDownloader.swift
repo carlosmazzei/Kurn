@@ -120,6 +120,25 @@ enum SherpaOnnxModelDownloader {
             onProgress(ModelDownloadStatus(fractionCompleted: 0.5 + fraction * 0.5, phase: .downloading))
         }
         onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
+
+        // H7 PR 16: same reasoning as `WhisperCppModelDownloader.download`
+        // — PR 15's `fetch` proved both transfers matched their declared
+        // size, but a byte-correct file can still fail to load. Both files
+        // are probed together since the pipeline needs both simultaneously
+        // anyway.
+        do {
+            try await SherpaOnnxDiarizer.verifyModelsLoad()
+        } catch {
+            try? FileManager.default.removeItem(at: segmentationModelURL)
+            try? FileManager.default.removeItem(at: embeddingModelURL)
+            AppLog.transcription.atError.error("sherpaOnnxDownload: failed post-install verification")
+            throw AppError.modelDownloadFailed("downloaded models failed to load — the files may be corrupt")
+        }
+        ModelVerification.record(
+            id: ModelVerification.recordID(for: .sherpaOnnxDiarization),
+            size: ModelFileDownloader.installedSize(of: segmentationModelURL)
+                + ModelFileDownloader.installedSize(of: embeddingModelURL)
+        )
         AppLog.transcription.atNotice.notice("sherpaOnnxDownload: both models installed")
     }
 }

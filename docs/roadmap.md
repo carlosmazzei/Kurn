@@ -729,7 +729,7 @@ satisfy part of a planned contract.
 | **H4**             | **Done, merged (PR [#165](https://github.com/carlosmazzei/Kurn/pull/165), [#166](https://github.com/carlosmazzei/Kurn/pull/166), [#167](https://github.com/carlosmazzei/Kurn/pull/167))** | `TranscriptionPipelineFingerprint` and `TranscriptionCheckpoint.isStructurallyValid` (PR 8, items 1–2 of the plan) replace the old engine/language/compaction/provider-only match with source size/duration/content-digest, effective preprocessing/VAD, exact ASR provider+model, a compaction-map digest, and a separately-checked exact chunk-plan digest. PR 9 (items 1, 2, 4) makes `ChunkedTranscriptionRunner`'s chunk-completion callback `async throws` and awaited before the next chunk starts, so a checkpoint-save failure stops the run instead of continuing past a chunk that was never made durable, and bounds automatic (unattended) resume attempts per recording (`Recording.automaticResumeAttempts`, reset by any manual retry) so a systemic failure can't retry forever — or, for a cloud engine, keep re-paying — every time the app launches or foregrounds. See the "Progress" note under H4 for what shipped in each PR and the one deliberate PR 8 compatibility break. PR 10 (item 6) extends the same gated-durable-progress contract to the map stage of staged summary and wiki generation (`SummaryMapCheckpoint`/`SummaryMapRunner`, one shared `Meeting.summaryMapCheckpointData`); `DocumentGenerationService` is deliberately excluded, since a document can span several meetings and has no single `Meeting` to checkpoint against. Only item 3 (the full explicit operation-state enum with reason codes/`nextAttemptAt`) remains, deliberately deferred.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | **H5**             | **Done (PR 11 merged in [#168](https://github.com/carlosmazzei/Kurn/pull/168); PR 12 merged in [#169](https://github.com/carlosmazzei/Kurn/pull/169); PR 13 implemented)** | Typed stage outcomes and a pipeline report persisted in `Transcript.pipelineReportData` are implemented for every stage (plan items 1–2 and the durable half of item 3, PR 11, merged). `TranscriptIntegrityGate` rejects a structurally broken fused/corrected result or an identity-violating correction before it can replace an existing transcript (items 4–5, PR 12, merged); summary and semantic-index replacement already kept the previous artifact until the new one was ready and needed no change. `MeetingDetailView` now surfaces a completed-with-warnings banner from the stored report, and correction — the one stage cheap enough to retry in isolation — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13).                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **H6**             | **Core implemented**   | Provider URLs fail closed and all new cloud traffic uses one origin-locked, deadline-bounded, 16 MB-capped foreground policy with exact budgeted `Retry-After`. Each logical request owns one UUID reused across attempts; official OpenAI chat requests also send it as the documented correlation header, never as an undocumented idempotency claim. Ambiguous POST timeouts/connection loss stop without automatic replay and surface a typed duplicate-charge warning. Background upload has no creation API or response-buffering state; its synchronized adapter only drains old system tasks. A durable per-provider circuit gates automatic title/wiki/backfill work. Large transfers default to unrestricted Wi-Fi: app-owned audio uploads/model sessions carry native expensive/constrained flags, while FluidAudio downloads fail preflight on a disallowed path. Cloud consent is pinned to provider plus URL and discloses hostname and estimated hourly audio size; model dialogs disclose source and approximate size. Non-blocking follow-ups are dedicated waiting UI under H9, FluidAudio’s unobservable mid-transfer path changes, and measured streaming evaluation. |
-| **H7**             | **In progress (PR 14 merged in [#171](https://github.com/carlosmazzei/Kurn/pull/171); PR 15 implemented)** | Typed `KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason` replace the old API that collapsed every Security-framework failure into "not configured"; the accessibility migration now only completes after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed write surfaced rather than silently assumed (PR 14). The whisper.cpp and sherpa-onnx downloaders now share one injectable `ModelDownloading` actor that verifies a completed download's exact byte count against the server's declared `Content-Length` and, when volunteered, its SHA-256; installs atomically with backup-and-restore on any post-install mismatch; keeps resume data across an interrupted transfer; and exposes a Cancel action wired into every download progress row (PR 15). Remaining: whisper.cpp still resolves against a mutable HuggingFace branch rather than a pinned revision (no network path to obtain a real commit SHA in the environment PR 15 was authored in), resume data does not survive a relaunch, and storage-inventory verification plus a post-install health probe (PR 16) are untouched.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **H7**             | **In progress (PR 14/15 merged in [#171](https://github.com/carlosmazzei/Kurn/pull/171)/[#172](https://github.com/carlosmazzei/Kurn/pull/172); PR 16 implemented)** | Typed `KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason` replace the old API that collapsed every Security-framework failure into "not configured"; the accessibility migration now only completes after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed write surfaced rather than silently assumed (PR 14). The whisper.cpp and sherpa-onnx downloaders now share one injectable `ModelDownloading` actor that verifies a completed download's exact byte count against the server's declared `Content-Length` and, when volunteered, its SHA-256; installs atomically with backup-and-restore on any post-install mismatch; keeps resume data across an interrupted transfer; and exposes a Cancel action wired into every download progress row (PR 15). `ModelVerification` now persists whether a model has actually been proven to load — a third fact next to consent and bytes-on-disk — via a real post-install health probe for whisper.cpp/sherpa-onnx and, for the four FluidAudio-backed sets, by recording the load their own download already performs; a storage-inventory pass flags on-disk size drift as corruption and repairs `isExcludedFromBackup`; Settings → Storage shows the result per row (PR 16). Remaining: whisper.cpp still resolves against a mutable HuggingFace branch rather than a pinned revision (no network path to obtain a real commit SHA in either PR's authoring environment), resume data does not survive a relaunch, and a model installed before PR 16 stays unverified until its next re-download.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **H8**             | **Partial, pre-track** | Several long jobs have app-level owners and run IDs, but memory pressure is sticky until relaunch and the scheduler, cancellation truth, Activity race handling, shared Watch protocol, deduplication, timeout, and durable acknowledgements remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **H9**             | **Started**            | `AppError.logCode` and the content-free `ReliabilityEvent` vocabulary are present. Action metadata, per-operation queues/reports, bounded encrypted event storage, health UI, redaction preview, and recovery accessibility coverage remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **H10**            | **Started**            | Clock, filesystem, store-factory, reliability-event, and audio-sink fakes prove initial seams. The full transition fault matrix, split CI signals, retained failure artifacts, sanitizers/repetition, static policy checks, and device checklist remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -761,7 +761,7 @@ feature requests:
 | **H4**  | A checkpoint fingerprints source content, preprocessing/VAD, exact ASR provider/model, the compaction map, and the exact chunk plan (PR 8); a checkpoint save is now awaited and gates the next chunk, and automatic resume attempts are bounded per recording (PR 9); the map stage of staged summary/wiki generation checkpoints the same way (PR 10); it still doesn't use the plan's full explicit operation-state enum (reason codes, `nextAttemptAt`) | Bounded automatic recovery and a throwing durable commit are both in place; a richer operation-state model remains open if a concrete need for it shows up | **P0 → closed except item 3** |
 | **H5**  | `TranscriptIntegrityGate` rejects a structurally broken fused/corrected result or a correction that violated its identity contract before it can replace an existing transcript (H5 PR 12); VAD/LID/diarization degradation is recorded in `PipelineReport` rather than silently returning a normal-looking fallback (H5 PR 11); the report is now surfaced in the Transcript tab with a stage-specific retry for correction (H5 PR 13)                                                                                                                | Resolved for the paths above; H5's plan is fully addressed                                                    | **Done** |
 | **H6**  | App-owned large transfers enforce user-selected expensive/constrained flags; FluidAudio is preflight-gated because its internal session is not configurable                                                                         | A network becoming expensive after a FluidAudio download starts cannot yet be cancelled through the library                 | **P1**                |
-| **H7**  | `KeychainAccessing` now classifies absent vs locked/denied/transient instead of collapsing every failure to "not configured", and the accessibility migration only completes after a confirmed outcome (H7 PR 14); app-managed downloads now verify an exact declared size plus an opportunistic SHA-256 and install atomically with backup-and-restore on any failure (H7 PR 15), but whisper.cpp is not yet pinned to an immutable revision                                                                                                    | Resolved for the Keychain paths above; a model can no longer be silently truncated or destroy the previous valid copy on a failed replace, but whisper.cpp still trusts a mutable branch pointer and PR 16's storage-inventory verification/health probe remain              | **P1 → mostly closed** |
+| **H7**  | `KeychainAccessing` now classifies absent vs locked/denied/transient instead of collapsing every failure to "not configured", and the accessibility migration only completes after a confirmed outcome (H7 PR 14); app-managed downloads now verify an exact declared size plus an opportunistic SHA-256 and install atomically with backup-and-restore on any failure (H7 PR 15); a model that installs cleanly is no longer assumed usable — a post-install health probe (or, for FluidAudio, its own unavoidable load-at-download-time) has to succeed first, and a storage-inventory pass catches later drift (H7 PR 16) — but whisper.cpp is not yet pinned to an immutable revision                                                                                                    | Resolved for the Keychain paths above; a model can no longer be silently truncated, destroy the previous valid copy on a failed replace, or sit corrupted-but-marked-installed until a real transcription fails; whisper.cpp still trusts a mutable branch pointer, and models installed before PR 16 stay unverified until their next re-download              | **P1 → mostly closed** |
 | **H8**  | One memory warning latches resource failure until relaunch; some task and ActivityKit/Watch continuations lack robust lifetime/timeout contracts                                                                                    | Work can stay disabled, outlive its UI, hang, race start/end, or acknowledge a command before durable completion            | **P1**                |
 | **H9**  | Most screens hold one optional error and the shared dialog has only “OK”; many logs publish raw `localizedDescription`                                                                                                              | Concurrent failures overwrite each other, recovery is opaque, and diagnostic exports can carry more detail than intended    | **P1**                |
 | **H10** | Clean-path CI does not inject store, filesystem, lock, process-death, route, redirect, or response-loss failures                                                                                                                    | The contracts above can regress while every ordinary test stays green                                                       | **P0, cross-cutting** |
@@ -1931,7 +1931,7 @@ request identity and network-cost flags; dedicated suites cover cooldown persist
 consent destination changes, background relaunch handlers and model preflight. Real-
 device path transitions and the FluidAudio mid-transfer boundary remain checklist work.
 
-### H7 · Credential and model integrity — P1, items 1–2, 3, 5, 7 done; item 4 half-closed
+### H7 · Credential and model integrity — P1, items 1–2, 3, 5–7 done; item 4 half-closed
 
 **Plan.**
 
@@ -2005,8 +2005,9 @@ Items 3–7 (model download consolidation, pinned/verified revisions, atomic
 staging, storage-inventory verification, owned download tasks) are PR
 15/16's scope.
 
-**Progress — items 3, 5, 7 (the PR 15 boundary) and half of item 4,
-implemented on branch `claude/resilience-roadmap-plan-fn23ki`.**
+**Progress — items 3, 5, 7 (the PR 15 boundary) and half of item 4, merged
+as [PR #172](https://github.com/carlosmazzei/Kurn/pull/172) (commit
+`d66c10f`).**
 `ModelDownloading` (`Kurn/Services/ModelFileDownloader.swift`, new protocol)
 replaces the bare enum of static functions `WhisperCppModelDownloader` and
 `SherpaOnnxModelDownloader` used to call directly — `ModelFileDownloader` is
@@ -2030,22 +2031,64 @@ in, re-hashes the *installed* copy when a hash was checked, and restores
 the kept backup rather than deleting it on a mismatch — a failure at any
 point now always leaves the previous valid model exactly as it was.
 "Loading a small health probe" and "corruption offers re-download instead
-of failing every transcription" remain PR 16's scope. Item 4 ("pin
-immutable model revisions and verify a published exact size plus SHA-256")
-is **half-closed**: exact-size verification against the server's declared
-length, and opportunistic SHA-256 verification via HuggingFace's
-`X-Linked-ETag` header when the origin volunteers one, now run on every
-install — but no commit SHA is hardcoded for whisper.cpp
+of failing every transcription" — deferred here, and closed by PR 16 below.
+Item 4 ("pin immutable model revisions and verify a published exact size
+plus SHA-256") is **half-closed**: exact-size verification against the
+server's declared length, and opportunistic SHA-256 verification via
+HuggingFace's `X-Linked-ETag` header when the origin volunteers one, now
+run on every install — but no commit SHA is hardcoded for whisper.cpp
 (`WhisperCppModel.downloadURL` still resolves against a mutable
 `resolve/main`), because this PR was authored in an environment with no
 network path to `huggingface.co` to obtain a real one to pin, and a wrong
 or stale hardcoded value would fail every future download outright.
 sherpa-onnx's two models were already pinned to an exact commit SHA and an
 exact release tag before this PR — pre-existing, not new work here. See
-the megaplan's "PR 15" section for the full contract, the
-`MockURLProtocol`-backed test coverage, and the rest of the known gaps
+the megaplan's "PR 15" section for the full contract, the test coverage
+(a private `StubDownloadProtocol` rather than the shared `MockURLProtocol`
+— see PR 15's "Status" note for why), and the rest of the known gaps
 (resume data does not survive a relaunch; no automatic retry-with-backoff;
 no cancellation-timing test).
+
+**Progress — item 6 and the rest of item 5 (the PR 16 boundary),
+implemented on branch `claude/resilience-roadmap-plan-fn23ki`.**
+`ModelVerification` (`Kurn/Services/ModelVerification.swift`, new) is the
+third fact item 6 asks for: `.unverified` / `.verified(Date)` /
+`.corrupt(reason:)` per model id, persisted separately from consent and
+from `ModelStore.isInstalled`'s byte-count check. Item 5's remaining half
+("loading a small health probe") landed for whisper.cpp and sherpa-onnx:
+`WhisperContext.init` and `SherpaOnnxOfflineSpeakerDiarizationWrapper
+.init?` were already failable on a corrupt file but nothing called them
+until a real transcription/diarization run did — `WhisperCppTranscriber
+.verifyModelLoads(at:)` and `SherpaOnnxDiarizer.verifyModelsLoad()` now
+call exactly those same initializers once, right after each downloader
+installs its bytes, off-actor (`Task.detached`, since both are blocking C
+calls), deleting the file and failing the download outright if the probe
+fails. The four FluidAudio-backed sets get the same fact without a new
+probe: `ModelDownloadConsent.download`'s FluidAudio branch already fully
+loads each model (CoreML/ANE compilation included) as an inseparable part
+of downloading it, so `ModelDownloadController` now just records that
+success via `ModelVerification.record(...)` instead of discarding it.
+Item 6's "verify ... during storage inventory" is `ModelStore
+.installedModels()`, which now attaches each row's verification state
+(size drift against the last recorded verification reads as corrupt) and
+quietly re-applies `isExcludedFromBackup` on whisper.cpp/sherpa-onnx
+folders if it's ever found unset — the "verify and fix" shape
+`ModelStoreProtection.applyAndVerify` already uses for the SwiftData store.
+"Offer redownload for corruption" reuses the existing delete flow rather
+than a new one: `ModelDownloadController.deleteModel` already reverts the
+affected engine/consent when the deleted group is active, so removing a
+corrupt model leaves the feature ready to re-enable, which re-triggers
+consent + download + probe. Settings → Storage shows a checkmark for a
+verified model and a warning line for a corrupt one; `.unverified` (every
+model installed before this PR) renders with no badge, deliberately, so
+existing working installs don't suddenly look suspect. See the megaplan's
+"PR 16" section for the full contract, `KurnTests/ModelVerificationTests
+.swift`'s coverage, and the known gaps (retroactive verification of
+pre-existing installs is out of scope; digest checking stays
+whisper.cpp/sherpa-onnx-only and is size-based drift detection, not a
+routine re-hash; `isExcludedFromBackup` reconciliation can't reach
+FluidAudio's own cache directory; whisper.cpp's revision pinning is still
+open).
 
 ### H8 · Operation ownership, resource recovery, and external controls — P1
 
@@ -2312,7 +2355,7 @@ migrates.
    retry for correction (PR 13) merged in
    [PR #170](https://github.com/carlosmazzei/Kurn/pull/170), closing H5's
    plan.
-9. **In flight: H7 (P1), items 1–2 merged, items 3/5/7 implemented.**
+9. **In flight: H7 (P1), items 1–2/3/5/7 merged, item 6 implemented.**
    Typed Keychain outcomes (`docs/resilience-megaplan.md`'s PR 14 boundary)
    replace the old API that collapsed every Security-framework failure into
    "not configured": a `KeychainAccessing` seam, a fixed accessibility
@@ -2324,10 +2367,17 @@ migrates.
    injectable `ModelDownloading` actor: exact-size plus opportunistic-SHA-256
    verification, atomic install with backup-and-restore on failure, resume
    data across an interrupted transfer, and a wired-up Cancel action —
-   implemented on branch `claude/resilience-roadmap-plan-fn23ki`. Pinning
-   whisper.cpp to an immutable revision (no network path to HuggingFace to
-   obtain a real one in this environment), plus storage-inventory
-   verification and a health probe (PR 16), remain.
+   merged in [PR #172](https://github.com/carlosmazzei/Kurn/pull/172). The
+   PR 16 boundary adds `ModelVerification`, a third persisted fact —
+   "proven to load," distinct from consent and from bytes-on-disk — backed
+   by a real post-install health probe for whisper.cpp/sherpa-onnx and, for
+   the four FluidAudio-backed sets, by recording the load their own
+   download already performs; a storage-inventory pass flags on-disk size
+   drift as corruption and repairs `isExcludedFromBackup` — implemented on
+   branch `claude/resilience-roadmap-plan-fn23ki`. Pinning whisper.cpp to
+   an immutable revision (no network path to HuggingFace to obtain a real
+   one in either PR's environment) is the one piece of H7's plan still
+   open.
 10. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
     route, lock/background and low-storage matrix without delaying the next code P0.
 11. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience
