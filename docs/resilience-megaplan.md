@@ -223,16 +223,28 @@ Last updated: 2026-09-01.
   Activity nothing would ever end if it happened to run after a
   same-instant `end()`'s task), merged into `main`** (commit `5dd71c8`).
   CI green on the first push. See "PR 19" below for the full contract.
-- H8 PR 20 (a single shared `WatchCommand`/`WatchSessionKey` source compiled
-  into both the `Kurn` and `KurnWatch` targets; command IDs, dedup, a
-  timeout, and a three-phase `WatchAckPhase` reply for Watch commands;
-  reconnect reconciliation so a stale "recording" context can't outlive the
-  process that set it; the same "accepted, not actual outcome" semantics
-  applied to `StartRecordingIntent`; and one real fix each for items 1 and 8
-  found along the way) is implemented on branch
-  `claude/resilience-roadmap-plan-fn23ki`; see "PR 20" below for what
-  shipped. Docs status corrections for PR 19 are bundled in this same PR,
-  per the same standing request.
+- **[PR #177](https://github.com/carlosmazzei/Kurn/pull/177), H8 PR 20
+  (a single shared `WatchCommand`/`WatchSessionKey` source compiled into
+  both the `Kurn` and `KurnWatch` targets; command IDs, dedup, a timeout,
+  and a three-phase `WatchAckPhase` reply for Watch commands; reconnect
+  reconciliation so a stale "recording" context can't outlive the process
+  that set it; the same "accepted, not actual outcome" semantics applied to
+  `StartRecordingIntent`; and one real fix each for items 1 and 8 found
+  along the way), merged into `main`** (commit `7d15192`, plus one
+  follow-up CI fix — `45d96d0`, for a Swift 6 `deinit` isolation error on
+  `MeetingChatViewModel.task`, the same "`nonisolated(unsafe)`, confirmed
+  by CI" shape PR 18 established for
+  `LockScreenRecordingController.activity`). CI green after that fix. See
+  "PR 20" below for the full contract. **H8's plan is now fully
+  addressed.**
+- H9 PR 21 (presentation metadata on `AppError` — category, severity,
+  retryability, a recovery-action ID, private diagnostic context — plus a
+  per-recording error queue for `TranscriptionViewModel`, the one shared
+  app-wide instance whose single `error` property could previously let one
+  recording's transcription failure clobber or misattribute another's) is
+  implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see "PR 21"
+  below for what shipped. Docs status corrections for H8 PR 20 are bundled
+  in this same PR, per the same standing request.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -293,8 +305,12 @@ Last updated: 2026-09-01.
    `5dd71c8`); "PR 20" (shared Watch protocol, command IDs/dedup/timeout/
    three-phase acknowledgements, reconnect reconciliation, and the same
    "accepted, not actual outcome" semantics applied to
-   `StartRecordingIntent`) is implemented next, on branch
-   `claude/resilience-roadmap-plan-fn23ki`.
+   `StartRecordingIntent`) merged as
+   [PR #177](https://github.com/carlosmazzei/Kurn/pull/177) (commit
+   `7d15192`). **H8's plan is now fully addressed.** **H9 is now in
+   flight**: "PR 21" (`AppError` presentation metadata and a per-recording
+   error queue for `TranscriptionViewModel`) is implemented next, on
+   branch `claude/resilience-roadmap-plan-fn23ki`.
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -336,8 +352,8 @@ Last updated: 2026-09-01.
 | H5    | Done, merged (PR #168, #169, #170) | `PipelineReport`/`PipelineStageReport` (KurnCore) give every stage a requested/effective engine and a `succeeded`/`degraded`/`skipped`/`failed` outcome with a closed-vocabulary reason, and the aggregate is persisted in `Transcript.pipelineReportData` in the same save as the segments (PR 11, merged). `TranscriptIntegrityGate` (KurnCore) rejects a structurally broken fused/corrected result — empty output from non-empty input, out-of-bounds/out-of-order spans, blank text or speaker attribution — before `TranscriptionService.transcribe` ever returns it, and verifies a `TranscriptCorrecting` conformer preserved segment identity before trusting its output; either failure throws instead of reaching `TranscriptionViewModel.saveTranscript`, so an existing transcript is never replaced by bad data (PR 12, merged). `MeetingDetailView`'s Transcript tab shows a "completed with warnings" banner driven by the stored `PipelineReport`, and correction — the one stage cheap enough to retry without repeating audio/ASR/diarization — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13, merged). |
 | H6    | Core implemented       | H9 waiting UX, FluidAudio path-change limitation, and deferred streaming measurement.                                                |
 | H7    | Done, merged (PR 14/15/16) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
-| H8    | In progress (PR 17/18/19 merged, PR 20 implemented) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). `LockScreenRecordingController` now closes the ActivityKit start/end race: a `runID` generation counter, bumped by both `start()` and `end()`, is checked synchronously by the queued start task immediately before the one non-cancellable call (`Activity.request`, which is `throws` but not `async`) that creates a Live Activity nothing would otherwise be tracking to end (item 6, PR 19). `WatchCommand`/`WatchSessionKey` now compile from one file shared into both the `Kurn` and `KurnWatch` targets instead of two independently-typed copies; Watch commands carry a `commandID` the phone deduplicates against (a redelivered duplicate replays its cached outcome instead of re-running the action), a bounded local timeout on the Watch side, and a three-phase `WatchAckPhase` reply (`received`/`stateChanged`/`finalized`) since every command handler in this app already runs synchronously to completion — `stop`'s file finalization included — before its caller learns the outcome; the phone also reconciles a stale application-context recording state on every `WCSession` (re)activation, since a live session never survives process termination (item 7, PR 20). `StartRecordingIntent` gets the same "accepted, not actual capture" semantics: it now awaits `RecordingLauncher`'s acceptance reply (bounded by a timeout) instead of claiming success the instant it posted the request, closing a cold-launch race where an unconfigured `RecordingLauncher` silently swallowed the request (item 8, PR 20). Item 1 (general operation ownership/run IDs) was audited against its own named examples: `MeetingsListView`'s semantic-search debounce already cancels correctly via SwiftUI's `.task(id:)`; `MeetingChatViewModel`'s reply `Task` did not cancel when its owning view was dismissed, now fixed with a `deinit` (PR 20). H8's plan is now fully addressed. |
-| H9    | Started                | Action metadata, per-operation error queues, bounded encrypted events, redacted export, health UI, and accessibility.                |
+| H8    | Done, plan fully addressed (PR 17/18/19/20 merged) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). `LockScreenRecordingController` now closes the ActivityKit start/end race: a `runID` generation counter, bumped by both `start()` and `end()`, is checked synchronously by the queued start task immediately before the one non-cancellable call (`Activity.request`, which is `throws` but not `async`) that creates a Live Activity nothing would otherwise be tracking to end (item 6, PR 19). `WatchCommand`/`WatchSessionKey` now compile from one file shared into both the `Kurn` and `KurnWatch` targets instead of two independently-typed copies; Watch commands carry a `commandID` the phone deduplicates against (a redelivered duplicate replays its cached outcome instead of re-running the action), a bounded local timeout on the Watch side, and a three-phase `WatchAckPhase` reply (`received`/`stateChanged`/`finalized`) since every command handler in this app already runs synchronously to completion — `stop`'s file finalization included — before its caller learns the outcome; the phone also reconciles a stale application-context recording state on every `WCSession` (re)activation, since a live session never survives process termination (item 7, PR 20). `StartRecordingIntent` gets the same "accepted, not actual capture" semantics: it now awaits `RecordingLauncher`'s acceptance reply (bounded by a timeout) instead of claiming success the instant it posted the request, closing a cold-launch race where an unconfigured `RecordingLauncher` silently swallowed the request (item 8, PR 20). Item 1 (general operation ownership/run IDs) was audited against its own named examples: `MeetingsListView`'s semantic-search debounce already cancels correctly via SwiftUI's `.task(id:)`; `MeetingChatViewModel`'s reply `Task` did not cancel when its owning view was dismissed, now fixed with a `deinit` (PR 20). H8's plan is now fully addressed. |
+| H9    | In progress (PR 21 implemented) | `AppErrorCategory`/`AppErrorSeverity`/`AppErrorRecoveryAction` and a `privateContext` field extend `AppError` with the presentation metadata item 1 asks for (`Packages/KurnCore/.../AppErrorMetadata.swift`). `TranscriptionViewModel.errorsByRecording` fixes the one concrete "concurrent operations clobber a shared error" case found: the view model is a single app-wide shared instance, so two recordings' transcription failures used to be able to overwrite or misattribute each other through one `error` property; `MeetingDetailView`'s alert now binds to the per-recording accessor instead. Cancellation-is-silent was audited across the app's four biggest cancellable flows and found already correct everywhere. Remaining: item 2 (contextual recovery-action UI), item 4 (optimistic-UI rollback), `persist()`'s own error surface (still shared, not recording-scoped), and items 5–8 (bounded encrypted events, redacted export, health/recovery center, accessibility) are PR 22–23's scope. |
 | H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
 
 ## Completed H1 boundary
@@ -2061,9 +2077,11 @@ deduplication, ordered reconciliation, and acknowledgements for received,
 state-changed, and durably-finalized. Intents report accepted, not actual capture,
 until the recorder confirms it.
 
-Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
-the verification of record, per "Verifying without a local macOS/Xcode
-toolchain" in `CLAUDE.md`.
+Status: merged into `main` as
+[PR #177](https://github.com/carlosmazzei/Kurn/pull/177) (commit `7d15192`,
+plus one follow-up CI fix — `45d96d0`, restoring `nonisolated(unsafe)`-shaped
+access for `MeetingChatViewModel.task` from a nonisolated `deinit`). CI green
+after that fix.
 
 **One shared protocol source (item 7's "compile one protocol source into
 both targets").** `WatchCommand` and `WatchSessionKey` used to be typed
@@ -2214,6 +2232,118 @@ Extend presentation metadata around `AppError` with category, severity,
 retryability, safe explanation, private context, and recovery action IDs. Queue
 blocking errors per operation and retain warnings in operation reports.
 Cancellation is silent.
+
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`.
+
+**The metadata (item 1).** `Packages/KurnCore/Sources/KurnCore/Infrastructure/AppErrorMetadata.swift`
+(new, kept out of `AppError.swift` itself to keep that file to its own
+concerns as this grows) adds four per-case properties: `category`
+(`AppErrorCategory`, 11 cases — network/provider/transcription/audio/
+storage/permission/authentication/resource/model/generation/integrity),
+`severity` (`AppErrorSeverity.blocking`/`.warning`), `isRetryable`, and
+`recoveryAction` (`AppErrorRecoveryAction?` — a stable identifier for the
+single most relevant next step, not a UI: wiring these into actual
+contextual buttons is item 2, a later PR). A fifth property,
+`privateContext: String?`, surfaces the raw associated-value detail a
+handful of cases already carried (typically another error's own
+`localizedDescription`) as its own field, distinct from the safe,
+localized `errorDescription` — not wired into any export or redaction path
+yet, since that's item 6 (PR 22); this only names the field so that PR has
+something to read. `category`'s switch has no `default`, so a future
+`AppError` case added without a matching `category` arm fails to compile;
+the other three intentionally do have a `default`, since they're judgment
+calls a missing-case compile error can't validate — `AppErrorMetadataTests`
+covers those instead. One correction made along the way:
+`.authenticationFailed` (from `RecordingAccessGate`'s Face ID/Touch ID/
+passcode gate) reads as a provider-authentication case by name alone, but
+is unrelated to `AIProvider`; categorized as `.authentication`, not
+`.provider`.
+
+**The per-operation queue (item 3), scoped to the one concrete case
+found.** `TranscriptionViewModel` is a single app-wide shared instance
+(`KurnApp.swift`, injected via `.environment`, read by every
+`MeetingDetailView` through `@Environment(TranscriptionViewModel.self)`) —
+confirmed by reading every `TranscriptionViewModel(...)` call site in the
+app (exactly two: `KurnApp`'s shared instance and
+`TranscriptionScheduler`'s own separate one for the background resume
+pass; a stale comment on `globalActiveIDs` claiming "`MeetingDetailView`
+creates a view model per screen" was wrong and is corrected in the same
+commit). Its `var error: AppError?` was one shared property regardless of
+which recording's transcription set it, so a background transcription
+failure for Recording B could pop up as an alert on the screen for
+unrelated Recording A, or Recording A's own unrelated `modelContext.save()`
+failure (e.g. renaming the meeting) could silently overwrite/hide
+Recording B's real transcription failure before the user ever saw it. Now
+split: `errorsByRecording: [UUID: AppError]`, keyed exactly like the
+existing `diarizationWarnings: [UUID: String]` right next to it (same
+problem, already solved once for a non-`AppError` warning type — this
+generalizes that shape to blocking errors rather than inventing a new
+one), with `transcriptionError(for:)`/`clearTranscriptionError(for:)`
+accessors. `MeetingDetailView`'s `.errorAlert` now binds to a
+`transcriptionErrorBinding` that surfaces the *first* of this meeting's own
+`queriedRecordings` with a queued error and clears only that recording's
+slot on dismiss — a second recording's still-queued failure (rare, but the
+plan's "queue" wording allows for it) surfaces on the next evaluation
+rather than being silently dropped alongside the first. `persist()` and
+the AI-title-generation path deliberately keep using the original `error`
+property: `persist()` commits whatever SwiftData has pending across the
+whole context in one call, not one recording's own changes, so it has no
+natural single recording to key against, and retrofitting it (13 call
+sites across 5 files, several of them meeting-scoped rather than
+recording-scoped) was judged a separate, riskier change not required to
+fix the concrete bug this PR targets — stated as a known gap below rather
+than attempted partially.
+
+**Cancellation is silent (part of item 1) — audited, already correct.**
+Checked the app's four biggest cancellable async flows:
+`TranscriptionViewModel.transcribe`, `...+Summary.generateSummary`,
+`DocumentGenerationViewModel`'s generation, and
+`MeetingChatViewModel.send`. All four already catch `CancellationError`
+(and, for summary generation, its `AppError.networkError` cancellation
+shape) ahead of any catch-all that would otherwise set a visible `error`,
+so a user-initiated cancel never surfaces as an alert. No fix needed; this
+is recorded so a future PR doesn't re-derive it from scratch.
+
+**Tests.** `Packages/KurnCore/Tests/KurnCoreTests/AppErrorMetadataTests.swift`
+(new): the `.authenticationFailed` categorization fix, representative
+severity/retryability/recoveryAction spot-checks per category (not
+exhaustive over all 32 cases — `category`'s own missing-case compile error
+already guarantees full coverage there), and `privateContext` pass-through
+for cases that carry it vs. `nil` for those that don't.
+`KurnTests/TranscriptionViewModelErrorAttributionTests.swift` (new): two
+different recordings' failures set via a `#if DEBUG`-only
+`setTranscriptionErrorForTesting(_:for:)` (matching the established
+test-only-accessor pattern rather than widening the real API) don't
+clobber each other, clearing one leaves the other intact, and a recording
+with no failure reports none. Doesn't drive `transcribe()` itself — no
+harness in this test target mocks the full pipeline (real engines) needed
+to reach its catch blocks, so the isolation is tested directly on the
+dictionary rather than end-to-end.
+
+**Known gaps, stated plainly.**
+
+- **`persist()` and the AI-title-generation path are not recording-scoped**
+  — see "The per-operation queue" above. The single concrete symptom this
+  PR targets (two *transcriptions* clobbering each other) is fixed;
+  a `persist()` failure racing a transcription failure on a different
+  recording is not, and remains the shared `error` property's behavior,
+  unchanged from before this PR.
+- **Item 2 (contextual recovery actions — Retry, Free Space, Open
+  Settings, ...) is not built.** `recoveryAction` exists as data; no UI
+  reads it yet. Every error dialog still shows the same "OK" it did
+  before.
+- **Item 4 (rolling back optimistic UI mutations after a persistence
+  failure) is not attempted.**
+- **H5 PR 13's "revisit when H9's action-metadata model lands" note**
+  (`MeetingDetailView`'s completed-with-warnings banner, which explicitly
+  deferred integrating with H9) is not revisited here — that's UI wiring
+  work belonging with item 2, not this PR's data-model boundary.
+- **Items 5–8** (structured reliability events beyond what
+  `ReliabilityEvent`/`ReliabilityLog` already provide, the bounded
+  encrypted event buffer, redacted export, the health/recovery center,
+  and accessibility coverage of recovery UI) **remain PR 22–23's scope.**
 
 #### PR 22 — H9 bounded encrypted events and redacted export
 

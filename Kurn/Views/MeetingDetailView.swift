@@ -56,6 +56,27 @@ struct MeetingDetailView: View {
     @State var player = AudioPlayerService()
     /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
     var txVM: TranscriptionViewModel? { sharedTxVM }
+    /// The first transcription failure among this meeting's own recordings
+    /// (H9 PR 21) — `txVM` is one app-wide shared instance, so this screen
+    /// must only ever surface an error that actually belongs to a recording
+    /// it's showing, never a different meeting's background transcription
+    /// failure. Dismissing clears just that recording's slot: if another of
+    /// this meeting's recordings also has a queued failure, the next `get`
+    /// picks it up automatically.
+    private var transcriptionErrorBinding: Binding<AppError?> {
+        Binding(
+            get: {
+                guard let txVM else { return nil }
+                return queriedRecordings.lazy.compactMap { txVM.transcriptionError(for: $0) }.first
+            },
+            set: { newValue in
+                guard newValue == nil, let txVM else { return }
+                if let recording = queriedRecordings.first(where: { txVM.transcriptionError(for: $0) != nil }) {
+                    txVM.clearTranscriptionError(for: recording)
+                }
+            }
+        )
+    }
     @State private var tab: Tab = .recordings
 
     @State private var showingRecorder = false
@@ -135,7 +156,7 @@ struct MeetingDetailView: View {
                 runSummary(with: template)
             }
         }
-        .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
+        .errorAlert(transcriptionErrorBinding)
         .errorAlert($autoTagError)
         .sheet(item: $autoTagSuggestion) { suggestion in
             AutoTagConfirmView(

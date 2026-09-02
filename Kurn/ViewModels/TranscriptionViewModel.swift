@@ -45,7 +45,21 @@ final class TranscriptionViewModel {
     /// Staged-summary progress as (stage, total) when a long transcript is
     /// being summarized in parts; nil for single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
+    /// Failures not tied to any one recording — a generic `persist()` save
+    /// (which commits whatever is pending across the whole context, not one
+    /// recording's own changes) or AI title generation for a meeting.
     var error: AppError?
+    /// Transcription failures, keyed by recording (H9 PR 21) — split out of
+    /// the single `error` above because `TranscriptionViewModel` is one
+    /// app-wide shared instance (`KurnApp`, injected via `.environment`, read
+    /// by every `MeetingDetailView` through `@Environment`), so two different
+    /// recordings transcribing concurrently used to be able to clobber or
+    /// misattribute each other's failure through that one shared property —
+    /// exactly `diarizationWarnings`' own problem below, generalized to
+    /// blocking transcription errors. `MeetingDetailView` binds its
+    /// `.errorAlert` to `transcriptionError(for:)`/`clearTranscriptionError(for:)`
+    /// for the recording it's actually showing.
+    private(set) var errorsByRecording: [UUID: AppError] = [:]
     /// Non-fatal diarization failures (e.g. a FluidAudio model download error),
     /// keyed by recording so concurrent transcriptions of different recordings
     /// never clobber or misattribute each other's warning. Transcription still
@@ -87,9 +101,12 @@ final class TranscriptionViewModel {
     /// Active summary task, owned here so the detail screen can cancel it.
     /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
     var summaryTask: Task<Void, Never>?
-    /// Recordings in flight across ALL instances — `MeetingDetailView` creates
-    /// a view model per screen and the app-level resume coordinator has its
-    /// own, and a recording must never transcribe twice concurrently.
+    /// Recordings in flight across ALL instances — `KurnApp`'s shared
+    /// instance (the one every `MeetingDetailView` reads via `@Environment`)
+    /// and the app-level `TranscriptionScheduler` resume coordinator's own
+    /// separate instance are two processes that could otherwise both start
+    /// the same recording; a recording must never transcribe twice
+    /// concurrently.
     private static var globalActiveIDs: Set<UUID> = []
 
     /// Recordings some view model in this process is actually working on.
@@ -134,6 +151,27 @@ final class TranscriptionViewModel {
             self.error = .persistenceFailed(error.localizedDescription)
         }
     }
+
+    /// The transcription failure attributed to this recording, if any (H9 PR
+    /// 21) — distinct from `error` so two different recordings' concurrent
+    /// transcription failures can't clobber or misattribute each other.
+    func transcriptionError(for recording: Recording) -> AppError? {
+        errorsByRecording[recording.id]
+    }
+
+    func clearTranscriptionError(for recording: Recording) {
+        errorsByRecording[recording.id] = nil
+    }
+
+    #if DEBUG
+    /// Test-only: `transcribe()`'s real failure paths need the full pipeline
+    /// running, so `KurnTests` sets `errorsByRecording` directly instead
+    /// (see `TranscriptionViewModelErrorAttributionTests`) rather than
+    /// widening the real API with a public setter.
+    func setTranscriptionErrorForTesting(_ error: AppError, for recording: Recording) {
+        errorsByRecording[recording.id] = error
+    }
+    #endif
 
     func isTranscribing(_ recording: Recording) -> Bool {
         transcribingIDs.contains(recording.id)
@@ -375,7 +413,7 @@ final class TranscriptionViewModel {
                 // resumes from the last completed chunk.
                 recording.transcriptionStatus = .failed
                 persist()
-                error = appError
+                errorsByRecording[recordingID] = appError
                 let context = Self.logContext(for: appError)
                 AppLog.transcription.atError.error("VM: transcribe failed (AppError) id=\(recordingID, privacy: .public) context=\(context, privacy: .public): \(appError.errorDescription ?? "nil", privacy: .public)")
             }
@@ -383,7 +421,7 @@ final class TranscriptionViewModel {
             await drainEvents()
             recording.transcriptionStatus = .failed
             persist()
-            self.error = .transcriptionFailed(error.localizedDescription)
+            errorsByRecording[recordingID] = .transcriptionFailed(error.localizedDescription)
             AppLog.transcription.atError.error("VM: transcribe failed id=\(recordingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
