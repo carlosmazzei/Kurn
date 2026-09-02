@@ -798,6 +798,21 @@
 "error.on_device_model_unavailable" = "On-device model unavailable: %@";
 "error.on_device_generation_timeout" = "On-device generation timed out.";
 
+/* Health & Recovery (H9 PR 23) */
+"health.title" = "Health & Recovery";
+"health.all_clear" = "Nothing needs attention";
+"health.untitled_meeting" = "Untitled meeting";
+"health.recovery_needed" = "Pending Recovery";
+"health.recovery_needed_footer" = "Recordings whose capture was interrupted before Kurn could finish writing them. Retrying reruns the same recovery Kurn already attempts automatically at launch.";
+"health.stalled_transcriptions" = "Failed or Deferred Transcriptions";
+"health.stalled_transcriptions_footer" = "Recordings whose transcription failed or hasn't started yet. Retrying starts transcription again with your current settings.";
+"health.degraded_transcripts" = "Completed with Warnings";
+"health.degraded_transcripts_footer" = "Transcripts where a pipeline stage degraded or fell back. Retry is only offered for stages that support it.";
+"health.model_verification" = "Model Verification";
+"health.model_verification_footer" = "On-device models that failed verification. Remove them and Kurn will re-download the model the next time the feature is used.";
+"health.recent_failures" = "Recent Failure Codes";
+"health.view_all_events" = "View All Reliability Events";
+
 "intent.startRecording.title" = "Start Recording";
 "intent.startRecording.description" = "Starts a new Kurn recording without opening the app.";
 "intent.startRecording.shortTitle" = "Start Recording";

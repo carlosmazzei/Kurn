@@ -798,6 +798,21 @@
 "error.on_device_model_unavailable" = "On-Device-Modell nicht verfügbar: %@";
 "error.on_device_generation_timeout" = "Die Generierung auf dem Gerät hat das Zeitlimit überschritten.";
 
+/* Health & Recovery (H9 PR 23) */
+"health.title" = "Status & Wiederherstellung";
+"health.all_clear" = "Nichts erfordert Aufmerksamkeit";
+"health.untitled_meeting" = "Unbenanntes Meeting";
+"health.recovery_needed" = "Ausstehende Wiederherstellung";
+"health.recovery_needed_footer" = "Aufnahmen, deren Erfassung unterbrochen wurde, bevor Kurn sie fertig schreiben konnte. Erneut versuchen führt dieselbe Wiederherstellung aus, die Kurn beim Start bereits automatisch versucht.";
+"health.stalled_transcriptions" = "Fehlgeschlagene oder Zurückgestellte Transkriptionen";
+"health.stalled_transcriptions_footer" = "Aufnahmen, deren Transkription fehlgeschlagen ist oder noch nicht begonnen hat. Erneut versuchen startet die Transkription mit deinen aktuellen Einstellungen neu.";
+"health.degraded_transcripts" = "Mit Warnungen Abgeschlossen";
+"health.degraded_transcripts_footer" = "Transkripte, bei denen eine Pipeline-Stufe eingeschränkt wurde oder auf eine Alternative zurückgegriffen hat. Erneut versuchen wird nur für Stufen angeboten, die dies unterstützen.";
+"health.model_verification" = "Modellüberprüfung";
+"health.model_verification_footer" = "Modelle auf dem Gerät, die die Überprüfung nicht bestanden haben. Entferne sie, und Kurn lädt das Modell beim nächsten Gebrauch der Funktion erneut herunter.";
+"health.recent_failures" = "Aktuelle Fehlercodes";
+"health.view_all_events" = "Alle Zuverlässigkeitsereignisse Anzeigen";
+
 "intent.startRecording.title" = "Aufnahme starten";
 "intent.startRecording.description" = "Startet eine neue Kurn-Aufnahme, ohne die App zu öffnen.";
 "intent.startRecording.shortTitle" = "Aufnahme starten";

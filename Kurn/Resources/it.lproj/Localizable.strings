@@ -798,6 +798,21 @@
 "error.on_device_model_unavailable" = "Modello sul dispositivo non disponibile: %@";
 "error.on_device_generation_timeout" = "La generazione sul dispositivo è scaduta.";
 
+/* Health & Recovery (H9 PR 23) */
+"health.title" = "Stato e Ripristino";
+"health.all_clear" = "Nessuna attenzione richiesta";
+"health.untitled_meeting" = "Riunione senza titolo";
+"health.recovery_needed" = "Ripristino in Sospeso";
+"health.recovery_needed_footer" = "Registrazioni la cui acquisizione è stata interrotta prima che Kurn terminasse di scriverle. Riprovare esegue lo stesso ripristino che Kurn tenta già automaticamente all'avvio.";
+"health.stalled_transcriptions" = "Trascrizioni Non Riuscite o Rimandate";
+"health.stalled_transcriptions_footer" = "Registrazioni la cui trascrizione non è riuscita o non è ancora iniziata. Riprovare riavvia la trascrizione con le impostazioni attuali.";
+"health.degraded_transcripts" = "Completate con Avvisi";
+"health.degraded_transcripts_footer" = "Trascrizioni in cui una fase della pipeline è stata degradata o ha usato un'alternativa. Riprovare è disponibile solo per le fasi che lo supportano.";
+"health.model_verification" = "Verifica dei Modelli";
+"health.model_verification_footer" = "Modelli sul dispositivo che non hanno superato la verifica. Rimuovili e Kurn scaricherà di nuovo il modello alla prossima volta che la funzione verrà usata.";
+"health.recent_failures" = "Codici di Errore Recenti";
+"health.view_all_events" = "Visualizza Tutti gli Eventi di Affidabilità";
+
 "intent.startRecording.title" = "Avvia registrazione";
 "intent.startRecording.description" = "Avvia una nuova registrazione in Kurn senza aprire l'app.";
 "intent.startRecording.shortTitle" = "Avvia registrazione";

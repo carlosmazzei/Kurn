@@ -113,6 +113,12 @@ struct SettingsView: View {
                     StorageSettingsView()
                 }
                 link(
+                    NSLocalizedString("health.title", comment: "Health & Recovery"),
+                    systemImage: "wrench.and.screwdriver"
+                ) {
+                    HealthRecoveryView()
+                }
+                link(
                     NSLocalizedString("settings.diagnostics", comment: "Diagnostics"),
                     systemImage: "stethoscope"
                 ) {

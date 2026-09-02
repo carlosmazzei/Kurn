@@ -798,6 +798,21 @@
 "error.on_device_model_unavailable" = "Modelo en el dispositivo no disponible: %@";
 "error.on_device_generation_timeout" = "Se agotó el tiempo de la generación en el dispositivo.";
 
+/* Health & Recovery (H9 PR 23) */
+"health.title" = "Estado y Recuperación";
+"health.all_clear" = "Nada requiere atención";
+"health.untitled_meeting" = "Reunión sin título";
+"health.recovery_needed" = "Recuperación Pendiente";
+"health.recovery_needed_footer" = "Grabaciones cuya captura se interrumpió antes de que Kurn terminara de escribirlas. Reintentar ejecuta la misma recuperación que Kurn ya intenta automáticamente al iniciar.";
+"health.stalled_transcriptions" = "Transcripciones Fallidas o Pendientes";
+"health.stalled_transcriptions_footer" = "Grabaciones cuya transcripción falló o aún no ha comenzado. Reintentar inicia la transcripción de nuevo con tu configuración actual.";
+"health.degraded_transcripts" = "Completadas con Advertencias";
+"health.degraded_transcripts_footer" = "Transcripciones en las que una etapa del proceso se degradó o usó una alternativa. Reintentar solo se ofrece para etapas que lo permiten.";
+"health.model_verification" = "Verificación de Modelos";
+"health.model_verification_footer" = "Modelos en el dispositivo que fallaron la verificación. Elimínalos y Kurn descargará el modelo de nuevo la próxima vez que se use la función.";
+"health.recent_failures" = "Códigos de Fallo Recientes";
+"health.view_all_events" = "Ver Todos los Eventos de Fiabilidad";
+
 "intent.startRecording.title" = "Iniciar grabación";
 "intent.startRecording.description" = "Inicia una nueva grabación en Kurn sin abrir la app.";
 "intent.startRecording.shortTitle" = "Iniciar grabación";
