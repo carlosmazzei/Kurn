@@ -32,6 +32,36 @@ final class LockScreenRecordingController {
     private var highlightCount = 0
     private var isActive = false
 
+    // H8 PR 19: `start()` used to fire an untracked `Task` that, once
+    // scheduled, always ran to completion and unconditionally set
+    // `activity` — including after an immediate `end()` had already run,
+    // found `activity` still `nil` (the start `Task` hadn't executed yet),
+    // and done nothing. `Activity.request` is `throws` but not `async`, so
+    // once its `Task` actually starts running there is no `await` between
+    // then and `activity = try Activity.request(...)` for anything else to
+    // interleave on — the only race is *scheduling order* between the
+    // start and end `Task`s themselves, which Swift's concurrency model
+    // does not guarantee to match call order for independently-created
+    // unstructured tasks. If `end()`'s task happened to run first, the
+    // later-running `start()` task would still create a real Live Activity
+    // and store it — one `end()` already decided nothing needed ending,
+    // so nothing would ever end it: an orphan on the Lock Screen/Dynamic
+    // Island until the system eventually evicts it.
+    //
+    // `runID` closes that hole: every `start()`/`end()` bumps it, and the
+    // start task captures the id current when it was scheduled and checks
+    // it again — synchronously, with no intervening `await` — right before
+    // creating anything. An `end()` that ran first already moved `runID`
+    // on, so a start task that (however it got scheduled) runs after it
+    // sees the mismatch and skips creating an activity nothing would
+    // manage, rather than creating one and only then discovering it's
+    // orphaned. `startTask` is retained so `end()` can also explicitly
+    // cancel it — belt-and-suspenders alongside `runID`, since a bare
+    // `Task.cancel()` can't interrupt `Activity.request` itself (a foreign
+    // synchronous call), only signal intent for code that checks it.
+    private var runID = UUID()
+    private var startTask: Task<Void, Never>?
+
     func start(
         title: String,
         state: AudioRecorderService.State,
@@ -43,19 +73,26 @@ final class LockScreenRecordingController {
         self.elapsed = elapsed
         self.highlightCount = highlightCount
         self.isActive = true
+        let id = UUID()
+        runID = id
 
         let activitiesEnabled = ActivityAuthorizationInfo().areActivitiesEnabled
         AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: start requested, activitiesEnabled=\(activitiesEnabled, privacy: .public)")
         guard activitiesEnabled else { return }
 
-        Task {
+        startTask = Task { [weak self] in
+            guard let self else { return }
+            guard self.runID == id else {
+                AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: start superseded before running, skipped")
+                return
+            }
             do {
                 let attributes = RecordingActivityAttributes(meetingTitle: title)
                 let content = ActivityContent(
-                    state: contentState(state: state, elapsed: elapsed, highlightCount: highlightCount),
+                    state: self.contentState(state: state, elapsed: elapsed, highlightCount: highlightCount),
                     staleDate: nil
                 )
-                activity = try Activity.request(
+                self.activity = try Activity.request(
                     attributes: attributes,
                     content: content,
                     pushType: nil
@@ -63,7 +100,7 @@ final class LockScreenRecordingController {
                 AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: Live Activity started")
             } catch {
                 AppLog.recorderUI.atError.error("LockScreenRecordingController: Activity.request failed: \(error.localizedDescription, privacy: .public)")
-                activity = nil
+                self.activity = nil
             }
         }
     }
@@ -81,8 +118,10 @@ final class LockScreenRecordingController {
             state: contentState(state: state, elapsed: elapsed, highlightCount: highlightCount),
             staleDate: nil
         )
+        let id = runID
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self, self.runID == id else { return }
             await self.activity?.update(content)
         }
     }
@@ -102,8 +141,15 @@ final class LockScreenRecordingController {
         elapsed = 0
         highlightCount = 0
         isActive = false
+        // Supersedes the current run: a start task still waiting to run
+        // will see this and skip creating an activity; `startTask.cancel()`
+        // is the same signal for anything that checks `Task.isCancelled`.
+        runID = UUID()
+        startTask?.cancel()
+        startTask = nil
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             await self.activity?.end(finalContent, dismissalPolicy: .immediate)
             self.activity = nil
         }
