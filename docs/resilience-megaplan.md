@@ -1822,8 +1822,10 @@ the annotation merely routes around a spurious `Sendable` check for
 closure that never actually crosses threads despite its type
 (`RecordingSink.ConverterInput`, `VADAudioCompactor`'s feed-once flag) — and
 those are left exactly as they were, per the plan's own "keep the justified
-lock/queue wrappers." Four real findings came out of it, and this PR fixes
-three:
+lock/queue wrappers." Five things worth reporting came out of it: three
+real bugs, fixed here; one annotation that looked removable, checked, and
+turned out to be necessary for a different reason than its own comment
+gave; and one plan item that was already fixed before this PR started.
 
 - **Two "false timeouts," found and fixed.** `SherpaOnnxDiarizer` and
   `FluidAudioVAD` each raced their real work against a sleeping child task
@@ -1873,13 +1875,22 @@ three:
   practice, enforced by nothing. It's now guarded by the same `NSLock`
   pattern every other mutable-state `@unchecked Sendable` in this codebase
   already uses, making the claim executable instead of only documented.
-- **An unnecessary escape hatch, found and removed.**
-  `LockScreenRecordingController.activity`'s `nonisolated(unsafe)` looked
-  load-bearing but wasn't: the whole type is `@MainActor`, and every access
-  site is inside a `Task { }`/`Task { @MainActor in }` created from a
-  `@MainActor` method — which inherits `@MainActor` isolation by default,
-  not `.detached` — so access was already serialized through the actor.
-  Removed; CI is the check that it really was unnecessary.
+- **A `nonisolated(unsafe)` checked, and confirmed necessary for a
+  different reason than its own comment gave.**
+  `LockScreenRecordingController.activity`'s annotation looked
+  unnecessary at first read — the whole type is `@MainActor`, and every
+  access site is inside a `Task { }`/`Task { @MainActor in }` created from
+  a `@MainActor` method (inheriting that isolation, not `.detached`), so
+  access was never racing across real threads. Removing it was tried and
+  reverted: CI's first push failed with two Swift 6 "sending... risks
+  causing data races" errors, because `Activity<T>.update(_:)`/
+  `.end(_:dismissalPolicy:)` are `nonisolated` async methods in
+  ActivityKit's own API — passing a main-actor-isolated value into a
+  `nonisolated` call is exactly what Swift 6's region-based "sending"
+  check exists to catch, independent of whether the value is genuinely
+  shared across threads. The annotation is load-bearing after all, just
+  not for the reason its own comment stated; it's kept, with a comment
+  now explaining the real reason and citing that CI confirmed it.
 - **The "racing lazy property" item 4 names for the background uploader
   session was already fixed before this PR** — `git log -p` on
   `WhisperBackgroundUploader.swift` shows an earlier commit

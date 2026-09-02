@@ -2184,7 +2184,9 @@ every continuation/callback bridge (11 sites), was read and classified;
 most were already correctly justified (a lock, actor isolation, or a
 synchronously-invoked `@Sendable` closure that never truly crosses
 threads) and left alone, per item 4's own "keep the justified lock/queue
-wrappers." Four real findings, three fixed here: `SherpaOnnxDiarizer` and
+wrappers." Five things worth reporting came out of it — three real bugs
+fixed here, one annotation checked and confirmed necessary, and one plan
+item already fixed before this PR started: `SherpaOnnxDiarizer` and
 `FluidAudioVAD` each raced their real work against a sleeping timer in a
 `TaskGroup` and called the loser a "timeout" — but neither sherpa-onnx nor
 FluidAudio's `VadManager` exposes any way to abort an in-flight call, and
@@ -2204,10 +2206,18 @@ continuation is resumed exactly once. `CloudSettingsSync
 .didChangeExternally` was an unsynchronized mutable property on an
 `@unchecked Sendable` type relying only on a comment's claim about which
 actor touches it; now lock-guarded like every other such property in this
-codebase. A fourth finding — the plan's own "background uploader session
-under synchronization rather than a racing lazy property" — turned out to
-already be fixed by an earlier commit that landed before this track
-branched; this PR adds the concurrent-access test that fix never had. See
+codebase. `LockScreenRecordingController.activity`'s `nonisolated(unsafe)`
+looked removable (the whole type is `@MainActor` and every access site
+already inherits that isolation) — removing it was tried and reverted
+when CI's first push failed: `Activity<T>.update`/`.end` are `nonisolated`
+async methods in ActivityKit's own API, and Swift 6's "sending" check
+flags passing a main-actor-isolated value into a `nonisolated` call
+regardless of whether it's genuinely shared across threads. Kept, now
+with a comment explaining the real reason. A last finding — the plan's own
+"background uploader session under synchronization rather than a racing
+lazy property" — turned out to already be fixed by an earlier commit that
+landed before this track branched; this PR adds the concurrent-access
+test that fix never had. See
 the megaplan's "PR 18" section for the full contract, the test coverage,
 and the known gaps (no Thread Sanitizer configuration exists yet anywhere
 in the project; three duplicated `nonisolated(unsafe)` logging-handler
