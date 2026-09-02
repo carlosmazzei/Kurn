@@ -162,7 +162,7 @@ struct TranscriptionSettingsView: View {
             }
 
             if downloads.downloadingModel == .onDeviceASR || Self.isDownloadingWhisperCpp(downloads) {
-                ModelDownloadProgressRow(progress: downloads.downloadProgress)
+                ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {
             Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
@@ -311,7 +311,7 @@ struct TranscriptionSettingsView: View {
             if downloads.downloadingModel == .diarization
                 || downloads.downloadingModel == .sherpaOnnxDiarization
                 || downloads.downloadingModel == .vad {
-                ModelDownloadProgressRow(progress: downloads.downloadProgress)
+                ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {
             Text(NSLocalizedString("settings.pipeline_advanced", comment: "Advanced pipeline"))

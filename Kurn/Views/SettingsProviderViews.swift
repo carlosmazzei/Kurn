@@ -459,6 +459,10 @@ extension View {
 /// Download indicator backed by FluidAudio's byte-level progress reporting.
 struct ModelDownloadProgressRow: View {
     let progress: ModelDownloadStatus?
+    /// H7 PR 15: `nil` renders no cancel button (the row's previous shape),
+    /// so a screen only needs to pass this once `ModelDownloadController`
+    /// has something to cancel.
+    var onCancel: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -470,6 +474,15 @@ struct ModelDownloadProgressRow: View {
                     Text(progress.fractionCompleted, format: .percent.precision(.fractionLength(0)))
                         .monospacedDigit()
                         .foregroundStyle(Theme.textSecondary)
+                }
+                if let onCancel {
+                    Button(role: .cancel) {
+                        onCancel()
+                    } label: {
+                        Text(NSLocalizedString("common.cancel", comment: "Cancel"))
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
                 }
             }
             if let progress {

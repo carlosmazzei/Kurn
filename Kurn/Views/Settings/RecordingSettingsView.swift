@@ -89,7 +89,7 @@ struct RecordingSettingsView: View {
             )
             .disabled(downloads.isDownloading)
             if downloads.downloadingModel == .liveTranscriptionASR {
-                ModelDownloadProgressRow(progress: downloads.downloadProgress)
+                ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {
             Text(NSLocalizedString("settings.recording_section_live_transcription", comment: "Live Transcription"))

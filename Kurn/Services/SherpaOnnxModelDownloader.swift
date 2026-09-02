@@ -87,8 +87,11 @@ enum SherpaOnnxModelDownloader {
     /// reported as a `0...1` fraction split evenly across the two transfers
     /// (segmentation is the much smaller of the two, but there is no cost
     /// signal cheap enough to weight the split more precisely than that).
+    /// `downloader` is injectable (H7 PR 15) so tests can exercise this
+    /// against `MockURLProtocol`; production callers never pass it.
     static func download(
         policy: LargeTransferPolicy = .wifiOnly,
+        downloader: any ModelDownloading = ModelFileDownloader.shared,
         onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
     ) async throws {
         if isInstalled {
@@ -98,7 +101,7 @@ enum SherpaOnnxModelDownloader {
         }
 
         onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
-        try await ModelFileDownloader.fetch(
+        try await downloader.fetch(
             url: segmentationDownloadURL,
             destination: segmentationModelURL,
             minimumPlausibleBytes: segmentationMinimumPlausibleBytes,
@@ -107,7 +110,7 @@ enum SherpaOnnxModelDownloader {
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: fraction * 0.5, phase: .downloading))
         }
-        try await ModelFileDownloader.fetch(
+        try await downloader.fetch(
             url: embeddingDownloadURL,
             destination: embeddingModelURL,
             minimumPlausibleBytes: embeddingMinimumPlausibleBytes,

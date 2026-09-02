@@ -21,7 +21,12 @@ enum TempFileCleaner {
         "kurn_diar_",
         "kurn_chunk_",
         "kurn_compact_",
-        "kurn_enh_"
+        "kurn_enh_",
+        // A completed-but-not-yet-installed model download, staged here by
+        // `Downloader` before `ModelFileDownloader` verifies and atomically
+        // installs it (H7 PR 15) — swept the same way every other pipeline
+        // temp file is if a crash leaves one behind.
+        "kurn_model_"
     ]
 
     /// Sweep old temporary files left behind by killed/crashed transcriptions.
