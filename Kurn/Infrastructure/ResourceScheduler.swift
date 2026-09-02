@@ -70,7 +70,7 @@ enum ResourceWorkKind: Sendable, Equatable {
         case .transcription(let engine):
             switch engine {
             case .whisperAPI: return 5
-            case .appleSpeech: return 35
+            case .appleSpeech: return 55
             case .fluidAudioParakeet, .whisperCpp: return 60
             }
         case .diarization(let engine):

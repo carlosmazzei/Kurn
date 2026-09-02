@@ -1736,7 +1736,7 @@ state," and the roadmap's own H8 status row named it directly.
   was chosen so the scheduler *agrees* with that branch rather than
   fighting it: cloud transcription's weight (5) fits alongside any
   diarization engine's, matching the branch's own concurrent case; any
-  on-device transcription engine's weight (35–60) never fits alongside
+  on-device transcription engine's weight (55–60) never fits alongside
   FluidAudio's or sherpa-onnx's diarization weight (50), matching the
   branch's own sequential case — both pinned as regression tests (see
   below). What the scheduler adds is the case that branch never covered:
