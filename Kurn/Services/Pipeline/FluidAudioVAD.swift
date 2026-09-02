@@ -45,8 +45,8 @@ actor FluidAudioVAD: VoiceActivityDetecting {
             let started = Date()
             let regions = try await segment(url: url)
             let elapsed = Date().timeIntervalSince(started)
-            if elapsed > budget {
-                AppLog.transcription.atNotice.notice("FluidAudioVAD: exceeded its \(Int(budget))s budget (took \(String(format: "%.1f", elapsed), privacy: .public)s) — FluidAudio's VadManager exposes no abort hook, so processing ran to completion rather than being interrupted")
+            if elapsed > self.budget {
+                AppLog.transcription.atNotice.notice("FluidAudioVAD: exceeded its \(Int(self.budget))s budget (took \(String(format: "%.1f", elapsed), privacy: .public)s) — FluidAudio's VadManager exposes no abort hook, so processing ran to completion rather than being interrupted")
             }
             return regions
         } catch is CancellationError {
