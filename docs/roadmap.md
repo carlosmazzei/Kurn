@@ -730,7 +730,7 @@ satisfy part of a planned contract.
 | **H5**             | **Done (PR 11 merged in [#168](https://github.com/carlosmazzei/Kurn/pull/168); PR 12 merged in [#169](https://github.com/carlosmazzei/Kurn/pull/169); PR 13 implemented)** | Typed stage outcomes and a pipeline report persisted in `Transcript.pipelineReportData` are implemented for every stage (plan items 1–2 and the durable half of item 3, PR 11, merged). `TranscriptIntegrityGate` rejects a structurally broken fused/corrected result or an identity-violating correction before it can replace an existing transcript (items 4–5, PR 12, merged); summary and semantic-index replacement already kept the previous artifact until the new one was ready and needed no change. `MeetingDetailView` now surfaces a completed-with-warnings banner from the stored report, and correction — the one stage cheap enough to retry in isolation — gets its own retry action; every other warning falls back to the existing full re-transcribe confirmation (PR 13).                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **H6**             | **Core implemented**   | Provider URLs fail closed and all new cloud traffic uses one origin-locked, deadline-bounded, 16 MB-capped foreground policy with exact budgeted `Retry-After`. Each logical request owns one UUID reused across attempts; official OpenAI chat requests also send it as the documented correlation header, never as an undocumented idempotency claim. Ambiguous POST timeouts/connection loss stop without automatic replay and surface a typed duplicate-charge warning. Background upload has no creation API or response-buffering state; its synchronized adapter only drains old system tasks. A durable per-provider circuit gates automatic title/wiki/backfill work. Large transfers default to unrestricted Wi-Fi: app-owned audio uploads/model sessions carry native expensive/constrained flags, while FluidAudio downloads fail preflight on a disallowed path. Cloud consent is pinned to provider plus URL and discloses hostname and estimated hourly audio size; model dialogs disclose source and approximate size. Non-blocking follow-ups are dedicated waiting UI under H9, FluidAudio’s unobservable mid-transfer path changes, and measured streaming evaluation. |
 | **H7**             | **Done, merged ([#171](https://github.com/carlosmazzei/Kurn/pull/171)/[#172](https://github.com/carlosmazzei/Kurn/pull/172)/[#173](https://github.com/carlosmazzei/Kurn/pull/173))** | Typed `KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason` replace the old API that collapsed every Security-framework failure into "not configured"; the accessibility migration now only completes after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed write surfaced rather than silently assumed (PR 14). The whisper.cpp and sherpa-onnx downloaders now share one injectable `ModelDownloading` actor that verifies a completed download's exact byte count against the server's declared `Content-Length` and, when volunteered, its SHA-256; installs atomically with backup-and-restore on any post-install mismatch; keeps resume data across an interrupted transfer; and exposes a Cancel action wired into every download progress row (PR 15). `ModelVerification` now persists whether a model has actually been proven to load — a third fact next to consent and bytes-on-disk — via a real post-install health probe for whisper.cpp/sherpa-onnx and, for the four FluidAudio-backed sets, by recording the load their own download already performs; a storage-inventory pass flags on-disk size drift as corruption and repairs `isExcludedFromBackup`; Settings → Storage shows the result per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: whisper.cpp still resolves against a mutable HuggingFace branch rather than a pinned revision (no network path to obtain a real commit SHA in either PR's authoring environment) — the one item across all three PRs left open.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **H8**             | **In progress (PR 17 merged, PR 18 implemented)** | `MemoryPressureState` replaces the sticky memory-warning latch — a boolean set once by the first `UIApplicationDidReceiveMemoryWarning` and never cleared for the rest of the process — with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live thermal-state check with no cooldown of its own. `ResourceScheduler`, a global actor-isolated weight budget, now gates preprocessing, transcription (per engine), diarization (per engine), enhancement, and model loading at their existing funnel points, so two concurrent transcriptions picking the same heavy engine can no longer both pass an independent preflight and then both hold that engine's memory at once (items 2–3, PR 17, merged as [#174](https://github.com/carlosmazzei/Kurn/pull/174)). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" that raced a sleeping timer against a blocking call neither engine can actually abort — a `TaskGroup` can't return until every child finishes, so the race never bounded time, it just discarded a valid slow result for a fabricated error (`SherpaOnnxDiarizer`, `FluidAudioVAD`) — plus a leaked mic-picker continuation and an unsynchronized mutable property (items 4–5, PR 18). Remaining: items 1 and 6–8 — operation ownership/run IDs, ActivityKit lifecycle, shared Watch protocol, and F3 intent semantics (PR 19–20).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **H8**             | **Done, plan fully addressed (PR 17/18/19/20)** | `MemoryPressureState` replaces the sticky memory-warning latch — a boolean set once by the first `UIApplicationDidReceiveMemoryWarning` and never cleared for the rest of the process — with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live thermal-state check with no cooldown of its own. `ResourceScheduler`, a global actor-isolated weight budget, now gates preprocessing, transcription (per engine), diarization (per engine), enhancement, and model loading at their existing funnel points, so two concurrent transcriptions picking the same heavy engine can no longer both pass an independent preflight and then both hold that engine's memory at once (items 2–3, PR 17, merged as [#174](https://github.com/carlosmazzei/Kurn/pull/174)). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" that raced a sleeping timer against a blocking call neither engine can actually abort — a `TaskGroup` can't return until every child finishes, so the race never bounded time, it just discarded a valid slow result for a fabricated error (`SherpaOnnxDiarizer`, `FluidAudioVAD`) — plus a leaked mic-picker continuation and an unsynchronized mutable property (items 4–5, PR 18, merged as [#175](https://github.com/carlosmazzei/Kurn/pull/175)). `LockScreenRecordingController` closes the ActivityKit start/end race with a `runID` generation counter checked synchronously right before the one non-cancellable `Activity.request` call (item 6, PR 19, merged as [#176](https://github.com/carlosmazzei/Kurn/pull/176)). `WatchCommand`/`WatchSessionKey` now compile from one shared file into both the `Kurn` and `KurnWatch` targets; Watch commands carry a `commandID` the phone deduplicates against, a bounded local timeout, and a three-phase `WatchAckPhase` reply; the phone reconciles a stale application context on every reconnect; `StartRecordingIntent` awaits an acceptance reply instead of assuming success; and `MeetingChatViewModel`'s reply task now cancels on dismissal (items 1, 7–8, PR 20).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **H9**             | **Started**            | `AppError.logCode` and the content-free `ReliabilityEvent` vocabulary are present. Action metadata, per-operation queues/reports, bounded encrypted event storage, health UI, redaction preview, and recovery accessibility coverage remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **H10**            | **Started**            | Clock, filesystem, store-factory, reliability-event, and audio-sink fakes prove initial seams. The full transition fault matrix, split CI signals, retained failure artifacts, sanitizers/repetition, static policy checks, and device checklist remain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
@@ -2225,8 +2225,8 @@ globals share one unreasoned-about pattern; `FoundationModelsProvider`'s
 timeout wraps a closed-source Apple framework call that couldn't be
 verified either way). Items 1 and 6–8 remain PR 19–20's scope.
 
-**Progress — item 6 (the PR 19 boundary), implemented on branch
-`claude/resilience-roadmap-plan-fn23ki`.**
+**Progress — item 6 (the PR 19 boundary), merged as
+[PR #176](https://github.com/carlosmazzei/Kurn/pull/176).**
 `LockScreenRecordingController.start()` used to fire an untracked `Task { }`
 that unconditionally created and stored a Live Activity once it ran, with
 nothing checking whether a same-instant `end()` had already decided there
@@ -2256,6 +2256,57 @@ isn't something Swift's concurrency runtime supports; verified by CI
 compiling and the existing suite passing, and by the same `runID`
 generation-counter pattern already proven elsewhere in this codebase, e.g.
 PR 18's mic-choice continuation). Items 1, 7 and 8 remain PR 20's scope.
+
+**Progress — items 1, 7 and 8 (the PR 20 boundary), implemented on branch
+`claude/resilience-roadmap-plan-fn23ki`.** Item 7's "compile the Watch wire
+protocol from one shared source": `WatchCommand`/`WatchSessionKey` were
+independently typed in a per-target copy of `WatchSessionProtocol.swift` on
+each side; `KurnWatch`'s copy is now deleted and the single remaining file
+(`Kurn/Services/WatchSessionProtocol.swift`) compiles into both targets via
+an explicit `project.pbxproj` Sources entry, the same dual-membership
+pattern `RecordingActivityAttributes.swift` already uses to share one file
+between `Kurn` and `KurnLiveActivityExtension`. "Add command IDs, timeout,
+deduplication ... and acknowledgements for received, state-changed, and
+durably-finalized": every Watch command now carries a `commandID`;
+`RecordingCommandRouter` caches the last 20 outcomes so a redelivered
+duplicate (the watch retrying after a lost reply) replays the cached result
+instead of re-running the action, and the watch's `send()` gained a 10s
+local timeout via a lock-guarded resume-exactly-once continuation box (the
+same shape PR 18's `storeMicChoiceContinuation` established). Since every
+`RecordingCommandRouter` handler in this app — `stop`'s file finalization
+included — already runs synchronously to completion before its caller
+learns the outcome, a single reply carrying a new `WatchAckPhase`
+(`received`/`stateChanged`/`finalized`) covers all three cases the plan
+asks for without a multi-message round trip; `onStop`'s type changed from
+`() -> Void` to `() -> Bool` so `stopAndSave()`'s already-synchronous
+finalization outcome reaches the reply. "Reconcile from application context
+after reconnect": `PhoneSessionController` now checks
+`RecordingCommandRouter.shared.hasActiveSession` on every `WCSession`
+(re)activation and pushes a fresh idle context when false — a live session
+never survives process termination, so without this a kill mid-recording
+could leave the Watch showing a phantom in-progress recording indefinitely.
+Item 8's "intents report accepted, not actual capture, until the recorder
+confirms it": `StartRecordingIntent.perform()` now awaits an acceptance
+reply from `RecordingLauncher` (bounded by a 3s timeout, same box shape)
+instead of claiming success the instant it posted the request — closing a
+cold-launch race where an unconfigured `RecordingLauncher` silently dropped
+the request but the intent still reported success; actual capture
+confirmation remains the Live Activity's job, unchanged, since this intent
+has no channel back from `RecorderView`'s later mic-permission flow. Item 1
+("give every long-running operation an owner, run ID and explicit
+lifetime") was audited against the plan's own named example — "chat/search
+tasks cancel on dismissal": `MeetingsListView`'s search debounce already
+gets this for free from SwiftUI's `.task(id:)`, but `MeetingChatViewModel`'s
+reply `Task` had nothing cancelling it when its owning view was dismissed
+mid-reply, silently burning a paid cloud LLM call in the background; fixed
+with a `deinit { task?.cancel() }`. See the megaplan's "PR 20" section for
+the full contract, the new `RecordingCommandRouterTests` coverage, and the
+known gaps (the Watch-side timeout, reconnect reconciliation, and intent
+acceptance wait aren't covered by automated tests, for the same
+real-device/non-deterministic-ordering reasons PR 19 already stated; item
+1's general mechanism was audited against its named examples, not
+exhaustively re-swept across the whole app). **H8's plan is now fully
+addressed.**
 
 ### H9 · Actionable error UX and privacy-safe diagnostics — P1/P2
 
@@ -2501,7 +2552,7 @@ migrates.
    whisper.cpp to an immutable revision (no network path to HuggingFace to
    obtain a real one in either PR's environment) is the one piece of H7's
    plan still open.
-10. **In flight: H8 (P1), items 2–6 implemented.** The PR 17 boundary
+10. **Done: H8 (P1), plan fully addressed.** The PR 17 boundary
     (`docs/resilience-megaplan.md`'s "PR 17") replaces the sticky
     memory-warning latch — a boolean set once and never cleared for the
     rest of the process's life — with `MemoryPressureState`, an
@@ -2531,10 +2582,31 @@ migrates.
     Screen/Dynamic Island. A `runID` generation counter, checked
     synchronously immediately before the one non-cancellable call
     (`Activity.request`, `throws` but not `async`) that creates the
-    activity, closes it — implemented on branch
-    `claude/resilience-roadmap-plan-fn23ki`. Items 1, 7 and 8 (operation
-    ownership/run IDs generalized beyond ActivityKit, shared Watch
-    protocol, F3 intent semantics) remain PR 20's scope.
+    activity, closes it — merged as
+    [PR #176](https://github.com/carlosmazzei/Kurn/pull/176). The PR 20
+    boundary closes the rest: `WatchCommand`/`WatchSessionKey` now compile
+    from one shared source into both the `Kurn` and `KurnWatch` targets
+    instead of two independently-typed copies; Watch commands carry a
+    `commandID` `RecordingCommandRouter` deduplicates against (a
+    redelivered duplicate replays its cached outcome instead of re-running
+    the action), `WatchConnectivityManager.send` gained a bounded local
+    timeout, and a three-phase `WatchAckPhase` reply
+    (`received`/`stateChanged`/`finalized`) covers item 7's acknowledgement
+    ask in one round trip, since every command handler already runs
+    synchronously to completion (`stop`'s file finalization included)
+    before its caller learns the outcome. `PhoneSessionController`
+    reconciles a stale application-context recording state on every
+    `WCSession` reconnect, since a live session never survives process
+    termination. `StartRecordingIntent.perform()` now awaits an acceptance
+    reply from `RecordingLauncher` (bounded timeout) instead of claiming
+    success the instant it posted the request, closing a cold-launch race
+    that used to silently drop the request — item 8's "report accepted, not
+    actual capture." Item 1 was audited against its own named "chat/search
+    tasks cancel on dismissal" example: the search debounce was already
+    correct via SwiftUI's `.task(id:)`; `MeetingChatViewModel`'s reply task
+    was not, and now cancels via `deinit` — implemented on branch
+    `claude/resilience-roadmap-plan-fn23ki`. **H8's plan is now fully
+    addressed.**
 11. **Carry H1/H10 release work in parallel.** Complete the physical interruption,
     route, lock/background and low-storage matrix without delaying the next code P0.
 12. **Defer H6.9.** Streaming is evidence-gated polish, not the next resilience

@@ -31,7 +31,31 @@ final class MeetingChatViewModel {
     var error: AppError?
 
     private let chatService = MeetingChatService()
-    private var task: Task<Void, Never>?
+    // H8 PR 20: `deinit` is nonisolated even on a `@MainActor` class (Swift
+    // gives it no way to hop actors before the object is gone), so cancelling
+    // `task` there needs unchecked access — confirmed by CI, which rejected
+    // a plain `private var task` with "main actor-isolated property 'task'
+    // can not be referenced from a nonisolated context". This is the same
+    // "the compiler can't prove it, but it's fine" shape PR 18 already
+    // resolved for `LockScreenRecordingController.activity`: every other
+    // access to `task` (`send`/`cancel`/`reset`) is already isolated to the
+    // main actor as normal, and the one added by `deinit` can't race them —
+    // `deinit` only runs once the object's refcount reaches zero, and the
+    // task's own closure holds a strong reference to `self` (via its
+    // `guard let self`) for as long as it's actively mutating state, which
+    // makes that reference and deinit mutually exclusive by construction.
+    private nonisolated(unsafe) var task: Task<Void, Never>?
+
+    /// H8 PR 20, item 1's "chat/search tasks cancel on dismissal": this view
+    /// model is owned by `MeetingChatView`'s `@State`, so SwiftUI deallocates
+    /// it when the chat tab/sheet leaves the hierarchy — but nothing
+    /// previously cancelled `task` when that happened, so a reply already in
+    /// flight (a paid cloud LLM call) kept running to completion in the
+    /// background after the user navigated away. `deinit` is the reliable
+    /// backstop regardless of which dismissal path was taken.
+    deinit {
+        task?.cancel()
+    }
 
     /// Send `question`. When `transcriptText` is non-nil the scope is a single
     /// meeting (full-transcript grounding, falling back to retrieval over

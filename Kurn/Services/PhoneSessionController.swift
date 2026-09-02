@@ -109,7 +109,24 @@ extension PhoneSessionController: WCSessionDelegate {
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
-    ) {}
+    ) {
+        // H8 PR 20, item 7's "reconcile from application context after
+        // reconnect": if this phone process has no live recorder session
+        // registered, any "recording"/"paused" context WCSession is still
+        // holding from before is stale — a live session never survives
+        // process termination, so a fresh launch (including one after a kill
+        // mid-recording) always starts with `hasActiveSession == false`.
+        // Correcting the Watch's picture here, right on (re)activation,
+        // rather than waiting for the next real state change (which may
+        // never come if the user doesn't start another recording) is what
+        // keeps a phantom "still recording" from persisting on the Watch
+        // indefinitely.
+        guard activationState == .activated else { return }
+        Task { @MainActor in
+            guard !RecordingCommandRouter.shared.hasActiveSession else { return }
+            PhoneSessionController.shared.notifyEnded()
+        }
+    }
 
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
 
@@ -124,18 +141,30 @@ extension PhoneSessionController: WCSessionDelegate {
     ) {
         guard let raw = message[WatchSessionKey.command] as? String, let command = WatchCommand(rawValue: raw) else {
             AppLog.recorderUI.atError.error("PhoneSessionController: received unrecognized Watch command")
-            replyHandler([WatchSessionKey.ok: false, WatchSessionKey.error: WatchSessionReplyError.unknownCommand])
+            replyHandler([
+                WatchSessionKey.ok: false,
+                WatchSessionKey.error: WatchSessionReplyError.unknownCommand,
+                WatchSessionKey.ackPhase: WatchAckPhase.received.rawValue
+            ])
             return
         }
+        // A commandID-less message can only come from an older paired Watch
+        // app build; fall back to a fresh ID (never a replay match) so
+        // dedup simply doesn't engage rather than failing closed.
+        let commandID = (message[WatchSessionKey.commandID] as? String) ?? UUID().uuidString
         AppLog.recorderUI.atNotice.notice("PhoneSessionController: received Watch command \(raw, privacy: .public)")
         let reply = WatchCommandReplyHandler(reply: replyHandler)
         Task {
-            let handled = await MainActor.run {
-                RecordingCommandRouter.shared.handleWatchCommand(command)
+            let (handled, phase) = await MainActor.run {
+                RecordingCommandRouter.shared.handleWatchCommand(command, commandID: commandID)
             }
             reply.call(handled
-                ? [WatchSessionKey.ok: true]
-                : [WatchSessionKey.ok: false, WatchSessionKey.error: WatchSessionReplyError.noActiveRecording])
+                ? [WatchSessionKey.ok: true, WatchSessionKey.ackPhase: phase.rawValue]
+                : [
+                    WatchSessionKey.ok: false,
+                    WatchSessionKey.error: WatchSessionReplyError.noActiveRecording,
+                    WatchSessionKey.ackPhase: phase.rawValue
+                ])
         }
     }
 }

@@ -342,7 +342,7 @@ final class RecorderViewModel {
                     self?.recorder.pause(reason: .watchCommand)
                 },
                 onResume: { [weak self] in self?.recorder.resume() },
-                onStop: { [weak self] in self?.stopAndSave() },
+                onStop: { [weak self] in self?.stopAndSave() ?? false },
                 onHighlight: { [weak self] in self?.markHighlight() }
             )
             await liveStartTask?.value
@@ -394,13 +394,20 @@ final class RecorderViewModel {
         Task { await live.stop() }
     }
 
-    /// Stop, save the segment to SwiftData, and flag completion.
-    func stopAndSave() {
+    /// Stop, save the segment to SwiftData, and flag completion. Returns
+    /// whether the recording was durably finalized to disk — `false` for a
+    /// recovery-needed outcome or a persistence failure, `true` otherwise
+    /// (including "no active recording", a legitimate no-op). Consumed by
+    /// `RecordingCommandRouter`'s Watch command reply (H8 PR 20), since this
+    /// method already runs entirely synchronously, finalization included, so
+    /// the outcome is known before it returns rather than discovered later.
+    @discardableResult
+    func stopAndSave() -> Bool {
         AppLog.recorderUI.atNotice.notice("stopAndSave: called state=\(String(describing: self.recorder.state), privacy: .public)")
         stopLiveTranscription()
         guard let recording = activeRecording else {
             finishExternalRecordingState()
-            return
+            return true
         }
         recording.captureState = .finalizing
         do {
@@ -409,21 +416,22 @@ final class RecorderViewModel {
             AppLog.persistence.atError.error("recording: finalizing transition save failed")
         }
         let result = recorder.stop()
-        finalizeCapture(recording, result: result)
+        let finalized = finalizeCapture(recording, result: result)
         finishExternalRecordingState()
+        return finalized
     }
 
+    @discardableResult
     func finalizeCapture(
         _ recording: Recording,
         result: AudioRecordingResult?,
         forcedReason: CaptureRecoveryReason? = nil
-    ) {
+    ) -> Bool {
         do {
             let metadata = try fileFinalizer.finalize(fileName: recording.fileName)
             let recoveryReason = forcedReason ?? result?.captureFailure.map(CaptureRecoveryReason.init)
             if metadata.duration < 0.5, recoveryReason == nil {
-                discardShortRecording(recording)
-                return
+                return discardShortRecording(recording)
             }
             recording.duration = metadata.duration
             recording.fileSize = metadata.fileSize
@@ -444,28 +452,33 @@ final class RecorderViewModel {
             activeRecording = nil
         } catch {
             self.error = .persistenceFailed(error.localizedDescription)
-            return
+            return false
         }
         if recording.captureState == .ready {
             didSaveRecording = true
+            return true
         } else {
             finishAfterErrorDismissal = true
             error = .audioError(NSLocalizedString(
                 "recorder.partial_saved",
                 comment: "A partial recording was preserved after a capture failure"
             ))
+            return false
         }
     }
 
-    private func discardShortRecording(_ recording: Recording) {
+    @discardableResult
+    private func discardShortRecording(_ recording: Recording) -> Bool {
         AudioFileStore.delete(fileName: recording.fileName)
         modelContext.delete(recording)
         do {
             try lifecycleSaver.save(modelContext)
             activeRecording = nil
             didSaveRecording = true
+            return true
         } catch {
             self.error = .persistenceFailed(error.localizedDescription)
+            return false
         }
     }
 

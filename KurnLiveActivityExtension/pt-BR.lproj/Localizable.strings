@@ -8,6 +8,7 @@
 "intent.startRecording.title" = "Iniciar gravação";
 "intent.startRecording.description" = "Inicia uma nova gravação no Kurn sem abrir o app.";
 "intent.startRecording.shortTitle" = "Iniciar gravação";
+"intent.startRecording.notReady" = "O Kurn não estava pronto para iniciar a gravação. Tente novamente pelo app.";
 "control.startRecording.title" = "Iniciar gravação";
 "control.startRecording.displayName" = "Iniciar gravação";
 "control.startRecording.description" = "Inicia uma nova gravação no Kurn. Ao adicionar isso à Tela Bloqueada, ela pode ser acionada com um único toque enquanto o aparelho está bloqueado.";
