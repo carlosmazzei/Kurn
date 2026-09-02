@@ -77,6 +77,39 @@ struct ReliabilityEventTests {
         #expect(capture.value?.operation == "test_operation")
         #expect(capture.value?.outcome == .started)
     }
+
+    // H9 PR 22: `ReliabilityEventStore` persists events as JSON, so a
+    // round-trip through `Codable` has to preserve every field exactly —
+    // including `recordedAt`, added in this PR for that store.
+    @Test func roundTripsThroughJSONCoding() throws {
+        let original = ReliabilityEvent(
+            operationID: OperationID("abcd1234"),
+            operation: "document_generation",
+            stage: "validation",
+            outcome: .failed,
+            attempt: 2,
+            elapsedSeconds: 1.5,
+            code: "no_transcripts",
+            recordedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(ReliabilityEvent.self, from: data)
+
+        #expect(decoded.operationID == original.operationID)
+        #expect(decoded.operation == original.operation)
+        #expect(decoded.stage == original.stage)
+        #expect(decoded.outcome == original.outcome)
+        #expect(decoded.attempt == original.attempt)
+        #expect(decoded.elapsedSeconds == original.elapsedSeconds)
+        #expect(decoded.code == original.code)
+        #expect(decoded.recordedAt == original.recordedAt)
+    }
 }
 
 private final class CapturedEventBox: @unchecked Sendable {

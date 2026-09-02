@@ -105,6 +105,10 @@ struct KurnApp: App {
             default:
                 AppLog.reliability.atInfo.info("\(event.logLine, privacy: .public)")
             }
+            // H9 PR 22, item 6: `os.Logger` above is ephemeral (Console.app
+            // only, on a connected Mac) — this is the durable, bounded,
+            // protected local buffer the export/health screens read from.
+            ReliabilityEventStore.record(event)
         }
         _ = NetworkPathObserver.shared
 

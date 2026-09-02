@@ -349,7 +349,11 @@ final class RecorderViewModel {
             AppLog.recorderUI.atInfo.info("startRecording: done, state=\(String(describing: self.recorder.state), privacy: .public)")
         } catch let appError as AppError {
             if cancellationRequested { return }
-            AppLog.recorderUI.atError.error("startRecording: AppError: \(appError.errorDescription ?? "nil", privacy: .public)")
+            // H9 PR 22, item 5: `logCode` is content-free; `errorDescription`
+            // can interpolate a raw underlying error's own
+            // `localizedDescription` for several `AppError` cases, which
+            // must not reach a `.public` log line unredacted.
+            AppLog.recorderUI.atError.error("startRecording: AppError code=\(appError.logCode, privacy: .public) detail=\(appError.privateContext ?? "", privacy: .private)")
             recoverFailedStart(recording)
             await liveStartTask?.value
             if liveTranscriptionEnabled { await liveTranscription.stop() }

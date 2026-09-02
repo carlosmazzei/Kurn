@@ -235,7 +235,11 @@ final class AudioRecorderService: NSObject {
             try Task.checkCancellation()
             if startCancellationRequested { throw CancellationError() }
         } catch let error as AppError {
-            AppLog.recorder.atError.error("start: setup threw AppError: \(error.errorDescription ?? "nil", privacy: .public)")
+            // H9 PR 22, item 5: `logCode` is content-free; `errorDescription`
+            // can interpolate a raw underlying error's own
+            // `localizedDescription` for several `AppError` cases, which
+            // must not reach a `.public` log line unredacted.
+            AppLog.recorder.atError.error("start: setup threw AppError code=\(error.logCode, privacy: .public) detail=\(error.privateContext ?? "", privacy: .private)")
             cleanUpFailedStart(fileName: fileName)
             throw error
         } catch is CancellationError {

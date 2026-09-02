@@ -572,6 +572,9 @@
 "settings.diagnostic_reports.empty" = "No diagnostic reports yet";
 "settings.diagnostic_reports.crash" = "Crash";
 "settings.diagnostic_reports.hang" = "Freeze";
+"settings.reliability_events.view" = "View Reliability Events";
+"settings.reliability_events.empty" = "No reliability events yet";
+"settings.reliability_events_footer" = "A content-free record of how operations like transcription went — start, success, failure, or cancellation — with a code but never a transcript, title, or provider message. Nothing is ever sent anywhere automatically — events only leave the device if you tap Share.";
 "log_level.off" = "Off";
 "log_level.error" = "Errors only";
 "log_level.notice" = "Standard";

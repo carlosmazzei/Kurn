@@ -572,6 +572,9 @@
 "settings.diagnostic_reports.empty" = "Noch keine Diagnoseberichte";
 "settings.diagnostic_reports.crash" = "Absturz";
 "settings.diagnostic_reports.hang" = "Einfrieren";
+"settings.reliability_events.view" = "Zuverlässigkeitsereignisse anzeigen";
+"settings.reliability_events.empty" = "Noch keine Zuverlässigkeitsereignisse";
+"settings.reliability_events_footer" = "Eine inhaltsfreie Aufzeichnung, wie Vorgänge wie die Transkription verlaufen sind – Start, Erfolg, Fehler oder Abbruch – mit einem Code, aber nie einem Transkript, Titel oder einer Anbieternachricht. Es wird nie automatisch etwas gesendet – Ereignisse verlassen das Gerät nur, wenn du auf Teilen tippst.";
 "log_level.off" = "Aus";
 "log_level.error" = "Nur Fehler";
 "log_level.notice" = "Standard";
