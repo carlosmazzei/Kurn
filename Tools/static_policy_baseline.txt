@@ -1,0 +1,87 @@
+# H10 PR 24: grandfathered static-policy findings.
+#
+# Format: <check-name>|<path relative to repo root>|<exact stripped source line>
+# Keyed by line content, not line number, so it survives unrelated edits
+# elsewhere in the file. Generated from the state of the codebase when
+# Tools/check_static_policy.py was introduced (H10 PR 24) — every entry
+# below was reviewed at that point, not auto-approved.
+#
+# A NEW deliberate exception should usually get an inline
+# `// static-policy:allow <check-name> - <reason>` comment on the line
+# instead of an entry here — this file is for retrofitting the check onto
+# code that predates it, not the primary way to add an exception.
+
+# fatal-error: all three are provably-unreachable guards, not
+# data-dependent crash risk — an exhaustive switch's remaining case
+# already handled by an earlier guard (ProviderFactory,
+# ProviderModelsService: ".appleOnDevice", handled above the switch), or
+# a system call whose failure is impossible given a precondition already
+# checked immediately above (STFT: frameSize already validated by
+# supportsDFTSize).
+fatal-error|Kurn/Providers/ProviderFactory.swift|preconditionFailure("handled above")
+fatal-error|Kurn/Providers/ProviderModelsService.swift|preconditionFailure("handled above")
+fatal-error|Kurn/Services/Pipeline/STFT.swift|preconditionFailure("vDSP.DiscreteFourierTransform setup failed for frameSize=\(frameSize)")
+
+# custom-url-session: the app's three sanctioned transport/download
+# seams (CLAUDE.md's "Providers"/"Infrastructure" sections) — the ones
+# a new ad hoc URLSession should route through instead of duplicating.
+custom-url-session|Kurn/Providers/ProviderHTTPTransport.swift|let controlledSession = URLSession(
+custom-url-session|Kurn/Services/ModelFileDownloader.swift|let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+custom-url-session|Kurn/Services/WhisperBackgroundUploader.swift|let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+
+# raw-public-error: the broader non-AppError raw-localizedDescription-at-
+# .public sweep that H9 PR 22's write-up explicitly named as unaudited —
+# "a different, much larger question (is a given library's own error
+# text ever privacy-sensitive) not answerable case-by-case." Grandfathered
+# here rather than fixed blind; a future audit narrows this list, a new
+# call site should not grow it.
+raw-public-error|Kurn/Infrastructure/CrashReporting/DiagnosticsSubscriber.swift|"diagnostics: failed to save \(kind.rawValue, privacy: .public) report: \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Infrastructure/Extensions/ModelContext+Save.swift|AppLog.persistence.atError.error("Failed to save context: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Infrastructure/ModelStoreBootCoordinator.swift|"modelStoreBoot: pre-open backup failed: \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Infrastructure/RecordingOperationJournal.swift|"journal: could not record \(record.kind.rawValue, privacy: .public) intent: \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Infrastructure/RecordingProtection.swift|"protection: failed to set on \(fileURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Infrastructure/RecordingProtection.swift|"protection: migrate failed for \(legacy.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Infrastructure/RecordingQuarantine.swift|"quarantine: failed to preserve original reason=\(reason.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Infrastructure/ReliabilityEventStore.swift|AppLog.reliability.atError.error("ReliabilityEventStore: append failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Infrastructure/TranscriptionRecovery.swift|AppLog.transcription.atError.error("recovery: sweep save failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Infrastructure/TranscriptionScheduler.swift|AppLog.transcription.atError.error("bgTask: submit failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/AudioRecorderService.swift|AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public); retrying without explicit bit rate: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/AudioRecorderService.swift|AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/AudioRecorderService.swift|AppLog.recorder.atError.error("beginEngine: engine.start() failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/AudioRecorderService.swift|AppLog.recorder.atError.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/AudioRecorderService.swift|AppLog.recorder.atError.error("resume: engine.start() failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/AudioRecorderService.swift|AppLog.recorder.atError.error("start: setup threw: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Embedding/EmbeddingModelStore.swift|AppLog.transcription.atError.error("embedding: model load failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Enhancement/PlaybackEnhancementNeuralPass.swift|AppLog.recorder.atError.error("enhance: neural pre-pass failed, using DSP only: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Enhancement/SpeechEnhancer.swift|AppLog.recorder.atError.error("enhance: GTCRN inference failed, using DSP only: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Enhancement/SpeechEnhancer.swift|AppLog.recorder.atError.error("enhance: could not initialize GTCRN tensors: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Enhancement/SpeechEnhancer.swift|AppLog.recorder.atError.error("enhance: could not load GTCRN: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/FluidAudioDiarizer.swift|AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/FluidAudioDiarizer.swift|AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/FluidAudioModelStore.swift|AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/FluidAudioTranscriber.swift|AppLog.transcription.atError.error("fluidAudio: transcription failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/LiveTranscriptionService.swift|AppLog.transcription.atError.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/LiveTranscriptionService.swift|AppLog.transcription.atError.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/LockScreenRecordingController.swift|AppLog.recorderUI.atError.error("LockScreenRecordingController: Activity.request failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/OnDeviceTranscriber.swift|"speechAnalyzer: asset installation failed: \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Services/OnDeviceTranscriber.swift|"speechAnalyzer: transcription failed: \(error.localizedDescription, privacy: .public)"
+raw-public-error|Kurn/Services/Pipeline/FluidAudioVAD.swift|AppLog.transcription.atError.error("FluidAudioVAD: failed, using whole-clip fallback: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Pipeline/LLMTranscriptCorrector.swift|AppLog.transcription.atNotice.notice("correct: batch of \(batch.count, privacy: .public) segment(s) failed, keeping originals: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Pipeline/LLMTranscriptCorrector.swift|AppLog.transcription.atNotice.notice("correct: no usable provider (\(error.localizedDescription, privacy: .public)); skipping correction")
+raw-public-error|Kurn/Services/Pipeline/LanguageDetectors.swift|AppLog.transcription.atError.error("langDetect: fluidAudio LID failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Pipeline/TranscriptionServiceInputPreparation.swift|AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(appError.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Pipeline/TranscriptionServiceInputPreparation.swift|AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/Pipeline/WhisperTranscriber.swift|AppLog.transcription.atError.error("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) failed for \(vendor, privacy: .public) after \(Date().timeIntervalSince(chunkStart), privacy: .public)s: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/RecordingCompactor.swift|AppLog.recorder.atError.error("compact: swap failed for \(fileName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/RecordingSink.swift|AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/RecordingSink.swift|AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/SherpaOnnxDiarizer.swift|AppLog.transcription.atError.error("SherpaOnnxDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/SpeakerDiarizer.swift|AppLog.transcription.atError.error("SpeakerDiarizer: readFrames failed for \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public) — single-speaker fallback")
+raw-public-error|Kurn/Services/TempFileCleaner.swift|AppLog.transcription.atDebug.debug("transcribe: could not remove temp file \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/TranscriptionService.swift|AppLog.transcription.atError.error("diarize: preprocess failed, falling back to original: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Services/TranscriptionService.swift|AppLog.transcription.atError.error("transcribe: VAD compaction failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/ViewModels/RecorderViewModel.swift|AppLog.recorderUI.atError.error("startRecording: error: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/ViewModels/SemanticIndexCoordinator.swift|AppLog.persistence.atError.error("semanticIndex: persist failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/ViewModels/SemanticIndexCoordinator.swift|AppLog.transcription.atError.error("semanticIndex: failed for meeting \(meetingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/ViewModels/WikiCoordinator.swift|AppLog.persistence.atError.error("wiki: persist failed: \(error.localizedDescription, privacy: .public)")
+raw-public-error|Kurn/Views/SettingsSections.swift|AppLog.persistence.atError.error("Failed to delete all data: \(error.localizedDescription, privacy: .public)")

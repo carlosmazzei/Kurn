@@ -15,13 +15,15 @@ permissions:
   contents: write
 
 jobs:
-  build-and-test:
+  # Fast, no-simulator signal: SwiftLint, the two config-file validators, and
+  # localization key-set parity. None of this needs a booted simulator, so it
+  # used to pay for one (inside the old single `build-and-test` job) purely
+  # to sit ahead of the build step — splitting it out (H10 PR 24, "split pure/
+  # unit, simulator integration, and UI/accessibility signals") reports a
+  # lint/config failure in the time SwiftLint itself takes, not after a
+  # multi-minute simulator-runtime download.
+  lint-and-validate:
     runs-on: macos-26
-
-    env:
-      XCODE_PROJECT: Kurn.xcodeproj
-      XCODE_SCHEME: Kurn
-      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
 
     steps:
       - name: Checkout
@@ -86,6 +88,44 @@ jobs:
           python3 Tools/validate_store_metadata.py
           ruby -r ./fastlane/accessibility_labels -e 'AccessibilityLabels.load("fastlane/accessibility.json")'
 
+  # H10 PR 24: allow-listed checks for a production fatalError/
+  # preconditionFailure, a silently-dropped ModelContext save, an ad hoc
+  # URLSession bypassing the app's sanctioned transport seams, and a raw
+  # error description logged at `.public`. Pure text scanning over Swift
+  # sources, so it needs neither Xcode nor a simulator — reports in seconds,
+  # in parallel with everything else. See Tools/check_static_policy.py's own
+  # header for what is and is not covered and why.
+  static-policy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run static policy checks
+        run: python3 Tools/check_static_policy.py
+
+  # Simulator-integration signal: KurnTests (Swift Testing unit/integration
+  # suite) plus KurnSwiftDataTests (split into its own test target for
+  # process isolation — see the scheme's own comment). Reports separately
+  # from ui-accessibility-tests below (H10 PR 24, item 3) so a flaky UI-test
+  # launch can never obscure a deterministic data-integrity failure in this
+  # suite, or vice versa.
+  unit-tests:
+    runs-on: macos-26
+
+    env:
+      XCODE_PROJECT: Kurn.xcodeproj
+      XCODE_SCHEME: Kurn
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
       - name: Prepare simulator runtimes
         run: |
           sudo xcodebuild -runFirstLaunch
@@ -106,7 +146,9 @@ jobs:
       # artifact, only avoid re-fetching unchanged package sources. Keyed on
       # the files that actually pin what gets resolved: project.pbxproj's
       # `XCRemoteSwiftPackageReference` entries and WhisperCpp's manifest
-      # (which pins the XCFramework's download URL/checksum).
+      # (which pins the XCFramework's download URL/checksum). Shared (same
+      # key) with ui-accessibility-tests below, since both resolve the same
+      # packages from the same scheme.
       - name: Cache resolved SPM packages
         uses: actions/cache@v6
         with:
@@ -122,14 +164,123 @@ jobs:
             -scheme "$XCODE_SCHEME" \
             -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -only-testing:KurnTests \
+            -only-testing:KurnSwiftDataTests \
             clean test
+
+      # H10 PR 24, item 4: retain enough evidence to diagnose one run without
+      # needing to reproduce it locally. The .xcresult bundle carries the
+      # full test log, timings, and any attachments a failing test captured.
+      - name: Collect simulator/system logs on failure
+        if: failure()
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
+          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
+          if [ -n "$booted_udid" ]; then
+            xcrun simctl spawn "$booted_udid" log collect \
+              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
+          fi
+          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
+          exit 0
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-tests-failure-diagnostics
+          path: |
+            ${{ runner.temp }}/TestResults.xcresult
+            ${{ runner.temp }}/failure-diagnostics
+          retention-days: 14
+
+  # UI/accessibility signal: KurnUITests, i.e. AccessibilityAuditUITests
+  # (ScreenshotUITests stays excluded here exactly as it is in the scheme —
+  # it needs fastlane's snapshot setup and runs via `fastlane screenshots`
+  # instead). Split from unit-tests above for the same reason: a simulator
+  # launch/UI flake and a data-integrity regression should never share one
+  # red check.
+  ui-accessibility-tests:
+    runs-on: macos-26
+
+    env:
+      XCODE_PROJECT: Kurn.xcodeproj
+      XCODE_SCHEME: Kurn
+      IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Prepare simulator runtimes
+        run: |
+          sudo xcodebuild -runFirstLaunch
+
+          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
+            xcodebuild -downloadPlatform iOS
+          fi
+
+          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
+            xcodebuild -downloadPlatform watchOS
+          fi
+
+      - name: Cache resolved SPM packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/DerivedData/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build and test
+        run: |
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$IOS_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -only-testing:KurnUITests \
+            -skip-testing:KurnUITests/ScreenshotUITests \
+            clean test
+
+      # Failed UI/accessibility-audit tests attach their own screenshots to
+      # the .xcresult bundle automatically (XCTest's failure-screenshot
+      # capture); uploading the bundle carries them without a separate
+      # extraction step.
+      - name: Collect simulator/system logs on failure
+        if: failure()
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
+          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
+          if [ -n "$booted_udid" ]; then
+            xcrun simctl spawn "$booted_udid" log collect \
+              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
+          fi
+          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
+          exit 0
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-accessibility-tests-failure-diagnostics
+          path: |
+            ${{ runner.temp }}/TestResults.xcresult
+            ${{ runner.temp }}/failure-diagnostics
+          retention-days: 14
 
   # Fast, Xcode-free signal for the KurnCore package (see docs/roadmap.md,
   # "The change that isn't a feature: SPM extraction"): runs in seconds on
-  # Linux, well before build-and-test's simulator boot finishes, and proves
+  # Linux, well before the macOS jobs' simulator boot finishes, and proves
   # the package's pure logic actually passes its tests rather than just
-  # compiling under Xcode. Deliberately no `needs:` on build-and-test so the
-  # two run in parallel.
+  # compiling under Xcode. Deliberately no `needs:` on the other jobs so all
+  # of them run in parallel.
   kurncore-linux:
     runs-on: ubuntu-latest
 
@@ -145,7 +296,7 @@ jobs:
         run: swift test
 
   release:
-    needs: [build-and-test, kurncore-linux]
+    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
@@ -167,7 +318,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   beta:
-    needs: [build-and-test, kurncore-linux]
+    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-26
     # Gates the actual TestFlight upload behind the `release` GitHub
@@ -200,7 +351,7 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
 
   store-assets:
-    needs: [build-and-test, kurncore-linux]
+    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/screenshots.yml
     with:
