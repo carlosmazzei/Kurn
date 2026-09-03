@@ -1,0 +1,40 @@
+name: Collect and upload failure diagnostics
+description: >
+  On a failed Xcode test job, best-effort collects the booted simulator's
+  unified log and any DiagnosticReports, then uploads them alongside the
+  .xcresult bundle (H10 PR 24, item 4: retain enough evidence to diagnose one
+  run without needing to reproduce it locally). Log collection is guarded
+  end-to-end (`set +e`, `|| true`, a final `exit 0`) so a wrong `simctl` flag
+  or a missing booted device degrades to "no simulator log collected," never
+  a second, confusing failure layered on top of the real one. Call this step
+  with `if: failure()`.
+
+inputs:
+  artifact-name:
+    description: Name for the uploaded artifact (must be unique within the job/matrix leg).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Collect simulator/system logs
+      shell: bash
+      run: |
+        set +e
+        mkdir -p "$RUNNER_TEMP/failure-diagnostics"
+        booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
+        if [ -n "$booted_udid" ]; then
+          xcrun simctl spawn "$booted_udid" log collect \
+            --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
+        fi
+        cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
+        exit 0
+
+    - name: Upload failure diagnostics
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ runner.temp }}/TestResults.xcresult
+          ${{ runner.temp }}/failure-diagnostics
+        retention-days: 14

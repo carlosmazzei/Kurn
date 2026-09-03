@@ -1,0 +1,22 @@
+name: Prepare simulator runtimes
+description: >
+  Runs Xcode's first-launch setup and ensures iOS/watchOS simulator runtimes
+  are installed. Used by every macOS job that boots a simulator (iOS CI's
+  unit-tests/ui-accessibility-tests, the reliability-hardening lane,
+  pipeline-eval), so it lives here once instead of six copies.
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare simulator runtimes
+      shell: bash
+      run: |
+        sudo xcodebuild -runFirstLaunch
+
+        if ! xcrun simctl list runtimes available | grep -q "iOS"; then
+          xcodebuild -downloadPlatform iOS
+        fi
+
+        if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
+          xcodebuild -downloadPlatform watchOS
+        fi

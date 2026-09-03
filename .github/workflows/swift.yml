@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Fast, no-simulator signal: SwiftLint, the two config-file validators, and
@@ -126,36 +126,11 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
+      - uses: ./.github/actions/prepare-simulator
 
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-
-          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
-            xcodebuild -downloadPlatform watchOS
-          fi
-
-      # Caches the resolved/checked-out SPM packages (FluidAudio, KurnCore,
-      # and the two large ones: the whisper.cpp binary XCFramework and
-      # sherpa-onnx), not compiled build products. `xcodebuild clean` only
-      # wipes `<DerivedDataPath>/Build/`, never `SourcePackages`, so this is
-      # safe alongside `clean test` below — it cannot serve a stale compiled
-      # artifact, only avoid re-fetching unchanged package sources. Keyed on
-      # the files that actually pin what gets resolved: project.pbxproj's
-      # `XCRemoteSwiftPackageReference` entries and WhisperCpp's manifest
-      # (which pins the XCFramework's download URL/checksum). Shared (same
-      # key) with ui-accessibility-tests below, since both resolve the same
-      # packages from the same scheme.
-      - name: Cache resolved SPM packages
-        uses: actions/cache@v6
-        with:
-          path: ${{ runner.temp }}/DerivedData/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+      # Shared (same key) with ui-accessibility-tests below, since both
+      # resolve the same packages from the same scheme.
+      - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
         run: |
@@ -170,60 +145,19 @@ jobs:
             -only-testing:KurnSwiftDataTests \
             clean test
 
-      # H10 PR 24, item 4: retain enough evidence to diagnose one run without
-      # needing to reproduce it locally. The .xcresult bundle carries the
-      # full test log, timings, and any attachments a failing test captured.
-      - name: Collect simulator/system logs on failure
+      - name: Collect failure diagnostics
         if: failure()
-        run: |
-          set +e
-          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
-          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
-          if [ -n "$booted_udid" ]; then
-            xcrun simctl spawn "$booted_udid" log collect \
-              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
-          fi
-          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
-          exit 0
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/collect-failure-diagnostics
         with:
-          name: unit-tests-failure-diagnostics
-          path: |
-            ${{ runner.temp }}/TestResults.xcresult
-            ${{ runner.temp }}/failure-diagnostics
-          retention-days: 14
+          artifact-name: unit-tests-failure-diagnostics
 
-      # `-enableCodeCoverage YES` above writes coverage into the .xcresult;
-      # `xccov` (bundled with Xcode) turns it into the JSON report Codecov's
-      # uploader understands. `if: always()` so a coverage snapshot still
-      # uploads even when a test failed partway through — the xcresult exists
-      # as soon as the test action starts, not only on a clean pass.
-      - name: Export coverage report
+      - name: Export and upload coverage
         if: always()
-        run: |
-          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
-            xcrun xccov view --report --json "$RUNNER_TEMP/TestResults.xcresult" \
-              > "$RUNNER_TEMP/coverage-unit-tests.json"
-          else
-            echo "::warning::no .xcresult found; skipping coverage export"
-          fi
-
-      # Uploads are informational only (see codecov.yml: `informational:
-      # true`) and never block a merge — `fail_ci_if_error: false` so a
-      # Codecov outage or a not-yet-configured CODECOV_TOKEN can't turn an
-      # otherwise-green PR red over a third-party service this repo doesn't
-      # depend on for correctness.
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v5
+        uses: ./.github/actions/upload-xcode-coverage
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ${{ runner.temp }}/coverage-unit-tests.json
-          flags: unittests
-          fail_ci_if_error: false
+          flag: unittests
+          output-file: coverage-unit-tests.json
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   # UI/accessibility signal: KurnUITests, i.e. AccessibilityAuditUITests
   # (ScreenshotUITests stays excluded here exactly as it is in the scheme —
@@ -246,25 +180,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
+      - uses: ./.github/actions/prepare-simulator
 
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-
-          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
-            xcodebuild -downloadPlatform watchOS
-          fi
-
-      - name: Cache resolved SPM packages
-        uses: actions/cache@v6
-        with:
-          path: ${{ runner.temp }}/DerivedData/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+      - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
         run: |
@@ -283,47 +201,19 @@ jobs:
       # the .xcresult bundle automatically (XCTest's failure-screenshot
       # capture); uploading the bundle carries them without a separate
       # extraction step.
-      - name: Collect simulator/system logs on failure
+      - name: Collect failure diagnostics
         if: failure()
-        run: |
-          set +e
-          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
-          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
-          if [ -n "$booted_udid" ]; then
-            xcrun simctl spawn "$booted_udid" log collect \
-              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
-          fi
-          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
-          exit 0
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/collect-failure-diagnostics
         with:
-          name: ui-accessibility-tests-failure-diagnostics
-          path: |
-            ${{ runner.temp }}/TestResults.xcresult
-            ${{ runner.temp }}/failure-diagnostics
-          retention-days: 14
+          artifact-name: ui-accessibility-tests-failure-diagnostics
 
-      - name: Export coverage report
+      - name: Export and upload coverage
         if: always()
-        run: |
-          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
-            xcrun xccov view --report --json "$RUNNER_TEMP/TestResults.xcresult" \
-              > "$RUNNER_TEMP/coverage-ui-tests.json"
-          else
-            echo "::warning::no .xcresult found; skipping coverage export"
-          fi
-
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v5
+        uses: ./.github/actions/upload-xcode-coverage
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ${{ runner.temp }}/coverage-ui-tests.json
-          flags: uitests
-          fail_ci_if_error: false
+          flag: uitests
+          output-file: coverage-ui-tests.json
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
   # Fast, Xcode-free signal for the KurnCore package (see docs/roadmap.md,
   # "The change that isn't a feature: SPM extraction"): runs in seconds on
@@ -386,6 +276,11 @@ jobs:
     needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # The only job in this workflow that writes to the repository (creates a
+    # GitHub Release). Every other job only needs to read — the workflow-
+    # level default above is `contents: read`.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
