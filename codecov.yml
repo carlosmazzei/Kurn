@@ -1,0 +1,37 @@
+# Codecov configuration.
+#
+# Every status check here is `informational: true` — matching the same "no
+# invented numeric reliability SLO" rule this repo already applies to its
+# own pipeline-evaluation and reliability-hardening reports (see
+# docs/roadmap.md's H10 "Reliability scorecard" section). Codecov's
+# project/patch coverage checks never block a merge; they exist to make
+# coverage visible on the PR, not to gate it on a threshold nobody has
+# established a baseline for yet.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# Three flags, one per CI job that uploads coverage (unit-tests,
+# ui-accessibility-tests in .github/workflows/swift.yml; kurncore-linux for
+# the KurnCore Swift package) — kept separate rather than merged into one
+# number, since a UI-test run and a unit-test run cover very different code
+# and conflating them would make neither figure meaningful.
+flags:
+  unittests:
+    paths:
+      - Kurn/
+  uitests:
+    paths:
+      - Kurn/
+  kurncore:
+    paths:
+      - Packages/KurnCore/
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: false

@@ -165,6 +165,7 @@ jobs:
             -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -enableCodeCoverage YES \
             -only-testing:KurnTests \
             -only-testing:KurnSwiftDataTests \
             clean test
@@ -194,6 +195,35 @@ jobs:
             ${{ runner.temp }}/TestResults.xcresult
             ${{ runner.temp }}/failure-diagnostics
           retention-days: 14
+
+      # `-enableCodeCoverage YES` above writes coverage into the .xcresult;
+      # `xccov` (bundled with Xcode) turns it into the JSON report Codecov's
+      # uploader understands. `if: always()` so a coverage snapshot still
+      # uploads even when a test failed partway through — the xcresult exists
+      # as soon as the test action starts, not only on a clean pass.
+      - name: Export coverage report
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
+            xcrun xccov view --report --json "$RUNNER_TEMP/TestResults.xcresult" \
+              > "$RUNNER_TEMP/coverage-unit-tests.json"
+          else
+            echo "::warning::no .xcresult found; skipping coverage export"
+          fi
+
+      # Uploads are informational only (see codecov.yml: `informational:
+      # true`) and never block a merge — `fail_ci_if_error: false` so a
+      # Codecov outage or a not-yet-configured CODECOV_TOKEN can't turn an
+      # otherwise-green PR red over a third-party service this repo doesn't
+      # depend on for correctness.
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/coverage-unit-tests.json
+          flags: unittests
+          fail_ci_if_error: false
 
   # UI/accessibility signal: KurnUITests, i.e. AccessibilityAuditUITests
   # (ScreenshotUITests stays excluded here exactly as it is in the scheme —
@@ -244,6 +274,7 @@ jobs:
             -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -enableCodeCoverage YES \
             -only-testing:KurnUITests \
             -skip-testing:KurnUITests/ScreenshotUITests \
             clean test
@@ -275,6 +306,25 @@ jobs:
             ${{ runner.temp }}/failure-diagnostics
           retention-days: 14
 
+      - name: Export coverage report
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
+            xcrun xccov view --report --json "$RUNNER_TEMP/TestResults.xcresult" \
+              > "$RUNNER_TEMP/coverage-ui-tests.json"
+          else
+            echo "::warning::no .xcresult found; skipping coverage export"
+          fi
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/coverage-ui-tests.json
+          flags: uitests
+          fail_ci_if_error: false
+
   # Fast, Xcode-free signal for the KurnCore package (see docs/roadmap.md,
   # "The change that isn't a feature: SPM extraction"): runs in seconds on
   # Linux, well before the macOS jobs' simulator boot finishes, and proves
@@ -293,7 +343,44 @@ jobs:
 
       - name: swift test
         working-directory: Packages/KurnCore
-        run: swift test
+        run: swift test --enable-code-coverage
+
+      # SwiftPM's coverage output lands as raw LLVM profile data, not a
+      # report; `llvm-cov export` needs the exact test binary the profile
+      # was recorded against, which SwiftPM doesn't print a path for and
+      # whose name depends on the package's own naming — found by search
+      # rather than assumed. `continue-on-error` (not `|| true` inside the
+      # step, so a real failure here is still visible in the job's UI as a
+      # yellow/skipped step) because this is the one piece of this workflow
+      # with no macOS/Xcode toolchain available anywhere in this project's
+      # authoring environment to verify against a real SwiftPM coverage
+      # build.
+      - name: Export coverage report
+        if: always()
+        continue-on-error: true
+        working-directory: Packages/KurnCore
+        run: |
+          profdata=$(find .build -name "default.profdata" -print -quit)
+          binary=$(find .build -name "*PackageTests.xctest" -o -name "*PackageTests" | grep -v '\.build/checkouts' | head -n1)
+          if [ -z "$profdata" ] || [ -z "$binary" ]; then
+            echo "::warning::could not locate coverage profile/binary; skipping Linux coverage export"
+            exit 0
+          fi
+          test_binary="$binary"
+          if [ -d "$binary" ]; then
+            test_binary=$(find "$binary" -type f -perm -u+x | head -n1)
+          fi
+          llvm-cov export -format=lcov "$test_binary" -instr-profile "$profdata" \
+            > "$RUNNER_TEMP/kurncore-coverage.lcov"
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/kurncore-coverage.lcov
+          flags: kurncore
+          fail_ci_if_error: false
 
   release:
     needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
@@ -340,6 +427,22 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
 
+      # H10 PR 25, item 7: a workflow step runs only after the `release`
+      # environment's approval is already granted, so this can't appear
+      # *before* that decision — GitHub's own approval UI is the only
+      # surface that could, and this workflow can't add to it. What this can
+      # do is leave a durable, hard-to-miss record on the run itself, for
+      # whoever reviews it during or after the fact.
+      - name: Record the physical release checklist reminder
+        run: |
+          {
+            echo "## Physical release checklist"
+            echo
+            echo "Confirm \`docs/release-physical-checklist.md\` was run on a physical device"
+            echo "against this build (or the most recent equivalent build) — this run's approval"
+            echo "does not verify that on its own."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build and upload to TestFlight
         run: bundle exec fastlane beta
         env:
@@ -376,6 +479,18 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
+
+      # Same reminder as `beta`'s, repeated here because `submit` is the
+      # actual point of no return — the build goes to Apple after this.
+      - name: Record the physical release checklist reminder
+        run: |
+          {
+            echo "## Physical release checklist"
+            echo
+            echo "Confirm \`docs/release-physical-checklist.md\` was run on a physical device"
+            echo "against this build before it goes to App Review — this run's approval does"
+            echo "not verify that on its own."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Submit processed build for App Review
         run: bundle exec fastlane submit_review

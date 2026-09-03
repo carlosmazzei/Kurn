@@ -268,16 +268,35 @@ Last updated: 2026-09-01.
   (contextual recovery-action UI buttons and optimistic-UI rollback),
   which were explicitly deferred as known gaps in PR 21's own write-up and
   remain out of scope here.
-- H10 PR 24 (splitting the single `build-and-test` CI job into
-  independently-reporting lint/static-policy/simulator-integration/UI-
-  accessibility signals, retaining `.xcresult` and simulator/system-log
-  artifacts on failure, and a new allow-listed static-policy check for a
-  production `fatalError`, a silently-dropped `ModelContext` save, an ad
-  hoc `URLSession`, and a raw error description logged at `.public`) is
+- **[PR #181](https://github.com/carlosmazzei/Kurn/pull/181), H10 PR 24
+  (splitting the single `build-and-test` CI job into independently-
+  reporting lint/static-policy/simulator-integration/UI-accessibility
+  signals, retaining `.xcresult` and simulator/system-log artifacts on
+  failure, and a new allow-listed static-policy check for a production
+  `fatalError`, a silently-dropped `ModelContext` save, an ad hoc
+  `URLSession`, and a raw error description logged at `.public`), merged
+  into `main`** (commit `6189f1a`). All five real jobs (`lint-and-
+  validate`, `static-policy`, `unit-tests`, `ui-accessibility-tests`,
+  `kurncore-linux`) passed on the first push — confirmed by reading the
+  actual job logs, not just the pass/fail summary: `unit-tests` ran 934
+  tests in 113 suites (`KurnTests`) plus 13 in 3 suites
+  (`KurnSwiftDataTests`), `ui-accessibility-tests` ran 12
+  (`AccessibilityAuditUITests` + `ModelStoreRecoveryUITests`,
+  `ScreenshotUITests` correctly excluded). See "PR 24" below for the full
+  contract. Docs status corrections for H9 PR 23 were bundled in this same
+  PR, per the standing request. **This begins H10**, the last phase in the
+  megaplan.
+- H10 PR 25 (the scheduled/release hardening lane — Thread Sanitizer and a
+  Release-configuration test run against the app's concurrency-sensitive
+  suites, five repeated attempts at the UI/accessibility suite to measure
+  flake rate, a versioned checkbox release checklist, and Codecov coverage
+  reporting for `unit-tests`/`ui-accessibility-tests`/`kurncore-linux`,
+  added at the user's explicit request alongside this PR's own scope) is
   implemented on branch `claude/resilience-roadmap-plan-fn23ki`; see
-  "PR 24" below for what shipped. Docs status corrections for H9 PR 23 are
-  bundled in this same PR, per the same standing request. **This begins
-  H10**, the last phase in the megaplan.
+  "PR 25" below for what shipped. Docs status corrections for H10 PR 24 are
+  bundled in this same PR. **This closes out H10's plan and the megaplan's
+  own PR sequence** (PRs 1–25), except the items each PR along the way
+  named as a deliberate, stated known gap.
 - The Xcode-generated
   `Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` is
   currently unrelated to this track and must not be included without a separate
@@ -356,8 +375,12 @@ Last updated: 2026-09-01.
    `9511f32`). **This closed out H9's plan** except items 2 and 4,
    deliberately deferred as known gaps in PR 21's own write-up. **H10 is
    now in flight**: "PR 24" (split CI signals, retained failure artifacts,
-   and allow-listed static-policy checks) is implemented next, on branch
-   `claude/resilience-roadmap-plan-fn23ki`.
+   and allow-listed static-policy checks) merged as
+   [PR #181](https://github.com/carlosmazzei/Kurn/pull/181) (commit
+   `6189f1a`); "PR 25" (the scheduled/release hardening lane, a versioned
+   physical release checklist, and Codecov coverage reporting) is
+   implemented next, on branch `claude/resilience-roadmap-plan-fn23ki`.
+   **This closes out H10's plan and the megaplan's own PR sequence.**
 3. Keep the physical H1 matrix as a release gate; it does not block later work.
 4. Create the next branch from updated `main` and implement only the next PR
    boundary below.
@@ -401,7 +424,7 @@ Last updated: 2026-09-01.
 | H7    | Done, merged (PR 14/15/16) | `KeychainAccessing` (`KeychainReadOutcome`/`KeychainWriteOutcome`/`KeychainFailureReason`) replaces the old API that collapsed every Security-framework failure into the same value as "not configured"; `migrateToBackgroundAccessible()` now only marks itself complete after a confirmed outcome instead of after a failed fetch; provider credential edits commit only on explicit Save, after URL validation, with a failed Keychain write surfaced instead of silently assumed (PR 14, merged as [#171](https://github.com/carlosmazzei/Kurn/pull/171)). `ModelDownloading` (an injectable actor replacing the old static `ModelFileDownloader`) now verifies a completed download's exact byte count against the server's declared `Content-Length` and, when the origin volunteers one (HuggingFace's `X-Linked-ETag`), its SHA-256, installs atomically via `FileManager.replaceItemAt` with backup-and-restore on any post-install re-verification failure, keeps resume data across a cancelled/interrupted transfer, and wires a Cancel action into every download progress row (PR 15, merged as [#172](https://github.com/carlosmazzei/Kurn/pull/172)). `ModelVerification` now persists a third fact — "does this model actually load" — distinct from consent and from bytes-on-disk: whisper.cpp and sherpa-onnx each get a post-install health probe (`WhisperContext(modelPath:)` / `SherpaOnnxOfflineSpeakerDiarizationWrapper.init?`, both already-failable calls this PR now checks instead of ignoring) that deletes and fails the download outright on a bad file; the four FluidAudio-backed sets get the same fact for free, since `ModelDownloadConsent.download` already fully loads those models as part of downloading them; a storage-inventory pass (`ModelStore.installedModels()`) compares each installed model's current size against its last verified size, flags a mismatch as corrupt, and quietly re-applies `isExcludedFromBackup` if unset; Settings → Storage shows a checkmark/warning per row (PR 16, merged as [#173](https://github.com/carlosmazzei/Kurn/pull/173)). Remaining: pinning whisper.cpp's mutable `resolve/main` source to an immutable revision (no network path to HuggingFace to verify a real commit SHA in the environment both PRs were authored in), and retroactively verifying models installed before PR 16 (they read `.unverified`, not corrupt, until their next re-download).           |
 | H8    | Done, plan fully addressed (PR 17/18/19/20 merged) | `MemoryPressureState` replaces the sticky memory-warning latch (a single boolean, set once, never cleared for the rest of the process) with an observed-at/cooldown/recheck model: new heavy work pauses for a measured interval after the *last* observed warning, then admission re-evaluates automatically, plus a live (non-latched) thermal-state check. `ResourceScheduler`, a global actor-isolated weight budget, gates preprocessing/transcription/diarization/enhancement/model-loading at their existing funnel points so two concurrent transcriptions picking the same heavy engine can't both pass an independent preflight and then both hold that engine's memory at once — generalizing across recordings the jetsam protection `TranscriptionService` already has within one (items 2–3, PR 17). A full audit of every `@unchecked Sendable`/`nonisolated(unsafe)`/continuation bridge fixed two "false timeouts" (`SherpaOnnxDiarizer`, `FluidAudioVAD` — a `TaskGroup` can't return until every child finishes, so racing a sleeping timer against a blocking call neither engine can abort never actually bounded time, it just discarded a valid slow result for a fabricated error), a leaked continuation (`RecorderViewModel`'s mic picker), and an unsynchronized mutable property (`CloudSettingsSync`) (items 4–5, PR 18). `LockScreenRecordingController` now closes the ActivityKit start/end race: a `runID` generation counter, bumped by both `start()` and `end()`, is checked synchronously by the queued start task immediately before the one non-cancellable call (`Activity.request`, which is `throws` but not `async`) that creates a Live Activity nothing would otherwise be tracking to end (item 6, PR 19). `WatchCommand`/`WatchSessionKey` now compile from one file shared into both the `Kurn` and `KurnWatch` targets instead of two independently-typed copies; Watch commands carry a `commandID` the phone deduplicates against (a redelivered duplicate replays its cached outcome instead of re-running the action), a bounded local timeout on the Watch side, and a three-phase `WatchAckPhase` reply (`received`/`stateChanged`/`finalized`) since every command handler in this app already runs synchronously to completion — `stop`'s file finalization included — before its caller learns the outcome; the phone also reconciles a stale application-context recording state on every `WCSession` (re)activation, since a live session never survives process termination (item 7, PR 20). `StartRecordingIntent` gets the same "accepted, not actual capture" semantics: it now awaits `RecordingLauncher`'s acceptance reply (bounded by a timeout) instead of claiming success the instant it posted the request, closing a cold-launch race where an unconfigured `RecordingLauncher` silently swallowed the request (item 8, PR 20). Item 1 (general operation ownership/run IDs) was audited against its own named examples: `MeetingsListView`'s semantic-search debounce already cancels correctly via SwiftUI's `.task(id:)`; `MeetingChatViewModel`'s reply `Task` did not cancel when its owning view was dismissed, now fixed with a `deinit` (PR 20). H8's plan is now fully addressed. |
 | H9    | Done, plan fully addressed except items 2 and 4 (PR 21/22/23 merged) | `AppErrorCategory`/`AppErrorSeverity`/`AppErrorRecoveryAction` and a `privateContext` field extend `AppError` with the presentation metadata item 1 asks for (`Packages/KurnCore/.../AppErrorMetadata.swift`). `TranscriptionViewModel.errorsByRecording` fixes the one concrete "concurrent operations clobber a shared error" case found: the view model is a single app-wide shared instance, so two recordings' transcription failures used to be able to overwrite or misattribute each other through one `error` property; `MeetingDetailView`'s alert now binds to the per-recording accessor instead (PR 21). `ReliabilityEventStore` gives the pre-existing content-free `ReliabilityEvent`/`ReliabilityLog` vocabulary a bounded, protected on-device buffer (item 6); `TranscriptionViewModel.transcribe` gets its own instrumentation, correlated by one `OperationID` per attempt; the four exact sites logging an `AppError`'s raw `errorDescription` at `.public` now log `logCode`/`privateContext` instead; and `ReliabilityEventsListView` (Settings → Diagnostics) lists and shares recent events — every field content-free by construction, so displaying them verbatim already is the redaction preview item 6 asks for (PR 22, merged as [#179](https://github.com/carlosmazzei/Kurn/pull/179)). `HealthRecoveryView` (Settings → Health & Recovery) aggregates six conditions already tracked individually elsewhere — pending capture recovery, quarantined audio, degraded transcripts, failed/deferred transcription jobs, corrupt on-device models, and recent reliability failure codes — behind one screen, dispatching every action to the exact same recovery function its existing per-item UI already calls rather than reimplementing recovery logic (items 7–8, PR 23, merged as [#180](https://github.com/carlosmazzei/Kurn/pull/180)). Remaining, deliberately out of scope for this track: item 2 (contextual recovery-action UI), item 4 (optimistic-UI rollback), a reference ID surfaced in the UI error dialog, `persist()`'s own error surface (still shared, not recording-scoped), health/recovery-center accessibility test coverage, and the broader non-`AppError` raw-log-description sweep. |
-| H10   | Started                | Complete fault matrix, split CI signals, retained artifacts, hardening lane, static checks, and device checklist.                    |
+| H10   | In progress (PR 24 merged, PR 25 implemented) | `.github/workflows/swift.yml`'s single `build-and-test` job is now five parallel jobs (`lint-and-validate`/`static-policy`/`unit-tests`/`ui-accessibility-tests`, plus `kurncore-linux`), each reporting separately, with `.xcresult`/simulator-log retention on failure and a narrow allow-listed static-policy scan for four regression classes (PR 24, merged as [#181](https://github.com/carlosmazzei/Kurn/pull/181)). `.github/workflows/reliability-hardening.yml` (new, weekly + on-demand) adds Thread Sanitizer and Release-configuration runs against the concurrency-sensitive suites, and five repeated UI/accessibility attempts to measure flake rate, summarized without an invented threshold; `docs/release-physical-checklist.md` versions the manual device matrix as an actual checkbox list, referenced from both `beta` and `submit`; Codecov coverage reporting was added across `unit-tests`/`ui-accessibility-tests`/`kurncore-linux`, informational-only per `codecov.yml` (PR 25). Item 1–2's full fault-injection protocol/matrix stays threaded through prior PRs' own fakes rather than landing as one PR — see this section's known gaps. |
 
 ## Completed H1 boundary
 
@@ -2575,10 +2598,16 @@ synthetic diagnostics on failure. Add allow-listed checks for production
 `fatalError`, durability-boundary `try?`, raw public errors, custom destinations,
 and unowned long-lived tasks.
 
-Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
-the verification of record, per "Verifying without a local macOS/Xcode
-toolchain" in `CLAUDE.md` — this PR touches CI itself, so it's the one place
-"CI is the verification" is also the actual subject under test.
+Status: merged into `main` as
+[PR #181](https://github.com/carlosmazzei/Kurn/pull/181) (commit
+`6189f1a`). All five real jobs passed on the first push, confirmed by
+reading the job logs directly rather than trusting the pass/fail summary:
+`unit-tests` ran 934 tests in 113 suites (`KurnTests`) plus 13 in 3 suites
+(`KurnSwiftDataTests`) with zero real failures (the single "error:" grep
+hit was a deliberately-triggered network-error log line inside a
+correction-fallback test, not a failure); `ui-accessibility-tests` ran 12
+tests (`AccessibilityAuditUITests` + `ModelStoreRecoveryUITests`) with
+`ScreenshotUITests` correctly excluded.
 
 **Splitting the signals (item 3).** `.github/workflows/swift.yml`'s single
 `build-and-test` job used to run SwiftLint, both config validators, and the
@@ -2703,6 +2732,127 @@ supported sanitizers, repeated UI subset, and measured flake rate. Keep the
 manual physical checklist versioned and make it a release gate. Record baseline
 counts without inventing a numeric reliability SLO.
 
+Status: implemented on branch `claude/resilience-roadmap-plan-fn23ki`; CI is
+the verification of record, per "Verifying without a local macOS/Xcode
+toolchain" in `CLAUDE.md`. This PR also folds in test-coverage measurement
+and Codecov reporting, added at the user's explicit request alongside its
+own scope rather than as a separate follow-up.
+
+**A new, separate lane, not a widening of `iOS CI` (item 3, 5).**
+`.github/workflows/reliability-hardening.yml` (new) triggers on
+`workflow_dispatch` and a weekly Sunday cron, deliberately not `push`/
+`pull_request` — the whole point of a "scheduled/release hardening lane"
+is that it is slower and noisier than what gates every PR. It has four
+jobs:
+
+- **`thread-sanitizer`** — `-enableThreadSanitizer YES`, run as two
+  independent matrix attempts (not retries of each other; both report).
+  Scoped to the app's concurrency-sensitive suites specifically —
+  `ResourceSchedulerTests`, `ResourceGuardTests`,
+  `TranscriptionRecoveryTests`, `SpeechEnhancerTests`,
+  `RecordingAccessGateTests`, `MeetingChatViewModelTests`,
+  `ChunkedTranscriptionRunnerTests`, `SummaryMapRunnerTests`, and all of
+  `KurnSwiftDataTests` (the target this project already isolated for a
+  known SwiftData concurrency crash) — not the full ~950-test suite,
+  whose TSan-instrumented runtime would make a weekly job impractically
+  slow for little extra signal over the curated set. This is the first
+  Thread Sanitizer configuration in the project; H7/H8's own write-ups
+  named its absence as a stated gap ("no Thread Sanitizer configuration
+  exists yet").
+- **`release-configuration-tests`** — the same `KurnTests`/
+  `KurnSwiftDataTests` selection as `iOS CI`'s `unit-tests`, but
+  `-configuration Release` instead of the implicit Debug every other job
+  uses. Release strips some assertions and enables whole-module
+  optimization, either of which can hide or change the shape of a
+  precondition/concurrency bug a Debug run never exercises.
+- **`ui-flake-rate`** — five independent attempts at the same
+  `-only-testing:KurnUITests -skip-testing:KurnUITests/ScreenshotUITests`
+  selection `ui-accessibility-tests` runs on every PR. Each attempt
+  uploads its own pass/fail marker as an artifact rather than only
+  reporting the matrix job's overall (necessarily coarser) green/red, so
+  the rate is an actual `passed/total`, not a guess from whether any leg
+  went red.
+- **`hardening-summary`** — downloads every attempt's marker, counts
+  `passed/total` per repeated job, and writes a Markdown table to
+  `$GITHUB_STEP_SUMMARY`. No pass/fail gate, no invented numeric SLO —
+  the same "a maintainer reads and records a run by hand" philosophy
+  `pipeline-eval.yml`/`docs/pipeline-evaluation.md` already established
+  for accuracy measurement, applied here to reliability. `needs:` the
+  three job types above but runs with `if: always()` so a red attempt
+  still gets counted rather than skipping the summary.
+
+Migration fixtures (also item 5) are not duplicated into this lane:
+`LegacyStoreAdoptionTests` already runs on every PR inside `unit-tests`,
+and H2's own design generates its legacy-store fixture same-run rather
+than from committed N-1/N-2 binaries (see the H2 schema-baseline handoff),
+so there is no separate fixture surface this lane would add coverage for
+by re-running it on a schedule.
+
+**The versioned physical checklist, made an actual release gate (item
+7).** `docs/release-physical-checklist.md` (new) converts this document's
+prose "Release-only physical matrix" bullets into an actual checkbox list
+a maintainer runs on a real device — Data Protection, screen lock during
+capture, phone/Siri interruption, Bluetooth route changes, background
+expiration, low storage, memory/thermal pressure, Watch reconnect/
+duplicate-command handling, and model compilation/cancellation on real
+hardware. It is genuinely the release gate for everything a Simulator
+cannot reproduce: `beta` and `submit` in `.github/workflows/swift.yml`
+each gained a step that records a reminder to `$GITHUB_STEP_SUMMARY`
+pointing at the file. That step cannot appear *before* the `release`
+GitHub Environment's approval gate — a workflow step only runs after
+approval is already granted, and GitHub's own approval UI is the only
+surface that runs earlier, which this workflow has no way to add to — so
+its role is a durable, hard-to-miss record on the run itself for whoever
+reviews it, not a technical block. The file's own closing section states
+this plainly rather than overclaiming automated enforcement.
+
+**Coverage measurement and Codecov (added at the user's request,
+alongside this PR's own scope).** `unit-tests` and `ui-accessibility-tests`
+in `iOS CI` now pass `-enableCodeCoverage YES` and export a JSON report via
+`xcrun xccov view --report --json` (bundled with Xcode, stable since
+Xcode 11) from the `.xcresult` each already produces; `kurncore-linux`
+adds `swift test --enable-code-coverage` and locates the resulting LLVM
+profile/binary by search (SwiftPM prints no path for either) to export an
+lcov report via `llvm-cov export`. All three upload to Codecov
+(`codecov/codecov-action@v5`, `flags: unittests`/`uitests`/`kurncore` so
+the three surfaces stay distinguishable rather than one blended number)
+with `fail_ci_if_error: false` — a Codecov outage or a not-yet-configured
+`CODECOV_TOKEN` secret must never turn an otherwise-green PR red over a
+third-party service correctness doesn't depend on. `codecov.yml` (new,
+repo root) marks every coverage status `informational: true`: the same
+"no invented numeric SLO" rule this PR's own hardening-lane summary
+follows, applied to coverage — Codecov reports the number, it does not
+gate the merge on one nobody has established a baseline for yet.
+
+**Known gaps, stated plainly.**
+
+- **`CODECOV_TOKEN` is not configured by this PR.** A maintainer needs to
+  connect the repository at codecov.io and add the resulting token as a
+  repo secret; until then, coverage upload steps no-op (by design,
+  `fail_ci_if_error: false`) rather than failing CI.
+- **`kurncore-linux`'s coverage export is the least-verified piece of this
+  PR.** No macOS/Xcode toolchain exists anywhere in this project's
+  authoring environment to run a real `swift test --enable-code-coverage`
+  and confirm the exact `.build/` layout `llvm-cov export` needs; the
+  binary/profile discovery was smoke-tested against a synthetic directory
+  layout standing in for SwiftPM's real output, both the macOS-bundle and
+  Linux-flat-executable shapes, but not against a real build.
+  `continue-on-error: true` on that one step so a wrong path assumption
+  degrades to "no Linux coverage this run," not a red `kurncore-linux`
+  job — which otherwise stays the fast, load-bearing pure-logic signal
+  every PR depends on.
+- **The `xcrun simctl ... log collect` step reused in
+  `reliability-hardening.yml`'s three Xcode jobs carries the same
+  not-yet-exercised-on-a-real-failure caveat PR 24's version does** — see
+  that PR's own known gaps.
+- **Items 1–2 of H10's plan** (the narrow injectable-fault-protocol seams
+  and the full fault-injection matrix as a single, explicit artifact) stay
+  threaded through prior PRs' own fakes (`ClockProviding`,
+  `ReliabilityEventStore`, `ModelDownloading`, and the rest) rather than
+  landing as one PR that introduces them from scratch — consistent with
+  how this track has built durability seams incrementally since H1, not a
+  gap specific to this PR.
+
 ## Dependency graph
 
 ```text
@@ -2749,6 +2899,11 @@ pipeline reports rather than invent temporary state models.
 - Memory and thermal pressure.
 - Watch disconnect/reconnect and duplicate/lost commands.
 - Model compilation/load and cancellation on physical hardware.
+
+The versioned, checkbox form of this matrix a maintainer actually runs
+before a release — H10 PR 25, item 7's "keep the manual physical checklist
+versioned and make it a release gate" — is
+[`docs/release-physical-checklist.md`](release-physical-checklist.md).
 
 ## Explicitly deferred or out of scope
 
