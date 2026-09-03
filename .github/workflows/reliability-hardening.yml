@@ -62,25 +62,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
+      - uses: ./.github/actions/prepare-simulator
 
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-
-          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
-            xcodebuild -downloadPlatform watchOS
-          fi
-
-      - name: Cache resolved SPM packages
-        uses: actions/cache@v6
-        with:
-          path: ${{ runner.temp }}/DerivedData/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+      - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test under Thread Sanitizer
         id: run
@@ -103,28 +87,11 @@ jobs:
             -only-testing:KurnSwiftDataTests \
             clean test
 
-      - name: Collect simulator/system logs on failure
+      - name: Collect failure diagnostics
         if: failure()
-        run: |
-          set +e
-          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
-          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
-          if [ -n "$booted_udid" ]; then
-            xcrun simctl spawn "$booted_udid" log collect \
-              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
-          fi
-          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
-          exit 0
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/collect-failure-diagnostics
         with:
-          name: thread-sanitizer-attempt-${{ matrix.attempt }}-failure-diagnostics
-          path: |
-            ${{ runner.temp }}/TestResults.xcresult
-            ${{ runner.temp }}/failure-diagnostics
-          retention-days: 14
+          artifact-name: thread-sanitizer-attempt-${{ matrix.attempt }}-failure-diagnostics
 
       - name: Record attempt result
         if: always()
@@ -160,25 +127,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
+      - uses: ./.github/actions/prepare-simulator
 
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-
-          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
-            xcodebuild -downloadPlatform watchOS
-          fi
-
-      - name: Cache resolved SPM packages
-        uses: actions/cache@v6
-        with:
-          path: ${{ runner.temp }}/DerivedData/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+      - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test (Release configuration)
         run: |
@@ -193,28 +144,11 @@ jobs:
             -only-testing:KurnSwiftDataTests \
             clean test
 
-      - name: Collect simulator/system logs on failure
+      - name: Collect failure diagnostics
         if: failure()
-        run: |
-          set +e
-          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
-          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
-          if [ -n "$booted_udid" ]; then
-            xcrun simctl spawn "$booted_udid" log collect \
-              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
-          fi
-          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
-          exit 0
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/collect-failure-diagnostics
         with:
-          name: release-configuration-tests-failure-diagnostics
-          path: |
-            ${{ runner.temp }}/TestResults.xcresult
-            ${{ runner.temp }}/failure-diagnostics
-          retention-days: 14
+          artifact-name: release-configuration-tests-failure-diagnostics
 
   # Item 5's "selected UI tests repeated to measure flake rate." Five
   # independent attempts at the same suite `ui-accessibility-tests` in
@@ -238,25 +172,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
+      - uses: ./.github/actions/prepare-simulator
 
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-
-          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
-            xcodebuild -downloadPlatform watchOS
-          fi
-
-      - name: Cache resolved SPM packages
-        uses: actions/cache@v6
-        with:
-          path: ${{ runner.temp }}/DerivedData/SourcePackages
-          key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+      - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
         run: |
@@ -270,28 +188,11 @@ jobs:
             -skip-testing:KurnUITests/ScreenshotUITests \
             clean test
 
-      - name: Collect simulator/system logs on failure
+      - name: Collect failure diagnostics
         if: failure()
-        run: |
-          set +e
-          mkdir -p "$RUNNER_TEMP/failure-diagnostics"
-          booted_udid=$(xcrun simctl list devices booted -j | python3 -c "import json, sys; data = json.load(sys.stdin); devices = [d for group in data['devices'].values() for d in group if d.get('state') == 'Booted']; print(devices[0]['udid'] if devices else '')")
-          if [ -n "$booted_udid" ]; then
-            xcrun simctl spawn "$booted_udid" log collect \
-              --output "$RUNNER_TEMP/failure-diagnostics/simulator.logarchive" || true
-          fi
-          cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
-          exit 0
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/collect-failure-diagnostics
         with:
-          name: ui-flake-rate-attempt-${{ matrix.attempt }}-failure-diagnostics
-          path: |
-            ${{ runner.temp }}/TestResults.xcresult
-            ${{ runner.temp }}/failure-diagnostics
-          retention-days: 14
+          artifact-name: ui-flake-rate-attempt-${{ matrix.attempt }}-failure-diagnostics
 
       - name: Record attempt result
         if: always()
@@ -317,7 +218,7 @@ jobs:
 
     steps:
       - name: Download attempt results
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           pattern: "*-result-*"
           path: ${{ runner.temp }}/results

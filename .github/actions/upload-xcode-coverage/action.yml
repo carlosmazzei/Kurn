@@ -1,0 +1,44 @@
+name: Export and upload Xcode test coverage
+description: >
+  Exports an xccov JSON coverage report from an .xcresult bundle
+  (`-enableCodeCoverage YES` on the test invocation writes the raw coverage
+  into it) and uploads it to Codecov. Call with `if: always()` so a coverage
+  snapshot still uploads even when a test failed partway through — the
+  xcresult exists as soon as the test action starts, not only on a clean
+  pass. The Codecov upload is informational only (see codecov.yml:
+  `informational: true`) and never blocks a merge —
+  `fail_ci_if_error: false` so a Codecov outage or a not-yet-configured
+  CODECOV_TOKEN can't turn an otherwise-green job red over a third-party
+  service this repo doesn't depend on for correctness.
+
+inputs:
+  flag:
+    description: Codecov flag name for this report (see codecov.yml's flags).
+    required: true
+  output-file:
+    description: Filename (written under RUNNER_TEMP) for the exported coverage JSON.
+    required: true
+  codecov-token:
+    description: Codecov upload token (pass secrets.CODECOV_TOKEN).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Export coverage report
+      shell: bash
+      run: |
+        if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
+          xcrun xccov view --report --json "$RUNNER_TEMP/TestResults.xcresult" \
+            > "$RUNNER_TEMP/${{ inputs.output-file }}"
+        else
+          echo "::warning::no .xcresult found; skipping coverage export"
+        fi
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ inputs.codecov-token }}
+        files: ${{ runner.temp }}/${{ inputs.output-file }}
+        flags: ${{ inputs.flag }}
+        fail_ci_if_error: false

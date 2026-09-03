@@ -82,15 +82,7 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Prepare simulator runtimes
-        run: |
-          sudo xcodebuild -runFirstLaunch
-          if ! xcrun simctl list runtimes available | grep -q "iOS"; then
-            xcodebuild -downloadPlatform iOS
-          fi
-          if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
-            xcodebuild -downloadPlatform watchOS
-          fi
+      - uses: ./.github/actions/prepare-simulator
 
       - name: Set up Python
         uses: actions/setup-python@v7
