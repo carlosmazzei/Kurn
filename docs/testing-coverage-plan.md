@@ -108,7 +108,8 @@ Alvo: `Services` 50,8 % → ~58 %, `Infrastructure` 80,9 % → ~90 %.
 Alvo: `TranscriptionService` 7,5 % → ≥ 60 %; `AudioRecorderService`
 20 % → ≥ 55 %; `ViewModels` 32 % → ≥ 55 %.
 
-- **`TranscriptionService`**: mover a criação dos 16 engines para um
+- **`TranscriptionService`** (feito — `Kurn/Services/Pipeline/PipelineEngineCatalog.swift`,
+  `KurnTests/TranscriptionServicePipelineTests.swift`): mover a criação dos 16 engines para um
   `PipelineEngineCatalog` (struct com closures/protocolos por estágio,
   `Sendable`) recebido no `init` com default = engines reais. O
   `transcribe(...)` passa a ser testável de ponta a ponta com fakes por

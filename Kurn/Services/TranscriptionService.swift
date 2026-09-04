@@ -98,27 +98,14 @@ struct TranscriptionService {
     /// Cap on a single fused segment's spoken duration before it's split.
     private let maxSegmentDuration: TimeInterval = TranscriptFusion.defaultMaxSegmentDuration
 
-    // Stage engines are created once and reused across concurrent
-    // transcriptions; the per-stage selectors below map a configuration choice
-    // to one of these existing instances rather than spinning up a new actor
-    // per call. The non-Sendable audio resources stay isolated inside each actor.
-    private let standardPreprocessor = AudioPreprocessor()
-    private let passthroughPreprocessor = PassthroughPreprocessor()
-    private let energyVAD = EnergyVAD()
-    private let fluidAudioVAD = FluidAudioVAD()
-    private let noOpLanguageDetector = NoOpLanguageDetector()
-    private let fluidAudioLanguageDetector = FluidAudioLanguageDetector()
-    private let appleTranscriber = OnDeviceTranscriber()
-    private let fluidAudioTranscriber = FluidAudioTranscriber()
-    private let whisperTranscriber = WhisperTranscriber()
-    private let whisperCppTranscriber = WhisperCppTranscriber()
-    private let heuristicDiarizer = SpeakerDiarizer()
-    private let fluidAudioDiarizer = FluidAudioDiarizer()
-    private let sherpaOnnxDiarizer = SherpaOnnxDiarizer()
-    private let diarizationPreprocessor = DiarizationPreprocessor()
-    private let vadCompactor = VADAudioCompactor()
-    private let noOpCorrector = NoOpTranscriptCorrector()
-    private let llmCorrector = LLMTranscriptCorrector()
+    /// Stage engines, resolved per configuration choice. `.live` holds the
+    /// real engines, created once and shared across concurrent transcriptions;
+    /// tests inject fakes per stage.
+    let engines: PipelineEngineCatalog
+
+    init(engines: PipelineEngineCatalog = .live) {
+        self.engines = engines
+    }
 
     /// Transcribe one recording file and return diarized segments, driving each
     /// pipeline stage through the engine selected in `config`.
@@ -397,50 +384,24 @@ struct TranscriptionService {
 
     // MARK: - Per-stage engine selectors
 
-    // The three selectors below are not `private` only so
-    // `TranscriptionServiceInputPreparation.swift`'s extension can reach them;
-    // nothing outside this type is meant to call them.
+    // Not `private` only so the extensions in
+    // `TranscriptionServiceInputPreparation.swift` and
+    // `TranscriptionServiceCorrection.swift` can reach them.
 
-    /// Map a `PreprocessingEngine` to its (already instantiated) engine.
     func resolvePreprocessor(_ engine: PreprocessingEngine) -> any AudioPreprocessing {
-        switch engine {
-        case .standardDSP: return standardPreprocessor
-        case .none: return passthroughPreprocessor
-        }
+        engines.preprocessor(engine)
     }
 
-    /// Map a `LanguageDetectionEngine` to its engine.
     func resolveLanguageDetector(_ engine: LanguageDetectionEngine) -> any LanguageDetecting {
-        switch engine {
-        case .byTranscriber: return noOpLanguageDetector
-        case .fluidAudioLID: return fluidAudioLanguageDetector
-        }
+        engines.languageDetector(engine)
     }
 
-    /// Map a `TranscriptionEngine` to its engine.
-    private func resolveTranscriber(_ engine: TranscriptionEngine) -> any Transcribing {
-        switch engine {
-        case .appleSpeech: return appleTranscriber
-        case .fluidAudioParakeet: return fluidAudioTranscriber
-        case .whisperAPI: return whisperTranscriber
-        case .whisperCpp: return whisperCppTranscriber
-        }
-    }
-
-    /// Map a `VADEngine` to its engine.
     func resolveVAD(_ engine: VADEngine) -> any VoiceActivityDetecting {
-        switch engine {
-        case .energyThreshold: return energyVAD
-        case .fluidAudio: return fluidAudioVAD
-        }
+        engines.vad(engine)
     }
 
-    /// Map a `CorrectionEngine` to its engine.
     func resolveCorrector(_ engine: CorrectionEngine) -> any TranscriptCorrecting {
-        switch engine {
-        case .none: return noOpCorrector
-        case .llm: return llmCorrector
-        }
+        engines.corrector(engine)
     }
 
     private func validateModelTransferPolicy(_ config: PipelineConfiguration) throws {
@@ -539,7 +500,7 @@ struct TranscriptionService {
         var stages: [PipelineStageReport] = []
         let compaction: CompactionResult?
         do {
-            compaction = try await vadCompactor.compact(url: cleanedURL, regions: regions)
+            compaction = try await engines.compactor.compact(url: cleanedURL, regions: regions)
             // A `nil` result is the compactor declining (nothing worth
             // removing), which is not a failure and must not read as one.
             stages.append(PipelineStageReport(
@@ -567,7 +528,7 @@ struct TranscriptionService {
         try await ResourceGuard.requireTranscriptionHeadroom()
         let target = compaction?.url ?? cleanedURL
         defer {
-            if let url = compaction?.url { vadCompactor.cleanup(url) }
+            if let url = compaction?.url { engines.compactor.cleanup(url) }
         }
 
         let compacted = compaction != nil
@@ -627,54 +588,26 @@ struct TranscriptionService {
         let targetSize = (try? target.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let targetDuration = (try? await AVURLAsset(url: target).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("transcribe: engine input \(target.lastPathComponent, privacy: .public) size=\(targetSize, privacy: .public) bytes duration=\(String(format: "%.1f", targetDuration), privacy: .public)s compacted=\(compacted, privacy: .public)")
-        switch engine {
-        case .whisperAPI:
-            guard cloudTransfer.consented else {
-                throw AppError.permissionDenied(NSLocalizedString(
-                    "error.cloud_transcription_consent_required",
-                    comment: "Cloud transcription requires upload consent"
-                ))
-            }
-            raw = try await whisperTranscriber.transcribeResumable(
-                url: target,
-                language: language,
-                provider: transcriptionProvider,
-                model: transcriptionModel,
-                transferPolicy: cloudTransfer.policy,
-                cutPoints: cutPoints,
-                resume: resume,
-                onChunkCompleted: checkpointSink,
-                onProgress: { progress, completed, total in
-                    onPhase(.transcribing(progress: progress, chunks: total > 0 ? ChunkProgress(completed: completed, total: total) : nil))
-                }
-            )
-        case .appleSpeech:
-            raw = try await appleTranscriber.transcribe(
-                url: target,
-                language: language,
-                onProgress: { progress in
-                    onPhase(.transcribing(progress: progress, chunks: nil))
-                }
-            )
-        case .whisperCpp:
-            raw = try await whisperCppTranscriber.transcribeResumable(
-                url: target,
-                language: language,
-                model: whisperCppModel,
-                cutPoints: cutPoints,
-                resume: resume,
-                onChunkCompleted: checkpointSink,
-                onProgress: { progress, completed, total in
-                    onPhase(.transcribing(progress: progress, chunks: total > 0 ? ChunkProgress(completed: completed, total: total) : nil))
-                }
-            )
-        case .fluidAudioParakeet:
-            raw = try await resolveTranscriber(engine).transcribe(
-                url: target,
-                language: language,
-                onProgress: { progress in onPhase(.transcribing(progress: progress, chunks: nil)) }
-            )
+        if engine == .whisperAPI, !cloudTransfer.consented {
+            throw AppError.permissionDenied(NSLocalizedString(
+                "error.cloud_transcription_consent_required",
+                comment: "Cloud transcription requires upload consent"
+            ))
         }
+        raw = try await engines.transcriber(engine).transcribe(EngineTranscriptionRequest(
+            url: target,
+            language: language,
+            provider: transcriptionProvider,
+            model: transcriptionModel,
+            transferPolicy: cloudTransfer.policy,
+            whisperCppModel: whisperCppModel,
+            cutPoints: cutPoints,
+            resume: resume,
+            onChunkCompleted: checkpointSink,
+            onProgress: { progress, chunks in
+                onPhase(.transcribing(progress: progress, chunks: chunks))
+            }
+        ))
         try await ResourceGuard.requireTranscriptionHeadroom()
         // The engine either produced spans or threw; no spans at all from a
         // clip the VAD found speech in is the one silent-failure shape left.
@@ -701,7 +634,7 @@ struct TranscriptionService {
     /// heuristic engine reuses the pipeline's VAD regions; FluidAudio diarization
     /// is end-to-end and ignores them.
     ///
-    /// `fluidAudioDiarizer` is a single shared actor reused across concurrent
+    /// Each diarizer is a single shared actor reused across concurrent
     /// transcriptions (different recordings can transcribe at once), so the
     /// warning handler is passed as a call argument rather than set on shared
     /// actor state beforehand — that would let one call's handler leak into
@@ -761,7 +694,7 @@ struct TranscriptionService {
         if diarizationPreprocessingEnabled {
             AppLog.transcription.atInfo.info("diarize: preprocessing requested file=\(originalURL.lastPathComponent, privacy: .public); shared preprocessor may queue concurrent recordings")
             do {
-                diarURL = try await diarizationPreprocessor.process(
+                diarURL = try await engines.diarizationPreprocessor.process(
                     url: originalURL,
                     onProgress: { onProgress(0.55 * $0) }
                 )
@@ -784,44 +717,25 @@ struct TranscriptionService {
         onProgress(0.55)
         defer {
             if let url = cleanupURL {
-                Task { [diarizationPreprocessor] in await diarizationPreprocessor.cleanup(url) }
+                let preprocessor = engines.diarizationPreprocessor
+                Task { await preprocessor.cleanup(url) }
             }
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
         try Task.checkCancellation()
-        switch engine {
-        case .heuristic:
-            onProgress(0.65)
-            let turns = await heuristicDiarizer.diarize(url: diarURL, speechRegions: regions)
-            try await ResourceGuard.requireTranscriptionHeadroom()
-            AppLog.transcription.atNotice.notice("diarize: complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
-            onProgress(0.98)
-            // No voiceprints: three scalars and one greedy clustering pass leave
-            // nothing behind that could identify a voice again later.
-            return DiarizationOutcome(turns: turns)
-        case .fluidAudio:
-            onProgress(0.60)
-            let outcome = await fluidAudioDiarizer.outcome(
-                url: diarURL,
-                speakerCount: speakerCount,
-                onDownloadFailure: onWarning,
-                onProgress: { onProgress(0.60 + 0.36 * $0) }
-            )
-            try Task.checkCancellation()
-            try await ResourceGuard.requireTranscriptionHeadroom()
-            let speakers = Set(outcome.turns.map { $0.speakerLabel }).count
-            AppLog.transcription.atNotice.notice("diarize: FluidAudio complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(outcome.turns.count, privacy: .public) speakers=\(speakers, privacy: .public) voiceprints=\(outcome.voiceprints.count, privacy: .public)")
-            onProgress(0.98)
-            return outcome
-        case .sherpaOnnx:
-            onProgress(0.60)
-            let turns = await sherpaOnnxDiarizer.diarize(url: diarURL, speakerCount: speakerCount)
-            try await ResourceGuard.requireTranscriptionHeadroom()
-            AppLog.transcription.atNotice.notice("diarize: SherpaOnnx complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(turns.count, privacy: .public)")
-            onProgress(0.98)
-            // No voiceprints yet: sherpa-onnx's CAM++ embeddings aren't
-            // surfaced through this engine's MVP — see `SherpaOnnxDiarizer`.
-            return DiarizationOutcome(turns: turns)
-        }
+        onProgress(0.60)
+        let outcome = await engines.diarizer(engine).diarize(PipelineDiarizationRequest(
+            url: diarURL,
+            regions: regions,
+            speakerCount: speakerCount,
+            onWarning: onWarning,
+            onProgress: { onProgress(0.60 + 0.36 * $0) }
+        ))
+        try Task.checkCancellation()
+        try await ResourceGuard.requireTranscriptionHeadroom()
+        let speakers = Set(outcome.turns.map { $0.speakerLabel }).count
+        AppLog.transcription.atNotice.notice("diarize: \(engine.rawValue, privacy: .public) complete in \(Date().timeIntervalSince(started), privacy: .public)s, turns=\(outcome.turns.count, privacy: .public) speakers=\(speakers, privacy: .public) voiceprints=\(outcome.voiceprints.count, privacy: .public)")
+        onProgress(0.98)
+        return outcome
     }
 }

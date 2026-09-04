@@ -70,8 +70,8 @@ struct ProviderCircuitBreakerTests {
 
     @Test func openingAndClosingTheCircuitAreDurableReliabilityEvents() async {
         let capture = ReliabilityEventCapture()
-        ReliabilityLog.handler = { capture.record($0) }
-        defer { ReliabilityLog.handler = nil }
+        capture.install()
+        defer { capture.uninstall() }
         let breaker = ProviderCircuitBreaker(store: InMemoryProviderCircuitStore())
         // The handler is process-global and tests run in parallel, so the
         // provider ID must be one no other test emits events for.

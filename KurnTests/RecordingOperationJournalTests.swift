@@ -230,8 +230,8 @@ struct RecordingOperationJournalTests {
         // did happen, so the journal must withdraw it, report the failure, and
         // let the delete finish unjournaled.
         let capture = ReliabilityEventCapture()
-        ReliabilityLog.handler = { capture.record($0) }
-        defer { ReliabilityLog.handler = nil }
+        capture.install()
+        defer { capture.uninstall() }
         let file = try makeAudioFile()
         _ = try RecordingProtection.ensureProtectedDirectory(
             named: RecordingProtection.journalDirectoryName, in: AudioFileStore.ensureRecordingsDirectory()
@@ -253,8 +253,8 @@ struct RecordingOperationJournalTests {
 
     @Test func pendingRecordsSetsAsideAnUnreadableRecordInsteadOfDroppingIt() throws {
         let capture = ReliabilityEventCapture()
-        ReliabilityLog.handler = { capture.record($0) }
-        defer { ReliabilityLog.handler = nil }
+        capture.install()
+        defer { capture.uninstall() }
         let parent = try AudioFileStore.ensureRecordingsDirectory()
         let directory = try RecordingProtection.ensureProtectedDirectory(
             named: RecordingProtection.journalDirectoryName, in: parent

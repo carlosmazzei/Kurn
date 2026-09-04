@@ -17,8 +17,8 @@ struct DocumentGenerationReliabilityEventTests {
 
     @Test func emptySourcesReportsOneFailedValidationEvent() async {
         let capture = ReliabilityEventCapture()
-        ReliabilityLog.handler = { capture.record($0) }
-        defer { ReliabilityLog.handler = nil }
+        capture.install()
+        defer { capture.uninstall() }
 
         let service = DocumentGenerationService()
         await #expect(throws: AppError.self) {
