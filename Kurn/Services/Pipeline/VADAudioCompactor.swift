@@ -110,7 +110,7 @@ enum VADAudioLoader {
     }
 }
 
-struct VADAudioCompactor {
+struct VADAudioCompactor: Sendable {
 
     private let sampleRate: Double = 16_000
 
