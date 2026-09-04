@@ -27,7 +27,10 @@ struct AudioRecorderServiceCaptureTests {
         init(engine: FakeAudioCaptureEngine = FakeAudioCaptureEngine()) {
             self.engine = engine
             sink = FakeAudioSinkWriting()
-            recorder = AudioRecorderService(engine: engine, sink: sink, stallInterval: 2)
+            // The fake engine never delivers buffers, so the real watchdog would
+            // report a stall on any test slow enough under CI load; the stall path
+            // is driven explicitly through `reportCaptureStall()` instead.
+            recorder = AudioRecorderService(engine: engine, sink: sink, stallInterval: 3_600)
             fileName = "capture-test-\(UUID().uuidString).m4a"
         }
 
