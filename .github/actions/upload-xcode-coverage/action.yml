@@ -59,6 +59,18 @@ runs:
 
         echo "exported=true" >> "$GITHUB_OUTPUT"
 
+    - name: Summarize coverage by layer
+      if: steps.export.outputs.exported == 'true'
+      shell: bash
+      env:
+        OUTPUT: ${{ runner.temp }}/${{ inputs.output-file }}
+      run: |
+        {
+          echo "### Coverage (${{ inputs.flag }})"
+          python3 "$GITHUB_WORKSPACE/Tools/coverage_report.py" --root "$GITHUB_WORKSPACE" "$OUTPUT" \
+            || echo "_coverage summary failed; see the lcov artifact_"
+        } >> "$GITHUB_STEP_SUMMARY"
+
     - name: Keep the coverage report as an artifact
       if: steps.export.outputs.exported == 'true'
       uses: actions/upload-artifact@v7

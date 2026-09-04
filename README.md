@@ -370,7 +370,14 @@ top of this file reports. Third-party SwiftPM checkouts and test sources are
 excluded so the number describes first-party production code. Coverage is
 informational only (`codecov.yml` marks every status `informational: true`):
 it is visible on every PR but never blocks a merge, since no coverage
-threshold with a real baseline has been established.
+threshold with a real baseline has been established. `codecov.yml` also
+declares one Codecov *component* per architectural layer (Infrastructure,
+Providers, Models, Services, ViewModels, Views, KurnCore) so the PR comment
+shows where coverage moved, and `Tools/coverage_report.py` writes the same
+per-layer table plus the top uncovered files to each test job's summary.
+The watch app, the Live Activity extension and the App Intents are ignored
+until a job actually executes them. The prioritized plan for raising coverage
+is `docs/testing-coverage-plan.md`.
 
 ### Reliability hardening lane
 
