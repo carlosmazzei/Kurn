@@ -70,6 +70,8 @@ runs:
           exit 0
         fi
 
+        printf 'instrumented binaries:\n'; printf '  %s\n' "${objects[@]}"
+
         args=()
         for obj in "${objects[@]:1}"; do
           args+=(-object "$obj")
@@ -88,7 +90,16 @@ runs:
         fi
 
         echo "exported $(grep -c '^SF:' "$OUTPUT") source files to $OUTPUT"
+        grep '^SF:' "$OUTPUT" | sed 's/^SF:/  /'
         echo "exported=true" >> "$GITHUB_OUTPUT"
+
+    - name: Keep the coverage report as an artifact
+      if: steps.export.outputs.exported == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.output-file }}
+        path: ${{ runner.temp }}/${{ inputs.output-file }}
+        retention-days: 7
 
     - name: Upload coverage to Codecov
       if: steps.export.outputs.exported == 'true'
