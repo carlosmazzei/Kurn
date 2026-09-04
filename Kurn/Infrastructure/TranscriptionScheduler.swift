@@ -148,8 +148,11 @@ enum TranscriptionScheduler {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    // `interruptedRecordings` and `pipelineUsesCoreML` are internal rather than
+    // private only so the scheduling decision can be unit tested without
+    // `BGTaskScheduler`; nothing outside this type is meant to call them.
     @MainActor
-    private static func interruptedRecordings(context: ModelContext) -> [Recording] {
+    static func interruptedRecordings(context: ModelContext) -> [Recording] {
         let pendingRaw = TranscriptionStatus.pending.rawValue
         let inProgressRaw = TranscriptionStatus.inProgress.rawValue
         let readyRaw = RecordingCaptureState.ready.rawValue
@@ -166,7 +169,7 @@ enum TranscriptionScheduler {
     /// does not allow a backgrounded app to do — CoreML model compilation for the
     /// FluidAudio stages, Metal command submission for whisper.cpp. Scheduling a
     /// `BGProcessingTask` for these would burn the window on a guaranteed failure.
-    private static func pipelineUsesCoreML(_ config: PipelineConfiguration) -> Bool {
+    static func pipelineUsesCoreML(_ config: PipelineConfiguration) -> Bool {
         config.transcription == .fluidAudioParakeet
             || config.transcription == .whisperCpp
             || config.vad == .fluidAudio
