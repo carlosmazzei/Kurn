@@ -123,7 +123,12 @@ store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
 `kurncore-linux` (`swift test` for `Packages/KurnCore`). The `release` job
 needs all five. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
-test run and a UI-test flake measurement:
+test run and a UI-test flake measurement. The three test jobs also upload
+lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`, via
+`.github/actions/upload-xcode-coverage` and `llvm-cov export`; the README
+badge reads the `main` total). Coverage is informational only (`codecov.yml`)
+and excludes SwiftPM checkouts and test sources; do not add a coverage
+threshold or make the upload fatal:
 
 - Push the change to its branch and open (or update) a PR targeting `main` — the
   `pull_request` trigger runs the workflow. Pushing to a feature branch alone

@@ -6,6 +6,7 @@
 
 [![Download on the App Store](https://img.shields.io/badge/Download_on_the-App_Store-0D96F6.svg?logo=apple&logoColor=white)](https://apps.apple.com/app/id6804278920)
 [![iOS CI](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml)
+[![codecov](https://codecov.io/gh/carlosmazzei/Kurn/branch/main/graph/badge.svg)](https://codecov.io/gh/carlosmazzei/Kurn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-iOS%2017%2B%20%7C%20watchOS%2010%2B-blue.svg)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
@@ -288,10 +289,18 @@ Use another simulator name if `iPhone 17` is not installed locally.
 
 ## Running Tests
 
-Unit tests live in the `KurnTests` target and use Swift Testing. They cover
-logic such as JSON parsing, Markdown export, SwiftData model helpers, audio
-chunking and preprocessing, provider setup, formatting helpers, and view model
-behavior against an in-memory `ModelContainer`.
+Tests use Swift Testing and are split across four targets:
+
+- `KurnTests` — unit tests for JSON parsing, Markdown export, SwiftData model
+  helpers, audio chunking and preprocessing, provider setup, formatting
+  helpers, the recording journal, the resource scheduler, and view model
+  behavior against an in-memory `ModelContainer`.
+- `KurnSwiftDataTests` — store boot, backup/salvage and other
+  concurrency-sensitive SwiftData suites, isolated in their own process.
+- `KurnUITests` — the accessibility audit (and the fastlane screenshot suite,
+  which only runs via `fastlane screenshots`).
+- `Packages/KurnCore/Tests` — the pure-Foundation package, runnable without
+  Xcode: `(cd Packages/KurnCore && swift test)`.
 
 Run tests from Xcode with `Cmd + U`, or from the terminal:
 
@@ -303,9 +312,37 @@ xcodebuild \
   test
 ```
 
-CI is configured in `.github/workflows/swift.yml` and runs clean test on macOS
-with the `Kurn` scheme, on every push to `main` and every pull request
-targeting it.
+CI is configured in `.github/workflows/swift.yml` (`iOS CI`) and runs on every
+push to `main` and every pull request targeting it, as five independent jobs:
+`lint-and-validate` (SwiftLint, localization and store-metadata checks),
+`static-policy` (`python3 Tools/check_static_policy.py` — bans unchecked
+`save()`, `fatalError`, ad-hoc `URLSession`s and raw error text in public
+logs, against an allow-list baseline that fails when it goes stale),
+`unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
+`ui-accessibility-tests` (`KurnUITests`) and `kurncore-linux` (`swift test`
+for `Packages/KurnCore` on Ubuntu).
+
+### Coverage
+
+The three test jobs export lcov reports (`xcrun llvm-cov export` from the
+Xcode profile data, `llvm-cov export` from SwiftPM's on Linux) and upload
+them to [Codecov](https://codecov.io/gh/carlosmazzei/Kurn) under the
+`unittests`, `uitests` and `kurncore` flags, which is what the badge at the
+top of this file reports. Third-party SwiftPM checkouts and test sources are
+excluded so the number describes first-party production code. Coverage is
+informational only (`codecov.yml` marks every status `informational: true`):
+it is visible on every PR but never blocks a merge, since no coverage
+threshold with a real baseline has been established.
+
+### Reliability hardening lane
+
+`.github/workflows/reliability-hardening.yml` runs weekly and on demand
+rather than on every PR. It re-runs the concurrency-sensitive suites
+(capture ownership, sink faults, the recording journal, the circuit breaker,
+the reliability-event store, model downloads, the SwiftData store boot) under
+Thread Sanitizer, runs the unit-test selection in the Release configuration,
+and measures the UI-test flake rate over five attempts, reporting a
+`passed/total` count without a pass/fail threshold.
 
 A second workflow, `.github/workflows/pipeline-eval.yml`, is a measurement run
 rather than a merge gate: it is dispatched on demand to score the recognition
@@ -397,9 +434,16 @@ Kurn/
 │   └── Pipeline/                # Transcription pipeline stages (protocol seams,
 │                                 # each with a built-in and a FluidAudio engine)
 ├── Providers/                   # OpenAI, Anthropic, Google AI, and Groq clients
-├── Infrastructure/              # Keychain, errors, settings, export, extensions
+├── Infrastructure/              # Keychain, settings, export, store boot, journal,
+│                                 # recovery, reliability events, resource scheduler
+├── DebugSupport/                # Debug-only fault injection hooks
 ├── Resources/                   # Localizations and privacy manifest
 └── Assets.xcassets/             # App icon and accent color
+
+Packages/
+├── KurnCore/                    # Pure-Foundation logic (AppError, ReliabilityEvent,
+│                                 # filesystem/clock seams); `swift test` on Linux
+└── WhisperCpp/                  # Binary target wrapping whisper.cpp's XCFramework
 
 KurnWatch/
 ├── KurnWatchApp.swift            # Watch app entry point
@@ -418,6 +462,40 @@ scheduling and recovery (`TranscriptionScheduler.swift`,
 guardrails and on-device model downloads (`ResourceGuard.swift`,
 `ModelDownloadConsent.swift`), and `RecordingActivityAttributes.swift`, which
 is shared into the `KurnLiveActivityExtension` target rather than duplicated.
+
+### Resilience
+
+Kurn is local-first, so a recording is usually the only copy of the audio.
+The resilience track in [`docs/roadmap.md`](docs/roadmap.md) (H1–H10) turns
+that into concrete rules the code follows:
+
+- **Capture never loses audio silently.** `AudioRecorderService` writes
+  through an `AudioSinkWriting` seam; a sink failure or stall stops the
+  recording, marks it for recovery, and emits a reliability event.
+- **The store boots or asks for help.** `ModelStoreBootCoordinator` takes a
+  pre-open backup and, if Application Support cannot be resolved or the
+  store cannot open, enters an explicit recovery screen instead of silently
+  falling back to a temporary directory. Restore/salvage/fresh-start actions
+  are only offered when a durable directory exists.
+- **File operations are journaled.** `RecordingOperationJournal` records
+  intent → trashed → committed for every destructive file operation and
+  replays it on launch; records it cannot read are quarantined under
+  `Journal/Unreadable` rather than dropped.
+- **Versioned JSON is validated.** `JSONStorage` distinguishes corruption from
+  an envelope written by a newer app version and preserves the original bytes
+  in both cases.
+- **Network and models have limits.** `ProviderCircuitBreaker` opens after
+  repeated provider failures; `ModelFileDownloader` verifies each download
+  (size plus the integrity hash the origin publishes for that transfer) and
+  installs atomically, so a failed download never replaces a working model.
+- **Concurrency has one owner.** Heavy work is admitted through
+  `withResourceReservation` on `ResourceScheduler`, which releases the
+  reservation on success, error and cancellation alike.
+- **Failures are observable and redacted.** `ReliabilityEvent`s carry an
+  operation, stage, outcome and code — never paths, titles, audio or raw error
+  text — into a bounded on-device store surfaced in Settings → Health &
+  Recovery. Public `os.Logger` lines use `Error.publicLogCode`; the static
+  policy check enforces this in CI.
 
 ## Important Implementation Notes
 

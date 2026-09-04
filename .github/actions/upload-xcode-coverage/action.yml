@@ -1,12 +1,16 @@
 name: Export and upload Xcode test coverage
 description: >
-  Exports an xccov JSON coverage report from an .xcresult bundle
-  (`-enableCodeCoverage YES` on the test invocation writes the raw coverage
-  into it) and uploads it to Codecov. Call with `if: always()` so a coverage
-  snapshot still uploads even when a test failed partway through — the
-  xcresult exists as soon as the test action starts, not only on a clean
-  pass. The Codecov upload is informational only (see codecov.yml:
-  `informational: true`) and never blocks a merge —
+  Exports an lcov coverage report from an xcodebuild test run
+  (`-enableCodeCoverage YES` leaves `Coverage.profdata` plus the instrumented
+  binaries under the derived-data path) and uploads it to Codecov. lcov is
+  used because Codecov ingests it natively, whereas `xcrun xccov`'s JSON
+  report is not a supported report type (the uploader accepts the file, but
+  server-side processing fails and the commit shows no coverage).
+  Third-party sources (SwiftPM checkouts, DerivedData) and test sources are
+  excluded so the percentage describes first-party production code only.
+  Call with `if: always()` so a coverage snapshot still uploads even when a
+  test failed partway through. The Codecov upload is informational
+  only (see codecov.yml: `informational: true`) and never blocks a merge —
   `fail_ci_if_error: false` so a Codecov outage or a not-yet-configured
   CODECOV_TOKEN can't turn an otherwise-green job red over a third-party
   service this repo doesn't depend on for correctness.
@@ -16,8 +20,12 @@ inputs:
     description: Codecov flag name for this report (see codecov.yml's flags).
     required: true
   output-file:
-    description: Filename (written under RUNNER_TEMP) for the exported coverage JSON.
+    description: Filename (written under RUNNER_TEMP) for the exported lcov report.
     required: true
+  derived-data-path:
+    description: The -derivedDataPath the test invocation used.
+    required: false
+    default: ${{ runner.temp }}/DerivedData
   codecov-token:
     description: Codecov upload token (pass secrets.CODECOV_TOKEN).
     required: true
@@ -27,13 +35,45 @@ runs:
   steps:
     - name: Export coverage report
       shell: bash
+      env:
+        DERIVED_DATA: ${{ inputs.derived-data-path }}
+        OUTPUT: ${{ runner.temp }}/${{ inputs.output-file }}
       run: |
-        if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
-          xcrun xccov view --report --json "$RUNNER_TEMP/TestResults.xcresult" \
-            > "$RUNNER_TEMP/${{ inputs.output-file }}"
-        else
-          echo "::warning::no .xcresult found; skipping coverage export"
+        profdata=$(find "$DERIVED_DATA/Build/ProfileData" -name "Coverage.profdata" -print -quit 2>/dev/null || true)
+        if [ -z "$profdata" ]; then
+          echo "::warning::no Coverage.profdata found under $DERIVED_DATA; skipping coverage export"
+          exit 0
         fi
+
+        # Every instrumented Mach-O the profile may reference: the app, its
+        # extensions and each test bundle. Bundle layout on the simulator is
+        # flat (`Foo.app/Foo`, `Foo.xctest/Foo`), so the executable is the
+        # bundle's stem inside the bundle.
+        objects=()
+        while IFS= read -r bundle; do
+          name=$(basename "$bundle")
+          exe="$bundle/${name%.*}"
+          if [ -f "$exe" ]; then
+            objects+=("$exe")
+          fi
+        done < <(find "$DERIVED_DATA/Build/Products" \( -name "*.app" -o -name "*.appex" -o -name "*.xctest" \) -type d 2>/dev/null)
+
+        if [ "${#objects[@]}" -eq 0 ]; then
+          echo "::warning::no instrumented binaries found under $DERIVED_DATA/Build/Products; skipping coverage export"
+          exit 0
+        fi
+
+        args=()
+        for obj in "${objects[@]:1}"; do
+          args+=(-object "$obj")
+        done
+
+        xcrun llvm-cov export -format=lcov \
+          -instr-profile "$profdata" \
+          -ignore-filename-regex='(/SourcePackages/|/DerivedData/|/\.build/|/Tests?/|Tests\.swift$)' \
+          "${objects[0]}" "${args[@]}" > "$OUTPUT"
+
+        echo "exported $(grep -c '^SF:' "$OUTPUT") source files to $OUTPUT"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
@@ -41,4 +81,5 @@ runs:
         token: ${{ inputs.codecov-token }}
         files: ${{ runner.temp }}/${{ inputs.output-file }}
         flags: ${{ inputs.flag }}
+        disable_search: true
         fail_ci_if_error: false
