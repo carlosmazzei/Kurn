@@ -34,6 +34,7 @@ runs:
   using: composite
   steps:
     - name: Export coverage report
+      id: export
       shell: bash
       env:
         DERIVED_DATA: ${{ inputs.derived-data-path }}
@@ -46,17 +47,23 @@ runs:
         fi
 
         # Every instrumented Mach-O the profile may reference: the app, its
-        # extensions and each test bundle. Bundle layout on the simulator is
-        # flat (`Foo.app/Foo`, `Foo.xctest/Foo`), so the executable is the
-        # bundle's stem inside the bundle.
+        # extensions and each test bundle. Only the iOS simulator products —
+        # the watchOS companion is built as a dependency but no test runs
+        # against it, and its universal binary makes llvm-cov demand an
+        # `-arch`. Bundle layout on the simulator is flat (`Foo.app/Foo`,
+        # `Foo.xctest/Foo`), so the executable is the bundle's stem inside the
+        # bundle; nested bundles (the watch app inside the iOS app) are skipped.
         objects=()
         while IFS= read -r bundle; do
+          case "$bundle" in
+            */Watch/*|*/PlugIns/*Watch*) continue ;;
+          esac
           name=$(basename "$bundle")
           exe="$bundle/${name%.*}"
           if [ -f "$exe" ]; then
             objects+=("$exe")
           fi
-        done < <(find "$DERIVED_DATA/Build/Products" \( -name "*.app" -o -name "*.appex" -o -name "*.xctest" \) -type d 2>/dev/null)
+        done < <(find "$DERIVED_DATA/Build/Products" -path "*-iphonesimulator/*" \( -name "*.app" -o -name "*.appex" -o -name "*.xctest" \) -type d 2>/dev/null)
 
         if [ "${#objects[@]}" -eq 0 ]; then
           echo "::warning::no instrumented binaries found under $DERIVED_DATA/Build/Products; skipping coverage export"
@@ -68,14 +75,23 @@ runs:
           args+=(-object "$obj")
         done
 
-        xcrun llvm-cov export -format=lcov \
+        # Coverage is informational: a broken export must not turn a green
+        # test job red, so failures degrade to a warning and no upload.
+        if ! xcrun llvm-cov export -format=lcov \
+          -arch "$(uname -m)" \
           -instr-profile "$profdata" \
           -ignore-filename-regex='(/SourcePackages/|/DerivedData/|/\.build/|/Tests?/|Tests\.swift$)' \
-          "${objects[0]}" "${args[@]}" > "$OUTPUT"
+          "${objects[0]}" "${args[@]}" > "$OUTPUT"; then
+          echo "::warning::llvm-cov export failed; skipping coverage upload"
+          rm -f "$OUTPUT"
+          exit 0
+        fi
 
         echo "exported $(grep -c '^SF:' "$OUTPUT") source files to $OUTPUT"
+        echo "exported=true" >> "$GITHUB_OUTPUT"
 
     - name: Upload coverage to Codecov
+      if: steps.export.outputs.exported == 'true'
       uses: codecov/codecov-action@v5
       with:
         token: ${{ inputs.codecov-token }}
