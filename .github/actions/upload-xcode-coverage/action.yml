@@ -1,11 +1,13 @@
 name: Export and upload Xcode test coverage
 description: >
-  Exports an lcov coverage report from an xcodebuild test run
-  (`-enableCodeCoverage YES` leaves `Coverage.profdata` plus the instrumented
-  binaries under the derived-data path) and uploads it to Codecov. lcov is
-  used because Codecov ingests it natively, whereas `xcrun xccov`'s JSON
-  report is not a supported report type (the uploader accepts the file, but
-  server-side processing fails and the commit shows no coverage).
+  Exports an lcov coverage report from an xcodebuild test run and uploads it
+  to Codecov. The report is read from the `.xcresult` bundle through
+  `xcrun xccov view --archive` (Tools/xccov_to_lcov.py), the same data
+  Xcode's coverage pane shows. Neither `xccov`'s JSON report (not a Codecov
+  report type: the upload is accepted but processing fails) nor
+  `llvm-cov export` over `Coverage.profdata` (only the test bundles' own
+  sources came out; the host app's profile never made it into the merged
+  profdata) produced a usable report, and lcov is ingested natively.
   Third-party sources (SwiftPM checkouts, DerivedData) and test sources are
   excluded so the percentage describes first-party production code only.
   Call with `if: always()` so a coverage snapshot still uploads even when a
@@ -22,10 +24,10 @@ inputs:
   output-file:
     description: Filename (written under RUNNER_TEMP) for the exported lcov report.
     required: true
-  derived-data-path:
-    description: The -derivedDataPath the test invocation used.
+  result-bundle-path:
+    description: The -resultBundlePath the test invocation used.
     required: false
-    default: ${{ runner.temp }}/DerivedData
+    default: ${{ runner.temp }}/TestResults.xcresult
   codecov-token:
     description: Codecov upload token (pass secrets.CODECOV_TOKEN).
     required: true
@@ -37,60 +39,24 @@ runs:
       id: export
       shell: bash
       env:
-        DERIVED_DATA: ${{ inputs.derived-data-path }}
+        RESULT_BUNDLE: ${{ inputs.result-bundle-path }}
         OUTPUT: ${{ runner.temp }}/${{ inputs.output-file }}
       run: |
-        profdata=$(find "$DERIVED_DATA/Build/ProfileData" -name "Coverage.profdata" -print -quit 2>/dev/null || true)
-        if [ -z "$profdata" ]; then
-          echo "::warning::no Coverage.profdata found under $DERIVED_DATA; skipping coverage export"
+        if [ ! -d "$RESULT_BUNDLE" ]; then
+          echo "::warning::no result bundle at $RESULT_BUNDLE; skipping coverage export"
           exit 0
         fi
-
-        # Every instrumented Mach-O the profile may reference: the app, its
-        # extensions and each test bundle. Only the iOS simulator products —
-        # the watchOS companion is built as a dependency but no test runs
-        # against it, and its universal binary makes llvm-cov demand an
-        # `-arch`. Bundle layout on the simulator is flat (`Foo.app/Foo`,
-        # `Foo.xctest/Foo`), so the executable is the bundle's stem inside the
-        # bundle; nested bundles (the watch app inside the iOS app) are skipped.
-        objects=()
-        while IFS= read -r bundle; do
-          case "$bundle" in
-            */Watch/*|*/PlugIns/*Watch*) continue ;;
-          esac
-          name=$(basename "$bundle")
-          exe="$bundle/${name%.*}"
-          if [ -f "$exe" ]; then
-            objects+=("$exe")
-          fi
-        done < <(find "$DERIVED_DATA/Build/Products" -path "*-iphonesimulator/*" \( -name "*.app" -o -name "*.appex" -o -name "*.xctest" \) -type d 2>/dev/null)
-
-        if [ "${#objects[@]}" -eq 0 ]; then
-          echo "::warning::no instrumented binaries found under $DERIVED_DATA/Build/Products; skipping coverage export"
-          exit 0
-        fi
-
-        printf 'instrumented binaries:\n'; printf '  %s\n' "${objects[@]}"
-
-        args=()
-        for obj in "${objects[@]:1}"; do
-          args+=(-object "$obj")
-        done
 
         # Coverage is informational: a broken export must not turn a green
         # test job red, so failures degrade to a warning and no upload.
-        if ! xcrun llvm-cov export -format=lcov \
-          -arch "$(uname -m)" \
-          -instr-profile "$profdata" \
-          -ignore-filename-regex='(/SourcePackages/|/DerivedData/|/\.build/|/Tests?/|Tests\.swift$)' \
-          "${objects[0]}" "${args[@]}" > "$OUTPUT"; then
-          echo "::warning::llvm-cov export failed; skipping coverage upload"
+        if ! python3 "$GITHUB_WORKSPACE/Tools/xccov_to_lcov.py" \
+          "$RESULT_BUNDLE" "$OUTPUT" \
+          '(/SourcePackages/|/DerivedData/|/\.build/|/Kurn[A-Za-z]*Tests/|Tests\.swift$)'; then
+          echo "::warning::coverage export from $RESULT_BUNDLE failed; skipping coverage upload"
           rm -f "$OUTPUT"
           exit 0
         fi
 
-        echo "exported $(grep -c '^SF:' "$OUTPUT") source files to $OUTPUT"
-        grep '^SF:' "$OUTPUT" | sed 's/^SF:/  /'
         echo "exported=true" >> "$GITHUB_OUTPUT"
 
     - name: Keep the coverage report as an artifact
