@@ -59,6 +59,18 @@ enum RecordingOperationJournal {
             .appendingPathComponent(RecordingProtection.journalDirectoryName, isDirectory: true)
     }
 
+    /// Subdirectory of the journal holding records that could not be decoded.
+    /// They are moved here rather than deleted so a corrupt record is
+    /// preserved for diagnosis, and rather than left in place so replay does
+    /// not rediscover (and re-report) them on every launch.
+    static let unreadableDirectoryName = "Unreadable"
+
+    static var unreadableDirectoryURL: URL {
+        journalDirectoryURL.appendingPathComponent(unreadableDirectoryName, isDirectory: true)
+    }
+
+    static let reliabilityOperation = "recording_journal"
+
     // MARK: - Journaled delete
 
     /// Runs a delete as journaled trash → model commit → purge. `commit` is
@@ -67,28 +79,32 @@ enum RecordingOperationJournal {
     /// commit's failure so the caller can surface it.
     @discardableResult
     @MainActor
-    static func performDelete(fileNames: [String], commit: () -> AppError?) -> AppError? {
+    static func performDelete(
+        fileNames: [String],
+        fileManager: FileManager = .default,
+        commit: () -> AppError?
+    ) -> AppError? {
         let operationID = UUID()
-        let journaled = write(Record(
+        var journaled = write(Record(
             id: operationID,
             kind: .delete,
             fileNames: fileNames,
             startedAt: Date(),
             state: .intent
-        ))
+        ), fileManager: fileManager)
 
         RecordingTrash.trash(fileNames: fileNames, operationID: operationID)
-        if journaled { advance(operationID, to: .trashed) }
+        if journaled { journaled = advance(operationID, to: .trashed, fileManager: fileManager) }
 
         if let failure = commit() {
             RecordingTrash.restore(operationID: operationID)
-            removeRecord(operationID)
+            removeRecord(operationID, fileManager: fileManager)
             return failure
         }
 
-        if journaled { advance(operationID, to: .committed) }
+        if journaled { journaled = advance(operationID, to: .committed, fileManager: fileManager) }
         RecordingTrash.purge(operationID: operationID)
-        removeRecord(operationID)
+        removeRecord(operationID, fileManager: fileManager)
         return nil
     }
 
@@ -143,6 +159,13 @@ enum RecordingOperationJournal {
             AppLog.recorder.atNotice.notice(
                 "journal: replayed \(record.kind.rawValue, privacy: .public) op in state \(record.state.rawValue, privacy: .public)"
             )
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: reliabilityID(record.id),
+                operation: reliabilityOperation,
+                stage: "replay",
+                outcome: .succeeded,
+                code: "\(record.kind.rawValue)_\(record.state.rawValue)"
+            ))
         }
     }
 
@@ -181,6 +204,11 @@ enum RecordingOperationJournal {
 
     // MARK: - Record storage
 
+    /// Every readable record, oldest first. A record that cannot be read or
+    /// decoded is set aside under `unreadableDirectoryURL` and reported,
+    /// never silently dropped: its trash folder (if any) is still reconciled
+    /// by `RecordingTrash.sweep`, which consults the store rather than the
+    /// record, so setting the record aside loses no audio.
     static func pendingRecords(fileManager: FileManager = .default) -> [Record] {
         guard let items = try? fileManager.contentsOfDirectory(
             at: journalDirectoryURL,
@@ -188,13 +216,35 @@ enum RecordingOperationJournal {
             options: [.skipsHiddenFiles]
         ) else { return [] }
         let decoder = JSONDecoder()
-        return items
-            .filter { $0.pathExtension == "json" }
-            .compactMap { url in
-                guard let data = try? Data(contentsOf: url) else { return nil }
-                return try? decoder.decode(Record.self, from: data)
+        var records: [Record] = []
+        for url in items where url.pathExtension == "json" {
+            do {
+                records.append(try decoder.decode(Record.self, from: Data(contentsOf: url)))
+            } catch {
+                setAsideUnreadable(url, fileManager: fileManager)
             }
-            .sorted { $0.startedAt < $1.startedAt }
+        }
+        return records.sorted { $0.startedAt < $1.startedAt }
+    }
+
+    private static func setAsideUnreadable(_ url: URL, fileManager: FileManager) {
+        let name = url.lastPathComponent
+        do {
+            let directory = try RecordingProtection.ensureProtectedDirectory(
+                named: "\(RecordingProtection.journalDirectoryName)/\(unreadableDirectoryName)",
+                in: AudioFileStore.recordingsDirectoryURL,
+                fileManager: fileManager
+            )
+            let destination = directory.appendingPathComponent(name)
+            try? fileManager.removeItem(at: destination)
+            try fileManager.moveItem(at: url, to: destination)
+            reportFailure(operationID: operationIDFromFileName(name), stage: "replay", code: "journal_record_unreadable")
+        } catch {
+            AppLog.recorder.atError.error(
+                "journal: unreadable record could not be set aside code=\(error.publicLogCode, privacy: .public)"
+            )
+            reportFailure(operationID: operationIDFromFileName(name), stage: "replay", code: "journal_record_stuck")
+        }
     }
 
     /// Durably write `record`, creating the protected journal directory as
@@ -215,16 +265,31 @@ enum RecordingOperationJournal {
             return true
         } catch {
             AppLog.recorder.atError.error(
-                "journal: could not record \(record.kind.rawValue, privacy: .public) intent: \(error.localizedDescription, privacy: .public)"
+                "journal: could not record \(record.kind.rawValue, privacy: .public) intent code=\(error.publicLogCode, privacy: .public)"
             )
+            reportFailure(operationID: record.id, stage: record.state.rawValue, code: "journal_write_failed")
             return false
         }
     }
 
-    private static func advance(_ operationID: UUID, to state: State) {
-        guard var record = read(operationID) else { return }
+    /// Durably move `operationID`'s record to `state`. Returns false — and
+    /// withdraws the record — when the marker could not be written: a record
+    /// frozen at a stale state would make replay roll back a commit that did
+    /// happen, whereas with no record `RecordingTrash.sweep` resolves the
+    /// trash folder from the store. The operation continues unjournaled.
+    private static func advance(_ operationID: UUID, to state: State, fileManager: FileManager) -> Bool {
+        guard var record = read(operationID) else {
+            reportFailure(operationID: operationID, stage: state.rawValue, code: "journal_record_missing")
+            removeRecord(operationID, fileManager: fileManager)
+            return false
+        }
         record.state = state
-        write(record)
+        guard write(record, fileManager: fileManager) else {
+            reportFailure(operationID: operationID, stage: state.rawValue, code: "journal_advance_failed")
+            removeRecord(operationID, fileManager: fileManager)
+            return false
+        }
+        return true
     }
 
     private static func read(_ operationID: UUID) -> Record? {
@@ -232,8 +297,35 @@ enum RecordingOperationJournal {
         return try? JSONDecoder().decode(Record.self, from: data)
     }
 
-    static func removeRecord(_ operationID: UUID) {
-        try? FileManager.default.removeItem(at: recordURL(operationID, in: journalDirectoryURL))
+    static func removeRecord(_ operationID: UUID, fileManager: FileManager = .default) {
+        let url = recordURL(operationID, in: journalDirectoryURL)
+        do {
+            try fileManager.removeItem(at: url)
+        } catch {
+            guard fileManager.fileExists(atPath: url.path) else { return }
+            reportFailure(operationID: operationID, stage: "remove", code: "journal_record_stuck")
+        }
+    }
+
+    private static func reportFailure(operationID: UUID, stage: String, code: String) {
+        AppLog.recorder.atError.error(
+            "journal: \(code, privacy: .public) stage=\(stage, privacy: .public)"
+        )
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: reliabilityID(operationID),
+            operation: reliabilityOperation,
+            stage: stage,
+            outcome: .failed,
+            code: code
+        ))
+    }
+
+    private static func reliabilityID(_ operationID: UUID) -> OperationID {
+        OperationID(String(operationID.uuidString.prefix(8)))
+    }
+
+    private static func operationIDFromFileName(_ name: String) -> UUID {
+        UUID(uuidString: (name as NSString).deletingPathExtension) ?? UUID()
     }
 
     private static func recordURL(_ operationID: UUID, in directory: URL) -> URL {

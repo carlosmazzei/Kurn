@@ -40,7 +40,7 @@ extension ModelContext: ModelPersisting {
             try save()
             return nil
         } catch {
-            AppLog.persistence.atError.error("Failed to save context: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence.atError.error("Failed to save context code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return .persistenceFailed(error.localizedDescription)
         }
     }

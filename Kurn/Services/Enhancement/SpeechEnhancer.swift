@@ -103,7 +103,7 @@ actor SpeechEnhancer: SpeechEnhancing {
             streams[streamID] = try StreamState(config: config, model: model)
             return streamID
         } catch {
-            AppLog.recorder.atError.error("enhance: could not initialize GTCRN tensors: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("enhance: could not initialize GTCRN tensors code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return nil
         }
     }
@@ -117,7 +117,7 @@ actor SpeechEnhancer: SpeechEnhancing {
             }
             return output
         } catch {
-            AppLog.recorder.atError.error("enhance: GTCRN inference failed, using DSP only: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("enhance: GTCRN inference failed, using DSP only code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return nil
         }
     }
@@ -153,7 +153,7 @@ actor SpeechEnhancer: SpeechEnhancing {
             modelConfiguration.computeUnits = .all
             model = try MLModel(contentsOf: url, configuration: modelConfiguration)
         } catch {
-            AppLog.recorder.atError.error("enhance: could not load GTCRN: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("enhance: could not load GTCRN code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
         return model
     }

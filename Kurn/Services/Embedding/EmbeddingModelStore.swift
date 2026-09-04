@@ -63,7 +63,7 @@ actor EmbeddingModelStore {
         do {
             try await task.value
         } catch {
-            AppLog.transcription.atError.error("embedding: model load failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("embedding: model load failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             throw error
         }
         guard let model else {

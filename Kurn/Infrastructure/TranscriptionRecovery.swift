@@ -52,7 +52,7 @@ enum TranscriptionRecovery {
         var resumable = 0
         for recording in stale {
             let outcome = recording.transcriptionCheckpointOutcome
-            if outcome.isCorrupted {
+            if outcome.isUnreadable {
                 // A checkpoint that fails to decode or verify cannot say what
                 // engine produced it, so it gets the same treatment as cloud
                 // or unknown work: manual retry, never an automatic resume
@@ -83,7 +83,7 @@ enum TranscriptionRecovery {
             try context.save()
             AppLog.transcription.atNotice.notice("recovery: swept \(stale.count, privacy: .public) stale transcription(s), \(resumable, privacy: .public) safe to resume")
         } catch {
-            AppLog.transcription.atError.error("recovery: sweep save failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("recovery: sweep save failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 }

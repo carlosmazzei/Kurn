@@ -39,6 +39,10 @@ enum ModelStoreDebugInjection {
             // `makeStore()` error. Included only so this switch stays
             // exhaustive as `ModelStoreOpenFailureReason` grows.
             return NSError(domain: "ai.kurn.debug.syntheticStoreOpenFailure", code: -2)
+        case .applicationSupportUnavailable:
+            // Likewise produced directly by the coordinator when Application
+            // Support cannot be resolved, before `makeStore()` is ever called.
+            return NSError(domain: "ai.kurn.debug.syntheticStoreOpenFailure", code: -3)
         }
     }
 }

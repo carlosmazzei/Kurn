@@ -106,11 +106,13 @@ enum RecordingQuarantine {
         } catch {
             // Leave the original in place: quarantine preserves, never loses.
             AppLog.recorder.atError.error(
-                "quarantine: failed to preserve original reason=\(reason.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                "quarantine: failed to preserve original reason=\(reason.rawValue, privacy: .public) code=\(error.publicLogCode, privacy: .public)"
             )
+            CaptureReliability.quarantined(fileName: fileName, reason: reason, preserved: false)
             return false
         }
         RecordingProtection.apply(to: itemURL.appendingPathComponent(fileName))
+        CaptureReliability.quarantined(fileName: fileName, reason: reason, preserved: true)
 
         // The audio is now safe. Metadata is best-effort on top: if the
         // sidecar can't be written, `items()` synthesizes attributes from the

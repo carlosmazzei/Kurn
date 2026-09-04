@@ -363,7 +363,7 @@ final class RecorderViewModel {
             if liveTranscriptionEnabled { await liveTranscription.stop() }
         } catch {
             if cancellationRequested { return }
-            AppLog.recorderUI.atError.error("startRecording: error: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorderUI.atError.error("startRecording: error code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             recoverFailedStart(recording)
             await liveStartTask?.value
             if liveTranscriptionEnabled { await liveTranscription.stop() }
@@ -449,6 +449,7 @@ final class RecorderViewModel {
             recording.captureState = .recoveryNeeded
             recording.captureRecoveryReason = .unreadableFile
         }
+        CaptureReliability.finalized(fileName: recording.fileName, reason: recording.captureRecoveryReason)
 
         do {
             try lifecycleSaver.save(modelContext)

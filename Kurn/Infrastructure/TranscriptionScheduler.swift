@@ -74,7 +74,7 @@ enum TranscriptionScheduler {
             try BGTaskScheduler.shared.submit(request)
             AppLog.transcription.atNotice.notice("bgTask: scheduled for \(pending.count, privacy: .public) pending recording(s)")
         } catch {
-            AppLog.transcription.atError.error("bgTask: submit failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("bgTask: submit failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 

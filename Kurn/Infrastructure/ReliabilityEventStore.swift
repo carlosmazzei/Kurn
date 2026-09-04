@@ -101,7 +101,7 @@ enum ReliabilityEventStore {
             }
             pruneIfNeeded()
         } catch {
-            AppLog.reliability.atError.error("ReliabilityEventStore: append failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.reliability.atError.error("ReliabilityEventStore: append failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 

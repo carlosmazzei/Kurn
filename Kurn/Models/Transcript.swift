@@ -74,7 +74,7 @@ final class Transcript {
     /// tell apart from corruption. Surfaced in `MeetingDetailView`'s
     /// transcript tab rather than rendered as "no speech detected".
     var isSegmentsDataCorrupted: Bool {
-        JSONStorage.decodeAuthoritative([TranscriptSegment].self, from: segmentsData).isCorrupted
+        JSONStorage.decodeAuthoritative([TranscriptSegment].self, from: segmentsData).isUnreadable
     }
 
     /// Flattened plain text, one line per segment, for sharing/export.

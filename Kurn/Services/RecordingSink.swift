@@ -395,7 +395,7 @@ enum AudioRecorderEngineSupport {
             )
             AppLog.recorder.atDebug.debug("configureSession: active route=\(session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ","), privacy: .public) sampleRate=\(session.sampleRate, privacy: .public)")
         } catch {
-            AppLog.recorder.atError.error("configureSession: failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("configureSession: failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             throw AppError.audioError(error.localizedDescription)
         }
     }
@@ -413,7 +413,7 @@ enum AudioRecorderEngineSupport {
                 return
             } catch {
                 if attempt == attempts { throw error }
-                AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying: \(error.localizedDescription, privacy: .public)")
+                AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 try? await Task.sleep(nanoseconds: 200_000_000)
             }
         }

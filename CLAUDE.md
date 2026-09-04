@@ -22,14 +22,20 @@ directly (see "Navigation chrome" below); the watchOS companion still targets
 watchOS 10.0. There is no `#available` fallback for pre-26 iOS — the floor is the
 deployment target.
 
-The project is an Xcode project (`Kurn.xcodeproj`) with three targets: `Kurn`
+The project is an Xcode project (`Kurn.xcodeproj`) with three app targets: `Kurn`
 (app), `KurnWatch` (watchOS companion), and `KurnLiveActivityExtension`
-(widget/Live Activity). Tests live in `KurnTests` (Swift Testing, not XCTest).
-There is no root `Package.swift`; the one package manifest in the repo is
-`Packages/WhisperCpp/Package.swift`, a local package whose only target is a
-`.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework release
-asset (see "On-device Whisper (whisper.cpp)" below). The only remote package is
-FluidAudio.
+(widget/Live Activity). Tests live in `KurnTests` (Swift Testing, not XCTest),
+`KurnSwiftDataTests` (SwiftData store boot/salvage and concurrency-sensitive
+suites, split into their own target for process isolation), `KurnUITests`
+(accessibility audit and fastlane screenshots) and `KurnWatchUITests`.
+There is no root `Package.swift`; two local packages live under `Packages/`:
+`Packages/KurnCore` (pure-Foundation logic — `AppError`, `ReliabilityEvent`,
+the filesystem/clock seams, the transcript pipeline value types — compiled and
+tested with `swift test` on Linux, no Xcode needed; see
+`Packages/KurnCore/Package.swift`) and `Packages/WhisperCpp`, whose only target
+is a `.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework
+release asset (see "On-device Whisper (whisper.cpp)" below). The only remote
+package is FluidAudio.
 
 ## Commands
 
@@ -53,6 +59,10 @@ xcodebuild -project Kurn.xcodeproj -scheme Kurn \
 
 # Lint (must pass before build in CI)
 swiftlint lint --config .swiftlint.yml
+
+# Xcode-free checks that also run in CI (work on Linux)
+python3 Tools/check_static_policy.py
+(cd Packages/KurnCore && swift test)
 ```
 
 If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
@@ -67,7 +77,7 @@ substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
 which reorder unrelated parts of this file because it uses Xcode 16
 file-system-synchronized groups), then commits, tags `vX.Y.Z`, and pushes —
 run locally by a maintainer. Pushing that tag starts the pipeline in
-`.github/workflows/swift.yml` after `build-and-test`: `release` publishes the
+`.github/workflows/swift.yml` once all five CI jobs pass: `release` publishes the
 GitHub Release; `beta` signs via readonly `fastlane match`, uploads to TestFlight,
 and waits for Apple processing; and `store-assets` calls the reusable
 `.github/workflows/screenshots.yml` to capture iPhone/iPad/Watch screenshots and
@@ -105,17 +115,24 @@ function body at 120, cyclomatic complexity at 15, type body at 400.
 Builds and tests require macOS + Xcode, so they can't run in Linux/CI agents or
 any environment without the Apple toolchain. When you cannot build or test
 locally, **do not claim a change compiles or passes — verify it through the
-GitHub Actions `iOS CI` workflow** (`.github/workflows/swift.yml`), which builds,
-lints, and runs the full test suite on a macOS runner:
+GitHub Actions `iOS CI` workflow** (`.github/workflows/swift.yml`). It is five
+independently-reporting jobs: `lint-and-validate` (SwiftLint, localization and
+store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
+`unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
+`ui-accessibility-tests` (`KurnUITests` minus the screenshot suite) and
+`kurncore-linux` (`swift test` for `Packages/KurnCore`). The `release` job
+needs all five. The weekly/on-demand `reliability-hardening.yml` adds a Thread
+Sanitizer run over the concurrency-sensitive suites, a Release-configuration
+test run and a UI-test flake measurement:
 
 - Push the change to its branch and open (or update) a PR targeting `main` — the
   `pull_request` trigger runs the workflow. Pushing to a feature branch alone
   does **not** trigger CI; only `push` to `main` and PRs to `main` do.
 - Read the run's outcome with the GitHub Actions tooling/API: fetch the
-  `build-and-test` job logs and grep for `error:` (compile failures),
-  `recorded an issue` / `** TEST FAILED **` (test failures), and the final
-  result line. Treat a green run as the source of truth that it compiles and
-  passes.
+  `unit-tests` (or `ui-accessibility-tests`) job logs and grep for `error:`
+  (compile failures), `recorded an issue` / `** TEST FAILED **` (test
+  failures), and the final result line. Treat a green run as the source of
+  truth that it compiles and passes.
 - Iterate against CI: each fix can surface the next latent error (the Swift
   build stops at the first error), so expect several rounds. State plainly that
   results are pending/observed from CI rather than asserting local success.
@@ -1493,10 +1510,25 @@ enforced by lint and by a CI audit test, not just convention:
   `.error`/`.fault` for failures. The user controls the threshold in Settings
   (persisted via `AppSettings.logLevel`); `.off` silences everything. The launch
   default is `.notice`, overridable with `KURN_LOG_LEVEL=debug|info|notice|error|off`
-  or `KURN_LOG=0`. Mark interpolated values `privacy:` explicitly.
+  or `KURN_LOG=0`. Mark interpolated values `privacy:` explicitly. Never log an
+  error's `localizedDescription` at `.public`: log `error.publicLogCode`
+  (`Infrastructure/Extensions/Error+LogCode.swift` — an `AppError`'s `logCode`,
+  otherwise NSError domain and numeric code) at `.public` and the text at
+  `.private`. `Tools/check_static_policy.py` fails CI on a new `.public`
+  description, and its baseline only shrinks (a stale entry is an error).
+- **Reliability events:** a failure the user may need to recover from later —
+  capture, store boot, journal replay, model install, provider circuit,
+  transcription/document stages — is recorded as a `ReliabilityEvent`
+  (`KurnCore`) via `ReliabilityLog.record`, never only as a log line. Events
+  carry fixed codes and short IDs (`OperationID`), no content, paths or error
+  text; `CaptureReliability` is the seam for the capture path.
 - **Concurrency:** services are `Sendable` value types callable off the main actor;
   view models and anything touching SwiftData/UI are `@MainActor`. Preserve these
-  boundaries when adding code.
+  boundaries when adding code. Heavy pipeline work (preprocessing, ASR, diarization,
+  enhancement, model loading) reserves its `ResourceWorkKind` weight through
+  `withResourceReservation(_:on:_:)` (`Infrastructure/ResourceScheduler.swift`),
+  which releases in the same async flow on return, throw and cancellation — do not
+  pair `acquire` with a `defer { Task { release } }`.
 - **Tests:** Swift Testing (`@Test`, `#expect`). Use
   `TestModelContainer.make()` for an in-memory `ModelContainer` when exercising real
   SwiftData relationship behavior.

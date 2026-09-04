@@ -68,6 +68,23 @@ struct ProviderCircuitBreakerTests {
         #expect(await restored.allows(providerID: "openai", trigger: .automatic))
     }
 
+    @Test func openingAndClosingTheCircuitAreDurableReliabilityEvents() async {
+        let capture = ReliabilityEventCapture()
+        ReliabilityLog.handler = { capture.record($0) }
+        defer { ReliabilityLog.handler = nil }
+        let breaker = ProviderCircuitBreaker(store: InMemoryProviderCircuitStore())
+
+        await breaker.recordSuccess(providerID: "openai")
+        await breaker.recordFailure(providerID: "openai", failure: .transient)
+        await breaker.recordFailure(providerID: "openai", failure: .configuration)
+        await breaker.recordSuccess(providerID: "openai")
+
+        let events = capture.recorded.filter { $0.operation == "provider_circuit" && $0.stage == "openai" }
+        #expect(events.map(\.code) == ["circuit_open_transient", "circuit_open_configuration", "circuit_closed"])
+        #expect(events.map(\.outcome) == [.failed, .failed, .succeeded])
+        #expect(events.map(\.attempt) == [1, 2, 0])
+    }
+
     @Test func errorsAreClassifiedWithoutPersistingTheirMessages() {
         #expect(ProviderCircuitFailure(error: AppError.ambiguousProviderResult) == .ambiguous)
         #expect(ProviderCircuitFailure(error: AppError.invalidProviderURL) == .configuration)

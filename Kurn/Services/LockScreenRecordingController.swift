@@ -99,7 +99,7 @@ final class LockScreenRecordingController {
                 )
                 AppLog.recorderUI.atNotice.notice("LockScreenRecordingController: Live Activity started")
             } catch {
-                AppLog.recorderUI.atError.error("LockScreenRecordingController: Activity.request failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.recorderUI.atError.error("LockScreenRecordingController: Activity.request failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 self.activity = nil
             }
         }

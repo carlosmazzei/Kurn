@@ -58,12 +58,12 @@ extension TranscriptionService {
             if case .resourceUnavailable = appError { throw appError }
             cleanedURL = fileURL
             stages.append(Self.preprocessingReport(engine: config.preprocessing, usedOriginal: true))
-            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(appError.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original code=\(appError.logCode, privacy: .public) detail=\(appError.localizedDescription, privacy: .private)")
         } catch {
             try ResourceGuard.rethrowIfResourceFailure(error)
             cleanedURL = fileURL
             stages.append(Self.preprocessingReport(engine: config.preprocessing, usedOriginal: true))
-            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("transcribe: preprocessing failed after \(Date().timeIntervalSince(preStart), privacy: .public)s, using original code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
         try await ResourceGuard.requireTranscriptionHeadroom()
 

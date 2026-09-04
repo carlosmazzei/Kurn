@@ -43,8 +43,12 @@ actor AudioPreprocessor: AudioPreprocessing {
         try await ResourceGuard.requireTranscriptionHeadroom()
         // H8 PR 17: global weight budget shared with the other pipeline
         // stages — see `ResourceScheduler`'s header.
-        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.preprocessing.weight)
-        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.preprocessing.weight) } }
+        return try await withResourceReservation(.preprocessing) {
+            try await processAdmitted(url: url)
+        }
+    }
+
+    private func processAdmitted(url: URL) async throws -> URL {
         let started = Date()
         AppLog.transcription.atDebug.debug("preprocess: open \(url.lastPathComponent, privacy: .public)")
 

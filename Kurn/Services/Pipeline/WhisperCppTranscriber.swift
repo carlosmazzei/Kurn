@@ -139,11 +139,11 @@ actor WhisperCppTranscriber: Transcribing {
         // H8 PR 17: same global weight budget as a real transcription's
         // load, so a health probe racing an in-flight transcription can't
         // stack memory with it either.
-        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
-        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
-        try await Task.detached(priority: .utility) {
-            _ = try WhisperContext(modelPath: path.path)
-        }.value
+        try await withResourceReservation(.modelLoading) {
+            try await Task.detached(priority: .utility) {
+                _ = try WhisperContext(modelPath: path.path)
+            }.value
+        }
     }
 
     private func loadedContext(for model: WhisperCppModel) throws -> WhisperContext {

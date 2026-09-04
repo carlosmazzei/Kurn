@@ -832,6 +832,7 @@
 
 /* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
 "store_recovery.reason_protection_verification_failed" = "Kurn konnte nicht bestätigen, dass deine Daten im Ruhezustand verschlüsselt sind.";
+"store_recovery.reason_application_support_unavailable" = "Kurn konnte auf diesem Gerät keinen sicheren Speicherort für deine Daten finden. Starte die App neu, um es erneut zu versuchen.";
 "store_recovery.backups_title" = "Aus Backup wiederherstellen";
 "store_recovery.restore_button" = "Wiederherstellen";
 "store_recovery.restore_confirm_title" = "Dieses Backup wiederherstellen?";

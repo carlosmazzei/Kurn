@@ -20,6 +20,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 import Testing
 @testable import Kurn
@@ -183,6 +184,28 @@ struct BootCoordinatorTests {
         }
     }
 
+    @Test func anUnresolvedApplicationSupportDirectoryBecomesRecoveryRequiredWithoutOpening() {
+        // Application Support failing to resolve must never degrade into a
+        // store under `tmp/` that reports `.ready` and is later purged.
+        final class Spy: @unchecked Sendable { var openAttempts = 0; var backupAttempts = 0 }
+        let spy = Spy()
+        let coordinator = ModelStoreBootCoordinator(
+            appSupportDirectory: nil,
+            makeStore: { spy.openAttempts += 1; return try self.makeInMemoryContainer() },
+            isProtectedDataAvailable: { true },
+            createBackupBeforeOpen: { spy.backupAttempts += 1 }
+        )
+
+        coordinator.beginBoot()
+        coordinator.retryIfNeeded()
+
+        #expect(coordinator.state == .recoveryRequired(ModelStoreOpenFailure(reason: .applicationSupportUnavailable)))
+        #expect(coordinator.container == nil)
+        #expect(spy.openAttempts == 0)
+        #expect(spy.backupAttempts == 0)
+        #expect(!ModelStoreOpenFailureReason.applicationSupportUnavailable.offersStoreFileActions)
+    }
+
     // MARK: - H2 PR 4: backup and protection verification
 
     @Test func backsUpAnExistingLiveStoreBeforeOpening() throws {
@@ -215,7 +238,57 @@ struct BootCoordinatorTests {
 
             #expect(coordinator.state == .ready)
             #expect(coordinator.container != nil)
+            #expect(coordinator.preOpenBackupFailed)
         }
+    }
+
+    @Test func aBackupFailureIsRecordedAsADurableReliabilityEvent() throws {
+        // A missed backup is a durability gap Health & Recovery must be able
+        // to show, not just a log line — and the open itself still records
+        // as succeeded so the two facts stay distinguishable.
+        let capture = BootReliabilityEventCapture()
+        ReliabilityLog.handler = { capture.record($0) }
+        defer { ReliabilityLog.handler = nil }
+
+        try withTempAppSupport { directory in
+            let coordinator = ModelStoreBootCoordinator(
+                appSupportDirectory: directory,
+                makeStore: { try self.makeInMemoryContainer() },
+                isProtectedDataAvailable: { true },
+                createBackupBeforeOpen: { throw NSError(domain: "test.backup", code: 1) }
+            )
+
+            coordinator.beginBoot()
+        }
+
+        let events = capture.recorded.filter { $0.operation == "model_store_boot" }
+        #expect(events.map(\.code) == ["pre_open_backup_failed", nil])
+        #expect(events.map(\.outcome) == [.failed, .succeeded])
+        #expect(Set(events.map(\.operationID)).count == 1)
+    }
+
+    @Test func anOpenFailureRecordsItsReasonCodeAndRetriesCountAttempts() throws {
+        let capture = BootReliabilityEventCapture()
+        ReliabilityLog.handler = { capture.record($0) }
+        defer { ReliabilityLog.handler = nil }
+
+        try withTempAppSupport { directory in
+            let coordinator = ModelStoreBootCoordinator(
+                appSupportDirectory: directory,
+                makeStore: { throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError) },
+                isProtectedDataAvailable: { true },
+                createBackupBeforeOpen: {}
+            )
+
+            coordinator.beginBoot()
+            coordinator.retryIfNeeded()
+        }
+
+        let events = capture.recorded.filter { $0.operation == "model_store_boot" }
+        #expect(events.count == 2)
+        #expect(events.allSatisfy { $0.outcome == .failed && $0.stage == "open" })
+        #expect(events.allSatisfy { $0.code == ModelStoreOpenFailure(reason: .storageFull).logCode })
+        #expect(events.map(\.attempt) == [0, 1])
     }
 
     @Test func aProtectionVerificationFailureBecomesRecoveryRequiredAndDiscardsTheContainer() throws {
@@ -234,4 +307,22 @@ struct BootCoordinatorTests {
         }
     }
 }
+}
+
+/// Lock-guarded box for `ReliabilityLog.handler` (a `@Sendable` closure that
+/// cannot mutate a captured local). `KurnTests/Support` has the same helper,
+/// but this target does not share that folder.
+private final class BootReliabilityEventCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [ReliabilityEvent] = []
+
+    func record(_ event: ReliabilityEvent) {
+        lock.lock(); defer { lock.unlock() }
+        events.append(event)
+    }
+
+    var recorded: [ReliabilityEvent] {
+        lock.lock(); defer { lock.unlock() }
+        return events
+    }
 }

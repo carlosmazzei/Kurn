@@ -257,7 +257,7 @@ final class WikiCoordinator {
         do {
             try modelContext.save()
         } catch {
-            AppLog.persistence.atError.error("wiki: persist failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence.atError.error("wiki: persist failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 

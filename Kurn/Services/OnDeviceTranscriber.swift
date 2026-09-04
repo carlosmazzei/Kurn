@@ -61,7 +61,7 @@ actor OnDeviceTranscriber: Transcribing {
             }
         } catch {
             AppLog.transcription.atError.error(
-                "speechAnalyzer: asset installation failed: \(error.localizedDescription, privacy: .public)"
+                "speechAnalyzer: asset installation failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
@@ -126,7 +126,7 @@ actor OnDeviceTranscriber: Transcribing {
             resultTask.cancel()
             await analyzer.cancelAndFinishNow()
             AppLog.transcription.atError.error(
-                "speechAnalyzer: transcription failed: \(error.localizedDescription, privacy: .public)"
+                "speechAnalyzer: transcription failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
             throw AppError.transcriptionFailed(error.localizedDescription)
         }

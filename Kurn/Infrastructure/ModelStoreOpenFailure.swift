@@ -33,6 +33,16 @@ enum ModelStoreOpenFailureReason: String, Sendable, CaseIterable {
     case migrationIncompatible
     case corruptOrUnknown
     case protectionVerificationFailed
+    /// Application Support itself could not be resolved or created, so there
+    /// is no durable location to open, back up, restore or quarantine in.
+    case applicationSupportUnavailable
+
+    /// Whether restore/salvage/fresh-start make sense: they all operate on
+    /// store files under Application Support, which this reason says has no
+    /// usable location.
+    var offersStoreFileActions: Bool {
+        self != .applicationSupportUnavailable
+    }
 }
 
 /// A classified store-open failure. Deliberately carries no free-text

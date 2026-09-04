@@ -154,7 +154,7 @@ struct RecordingCompactor: Sendable {
             _ = try FileManager.default.replaceItemAt(originalURL, withItemAt: tempURL)
         } catch {
             RecordingOperationJournal.finishReplace(operationID)
-            AppLog.recorder.atError.error("compact: swap failed for \(fileName, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("compact: swap failed for \(fileName, privacy: .public) code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return 0
         }
         swapped = true

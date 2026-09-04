@@ -100,6 +100,27 @@ struct JSONStorageTests {
         #expect(!outcome.isCorrupted)
     }
 
+    @Test func decodeAuthoritativeRefusesAFutureEnvelopeVersionWithoutCallingItCorrupted() {
+        // An envelope written by a newer build is intact content this build
+        // cannot interpret. Reading its payload anyway would trust a format
+        // whose rules are unknown here; calling it corrupted would invite a
+        // "repair" that discards the newer build's data. Both are wrong.
+        let payload = JSONStorage.encode([Point(x: 1, y: 2)]).base64EncodedString()
+        let future = Data("{\"version\":999,\"payloadChecksum\":0,\"payload\":\"\(payload)\"}".utf8)
+
+        let outcome = JSONStorage.decodeAuthoritative([Point].self, from: future)
+
+        guard case .unsupportedVersion(let version, let originalData) = outcome else {
+            Issue.record("expected .unsupportedVersion, got \(outcome)")
+            return
+        }
+        #expect(version == 999)
+        #expect(originalData == future)
+        #expect(outcome.decodedValue == nil)
+        #expect(!outcome.isCorrupted)
+        #expect(outcome.isUnreadable)
+    }
+
     @Test func encodeAuthoritativeFailsRatherThanProducingData() {
         // JSONEncoder has no JSON representation for NaN/infinite floating
         // point values and throws for them by default — a real, if rare,

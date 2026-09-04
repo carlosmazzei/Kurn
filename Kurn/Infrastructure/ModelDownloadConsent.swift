@@ -107,51 +107,11 @@ struct ModelDownloadConsent {
         }
         #if canImport(FluidAudio)
         do {
-            // H8 PR 17: acquired for the whole download+load, released
-            // whichever way this `do` block exits (including the `catch`
-            // below, since a thrown error propagates out of this scope
-            // before the `catch` runs) — see `ResourceScheduler`'s header.
-            try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
-            defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
-            onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
-            switch set {
-            case .liveTranscriptionASR:
-                // The live preview picks a streaming model per meeting language at
-                // record time (English-only EOU vs. multilingual), so warm both
-                // now — the recording path must never block on a missing model.
-                let englishEngine = StreamingEouAsrManager(chunkSize: .ms160)
-                try await englishEngine.loadModels(progressHandler: scaledProgress(
-                    from: 0,
-                    to: 0.5,
-                    onProgress: onProgress
-                ))
-                let multilingualEngine = FluidAudioMultilingualStreamingManager()
-                try await multilingualEngine.loadModels(progressHandler: scaledProgress(
-                    from: 0.5,
-                    to: 1,
-                    onProgress: onProgress
-                ))
-            case .onDeviceASR:
-                // Multilingual on-device batch ASR (Parakeet TDT v3) used for the
-                // post-recording transcript when the meeting language is "Auto".
-                _ = try await AsrModels.downloadAndLoad(
-                    version: .v3,
-                    progressHandler: progressHandler(onProgress)
-                )
-            case .diarization:
-                _ = try await OfflineDiarizerModels.load(
-                    progressHandler: progressHandler(onProgress)
-                )
-            case .vad:
-                // Silero VAD CoreML model; `VadManager`'s initializer downloads
-                // and loads it on first use.
-                _ = try await VadManager(progressHandler: progressHandler(onProgress))
-            case .whisperCppASR, .sherpaOnnxDiarization:
-                // Unreachable — both returned above, before this branch.
-                break
+            // H8 PR 17: reserved for the whole download+load, released in
+            // the same flow whichever way it exits — see `ResourceScheduler`.
+            try await withResourceReservation(.modelLoading) {
+                try await loadFluidAudioModels(set, onProgress: onProgress)
             }
-            onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
-            try await ResourceGuard.requireModelDownloadHeadroom()
         } catch let appError as AppError {
             throw appError
         } catch {
@@ -169,6 +129,51 @@ struct ModelDownloadConsent {
     }
 
     #if canImport(FluidAudio)
+    private static func loadFluidAudioModels(
+        _ set: ModelSet,
+        onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
+    ) async throws {
+        onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
+        switch set {
+        case .liveTranscriptionASR:
+            // The live preview picks a streaming model per meeting language at
+            // record time (English-only EOU vs. multilingual), so warm both
+            // now — the recording path must never block on a missing model.
+            let englishEngine = StreamingEouAsrManager(chunkSize: .ms160)
+            try await englishEngine.loadModels(progressHandler: scaledProgress(
+                from: 0,
+                to: 0.5,
+                onProgress: onProgress
+            ))
+            let multilingualEngine = FluidAudioMultilingualStreamingManager()
+            try await multilingualEngine.loadModels(progressHandler: scaledProgress(
+                from: 0.5,
+                to: 1,
+                onProgress: onProgress
+            ))
+        case .onDeviceASR:
+            // Multilingual on-device batch ASR (Parakeet TDT v3) used for the
+            // post-recording transcript when the meeting language is "Auto".
+            _ = try await AsrModels.downloadAndLoad(
+                version: .v3,
+                progressHandler: progressHandler(onProgress)
+            )
+        case .diarization:
+            _ = try await OfflineDiarizerModels.load(
+                progressHandler: progressHandler(onProgress)
+            )
+        case .vad:
+            // Silero VAD CoreML model; `VadManager`'s initializer downloads
+            // and loads it on first use.
+            _ = try await VadManager(progressHandler: progressHandler(onProgress))
+        case .whisperCppASR, .sherpaOnnxDiarization:
+            // Unreachable — `download` returned for both before reaching here.
+            break
+        }
+        onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
+        try await ResourceGuard.requireModelDownloadHeadroom()
+    }
+
     private static func progressHandler(
         _ onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
     ) -> ProgressHandler {

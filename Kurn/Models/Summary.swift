@@ -68,7 +68,7 @@ final class Summary {
     /// Whether the stored sections failed to decode or verify — see
     /// `Transcript.isSegmentsDataCorrupted`.
     var isSectionsDataCorrupted: Bool {
-        JSONStorage.decodeAuthoritative([SummarySection].self, from: sectionsData).isCorrupted
+        JSONStorage.decodeAuthoritative([SummarySection].self, from: sectionsData).isUnreadable
     }
 
     var provider: AIProvider {
