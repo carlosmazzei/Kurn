@@ -73,13 +73,16 @@ struct ProviderCircuitBreakerTests {
         ReliabilityLog.handler = { capture.record($0) }
         defer { ReliabilityLog.handler = nil }
         let breaker = ProviderCircuitBreaker(store: InMemoryProviderCircuitStore())
+        // The handler is process-global and tests run in parallel, so the
+        // provider ID must be one no other test emits events for.
+        let providerID = "durable-events-\(UUID().uuidString)"
 
-        await breaker.recordSuccess(providerID: "openai")
-        await breaker.recordFailure(providerID: "openai", failure: .transient)
-        await breaker.recordFailure(providerID: "openai", failure: .configuration)
-        await breaker.recordSuccess(providerID: "openai")
+        await breaker.recordSuccess(providerID: providerID)
+        await breaker.recordFailure(providerID: providerID, failure: .transient)
+        await breaker.recordFailure(providerID: providerID, failure: .configuration)
+        await breaker.recordSuccess(providerID: providerID)
 
-        let events = capture.recorded.filter { $0.operation == "provider_circuit" && $0.stage == "openai" }
+        let events = capture.recorded.filter { $0.operation == "provider_circuit" && $0.stage == providerID }
         #expect(events.map(\.code) == ["circuit_open_transient", "circuit_open_configuration", "circuit_closed"])
         #expect(events.map(\.outcome) == [.failed, .failed, .succeeded])
         #expect(events.map(\.attempt) == [1, 2, 0])
