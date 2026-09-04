@@ -83,7 +83,8 @@ struct TranscriptionSchedulerTests {
     // MARK: - interruptedRecordings
 
     @Test func interruptedRecordingsIncludePendingAndInProgressOnly() {
-        let context = TestModelContainer.make().mainContext
+        let container = TestModelContainer.make()
+        let context = container.mainContext
         insertRecording(in: context, status: .pending)
         insertRecording(in: context, status: .inProgress)
         insertRecording(in: context, status: .done)
@@ -93,19 +94,24 @@ struct TranscriptionSchedulerTests {
         let interrupted = TranscriptionScheduler.interruptedRecordings(context: context)
         #expect(interrupted.count == 2)
         #expect(Set(interrupted.map(\.transcriptionStatus)) == [.pending, .inProgress])
+        withExtendedLifetime(container) {}
     }
 
     @Test func recordingsStillBeingCapturedOrAwaitingRecoveryAreNotInterruptedWork() {
-        let context = TestModelContainer.make().mainContext
+        let container = TestModelContainer.make()
+        let context = container.mainContext
         insertRecording(in: context, status: .pending, captureState: .recording)
         insertRecording(in: context, status: .pending, captureState: .finalizing)
         insertRecording(in: context, status: .pending, captureState: .recoveryNeeded)
 
         #expect(TranscriptionScheduler.interruptedRecordings(context: context).isEmpty)
+        withExtendedLifetime(container) {}
     }
 
     @Test func emptyStoreHasNoInterruptedWork() {
-        let context = TestModelContainer.make().mainContext
+        let container = TestModelContainer.make()
+        let context = container.mainContext
         #expect(TranscriptionScheduler.interruptedRecordings(context: context).isEmpty)
+        withExtendedLifetime(container) {}
     }
 }

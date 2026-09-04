@@ -18,6 +18,12 @@
 //  return nothing, honour the regions it is given, respect the speaker cap — and
 //  the accuracy claims belong to `.fluidAudio`, which is now the default.
 //
+//  Every test that renders audio takes `tempFileTestLock`: each `diarize` spins
+//  up an offline `AVAudioEngine`, and enough of those in flight at once makes
+//  disposing the engine's IO unit time out against the simulator's audio
+//  server (`AURemoteIO: RPC timeout` → SIGABRT), taking the whole test process
+//  down with it.
+//
 
 import Foundation
 import KurnCore
@@ -38,70 +44,80 @@ struct SpeakerDiarizerTests {
     /// with nothing to segment there is no meaningful duration, only the
     /// requirement that a label exists.
     @Test func silentFileProducesSingleWholeClipTurn() async throws {
-        let url = try AudioFixtures.wav(segments: [(0, 2.0)])
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            let url = try AudioFixtures.wav(segments: [(0, 2.0)])
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let turns = await SpeakerDiarizer().diarize(url: url)
-        #expect(turns.count == 1)
-        #expect(turns.first?.speakerLabel == "Speaker 1")
+            let turns = await SpeakerDiarizer().diarize(url: url)
+            #expect(turns.count == 1)
+            #expect(turns.first?.speakerLabel == "Speaker 1")
+        }
     }
 
     /// Not "two pitches become two speakers" — the engine does not deliver that,
     /// which is why the claim was disabled rather than fixed. What it must
     /// deliver is a usable, labelled result over audio that changes voice.
     @Test func twoSpeakerAudioStillProducesLabelledTurns() async throws {
-        let url = try AudioFixtures.twoSpeakerWAV()
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            let url = try AudioFixtures.twoSpeakerWAV()
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let turns = await SpeakerDiarizer().diarize(url: url)
-        #expect(!turns.isEmpty)
-        #expect(turns.allSatisfy { !$0.speakerLabel.isEmpty })
-        #expect(turns.allSatisfy { $0.end >= $0.start })
+            let turns = await SpeakerDiarizer().diarize(url: url)
+            #expect(!turns.isEmpty)
+            #expect(turns.allSatisfy { !$0.speakerLabel.isEmpty })
+            #expect(turns.allSatisfy { $0.end >= $0.start })
+        }
     }
 
     @Test func sameVoiceRepeatedStaysOneSpeaker() async throws {
-        let url = try AudioFixtures.sameSpeakerWAV()
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            let url = try AudioFixtures.sameSpeakerWAV()
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let turns = await SpeakerDiarizer().diarize(url: url)
-        // Identical timbre on both sides of the gap clusters to one centroid, and
-        // the two same-speaker turns merge back into a contiguous run.
-        #expect(Set(turns.map(\.speakerLabel)).count == 1)
+            let turns = await SpeakerDiarizer().diarize(url: url)
+            // Identical timbre on both sides of the gap clusters to one centroid, and
+            // the two same-speaker turns merge back into a contiguous run.
+            #expect(Set(turns.map(\.speakerLabel)).count == 1)
+        }
     }
 
     @Test func externalSpeechRegionsAreHonored() async throws {
-        // One continuous tone; supply two external regions. The diarizer should
-        // produce turns confined to those regions' span (same pitch ⇒ one label).
-        let url = try AudioFixtures.wav(segments: [(150, 3.0)])
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            // One continuous tone; supply two external regions. The diarizer should
+            // produce turns confined to those regions' span (same pitch ⇒ one label).
+            let url = try AudioFixtures.wav(segments: [(150, 3.0)])
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let regions = [SpeechRegion(start: 0, end: 1.0), SpeechRegion(start: 2.0, end: 3.0)]
-        let turns = await SpeakerDiarizer().diarize(url: url, speechRegions: regions)
+            let regions = [SpeechRegion(start: 0, end: 1.0), SpeechRegion(start: 2.0, end: 3.0)]
+            let turns = await SpeakerDiarizer().diarize(url: url, speechRegions: regions)
 
-        #expect(!turns.isEmpty)
-        #expect((turns.first?.start ?? -1) >= 0)
-        #expect((turns.last?.end ?? .greatestFiniteMagnitude) <= 3.0 + 0.2)
+            #expect(!turns.isEmpty)
+            #expect((turns.first?.start ?? -1) >= 0)
+            #expect((turns.last?.end ?? .greatestFiniteMagnitude) <= 3.0 + 0.2)
+        }
     }
 
     @Test func manyToneRegionsClusterWithoutExceedingCap() async throws {
-        // A dozen tone regions across the human pitch range. Nearby pitches fall
-        // within the clustering threshold and merge, so this never explodes into
-        // a speaker-per-region.
-        let pitches: [Double] = [90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 110]
-        var segments: [(hz: Double, seconds: Double)] = []
-        for pitch in pitches {
-            segments.append((pitch, 0.7))
-            segments.append((0, 0.7)) // >= 0.5s silence to split regions
-        }
-        let url = try AudioFixtures.wav(segments: segments)
-        defer { try? FileManager.default.removeItem(at: url) }
+        try await tempFileTestLock.run {
+            // A dozen tone regions across the human pitch range. Nearby pitches fall
+            // within the clustering threshold and merge, so this never explodes into
+            // a speaker-per-region.
+            let pitches: [Double] = [90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 110]
+            var segments: [(hz: Double, seconds: Double)] = []
+            for pitch in pitches {
+                segments.append((pitch, 0.7))
+                segments.append((0, 0.7)) // >= 0.5s silence to split regions
+            }
+            let url = try AudioFixtures.wav(segments: segments)
+            defer { try? FileManager.default.removeItem(at: url) }
 
-        let turns = await SpeakerDiarizer().diarize(url: url)
-        let speakers = Set(turns.map(\.speakerLabel))
-        // Only the cap. How many clusters a dozen tones collapse into is exactly
-        // what this engine is unreliable about; that it never explodes past its
-        // own ceiling is the invariant worth holding it to.
-        #expect(speakers.count >= 1)
-        #expect(speakers.count <= 8) // SpeakerDiarizer.maxSpeakers
+            let turns = await SpeakerDiarizer().diarize(url: url)
+            let speakers = Set(turns.map(\.speakerLabel))
+            // Only the cap. How many clusters a dozen tones collapse into is exactly
+            // what this engine is unreliable about; that it never explodes past its
+            // own ceiling is the invariant worth holding it to.
+            #expect(speakers.count >= 1)
+            #expect(speakers.count <= 8) // SpeakerDiarizer.maxSpeakers
+        }
     }
 }
