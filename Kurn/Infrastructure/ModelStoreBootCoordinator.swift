@@ -26,6 +26,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 #if canImport(UIKit)
 import UIKit
@@ -54,11 +55,24 @@ final class ModelStoreBootCoordinator: Sendable {
     /// Set only on the transition into `.ready`; `KurnApp` reads this once to
     /// build its app-wide coordinators and never needs it again.
     private(set) var container: ModelContainer?
+    /// Set when the most recent open attempt's pre-open backup threw. Opening
+    /// still proceeds (see `attemptOpen`), but the miss is a durability gap
+    /// Health & Recovery must be able to show rather than a log line only.
+    private(set) var preOpenBackupFailed = false
+    /// Correlates every reliability event this launch's boot emits; the
+    /// attempt counter distinguishes the initial open from user retries.
+    private let bootRunID = OperationID()
+    private var openAttempts = 0
     /// Where the live store (and, under it, `StoreRecovery/`'s backups and
     /// quarantine) lives. Exposed so `KurnApp` can point
     /// `ModelStoreRecoveryViewModel` at the identical location without
-    /// re-deriving Application Support itself.
+    /// re-deriving Application Support itself. When Application Support could
+    /// not be resolved at all this is a placeholder under `temporaryDirectory`
+    /// that is never opened, backed up or restored into: `attemptOpen()` routes
+    /// straight to `.recoveryRequired(.applicationSupportUnavailable)` and the
+    /// recovery UI hides every store-file action for that reason.
     let appSupportDirectory: URL
+    private let isAppSupportDirectoryResolved: Bool
 
     private let makeStore: @MainActor () throws -> ModelContainer
     private let isProtectedDataAvailable: @MainActor () -> Bool
@@ -66,12 +80,15 @@ final class ModelStoreBootCoordinator: Sendable {
     private let verifyProtectionAfterOpen: @MainActor () throws -> Void
 
     init(
-        appSupportDirectory: URL = ModelStoreBootCoordinator.systemAppSupportDirectory(),
+        appSupportDirectory: URL? = ModelStoreBootCoordinator.systemAppSupportDirectory(),
         makeStore: @escaping @MainActor () throws -> ModelContainer = { try ModelContainerBootstrap.makeStore() },
         isProtectedDataAvailable: @escaping @MainActor () -> Bool = ModelStoreBootCoordinator.systemProtectedDataAvailable,
         createBackupBeforeOpen: (@MainActor () throws -> Void)? = nil,
         verifyProtectionAfterOpen: (@MainActor () throws -> Void)? = nil
     ) {
+        self.isAppSupportDirectoryResolved = appSupportDirectory != nil
+        let appSupportDirectory = appSupportDirectory
+            ?? FileManager.default.temporaryDirectory.appendingPathComponent("UnresolvedAppSupport", isDirectory: true)
         self.appSupportDirectory = appSupportDirectory
         self.makeStore = makeStore
         self.isProtectedDataAvailable = isProtectedDataAvailable
@@ -110,18 +127,28 @@ final class ModelStoreBootCoordinator: Sendable {
             state = .waitingForProtectedData
             return
         }
+        openAttempts += 1
+        // Never open, back up or verify against a volatile placeholder: a store
+        // that lands in `tmp/` would report `.ready` and then vanish.
+        guard isAppSupportDirectoryResolved else {
+            fail(ModelStoreOpenFailure(reason: .applicationSupportUnavailable))
+            return
+        }
         state = .opening
 
         // Best-effort: a backup failure must never block opening the store
-        // it was trying to protect. Logged, not surfaced as a boot failure —
+        // it was trying to protect. Recorded, not surfaced as a boot failure —
         // the H2 PR 4 acceptance bar is "the original is never lost to a
         // migration without one", not "the app cannot launch without one".
         do {
             try createBackupBeforeOpen()
+            preOpenBackupFailed = false
         } catch {
+            preOpenBackupFailed = true
             AppLog.persistence.atError.error(
-                "modelStoreBoot: pre-open backup failed: \(error.localizedDescription, privacy: .public)"
+                "modelStoreBoot: pre-open backup failed code=\(error.publicLogCode, privacy: .public)"
             )
+            report(stage: "backup", outcome: .failed, code: "pre_open_backup_failed")
         }
 
         do {
@@ -133,14 +160,31 @@ final class ModelStoreBootCoordinator: Sendable {
                 // verified — per the megaplan, that is a visible privacy
                 // failure, not an unprotected fallback path. Discard the
                 // container rather than hand out an unverified one.
-                state = .recoveryRequired(ModelStoreOpenFailure(reason: .protectionVerificationFailed))
+                fail(ModelStoreOpenFailure(reason: .protectionVerificationFailed))
                 return
             }
             self.container = container
             state = .ready
+            report(stage: "open", outcome: .succeeded, code: nil)
         } catch {
-            state = .recoveryRequired(ModelStoreOpenFailure(classifying: error))
+            fail(ModelStoreOpenFailure(classifying: error))
         }
+    }
+
+    private func fail(_ failure: ModelStoreOpenFailure) {
+        state = .recoveryRequired(failure)
+        report(stage: "open", outcome: .failed, code: failure.logCode)
+    }
+
+    private func report(stage: String, outcome: ReliabilityEvent.Outcome, code: String?) {
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: bootRunID,
+            operation: "model_store_boot",
+            stage: stage,
+            outcome: outcome,
+            attempt: openAttempts - 1,
+            code: code
+        ))
     }
 
     private static func systemProtectedDataAvailable() -> Bool {
@@ -151,9 +195,19 @@ final class ModelStoreBootCoordinator: Sendable {
         #endif
     }
 
-    static func systemAppSupportDirectory() -> URL {
-        (try? FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-        )) ?? FileManager.default.temporaryDirectory
+    /// `nil` when Application Support cannot be resolved or created; the
+    /// coordinator then refuses to open rather than fall back to a directory
+    /// the system may purge.
+    static func systemAppSupportDirectory() -> URL? {
+        do {
+            return try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+            )
+        } catch {
+            AppLog.persistence.atError.error(
+                "modelStoreBoot: application support unavailable code=\(error.publicLogCode, privacy: .public)"
+            )
+            return nil
+        }
     }
 }

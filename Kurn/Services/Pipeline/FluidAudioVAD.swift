@@ -55,7 +55,7 @@ actor FluidAudioVAD: VoiceActivityDetecting {
             AppLog.transcription.atNotice.notice("FluidAudioVAD: cancelled")
             return [Self.fallbackRegion(for: url)]
         } catch {
-            AppLog.transcription.atError.error("FluidAudioVAD: failed, using whole-clip fallback: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("FluidAudioVAD: failed, using whole-clip fallback code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return [Self.fallbackRegion(for: url)]
         }
     }

@@ -494,12 +494,48 @@ struct TranscriptionService {
         // can't both pass this preflight and then both hold that engine's
         // inference activations in memory at once — the cross-recording
         // analogue of why this file already never runs one recording's own
-        // on-device ASR concurrently with its diarizer. `defer` can't
-        // `await`, so the release is fired as a detached step, same as the
-        // preprocessed-file cleanup above.
-        let resourceWeight = ResourceWorkKind.transcription(engine).weight
-        try await ResourceScheduler.shared.acquire(weight: resourceWeight)
-        defer { Task { await ResourceScheduler.shared.release(weight: resourceWeight) } }
+        // on-device ASR concurrently with its diarizer.
+        return try await withResourceReservation(.transcription(engine)) {
+            try await transcribeGatedAdmitted(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: engine,
+                transcriptionProvider: transcriptionProvider,
+                transcriptionModel: transcriptionModel,
+                cloudTransfer: cloudTransfer,
+                whisperCppModel: whisperCppModel,
+                language: language,
+                sourceFileSize: sourceFileSize,
+                sourceDuration: sourceDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: preprocessing,
+                vad: vad,
+                checkpoint: checkpoint,
+                onPhase: onPhase,
+                onCheckpoint: onCheckpoint
+            )
+        }
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    private func transcribeGatedAdmitted(
+        cleanedURL: URL,
+        regions: [SpeechRegion],
+        engine: TranscriptionEngine,
+        transcriptionProvider: AIProvider,
+        transcriptionModel: String,
+        cloudTransfer: CloudTranscriptionTransfer,
+        whisperCppModel: WhisperCppModel,
+        language: MeetingLanguage,
+        sourceFileSize: Int64,
+        sourceDuration: TimeInterval,
+        sourceDigest: String?,
+        preprocessing: PreprocessingEngine,
+        vad: VADEngine,
+        checkpoint: TranscriptionCheckpoint?,
+        onPhase: @escaping PhaseHandler,
+        onCheckpoint: CheckpointHandler?
+    ) async throws -> GatedTranscription {
         var stages: [PipelineStageReport] = []
         let compaction: CompactionResult?
         do {
@@ -515,7 +551,7 @@ struct TranscriptionService {
             throw CancellationError()
         } catch {
             try ResourceGuard.rethrowIfResourceFailure(error)
-            AppLog.transcription.atError.error("transcribe: VAD compaction failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("transcribe: VAD compaction failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             compaction = nil
             stages.append(PipelineStageReport(
                 stage: .compaction,
@@ -691,13 +727,35 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("diarize: start file=\(originalURL.lastPathComponent, privacy: .public) engine=\(engine.rawValue, privacy: .public) size=\(originalSize, privacy: .public) bytes duration=\(String(format: "%.1f", originalDuration), privacy: .public)s")
         onProgress(0)
         try await ResourceGuard.requireTranscriptionHeadroom()
-        // H8 PR 17: same reasoning as `transcribeGated`'s own acquire above
-        // — a global budget across concurrent recordings, not a
+        // H8 PR 17: same reasoning as `transcribeGated`'s own reservation
+        // above — a global budget across concurrent recordings, not a
         // replacement for this file's existing single-recording sequential/
         // concurrent branch.
-        let resourceWeight = ResourceWorkKind.diarization(engine).weight
-        try await ResourceScheduler.shared.acquire(weight: resourceWeight)
-        defer { Task { await ResourceScheduler.shared.release(weight: resourceWeight) } }
+        return try await withResourceReservation(.diarization(engine)) {
+            try await diarizeAdmitted(
+                originalURL: originalURL,
+                engine: engine,
+                diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
+                regions: regions,
+                speakerCount: speakerCount,
+                onWarning: onWarning,
+                onProgress: onProgress,
+                started: started
+            )
+        }
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    private func diarizeAdmitted(
+        originalURL: URL,
+        engine: DiarizationEngine,
+        diarizationPreprocessingEnabled: Bool,
+        regions: [SpeechRegion],
+        speakerCount: Int,
+        onWarning: DiarizationWarningHandler?,
+        onProgress: @escaping @Sendable (Double) -> Void,
+        started: Date
+    ) async throws -> DiarizationOutcome {
         let diarURL: URL
         let cleanupURL: URL?
         if diarizationPreprocessingEnabled {
@@ -714,7 +772,7 @@ struct TranscriptionService {
                 throw CancellationError()
             } catch {
                 try ResourceGuard.rethrowIfResourceFailure(error)
-                AppLog.transcription.atError.error("diarize: preprocess failed, falling back to original: \(error.localizedDescription, privacy: .public)")
+                AppLog.transcription.atError.error("diarize: preprocess failed, falling back to original code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 diarURL = originalURL
                 cleanupURL = nil
             }

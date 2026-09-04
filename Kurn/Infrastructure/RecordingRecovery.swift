@@ -88,10 +88,12 @@ enum RecordingRecovery {
             recording.captureState = .ready
             recording.captureRecoveryReason = nil
             try context.save()
+            CaptureReliability.finalized(fileName: recording.fileName, reason: nil, stage: "recovery")
             return nil
         } catch let error as RecordingFileFinalizationError {
             recording.captureState = .recoveryNeeded
             recording.captureRecoveryReason = error.recoveryReason
+            CaptureReliability.finalized(fileName: recording.fileName, reason: error.recoveryReason, stage: "recovery")
             do {
                 try context.save()
             } catch {
@@ -185,6 +187,15 @@ enum RecordingRecovery {
             } catch {
                 recording.captureState = .recoveryNeeded
                 recording.captureRecoveryReason = .unreadableFile
+            }
+            // Rows already in `.recoveryNeeded` are re-checked on every
+            // activation; only a transition is worth a durable event.
+            if previousState != .recoveryNeeded {
+                CaptureReliability.finalized(
+                    fileName: recording.fileName,
+                    reason: recording.captureRecoveryReason,
+                    stage: "reconcile"
+                )
             }
             changed = true
         }

@@ -99,10 +99,16 @@ enum JSONStorage {
     /// recovery or diagnostic path has something to work with.
     static func decodeAuthoritative<T: Decodable>(_ type: T.Type, from data: Data) -> JSONDecodeOutcome<T> {
         guard !data.isEmpty else { return .empty }
-        if let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
-           envelope.payloadChecksum == fnv1aChecksum(of: envelope.payload),
-           let value = try? JSONDecoder().decode(T.self, from: envelope.payload) {
-            return .value(value)
+        if let envelope = try? JSONDecoder().decode(Envelope.self, from: data) {
+            // A newer build's envelope is intact content this build cannot
+            // interpret — never "absent" and never "corrupted".
+            guard envelope.version <= envelopeVersion else {
+                return .unsupportedVersion(envelope.version, originalData: data)
+            }
+            if envelope.payloadChecksum == fnv1aChecksum(of: envelope.payload),
+               let value = try? JSONDecoder().decode(T.self, from: envelope.payload) {
+                return .value(value)
+            }
         }
         if let legacyValue = try? JSONDecoder().decode(T.self, from: data) {
             return .value(legacyValue)
@@ -119,6 +125,8 @@ enum JSONDecodeOutcome<Value> {
     case empty
     case value(Value)
     case corrupted(originalData: Data)
+    /// Written by a build with a newer envelope format than this one reads.
+    case unsupportedVersion(Int, originalData: Data)
 
     /// The decoded value, or `nil` for both `.empty` and `.corrupted`. For a
     /// getter that still needs to return a bare `[T]`/`T?` to its many
@@ -134,5 +142,15 @@ enum JSONDecodeOutcome<Value> {
     var isCorrupted: Bool {
         if case .corrupted = self { return true }
         return false
+    }
+
+    /// Content exists but this build cannot read it — corrupted or written in
+    /// a newer format. Callers that must not mistake unreadable content for
+    /// absent content check this rather than `isCorrupted`.
+    var isUnreadable: Bool {
+        switch self {
+        case .corrupted, .unsupportedVersion: return true
+        case .empty, .value: return false
+        }
     }
 }

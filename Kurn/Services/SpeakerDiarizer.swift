@@ -136,7 +136,7 @@ actor SpeakerDiarizer: Diarizing {
         do {
             return try readFrames(url: url)
         } catch {
-            AppLog.transcription.atError.error("SpeakerDiarizer: readFrames failed for \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public) — single-speaker fallback")
+            AppLog.transcription.atError.error("SpeakerDiarizer: readFrames failed for \(url.lastPathComponent, privacy: .public) code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private) — single-speaker fallback")
             return nil
         }
     }

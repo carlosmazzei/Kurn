@@ -53,12 +53,16 @@ struct ModelStoreRecoveryView: View {
             VStack(spacing: 18) {
                 header
                 retryButton
-                if !viewModel.backupGenerations.isEmpty {
-                    backupsSection
+                if failure.reason.offersStoreFileActions {
+                    if !viewModel.backupGenerations.isEmpty {
+                        backupsSection
+                    }
+                    salvageSection
                 }
-                salvageSection
                 exportDiagnosticsButton
-                startFreshButton
+                if failure.reason.offersStoreFileActions {
+                    startFreshButton
+                }
             }
             .padding(.horizontal, 36)
             .padding(.vertical, 24)
@@ -253,6 +257,11 @@ struct ModelStoreRecoveryView: View {
             return NSLocalizedString(
                 "store_recovery.reason_protection_verification_failed",
                 comment: "Store protection could not be verified"
+            )
+        case .applicationSupportUnavailable:
+            return NSLocalizedString(
+                "store_recovery.reason_application_support_unavailable",
+                comment: "App storage location unavailable, restart and retry"
             )
         }
     }

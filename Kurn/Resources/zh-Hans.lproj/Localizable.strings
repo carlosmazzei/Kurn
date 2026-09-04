@@ -832,6 +832,7 @@
 
 /* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
 "store_recovery.reason_protection_verification_failed" = "Kurn 无法确认你的数据已进行静态加密。";
+"store_recovery.reason_application_support_unavailable" = "Kurn 在此设备上找不到安全的位置来存储你的数据。请重新启动应用后重试。";
 "store_recovery.backups_title" = "从备份恢复";
 "store_recovery.restore_button" = "恢复";
 "store_recovery.restore_confirm_title" = "恢复此备份?";

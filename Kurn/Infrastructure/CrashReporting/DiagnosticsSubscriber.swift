@@ -67,7 +67,7 @@ final class DiagnosticsSubscriber: NSObject, MXMetricManagerSubscriber, @uncheck
             try DiagnosticReportStore.save(text, kind: kind, receivedAt: receivedAt)
         } catch {
             AppLog.persistence.atError.error(
-                "diagnostics: failed to save \(kind.rawValue, privacy: .public) report: \(error.localizedDescription, privacy: .public)"
+                "diagnostics: failed to save \(kind.rawValue, privacy: .public) report code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
         }
     }

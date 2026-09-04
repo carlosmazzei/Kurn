@@ -57,7 +57,7 @@ actor FluidAudioLanguageDetector: LanguageDetecting {
             AppLog.transcription.atInfo.info("langDetect: fluidAudio LID -> \(code, privacy: .public) (\(detected.rawValue, privacy: .public))")
             return detected
         } catch {
-            AppLog.transcription.atError.error("langDetect: fluidAudio LID failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("langDetect: fluidAudio LID failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return hint
         }
     }

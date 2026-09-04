@@ -47,6 +47,14 @@ jobs:
   # Two independent attempts (not a retry of each other -- both are
   # reported) since a data race is inherently nondeterministic and a single
   # clean run doesn't rule one out.
+  #
+  # The capture path (`RecordingSink`'s render-thread/actor bridge and the
+  # recorder's ownership handoff), the background-upload delegate, the
+  # `@unchecked Sendable` journal/quarantine file managers, the durable
+  # circuit and event stores, and the download delegate are on the list for
+  # the same reason: each crosses an isolation boundary through a callback
+  # or a lock rather than an actor, which is exactly what TSan can see and
+  # the compiler cannot.
   thread-sanitizer:
     runs-on: macos-26
     timeout-minutes: 90
@@ -84,6 +92,13 @@ jobs:
             -only-testing:KurnTests/MeetingChatViewModelTests \
             -only-testing:KurnTests/ChunkedTranscriptionRunnerTests \
             -only-testing:KurnTests/SummaryMapRunnerTests \
+            -only-testing:KurnTests/RecordingSinkFaultTests \
+            -only-testing:KurnTests/RecorderCaptureOwnershipTests \
+            -only-testing:KurnTests/WhisperBackgroundUploaderTests \
+            -only-testing:KurnTests/RecordingOperationJournalTests \
+            -only-testing:KurnTests/ProviderCircuitBreakerTests \
+            -only-testing:KurnTests/ReliabilityEventStoreTests \
+            -only-testing:KurnTests/ModelFileDownloaderTests \
             -only-testing:KurnSwiftDataTests \
             clean test
 

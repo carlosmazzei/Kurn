@@ -127,7 +127,7 @@ enum TempFileCleaner {
                 removed += 1
                 removedBytes += Int64(size)
             } catch {
-                AppLog.transcription.atDebug.debug("transcribe: could not remove temp file \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                AppLog.transcription.atDebug.debug("transcribe: could not remove temp file \(name, privacy: .public) code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             }
         }
         return (removed, removedBytes)

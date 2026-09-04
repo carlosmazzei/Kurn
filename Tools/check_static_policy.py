@@ -26,6 +26,12 @@
 # shifts) or given an inline `// static-policy:allow <check>` comment on the
 # same line (for a new, deliberate exception). A finding that is neither is
 # a new violation and fails CI.
+#
+# The baseline may only shrink: an entry whose line no longer exists in the
+# file it names is reported as stale and fails the check, so a fixed site
+# cannot quietly keep its exemption (and later re-grow into it). The check
+# prints the remaining baseline size per rule so the number is visible in
+# every CI run rather than only to whoever opens the file.
 
 from __future__ import annotations
 
@@ -110,7 +116,7 @@ RULES = [
             "a raw error description logged at `.public`. An AppError's "
             "own errorDescription can embed a raw underlying system "
             "error's text (see privateContext in AppErrorMetadata.swift); "
-            "log `logCode`/a safe summary at `.public` and the raw "
+            "log `publicLogCode` (Error+LogCode.swift) at `.public` and the raw "
             "description at `.private` instead."
         ),
     ),
@@ -151,6 +157,7 @@ def load_baseline() -> dict[str, set[tuple[str, str]]]:
 def main() -> int:
     baseline = load_baseline()
     violations: list[str] = []
+    matched_baseline: set[tuple[str, str, str]] = set()
 
     for path in iter_source_files():
         rel_path = str(path.relative_to(ROOT))
@@ -185,20 +192,37 @@ def main() -> int:
                     continue
                 stripped = line.strip()
                 if (rel_path, stripped) in baseline[rule.name]:
+                    matched_baseline.add((rule.name, rel_path, stripped))
                     continue
                 violations.append(
                     f"::error file={rel_path},line={line_number}::"
                     f"[{rule.name}] {rule.description}"
                 )
 
-    if violations:
-        for violation in violations:
+    stale: list[str] = []
+    for rule_name, entries in baseline.items():
+        for rel_path, content in sorted(entries):
+            if (rule_name, rel_path, content) not in matched_baseline:
+                stale.append(
+                    f"::error file={BASELINE_PATH.relative_to(ROOT)}::"
+                    f"[{rule_name}] stale baseline entry for {rel_path}: the "
+                    f"line no longer exists; remove it so the exemption "
+                    f"does not outlive the code it covered: {content}"
+                )
+
+    for rule in RULES:
+        print(f"static policy baseline [{rule.name}]: {len(baseline[rule.name])} baseline entries")
+
+    if violations or stale:
+        for violation in violations + stale:
             print(violation)
         print(
             f"\nstatic policy check failed with {len(violations)} new "
-            "violation(s). Fix the code, or if this is a deliberate, "
-            "reviewed exception, add it to Tools/static_policy_baseline.txt "
-            "or annotate the line with `// static-policy:allow <check>`.",
+            f"violation(s) and {len(stale)} stale baseline entries. Fix "
+            "the code, or if this is a deliberate, reviewed exception, add "
+            "it to Tools/static_policy_baseline.txt or annotate the line "
+            "with `// static-policy:allow <check>`; delete baseline entries "
+            "whose line is gone.",
             file=sys.stderr,
         )
         return 1

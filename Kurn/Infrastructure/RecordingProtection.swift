@@ -136,7 +136,7 @@ enum RecordingProtection {
             )
         } catch {
             AppLog.recorder.atError.error(
-                "protection: failed to set on \(fileURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                "protection: failed to set on \(fileURL.lastPathComponent, privacy: .public) code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
         }
     }
@@ -173,7 +173,7 @@ enum RecordingProtection {
                     )
                 } catch {
                     AppLog.recorder.atError.error(
-                        "protection: migrate failed for \(legacy.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                        "protection: migrate failed for \(legacy.lastPathComponent, privacy: .public) code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
                     )
                 }
             }

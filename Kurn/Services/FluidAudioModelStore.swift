@@ -60,10 +60,10 @@ actor FluidAudioModelStore {
             // H8 PR 17: acquired once for the whole coalesced load, not per
             // caller — concurrent callers already await this one `Task`
             // rather than each starting their own.
-            try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
-            defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
-            let models = try await AsrModels.downloadAndLoad(version: .v3)
-            return AsrManager(config: Self.transcriptionConfig, models: models)
+            return try await withResourceReservation(.modelLoading) {
+                let models = try await AsrModels.downloadAndLoad(version: .v3)
+                return AsrManager(config: Self.transcriptionConfig, models: models)
+            }
         }
         loadTask = task
         do {
@@ -74,7 +74,7 @@ actor FluidAudioModelStore {
             return created
         } catch {
             loadTask = nil
-            AppLog.transcription.atError.error("fluidAudio: model load failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("fluidAudio: model load failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)
         }

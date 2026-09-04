@@ -832,6 +832,7 @@
 
 /* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
 "store_recovery.reason_protection_verification_failed" = "O Kurn não conseguiu confirmar que seus dados estão criptografados em repouso.";
+"store_recovery.reason_application_support_unavailable" = "O Kurn não encontrou um local seguro neste dispositivo para guardar seus dados. Reinicie o app para tentar novamente.";
 "store_recovery.backups_title" = "Restaurar de um backup";
 "store_recovery.restore_button" = "Restaurar";
 "store_recovery.restore_confirm_title" = "Restaurar este backup?";

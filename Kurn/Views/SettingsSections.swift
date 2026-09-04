@@ -59,7 +59,7 @@ extension SettingsView {
             try modelContext.delete(model: Meeting.self)
             try modelContext.save()
         } catch {
-            AppLog.persistence.atError.error("Failed to delete all data: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence.atError.error("Failed to delete all data code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             dataError = .persistenceFailed(error.localizedDescription)
             return
         }

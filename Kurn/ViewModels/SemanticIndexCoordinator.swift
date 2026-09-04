@@ -61,7 +61,7 @@ final class SemanticIndexCoordinator {
         } catch is CancellationError {
             // Leave existing chunks in place; a later pass retries.
         } catch {
-            AppLog.transcription.atError.error("semanticIndex: failed for meeting \(meetingID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("semanticIndex: failed for meeting \(meetingID, privacy: .public) code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 
@@ -158,7 +158,7 @@ final class SemanticIndexCoordinator {
         do {
             try modelContext.save()
         } catch {
-            AppLog.persistence.atError.error("semanticIndex: persist failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence.atError.error("semanticIndex: persist failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 }

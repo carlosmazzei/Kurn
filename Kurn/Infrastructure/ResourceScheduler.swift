@@ -122,9 +122,11 @@ actor ResourceScheduler {
     /// Reserve `weight` units, waiting if the budget is currently full.
     /// Cancelling the calling task while queued removes the waiter and
     /// throws `CancellationError` instead of leaking a slot nothing will
-    /// ever release.
+    /// ever release. A weight above the whole budget is clamped to it (it
+    /// runs alone rather than never), symmetrically with `release`.
     func acquire(weight: Int) async throws {
         try Task.checkCancellation()
+        let weight = min(weight, totalWeight)
         guard usedWeight + weight > totalWeight else {
             usedWeight += weight
             return
@@ -142,7 +144,7 @@ actor ResourceScheduler {
     /// Return `weight` units to the budget and admit whichever queued
     /// waiters now fit.
     func release(weight: Int) {
-        usedWeight = max(0, usedWeight - weight)
+        usedWeight = max(0, usedWeight - min(weight, totalWeight))
         admitWaitersIfPossible()
     }
 
@@ -178,4 +180,31 @@ actor ResourceScheduler {
             waiter.continuation.resume()
         }
     }
+}
+
+/// Run `body` while holding `kind`'s weight on `scheduler`. The reservation
+/// is released in the same async flow — after `body` returns, throws, or is
+/// cancelled mid-way — rather than from a fire-and-forget `Task` in a
+/// `defer`, so a stage's budget is provably back before its caller observes
+/// the result and no release can be lost to a torn-down task tree.
+/// Cancellation while still queued in `acquire` throws before `body` runs and
+/// leaves nothing to release. Runs in the caller's isolation (`#isolation`),
+/// so `body` may be non-`Sendable` and touch the caller's own state.
+func withResourceReservation<T>(
+    _ kind: ResourceWorkKind,
+    on scheduler: ResourceScheduler = .shared,
+    isolation: isolated (any Actor)? = #isolation,
+    _ body: () async throws -> T
+) async throws -> T {
+    let weight = kind.weight
+    try await scheduler.acquire(weight: weight)
+    let result: T
+    do {
+        result = try await body()
+    } catch {
+        await scheduler.release(weight: weight)
+        throw error
+    }
+    await scheduler.release(weight: weight)
+    return result
 }

@@ -147,7 +147,7 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         do {
             llm = try ProviderFactory.summaryProvider(for: provider, model: model)
         } catch {
-            AppLog.transcription.atNotice.notice("correct: no usable provider (\(error.localizedDescription, privacy: .public)); skipping correction")
+            AppLog.transcription.atNotice.notice("correct: no usable provider (code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)); skipping correction")
             return TranscriptCorrectionResult(
                 segments: segments,
                 outcome: .degraded,
@@ -227,7 +227,7 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
             }
             return BatchOutcome(corrections: corrections, failed: false)
         } catch {
-            AppLog.transcription.atNotice.notice("correct: batch of \(batch.count, privacy: .public) segment(s) failed, keeping originals: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atNotice.notice("correct: batch of \(batch.count, privacy: .public) segment(s) failed, keeping originals code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return BatchOutcome(corrections: [:], failed: true)
         }
     }

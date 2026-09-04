@@ -125,6 +125,7 @@ actor ModelFileDownloader: ModelDownloading {
         )
 
         let priorResumeData = resumeDataByDestination.removeValue(forKey: destination)
+        let runID = OperationID()
         let outcome: Downloader.Outcome
         do {
             outcome = try await Downloader().download(
@@ -139,9 +140,10 @@ actor ModelFileDownloader: ModelDownloading {
                 resumeDataByDestination[destination] = data
             }
             if interruption.underlying is CancellationError {
+                Self.report(runID, logLabel: logLabel, stage: "transfer", outcome: .cancelled, code: nil)
                 throw CancellationError()
             }
-            try Self.translate(interruption.underlying, logLabel: logLabel)
+            try Self.translate(interruption.underlying, runID: runID, stage: "transfer", logLabel: logLabel)
             return
         }
 
@@ -151,6 +153,7 @@ actor ModelFileDownloader: ModelDownloading {
             AppLog.transcription.atNotice.notice(
                 "\(logLabel, privacy: .public): installed \(destination.lastPathComponent, privacy: .public)"
             )
+            Self.report(runID, logLabel: logLabel, stage: "install", outcome: .succeeded, code: nil)
         } catch {
             try? FileManager.default.removeItem(at: outcome.fileURL)
             // A verification/install failure means the bytes themselves were
@@ -159,19 +162,40 @@ actor ModelFileDownloader: ModelDownloading {
             // attempt starts a fresh, full transfer instead.
             resumeDataByDestination[destination] = nil
             if let appError = error as? AppError {
+                Self.report(runID, logLabel: logLabel, stage: "install", outcome: .failed, code: appError.logCode)
                 throw appError
             }
-            try Self.translate(error, logLabel: logLabel)
+            try Self.translate(error, runID: runID, stage: "install", logLabel: logLabel)
         }
     }
 
-    private static func translate(_ error: Error, logLabel: String) throws -> Never {
+    private static func translate(_ error: Error, runID: OperationID, stage: String, logLabel: String) throws -> Never {
         if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+            report(runID, logLabel: logLabel, stage: stage, outcome: .failed, code: restriction.logCode)
             throw restriction
         }
         AppLog.transcription.atError.error("\(logLabel, privacy: .public): failed code=download_failed")
+        report(runID, logLabel: logLabel, stage: stage, outcome: .failed, code: "download_failed")
         try ResourceGuard.rethrowIfResourceFailure(error)
         throw AppError.modelDownloadFailed(error.localizedDescription)
+    }
+
+    /// `logLabel` is each downloader's fixed prefix (e.g. "whisperCpp"),
+    /// which doubles as the stage-free operation name here.
+    private static func report(
+        _ runID: OperationID,
+        logLabel: String,
+        stage: String,
+        outcome: ReliabilityEvent.Outcome,
+        code: String?
+    ) {
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID,
+            operation: "model_download.\(logLabel)",
+            stage: stage,
+            outcome: outcome,
+            code: code
+        ))
     }
 
     // MARK: - Verification

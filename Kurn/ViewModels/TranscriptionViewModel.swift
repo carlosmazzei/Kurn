@@ -327,7 +327,7 @@ final class TranscriptionViewModel {
         // fails to decode or verify starts this run from the beginning, but
         // the discard is explicit and logged, never a lenient decode's nil.
         let checkpointOutcome = recording.transcriptionCheckpointOutcome
-        if checkpointOutcome.isCorrupted {
+        if checkpointOutcome.isUnreadable {
             AppLog.transcription.atError.error("VM: checkpoint corrupted id=\(recordingID, privacy: .public), starting over")
         }
         let checkpoint = checkpointOutcome.decodedValue

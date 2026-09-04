@@ -77,7 +77,7 @@ actor WhisperTranscriber: Transcribing {
                     AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
                     return result
                 } catch {
-                    AppLog.transcription.atError.error("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) failed for \(vendor, privacy: .public) after \(Date().timeIntervalSince(chunkStart), privacy: .public)s: \(error.localizedDescription, privacy: .public)")
+                    AppLog.transcription.atError.error("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) failed for \(vendor, privacy: .public) after \(Date().timeIntervalSince(chunkStart), privacy: .public)s code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                     throw error
                 }
             },

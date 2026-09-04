@@ -246,7 +246,7 @@ final class AudioRecorderService: NSObject {
             cleanUpFailedStart(fileName: fileName)
             throw CancellationError()
         } catch {
-            AppLog.recorder.atError.error("start: setup threw: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("start: setup threw code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             cleanUpFailedStart(fileName: fileName)
             throw AppError.audioError(error.localizedDescription)
         }
@@ -333,7 +333,7 @@ final class AudioRecorderService: NSObject {
         // An interruption may have stopped the engine while we were paused.
         if !engine.isRunning {
             do { try engine.start() } catch {
-                AppLog.recorder.atError.error("resume: engine.start() failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.recorder.atError.error("resume: engine.start() failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 return
             }
         }
@@ -477,13 +477,13 @@ final class AudioRecorderService: NSObject {
         do {
             file = try AVAudioFile(forWriting: url, settings: settings)
         } catch {
-            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public); retrying without explicit bit rate: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public); retrying without explicit bit rate code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             var fallbackSettings = settings
             fallbackSettings.removeValue(forKey: AVEncoderBitRateKey)
             do {
                 file = try AVAudioFile(forWriting: url, settings: fallbackSettings)
             } catch {
-                AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 throw error
             }
         }
@@ -511,7 +511,7 @@ final class AudioRecorderService: NSObject {
             try engine.start()
             AppLog.recorder.atDebug.debug("beginEngine: engine.start() succeeded, isRunning=\(self.engine.isRunning, privacy: .public)")
         } catch {
-            AppLog.recorder.atError.error("beginEngine: engine.start() failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("beginEngine: engine.start() failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             throw AppError.audioError(
                 NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
             )
@@ -638,6 +638,7 @@ final class AudioRecorderService: NSObject {
         AppLog.recorder.atError.error(
             "capture sink failed code=\(failure.rawValue, privacy: .public) attemptedInputFrames=\(snapshot.attemptedInputFrames, privacy: .public) writtenOutputFrames=\(snapshot.writtenOutputFrames, privacy: .public)"
         )
+        CaptureReliability.sinkFailed(fileName: currentFileName, failure: failure)
         return true
     }
 
@@ -668,6 +669,7 @@ final class AudioRecorderService: NSObject {
         AppLog.recorder.atError.error(
             "capture watchdog stalled writtenOutputFrames=\(snapshot.writtenOutputFrames, privacy: .public) attemptedInputFrames=\(snapshot.attemptedInputFrames, privacy: .public)"
         )
+        CaptureReliability.sinkFailed(fileName: currentFileName, failure: .stalled)
         return true
     }
 
@@ -797,7 +799,7 @@ final class AudioRecorderService: NSObject {
             AppLog.recorder.atNotice.notice("engine restarted in place after \(reason, privacy: .public)")
             return
         } catch {
-            AppLog.recorder.atError.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("engine restart failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
 
         pause(reason: .engineRestartFailed)

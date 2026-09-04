@@ -832,6 +832,7 @@
 
 /* Store recovery: backup, restore, salvage, fresh start (H2 PR 4) */
 "store_recovery.reason_protection_verification_failed" = "Kurn couldn't confirm your data is encrypted at rest.";
+"store_recovery.reason_application_support_unavailable" = "Kurn couldn't find a safe place on this device to store your data. Restart the app to try again.";
 "store_recovery.backups_title" = "Restore from Backup";
 "store_recovery.restore_button" = "Restore";
 "store_recovery.restore_confirm_title" = "Restore this backup?";

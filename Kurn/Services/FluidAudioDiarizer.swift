@@ -162,7 +162,7 @@ actor FluidAudioDiarizer: Diarizing {
                 modelsReady = true
                 AppLog.transcription.atNotice.notice("FluidAudioDiarizer: models ready in \(Date().timeIntervalSince(preparationStarted), privacy: .public)s")
             } catch {
-                AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 onDownloadFailure?(error.localizedDescription)
                 return DiarizationOutcome(
                     turns: [Self.fallbackTurn(for: url)],
@@ -185,7 +185,7 @@ actor FluidAudioDiarizer: Diarizing {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
             // which would mislead the user into re-consenting for no reason.
-            AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .engineFailed)
         }
     }

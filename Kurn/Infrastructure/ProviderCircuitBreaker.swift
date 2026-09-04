@@ -106,8 +106,11 @@ actor ProviderCircuitBreaker {
     }
 
     func recordSuccess(providerID: String) {
-        let shouldPersist = records.removeValue(forKey: providerID) != nil || !storageHealthy
-        if shouldPersist { persist() }
+        let wasOpen = records.removeValue(forKey: providerID) != nil
+        if wasOpen {
+            report(providerID: providerID, outcome: .succeeded, code: "circuit_closed")
+        }
+        if wasOpen || !storageHealthy { persist() }
     }
 
     func recordFailure(providerID: String, failure: ProviderCircuitFailure) {
@@ -135,6 +138,7 @@ actor ProviderCircuitBreaker {
             )
         }
         records[providerID] = record
+        report(providerID: providerID, outcome: .failed, attempt: failures, code: "circuit_open_\(failure)")
         persist()
     }
 
@@ -149,6 +153,19 @@ actor ProviderCircuitBreaker {
         } catch {
             storageHealthy = false
             AppLog.persistence.atError.error("providerCircuit: state save failed; automatic work disabled")
+            report(providerID: "", outcome: .failed, code: "circuit_state_unwritable")
         }
+    }
+
+    /// `providerID` is a provider enum's raw value, never user content.
+    private func report(providerID: String, outcome: ReliabilityEvent.Outcome, attempt: Int = 0, code: String) {
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: OperationID(providerID.isEmpty ? "circuit" : providerID),
+            operation: "provider_circuit",
+            stage: providerID,
+            outcome: outcome,
+            attempt: attempt,
+            code: code
+        ))
     }
 }

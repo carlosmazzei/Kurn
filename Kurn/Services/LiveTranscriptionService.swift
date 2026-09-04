@@ -111,7 +111,7 @@ final class LiveTranscriptionService {
         do {
             _ = try await engine.finish()
         } catch {
-            AppLog.transcription.atError.error("LiveTranscriptionService: finish failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: finish failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
         await engine.cleanup()
         self.engine = nil
@@ -127,7 +127,7 @@ final class LiveTranscriptionService {
             try await engine.processBufferedAudio()
         } catch {
             // Best-effort preview; drop the buffer and keep listening.
-            AppLog.transcription.atError.error("LiveTranscriptionService: append/process failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("LiveTranscriptionService: append/process failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 

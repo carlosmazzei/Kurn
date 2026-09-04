@@ -91,7 +91,7 @@ extension PlaybackEnhancementRenderer {
             await enhancer.endStream(streamID)
             if error is CancellationError { throw error }
             try ResourceGuard.rethrowIfResourceFailure(error)
-            AppLog.recorder.atError.error("enhance: neural pre-pass failed, using DSP only: \(error.localizedDescription, privacy: .public)")
+            AppLog.recorder.atError.error("enhance: neural pre-pass failed, using DSP only code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             onProgress?(1)
             return nil
         }

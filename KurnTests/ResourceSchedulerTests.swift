@@ -109,6 +109,79 @@ struct ResourceSchedulerTests {
         try await scheduler.acquire(weight: 10)
     }
 
+    @Test func aWeightAboveTheWholeBudgetRunsAloneInsteadOfNever() async throws {
+        let scheduler = ResourceScheduler(totalWeight: 10)
+        try await scheduler.acquire(weight: 25)
+        #expect(await scheduler.waiterCountForTesting == 0)
+
+        let waiterTask = Task {
+            try await scheduler.acquire(weight: 1)
+        }
+        try await waitUntilWaiterCount(1, on: scheduler)
+
+        await scheduler.release(weight: 25)
+        try await waiterTask.value
+    }
+
+    // MARK: - Scoped reservation
+
+    @Test func scopedReservationReleasesBeforeReturningItsResult() async throws {
+        let scheduler = ResourceScheduler(totalWeight: 100)
+        let value = try await withResourceReservation(.preprocessing, on: scheduler) { 42 }
+        #expect(value == 42)
+        // The release is not a detached step: by the time the value is
+        // observed the full budget is back and admits a whole-budget acquire.
+        try await scheduler.acquire(weight: 100)
+    }
+
+    @Test func scopedReservationReleasesWhenTheBodyThrows() async throws {
+        struct BodyError: Error {}
+        let scheduler = ResourceScheduler(totalWeight: 100)
+        await #expect(throws: BodyError.self) {
+            try await withResourceReservation(.preprocessing, on: scheduler) {
+                throw BodyError()
+            }
+        }
+        try await scheduler.acquire(weight: 100)
+    }
+
+    @Test func scopedReservationReleasesWhenTheBodyIsCancelledMidway() async throws {
+        let scheduler = ResourceScheduler(totalWeight: 100)
+        let bodyStarted = AsyncStream<Void>.makeStream()
+        let task = Task {
+            try await withResourceReservation(.preprocessing, on: scheduler) {
+                bodyStarted.continuation.yield()
+                try await Task.sleep(for: .seconds(60))
+            }
+        }
+        for await _ in bodyStarted.stream { break }
+        task.cancel()
+        let result = await task.result
+        #expect(throws: CancellationError.self) { try result.get() }
+        try await scheduler.acquire(weight: 100)
+    }
+
+    @Test func scopedReservationCancelledWhileQueuedNeverRunsItsBody() async throws {
+        let scheduler = ResourceScheduler(totalWeight: 100)
+        try await scheduler.acquire(weight: 100)
+
+        let bodyRan = Ran()
+        let task = Task {
+            try await withResourceReservation(.preprocessing, on: scheduler) {
+                bodyRan.mark()
+            }
+        }
+        try await waitUntilWaiterCount(1, on: scheduler)
+        task.cancel()
+        let result = await task.result
+        #expect(throws: CancellationError.self) { try result.get() }
+        #expect(!bodyRan.value)
+        #expect(await scheduler.waiterCountForTesting == 0)
+
+        await scheduler.release(weight: 100)
+        try await scheduler.acquire(weight: 100)
+    }
+
     // MARK: - Weight table invariants
 
     @Test func cloudTranscriptionFitsAlongsideEveryDiarizationEngine() {
@@ -143,6 +216,13 @@ struct ResourceSchedulerTests {
     }
 
     // MARK: - Helpers
+
+    private final class Ran: @unchecked Sendable {
+        private let lock = NSLock()
+        private var flag = false
+        var value: Bool { lock.withLock { flag } }
+        func mark() { lock.withLock { flag = true } }
+    }
 
     /// Polls `waiterCountForTesting` until it reaches `count`, yielding
     /// between checks instead of sleeping a fixed duration. Bounded so a

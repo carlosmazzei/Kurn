@@ -56,18 +56,18 @@ actor SherpaOnnxDiarizer: Diarizing {
         // H8 PR 17: same global weight budget as a real diarization run's
         // load — see `WhisperCppTranscriber.verifyModelLoads(at:)`'s own
         // comment for why.
-        try await ResourceScheduler.shared.acquire(weight: ResourceWorkKind.modelLoading.weight)
-        defer { Task { await ResourceScheduler.shared.release(weight: ResourceWorkKind.modelLoading.weight) } }
-        try await Task.detached(priority: .utility) {
-            guard SherpaOnnxOfflineSpeakerDiarizationWrapper(
-                segmentationModelPath: SherpaOnnxModelDownloader.segmentationModelURL.path,
-                embeddingModelPath: SherpaOnnxModelDownloader.embeddingModelURL.path,
-                numSpeakers: 1,
-                numThreads: 1
-            ) != nil else {
-                throw AppError.modelDownloadFailed("sherpa-onnx models failed to load — the downloaded files may be corrupt")
-            }
-        }.value
+        try await withResourceReservation(.modelLoading) {
+            try await Task.detached(priority: .utility) {
+                guard SherpaOnnxOfflineSpeakerDiarizationWrapper(
+                    segmentationModelPath: SherpaOnnxModelDownloader.segmentationModelURL.path,
+                    embeddingModelPath: SherpaOnnxModelDownloader.embeddingModelURL.path,
+                    numSpeakers: 1,
+                    numThreads: 1
+                ) != nil else {
+                    throw AppError.modelDownloadFailed("sherpa-onnx models failed to load — the downloaded files may be corrupt")
+                }
+            }.value
+        }
     }
 
     func diarize(url: URL) async -> [SpeakerTurn] {
@@ -117,7 +117,7 @@ actor SherpaOnnxDiarizer: Diarizing {
             AppLog.transcription.atInfo.info("SherpaOnnxDiarizer: turns \(turns.count, privacy: .public) -> smoothed \(smoothed.count, privacy: .public), speakers=\(Set(smoothed.map { $0.speakerLabel }).count, privacy: .public)")
             return smoothed
         } catch {
-            AppLog.transcription.atError.error("SherpaOnnxDiarizer: processing failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.transcription.atError.error("SherpaOnnxDiarizer: processing failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             return [Self.fallbackTurn(for: url)]
         }
     }
