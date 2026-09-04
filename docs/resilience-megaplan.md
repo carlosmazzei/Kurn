@@ -2859,6 +2859,15 @@ gate the merge on one nobody has established a baseline for yet.
   degrades to "no Linux coverage this run," not a red `kurncore-linux`
   job — which otherwise stays the fast, load-bearing pure-logic signal
   every PR depends on.
+  *Resolved after the token was configured:* the first real uploads showed
+  both gaps at once — `xccov`'s JSON is not a report type Codecov
+  processes (every commit landed in Codecov's `error` state with no
+  totals) and `llvm-cov` is not on the Linux runner's `PATH` (exit 127,
+  empty lcov). Both macOS jobs now export lcov with `xcrun llvm-cov export`
+  over `Coverage.profdata` plus every `.app`/`.appex`/`.xctest` binary,
+  excluding `SourcePackages/` and test sources; the Linux job resolves
+  `llvm-cov` next to the `swift` binary. See roadmap H10 "Coverage export
+  fix".
 - **The `xcrun simctl ... log collect` step reused in
   `reliability-hardening.yml`'s three Xcode jobs carries the same
   not-yet-exercised-on-a-real-failure caveat PR 24's version does** — see
