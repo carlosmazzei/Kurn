@@ -32,8 +32,8 @@ struct DocumentGenerationServiceTests {
 
     @Test func blankPromptFailsBeforeTouchingAnyProvider() async {
         let capture = ReliabilityEventCapture()
-        ReliabilityLog.handler = { capture.record($0) }
-        defer { ReliabilityLog.handler = nil }
+        capture.install()
+        defer { capture.uninstall() }
         let runID = OperationID()
 
         await #expect(throws: AppError.self) {

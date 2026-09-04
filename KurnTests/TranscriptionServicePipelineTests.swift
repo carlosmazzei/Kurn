@@ -208,8 +208,8 @@ struct TranscriptionServicePipelineTests {
         let url = try Self.fixture()
         defer { try? FileManager.default.removeItem(at: url) }
         let harness = FakeEngines(regions: Self.regions)
-        harness.preprocessor.setFailure(AppError.audioError("dsp"))
-        harness.compactor.setResult(.failure(AppError.audioError("compact")))
+        harness.preprocessor.setFailure(FakeEngineError.dsp)
+        harness.compactor.setResult(.failure(FakeEngineError.compact))
         var config = Self.config()
         config.preprocessing = .standardDSP
 
@@ -314,6 +314,13 @@ struct TranscriptionServicePipelineTests {
     }
 }
 
+/// Engine-internal trouble. Deliberately not an `AppError`: the orchestrator
+/// treats those as resource failures and rethrows them instead of degrading.
+private enum FakeEngineError: Error {
+    case dsp
+    case compact
+}
+
 // MARK: - Fakes
 
 private struct FakeEngines {
@@ -341,7 +348,10 @@ private struct FakeEngines {
             },
             corrector: { engine in
                 corrector.record(engine)
-                return corrector
+                switch engine {
+                case .none: return NoOpTranscriptCorrector()
+                case .llm: return corrector
+                }
             },
             diarizationPreprocessor: FakeDiarizationPreprocessor(),
             compactor: compactor
