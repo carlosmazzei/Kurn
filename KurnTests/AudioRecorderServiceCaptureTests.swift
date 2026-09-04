@@ -17,6 +17,7 @@ import Testing
 @MainActor
 @Suite("AudioRecorderService with a scripted capture engine")
 struct AudioRecorderServiceCaptureTests {
+    @MainActor
     private struct Harness {
         let engine: FakeAudioCaptureEngine
         let sink: FakeAudioSinkWriting
