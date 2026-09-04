@@ -117,11 +117,13 @@ Alvo: `TranscriptionService` 7,5 % → ≥ 60 %; `AudioRecorderService`
   `onDiarizationWarning`, cancelamento entre chunks, falha em um estágio
   preservando o `PipelineStageReport`. Também destrava o refactor de tamanho
   já apontado na revisão (600+ linhas).
-- **`AudioRecorderService`**: separar o núcleo de estado (start/pause/resume/
-  markHighlight/stop/cancel, storage, stall) de um `AudioCaptureEngine`
-  protocol que embrulha `AVAudioEngine`/`AVAudioSession`. O fake dispara
-  interrupções, mudança de rota, buffers e erros do sink — os cenários que
-  hoje só o TSan lane exercita indiretamente.
+- **`AudioRecorderService`** (feito — `Kurn/Services/AudioCaptureEngine.swift`,
+  `KurnTests/AudioRecorderServiceCaptureTests.swift`): separar o núcleo de
+  estado (start/pause/resume/markHighlight/stop/cancel, storage, stall) de um
+  `AudioCaptureEngine` protocol que embrulha `AVAudioEngine`/`AVAudioSession`.
+  O fake dispara interrupções, mudança de rota, mudança de configuração/reset
+  de media services, formato não negociado e erros do sink — os cenários que
+  antes só o TSan lane exercitava indiretamente.
 - **`TranscriptionViewModel` / `+Summary` / `RecorderViewModel` /
   `ModelDownloadController`**: já recebem dependências no `init`; escrever
   testes de máquina de estados com fakes (`@MainActor` tests, sem UI):

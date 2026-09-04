@@ -113,7 +113,9 @@ final class AudioRecorderService: NSObject {
     // The engine, sink and tap flag are touched by the off-main setup/teardown
     // path (see `setUpEngine`), so they are kept out of main-actor isolation and
     // out of observation. Access is serialized by the `state`/`isStarting` guards.
-    @ObservationIgnored private nonisolated(unsafe) let engine = AVAudioEngine()
+    // Typed as the protocol (defaulted to the real `AVFoundationCaptureEngine`)
+    // so a test can script the session, the input format and system events.
+    @ObservationIgnored private nonisolated let engine: any AudioCaptureEngine
     /// Thread-safe sink that owns the output file and the latest level. The input
     /// tap runs on a render thread, so it talks to the sink rather than to this
     /// main-actor object directly. Typed as the protocol (defaulted to the real
@@ -163,17 +165,21 @@ final class AudioRecorderService: NSObject {
     private var wasRecordingBeforeInterruption = false
 
     init(
+        engine: any AudioCaptureEngine = AVFoundationCaptureEngine(),
         sink: any AudioSinkWriting = RecordingSink(),
         stallInterval: TimeInterval = 2,
         monotonicNow: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         storageProbe: any RecordingStorageProbing = SystemRecordingStorageProbe()
     ) {
+        self.engine = engine
         self.sink = sink
         self.monotonicNow = monotonicNow
         self.storageProbe = storageProbe
         self.captureWatchdog = CaptureProgressWatchdog(stallInterval: stallInterval)
         super.init()
-        registerNotifications()
+        engine.onEvent = { [weak self] event in
+            Task { @MainActor in self?.handleCaptureEvent(event) }
+        }
     }
 
     // MARK: - Permissions
@@ -278,7 +284,7 @@ final class AudioRecorderService: NSObject {
         preferredInputUID: String?
     ) async throws {
         try Task.checkCancellation()
-        try await AudioRecorderEngineSupport.configureSession(
+        try await engine.configureSession(
             pickup: pickup,
             forceBuiltIn: forceBuiltIn,
             preferredInputUID: preferredInputUID
@@ -292,7 +298,7 @@ final class AudioRecorderService: NSObject {
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)
         resetRuntimeState()
-        AudioRecorderEngineSupport.deactivateSession()
+        engine.deactivateSession()
     }
 
     typealias PauseReason = AudioRecorderPauseReason
@@ -322,12 +328,11 @@ final class AudioRecorderService: NSObject {
         }
         if retryingStall {
             if engine.isRunning { engine.stop() }
-            let currentFormat = engine.inputNode.outputFormat(forBus: 0)
-            guard rebuildTapForCurrentInput(currentFormat) else {
+            guard let currentFormat = engine.inputFormat, rebuildTapForCurrentInput(currentFormat) else {
                 AppLog.recorder.atError.error("resume: capture watchdog retry could not rebuild the input tap")
                 return
             }
-            try? AVAudioSession.sharedInstance().setActive(true)
+            engine.reactivateSession()
             engine.prepare()
         }
         // An interruption may have stopped the engine while we were paused.
@@ -384,7 +389,7 @@ final class AudioRecorderService: NSObject {
         let outcome = finalCaptureFailure == nil ? "ready" : "partial"
         AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
         resetRuntimeState()
-        AudioRecorderEngineSupport.deactivateSession()
+        engine.deactivateSession()
         return AudioRecordingResult(
             fileName: fileName,
             duration: duration,
@@ -404,7 +409,7 @@ final class AudioRecorderService: NSObject {
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)
         resetRuntimeState()
-        AudioRecorderEngineSupport.deactivateSession()
+        engine.deactivateSession()
     }
 
     private func resetRuntimeState() {
@@ -425,30 +430,27 @@ final class AudioRecorderService: NSObject {
     /// captured buffers and tracks the input level. `nonisolated` so it can run
     /// off the main actor from `setUpEngine`.
     private nonisolated func beginEngine(writingTo url: URL, bitRate: Int) async throws {
-        let input = engine.inputNode
-        // Keep the recorder on the standard input unit. VoiceProcessingIO can
-        // block engine startup on some routes/devices, freezing this screen.
-        try? input.setVoiceProcessingEnabled(false)
+        engine.disableVoiceProcessing()
 
         // Right after a session activation that pulled in a Bluetooth route,
         // the accessory may still be mid-handshake switching from A2DP/idle
         // to HFP, so the input format can briefly read as 0/0. Poll briefly
         // before giving up rather than failing on the first read.
-        var format = input.outputFormat(forBus: 0)
-        if format.sampleRate <= 0 || format.channelCount <= 0 {
+        var negotiated = engine.inputFormat
+        if negotiated == nil {
             for _ in 0..<4 {
                 try await Task.sleep(nanoseconds: 150_000_000)
-                format = input.outputFormat(forBus: 0)
-                if format.sampleRate > 0, format.channelCount > 0 { break }
+                negotiated = engine.inputFormat
+                if negotiated != nil { break }
             }
         }
-        AppLog.recorder.atDebug.debug("beginEngine: inputFormat sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)")
-        guard format.sampleRate > 0, format.channelCount > 0 else {
+        guard let format = negotiated else {
             AppLog.recorder.atError.error("beginEngine: invalid input format (sampleRate or channelCount is 0)")
             throw AppError.audioError(
                 NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
             )
         }
+        AppLog.recorder.atDebug.debug("beginEngine: inputFormat sampleRate=\(format.sampleRate, privacy: .public) channels=\(format.channelCount, privacy: .public)")
 
         // Encode at the fixed speech format rather than the mic's native one, so
         // the file size tracks the bit rate alone and a route change can't
@@ -459,34 +461,7 @@ final class AudioRecorderService: NSObject {
                 NSLocalizedString("error.recorder_engine", comment: "Audio engine could not start")
             )
         }
-        let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: Self.storageSampleRate,
-            AVNumberOfChannelsKey: Int(Self.storageChannelCount),
-            AVEncoderBitRateKey: bitRate,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-
-        // Kept from when the encoder saw the mic's native rate: some routes
-        // (e.g. Bluetooth HFP hearing aids negotiating a narrowband link) had a
-        // sample rate whose AAC encoder rejected an explicit bit rate this high,
-        // throwing out of AVAudioFile's init. The fixed 24kHz mono format above
-        // should never trip that, but failing a whole recording over an encoder
-        // property is not worth the saved lines.
-        let file: AVAudioFile
-        do {
-            file = try AVAudioFile(forWriting: url, settings: settings)
-        } catch {
-            AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public); retrying without explicit bit rate code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-            var fallbackSettings = settings
-            fallbackSettings.removeValue(forKey: AVEncoderBitRateKey)
-            do {
-                file = try AVAudioFile(forWriting: url, settings: fallbackSettings)
-            } catch {
-                AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-                throw error
-            }
-        }
+        let file = try engine.openOutputFile(at: url, bitRate: bitRate)
 
         guard let converter = AudioRecorderEngineSupport.makeConverter(from: format, to: storageFormat) else {
             AppLog.recorder.atError.error("beginEngine: could not build a converter from \(format.sampleRate, privacy: .public)Hz/\(format.channelCount, privacy: .public)ch")
@@ -502,7 +477,7 @@ final class AudioRecorderService: NSObject {
         // isolated, the Swift runtime would abort (`_dispatch_assert_queue_fail`)
         // on the first buffer because the executor check fails off the main
         // thread.
-        AudioRecorderEngineSupport.installTap(on: input, format: format, sink: sink)
+        engine.installTap(format: format, sink: sink)
         tapInstalled = true
         tapFormat = format
 
@@ -522,13 +497,13 @@ final class AudioRecorderService: NSObject {
         sink.setPaused(true)
         if engine.isRunning { engine.stop() }
         if tapInstalled {
-            engine.inputNode.removeTap(onBus: 0)
+            engine.removeTap()
             tapInstalled = false
         }
         // Flush and close the output file.
         sink.close()
         // Reset Voice Processing so the next session starts from a clean state.
-        try? engine.inputNode.setVoiceProcessingEnabled(false)
+        engine.disableVoiceProcessing()
     }
 
     // MARK: - Metering / timing
@@ -677,87 +652,36 @@ final class AudioRecorderService: NSObject {
         onStateChanged?(state, elapsed)
     }
 
-    // MARK: - Notifications
+    // MARK: - System events
 
-    private func registerNotifications() {
-        let center = NotificationCenter.default
-        center.addObserver(
-            self,
-            selector: #selector(handleInterruption(_:)),
-            name: AVAudioSession.interruptionNotification,
-            object: nil
-        )
-        center.addObserver(
-            self,
-            selector: #selector(handleRouteChange(_:)),
-            name: AVAudioSession.routeChangeNotification,
-            object: nil
-        )
-        // The engine can be stopped out from under a live recording with NO
-        // interruption notification: a configuration change (route/sample-rate
-        // shuffle, seen around locking and unlocking the device) or a
-        // media-services reset. Without these observers the recorder keeps
-        // counting elapsed time while no buffers reach the file — silent
-        // audio loss with only a frozen level meter as a symptom.
-        center.addObserver(
-            self,
-            selector: #selector(handleEngineConfigurationChange(_:)),
-            name: .AVAudioEngineConfigurationChange,
-            object: engine
-        )
-        center.addObserver(
-            self,
-            selector: #selector(handleMediaServicesReset(_:)),
-            name: AVAudioSession.mediaServicesWereResetNotification,
-            object: nil
-        )
-    }
-
-    @objc private nonisolated func handleInterruption(_ note: Notification) {
-        guard let info = note.userInfo,
-              let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
-
-        switch type {
-        case .began:
-            let interruptionReason = (info[AVAudioSessionInterruptionReasonKey] as? UInt)
-                .flatMap { AVAudioSession.InterruptionReason(rawValue: $0) }
-            AppLog.recorder.atNotice.notice("handleInterruption: began reason=\(AudioRecorderEngineSupport.interruptionReasonDescription(interruptionReason), privacy: .public)")
-            Task { @MainActor in
-                self.wasRecordingBeforeInterruption = (self.state == .recording)
-                if self.state == .recording { self.pause(reason: .audioInterruption) }
+    /// Apply a system event reported by the capture engine. Interruptions and
+    /// route loss pause; a stopped engine after a reconfiguration is restarted
+    /// in place when possible (see `recoverEngineIfNeeded`).
+    func handleCaptureEvent(_ event: AudioCaptureEvent) {
+        switch event {
+        case .interruptionBegan:
+            wasRecordingBeforeInterruption = (state == .recording)
+            if state == .recording { pause(reason: .audioInterruption) }
+        case .interruptionEnded(let shouldResume):
+            if wasRecordingBeforeInterruption, shouldResume, state == .paused {
+                engine.reactivateSession()
+                resume()
+                AppLog.recorder.atNotice.notice("handleInterruption: auto-resumed after interruption ended")
             }
-        case .ended:
-            let shouldResume: Bool
-            if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt {
-                shouldResume = AVAudioSession.InterruptionOptions(rawValue: optRaw).contains(.shouldResume)
-            } else {
-                shouldResume = false
-            }
-            AppLog.recorder.atNotice.notice("handleInterruption: ended shouldResume=\(shouldResume, privacy: .public)")
-            Task { @MainActor in
-                if self.wasRecordingBeforeInterruption,
-                   shouldResume,
-                   self.state == .paused {
-                    try? AVAudioSession.sharedInstance().setActive(true)
-                    self.resume()
-                    AppLog.recorder.atNotice.notice("handleInterruption: auto-resumed after interruption ended")
-                }
-                self.wasRecordingBeforeInterruption = false
-            }
-        @unknown default:
-            break
+            wasRecordingBeforeInterruption = false
+        case .inputRouteLost:
+            guard state == .recording else { return }
+            pause(reason: .routeChanged)
+            routeChangeMessage = NSLocalizedString(
+                "recorder.route_changed",
+                comment: "Recording paused after audio route change"
+            )
+            AppLog.recorder.atInfo.info("routeChangeMessage: \(self.routeChangeMessage ?? "nil", privacy: .public)")
+        case .configurationChanged:
+            recoverEngineIfNeeded(reason: "configuration change")
+        case .mediaServicesReset:
+            recoverEngineIfNeeded(reason: "media services reset")
         }
-    }
-
-    @objc private nonisolated func handleEngineConfigurationChange(_ note: Notification) {
-        AppLog.recorder.atInfo.info("handleEngineConfigurationChange: notification received")
-        Task { @MainActor in self.recoverEngineIfNeeded(reason: "configuration change") }
-    }
-
-    @objc private nonisolated func handleMediaServicesReset(_ note: Notification) {
-        AppLog.recorder.atInfo.info("handleMediaServicesReset: notification received")
-        Task { @MainActor in self.recoverEngineIfNeeded(reason: "media services reset") }
     }
 
     /// Restart an engine that stopped mid-recording. When the input format is
@@ -774,14 +698,17 @@ final class AudioRecorderService: NSObject {
         guard state == .recording, !engine.isRunning else { return }
         AppLog.recorder.atError.error("engine stopped mid-recording (\(reason, privacy: .public)); attempting restart")
 
-        let current = engine.inputNode.outputFormat(forBus: 0)
-        let formatUnchanged = tapFormat.map {
-            $0.sampleRate == current.sampleRate && $0.channelCount == current.channelCount
-        } ?? false
+        let current = engine.inputFormat
+        let formatUnchanged: Bool
+        if let tapFormat, let current {
+            formatUnchanged = tapFormat.sampleRate == current.sampleRate && tapFormat.channelCount == current.channelCount
+        } else {
+            formatUnchanged = false
+        }
 
         if !formatUnchanged {
-            AppLog.recorder.atNotice.notice("input format changed to \(current.sampleRate, privacy: .public)Hz/\(current.channelCount, privacy: .public)ch; rebuilding the tap")
-            if !rebuildTapForCurrentInput(current) {
+            AppLog.recorder.atNotice.notice("input format changed to \(current?.sampleRate ?? 0, privacy: .public)Hz/\(current?.channelCount ?? 0, privacy: .public)ch; rebuilding the tap")
+            guard let current, rebuildTapForCurrentInput(current) else {
                 pause(reason: .engineRecoveryFailed)
                 routeChangeMessage = NSLocalizedString(
                     "recorder.engine_stalled",
@@ -792,7 +719,7 @@ final class AudioRecorderService: NSObject {
             }
         }
 
-        try? AVAudioSession.sharedInstance().setActive(true)
+        engine.reactivateSession()
         engine.prepare()
         do {
             try engine.start()
@@ -814,44 +741,19 @@ final class AudioRecorderService: NSObject {
     /// the open output file. Returns false if either could not be rebuilt, in
     /// which case the caller pauses rather than capturing nothing.
     private func rebuildTapForCurrentInput(_ format: AVAudioFormat) -> Bool {
-        guard format.sampleRate > 0, format.channelCount > 0 else { return false }
         guard let targetFormat = sink.currentTargetFormat,
               let converter = AudioRecorderEngineSupport.makeConverter(from: format, to: targetFormat) else {
             AppLog.recorder.atError.error("rebuildTap: could not build a converter for the new input format")
             return false
         }
         if tapInstalled {
-            engine.inputNode.removeTap(onBus: 0)
+            engine.removeTap()
             tapInstalled = false
         }
         sink.replaceConverter(converter)
-        AudioRecorderEngineSupport.installTap(on: engine.inputNode, format: format, sink: sink)
+        engine.installTap(format: format, sink: sink)
         tapInstalled = true
         tapFormat = format
         return true
-    }
-
-    @objc private nonisolated func handleRouteChange(_ note: Notification) {
-        guard let info = note.userInfo,
-              let raw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
-              let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
-
-        let previousInputs = (info[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription)?
-            .inputs.map { $0.portName }.joined(separator: ",") ?? "unknown"
-        AppLog.recorder.atNotice.notice("handleRouteChange: reason=\(String(describing: reason), privacy: .public) previousInputs=\(previousInputs, privacy: .public)")
-
-        // An "old device unavailable" reason means e.g. headphones were pulled.
-        guard reason == .oldDeviceUnavailable else { return }
-
-        Task { @MainActor in
-            if self.state == .recording {
-                self.pause(reason: .routeChanged)
-                self.routeChangeMessage = NSLocalizedString(
-                    "recorder.route_changed",
-                    comment: "Recording paused after audio route change"
-                )
-                AppLog.recorder.atInfo.info("routeChangeMessage: \(self.routeChangeMessage ?? "nil", privacy: .public)")
-            }
-        }
     }
 }
