@@ -2863,8 +2863,12 @@ gate the merge on one nobody has established a baseline for yet.
   both gaps at once — `xccov`'s JSON is not a report type Codecov
   processes (every commit landed in Codecov's `error` state with no
   totals) and `llvm-cov` is not on the Linux runner's `PATH` (exit 127,
-  empty lcov). Both macOS jobs now export lcov with `xcrun llvm-cov export`
-  over `Coverage.profdata` plus every `.app`/`.appex`/`.xctest` binary,
+  empty lcov). A second attempt, `xcrun llvm-cov export` over
+  `Coverage.profdata` plus the simulator binaries, only ever yielded the
+  test bundles' own sources (the host app's profile was not in the merged
+  profdata), which Codecov's `Kurn/` flag paths filtered down to nothing.
+  Both macOS jobs now read the `.xcresult` coverage archive with
+  `xcrun xccov view --archive` (`Tools/xccov_to_lcov.py`) and emit lcov,
   excluding `SourcePackages/` and test sources; the Linux job resolves
   `llvm-cov` next to the `swift` binary. See roadmap H10 "Coverage export
   fix".

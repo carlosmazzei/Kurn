@@ -361,8 +361,9 @@ for `Packages/KurnCore` on Ubuntu).
 
 ### Coverage
 
-The three test jobs export lcov reports (`xcrun llvm-cov export` from the
-Xcode profile data, `llvm-cov export` from SwiftPM's on Linux) and upload
+The three test jobs export lcov reports (`Tools/xccov_to_lcov.py` reading
+the `.xcresult` coverage archive on macOS, `llvm-cov export` from SwiftPM's
+profile data on Linux) and upload
 them to [Codecov](https://codecov.io/gh/carlosmazzei/Kurn) under the
 `unittests`, `uitests` and `kurncore` flags, which is what the badge at the
 top of this file reports. Third-party SwiftPM checkouts and test sources are

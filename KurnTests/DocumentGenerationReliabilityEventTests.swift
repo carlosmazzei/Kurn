@@ -30,11 +30,12 @@ struct DocumentGenerationReliabilityEventTests {
             )
         }
 
-        let captured = capture.recorded
+        // The handler is process-global and suites run in parallel, so only
+        // this operation's events are this test's to count.
+        let captured = capture.recorded.filter { $0.operation == "document_generation" }
         #expect(captured.count == 1)
         #expect(captured.first?.outcome == .failed)
         #expect(captured.first?.stage == "validation")
         #expect(captured.first?.code == "no_transcripts")
-        #expect(captured.first?.operation == "document_generation")
     }
 }

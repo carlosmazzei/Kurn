@@ -2629,9 +2629,13 @@ Codecov's `error` state with no totals: the `xcrun xccov view --report
 --json` output is not a report type Codecov processes, and
 `kurncore-linux`'s `llvm-cov` call failed with `command not found` (the
 binary lives in the Swift toolchain's `usr/bin`, not on `PATH`), leaving an
-empty lcov file. Both macOS jobs now export lcov via `xcrun llvm-cov export`
-over `Coverage.profdata` and every `.app`/`.appex`/`.xctest` binary under the
-derived-data path, ignoring `SourcePackages/` and test sources so the number
+empty lcov file. `xcrun llvm-cov export` over `Coverage.profdata` was tried
+next and produced only the test bundles' own sources (the host app's profile
+never reached the merged profdata), which the flags' `Kurn/` path filter
+reduced to an empty — again `error` — report. Both macOS jobs now convert
+the `.xcresult` coverage archive (`xcrun xccov view --archive`, via
+`Tools/xccov_to_lcov.py`) to lcov, ignoring `SourcePackages/` and test
+sources so the number
 describes first-party production code (the caution from the SPM extraction
 section above); the Linux job resolves `llvm-cov` next to `swift`. The
 README carries the Codecov badge; statuses remain `informational: true`.

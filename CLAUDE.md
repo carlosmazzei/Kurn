@@ -125,7 +125,9 @@ needs all five. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
 test run and a UI-test flake measurement. The three test jobs also upload
 lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`, via
-`.github/actions/upload-xcode-coverage` and `llvm-cov export`; the README
+`.github/actions/upload-xcode-coverage`, which converts the `.xcresult`
+coverage archive with `Tools/xccov_to_lcov.py`, and `llvm-cov export` on
+Linux; the README
 badge reads the `main` total). Coverage is informational only (`codecov.yml`)
 and excludes SwiftPM checkouts and test sources; do not add a coverage
 threshold or make the upload fatal:
