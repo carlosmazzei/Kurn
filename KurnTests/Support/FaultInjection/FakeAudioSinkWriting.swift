@@ -17,6 +17,14 @@ final class FakeAudioSinkWriting: AudioSinkWriting, @unchecked Sendable {
     private var failFromCall: Int?
     private var shouldFailOnClose = false
     private var currentSnapshot = AudioSinkSnapshot()
+    private var targetFormat: AVAudioFormat?
+    private var converterReplacements = 0
+    private var pausedValue = true
+    private var opens = 0
+    private var closes = 0
+
+    var openCount: Int { lock.withLock { opens } }
+    var closeCount: Int { lock.withLock { closes } }
 
     /// Every `write(_:)` call from this point on (1-based) returns `false`.
     func failWrites(fromCall call: Int) {
@@ -44,17 +52,35 @@ final class FakeAudioSinkWriting: AudioSinkWriting, @unchecked Sendable {
         lock.withLock {
             writeCount = 0
             currentSnapshot = AudioSinkSnapshot()
+            self.targetFormat = targetFormat
+            pausedValue = false
+            opens += 1
         }
     }
 
-    func replaceConverter(_ converter: AVAudioConverter) {}
+    func replaceConverter(_ converter: AVAudioConverter) {
+        lock.withLock { converterReplacements += 1 }
+    }
 
-    var currentTargetFormat: AVAudioFormat? { nil }
+    var currentTargetFormat: AVAudioFormat? {
+        lock.withLock { targetFormat }
+    }
 
-    func setPaused(_ value: Bool) {}
+    var convertersReplaced: Int {
+        lock.withLock { converterReplacements }
+    }
+
+    func setPaused(_ value: Bool) {
+        lock.withLock { pausedValue = value }
+    }
+
+    var isPaused: Bool {
+        lock.withLock { pausedValue }
+    }
 
     func close() {
         lock.withLock {
+            closes += 1
             if shouldFailOnClose, currentSnapshot.firstFailure == nil {
                 currentSnapshot.firstFailure = .finalDrain
             }
