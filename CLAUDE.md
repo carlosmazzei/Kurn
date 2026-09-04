@@ -130,7 +130,14 @@ coverage archive with `Tools/xccov_to_lcov.py`, and `llvm-cov export` on
 Linux; the README
 badge reads the `main` total). Coverage is informational only (`codecov.yml`)
 and excludes SwiftPM checkouts and test sources; do not add a coverage
-threshold or make the upload fatal:
+threshold or make the upload fatal. `codecov.yml` declares one component per
+layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `ViewModels`,
+`Views`, KurnCore) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
+`Kurn/AppIntents` and `Kurn/DebugSupport` until a job executes them;
+`Tools/coverage_report.py` renders the per-layer table into the job summary.
+The phased plan for raising coverage is `docs/testing-coverage-plan.md`.
+
+To verify a change through CI:
 
 - Push the change to its branch and open (or update) a PR targeting `main` — the
   `pull_request` trigger runs the workflow. Pushing to a feature branch alone

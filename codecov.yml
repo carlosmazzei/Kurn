@@ -33,5 +33,48 @@ flags:
       - Packages/KurnCore/
 
 comment:
-  layout: "reach, diff, flags, files"
+  layout: "reach, diff, flags, components, files"
   require_changes: false
+
+# Per-layer breakdown (Codecov "components"), so a PR comment shows where
+# coverage moved rather than one blended number. Statuses stay informational.
+# Layers mirror the architecture in CLAUDE.md; the resilience track
+# (Infrastructure/Providers/Models/KurnCore) is the one that must not drift.
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        informational: true
+  individual_components:
+    - component_id: infrastructure
+      name: Infrastructure
+      paths: [Kurn/Infrastructure/**]
+    - component_id: providers
+      name: Providers
+      paths: [Kurn/Providers/**]
+    - component_id: models
+      name: Models
+      paths: [Kurn/Models/**]
+    - component_id: services
+      name: Services
+      paths: [Kurn/Services/**]
+    - component_id: viewmodels
+      name: ViewModels
+      paths: [Kurn/ViewModels/**]
+    - component_id: views
+      name: Views
+      paths: [Kurn/Views/**]
+    - component_id: kurncore
+      name: KurnCore
+      paths: [Packages/KurnCore/Sources/**]
+
+# The watch app, the Live Activity extension and the App Intents are built
+# for the iOS test run but no test executes them, so they sit at 0% and can
+# only drag the total down. Excluded until a job exercises them (see
+# docs/testing-coverage-plan.md, phase 4); DebugSupport is test-only glue.
+ignore:
+  - KurnWatch/**
+  - KurnLiveActivityExtension/**
+  - Kurn/AppIntents/**
+  - Kurn/DebugSupport/**

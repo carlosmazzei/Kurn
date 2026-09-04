@@ -274,6 +274,11 @@ jobs:
             -ignore-filename-regex='(/\.build/|/Tests/)' \
             > "$RUNNER_TEMP/kurncore-coverage.lcov"
           echo "exported $(grep -c '^SF:' "$RUNNER_TEMP/kurncore-coverage.lcov") source files"
+          {
+            echo "### Coverage (kurncore)"
+            python3 Tools/coverage_report.py --root "$GITHUB_WORKSPACE" "$RUNNER_TEMP/kurncore-coverage.lcov" \
+              || echo "_coverage summary failed; see the lcov artifact_"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage to Codecov
         if: always()
