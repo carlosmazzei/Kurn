@@ -61,9 +61,28 @@ generates a summary with a configured AI provider.
 - View folder analytics: meeting counts, durations, status breakdown, tag
   distribution, and top speakers.
 - Play saved recordings and seek from transcript timestamps.
-- Delete meetings and individual recording segments.
+- Delete meetings and individual recording segments. Deletion moves audio into
+  a protected trash folder first and only purges it once the SwiftData
+  mutation has committed, so a failed save or a crash mid-delete never leaves
+  a meeting pointing at missing audio.
+- Start a recording hands-free from Siri and Shortcuts (`StartRecordingIntent`),
+  or from a Control Center / Lock Screen / Action Button control
+  (`StartRecordingControl`), without unlocking the app first.
+- Chat with your meetings and search them semantically, on device: transcripts
+  are embedded with Apple's `NaturalLanguage` framework and retrieval-grounded
+  answers come from the selected AI provider.
+- Optional, off-by-default derived artifacts: a per-meeting wiki article,
+  free-form documents synthesized across meetings, and an LLM correction pass
+  over the transcript with a change-magnitude guardrail.
+- Recognize returning voices: when a new speaker's voiceprint closely matches
+  a named speaker from another meeting, Kurn suggests the name for
+  confirmation — it never renames silently.
 - Track local audio storage usage, manage downloaded on-device transcription
   models, and reset all app data from Settings.
+- A single **Health & Recovery** screen in Settings aggregates pending capture
+  recovery, quarantined audio, degraded transcripts, failed transcription jobs,
+  corrupt on-device models and recent failure codes, and dispatches the same
+  repair actions the per-item screens use.
 - Full VoiceOver support, Dynamic Type, and Reduce Motion throughout the app,
   the Watch companion, and the Lock Screen/Dynamic Island Live Activity — see
   [Accessibility](#accessibility).
@@ -80,9 +99,10 @@ generates a summary with a configured AI provider.
   replaces the full transcript generated afterward.
 - Cleans audio before transcription with preprocessing, while falling back to
   the original file if preprocessing fails.
-- Transcribes on device with Apple's Speech framework, or on device with
-  FluidAudio's multilingual model, which additionally auto-detects the spoken
-  language.
+- Transcribes on device with Apple's Speech framework, with FluidAudio's
+  multilingual Parakeet model (which additionally auto-detects the spoken
+  language), or with Whisper itself via whisper.cpp — Whisper's accuracy and
+  language coverage with nothing leaving the device.
 - Optionally transcribes with a cloud Whisper-compatible API using chunked
   uploads for longer recordings. The transcription provider (OpenAI, Groq, or
   a custom OpenAI-compatible endpoint) is chosen independently of the summary
@@ -157,12 +177,17 @@ the current run without losing an existing summary.
 
 Supported summary providers:
 
+- Apple Intelligence — on-device Foundation Models (`FoundationModelsProvider`),
+  no API key and no network call; the default for new installs.
 - OpenAI
 - Anthropic
 - Google AI
 - Groq
 
-Each provider has selectable models in Settings. Cloud transcription uses a
+All LLM-backed features (summaries, chat, tag suggestions, wiki, documents,
+transcript correction) resolve through the same `ProviderFactory`, so the
+selected provider applies everywhere. Each cloud provider has selectable
+models in Settings. Cloud transcription uses a
 Whisper-compatible API chosen independently of the summary provider, from
 whichever OpenAI-compatible provider (OpenAI, Groq, or a custom endpoint) has
 a configured key — Anthropic and Google AI don't expose a transcription API,
@@ -179,8 +204,14 @@ Cloud features require user-provided API keys.
 - Google AI key: required for Gemini summaries.
 - Groq key: required for Groq summaries, and usable for Whisper transcription
   (Groq serves `whisper-large-v3`).
-- API keys are stored in the Keychain.
+- API keys are stored in the Keychain; saving a key is an explicit action with
+  a typed success/failure outcome rather than a silent write.
 - Non-secret preferences are stored in `UserDefaults`.
+- Large downloads (on-device transcription and diarization models) are
+  Wi-Fi-only by default and are only fetched after the user enables the
+  corresponding feature in Settings; an "allow expensive network transfers"
+  setting opts into cellular/constrained paths. Downloads resume, verify a checksum before staging, and replace the
+  previous model only after verification.
 
 Default preferences are managed in:
 
@@ -205,7 +236,13 @@ Kurn is designed to avoid a backend service controlled by the app.
   locally with SwiftData.
 - API keys are stored in the Keychain.
 - Network requests are only made when the user selects a cloud transcription or
-  summary feature.
+  summary feature; the default summary provider is Apple's on-device model.
+- Cloud provider calls go through a hardened HTTP boundary: request timeouts,
+  bounded retries, HTTPS-only URL validation with redirect limits, and a
+  per-provider circuit breaker that stops retrying a failing vendor.
+- Reliability diagnostics (see [Resilience](#resilience)) record only
+  operation IDs and error codes — never paths, titles, audio or transcript
+  text — and the exportable log is redacted the same way.
 - No analytics or tracking SDKs are included.
 - The privacy manifest declares no tracking and no collected data types.
 
@@ -359,15 +396,16 @@ Fastlane-driven process (see `fastlane/Fastfile`):
    `type:patch` / `type:major`) locally. This bumps the version across all
    targets, commits, tags the commit `vX.Y.Z`, and pushes both to `main`.
 2. Pushing the `vX.Y.Z` tag triggers the `release` job in
-   `.github/workflows/swift.yml` (gated on tag pushes), which runs after the
-   same `build-and-test` job that gates every push/PR, then publishes a
+   `.github/workflows/swift.yml` (gated on tag pushes), which runs once the
+   same five CI jobs that gate every push/PR pass, then publishes a
    GitHub Release with auto-generated notes.
 
-Pushing the tag also starts the protected App Store pipeline. After
-`build-and-test`, `beta` signs with `fastlane match`, uploads to TestFlight, and
-waits for Apple to finish processing; in parallel, the reusable screenshots
-workflow captures iPhone, iPad, and Watch assets, then `store_assets` reconciles
-the remote screenshot set (removing stale/duplicate images), uploads all assets
+Pushing the tag also starts the protected App Store pipeline. After the CI
+jobs, `beta` signs with `fastlane match`, uploads to TestFlight, and waits for
+Apple to finish processing; in parallel, the reusable screenshots workflow
+captures iPhone, iPad, and Watch assets and chains the marketing-screenshot
+renderer (`marketing-screenshots.yml`, real device frames) onto them, then
+`store_assets` reconciles the remote screenshot set (removing stale/duplicate images), uploads all assets
 to the exact tagged app version, and synchronizes draft Accessibility Nutrition
 Labels. Once both branches succeed, `submit` derives the exact version/build
 from the tagged project and offers it to App Review.
@@ -404,11 +442,16 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```
 
 The GitHub Actions workflow installs SwiftLint and runs linting before the
-build/test step.
+build/test step. Shared CI steps (SwiftPM cache, simulator preparation, failure
+diagnostics, coverage upload) live as composite actions under
+`.github/actions/`, and Dependabot keeps GitHub Actions, SwiftPM, Bundler and
+the other package manifests in the repo up to date.
 
 ## Export
 
-Meetings can be shared as structured Markdown. The export includes:
+Meetings can be shared as structured Markdown in two formats — **Standard**,
+and **Obsidian** (YAML frontmatter plus `[[wikilinks]]` for speakers, ready to
+drop into a vault). The export includes:
 
 - Meeting title, date, notes, and total duration.
 - Summary content, key decisions, and action items when available.
@@ -433,7 +476,9 @@ Kurn/
 ├── Services/                    # Audio, diarization, live preview, summaries, folder analytics
 │   └── Pipeline/                # Transcription pipeline stages (protocol seams,
 │                                 # each with a built-in and a FluidAudio engine)
-├── Providers/                   # OpenAI, Anthropic, Google AI, and Groq clients
+├── Providers/                   # Apple Foundation Models, OpenAI, Anthropic, Google AI
+│                                 # and Groq clients behind one LLMProvider seam
+├── AppIntents/                  # Siri / Shortcuts start-recording intent
 ├── Infrastructure/              # Keychain, settings, export, store boot, journal,
 │                                 # recovery, reliability events, resource scheduler
 ├── DebugSupport/                # Debug-only fault injection hooks

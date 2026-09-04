@@ -281,7 +281,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   summaries, wiki and document generation, folder analytics, auto-tagging. These
   are mostly `struct`/`actor` types operating on plain values so they stay
   decoupled from SwiftData and safe off the main actor.
-- **Providers/** — cloud LLM clients behind the `LLMProvider` protocol. Shared
+- **Providers/** — LLM clients behind the `LLMProvider` protocol: Apple's
+  on-device `FoundationModelsProvider` plus the cloud vendors. Shared
   networking is split by responsibility: `ProviderHTTPPolicy` owns budgets and
   request/replay semantics,
   `ProviderURLPolicy` owns destination validation, `ProviderHTTPTransport` owns
@@ -290,8 +291,13 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   persisting results.
 - **Views/** — SwiftUI screens.
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
-  the durable provider circuit used only by automatic cloud enrichment, and the
-  large-transfer policy shared by cloud audio and model downloads.
+  the durable provider circuit used only by automatic cloud enrichment, the
+  large-transfer policy shared by cloud audio and model downloads, and the
+  durability layer (store boot/backup/salvage, trash, operation journal,
+  quarantine/recovery, reliability events, resource scheduler — see
+  "Durability & recovery" below).
+- **AppIntents/** — `StartRecordingIntent`/`KurnShortcuts` (Siri, Shortcuts);
+  the matching Control Center control lives in `KurnLiveActivityExtension`.
 - **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
   `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
@@ -1104,11 +1110,23 @@ never falls behind the microphone.
 
 ### Providers (`Providers/`)
 
-`LLMProvider` (`Sendable`) abstracts the cloud vendors. `ProviderFactory` is the
-single place that resolves a provider from `AppSettings` + Keychain and throws
-`AppError.noAPIKey` when a key is missing. Vendor API shapes are modeled by
-`AIProviderKind` (`openAICompatible`, `anthropic`, `googleGemini`); Groq reuses the
-OpenAI-compatible client. **Cloud (`.whisperAPI`) transcription is not pinned to
+`LLMProvider` (`Sendable`) abstracts every LLM backend, cloud or local.
+`ProviderFactory` is the single place that resolves a provider from `AppSettings`
++ Keychain and throws `AppError.noAPIKey` when a cloud key is missing or
+`AppError.onDeviceModelUnavailable` when the on-device model can't run. Vendor
+API shapes are modeled by `AIProviderKind` (`openAICompatible`, `anthropic`,
+`googleGemini`, `appleOnDevice`); Groq reuses the OpenAI-compatible client.
+`.appleOnDevice` is `FoundationModelsProvider`
+(`Providers/FoundationModelsProvider.swift`, Apple's `FoundationModels`, no
+`#available` guard because the floor is iOS 26): no key, no network, and the
+default `aiProviderID` for new installs — an existing user's stored selection is
+left alone. `AIProvider.isUsable` (key present, or on-device) is the single
+"can this provider be selected" check the pickers and services share. Cloud
+calls go through `ProviderHTTPTransport`/`ProviderHTTPPolicy` (timeouts, bounded
+retries, redirect limits), `ProviderURLPolicy` (HTTPS-only base-URL validation)
+and `Infrastructure/ProviderCircuitBreaker.swift` (a per-provider breaker that
+opens after repeated failures so a failing vendor is not hammered on every
+retry, and emits a reliability event when it trips). **Cloud (`.whisperAPI`) transcription is not pinned to
 OpenAI** — `AIProvider.supportsTranscription` is true for any `openAICompatible`
 provider (OpenAI, Groq, or a custom OpenAI-compatible endpoint the user adds),
 since they're the only ones exposing a Whisper-shaped `/audio/transcriptions`
@@ -1208,6 +1226,80 @@ than reading `meeting.title` directly.
 is, by contrast, a single file compiled into both the `Kurn` and
 `KurnLiveActivityExtension` targets — unlike `WatchCommand`, there was no reason
 for it to drift, so it's shared rather than duplicated.
+
+### Frictionless capture (`AppIntents/`, `Services/RecordingLauncher.swift`)
+
+`StartRecordingIntent` (Siri / Shortcuts via `KurnShortcuts`) and
+`StartRecordingControl` in `KurnLiveActivityExtension` (Control Center, Lock
+Screen, Action Button) both open the app and post a process-local start request;
+`RecordingLauncher` creates and queues the meeting through the same
+`RecorderView` path a tap uses, and the existing pause/resume/stop commands still
+converge on `RecordingCommandRouter`. Capture deliberately starts **without**
+waiting for `RecordingAccessGate` — a control that first demanded Face ID would
+miss the moment it exists for — while `SecurityCoverWindow` keeps meeting content
+hidden. External commands are idempotent (a duplicate start/stop is a no-op, not
+a second meeting), and the intent distinguishes "request accepted" from
+microphone permission and actual capture.
+
+### Durability & recovery (`Infrastructure/`)
+
+The resilience track (H1–H10 in `docs/roadmap.md`, detail in
+`docs/resilience-megaplan.md`) is built on a few invariants; keep them when
+touching anything that writes audio, the store, or the network:
+
+- **The store never silently opens somewhere else.** `ModelStoreBootCoordinator`
+  is a boot state machine (`KurnSchema` is the versioned SwiftData schema
+  baseline). If Application Support can't be resolved it enters
+  `.recoveryRequired(.applicationSupportUnavailable)` instead of falling back to
+  a temporary directory; `ModelStoreBootViews` hides restore/salvage/fresh-start
+  when there is no durable directory to act on. `ModelStoreProtection`,
+  `ModelStoreBackupManager` and `ModelStoreSalvage` own protection, protected
+  backup/restore and salvage.
+- **Move, then purge.** `RecordingTrash` deletes by atomically moving files into
+  a protected trash folder before the model mutation and purging only once the
+  save committed; `sweep(context:)` reconciles a crash mid-delete on the next
+  launch. `RecordingOperationJournal` records every delete/replace boundary with
+  `intent` → `trashed` → `committed` states; unreadable records are quarantined
+  under `Journal/Unreadable` (never dropped), and `advance(_:to:)` returns `Bool`
+  so a failed rewrite surfaces as a reliability event.
+- **Malformed or future data is not accepted silently.** `JSONStorage` wraps
+  authoritative JSON in a versioned envelope; `JSONDecodeOutcome` distinguishes
+  `.corrupted(originalData:)` from `.unsupportedVersion(_, originalData:)` and
+  preserves the original bytes in both cases. `RecordingProtection`,
+  `RecordingQuarantine` and `RecordingRecovery` handle protected audio,
+  quarantine of files that fail integrity checks, and explicit (never automatic)
+  recovery; `TranscriptionRecovery` resumes from durable checkpoints keyed by a
+  pipeline fingerprint (`PipelineDigest`).
+- **Capture failures are visible.** `CaptureReliability` and
+  `RecordingSink`/`RecordingFileFinalizer` treat sink write failures, stalls
+  and storage headroom as first-class outcomes; `Services/RecordingCompactor`
+  re-encodes to a temporary file, verifies it and only then swaps it in
+  atomically, and only when the user asks from Settings → Storage.
+- **Network and models have limits and rollback.** `LargeTransferPolicy` gates
+  model downloads by network cost (Wi-Fi-only unless
+  `allowsExpensiveNetworkTransfers`), `ModelFileDownloader` resumes and stages
+  into a verified location, and `ModelVerification` checks integrity before a
+  model replaces the previous one. `KeychainManager` returns typed outcomes and
+  credential saves are explicit.
+- **Concurrency has one owner.** `ResourceScheduler` is the global admission
+  scheduler with per-kind weights and cooldowns; wrap work in
+  `withResourceReservation(_:on:_:)` so the reservation is released on success,
+  error and cancellation in the same async flow (never `defer { Task { … } }`).
+  `TranscriptionScheduler` and `ResourceGuard` sit on top of it.
+- **Reliability events are redacted, bounded and durable.**
+  `ReliabilityEvent` (KurnCore) carries an operation ID, a kind and a log code —
+  never a path, title, audio, raw text or `localizedDescription`; use
+  `Error.publicLogCode` (`Extensions/Error+LogCode.swift`) for anything logged
+  with `privacy: .public`. `ReliabilityEventStore` keeps at most `maxEvents`
+  (500) encrypted JSONL records; `LogExport` produces the redacted export, and
+  `Views/Settings/HealthRecoveryView.swift` is the single repair surface that
+  dispatches to the existing per-item recovery functions rather than
+  reimplementing them.
+
+`Tools/check_static_policy.py` enforces the log-redaction and unchecked-save
+rules statically (baseline in `Tools/static_policy_baseline.txt`; a stale
+baseline entry fails the check), and `DebugSupport/` holds the debug-only fault
+injection hooks the recovery tests use.
 
 ### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/MeetingChatService.swift`)
 
