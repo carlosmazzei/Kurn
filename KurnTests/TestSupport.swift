@@ -102,10 +102,16 @@ enum TestModelContainer {
         // what `KurnApp` actually persists.
         let schema = Schema(KurnModelGraph.currentModels)
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container: ModelContainer
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            container = try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             fatalError("Failed to create in-memory ModelContainer: \(error)")
         }
+        // Production saves explicitly (`ModelContext+Save`), so the run-loop
+        // autosave adds nothing here; left on, it fires against containers a
+        // finished test has already released and traps inside SwiftData.
+        container.mainContext.autosaveEnabled = false
+        return container
     }
 }
