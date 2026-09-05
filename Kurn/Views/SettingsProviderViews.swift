@@ -101,6 +101,7 @@ struct ProviderEditor: View {
                 }
             }
         }
+        .accessibilityIdentifier("settings.providers.editor")
         .navigationTitle(provider.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

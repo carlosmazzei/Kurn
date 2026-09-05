@@ -59,10 +59,48 @@ class FlowUITestCase: XCTestCase {
         app.descendants(matching: .any)[identifier]
     }
 
-    /// Taps the back button of the top navigation bar.
-    func goBack() {
-        let back = app.navigationBars.buttons.element(boundBy: 0)
-        XCTAssertTrue(back.waitForExistence(timeout: 5))
+    /// Taps the back button that returns to the screen titled `title`. A
+    /// `NavigationStack` keeps the parent bar in the hierarchy, so the first
+    /// navigation-bar button is not reliably the visible back button; the
+    /// back button's label is the previous screen's title.
+    func goBack(to title: String) {
+        let back = app.navigationBars.buttons[title]
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "Back button to \(title) missing")
         back.tap()
+    }
+
+    /// Swipe-action buttons do not always expose the identifier set on them,
+    /// so match either the identifier or the visible label.
+    func swipeActionButton(identifier: String, label: String) -> XCUIElement {
+        let predicate = NSPredicate(format: "identifier == %@ OR label == %@", identifier, label)
+        return app.buttons.matching(predicate).firstMatch
+    }
+
+    /// Scrolls the visible list until `element` exists. `List` rows are
+    /// lazily created, so a row below the fold is absent from the hierarchy
+    /// until it scrolls into view.
+    @discardableResult
+    func scrollUntilExists(_ element: XCUIElement, maxSwipes: Int = 6) -> Bool {
+        for _ in 0..<maxSwipes {
+            if element.waitForExistence(timeout: 2) { return true }
+            app.swipeUp()
+        }
+        return element.waitForExistence(timeout: 2)
+    }
+
+    /// The visible text of a menu-style `Picker`: SwiftUI exposes the selected
+    /// option as a child static text, not as the picker element's own value.
+    func pickerValue(_ picker: XCUIElement) -> String {
+        if let value = picker.value as? String, !value.isEmpty { return value }
+        let texts = picker.descendants(matching: .staticText).allElementsBoundByIndex.map(\.label)
+        let joined = texts.joined(separator: " ")
+        return joined.isEmpty ? picker.label : joined
+    }
+
+    /// Dumps the element tree into the test log so a CI failure can be
+    /// diagnosed without a local simulator.
+    override func record(_ issue: XCTIssue) {
+        NSLog("[FlowUITest] hierarchy at failure:\n%@", app.debugDescription)
+        super.record(issue)
     }
 }

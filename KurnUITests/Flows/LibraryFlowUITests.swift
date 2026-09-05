@@ -33,10 +33,10 @@ final class LibraryFlowUITests: FlowUITestCase {
         add.tap()
 
         let row = anyElement("tags.row.\(name)")
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "Created tag row did not appear")
+        XCTAssertTrue(scrollUntilExists(row), "Created tag row did not appear")
 
         row.swipeLeft()
-        let delete = app.buttons["tags.row.delete"]
+        let delete = swipeActionButton(identifier: "tags.row.delete", label: "Delete Tag")
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
 
@@ -77,11 +77,14 @@ final class LibraryFlowUITests: FlowUITestCase {
         XCTAssertTrue(save.isEnabled)
         save.tap()
 
+        XCTAssertTrue(anyElement("folder.name").waitForNonExistence(timeout: 5), "Folder form did not dismiss")
+
+        // New folders sort last by creation date, below the seeded ones.
         let row = app.buttons["folders.row.\(name)"]
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "Created folder row did not appear")
+        XCTAssertTrue(scrollUntilExists(row), "Created folder row did not appear")
 
         row.swipeLeft()
-        let delete = app.buttons["folders.row.delete"]
+        let delete = swipeActionButton(identifier: "folders.row.delete", label: "Delete")
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
 
