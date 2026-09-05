@@ -201,9 +201,6 @@ jobs:
             -enableCodeCoverage YES \
             -only-testing:KurnUITests \
             -skip-testing:KurnUITests/ScreenshotUITests \
-            -skip-testing:KurnUITests/SettingsFlowUITests \
-            -skip-testing:KurnUITests/LibraryFlowUITests \
-            -skip-testing:KurnUITests/ShareAndChatFlowUITests \
             clean test
 
       # Failed UI/accessibility-audit tests attach their own screenshots to
