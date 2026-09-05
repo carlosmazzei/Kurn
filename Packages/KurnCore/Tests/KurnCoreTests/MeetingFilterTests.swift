@@ -118,4 +118,24 @@ struct MeetingFilterTests {
         filter.tagIDs.insert(UUID())
         #expect(filter.activeCount == 2)
     }
+
+    @Test func toggleTagInsertsThenRemoves() {
+        let id = UUID()
+        var filter = MeetingFilter()
+        filter.toggleTag(id)
+        #expect(filter.tagIDs == [id])
+        #expect(filter.isActive == true)
+        filter.toggleTag(id)
+        #expect(filter.tagIDs.isEmpty)
+        #expect(filter.isActive == false)
+    }
+
+    @Test func toggleStatusInsertsThenRemoves() {
+        var filter = MeetingFilter()
+        filter.toggleStatus(.failed)
+        filter.toggleStatus(.pending)
+        #expect(filter.statuses == [.failed, .pending])
+        filter.toggleStatus(.failed)
+        #expect(filter.statuses == [.pending])
+    }
 }

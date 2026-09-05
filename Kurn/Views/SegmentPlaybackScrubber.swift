@@ -12,27 +12,23 @@ struct SegmentPlaybackScrubber: View {
     let onCycleRate: () -> Void
     let onToggleEnhancement: () -> Void
 
-    private var playableDuration: TimeInterval { max(duration, 0) }
-    private var sliderUpperBound: TimeInterval { max(playableDuration, 1) }
-    private var boundedCurrentTime: TimeInterval {
-        min(max(currentTime, 0), sliderUpperBound)
+    private var layout: PlaybackScrubberLayout {
+        PlaybackScrubberLayout(currentTime: currentTime, duration: duration)
     }
+
+    private var playableDuration: TimeInterval { layout.playableDuration }
+    private var sliderUpperBound: TimeInterval { layout.sliderUpperBound }
+    private var boundedCurrentTime: TimeInterval { layout.boundedCurrentTime }
     private var isEnhancing: Bool { enhancementProgress != nil }
 
     /// "1×", "1.5×", "0.5×" — `%g` drops trailing zeros and the decimal point.
-    private var rateLabel: String {
-        String(format: "%g×", playbackRate)
-    }
+    private var rateLabel: String { PlaybackScrubberLayout.rateLabel(playbackRate) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { proxy in
-                let fraction = sliderUpperBound > 0 ? boundedCurrentTime / sliderUpperBound : 0
-                let markerWidth: CGFloat = 54
-                let markerX = min(
-                    max(markerWidth / 2, proxy.size.width * fraction),
-                    max(markerWidth / 2, proxy.size.width - markerWidth / 2)
-                )
+                let markerWidth = CGFloat(PlaybackScrubberLayout.markerWidth)
+                let markerX = CGFloat(layout.markerCenterX(trackWidth: Double(proxy.size.width)))
 
                 Text(boundedCurrentTime.clockDisplay)
                     .font(Theme.caption2Emphasized)

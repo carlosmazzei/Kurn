@@ -80,6 +80,24 @@ public struct MeetingFilter: Hashable, Sendable, Codable {
         return true
     }
 
+    /// Adds the tag to the selection, or removes it when already selected.
+    public mutating func toggleTag(_ id: UUID) {
+        if tagIDs.contains(id) {
+            tagIDs.remove(id)
+        } else {
+            tagIDs.insert(id)
+        }
+    }
+
+    /// Adds the status to the selection, or removes it when already selected.
+    public mutating func toggleStatus(_ status: TranscriptionStatus) {
+        if statuses.contains(status) {
+            statuses.remove(status)
+        } else {
+            statuses.insert(status)
+        }
+    }
+
     /// Whether any non-default condition is active.
     public var isActive: Bool {
         dateRange != .all

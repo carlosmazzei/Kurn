@@ -62,14 +62,7 @@ struct MarkdownBlocksView: View {
     }
 
     private func headingFont(level: Int) -> Font {
-        switch level {
-        case 1: return .title2.bold()
-        case 2: return .title3.bold()
-        case 3: return .subheadline.bold()
-        case 4: return .subheadline.weight(.semibold)
-        case 5: return .footnote.bold()
-        default: return .footnote.weight(.semibold)
-        }
+        MarkdownPresentation.headingFont(level: level)
     }
 
     private func listView(_ items: [MarkdownListItem]) -> some View {
@@ -105,11 +98,7 @@ struct MarkdownBlocksView: View {
     }
 
     private func bulletGlyph(for indent: Int) -> String {
-        switch indent % 3 {
-        case 1: return "◦"
-        case 2: return "▪"
-        default: return "•"
-        }
+        MarkdownPresentation.bulletGlyph(indent: indent)
     }
 
     private func blockquoteView(_ inner: [MarkdownBlock]) -> some View {
@@ -187,7 +176,7 @@ struct MarkdownTaskRow: View {
 /// Render inline Markdown for any summary text, falling back to plain text when
 /// a provider returns malformed Markdown.
 func markdownInlineText(_ text: String) -> Text {
-    if let attributed = try? AttributedString(markdown: text) {
+    if let attributed = MarkdownPresentation.inlineAttributedString(text) {
         return Text(attributed)
     }
     return Text(text)

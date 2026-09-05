@@ -13,72 +13,27 @@ import KurnCore
 import UIKit
 
 struct MeetingShareSelectionView: View {
-    /// Output format for every export in this sheet: standard plain Markdown,
-    /// or "Obsidian" (YAML frontmatter + `[[wikilinks]]` for speakers) — see
-    /// `MeetingExport.markdown(for:summary:obsidianStyle:)`.
-    private enum ShareFormat: String, CaseIterable {
-        case standard, obsidian
-
-        var title: String {
-            switch self {
-            case .standard: NSLocalizedString("share.format.standard", comment: "Standard")
-            case .obsidian: NSLocalizedString("share.format.obsidian", comment: "Obsidian")
-            }
-        }
-
-        /// What the choice actually changes in the exported file. Without it
-        /// "Obsidian" is just a word next to "Standard" — nothing else on this
-        /// screen reacts to the picker, so this line is the only feedback that
-        /// the control did anything.
-        var explanation: String {
-            switch self {
-            case .standard: NSLocalizedString("share.format.standard.detail", comment: "Standard format detail")
-            case .obsidian: NSLocalizedString("share.format.obsidian.detail", comment: "Obsidian format detail")
-            }
-        }
-    }
-
     let meeting: Meeting
     let onShare: ([URL]) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedSummaryIDs: Set<UUID>
-    @State private var selectedRecordingIDs: Set<UUID>
+    @State private var selection: MeetingShareSelection
     @State private var copiedRowID: UUID?
     @State private var copiedAll = false
     @State private var shareError: AppError?
-    @State private var format: ShareFormat = .standard
 
-    /// Defaults to every transcribed recording plus the summary currently
-    /// shown on screen, matching the export this replaces.
     init(meeting: Meeting, preselectedSummary: Summary?, onShare: @escaping ([URL]) -> Void) {
         self.meeting = meeting
         self.onShare = onShare
-        _selectedSummaryIDs = State(initialValue: preselectedSummary.map { [$0.id] } ?? [])
-        let transcribedIDs = meeting.recordings
-            .filter { $0.isReadyForConsumption && $0.transcript != nil }
-            .map(\.id)
-        _selectedRecordingIDs = State(initialValue: Set(transcribedIDs))
+        _selection = State(initialValue: MeetingShareSelection(meeting: meeting, preselectedSummary: preselectedSummary))
     }
 
-    private var sortedSummaries: [Summary] {
-        meeting.summaries.sorted { $0.createdAt > $1.createdAt }
-    }
+    private var sortedSummaries: [Summary] { selection.sortedSummaries }
 
-    /// Recordings with a transcript, numbered by their position among all of
-    /// the meeting's recordings so "Recording N" matches the Recordings tab.
-    private var transcribedRecordings: [(index: Int, recording: Recording)] {
-        meeting.recordings
-            .sorted { $0.recordedAt < $1.recordedAt }
-            .enumerated()
-            .filter { $0.element.isReadyForConsumption && $0.element.transcript != nil }
-            .map { (index: $0.offset, recording: $0.element) }
-    }
+    private var transcribedRecordings: [(index: Int, recording: Recording)] { selection.transcribedRecordings }
 
-    private var hasSelection: Bool {
-        !selectedSummaryIDs.isEmpty || !selectedRecordingIDs.isEmpty
-    }
+    private var hasSelection: Bool { selection.hasSelection }
 
     var body: some View {
         NavigationStack {
@@ -103,6 +58,7 @@ struct MeetingShareSelectionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
+                        .accessibilityIdentifier("share.cancel")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -112,6 +68,7 @@ struct MeetingShareSelectionView: View {
                     }
                     .disabled(!hasSelection)
                     .accessibilityLabel(NSLocalizedString("share.copy_all", comment: "Copy All"))
+                    .accessibilityIdentifier("share.copy_all")
                 }
             }
             // The format is a modifier on the export, not a segmentation of
@@ -139,53 +96,47 @@ struct MeetingShareSelectionView: View {
                     .font(Theme.subheadline)
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
-                Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $format) {
-                    ForEach(ShareFormat.allCases, id: \.self) { option in
+                Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $selection.format) {
+                    ForEach(MeetingShareFormat.allCases, id: \.self) { option in
                         Text(option.title).tag(option)
                     }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .accessibilityIdentifier("share.format_picker")
             }
 
-            Text(format.explanation)
+            Text(selection.format.explanation)
                 .font(Theme.caption)
                 .foregroundStyle(Theme.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("share.format_explanation")
 
             Button {
                 performShare()
             } label: {
-                Text(shareButtonTitle).frame(maxWidth: .infinity)
+                Text(selection.shareButtonTitle).frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
             .tint(Theme.accent)
             .disabled(!hasSelection)
+            .accessibilityIdentifier("share.share_button")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
 
-    /// "Share" alone while nothing is selected, "Share (3)" otherwise. The
-    /// count is parenthesised rather than written into the sentence so it
-    /// needs no plural handling in any of the seven localizations.
-    private var shareButtonTitle: String {
-        let share = NSLocalizedString("share.share_action", comment: "Share")
-        let count = selectedSummaryIDs.count + selectedRecordingIDs.count
-        return count > 0 ? "\(share) (\(count))" : share
-    }
-
     private func summaryRow(_ summary: Summary) -> some View {
         HStack(spacing: 12) {
             selectableLabel(
-                title: summaryTitle(for: summary),
+                title: MeetingShareSelection.summaryTitle(for: summary),
                 subtitle: nil,
-                isSelected: selectedSummaryIDs.contains(summary.id)
+                isSelected: selection.isSelected(summary)
             ) {
-                toggleSummary(summary)
+                selection.toggle(summary)
             }
             copyButton(id: summary.id) {
-                MeetingExport.summaryMarkdown(for: meeting, summary: summary, obsidianStyle: format == .obsidian)
+                selection.markdown(for: summary)
             }
         }
     }
@@ -193,14 +144,14 @@ struct MeetingShareSelectionView: View {
     private func transcriptRow(index: Int, recording: Recording) -> some View {
         HStack(spacing: 12) {
             selectableLabel(
-                title: String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1),
+                title: MeetingShareSelection.transcriptTitle(index: index),
                 subtitle: recording.recordedAt.meetingDisplay,
-                isSelected: selectedRecordingIDs.contains(recording.id)
+                isSelected: selection.isSelected(recording)
             ) {
-                toggleRecording(recording)
+                selection.toggle(recording)
             }
             copyButton(id: recording.id) {
-                MeetingExport.transcriptMarkdown(for: meeting, recording: recording, obsidianStyle: format == .obsidian)
+                selection.markdown(for: recording)
             }
         }
     }
@@ -248,29 +199,6 @@ struct MeetingShareSelectionView: View {
         .accessibilityLabel(NSLocalizedString("share.copy", comment: "Copy"))
     }
 
-    private func summaryTitle(for summary: Summary) -> String {
-        let name = summary.templateName?.isEmpty == false
-            ? summary.templateName!
-            : NSLocalizedString("detail.summary.untitled", comment: "Summary")
-        return "\(name) · \(summary.createdAt.shortTime)"
-    }
-
-    private func toggleSummary(_ summary: Summary) {
-        if selectedSummaryIDs.contains(summary.id) {
-            selectedSummaryIDs.remove(summary.id)
-        } else {
-            selectedSummaryIDs.insert(summary.id)
-        }
-    }
-
-    private func toggleRecording(_ recording: Recording) {
-        if selectedRecordingIDs.contains(recording.id) {
-            selectedRecordingIDs.remove(recording.id)
-        } else {
-            selectedRecordingIDs.insert(recording.id)
-        }
-    }
-
     private func flashCopied(_ id: UUID) {
         copiedRowID = id
         Task { @MainActor in
@@ -280,14 +208,7 @@ struct MeetingShareSelectionView: View {
     }
 
     private func copyAll() {
-        let obsidianStyle = format == .obsidian
-        let summaryTexts = sortedSummaries
-            .filter { selectedSummaryIDs.contains($0.id) }
-            .map { MeetingExport.summaryMarkdown(for: meeting, summary: $0, obsidianStyle: obsidianStyle) }
-        let transcriptTexts = transcribedRecordings
-            .filter { selectedRecordingIDs.contains($0.recording.id) }
-            .map { MeetingExport.transcriptMarkdown(for: meeting, recording: $0.recording, obsidianStyle: obsidianStyle) }
-        let combined = (summaryTexts + transcriptTexts).joined(separator: "\n\n---\n\n")
+        let combined = selection.combinedMarkdown()
         guard !combined.isEmpty else { return }
         UIPasteboard.general.string = combined
         copiedAll = true
@@ -299,17 +220,8 @@ struct MeetingShareSelectionView: View {
 
     private func performShare() {
         do {
-            let obsidianStyle = format == .obsidian
-            var urls: [URL] = []
-            for summary in sortedSummaries where selectedSummaryIDs.contains(summary.id) {
-                let text = MeetingExport.summaryMarkdown(for: meeting, summary: summary, obsidianStyle: obsidianStyle)
-                let name = "\(meeting.title)-summary-\(summary.templateName ?? "\(urls.count + 1)")"
-                urls.append(try MeetingExport.temporaryFile(markdown: text, suggestedName: name))
-            }
-            for entry in transcribedRecordings where selectedRecordingIDs.contains(entry.recording.id) {
-                let text = MeetingExport.transcriptMarkdown(for: meeting, recording: entry.recording, obsidianStyle: obsidianStyle)
-                let name = "\(meeting.title)-transcript-\(entry.index + 1)"
-                urls.append(try MeetingExport.temporaryFile(markdown: text, suggestedName: name))
+            let urls = try selection.exportItems().map {
+                try MeetingExport.temporaryFile(markdown: $0.markdown, suggestedName: $0.suggestedName)
             }
             dismiss()
             onShare(urls)

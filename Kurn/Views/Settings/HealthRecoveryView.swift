@@ -29,15 +29,7 @@ struct HealthRecoveryView: View {
 
     var txVM: TranscriptionViewModel? { sharedTxVM }
 
-    /// One decoded, warning-carrying `PipelineReport` alongside the recording
-    /// it came from — `pipelineReportData` is opaque JSON, so `Transcript`
-    /// can't be filtered by a SwiftData predicate; every transcript is
-    /// fetched and decoded here instead.
-    struct DegradedItem: Identifiable {
-        var id: UUID { recording.id }
-        let recording: Recording
-        let report: PipelineReport
-    }
+    typealias DegradedItem = HealthRecoveryAggregation.DegradedItem
 
     @State var recoveryNeeded: [Recording] = []
     @State var stalledTranscriptions: [Recording] = []
@@ -52,8 +44,14 @@ struct HealthRecoveryView: View {
     @State var quarantineShareItem: ShareItem?
 
     var isEmpty: Bool {
-        recoveryNeeded.isEmpty && stalledTranscriptions.isEmpty && degraded.isEmpty
-            && quarantineItems.isEmpty && corruptModels.isEmpty && recentFailures.isEmpty
+        HealthRecoveryAggregation.isEmpty(
+            recoveryNeeded: recoveryNeeded,
+            stalledTranscriptions: stalledTranscriptions,
+            degraded: degraded,
+            quarantineItems: quarantineItems,
+            corruptModels: corruptModels,
+            recentFailures: recentFailures
+        )
     }
 
     var body: some View {
@@ -171,43 +169,22 @@ struct HealthRecoveryView: View {
     // MARK: - Loading
 
     func refresh() async {
-        let recoveryRaw = RecordingCaptureState.recoveryNeeded.rawValue
-        let readyRaw = RecordingCaptureState.ready.rawValue
-        let failedRaw = TranscriptionStatus.failed.rawValue
-        let pendingRaw = TranscriptionStatus.pending.rawValue
-
-        let recoveryDescriptor = FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.captureStateRaw == recoveryRaw },
-            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
-        )
-        recoveryNeeded = (try? modelContext.fetch(recoveryDescriptor)) ?? []
-
-        let stalledDescriptor = FetchDescriptor<Recording>(
-            predicate: #Predicate {
-                $0.captureStateRaw == readyRaw
-                    && ($0.transcriptionStatusRaw == failedRaw || $0.transcriptionStatusRaw == pendingRaw)
-            },
-            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
-        )
-        stalledTranscriptions = (try? modelContext.fetch(stalledDescriptor)) ?? []
+        recoveryNeeded = (try? modelContext.fetch(HealthRecoveryAggregation.recoveryNeededDescriptor())) ?? []
+        stalledTranscriptions = (try? modelContext.fetch(
+            HealthRecoveryAggregation.stalledTranscriptionsDescriptor()
+        )) ?? []
 
         let allTranscripts = (try? modelContext.fetch(FetchDescriptor<Transcript>())) ?? []
-        degraded = allTranscripts.compactMap { transcript in
-            guard let report = transcript.pipelineReport, report.hasWarnings,
-                  let recording = transcript.recording else { return nil }
-            return DegradedItem(recording: recording, report: report)
-        }
+        degraded = HealthRecoveryAggregation.degradedItems(in: allTranscripts)
 
         quarantineItems = await Task.detached(priority: .utility) {
             RecordingQuarantine.items()
         }.value
 
-        corruptModels = downloads.installedModels.filter {
-            if case .corrupt = $0.verificationState { return true }
-            return false
-        }
+        corruptModels = HealthRecoveryAggregation.corruptModels(in: downloads.installedModels)
 
-        recentFailures = ReliabilityEventStore.recentEvents(limit: 100)
-            .filter { $0.outcome == .failed }
+        recentFailures = HealthRecoveryAggregation.recentFailures(
+            in: ReliabilityEventStore.recentEvents(limit: HealthRecoveryAggregation.recentFailureWindow)
+        )
     }
 }

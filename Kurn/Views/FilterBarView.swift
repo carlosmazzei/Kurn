@@ -190,19 +190,11 @@ struct FilterBarView: View {
     // MARK: - Helpers
 
     private func toggleTag(_ tag: Tag) {
-        if filter.tagIDs.contains(tag.id) {
-            filter.tagIDs.remove(tag.id)
-        } else {
-            filter.tagIDs.insert(tag.id)
-        }
+        filter.toggleTag(tag.id)
     }
 
     private func toggleStatus(_ status: TranscriptionStatus) {
-        if filter.statuses.contains(status) {
-            filter.statuses.remove(status)
-        } else {
-            filter.statuses.insert(status)
-        }
+        filter.toggleStatus(status)
     }
 
     private var saveSmartFolderSheet: some View {
