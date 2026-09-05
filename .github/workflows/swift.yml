@@ -166,11 +166,10 @@ jobs:
   # launch/UI flake and a data-integrity regression should never share one
   # red check.
   #
-  # The flow suites under KurnUITests/Flows (Settings, Tags/Folders, Share,
-  # Chat) are skipped here on purpose: they only run in the
-  # reliability-hardening.yml `ui-flake-rate` lane until their flake rate has
-  # been measured there, per docs/testing-coverage-plan.md (Fase 3). Drop the
-  # matching -skip-testing lines to promote a suite into this required job.
+  # The flow suites under KurnUITests/Flows run here since their flake rate
+  # measured 0/5 in reliability-hardening.yml's `ui-flake-rate` lane (per
+  # docs/testing-coverage-plan.md, Fase 3). A suite that starts flaking goes
+  # back behind a -skip-testing line until it is fixed and re-measured.
   ui-accessibility-tests:
     runs-on: macos-26
 
@@ -201,9 +200,6 @@ jobs:
             -enableCodeCoverage YES \
             -only-testing:KurnUITests \
             -skip-testing:KurnUITests/ScreenshotUITests \
-            -skip-testing:KurnUITests/SettingsFlowUITests \
-            -skip-testing:KurnUITests/LibraryFlowUITests \
-            -skip-testing:KurnUITests/ShareAndChatFlowUITests \
             clean test
 
       # Failed UI/accessibility-audit tests attach their own screenshots to

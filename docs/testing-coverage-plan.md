@@ -157,9 +157,11 @@ Alvo: `Views` 23 % → ~40 % sem snapshots frágeis.
   `MarkdownPresentation`, `MeetingShareSelection`/`MeetingShareFormat` e
   `MeetingFilter.toggleTag/toggleStatus` (KurnCore), com suítes em
   `KurnTests`; fluxos em `KurnUITests/Flows/` (`SettingsFlowUITests`,
-  `LibraryFlowUITests`, `ShareAndChatFlowUITests`). Os fluxos ficam
-  `-skip-testing` no job obrigatório e rodam no lane `ui-flake-rate` até a
-  medição; promover removendo a linha de skip em `swift.yml`.
+  `LibraryFlowUITests`, `ShareAndChatFlowUITests`). Medição no lane
+  `ui-flake-rate`: 5/5 tentativas verdes em `main`; os fluxos foram
+  promovidos ao job obrigatório `ui-accessibility-tests` (remoção das linhas
+  `-skip-testing` em `swift.yml`). Suíte que passar a oscilar volta para trás
+  de um skip até ser corrigida e re-medida.
 
 ### Fase 4 — Targets hoje em 0 % (1 sessão, opcional)
 
