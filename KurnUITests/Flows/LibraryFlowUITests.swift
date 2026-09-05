@@ -28,15 +28,19 @@ final class LibraryFlowUITests: FlowUITestCase {
         field.tap()
         field.typeText(name)
 
-        let add = app.buttons["tags.add"]
-        XCTAssertTrue(add.isEnabled)
-        add.tap()
+        XCTAssertTrue(app.buttons["tags.add"].isEnabled)
+        // Submitting from the keyboard creates the tag *and* dismisses the
+        // keyboard, which otherwise covers the rows below the fold.
+        field.typeText("\n")
+        _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
 
         let row = anyElement("tags.row.\(name)")
         XCTAssertTrue(scrollUntilExists(row), "Created tag row did not appear")
+        scrollIntoSafeArea(row)
 
-        row.swipeLeft()
-        let delete = swipeActionButton(identifier: "tags.row.delete", label: "Delete Tag")
+        let delete = revealSwipeAction(
+            on: row, identifier: "tags.row.delete", label: "Delete Tag"
+        )
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
 

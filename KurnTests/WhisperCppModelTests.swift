@@ -130,7 +130,6 @@ struct WhisperCppModelTests {
     /// Storage row, so there was no way to delete just one of them.
     @Test func installedVariantsAreListedAndDeletedIndividually() throws {
         let fm = FileManager.default
-        let root = WhisperCppModelDownloader.modelsDirectory
         let installed: [WhisperCppModel] = [.base, .largeTurbo]
         // Only run against a clean slate, so a real download on the simulator
         // can't make this flaky.

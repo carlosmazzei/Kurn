@@ -44,7 +44,9 @@ final class MeetingChatViewModel {
     // task's own closure holds a strong reference to `self` (via its
     // `guard let self`) for as long as it's actively mutating state, which
     // makes that reference and deinit mutually exclusive by construction.
-    private nonisolated(unsafe) var task: Task<Void, Never>?
+    // `@ObservationIgnored` keeps this a plain stored property; behind the
+    // `@Observable` accessors `nonisolated(unsafe)` would have no effect.
+    @ObservationIgnored private nonisolated(unsafe) var task: Task<Void, Never>?
 
     /// H8 PR 20, item 1's "chat/search tasks cancel on dismissal": this view
     /// model is owned by `MeetingChatView`'s `@State`, so SwiftUI deallocates

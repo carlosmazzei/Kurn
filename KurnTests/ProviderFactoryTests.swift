@@ -103,9 +103,9 @@ struct ProviderFactoryTests {
         }
     }
 
-    @Test func whisperProviderThrowsForGroqWhenGroqKeyMissingEvenWithOpenAIKey() throws {
+    @Test func whisperProviderThrowsForGroqWhenGroqKeyMissingEvenWithOpenAIKey() {
         // Selecting Groq must require Groq's own key, not fall back to OpenAI's.
-        try withKey(.openAI, value: "openai-key") {
+        withKey(.openAI, value: "openai-key") {
             withClearedKey(.groq) {
                 #expect(throws: AppError.self) {
                     _ = try ProviderFactory.whisperProvider(for: .groq, model: "whisper-large-v3")

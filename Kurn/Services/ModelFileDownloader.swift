@@ -144,7 +144,6 @@ actor ModelFileDownloader: ModelDownloading {
                 throw CancellationError()
             }
             try Self.translate(interruption.underlying, runID: runID, stage: "transfer", logLabel: logLabel)
-            return
         }
 
         do {

@@ -170,7 +170,7 @@ struct PublicDatasetEvaluationHarnessTests {
                         writer?.append(csvRow(for: row))
                     } catch let error as AppError {
                         if case .transcriptionLanguageUnsupported = error {
-                            let reason = error.localizedDescription ?? String(describing: error)
+                            let reason = error.localizedDescription
                             print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(reason)")
                             continue
                         }
