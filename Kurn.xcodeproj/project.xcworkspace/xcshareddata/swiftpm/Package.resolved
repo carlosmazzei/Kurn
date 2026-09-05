@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/csukuangfj/onnxruntime-libs",
       "state" : {
-        "revision" : "1fbef5f2a1b5c2691fe9411243f3a8afe9a0b169",
-        "version" : "1.27.1"
+        "revision" : "0b7a5932e2c94d4b2a90f6cebcc82d1d8e8b2f39",
+        "version" : "1.29.0"
       }
     },
     {
