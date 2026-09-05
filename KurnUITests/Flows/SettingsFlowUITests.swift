@@ -36,8 +36,8 @@ final class SettingsFlowUITests: FlowUITestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
 
-        XCTAssertTrue(anyElement("settings.providers.form").waitForNonExistence(timeout: 5))
-        goBack()
+        XCTAssertTrue(anyElement("settings.providers.editor").waitForExistence(timeout: 5))
+        goBack(to: "AI Providers")
         XCTAssertTrue(anyElement("settings.providers.form").waitForExistence(timeout: 5))
     }
 
@@ -46,7 +46,7 @@ final class SettingsFlowUITests: FlowUITestCase {
     func testDecliningAModelDownloadKeepsTheCurrentEngine() {
         openSettingsScreen("settings.link.transcription")
 
-        let picker = app.buttons["settings.transcription.engine"]
+        let picker = anyElement("settings.transcription.engine")
         XCTAssertTrue(picker.waitForExistence(timeout: 10))
         let before = pickerValue(picker)
         XCTAssertTrue(before.contains("Apple Speech"), "Fresh install should default to Apple Speech, got \(before)")
@@ -83,14 +83,21 @@ final class SettingsFlowUITests: FlowUITestCase {
         // (`ModelStoreRecoveryUITests` deliberately records boot failures),
         // so either the all-clear row or the recent-failures section is the
         // correct rendering — never an empty list.
-        let allClear = anyElement("health.all_clear")
-        let failures = app.buttons["health.view_all_events"]
-        let rendered = NSPredicate { _, _ in allClear.exists || failures.exists }
-        let expectation = XCTNSPredicateExpectation(predicate: rendered, object: nil)
-        XCTAssertEqual(XCTWaiter().wait(for: [expectation], timeout: 10), .completed)
-    }
-
-    private func pickerValue(_ picker: XCUIElement) -> String {
-        (picker.value as? String) ?? picker.label
+        // Identifiers set on a `Label` or `NavigationLink` inside a `List`
+        // row are not always surfaced by XCUITest, so the visible en strings
+        // are accepted as the second handle.
+        // The events link sits below the per-event rows, so it may need
+        // scrolling into view when the log is long.
+        let allClear = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier == %@ OR label == %@", "health.all_clear", "Nothing needs attention")
+        ).firstMatch
+        let failures = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "identifier == %@ OR label == %@",
+                "health.view_all_events", "View All Reliability Events"
+            )
+        ).firstMatch
+        if allClear.waitForExistence(timeout: 5) { return }
+        XCTAssertTrue(scrollUntilExists(failures), "Health & Recovery rendered neither all-clear nor recent failures")
     }
 }
