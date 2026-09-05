@@ -72,7 +72,7 @@ final class AppSettings {
     /// `CloudKeyValueStore` instead.
     private static let cloudTemplatesKey = "cloud.summaryTemplates"
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private let cloudStore: CloudKeyValueStore
 
     var providers: [AIProvider] {
@@ -550,8 +550,12 @@ final class AppSettings {
         }
     }
 
-    init(cloudStore: CloudKeyValueStore = CloudSettingsSync.shared) {
+    init(
+        cloudStore: CloudKeyValueStore = CloudSettingsSync.shared,
+        defaults: UserDefaults = .standard
+    ) {
         self.cloudStore = cloudStore
+        self.defaults = defaults
         // An empty stored list is treated as absent: it can only come from a
         // corrupt write, and shipping the app with no providers at all is worse
         // than re-seeding the built-ins.

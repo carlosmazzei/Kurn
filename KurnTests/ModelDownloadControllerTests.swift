@@ -59,25 +59,20 @@ private struct ScriptedError: Error {}
 
 // MARK: - Harness
 
-private let scopedDefaultsKeys = [
-    "settings.transcriptionProviderID",
-    "settings.liveTranscriptionEnabled", "settings.diarizationEngine", "settings.transcriptionEngine",
-    "settings.vadEngine", "settings.languageDetectionEngine",
-    "settings.fluidAudioASRModelsConsented", "settings.fluidAudioBatchASRModelsConsented",
-    "settings.fluidAudioDiarizationModelsConsented", "settings.fluidAudioVADModelsConsented",
-    "settings.whisperCppModel", "settings.whisperCppModelsConsented",
-    "settings.sherpaOnnxModelsConsented",
-    "settings.allowsExpensiveNetworkTransfers", "settings.allowsConstrainedNetworkTransfers"
-]
-
 @MainActor
 private struct Harness {
     let downloader = ScriptedDownloader()
     let settings: AppSettings
     let controller: ModelDownloadController
 
-    init(installedWhisperCpp: Set<WhisperCppModel> = []) {
-        settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore())
+    let defaults: UserDefaults
+    let suiteName: String
+
+    init(installedWhisperCpp: Set<WhisperCppModel> = []) throws {
+        suiteName = "ModelDownloadControllerTests.\(UUID().uuidString)"
+        defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults)
         controller = ModelDownloadController(
             downloader: downloader.closure,
             isWhisperCppInstalled: { installedWhisperCpp.contains($0) }
@@ -94,29 +89,18 @@ private struct Harness {
     }
 }
 
-@MainActor
-private func withScopedDefaults(_ body: (Harness) async throws -> Void) async throws {
-    let defaults = UserDefaults.standard
-    let snapshot = scopedDefaultsKeys.reduce(into: [String: Any]()) { acc, key in
-        if let value = defaults.object(forKey: key) { acc[key] = value }
-    }
-    defer {
-        for key in scopedDefaultsKeys {
-            if let value = snapshot[key] { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
-        }
-    }
-    for key in scopedDefaultsKeys { defaults.removeObject(forKey: key) }
-    try await body(Harness())
-}
-
+/// Each harness gets its own `UserDefaults` suite, so these async tests never
+/// race other suites that snapshot/restore `UserDefaults.standard`.
 @MainActor
 private func withScopedDefaults(
-    installedWhisperCpp: Set<WhisperCppModel>,
+    installedWhisperCpp: Set<WhisperCppModel> = [],
     _ body: (Harness) async throws -> Void
 ) async throws {
-    try await withScopedDefaults { _ in
-        try await body(Harness(installedWhisperCpp: installedWhisperCpp))
+    let harness = try Harness(installedWhisperCpp: installedWhisperCpp)
+    defer {
+        harness.defaults.removePersistentDomain(forName: harness.suiteName)
     }
+    try await body(harness)
 }
 
 @MainActor
