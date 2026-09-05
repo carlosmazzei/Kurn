@@ -73,7 +73,7 @@ class FlowUITestCase: XCTestCase {
     /// so match either the identifier or the visible label.
     func swipeActionButton(identifier: String, label: String) -> XCUIElement {
         let predicate = NSPredicate(format: "identifier == %@ OR label == %@", identifier, label)
-        return app.buttons.matching(predicate).firstMatch
+        return app.descendants(matching: .any).matching(predicate).firstMatch
     }
 
     /// Scrolls the visible list until `element` exists. `List` rows are
@@ -100,7 +100,12 @@ class FlowUITestCase: XCTestCase {
     /// Dumps the element tree into the test log so a CI failure can be
     /// diagnosed without a local simulator.
     override func record(_ issue: XCTIssue) {
-        NSLog("[FlowUITest] hierarchy at failure:\n%@", app.debugDescription)
+        // `NSLog` truncates long messages, so emit the tree a few lines at a time.
+        let lines = app.debugDescription.split(separator: "\n", omittingEmptySubsequences: false)
+        for chunk in stride(from: 0, to: lines.count, by: 8) {
+            let slice = lines[chunk..<min(chunk + 8, lines.count)].joined(separator: "\n")
+            NSLog("[FlowUITest] hierarchy %d:\n%@", chunk, slice)
+        }
         super.record(issue)
     }
 }
