@@ -94,14 +94,14 @@ extension HealthRecoveryView {
                         } label: {
                             rowLabel(
                                 title: meetingTitle(for: item.recording),
-                                subtitle: item.report.warnings.map { $0.stage.displayName }.joined(separator: ", "),
+                                subtitle: HealthRecoveryAggregation.degradedSubtitle(for: item.report),
                                 systemImage: "exclamationmark.triangle.fill",
                                 tint: Theme.warning
                             )
                         }
                         .buttonStyle(.plain)
                         Spacer()
-                        if item.report.warnings.contains(where: { $0.stage == .correction }) {
+                        if HealthRecoveryAggregation.canRetryCorrection(item.report) {
                             Button {
                                 retryCorrection(item.recording)
                             } label: {
@@ -219,10 +219,7 @@ extension HealthRecoveryView {
     }
 
     func meetingTitle(for recording: Recording) -> String {
-        guard let title = recording.meeting?.title, !title.isEmpty else {
-            return NSLocalizedString("health.untitled_meeting", comment: "Untitled meeting")
-        }
-        return title
+        HealthRecoveryAggregation.meetingTitle(for: recording)
     }
 
     func rowLabel(title: String, subtitle: String, systemImage: String, tint: Color) -> some View {
