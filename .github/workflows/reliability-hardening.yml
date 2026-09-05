@@ -155,6 +155,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -configuration Release \
+            ENABLE_TESTABILITY=YES \
             -only-testing:KurnTests \
             -only-testing:KurnSwiftDataTests \
             clean test

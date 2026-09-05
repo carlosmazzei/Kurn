@@ -1578,10 +1578,11 @@ enforced by lint and by a CI audit test, not just convention:
   download keeps the engine, Storage, Health & Recovery),
   `LibraryFlowUITests` (tag and folder create/delete) and
   `ShareAndChatFlowUITests` (share sheet up to the Obsidian format, Ask with
-  no provider → empty state, composer disabled). They are `-skip-testing`'d
-  in the required `ui-accessibility-tests` job and run in
-  `reliability-hardening.yml`'s `ui-flake-rate` lane until their flake rate
-  is measured; promote a suite by removing its skip line in `swift.yml`.
+  no provider → empty state, composer disabled). They run in the required
+  `ui-accessibility-tests` job (promoted after 5/5 green attempts in
+  `reliability-hardening.yml`'s `ui-flake-rate` lane); a suite that starts
+  flaking is demoted with a `-skip-testing` line in `swift.yml` and
+  re-measured there before coming back.
 - **Speaker identity, not color, carries meaning** everywhere it matters: the
   Live Activity's Lock Screen status dot differs by *shape* (pause icon vs.
   filled circle), not only color, and status text is never color-only.

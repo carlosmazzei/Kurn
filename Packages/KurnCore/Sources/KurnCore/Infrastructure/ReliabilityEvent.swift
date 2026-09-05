@@ -117,12 +117,17 @@ public struct ReliabilityEvent: Sendable, Codable {
     }
 }
 
-/// The single place a `ReliabilityEvent` is reported. Mirrors
-/// `TranscriptQualityFilter.logHandler`'s shape: `nonisolated(unsafe)` because
-/// it is set exactly once at launch, before any operation can run, and never
-/// mutated afterward.
+/// The single place a `ReliabilityEvent` is reported. The app installs the
+/// handler once at launch; the lock makes install and `record` safe to overlap
+/// (test processes swap handlers while other operations are still reporting).
 public enum ReliabilityLog {
-    public nonisolated(unsafe) static var handler: (@Sendable (ReliabilityEvent) -> Void)?
+    private static let lock = NSLock()
+    private nonisolated(unsafe) static var storedHandler: (@Sendable (ReliabilityEvent) -> Void)?
+
+    public static var handler: (@Sendable (ReliabilityEvent) -> Void)? {
+        get { lock.lock(); defer { lock.unlock() }; return storedHandler }
+        set { lock.lock(); defer { lock.unlock() }; storedHandler = newValue }
+    }
 
     public static func record(_ event: ReliabilityEvent) {
         handler?(event)
