@@ -165,11 +165,11 @@ struct MeetingShareSelectionTests {
     }
 
     @Test func exportItemsOnlyIncludeSelectedEntries() {
-        let first = addRecording(at: 0)
-        addRecording(at: 60)
+        addRecording(at: 0)
+        let second = addRecording(at: 60)
         let summary = addSummary(template: "General", at: 0)
         var selection = MeetingShareSelection(meeting: meeting, preselectedSummary: nil)
-        selection.toggle(first)
+        selection.toggle(second)
 
         let items = selection.exportItems()
         #expect(items.map(\.suggestedName) == ["Sprint Planning-transcript-1"])
