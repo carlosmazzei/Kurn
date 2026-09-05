@@ -168,8 +168,8 @@ struct VADAudioCompactorTests {
         }
     }
 
-    @Test func unreadableInputThrows() async throws {
-        try await tempFileTestLock.run {
+    @Test func unreadableInputThrows() async {
+        await tempFileTestLock.run {
             let url = AudioFixtures.tempURL(ext: "m4a")
             try? Data("garbage".utf8).write(to: url)
             defer { try? FileManager.default.removeItem(at: url) }

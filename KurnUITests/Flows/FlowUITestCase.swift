@@ -36,7 +36,18 @@ class FlowUITestCase: XCTestCase {
         openSettings()
         let row = app.buttons[identifier]
         XCTAssertTrue(row.waitForExistence(timeout: 10), "Settings row \(identifier) missing")
+        scrollIntoSafeArea(row)
         row.tap()
+    }
+
+    /// Rows at the bottom of the Settings hub sit under the home indicator /
+    /// sheet edge, where a tap lands but does nothing. Nudge the list until
+    /// the row is comfortably inside the window.
+    func scrollIntoSafeArea(_ element: XCUIElement, maxSwipes: Int = 4) {
+        let limit = app.frame.maxY - 120
+        for _ in 0..<maxSwipes where !element.isHittable || element.frame.maxY > limit {
+            app.swipeUp()
+        }
     }
 
     /// Opens the first seeded meeting and waits for its detail tabs.
@@ -74,6 +85,19 @@ class FlowUITestCase: XCTestCase {
     func swipeActionButton(identifier: String, label: String) -> XCUIElement {
         let predicate = NSPredicate(format: "identifier == %@ OR label == %@", identifier, label)
         return app.descendants(matching: .any).matching(predicate).firstMatch
+    }
+
+    /// Swipes the cell that contains `row` (falling back to the row itself)
+    /// until the swipe action appears; a swipe on a partially covered row
+    /// can be swallowed, so retry once.
+    func revealSwipeAction(on row: XCUIElement, identifier: String, label: String) -> XCUIElement {
+        let action = swipeActionButton(identifier: identifier, label: label)
+        let cell = app.cells.containing(NSPredicate(format: "identifier == %@", row.identifier)).firstMatch
+        for _ in 0..<2 where !action.exists {
+            (cell.exists ? cell : row).swipeLeft()
+            _ = action.waitForExistence(timeout: 3)
+        }
+        return action
     }
 
     /// Scrolls the visible list until `element` exists. `List` rows are

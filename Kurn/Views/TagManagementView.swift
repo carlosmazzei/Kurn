@@ -35,6 +35,8 @@ struct TagManagementView: View {
                             text: $newTagName
                         )
                         .accessibilityIdentifier("tags.new_name")
+                        .submitLabel(.done)
+                        .onSubmit(createTag)
                         Button {
                             createTag()
                         } label: {
