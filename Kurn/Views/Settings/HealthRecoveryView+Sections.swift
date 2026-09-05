@@ -206,6 +206,8 @@ extension HealthRecoveryView {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .padding(.vertical, 2)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("health.recent_failure")
                 }
                 NavigationLink {
                     ReliabilityEventsListView()
