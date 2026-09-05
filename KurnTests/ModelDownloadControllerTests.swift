@@ -392,6 +392,7 @@ struct ModelDownloadControllerTests {
         try await withScopedDefaults { h in
             h.downloader.holdUntilCancelled()
             h.downloader.report([ModelDownloadStatus(fractionCompleted: 0.5, phase: .downloading)])
+            h.settings.diarizationEngine = .heuristic
             h.controller.selectDiarizationEngine(.fluidAudio, settings: h.settings)
             #expect(h.controller.showingDiarizationConsent)
 
