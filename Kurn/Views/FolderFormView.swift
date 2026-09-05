@@ -58,6 +58,7 @@ struct FolderFormView: View {
                             NSLocalizedString("folder.name_placeholder", comment: "Folder name"),
                             text: $name
                         )
+                        .accessibilityIdentifier("folder.name")
                     }
                 }
                 Section(NSLocalizedString("folder.icon", comment: "Icon")) {
@@ -72,10 +73,12 @@ struct FolderFormView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(NSLocalizedString("common.cancel", comment: "Cancel")) { dismiss() }
+                        .accessibilityIdentifier("folder.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.save", comment: "Save")) { save() }
                         .disabled(!canSave)
+                        .accessibilityIdentifier("folder.save")
                 }
             }
             .onAppear(perform: hydrate)

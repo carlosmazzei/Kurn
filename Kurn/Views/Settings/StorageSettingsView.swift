@@ -96,6 +96,7 @@ struct StorageSettingsView: View {
             quarantineSection
             modelsSection
         }
+        .accessibilityIdentifier("settings.storage.form")
         .navigationTitle(NSLocalizedString("settings.storage", comment: "Storage"))
         .task {
             if compaction == nil {

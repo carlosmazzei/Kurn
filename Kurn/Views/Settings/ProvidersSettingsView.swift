@@ -41,14 +41,17 @@ struct ProvidersSettingsView: View {
                     } label: {
                         ProviderRow(provider: provider, revision: keyRevision)
                     }
+                    .accessibilityIdentifier("settings.providers.row.\(provider.id)")
                 }
                 Button {
                     showingAddProvider = true
                 } label: {
                     Label(NSLocalizedString("settings.add_provider", comment: "Add Provider"), systemImage: "plus")
                 }
+                .accessibilityIdentifier("settings.providers.add")
             }
         }
+        .accessibilityIdentifier("settings.providers.form")
         .navigationTitle(NSLocalizedString("settings.providers", comment: "AI Providers"))
         .errorAlert($keychainError)
         .sheet(isPresented: $showingAddProvider) {

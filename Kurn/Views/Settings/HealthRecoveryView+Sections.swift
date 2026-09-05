@@ -212,6 +212,7 @@ extension HealthRecoveryView {
                 } label: {
                     Text(NSLocalizedString("health.view_all_events", comment: "View all reliability events"))
                 }
+                .accessibilityIdentifier("health.view_all_events")
             } header: {
                 Text(NSLocalizedString("health.recent_failures", comment: "Recent failure codes"))
             }

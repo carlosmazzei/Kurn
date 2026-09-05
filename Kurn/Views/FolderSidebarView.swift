@@ -174,6 +174,7 @@ struct FolderSidebarView: View {
                         .foregroundStyle(Theme.accent)
                 }
                 .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
+                .accessibilityIdentifier(parent == nil ? "folders.new" : "folders.new_subfolder")
                 .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
             }
         }
@@ -270,6 +271,7 @@ struct FolderSidebarView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("folders.row.\(folder.name)")
 
             Button { path.append(folder) } label: {
                 Image(systemName: "chevron.right")
@@ -289,6 +291,7 @@ struct FolderSidebarView: View {
             } label: {
                 Label(NSLocalizedString("folder.delete", comment: "Delete"), systemImage: "trash")
             }
+            .accessibilityIdentifier("folders.row.delete")
             Button {
                 editing = folder
             } label: {

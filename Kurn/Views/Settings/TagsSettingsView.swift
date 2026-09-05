@@ -24,6 +24,7 @@ struct TagsSettingsView: View {
                         systemImage: "tag"
                     )
                 }
+                .accessibilityIdentifier("settings.tags.manage")
                 Toggle(
                     NSLocalizedString("settings.auto_tagging", comment: "Auto-tagging"),
                     isOn: $settings.autoTaggingEnabled
