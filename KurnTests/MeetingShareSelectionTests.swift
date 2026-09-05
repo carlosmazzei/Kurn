@@ -23,6 +23,10 @@ struct MeetingShareSelectionTests {
     init() {
         container = TestModelContainer.make()
         context = container.mainContext
+        // Every test leaves unsaved inserts behind; the main context's
+        // run-loop autosave must not fire against a container this
+        // instance has already released.
+        context.autosaveEnabled = false
         meeting = Meeting(title: "Sprint Planning")
         context.insert(meeting)
     }

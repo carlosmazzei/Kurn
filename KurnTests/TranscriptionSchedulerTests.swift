@@ -82,9 +82,17 @@ struct TranscriptionSchedulerTests {
 
     // MARK: - interruptedRecordings
 
-    @Test func interruptedRecordingsIncludePendingAndInProgressOnly() {
+    /// Unsaved inserts in a main context whose container dies with the test
+    /// must not be picked up by the run-loop autosave later.
+    private func makeUnsavedMainContext() -> (ModelContainer, ModelContext) {
         let container = TestModelContainer.make()
         let context = container.mainContext
+        context.autosaveEnabled = false
+        return (container, context)
+    }
+
+    @Test func interruptedRecordingsIncludePendingAndInProgressOnly() {
+        let (container, context) = makeUnsavedMainContext()
         insertRecording(in: context, status: .pending)
         insertRecording(in: context, status: .inProgress)
         insertRecording(in: context, status: .done)
@@ -98,8 +106,7 @@ struct TranscriptionSchedulerTests {
     }
 
     @Test func recordingsStillBeingCapturedOrAwaitingRecoveryAreNotInterruptedWork() {
-        let container = TestModelContainer.make()
-        let context = container.mainContext
+        let (container, context) = makeUnsavedMainContext()
         insertRecording(in: context, status: .pending, captureState: .recording)
         insertRecording(in: context, status: .pending, captureState: .finalizing)
         insertRecording(in: context, status: .pending, captureState: .recoveryNeeded)
@@ -109,8 +116,7 @@ struct TranscriptionSchedulerTests {
     }
 
     @Test func emptyStoreHasNoInterruptedWork() {
-        let container = TestModelContainer.make()
-        let context = container.mainContext
+        let (container, context) = makeUnsavedMainContext()
         #expect(TranscriptionScheduler.interruptedRecordings(context: context).isEmpty)
         withExtendedLifetime(container) {}
     }
