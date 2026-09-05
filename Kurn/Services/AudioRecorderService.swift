@@ -123,6 +123,7 @@ final class AudioRecorderService: NSObject {
     @ObservationIgnored private nonisolated let sink: any AudioSinkWriting
     @ObservationIgnored private let monotonicNow: @Sendable () -> TimeInterval
     @ObservationIgnored private let storageProbe: any RecordingStorageProbing
+    @ObservationIgnored private let microphonePermission: @Sendable () async -> Bool
     @ObservationIgnored private var captureWatchdog: CaptureProgressWatchdog
     @ObservationIgnored private var storageMonitor: RecordingStorageMonitor?
     @ObservationIgnored private nonisolated(unsafe) var tapInstalled = false
@@ -169,12 +170,14 @@ final class AudioRecorderService: NSObject {
         sink: any AudioSinkWriting = RecordingSink(),
         stallInterval: TimeInterval = 2,
         monotonicNow: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        storageProbe: any RecordingStorageProbing = SystemRecordingStorageProbe()
+        storageProbe: any RecordingStorageProbing = SystemRecordingStorageProbe(),
+        microphonePermission: @escaping @Sendable () async -> Bool = AudioRecorderService.systemMicrophonePermission
     ) {
         self.engine = engine
         self.sink = sink
         self.monotonicNow = monotonicNow
         self.storageProbe = storageProbe
+        self.microphonePermission = microphonePermission
         self.captureWatchdog = CaptureProgressWatchdog(stallInterval: stallInterval)
         super.init()
         engine.onEvent = { [weak self] event in
@@ -186,15 +189,20 @@ final class AudioRecorderService: NSObject {
 
     /// Request microphone permission. Returns true if granted.
     func requestMicrophonePermission() async -> Bool {
+        let granted = await microphonePermission()
+        AppLog.recorder.atInfo.info("requestMicrophonePermission: granted=\(granted, privacy: .public)")
+        return granted
+    }
+
+    /// Production permission path: the system prompt via `AVAudioApplication`.
+    nonisolated static func systemMicrophonePermission() async -> Bool {
         let current = AVAudioApplication.shared.recordPermission
         AppLog.recorder.atDebug.debug("requestMicrophonePermission: current=\(String(describing: current), privacy: .public)")
-        let granted = await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
         }
-        AppLog.recorder.atInfo.info("requestMicrophonePermission: granted=\(granted, privacy: .public)")
-        return granted
     }
 
     // MARK: - Recording lifecycle

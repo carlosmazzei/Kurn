@@ -93,29 +93,3 @@ struct RecorderCaptureOwnershipTests {
         #expect(try activeContainer.mainContext.fetch(FetchDescriptor<Recording>()).isEmpty)
     }
 }
-
-@MainActor
-private final class ScriptedRecordingLifecycleSaver: RecordingLifecycleSaving {
-    private let failOnCall: Int?
-    private var callCount = 0
-
-    init(failOnCall: Int? = nil) {
-        self.failOnCall = failOnCall
-    }
-
-    func save(_ context: ModelContext) throws {
-        callCount += 1
-        if callCount == failOnCall {
-            throw CocoaError(.persistentStoreSave)
-        }
-        try context.save()
-    }
-}
-
-private struct StubRecordingFileFinalizer: RecordingFileFinalizing {
-    let result: FinalizedRecordingFile
-
-    func finalize(fileName: String) throws -> FinalizedRecordingFile {
-        result
-    }
-}

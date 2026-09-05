@@ -14,6 +14,17 @@ import Foundation
 import KurnCore
 
 struct SummaryService {
+    /// Resolves the LLM that backs a run. Production resolves through
+    /// `ProviderFactory` (keychain key, base-URL validation, on-device
+    /// availability); tests inject a scripted provider.
+    typealias ProviderResolver = @Sendable (AIProvider, String) throws -> LLMProvider
+
+    private let resolveProvider: ProviderResolver
+
+    init(resolveProvider: @escaping ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+        self.resolveProvider = resolveProvider
+    }
+
     struct TranscriptGroup {
         let offset: TimeInterval
         let segments: [TranscriptSegment]
@@ -87,7 +98,7 @@ struct SummaryService {
             )
         }
 
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let llm = try resolveProvider(provider, model)
 
         guard trimmed.count > Self.maxSinglePassChars(for: provider) else {
             try Task.checkCancellation()
@@ -287,7 +298,7 @@ struct SummaryService {
         provider: AIProvider,
         model: String
     ) async throws -> String {
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let llm = try resolveProvider(provider, model)
         let excerpt = String(transcriptText.prefix(2_000))
         let system = """
         You generate short meeting titles. \

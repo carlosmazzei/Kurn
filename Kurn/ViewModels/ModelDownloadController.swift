@@ -85,6 +85,28 @@ final class ModelDownloadController {
     /// showing `downloadProgress`.
     private var activeDownloadTask: Task<Void, Never>?
 
+    /// Performs one consented download and reports progress. Production is
+    /// `ModelDownloadConsent.download` (network policy, headroom, the real
+    /// FluidAudio/whisper.cpp/sherpa-onnx downloaders); tests inject a script.
+    typealias Downloader = @Sendable (
+        ModelSet,
+        LargeTransferPolicy,
+        @escaping @Sendable (ModelDownloadStatus) -> Void
+    ) async throws -> Void
+
+    private let downloader: Downloader
+    private let isWhisperCppInstalled: (WhisperCppModel) -> Bool
+
+    init(
+        downloader: @escaping Downloader = { set, policy, onProgress in
+            try await ModelDownloadConsent.download(set, policy: policy, onProgress: onProgress)
+        },
+        isWhisperCppInstalled: @escaping (WhisperCppModel) -> Bool = WhisperCppModelDownloader.isInstalled
+    ) {
+        self.downloader = downloader
+        self.isWhisperCppInstalled = isWhisperCppInstalled
+    }
+
     // MARK: - Engine selection (consent gates)
 
     /// Apply a transcription-engine choice, intercepting the FluidAudio engine
@@ -149,7 +171,7 @@ final class ModelDownloadController {
     /// each variant is a separate download and Storage lets the user delete one
     /// while keeping another — the consent flag can't express that.
     private func needsWhisperCppDownload(_ model: WhisperCppModel) -> Bool {
-        !WhisperCppModelDownloader.isInstalled(model)
+        !isWhisperCppInstalled(model)
     }
 
     /// Apply a language-detection choice, intercepting the FluidAudio detector
@@ -302,16 +324,12 @@ final class ModelDownloadController {
             defer { background.end() }
             do {
                 let before = ModelStore.snapshot()
-                try await ModelDownloadConsent.download(
-                    set,
-                    policy: policy,
-                    onProgress: { [weak self] status in
-                        Task { @MainActor [weak self] in
-                            guard self?.downloadingModel == set else { return }
-                            self?.downloadProgress = status
-                        }
+                try await downloader(set, policy) { [weak self] status in
+                    Task { @MainActor [weak self] in
+                        guard self?.downloadingModel == set else { return }
+                        self?.downloadProgress = status
                     }
-                )
+                }
                 ModelStore.recordDownload(for: group, before: before)
                 // H7 PR 16: whisper.cpp/sherpa-onnx already probed and
                 // recorded their own verification inside `downloader.fetch`'s
@@ -401,7 +419,7 @@ final class ModelDownloadController {
         case .whisperCpp:
             // Variants are listed and deleted one at a time, so only tear the
             // engine down once the last set of weights is gone.
-            let remaining = WhisperCppModel.allCases.filter(WhisperCppModelDownloader.isInstalled)
+            let remaining = WhisperCppModel.allCases.filter(isWhisperCppInstalled)
             if remaining.isEmpty {
                 settings.whisperCppModelsConsented = false
                 if settings.transcriptionEngine == .whisperCpp {

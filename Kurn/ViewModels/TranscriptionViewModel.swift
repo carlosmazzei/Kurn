@@ -119,9 +119,9 @@ final class TranscriptionViewModel {
     /// Not `private` — `TranscriptionViewModel+CorrectionRetry.swift` needs
     /// it to retry just the correction stage without repeating the rest of
     /// the pipeline.
-    let transcriptionService = TranscriptionService()
+    let transcriptionService: TranscriptionService
     /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
-    let summaryService = SummaryService()
+    let summaryService: SummaryService
     private let aiTitleCoordinator: AITitleCoordinator
     /// App-wide settings, set by `KurnApp` so title generation can use the
     /// configured LLM provider without passing settings through every call site.
@@ -135,10 +135,14 @@ final class TranscriptionViewModel {
 
     init(
         modelContext: ModelContext,
-        aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator()
+        aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator(),
+        transcriptionService: TranscriptionService = TranscriptionService(),
+        summaryService: SummaryService = SummaryService()
     ) {
         self.modelContext = modelContext
         self.aiTitleCoordinator = aiTitleCoordinator
+        self.transcriptionService = transcriptionService
+        self.summaryService = summaryService
     }
 
     /// Persist pending model changes, surfacing failures instead of dropping
