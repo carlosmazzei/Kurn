@@ -20,6 +20,9 @@ import Testing
 
 struct ResourceSchedulerTests {
 
+    // The queue-introspection tests use the DEBUG-only `waiterCountForTesting`
+    // and are absent from the Release-configuration lane.
+    #if DEBUG
     @Test func acquireSucceedsImmediatelyWhenBudgetIsFree() async throws {
         let scheduler = ResourceScheduler(totalWeight: 10)
         try await scheduler.acquire(weight: 10)
@@ -123,6 +126,8 @@ struct ResourceSchedulerTests {
         try await waiterTask.value
     }
 
+    #endif
+
     // MARK: - Scoped reservation
 
     @Test func scopedReservationReleasesBeforeReturningItsResult() async throws {
@@ -161,6 +166,7 @@ struct ResourceSchedulerTests {
         try await scheduler.acquire(weight: 100)
     }
 
+    #if DEBUG
     @Test func scopedReservationCancelledWhileQueuedNeverRunsItsBody() async throws {
         let scheduler = ResourceScheduler(totalWeight: 100)
         try await scheduler.acquire(weight: 100)
@@ -181,6 +187,8 @@ struct ResourceSchedulerTests {
         await scheduler.release(weight: 100)
         try await scheduler.acquire(weight: 100)
     }
+
+    #endif
 
     // MARK: - Weight table invariants
 
@@ -224,6 +232,7 @@ struct ResourceSchedulerTests {
         func mark() { lock.withLock { flag = true } }
     }
 
+    #if DEBUG
     /// Polls `waiterCountForTesting` until it reaches `count`, yielding
     /// between checks instead of sleeping a fixed duration. Bounded so a
     /// real bug (the waiter never gets enqueued) fails the assertion right
@@ -240,4 +249,5 @@ struct ResourceSchedulerTests {
         }
         #expect(await scheduler.waiterCountForTesting == count)
     }
+    #endif
 }

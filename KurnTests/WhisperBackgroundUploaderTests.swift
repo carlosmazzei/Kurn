@@ -16,6 +16,10 @@ import Foundation
 import Testing
 @testable import Kurn
 
+// Exercises DEBUG-only test hooks; the Release-configuration lane
+// compiles KurnTests without DEBUG, so this suite is absent there.
+#if DEBUG
+
 struct WhisperBackgroundUploaderTests {
 
     @Test func concurrentFirstAccessesShareOneSessionInstance() async {
@@ -37,3 +41,4 @@ struct WhisperBackgroundUploaderTests {
         #expect(sessions.allSatisfy { $0 === first })
     }
 }
+#endif
