@@ -19,6 +19,10 @@ import SwiftData
 import Testing
 @testable import Kurn
 
+// Exercises DEBUG-only test hooks; the Release-configuration lane
+// compiles KurnTests without DEBUG, so this suite is absent there.
+#if DEBUG
+
 @MainActor
 struct TranscriptionViewModelErrorAttributionTests {
 
@@ -79,3 +83,4 @@ struct TranscriptionViewModelErrorAttributionTests {
         #expect(viewModel.transcriptionError(for: recording) == nil)
     }
 }
+#endif
