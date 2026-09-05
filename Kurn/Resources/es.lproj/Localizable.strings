@@ -721,6 +721,7 @@
 "error.semantic_index" = "No se pudo crear el índice semántico: %@";
 "error.wiki_generation" = "No se pudo crear la wiki de la reunión: %@";
 "error.wiki_unavailable" = "La wiki de la reunión aún no está lista. Inténtalo de nuevo cuando termine de generarse.";
+"error.title_generation" = "No se pudo generar el título de la reunión: %@";
 "error.embedding_no_model" = "No hay ningún modelo de embeddings disponible en este dispositivo.";
 "error.embedding_no_assets" = "No se pudo descargar el modelo de lenguaje en el dispositivo.";
 "tab.chat" = "Chat";
@@ -758,16 +759,25 @@
 "settings.wiki_title" = "Wiki de reuniones";
 "settings.wiki" = "Crear wiki de reuniones";
 "settings.wiki_articles" = "Artículos de la wiki";
-"settings.wiki_rebuild" = "Recrear wiki";
-"settings.wiki_rebuilding" = "Recreando…";
+"settings.wiki_generate_missing" = "Generar Faltantes";
+"settings.wiki_generating_missing" = "Generando Faltantes…";
+"settings.wiki_rebuild" = "Recrear Todo";
+"settings.wiki_rebuilding" = "Recreando Todo…";
+"settings.wiki_bulk_progress" = "%1$d de %2$d reuniones";
 "settings.wiki_clear" = "Borrar wiki";
-"settings.wiki_footer" = "Usa tu proveedor de IA de resúmenes para crear un artículo condensado por reunión, para que la función \"Preguntar\" de la biblioteca responda preguntas que abarcan o comparan reuniones. Desactivado por defecto: hace llamadas a la nube.";
+"settings.wiki_footer" = "Usa tu proveedor de IA de resúmenes para crear un artículo condensado por reunión, para que la función \"Preguntar\" de la biblioteca responda preguntas que abarcan o comparan reuniones. Desactivado por defecto: hace llamadas a la nube. \"Generar Faltantes\" solo crea los artículos que aún no existen; \"Recrear Todo\" regenera todos los artículos, incluidos los ya actualizados.";
 "settings.wiki_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para crear la wiki de reuniones.";
 "settings.correction_title" = "Corrección con IA";
 "settings.correction" = "Corregir errores de transcripción";
 "settings.correction_footer" = "Usa tu proveedor de IA de resúmenes para corregir errores de ortografía, puntuación y palabras mal entendidas en las partes inciertas de la transcripción, después de transcribir. Desactivado de forma predeterminada: realiza llamadas en la nube y puede tardar más en finalizar.";
 "settings.correction_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para activar la corrección con IA.";
 "detail.wiki.view" = "Ver wiki";
+"detail.wiki.generate" = "Generar Wiki";
+"detail.wiki.regenerate" = "Regenerar Wiki";
+"detail.wiki.generating" = "Generando Wiki…";
+"detail.title.generate" = "Generar Título";
+"detail.title.regenerate" = "Regenerar Título";
+"detail.title.generating" = "Generando Título…";
 "detail.wiki.title" = "Wiki de la reunión";
 "detail.wiki.updated" = "Actualizada el %@";
 
@@ -810,6 +820,9 @@
 "health.degraded_transcripts_footer" = "Transcripciones en las que una etapa del proceso se degradó o usó una alternativa. Reintentar solo se ofrece para etapas que lo permiten.";
 "health.model_verification" = "Verificación de Modelos";
 "health.model_verification_footer" = "Modelos en el dispositivo que fallaron la verificación. Elimínalos y Kurn descargará el modelo de nuevo la próxima vez que se use la función.";
+"health.blocked_providers" = "Proveedores de IA Bloqueados";
+"health.blocked_provider_subtitle" = "Generación automática pausada tras fallos repetidos";
+"health.blocked_providers_footer" = "Proveedores cuya generación automática de wiki y título por IA se detuvo tras fallos repetidos, como una clave de API inválida. Reintentar libera el bloqueo; corrige antes la configuración del proveedor si el problema original persiste.";
 "health.recent_failures" = "Códigos de Fallo Recientes";
 "health.view_all_events" = "Ver Todos los Eventos de Fiabilidad";
 

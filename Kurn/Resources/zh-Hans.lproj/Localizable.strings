@@ -721,6 +721,7 @@
 "error.semantic_index" = "无法构建语义索引：%@";
 "error.wiki_generation" = "无法构建会议维基：%@";
 "error.wiki_unavailable" = "会议维基尚未准备好。请在生成完成后重试。";
+"error.title_generation" = "无法生成会议标题：%@";
 "error.embedding_no_model" = "此设备没有可用的设备端嵌入模型。";
 "error.embedding_no_assets" = "无法下载设备端语言模型。";
 "tab.chat" = "聊天";
@@ -758,16 +759,25 @@
 "settings.wiki_title" = "会议维基";
 "settings.wiki" = "构建会议维基";
 "settings.wiki_articles" = "维基条目";
-"settings.wiki_rebuild" = "重建维基";
-"settings.wiki_rebuilding" = "正在重建…";
+"settings.wiki_generate_missing" = "生成缺失项";
+"settings.wiki_generating_missing" = "正在生成缺失项…";
+"settings.wiki_rebuild" = "重建全部";
+"settings.wiki_rebuilding" = "正在重建全部…";
+"settings.wiki_bulk_progress" = "%1$d / %2$d 场会议";
 "settings.wiki_clear" = "清除维基";
-"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。";
+"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。“生成缺失项”仅创建尚不存在的条目；“重建全部”会重新生成所有条目，包括已是最新的条目。";
 "settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";
 "settings.correction_title" = "AI 校正";
 "settings.correction" = "校正转录错误";
 "settings.correction_footer" = "转录完成后，使用你的摘要 AI 提供方修正转录中不确定部分的拼写、标点和听错的词语。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
 "settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
 "detail.wiki.view" = "查看维基";
+"detail.wiki.generate" = "生成维基";
+"detail.wiki.regenerate" = "重新生成维基";
+"detail.wiki.generating" = "正在生成维基…";
+"detail.title.generate" = "生成标题";
+"detail.title.regenerate" = "重新生成标题";
+"detail.title.generating" = "正在生成标题…";
 "detail.wiki.title" = "会议维基";
 "detail.wiki.updated" = "更新于 %@";
 
@@ -810,6 +820,9 @@
 "health.degraded_transcripts_footer" = "某个处理阶段降级或回退的转录记录。重试仅适用于支持该操作的阶段。";
 "health.model_verification" = "模型验证";
 "health.model_verification_footer" = "验证失败的设备端模型。移除后，Kurn 会在下次使用该功能时重新下载模型。";
+"health.blocked_providers" = "已阻止的 AI 提供方";
+"health.blocked_provider_subtitle" = "因反复失败，自动生成已暂停";
+"health.blocked_providers_footer" = "由于反复失败（例如 API 密钥无效），自动生成维基和 AI 标题已停止的提供方。点击重试可解除阻止；如果原始问题尚未解决，请先在设置中修正该提供方的配置。";
 "health.recent_failures" = "最近的失败代码";
 "health.view_all_events" = "查看所有可靠性事件";
 

@@ -721,6 +721,7 @@
 "error.semantic_index" = "Der semantische Index konnte nicht erstellt werden: %@";
 "error.wiki_generation" = "Das Meeting-Wiki konnte nicht erstellt werden: %@";
 "error.wiki_unavailable" = "Das Meeting-Wiki ist noch nicht bereit. Versuche es erneut, sobald es fertig generiert ist.";
+"error.title_generation" = "Der Meeting-Titel konnte nicht generiert werden: %@";
 "error.embedding_no_model" = "Für dieses Gerät ist kein Embedding-Modell verfügbar.";
 "error.embedding_no_assets" = "Das Sprachmodell konnte nicht auf das Gerät geladen werden.";
 "tab.chat" = "Chat";
@@ -758,16 +759,25 @@
 "settings.wiki_title" = "Meeting-Wiki";
 "settings.wiki" = "Meeting-Wiki erstellen";
 "settings.wiki_articles" = "Wiki-Artikel";
-"settings.wiki_rebuild" = "Wiki neu erstellen";
-"settings.wiki_rebuilding" = "Wird neu erstellt …";
+"settings.wiki_generate_missing" = "Fehlende Erstellen";
+"settings.wiki_generating_missing" = "Fehlende werden erstellt…";
+"settings.wiki_rebuild" = "Alles Neu Erstellen";
+"settings.wiki_rebuilding" = "Alles wird neu erstellt…";
+"settings.wiki_bulk_progress" = "%1$d von %2$d Meetings";
 "settings.wiki_clear" = "Wiki löschen";
-"settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt.";
+"settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt. „Fehlende Erstellen“ erstellt nur Artikel, die noch nicht existieren; „Alles Neu Erstellen“ erzeugt jeden Artikel neu, auch bereits aktuelle.";
 "settings.wiki_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um das Meeting-Wiki zu erstellen.";
 "settings.correction_title" = "KI-Korrektur";
 "settings.correction" = "Transkriptionsfehler korrigieren";
 "settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter, um Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren Teilen des Transkripts nach der Transkription zu korrigieren. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
 "settings.correction_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um die KI-Korrektur zu aktivieren.";
 "detail.wiki.view" = "Wiki anzeigen";
+"detail.wiki.generate" = "Wiki Erstellen";
+"detail.wiki.regenerate" = "Wiki Neu Erstellen";
+"detail.wiki.generating" = "Wiki wird erstellt…";
+"detail.title.generate" = "Titel Erstellen";
+"detail.title.regenerate" = "Titel Neu Erstellen";
+"detail.title.generating" = "Titel wird erstellt…";
 "detail.wiki.title" = "Meeting-Wiki";
 "detail.wiki.updated" = "Aktualisiert am %@";
 
@@ -810,6 +820,9 @@
 "health.degraded_transcripts_footer" = "Transkripte, bei denen eine Pipeline-Stufe eingeschränkt wurde oder auf eine Alternative zurückgegriffen hat. Erneut versuchen wird nur für Stufen angeboten, die dies unterstützen.";
 "health.model_verification" = "Modellüberprüfung";
 "health.model_verification_footer" = "Modelle auf dem Gerät, die die Überprüfung nicht bestanden haben. Entferne sie, und Kurn lädt das Modell beim nächsten Gebrauch der Funktion erneut herunter.";
+"health.blocked_providers" = "Blockierte KI-Anbieter";
+"health.blocked_provider_subtitle" = "Automatische Generierung nach wiederholten Fehlern pausiert";
+"health.blocked_providers_footer" = "Anbieter, deren automatische Wiki- und KI-Titel-Generierung nach wiederholten Fehlern gestoppt wurde, z. B. durch einen ungültigen API-Schlüssel. Erneut versuchen hebt die Blockierung auf; korrigiere zuerst die Anbieterkonfiguration, falls das ursprüngliche Problem weiterhin besteht.";
 "health.recent_failures" = "Aktuelle Fehlercodes";
 "health.view_all_events" = "Alle Zuverlässigkeitsereignisse Anzeigen";
 

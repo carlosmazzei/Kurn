@@ -29,6 +29,15 @@ final class WikiCoordinator {
         case failed
     }
 
+    /// Which bulk operation `bulkOperation` is currently tracking, so the
+    /// Settings screen can label its progress correctly — the two differ only
+    /// in which meetings are selected and whether an up-to-date article is
+    /// force-regenerated, but the UI needs to say which one is running.
+    enum BulkOperationKind: Equatable {
+        case missingOnly
+        case rebuildAll
+    }
+
     private let modelContext: ModelContext
     private let wikiService = WikiService()
     private let providerCircuitBreaker: ProviderCircuitBreaker
@@ -41,8 +50,20 @@ final class WikiCoordinator {
     /// Meetings whose article is being generated, so the UI can reflect progress
     /// and repeat requests for the same meeting coalesce instead of racing.
     private(set) var generatingMeetingIDs: Set<UUID> = []
+
+    /// Most recent failure from an *explicit* run (a per-meeting menu tap, a
+    /// bulk Settings run), for a view to surface via `.errorAlert`. Never set
+    /// by an automatic background failure — see `generate`'s catch block.
+    var lastError: AppError?
     /// True while a backfill sweep is running, so it never overlaps itself.
     private(set) var isBackfilling = false
+
+    /// Progress of an explicit, user-triggered bulk run (Settings → Wiki),
+    /// as (kind, meetings completed so far, meetings selected for this run).
+    /// `nil` when no bulk run is in flight. Unlike `isBackfilling`, this is
+    /// read directly by the Settings view to show real "N of M" progress
+    /// instead of a plain spinner.
+    private(set) var bulkOperation: (kind: BulkOperationKind, completed: Int, total: Int)?
 
     /// Meetings generated per foreground backfill, bounding the number of paid
     /// LLM calls per activation. The rest are picked up on later activations.
@@ -102,6 +123,8 @@ final class WikiCoordinator {
         // same `SummaryService.notesTemplate` — see `SummaryMapCheckpoint`'s
         // header. A structurally invalid one is treated the same as none.
         let resumeCheckpoint = meeting.summaryMapCheckpoint.flatMap { $0.isStructurallyValid ? $0 : nil }
+        let runID = OperationID()
+        let startedAt = Date()
         do {
             let markdown = try await wikiService.generate(
                 transcriptText: text, meetingTitle: title, provider: provider, model: model,
@@ -122,9 +145,17 @@ final class WikiCoordinator {
             )
             await providerCircuitBreaker.recordSuccess(providerID: provider.id)
             AppLog.transcription.atNotice.notice("wiki: generated meeting \(meetingID, privacy: .public)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "wiki_generation",
+                outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             return .generated
         } catch is CancellationError {
             // Leave any existing article in place; a later pass retries.
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "wiki_generation",
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             return .skipped
         } catch {
             await providerCircuitBreaker.recordFailure(
@@ -133,6 +164,18 @@ final class WikiCoordinator {
             )
             let code = (error as? AppError)?.logCode ?? "unexpected"
             AppLog.transcription.atError.error("wiki: failed for meeting \(meetingID, privacy: .public) code=\(code, privacy: .public)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "wiki_generation",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt), code: code
+            ))
+            // Only an explicit, user-initiated run surfaces its failure —
+            // an automatic background attempt stays silent-but-logged, the
+            // same "best-effort, never a user-facing error" contract
+            // `TranscriptionViewModel.generateAITitle` documents for its own
+            // automatic path.
+            if trigger == .explicit {
+                lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription)
+            }
             return .failed
         }
     }
@@ -173,16 +216,52 @@ final class WikiCoordinator {
         persist()
     }
 
-    /// Regenerate the wiki for every transcribed meeting (Settings → Rebuild
-    /// wiki). Each existing article is replaced only after its new version is
-    /// ready, so cancellation or provider failure never destroys the last copy.
+    /// Regenerate the wiki for every transcribed meeting, even ones already
+    /// up to date (Settings → Wiki → Rebuild All). Each existing article is
+    /// replaced only after its new version is ready, so cancellation or
+    /// provider failure never destroys the last copy. This is the expensive
+    /// option — every meeting re-pays for a fresh LLM call — kept distinct
+    /// from `generateMissing()` because "the wiki looks wrong, redo
+    /// everything" and "I only opted in after some meetings already
+    /// happened" are different requests with very different costs.
     func rebuildWiki() async {
         guard hasProviderKey else { return }
         let meetings = ((try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? [])
             .filter(\.hasAnyTranscript)
-        for meeting in meetings {
+        await runBulkGeneration(.rebuildAll, over: meetings, force: true)
+    }
+
+    /// Generate articles only for meetings that don't have an up-to-date one
+    /// yet (Settings → Wiki → Generate Missing) — meetings whose article
+    /// already matches the current generator are skipped entirely rather
+    /// than re-paying for them, unlike `rebuildWiki()`. Unlike the
+    /// background `backfill()`, this is explicit and unbounded: the user
+    /// asked for every missing article now, not up to `backfillBatchLimit`
+    /// per foreground activation.
+    func generateMissing() async {
+        guard hasProviderKey, let settings = appSettings else { return }
+        let generator = Self.generatorIdentifier(
+            provider: settings.aiProvider, model: settings.summaryModel(for: settings.aiProvider)
+        )
+        let meetings = ((try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? [])
+            .filter { needsWiki($0, generator: generator) }
+        await runBulkGeneration(.missingOnly, over: meetings, force: false)
+    }
+
+    /// Shared loop behind `rebuildWiki()`/`generateMissing()`: runs `generate`
+    /// over `meetings` in order, publishing `bulkOperation` after each one so
+    /// the Settings screen can show real progress instead of a plain spinner.
+    /// Bails at the first outright failure (a provider error, not a skip) the
+    /// same way `backfill()` does, rather than burning through the rest of a
+    /// list against a provider that just started failing.
+    private func runBulkGeneration(_ kind: BulkOperationKind, over meetings: [Meeting], force: Bool) async {
+        guard bulkOperation == nil, !meetings.isEmpty else { return }
+        bulkOperation = (kind, 0, meetings.count)
+        defer { bulkOperation = nil }
+        for (index, meeting) in meetings.enumerated() {
             if Task.isCancelled { return }
-            if await generate(meeting, trigger: .explicit, force: true) == .failed { return }
+            if await generate(meeting, trigger: .explicit, force: force) == .failed { return }
+            bulkOperation = (kind, index + 1, meetings.count)
         }
     }
 

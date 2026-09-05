@@ -146,6 +146,30 @@ actor ProviderCircuitBreaker {
         records[providerID]
     }
 
+    /// Providers currently blocked pending an explicit retry, for the Health
+    /// & Recovery surface. Deliberately excludes a plain time-based
+    /// `.transient` backoff — that clears itself and isn't something a user
+    /// needs to act on — so only the kind of block that would otherwise sit
+    /// silently forever shows up here.
+    func blockedProviderIDs() -> [String] {
+        records.filter(\.value.requiresExplicitRetry).keys.sorted()
+    }
+
+    /// Clears any open circuit for `providerID`. A `.configuration` (or
+    /// `.ambiguous`) failure sets `requiresExplicitRetry`, which `allows`
+    /// honors forever regardless of `blockedUntil` — the only way out is an
+    /// explicit trigger that happens to succeed, and until now the only one
+    /// wired up was `WikiCoordinator.rebuildWiki()`. Automatic AI title
+    /// generation has no explicit path at all, so fixing the underlying
+    /// problem (a bad key, a wrong base URL) left it silently blocked
+    /// forever. Called when the user edits that provider's config, since
+    /// that is exactly the kind of change that could resolve a
+    /// configuration failure.
+    func reset(providerID: String) {
+        guard records.removeValue(forKey: providerID) != nil else { return }
+        persist()
+    }
+
     private func persist() {
         do {
             try store.save(records)

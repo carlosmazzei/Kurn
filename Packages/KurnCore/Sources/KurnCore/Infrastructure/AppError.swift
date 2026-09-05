@@ -38,6 +38,7 @@ public enum AppError: LocalizedError, Identifiable {
     case semanticIndexFailed(String)
     case wikiGenerationFailed(String)
     case wikiUnavailable
+    case titleGenerationFailed(String)
     case documentGenerationFailed(String)
     case onDeviceModelUnavailable(String)
     /// A finished transcription run failed the final integrity gate (H5 PR
@@ -88,6 +89,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .semanticIndexFailed: return "semantic_index"
         case .wikiGenerationFailed: return "wiki_generation"
         case .wikiUnavailable: return "wiki_unavailable"
+        case .titleGenerationFailed: return "title_generation"
         case .documentGenerationFailed: return "document_generation"
         case .onDeviceModelUnavailable: return "on_device_model_unavailable"
         case .transcriptIntegrityFailed: return "transcript_integrity"
@@ -237,6 +239,11 @@ public enum AppError: LocalizedError, Identifiable {
             return NSLocalizedString(
                 "error.wiki_unavailable",
                 comment: "Meeting wiki is not ready yet"
+            )
+        case .titleGenerationFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.title_generation", comment: "AI title generation failed"),
+                detail
             )
         case .documentGenerationFailed(let detail):
             return String(
