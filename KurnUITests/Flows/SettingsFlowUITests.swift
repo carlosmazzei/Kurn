@@ -86,15 +86,16 @@ final class SettingsFlowUITests: FlowUITestCase {
         // Identifiers set on a `Label` or `NavigationLink` inside a `List`
         // row are not always surfaced by XCUITest, so the visible en strings
         // are accepted as the second handle.
-        // The events link sits below the per-event rows, so it may need
-        // scrolling into view when the log is long.
+        // The events link sits below up to 100 per-event rows, so the first
+        // failure row is the reliable handle (its log line starts with
+        // "<operation>: failed").
         let allClear = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier == %@ OR label == %@", "health.all_clear", "Nothing needs attention")
         ).firstMatch
         let failures = app.descendants(matching: .any).matching(
             NSPredicate(
-                format: "identifier == %@ OR label == %@",
-                "health.view_all_events", "View All Reliability Events"
+                format: "identifier IN %@ OR label CONTAINS %@ OR label == %@",
+                ["health.recent_failure", "health.view_all_events"], ": failed ", "View All Reliability Events"
             )
         ).firstMatch
         if allClear.waitForExistence(timeout: 5) { return }
