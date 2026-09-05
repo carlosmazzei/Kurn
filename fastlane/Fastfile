@@ -97,8 +97,24 @@ lane :beta do
 
   match(type: "appstore", readonly: is_ci)
 
+  archive_path = File.expand_path("build/Kurn.xcarchive", Dir.pwd)
+
+  # Archive only (skip_package_ipa stops gym after `xcodebuild archive`,
+  # before it runs `-exportArchive`) so the unwanted onnxruntime.framework
+  # below can be stripped before export/codesign-adjacent packaging sees it.
   build_app(
     scheme: "Kurn",
+    archive_path: archive_path,
+    skip_package_ipa: true
+  )
+
+  strip_unused_onnxruntime_framework(archive_path: archive_path)
+
+  # Export + package from the already-built, now-cleaned archive.
+  build_app(
+    scheme: "Kurn",
+    skip_build_archive: true,
+    archive_path: archive_path,
     export_method: "app-store",
     output_directory: "build",
     export_options: {
@@ -114,6 +130,52 @@ lane :beta do
     api_key: api_key,
     skip_waiting_for_build_processing: false
   )
+end
+
+# k2-fsa/sherpa-onnx pulls in onnxruntime-libs' onnxruntime.xcframework, whose
+# Info.plist has no LibraryType key. Xcode can't tell it's static from that
+# metadata alone, so it auto-embeds the bundle into Kurn.app/Frameworks/ even
+# though SherpaOnnxC.framework already statically links onnxruntime at build
+# time — nothing loads the embedded copy at runtime (verified: neither `Kurn`
+# nor `SherpaOnnxC` has an LC_LOAD_DYLIB or symbol reference to it). Apple's
+# validator rejects the resulting static-archive-in-a-.framework-wrapper with
+# ITMS-90208 ("does not support the minimum OS Version specified in the
+# Info.plist"). A Run Script build phase can't fix this from inside the
+# target: the embed step and any script both claiming
+# Frameworks/onnxruntime.framework as their output trips Xcode's new build
+# system's "Multiple commands produce" error. Stripping it from the archive
+# between the archive-only and export-only build_app calls above sidesteps
+# that build-graph conflict entirely. See microsoft/onnxruntime#27396 for the
+# same class of upstream packaging gap.
+#
+# Kurn.app's own code signature seals Frameworks/ (confirmed locally: removing
+# the framework without resigning fails `codesign --verify` with "a sealed
+# resource is missing"), so the app must be resigned afterward. Reusing the
+# identity already on the archive — rather than looking one up separately —
+# guarantees it matches what match/gym just signed with, and
+# `--preserve-metadata=identifier,entitlements,flags` keeps the bundle ID,
+# entitlements and flags from that same signature intact.
+def strip_unused_onnxruntime_framework(archive_path:)
+  app_path = File.join(archive_path, "Products/Applications/Kurn.app")
+  frameworks_dir = File.join(app_path, "Frameworks")
+  removed_any = false
+
+  %w[onnxruntime onnxruntime_extensions].each do |name|
+    framework_path = File.join(frameworks_dir, "#{name}.framework")
+    next unless File.directory?(framework_path)
+
+    UI.message("Stripping unused static #{name}.framework from archive")
+    FileUtils.rm_rf(framework_path)
+    removed_any = true
+  end
+
+  return unless removed_any
+
+  identity = sh("codesign -dvv #{app_path.shellescape} 2>&1 | grep '^Authority=' | head -1 | cut -d= -f2", log: false).strip
+  UI.user_error!("Could not determine the signing identity already on #{app_path} to resign after stripping onnxruntime.framework") if identity.empty?
+
+  sh("codesign --force --sign #{identity.shellescape} --preserve-metadata=identifier,entitlements,flags #{app_path.shellescape}")
+  sh("codesign --verify --deep --strict #{app_path.shellescape}")
 end
 
 # Pushes fastlane/metadata/ (description, keywords, support/marketing/privacy
