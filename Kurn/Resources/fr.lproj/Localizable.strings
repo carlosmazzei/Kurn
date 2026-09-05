@@ -810,6 +810,9 @@
 "health.degraded_transcripts_footer" = "Transcriptions pour lesquelles une étape du pipeline a été dégradée ou a utilisé une solution de repli. Réessayer n'est proposé que pour les étapes qui le permettent.";
 "health.model_verification" = "Vérification des Modèles";
 "health.model_verification_footer" = "Modèles sur l'appareil ayant échoué à la vérification. Supprimez-les et Kurn retéléchargera le modèle la prochaine fois que la fonctionnalité sera utilisée.";
+"health.blocked_providers" = "Fournisseurs d'IA Bloqués";
+"health.blocked_provider_subtitle" = "Génération automatique suspendue après des échecs répétés";
+"health.blocked_providers_footer" = "Fournisseurs dont la génération automatique du wiki et du titre par IA s'est arrêtée après des échecs répétés, comme une clé API invalide. Réessayer lève le blocage ; corrigez d'abord la configuration du fournisseur si le problème initial persiste.";
 "health.recent_failures" = "Codes d'Échec Récents";
 "health.view_all_events" = "Voir Tous les Événements de Fiabilité";
 

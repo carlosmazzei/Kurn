@@ -810,6 +810,9 @@
 "health.degraded_transcripts_footer" = "Transcripciones en las que una etapa del proceso se degradó o usó una alternativa. Reintentar solo se ofrece para etapas que lo permiten.";
 "health.model_verification" = "Verificación de Modelos";
 "health.model_verification_footer" = "Modelos en el dispositivo que fallaron la verificación. Elimínalos y Kurn descargará el modelo de nuevo la próxima vez que se use la función.";
+"health.blocked_providers" = "Proveedores de IA Bloqueados";
+"health.blocked_provider_subtitle" = "Generación automática pausada tras fallos repetidos";
+"health.blocked_providers_footer" = "Proveedores cuya generación automática de wiki y título por IA se detuvo tras fallos repetidos, como una clave de API inválida. Reintentar libera el bloqueo; corrige antes la configuración del proveedor si el problema original persiste.";
 "health.recent_failures" = "Códigos de Fallo Recientes";
 "health.view_all_events" = "Ver Todos los Eventos de Fiabilidad";
 

@@ -810,6 +810,9 @@
 "health.degraded_transcripts_footer" = "Transcripts where a pipeline stage degraded or fell back. Retry is only offered for stages that support it.";
 "health.model_verification" = "Model Verification";
 "health.model_verification_footer" = "On-device models that failed verification. Remove them and Kurn will re-download the model the next time the feature is used.";
+"health.blocked_providers" = "Blocked AI Providers";
+"health.blocked_provider_subtitle" = "Automatic generation paused after repeated failures";
+"health.blocked_providers_footer" = "Providers where automatic wiki and AI-title generation stopped after repeated failures, such as an invalid API key. Retrying clears the block; fix the provider's configuration first if the underlying problem hasn't changed.";
 "health.recent_failures" = "Recent Failure Codes";
 "health.view_all_events" = "View All Reliability Events";
 

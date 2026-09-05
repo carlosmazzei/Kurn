@@ -146,6 +146,15 @@ actor ProviderCircuitBreaker {
         records[providerID]
     }
 
+    /// Providers currently blocked pending an explicit retry, for the Health
+    /// & Recovery surface. Deliberately excludes a plain time-based
+    /// `.transient` backoff — that clears itself and isn't something a user
+    /// needs to act on — so only the kind of block that would otherwise sit
+    /// silently forever shows up here.
+    func blockedProviderIDs() -> [String] {
+        records.filter(\.value.requiresExplicitRetry).keys.sorted()
+    }
+
     /// Clears any open circuit for `providerID`. A `.configuration` (or
     /// `.ambiguous`) failure sets `requiresExplicitRetry`, which `allows`
     /// honors forever regardless of `blockedUntil` — the only way out is an

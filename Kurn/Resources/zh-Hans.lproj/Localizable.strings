@@ -810,6 +810,9 @@
 "health.degraded_transcripts_footer" = "某个处理阶段降级或回退的转录记录。重试仅适用于支持该操作的阶段。";
 "health.model_verification" = "模型验证";
 "health.model_verification_footer" = "验证失败的设备端模型。移除后，Kurn 会在下次使用该功能时重新下载模型。";
+"health.blocked_providers" = "已阻止的 AI 提供方";
+"health.blocked_provider_subtitle" = "因反复失败，自动生成已暂停";
+"health.blocked_providers_footer" = "由于反复失败（例如 API 密钥无效），自动生成维基和 AI 标题已停止的提供方。点击重试可解除阻止；如果原始问题尚未解决，请先在设置中修正该提供方的配置。";
 "health.recent_failures" = "最近的失败代码";
 "health.view_all_events" = "查看所有可靠性事件";
 

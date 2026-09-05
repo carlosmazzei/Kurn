@@ -810,6 +810,9 @@
 "health.degraded_transcripts_footer" = "Trascrizioni in cui una fase della pipeline è stata degradata o ha usato un'alternativa. Riprovare è disponibile solo per le fasi che lo supportano.";
 "health.model_verification" = "Verifica dei Modelli";
 "health.model_verification_footer" = "Modelli sul dispositivo che non hanno superato la verifica. Rimuovili e Kurn scaricherà di nuovo il modello alla prossima volta che la funzione verrà usata.";
+"health.blocked_providers" = "Provider IA Bloccati";
+"health.blocked_provider_subtitle" = "Generazione automatica sospesa dopo errori ripetuti";
+"health.blocked_providers_footer" = "Provider la cui generazione automatica di wiki e titolo IA si è interrotta dopo ripetuti errori, come una chiave API non valida. Riprovare rimuove il blocco; correggi prima la configurazione del provider se il problema originale persiste.";
 "health.recent_failures" = "Codici di Errore Recenti";
 "health.view_all_events" = "Visualizza Tutti gli Eventi di Affidabilità";
 

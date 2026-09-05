@@ -36,6 +36,7 @@ struct HealthRecoveryView: View {
     @State var degraded: [DegradedItem] = []
     @State var quarantineItems: [QuarantinedRecording] = []
     @State var corruptModels: [ModelStore.InstalledModel] = []
+    @State var blockedProviders: [String] = []
     @State var recentFailures: [ReliabilityEvent] = []
 
     @State var selectedMeeting: Meeting?
@@ -50,6 +51,7 @@ struct HealthRecoveryView: View {
             degraded: degraded,
             quarantineItems: quarantineItems,
             corruptModels: corruptModels,
+            blockedProviders: blockedProviders,
             recentFailures: recentFailures
         )
     }
@@ -71,6 +73,7 @@ struct HealthRecoveryView: View {
                 degradedSection
                 quarantineSection
                 modelsSection
+                blockedProvidersSection
                 eventsSection
             }
         }
@@ -168,6 +171,24 @@ struct HealthRecoveryView: View {
         }
     }
 
+    /// Clears a provider's stuck circuit directly, without the user needing
+    /// to re-save its config just to touch the reset path in
+    /// `ProvidersSettingsView`. The next automatic wiki/AI-title attempt for
+    /// that provider decides for itself whether the underlying problem is
+    /// actually fixed — this only lifts the block guarding against retrying.
+    func retryProvider(_ providerID: String) {
+        Task {
+            await ProviderCircuitBreaker.shared.reset(providerID: providerID)
+            await refresh()
+        }
+    }
+
+    /// A blocked provider's display name where it's still configured, or the
+    /// raw id (e.g. a provider since deleted) as a legible fallback.
+    func providerDisplayName(for providerID: String) -> String {
+        settings.providers.first { $0.id == providerID }?.displayName ?? providerID
+    }
+
     // MARK: - Loading
 
     func refresh() async {
@@ -184,6 +205,8 @@ struct HealthRecoveryView: View {
         }.value
 
         corruptModels = HealthRecoveryAggregation.corruptModels(in: downloads.installedModels)
+
+        blockedProviders = await ProviderCircuitBreaker.shared.blockedProviderIDs()
 
         recentFailures = HealthRecoveryAggregation.recentFailures(
             in: ReliabilityEventStore.recentEvents(limit: HealthRecoveryAggregation.recentFailureWindow)

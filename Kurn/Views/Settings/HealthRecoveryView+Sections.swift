@@ -194,6 +194,39 @@ extension HealthRecoveryView {
     }
 
     @ViewBuilder
+    var blockedProvidersSection: some View {
+        if !blockedProviders.isEmpty {
+            Section {
+                ForEach(blockedProviders, id: \.self) { providerID in
+                    HStack {
+                        rowLabel(
+                            title: providerDisplayName(for: providerID),
+                            subtitle: NSLocalizedString(
+                                "health.blocked_provider_subtitle",
+                                comment: "Automatic AI generation paused for this provider"
+                            ),
+                            systemImage: "bolt.slash.fill",
+                            tint: Theme.warning
+                        )
+                        Spacer()
+                        Button {
+                            retryProvider(providerID)
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .accessibilityIdentifier("health.blocked_provider")
+                }
+            } header: {
+                Text(NSLocalizedString("health.blocked_providers", comment: "Blocked AI providers"))
+            } footer: {
+                Text(NSLocalizedString("health.blocked_providers_footer", comment: "Explains blocked providers"))
+            }
+        }
+    }
+
+    @ViewBuilder
     var eventsSection: some View {
         if !recentFailures.isEmpty {
             Section {

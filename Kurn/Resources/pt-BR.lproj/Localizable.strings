@@ -810,6 +810,9 @@
 "health.degraded_transcripts_footer" = "Transcrições em que uma etapa do pipeline foi degradada ou usou um recurso alternativo. Tentar novamente só é oferecido para etapas que suportam isso.";
 "health.model_verification" = "Verificação de Modelos";
 "health.model_verification_footer" = "Modelos no dispositivo que falharam na verificação. Remova-os e o Kurn baixará o modelo novamente na próxima vez que o recurso for usado.";
+"health.blocked_providers" = "Provedores de IA Bloqueados";
+"health.blocked_provider_subtitle" = "Geração automática pausada após falhas repetidas";
+"health.blocked_providers_footer" = "Provedores cuja geração automática de wiki e título por IA parou após falhas repetidas, como uma chave de API inválida. Tentar novamente libera o bloqueio; corrija a configuração do provedor primeiro se o problema original ainda não foi resolvido.";
 "health.recent_failures" = "Códigos de Falha Recentes";
 "health.view_all_events" = "Ver Todos os Eventos de Confiabilidade";
 
