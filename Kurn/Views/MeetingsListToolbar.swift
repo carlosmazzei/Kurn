@@ -75,6 +75,7 @@ extension MeetingsListView {
         .labelStyle(.titleAndIcon)
         .accessibilityLabel(NSLocalizedString("meetings.bucket", comment: "Library"))
         .accessibilityValue(selectionTitle)
+        .accessibilityIdentifier("meetings.library")
     }
 
     /// Opens `FilterBarView`. Shows the active filter count inline so the badge

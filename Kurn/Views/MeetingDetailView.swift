@@ -607,6 +607,7 @@ struct MeetingDetailView: View {
                 Button { showingShareSelection = true } label: {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
+                .accessibilityIdentifier("detail.share")
                 if meeting.wikiArticle != nil {
                     Button { showingWiki = true } label: {
                         Label(
@@ -645,6 +646,7 @@ struct MeetingDetailView: View {
                 Image(systemName: "ellipsis.circle")
             }
             .accessibilityLabel(NSLocalizedString("detail.more_options", comment: "More options"))
+            .accessibilityIdentifier("detail.more")
         }
     }
 }

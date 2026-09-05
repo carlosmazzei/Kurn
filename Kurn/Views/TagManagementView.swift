@@ -34,12 +34,14 @@ struct TagManagementView: View {
                             NSLocalizedString("tag.name_placeholder", comment: "Tag name"),
                             text: $newTagName
                         )
+                        .accessibilityIdentifier("tags.new_name")
                         Button {
                             createTag()
                         } label: {
                             Text(NSLocalizedString("tag.add", comment: "Add"))
                         }
                         .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("tags.add")
                     }
                 }
 
@@ -107,12 +109,15 @@ struct TagManagementView: View {
                 .font(.footnote)
                 .foregroundStyle(Theme.textTertiary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("tags.row.\(tag.name)")
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 pendingDelete = tag
             } label: {
                 Label(NSLocalizedString("tag.delete", comment: "Delete"), systemImage: "trash")
             }
+            .accessibilityIdentifier("tags.row.delete")
             Button {
                 editingTag = tag
             } label: {

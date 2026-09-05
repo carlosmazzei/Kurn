@@ -208,6 +208,7 @@ struct MeetingChatView: View {
             .lineLimit(1...4)
             .textFieldStyle(.plain)
             .focused($inputFocused)
+            .accessibilityIdentifier("chat.input")
             .padding(.horizontal, 14).padding(.vertical, 10)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.separator, lineWidth: 1))
@@ -226,6 +227,7 @@ struct MeetingChatView: View {
                 }
                 .disabled(!canSend)
                 .accessibilityLabel(NSLocalizedString("chat.send", comment: "Send"))
+                .accessibilityIdentifier("chat.send")
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
@@ -239,6 +241,7 @@ struct MeetingChatView: View {
             title: NSLocalizedString("chat.disabled.title", comment: "Chat disabled title"),
             subtitle: NSLocalizedString("chat.disabled.subtitle", comment: "Chat disabled subtitle")
         )
+        .accessibilityIdentifier("chat.disabled_state")
     }
 
     private var emptyIndexState: some View {
@@ -247,6 +250,7 @@ struct MeetingChatView: View {
             title: NSLocalizedString("chat.no_index.title", comment: "Chat no index title"),
             subtitle: NSLocalizedString("chat.no_index.subtitle", comment: "Chat no index subtitle")
         )
+        .accessibilityIdentifier("chat.empty_state")
     }
 
     private func infoState(icon: String, title: String, subtitle: String) -> some View {
@@ -259,6 +263,7 @@ struct MeetingChatView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 32)
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - State & actions

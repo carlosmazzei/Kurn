@@ -202,6 +202,7 @@ struct KurnDialogModifier: ViewModifier {
                         .font(Theme.headline)
                         .foregroundStyle(Theme.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("dialog.title")
                     if !message.isEmpty {
                         Text(message)
                             .font(Theme.footnote)
@@ -221,6 +222,7 @@ struct KurnDialogModifier: ViewModifier {
                         secondaryAction()
                         isPresented = false
                     }
+                    .accessibilityIdentifier("dialog.secondary")
                 }
 
                 dialogButton(
@@ -231,6 +233,7 @@ struct KurnDialogModifier: ViewModifier {
                     primaryAction()
                     isPresented = false
                 }
+                .accessibilityIdentifier("dialog.primary")
             }
         }
         .padding(18)

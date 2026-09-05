@@ -100,6 +100,7 @@ struct TranscriptionSettingsView: View {
                         .disabled(engine == .whisperAPI && !hasAnyTranscriptionProvider)
                 }
             }
+            .accessibilityIdentifier("settings.transcription.engine")
             .disabled(downloads.isDownloading)
 
             // Cloud transcription provider + model, chosen independently of the

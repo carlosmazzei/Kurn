@@ -63,6 +63,7 @@ struct HealthRecoveryView: View {
                         systemImage: "checkmark.circle.fill"
                     )
                     .foregroundStyle(Theme.textSecondary)
+                    .accessibilityIdentifier("health.all_clear")
                 }
             } else {
                 recoverySection
@@ -73,6 +74,7 @@ struct HealthRecoveryView: View {
                 eventsSection
             }
         }
+        .accessibilityIdentifier("health.list")
         .navigationTitle(NSLocalizedString("health.title", comment: "Health & Recovery"))
         .navigationBarTitleDisplayMode(.inline)
         .task {

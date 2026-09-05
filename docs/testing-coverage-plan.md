@@ -153,6 +153,13 @@ Alvo: `Views` 23 % → ~40 % sem snapshots frágeis.
   `reliability-hardening` antes de promover para o job obrigatório.
 - Não fazer: snapshot testing pixel-a-pixel (Liquid Glass/iOS 26 muda por
   release; custo de manutenção alto, sinal baixo).
+- Entregue: `HealthRecoveryAggregation`, `PlaybackScrubberLayout`,
+  `MarkdownPresentation`, `MeetingShareSelection`/`MeetingShareFormat` e
+  `MeetingFilter.toggleTag/toggleStatus` (KurnCore), com suítes em
+  `KurnTests`; fluxos em `KurnUITests/Flows/` (`SettingsFlowUITests`,
+  `LibraryFlowUITests`, `ShareAndChatFlowUITests`). Os fluxos ficam
+  `-skip-testing` no job obrigatório e rodam no lane `ui-flake-rate` até a
+  medição; promover removendo a linha de skip em `swift.yml`.
 
 ### Fase 4 — Targets hoje em 0 % (1 sessão, opcional)
 

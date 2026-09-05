@@ -1569,6 +1569,19 @@ enforced by lint and by a CI audit test, not just convention:
   `KurnTests` (`KurnUITests` wasn't in the scheme before this was added, so it
   never ran in CI), with `ScreenshotUITests` explicitly skipped there since it
   depends on fastlane's snapshot setup.
+- **`KurnUITests/Flows/`** — user flows over the same seeded launch, driven
+  only through `accessibilityIdentifier`s (`settings.link.*`,
+  `settings.providers.*`, `settings.transcription.engine`, `health.*`,
+  `tags.*`, `folders.*`, `folder.*`, `detail.more`/`detail.share`, `share.*`,
+  `chat.*`, and `dialog.title`/`dialog.primary`/`dialog.secondary` on the
+  shared `kurnDialog`): `SettingsFlowUITests` (Providers, declining a model
+  download keeps the engine, Storage, Health & Recovery),
+  `LibraryFlowUITests` (tag and folder create/delete) and
+  `ShareAndChatFlowUITests` (share sheet up to the Obsidian format, Ask with
+  no provider → empty state, composer disabled). They are `-skip-testing`'d
+  in the required `ui-accessibility-tests` job and run in
+  `reliability-hardening.yml`'s `ui-flake-rate` lane until their flake rate
+  is measured; promote a suite by removing its skip line in `swift.yml`.
 - **Speaker identity, not color, carries meaning** everywhere it matters: the
   Live Activity's Lock Screen status dot differs by *shape* (pause icon vs.
   filled circle), not only color, and status text is never color-only.

@@ -43,25 +43,29 @@ struct SettingsView: View {
             Section {
                 link(
                     NSLocalizedString("settings.providers", comment: "AI Providers"),
-                    systemImage: "brain"
+                    systemImage: "brain",
+                    identifier: "settings.link.providers"
                 ) {
                     ProvidersSettingsView(keyRevision: $keyRevision)
                 }
                 link(
                     NSLocalizedString("settings.summary", comment: "Summary"),
-                    systemImage: "sparkles"
+                    systemImage: "sparkles",
+                    identifier: "settings.link.summary"
                 ) {
                     SummarySettingsView(keyRevision: keyRevision)
                 }
                 link(
                     NSLocalizedString("settings.semantic_search_title", comment: "Search and chat"),
-                    systemImage: "magnifyingglass"
+                    systemImage: "magnifyingglass",
+                    identifier: "settings.link.search"
                 ) {
                     SemanticSearchSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"),
-                    systemImage: "book"
+                    systemImage: "book",
+                    identifier: "settings.link.wiki"
                 ) {
                     WikiSettingsView(keyRevision: keyRevision)
                 }
@@ -72,13 +76,15 @@ struct SettingsView: View {
             Section {
                 link(
                     NSLocalizedString("settings.recording", comment: "Recording"),
-                    systemImage: "mic"
+                    systemImage: "mic",
+                    identifier: "settings.link.recording"
                 ) {
                     RecordingSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.transcription", comment: "Transcription"),
-                    systemImage: "waveform"
+                    systemImage: "waveform",
+                    identifier: "settings.link.transcription"
                 ) {
                     TranscriptionSettingsView(keyRevision: keyRevision)
                 }
@@ -89,13 +95,15 @@ struct SettingsView: View {
             Section {
                 link(
                     NSLocalizedString("tag.title", comment: "Tags"),
-                    systemImage: "tag"
+                    systemImage: "tag",
+                    identifier: "settings.link.tags"
                 ) {
                     TagsSettingsView()
                 }
                 link(
                     NSLocalizedString("usage_insights.title", comment: "Usage Insights"),
-                    systemImage: "chart.bar"
+                    systemImage: "chart.bar",
+                    identifier: "settings.link.usage"
                 ) {
                     UsageInsightsView()
                 }
@@ -108,25 +116,29 @@ struct SettingsView: View {
             Section {
                 link(
                     NSLocalizedString("settings.storage", comment: "Storage"),
-                    systemImage: "internaldrive"
+                    systemImage: "internaldrive",
+                    identifier: "settings.link.storage"
                 ) {
                     StorageSettingsView()
                 }
                 link(
                     NSLocalizedString("health.title", comment: "Health & Recovery"),
-                    systemImage: "wrench.and.screwdriver"
+                    systemImage: "wrench.and.screwdriver",
+                    identifier: "settings.link.health"
                 ) {
                     HealthRecoveryView()
                 }
                 link(
                     NSLocalizedString("settings.diagnostics", comment: "Diagnostics"),
-                    systemImage: "stethoscope"
+                    systemImage: "stethoscope",
+                    identifier: "settings.link.diagnostics"
                 ) {
                     DiagnosticsSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.about", comment: "About"),
-                    systemImage: "info.circle"
+                    systemImage: "info.circle",
+                    identifier: "settings.link.about"
                 ) {
                     AboutSettingsView()
                 }
@@ -186,6 +198,7 @@ struct SettingsView: View {
     private func link<Destination: View>(
         _ title: String,
         systemImage: String,
+        identifier: String,
         @ViewBuilder destination: @escaping () -> Destination
     ) -> some View {
         NavigationLink {
@@ -194,6 +207,7 @@ struct SettingsView: View {
         } label: {
             Label(title, systemImage: systemImage)
         }
+        .accessibilityIdentifier(identifier)
     }
 }
 
