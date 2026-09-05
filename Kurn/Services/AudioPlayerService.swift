@@ -34,7 +34,7 @@ final class AudioPlayerService: NSObject {
     private(set) var isPlayingEnhanced = false
 
     /// Speeds the user can cycle through, mirroring WhatsApp's voice-note control.
-    static let rateOptions: [Float] = [1.0, 1.5, 2.0, 0.5]
+    static var rateOptions: [Float] { PlaybackTransport.rateOptions }
 
     /// How far the skip controls move, in both the app and the Lock Screen.
     static var skipInterval: TimeInterval { NowPlayingController.skipInterval }
@@ -133,9 +133,7 @@ final class AudioPlayerService: NSObject {
     /// Advance to the next speed in `rateOptions`, wrapping around. Used by the
     /// tappable speed pill in the player UI.
     func cycleRate() {
-        let options = Self.rateOptions
-        let index = options.firstIndex(of: playbackRate) ?? 0
-        setRate(options[(index + 1) % options.count])
+        setRate(PlaybackTransport.nextRate(after: playbackRate))
     }
 
     func pause() {
@@ -156,7 +154,7 @@ final class AudioPlayerService: NSObject {
     /// Seek to an absolute time within the loaded file.
     func seek(to time: TimeInterval) {
         guard let player else { return }
-        player.currentTime = max(0, min(time, player.duration))
+        player.currentTime = PlaybackTransport.clampedPosition(time, duration: player.duration)
         currentTime = player.currentTime
         publishNowPlaying()
     }
