@@ -47,13 +47,15 @@ struct TranscriptionViewModelSummaryStateTests {
 
     @MainActor
     private struct Harness {
+        let container: ModelContainer
         let context: ModelContext
         let llm: ScriptedLLM
         let viewModel: TranscriptionViewModel
         let meeting: Meeting
 
         init(withTranscript: Bool = true) throws {
-            context = TestModelContainer.make().mainContext
+            container = TestModelContainer.make()
+            context = container.mainContext
             llm = ScriptedLLM()
             let scripted = llm
             viewModel = TranscriptionViewModel(
