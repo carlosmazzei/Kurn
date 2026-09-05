@@ -169,6 +169,50 @@ extension MeetingDetailView {
         }
     }
 
+    /// Whether the overflow menu should offer a wiki action at all — needs a
+    /// transcript to condense and a usable provider, same gate
+    /// `TranscriptionViewModel.shouldGenerateWiki` uses for the automatic
+    /// post-transcription pass. Deliberately not also gated on
+    /// `settings.wikiEnabled`: a meeting missing its wiki because generation
+    /// was off (or blocked) when it transcribed should still be one tap away
+    /// from getting one, without the user first hunting down the toggle.
+    var canGenerateWiki: Bool {
+        hasAnyTranscript && settings.aiProvider.isUsable
+    }
+
+    var isGeneratingWiki: Bool {
+        wiki.generatingMeetingIDs.contains(meeting.id)
+    }
+
+    /// Build (or rebuild) this meeting's wiki article from its own overflow
+    /// menu, so getting one back doesn't require a trip to Settings → Wiki
+    /// and a full "Rebuild All" over every other meeting too. Always
+    /// explicit and forced: a deliberate per-meeting tap should run
+    /// regardless of the provider circuit breaker or a matching content
+    /// hash, the same way `WikiCoordinator.rebuildWiki()` treats every
+    /// meeting it touches.
+    func regenerateWiki() {
+        Task { await wiki.generate(meeting, trigger: .explicit, force: true) }
+    }
+
+    /// Same gate as `canGenerateWiki`, for the AI title action.
+    var canGenerateTitle: Bool {
+        hasAnyTranscript && settings.aiProvider.isUsable
+    }
+
+    var isGeneratingTitle: Bool {
+        txVM?.isGeneratingTitle(for: meeting) ?? false
+    }
+
+    /// Build (or rebuild) this meeting's AI title from its own overflow
+    /// menu — the title analogue of `regenerateWiki()` above, and for the
+    /// same reason: an automatic title that never ran (off, blocked, or the
+    /// meeting predates the feature) shouldn't need a trip anywhere else to
+    /// get one.
+    func regenerateTitle() {
+        txVM?.regenerateTitle(for: meeting, settings: settings)
+    }
+
     func generateSummary() {
         showingTemplatePicker = true
     }

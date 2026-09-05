@@ -21,11 +21,8 @@ struct WikiSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(WikiCoordinator.self) private var wiki
 
-    /// Count of stored articles, refreshed on appear and after a rebuild/clear.
+    /// Count of stored articles, refreshed on appear and after a bulk run/clear.
     @State private var wikiArticleCount = 0
-    /// True while a rebuild is running, so the buttons show progress and can't
-    /// be re-triggered.
-    @State private var isRebuildingWiki = false
 
     /// The reason the toggle is disabled, when it is. Names the specific
     /// on-device unavailability reason rather than always suggesting an API
@@ -40,6 +37,10 @@ struct WikiSettingsView: View {
 
     var body: some View {
         let hasKey = settings.aiProvider.isUsable
+        // `wiki.bulkOperation` is read straight from the coordinator (an
+        // `@Observable`), so progress renders live instead of a plain spinner
+        // this view has to poll for.
+        let isBusy = wiki.bulkOperation != nil
         Form {
             Section {
                 Toggle(
@@ -54,27 +55,43 @@ struct WikiSettingsView: View {
                     NSLocalizedString("settings.wiki_articles", comment: "Wiki article count"),
                     value: "\(wikiArticleCount)"
                 )
+
+                if let progress = wiki.bulkOperation {
+                    bulkProgressRow(progress)
+                }
+
+                // Only fills in what's missing — meetings whose article is
+                // already up to date are skipped, so opting in after months
+                // of meetings doesn't re-pay for ones that already have one.
                 Button {
                     Task {
-                        isRebuildingWiki = true
-                        await wiki.rebuildWiki()
+                        await wiki.generateMissing()
                         wikiArticleCount = wiki.articleCount()
-                        isRebuildingWiki = false
                     }
                 } label: {
-                    if isRebuildingWiki {
-                        HStack {
-                            ProgressView()
-                            Text(NSLocalizedString("settings.wiki_rebuilding", comment: "Rebuilding wiki"))
-                        }
-                    } else {
-                        Label(
-                            NSLocalizedString("settings.wiki_rebuild", comment: "Rebuild wiki"),
-                            systemImage: "arrow.clockwise"
-                        )
-                    }
+                    Label(
+                        NSLocalizedString("settings.wiki_generate_missing", comment: "Generate missing wiki articles"),
+                        systemImage: "plus.circle"
+                    )
                 }
-                .disabled(isRebuildingWiki || !settings.wikiEnabled || !hasKey)
+                .disabled(isBusy || !settings.wikiEnabled || !hasKey)
+
+                // Regenerates every article unconditionally, including ones
+                // already up to date — the expensive option, kept separate
+                // from "Generate Missing" above.
+                Button {
+                    Task {
+                        await wiki.rebuildWiki()
+                        wikiArticleCount = wiki.articleCount()
+                    }
+                } label: {
+                    Label(
+                        NSLocalizedString("settings.wiki_rebuild", comment: "Rebuild wiki"),
+                        systemImage: "arrow.clockwise"
+                    )
+                }
+                .disabled(isBusy || !settings.wikiEnabled || !hasKey)
+
                 Button(role: .destructive) {
                     wiki.clearWiki()
                     wikiArticleCount = wiki.articleCount()
@@ -84,7 +101,7 @@ struct WikiSettingsView: View {
                         systemImage: "trash"
                     )
                 }
-                .disabled(isRebuildingWiki || wikiArticleCount == 0)
+                .disabled(isBusy || wikiArticleCount == 0)
             } header: {
                 Text(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki section title"))
             } footer: {
@@ -95,5 +112,37 @@ struct WikiSettingsView: View {
         }
         .navigationTitle(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"))
         .task { wikiArticleCount = wiki.articleCount() }
+    }
+
+    /// Determinate progress for the bulk run in flight, so a large library
+    /// shows real "N of M" feedback instead of an indeterminate spinner the
+    /// user has no way to gauge.
+    @ViewBuilder
+    private func bulkProgressRow(
+        _ progress: (kind: WikiCoordinator.BulkOperationKind, completed: Int, total: Int)
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(bulkProgressTitle(progress.kind))
+                .font(.subheadline)
+                .foregroundStyle(Theme.textPrimary)
+            ProgressView(value: Double(progress.completed), total: Double(progress.total))
+            Text(String(
+                format: NSLocalizedString("settings.wiki_bulk_progress", comment: "N of M meetings"),
+                progress.completed, progress.total
+            ))
+            .font(.caption)
+            .foregroundStyle(Theme.textSecondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func bulkProgressTitle(_ kind: WikiCoordinator.BulkOperationKind) -> String {
+        switch kind {
+        case .missingOnly:
+            return NSLocalizedString("settings.wiki_generating_missing", comment: "Generating missing wikis")
+        case .rebuildAll:
+            return NSLocalizedString("settings.wiki_rebuilding", comment: "Rebuilding wiki")
+        }
     }
 }

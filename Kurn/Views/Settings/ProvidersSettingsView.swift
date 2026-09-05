@@ -31,6 +31,14 @@ struct ProvidersSettingsView: View {
                             onSave: { updated in
                                 settings.updateProvider(updated)
                                 keyRevision += 1
+                                // Any edit here (key, base URL, kind) could be
+                                // exactly what fixes a configuration failure
+                                // that tripped the provider circuit breaker,
+                                // so give automatic wiki/AI-title generation
+                                // another chance instead of leaving them
+                                // blocked forever waiting for an explicit
+                                // retry that title generation never sends.
+                                Task { await ProviderCircuitBreaker.shared.reset(providerID: updated.id) }
                             },
                             onDelete: {
                                 settings.removeProvider(provider)

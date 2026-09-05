@@ -88,6 +88,27 @@ struct ProviderCircuitBreakerTests {
         #expect(events.map(\.attempt) == [1, 2, 0])
     }
 
+    @Test func resetClearsAConfigurationBlockWithoutRequiringAnExplicitSuccess() async {
+        let breaker = ProviderCircuitBreaker(store: InMemoryProviderCircuitStore())
+
+        await breaker.recordFailure(providerID: "openai", failure: .configuration)
+        #expect(await breaker.allows(providerID: "openai", trigger: .automatic) == false)
+
+        // Editing the provider's config (e.g. fixing a bad API key) resets
+        // the circuit even though no request has succeeded yet — the only
+        // way automatic AI-title generation, which has no explicit retry
+        // path, could ever recover from a `requiresExplicitRetry` block.
+        await breaker.reset(providerID: "openai")
+        #expect(await breaker.allows(providerID: "openai", trigger: .automatic))
+        #expect(await breaker.record(for: "openai") == nil)
+    }
+
+    @Test func resetOnAProviderWithNoRecordIsANoOp() async {
+        let breaker = ProviderCircuitBreaker(store: InMemoryProviderCircuitStore())
+        await breaker.reset(providerID: "openai")
+        #expect(await breaker.allows(providerID: "openai", trigger: .automatic))
+    }
+
     @Test func errorsAreClassifiedWithoutPersistingTheirMessages() {
         #expect(ProviderCircuitFailure(error: AppError.ambiguousProviderResult) == .ambiguous)
         #expect(ProviderCircuitFailure(error: AppError.invalidProviderURL) == .configuration)

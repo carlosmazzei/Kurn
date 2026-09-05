@@ -122,7 +122,8 @@ final class TranscriptionViewModel {
     let transcriptionService: TranscriptionService
     /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
     let summaryService: SummaryService
-    private let aiTitleCoordinator: AITitleCoordinator
+    /// Not `private` — `TranscriptionViewModel+AITitle.swift` needs it.
+    let aiTitleCoordinator: AITitleCoordinator
     /// App-wide settings, set by `KurnApp` so title generation can use the
     /// configured LLM provider without passing settings through every call site.
     var appSettings: AppSettings?
@@ -605,21 +606,6 @@ final class TranscriptionViewModel {
         recording.speakerVoiceprints = output.speakerVoiceprints
         syncSpeakers(for: recording.meeting)
         persist()
-    }
-
-    /// Generate and persist a short AI-derived meeting title after transcription.
-    /// Best-effort: errors are logged and swallowed so a failed title never
-    /// blocks or surfaces as a user-facing error.
-    private func generateAITitle(for meeting: Meeting?, settings: AppSettings) async {
-        guard let meeting,
-              let title = await aiTitleCoordinator.generateTitle(
-                for: meeting,
-                settings: settings
-              ),
-              !Task.isCancelled else { return }
-        meeting.aiTitle = title
-        persist()
-        AppLog.transcription.atNotice.notice("VM: AI title id=\(meeting.id, privacy: .public) \"\(title, privacy: .private)\"")
     }
 
     /// Whether an `AppError` should pause transcription (→ `.pending`) rather

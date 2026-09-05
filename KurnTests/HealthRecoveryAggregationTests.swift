@@ -165,17 +165,21 @@ struct HealthRecoveryAggregationTests {
     @Test func isEmptyRequiresEverySectionToBeEmpty() {
         #expect(HealthRecoveryAggregation.isEmpty(
             recoveryNeeded: [], stalledTranscriptions: [], degraded: [],
-            quarantineItems: [], corruptModels: [], recentFailures: []
+            quarantineItems: [], corruptModels: [], blockedProviders: [], recentFailures: []
         ))
         let failure = ReliabilityEvent(operationID: OperationID(), operation: "capture", outcome: .failed)
         #expect(!HealthRecoveryAggregation.isEmpty(
             recoveryNeeded: [], stalledTranscriptions: [], degraded: [],
-            quarantineItems: [], corruptModels: [], recentFailures: [failure]
+            quarantineItems: [], corruptModels: [], blockedProviders: [], recentFailures: [failure]
         ))
         let recording = insertRecording(captureState: .recoveryNeeded)
         #expect(!HealthRecoveryAggregation.isEmpty(
             recoveryNeeded: [recording], stalledTranscriptions: [], degraded: [],
-            quarantineItems: [], corruptModels: [], recentFailures: []
+            quarantineItems: [], corruptModels: [], blockedProviders: [], recentFailures: []
+        ))
+        #expect(!HealthRecoveryAggregation.isEmpty(
+            recoveryNeeded: [], stalledTranscriptions: [], degraded: [],
+            quarantineItems: [], corruptModels: [], blockedProviders: ["openai"], recentFailures: []
         ))
     }
 }

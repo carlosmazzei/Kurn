@@ -40,6 +40,7 @@ struct AppErrorMetadataTests {
         #expect(AppError.autoTaggingFailed("x").severity == .warning)
         #expect(AppError.semanticIndexFailed("x").severity == .warning)
         #expect(AppError.wikiGenerationFailed("x").severity == .warning)
+        #expect(AppError.titleGenerationFailed("x").severity == .warning)
         #expect(AppError.summaryTruncated.severity == .warning)
     }
 
@@ -89,6 +90,7 @@ struct AppErrorMetadataTests {
 
     @Test func casesWithAnUnderlyingDetailExposeItAsPrivateContext() {
         #expect(AppError.transcriptionFailed("underlying detail").privateContext == "underlying detail")
+        #expect(AppError.titleGenerationFailed("underlying detail").privateContext == "underlying detail")
         #expect(AppError.apiError(statusCode: 500, message: "server said this").privateContext == "server said this")
         let urlError = URLError(.timedOut)
         #expect(AppError.networkError(urlError).privateContext == urlError.localizedDescription)

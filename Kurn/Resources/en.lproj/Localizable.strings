@@ -721,6 +721,7 @@
 "error.semantic_index" = "Could not build the semantic index: %@";
 "error.wiki_generation" = "Could not build the meeting wiki: %@";
 "error.wiki_unavailable" = "The meeting wiki isn't ready yet. Try again after it finishes generating.";
+"error.title_generation" = "Could not generate the meeting title: %@";
 "error.embedding_no_model" = "No on-device embedding model is available for this device.";
 "error.embedding_no_assets" = "The on-device language model could not be downloaded.";
 "tab.chat" = "Chat";
@@ -758,16 +759,25 @@
 "settings.wiki_title" = "Meeting Wiki";
 "settings.wiki" = "Build meeting wiki";
 "settings.wiki_articles" = "Wiki articles";
-"settings.wiki_rebuild" = "Rebuild wiki";
-"settings.wiki_rebuilding" = "Rebuilding…";
+"settings.wiki_generate_missing" = "Generate Missing";
+"settings.wiki_generating_missing" = "Generating Missing…";
+"settings.wiki_rebuild" = "Rebuild All";
+"settings.wiki_rebuilding" = "Rebuilding All…";
+"settings.wiki_bulk_progress" = "%1$d of %2$d meetings";
 "settings.wiki_clear" = "Clear wiki";
-"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls.";
+"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls. \"Generate Missing\" only builds articles that don't exist yet; \"Rebuild All\" regenerates every article, including ones already up to date.";
 "settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";
 "settings.correction_title" = "AI Correction";
 "settings.correction" = "Correct transcription errors";
 "settings.correction_footer" = "Uses your summary AI provider to fix spelling, punctuation, and misheard words on uncertain parts of the transcript after transcription. Off by default — it makes cloud calls and can take longer to finish.";
 "settings.correction_needs_key" = "Add an API key for your summary provider to enable AI correction.";
 "detail.wiki.view" = "View wiki";
+"detail.wiki.generate" = "Generate Wiki";
+"detail.wiki.regenerate" = "Regenerate Wiki";
+"detail.wiki.generating" = "Generating Wiki…";
+"detail.title.generate" = "Generate Title";
+"detail.title.regenerate" = "Regenerate Title";
+"detail.title.generating" = "Generating Title…";
 "detail.wiki.title" = "Meeting Wiki";
 "detail.wiki.updated" = "Updated %@";
 
@@ -810,6 +820,9 @@
 "health.degraded_transcripts_footer" = "Transcripts where a pipeline stage degraded or fell back. Retry is only offered for stages that support it.";
 "health.model_verification" = "Model Verification";
 "health.model_verification_footer" = "On-device models that failed verification. Remove them and Kurn will re-download the model the next time the feature is used.";
+"health.blocked_providers" = "Blocked AI Providers";
+"health.blocked_provider_subtitle" = "Automatic generation paused after repeated failures";
+"health.blocked_providers_footer" = "Providers where automatic wiki and AI-title generation stopped after repeated failures, such as an invalid API key. Retrying clears the block; fix the provider's configuration first if the underlying problem hasn't changed.";
 "health.recent_failures" = "Recent Failure Codes";
 "health.view_all_events" = "View All Reliability Events";
 

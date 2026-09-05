@@ -72,10 +72,12 @@ enum HealthRecoveryAggregation {
         degraded: [DegradedItem],
         quarantineItems: [QuarantinedRecording],
         corruptModels: [ModelStore.InstalledModel],
+        blockedProviders: [String],
         recentFailures: [ReliabilityEvent]
     ) -> Bool {
         recoveryNeeded.isEmpty && stalledTranscriptions.isEmpty && degraded.isEmpty
-            && quarantineItems.isEmpty && corruptModels.isEmpty && recentFailures.isEmpty
+            && quarantineItems.isEmpty && corruptModels.isEmpty && blockedProviders.isEmpty
+            && recentFailures.isEmpty
     }
 
     static func meetingTitle(for recording: Recording) -> String {
