@@ -130,7 +130,12 @@ jobs:
   # KurnSwiftDataTests (the data/pipeline-integrity signal) rather than also
   # the UI suite, which is app-launch/accessibility behavior unlikely to
   # differ meaningfully by build configuration and would roughly double this
-  # job's runtime for little extra signal.
+  # job's runtime for little extra signal. Two Debug-only project settings are
+  # overridden on the command line because the test targets need them:
+  # ENABLE_TESTABILITY for `@testable import Kurn`, and ONLY_ACTIVE_ARCH
+  # because FluidAudio ships an arm64-only simulator static library
+  # (libtext_processing_rs.a) that fails the x86_64 slice a Release build
+  # would otherwise also link.
   release-configuration-tests:
     runs-on: macos-26
     timeout-minutes: 60
@@ -156,6 +161,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -configuration Release \
             ENABLE_TESTABILITY=YES \
+            ONLY_ACTIVE_ARCH=YES \
             -only-testing:KurnTests \
             -only-testing:KurnSwiftDataTests \
             clean test
