@@ -30,6 +30,10 @@ struct MeetingDetailView: View {
     /// Shared by all detail screens so a long enhancement remains observable
     /// across back-navigation instead of being orphaned with the old view.
     @Environment(PlaybackEnhancementViewModel.self) var enhancement
+    /// Shared, app-wide wiki coordinator (injected from `KurnApp`), so the
+    /// overflow menu's "Generate/Regenerate Wiki" reuses the same instance
+    /// the post-transcription pipeline and Settings → Wiki already drive.
+    @Environment(WikiCoordinator.self) var wiki
 
     enum Tab: Hashable, CaseIterable {
         case recordings, transcript, summary, chat
@@ -615,6 +619,18 @@ struct MeetingDetailView: View {
                             systemImage: "book.pages"
                         )
                     }
+                }
+                if canGenerateWiki {
+                    Button { regenerateWiki() } label: {
+                        if isGeneratingWiki {
+                            Label(NSLocalizedString("detail.wiki.generating", comment: "Generating wiki"), systemImage: "ellipsis")
+                        } else if meeting.wikiArticle != nil {
+                            Label(NSLocalizedString("detail.wiki.regenerate", comment: "Regenerate wiki"), systemImage: "arrow.clockwise")
+                        } else {
+                            Label(NSLocalizedString("detail.wiki.generate", comment: "Generate wiki"), systemImage: "book.pages")
+                        }
+                    }
+                    .disabled(isGeneratingWiki)
                 }
                 Button {
                     meeting.archivedAt = meeting.isArchived ? nil : Date()

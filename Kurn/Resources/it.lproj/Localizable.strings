@@ -758,16 +758,22 @@
 "settings.wiki_title" = "Wiki delle riunioni";
 "settings.wiki" = "Crea wiki delle riunioni";
 "settings.wiki_articles" = "Articoli della wiki";
-"settings.wiki_rebuild" = "Ricrea wiki";
-"settings.wiki_rebuilding" = "Ricreazione…";
+"settings.wiki_generate_missing" = "Genera Mancanti";
+"settings.wiki_generating_missing" = "Generazione Mancanti…";
+"settings.wiki_rebuild" = "Ricrea Tutto";
+"settings.wiki_rebuilding" = "Ricreazione di Tutto…";
+"settings.wiki_bulk_progress" = "%1$d di %2$d riunioni";
 "settings.wiki_clear" = "Cancella wiki";
-"settings.wiki_footer" = "Usa il tuo provider IA per i riassunti per creare un articolo condensato per riunione, così la funzione \"Chiedi\" della libreria può rispondere a domande che abbracciano o confrontano più riunioni. Disattivata per impostazione predefinita: effettua chiamate al cloud.";
+"settings.wiki_footer" = "Usa il tuo provider IA per i riassunti per creare un articolo condensato per riunione, così la funzione \"Chiedi\" della libreria può rispondere a domande che abbracciano o confrontano più riunioni. Disattivata per impostazione predefinita: effettua chiamate al cloud. \"Genera Mancanti\" crea solo gli articoli che non esistono ancora; \"Ricrea Tutto\" rigenera tutti gli articoli, compresi quelli già aggiornati.";
 "settings.wiki_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per creare la wiki delle riunioni.";
 "settings.correction_title" = "Correzione IA";
 "settings.correction" = "Correggi errori di trascrizione";
 "settings.correction_footer" = "Utilizza il tuo provider IA dei riassunti per correggere ortografia, punteggiatura e parole fraintese nelle parti incerte della trascrizione, dopo la trascrizione. Disattivata per impostazione predefinita: effettua chiamate al cloud e può richiedere più tempo per completarsi.";
 "settings.correction_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per attivare la correzione IA.";
 "detail.wiki.view" = "Visualizza wiki";
+"detail.wiki.generate" = "Genera Wiki";
+"detail.wiki.regenerate" = "Rigenera Wiki";
+"detail.wiki.generating" = "Generazione Wiki…";
 "detail.wiki.title" = "Wiki della riunione";
 "detail.wiki.updated" = "Aggiornata il %@";
 

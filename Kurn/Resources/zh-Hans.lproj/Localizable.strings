@@ -758,16 +758,22 @@
 "settings.wiki_title" = "会议维基";
 "settings.wiki" = "构建会议维基";
 "settings.wiki_articles" = "维基条目";
-"settings.wiki_rebuild" = "重建维基";
-"settings.wiki_rebuilding" = "正在重建…";
+"settings.wiki_generate_missing" = "生成缺失项";
+"settings.wiki_generating_missing" = "正在生成缺失项…";
+"settings.wiki_rebuild" = "重建全部";
+"settings.wiki_rebuilding" = "正在重建全部…";
+"settings.wiki_bulk_progress" = "%1$d / %2$d 场会议";
 "settings.wiki_clear" = "清除维基";
-"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。";
+"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。“生成缺失项”仅创建尚不存在的条目；“重建全部”会重新生成所有条目，包括已是最新的条目。";
 "settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";
 "settings.correction_title" = "AI 校正";
 "settings.correction" = "校正转录错误";
 "settings.correction_footer" = "转录完成后，使用你的摘要 AI 提供方修正转录中不确定部分的拼写、标点和听错的词语。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
 "settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
 "detail.wiki.view" = "查看维基";
+"detail.wiki.generate" = "生成维基";
+"detail.wiki.regenerate" = "重新生成维基";
+"detail.wiki.generating" = "正在生成维基…";
 "detail.wiki.title" = "会议维基";
 "detail.wiki.updated" = "更新于 %@";
 

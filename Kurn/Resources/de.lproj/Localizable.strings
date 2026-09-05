@@ -758,16 +758,22 @@
 "settings.wiki_title" = "Meeting-Wiki";
 "settings.wiki" = "Meeting-Wiki erstellen";
 "settings.wiki_articles" = "Wiki-Artikel";
-"settings.wiki_rebuild" = "Wiki neu erstellen";
-"settings.wiki_rebuilding" = "Wird neu erstellt …";
+"settings.wiki_generate_missing" = "Fehlende Erstellen";
+"settings.wiki_generating_missing" = "Fehlende werden erstellt…";
+"settings.wiki_rebuild" = "Alles Neu Erstellen";
+"settings.wiki_rebuilding" = "Alles wird neu erstellt…";
+"settings.wiki_bulk_progress" = "%1$d von %2$d Meetings";
 "settings.wiki_clear" = "Wiki löschen";
-"settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt.";
+"settings.wiki_footer" = "Nutzt deinen KI-Anbieter für Zusammenfassungen, um pro Meeting einen komprimierten Artikel zu erstellen, damit das bibliotheksweite „Fragen“ Fragen beantworten kann, die mehrere Meetings umfassen oder vergleichen. Standardmäßig aus — es werden Cloud-Aufrufe getätigt. „Fehlende Erstellen“ erstellt nur Artikel, die noch nicht existieren; „Alles Neu Erstellen“ erzeugt jeden Artikel neu, auch bereits aktuelle.";
 "settings.wiki_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um das Meeting-Wiki zu erstellen.";
 "settings.correction_title" = "KI-Korrektur";
 "settings.correction" = "Transkriptionsfehler korrigieren";
 "settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter, um Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren Teilen des Transkripts nach der Transkription zu korrigieren. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
 "settings.correction_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um die KI-Korrektur zu aktivieren.";
 "detail.wiki.view" = "Wiki anzeigen";
+"detail.wiki.generate" = "Wiki Erstellen";
+"detail.wiki.regenerate" = "Wiki Neu Erstellen";
+"detail.wiki.generating" = "Wiki wird erstellt…";
 "detail.wiki.title" = "Meeting-Wiki";
 "detail.wiki.updated" = "Aktualisiert am %@";
 

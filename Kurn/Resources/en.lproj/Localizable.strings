@@ -758,16 +758,22 @@
 "settings.wiki_title" = "Meeting Wiki";
 "settings.wiki" = "Build meeting wiki";
 "settings.wiki_articles" = "Wiki articles";
-"settings.wiki_rebuild" = "Rebuild wiki";
-"settings.wiki_rebuilding" = "Rebuilding…";
+"settings.wiki_generate_missing" = "Generate Missing";
+"settings.wiki_generating_missing" = "Generating Missing…";
+"settings.wiki_rebuild" = "Rebuild All";
+"settings.wiki_rebuilding" = "Rebuilding All…";
+"settings.wiki_bulk_progress" = "%1$d of %2$d meetings";
 "settings.wiki_clear" = "Clear wiki";
-"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls.";
+"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls. \"Generate Missing\" only builds articles that don't exist yet; \"Rebuild All\" regenerates every article, including ones already up to date.";
 "settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";
 "settings.correction_title" = "AI Correction";
 "settings.correction" = "Correct transcription errors";
 "settings.correction_footer" = "Uses your summary AI provider to fix spelling, punctuation, and misheard words on uncertain parts of the transcript after transcription. Off by default — it makes cloud calls and can take longer to finish.";
 "settings.correction_needs_key" = "Add an API key for your summary provider to enable AI correction.";
 "detail.wiki.view" = "View wiki";
+"detail.wiki.generate" = "Generate Wiki";
+"detail.wiki.regenerate" = "Regenerate Wiki";
+"detail.wiki.generating" = "Generating Wiki…";
 "detail.wiki.title" = "Meeting Wiki";
 "detail.wiki.updated" = "Updated %@";
 

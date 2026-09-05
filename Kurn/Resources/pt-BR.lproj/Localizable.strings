@@ -758,16 +758,22 @@
 "settings.wiki_title" = "Wiki das Reuniões";
 "settings.wiki" = "Montar wiki das reuniões";
 "settings.wiki_articles" = "Artigos da wiki";
-"settings.wiki_rebuild" = "Recriar wiki";
-"settings.wiki_rebuilding" = "Recriando…";
+"settings.wiki_generate_missing" = "Gerar Faltantes";
+"settings.wiki_generating_missing" = "Gerando Faltantes…";
+"settings.wiki_rebuild" = "Recriar Tudo";
+"settings.wiki_rebuilding" = "Recriando Tudo…";
+"settings.wiki_bulk_progress" = "%1$d de %2$d reuniões";
 "settings.wiki_clear" = "Limpar wiki";
-"settings.wiki_footer" = "Usa o provedor de IA de resumo para montar um artigo condensado por reunião, para que o \"Perguntar\" da biblioteca responda perguntas que abrangem ou comparam várias reuniões. Desativado por padrão — faz chamadas à nuvem.";
+"settings.wiki_footer" = "Usa o provedor de IA de resumo para montar um artigo condensado por reunião, para que o \"Perguntar\" da biblioteca responda perguntas que abrangem ou comparam várias reuniões. Desativado por padrão — faz chamadas à nuvem. \"Gerar Faltantes\" cria apenas os artigos que ainda não existem; \"Recriar Tudo\" gera novamente todos os artigos, inclusive os já atualizados.";
 "settings.wiki_needs_key" = "Adicione uma chave de API para o seu provedor de resumo para montar a wiki das reuniões.";
 "settings.correction_title" = "Correção por IA";
 "settings.correction" = "Corrigir erros de transcrição";
 "settings.correction_footer" = "Usa seu provedor de IA de resumo para corrigir erros de ortografia, pontuação e palavras mal compreendidas nos trechos incertos da transcrição, após a transcrição. Desativado por padrão — ele faz chamadas na nuvem e pode levar mais tempo para concluir.";
 "settings.correction_needs_key" = "Adicione uma chave de API para o seu provedor de resumo para ativar a correção por IA.";
 "detail.wiki.view" = "Visualizar wiki";
+"detail.wiki.generate" = "Gerar Wiki";
+"detail.wiki.regenerate" = "Regenerar Wiki";
+"detail.wiki.generating" = "Gerando Wiki…";
 "detail.wiki.title" = "Wiki da Reunião";
 "detail.wiki.updated" = "Atualizada em %@";
 
