@@ -1,0 +1,33 @@
+{
+  "originHash" : "e45cfc7fb75e5690ed20936613ffa6820fb53c2e0091138128eae6287705bf72",
+  "pins" : [
+    {
+      "identity" : "fluidaudio",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/FluidInference/FluidAudio.git",
+      "state" : {
+        "revision" : "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+        "version" : "0.15.6"
+      }
+    },
+    {
+      "identity" : "onnxruntime-libs",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/csukuangfj/onnxruntime-libs",
+      "state" : {
+        "revision" : "1fbef5f2a1b5c2691fe9411243f3a8afe9a0b169",
+        "version" : "1.27.1"
+      }
+    },
+    {
+      "identity" : "sherpa-onnx",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/k2-fsa/sherpa-onnx.git",
+      "state" : {
+        "revision" : "1cb484af5e69d3c7803c1eb0b3b5ab8041e0e911",
+        "version" : "1.13.6"
+      }
+    }
+  ],
+  "version" : 3
+}
