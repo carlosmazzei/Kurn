@@ -721,6 +721,7 @@
 "error.semantic_index" = "Impossible de créer l'index sémantique : %@";
 "error.wiki_generation" = "Impossible de créer le wiki de la réunion : %@";
 "error.wiki_unavailable" = "Le wiki de la réunion n'est pas encore prêt. Réessayez une fois sa génération terminée.";
+"error.title_generation" = "Impossible de générer le titre de la réunion : %@";
 "error.embedding_no_model" = "Aucun modèle d'embedding sur l'appareil n'est disponible pour cet appareil.";
 "error.embedding_no_assets" = "Impossible de télécharger le modèle de langue sur l'appareil.";
 "tab.chat" = "Chat";
@@ -774,6 +775,9 @@
 "detail.wiki.generate" = "Générer le Wiki";
 "detail.wiki.regenerate" = "Régénérer le Wiki";
 "detail.wiki.generating" = "Génération du Wiki…";
+"detail.title.generate" = "Générer le Titre";
+"detail.title.regenerate" = "Régénérer le Titre";
+"detail.title.generating" = "Génération du Titre…";
 "detail.wiki.title" = "Wiki de la réunion";
 "detail.wiki.updated" = "Mis à jour le %@";
 

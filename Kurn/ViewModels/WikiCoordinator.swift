@@ -50,6 +50,11 @@ final class WikiCoordinator {
     /// Meetings whose article is being generated, so the UI can reflect progress
     /// and repeat requests for the same meeting coalesce instead of racing.
     private(set) var generatingMeetingIDs: Set<UUID> = []
+
+    /// Most recent failure from an *explicit* run (a per-meeting menu tap, a
+    /// bulk Settings run), for a view to surface via `.errorAlert`. Never set
+    /// by an automatic background failure — see `generate`'s catch block.
+    var lastError: AppError?
     /// True while a backfill sweep is running, so it never overlaps itself.
     private(set) var isBackfilling = false
 
@@ -118,6 +123,8 @@ final class WikiCoordinator {
         // same `SummaryService.notesTemplate` — see `SummaryMapCheckpoint`'s
         // header. A structurally invalid one is treated the same as none.
         let resumeCheckpoint = meeting.summaryMapCheckpoint.flatMap { $0.isStructurallyValid ? $0 : nil }
+        let runID = OperationID()
+        let startedAt = Date()
         do {
             let markdown = try await wikiService.generate(
                 transcriptText: text, meetingTitle: title, provider: provider, model: model,
@@ -138,9 +145,17 @@ final class WikiCoordinator {
             )
             await providerCircuitBreaker.recordSuccess(providerID: provider.id)
             AppLog.transcription.atNotice.notice("wiki: generated meeting \(meetingID, privacy: .public)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "wiki_generation",
+                outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             return .generated
         } catch is CancellationError {
             // Leave any existing article in place; a later pass retries.
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "wiki_generation",
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
             return .skipped
         } catch {
             await providerCircuitBreaker.recordFailure(
@@ -149,6 +164,18 @@ final class WikiCoordinator {
             )
             let code = (error as? AppError)?.logCode ?? "unexpected"
             AppLog.transcription.atError.error("wiki: failed for meeting \(meetingID, privacy: .public) code=\(code, privacy: .public)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "wiki_generation",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt), code: code
+            ))
+            // Only an explicit, user-initiated run surfaces its failure —
+            // an automatic background attempt stays silent-but-logged, the
+            // same "best-effort, never a user-facing error" contract
+            // `TranscriptionViewModel.generateAITitle` documents for its own
+            // automatic path.
+            if trigger == .explicit {
+                lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription)
+            }
             return .failed
         }
     }

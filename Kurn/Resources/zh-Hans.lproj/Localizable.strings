@@ -721,6 +721,7 @@
 "error.semantic_index" = "无法构建语义索引：%@";
 "error.wiki_generation" = "无法构建会议维基：%@";
 "error.wiki_unavailable" = "会议维基尚未准备好。请在生成完成后重试。";
+"error.title_generation" = "无法生成会议标题：%@";
 "error.embedding_no_model" = "此设备没有可用的设备端嵌入模型。";
 "error.embedding_no_assets" = "无法下载设备端语言模型。";
 "tab.chat" = "聊天";
@@ -774,6 +775,9 @@
 "detail.wiki.generate" = "生成维基";
 "detail.wiki.regenerate" = "重新生成维基";
 "detail.wiki.generating" = "正在生成维基…";
+"detail.title.generate" = "生成标题";
+"detail.title.regenerate" = "重新生成标题";
+"detail.title.generating" = "正在生成标题…";
 "detail.wiki.title" = "会议维基";
 "detail.wiki.updated" = "更新于 %@";
 

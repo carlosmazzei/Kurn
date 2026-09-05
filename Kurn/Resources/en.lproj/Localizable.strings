@@ -721,6 +721,7 @@
 "error.semantic_index" = "Could not build the semantic index: %@";
 "error.wiki_generation" = "Could not build the meeting wiki: %@";
 "error.wiki_unavailable" = "The meeting wiki isn't ready yet. Try again after it finishes generating.";
+"error.title_generation" = "Could not generate the meeting title: %@";
 "error.embedding_no_model" = "No on-device embedding model is available for this device.";
 "error.embedding_no_assets" = "The on-device language model could not be downloaded.";
 "tab.chat" = "Chat";
@@ -774,6 +775,9 @@
 "detail.wiki.generate" = "Generate Wiki";
 "detail.wiki.regenerate" = "Regenerate Wiki";
 "detail.wiki.generating" = "Generating Wiki…";
+"detail.title.generate" = "Generate Title";
+"detail.title.regenerate" = "Regenerate Title";
+"detail.title.generating" = "Generating Title…";
 "detail.wiki.title" = "Meeting Wiki";
 "detail.wiki.updated" = "Updated %@";
 

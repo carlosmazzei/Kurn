@@ -721,6 +721,7 @@
 "error.semantic_index" = "Der semantische Index konnte nicht erstellt werden: %@";
 "error.wiki_generation" = "Das Meeting-Wiki konnte nicht erstellt werden: %@";
 "error.wiki_unavailable" = "Das Meeting-Wiki ist noch nicht bereit. Versuche es erneut, sobald es fertig generiert ist.";
+"error.title_generation" = "Der Meeting-Titel konnte nicht generiert werden: %@";
 "error.embedding_no_model" = "Für dieses Gerät ist kein Embedding-Modell verfügbar.";
 "error.embedding_no_assets" = "Das Sprachmodell konnte nicht auf das Gerät geladen werden.";
 "tab.chat" = "Chat";
@@ -774,6 +775,9 @@
 "detail.wiki.generate" = "Wiki Erstellen";
 "detail.wiki.regenerate" = "Wiki Neu Erstellen";
 "detail.wiki.generating" = "Wiki wird erstellt…";
+"detail.title.generate" = "Titel Erstellen";
+"detail.title.regenerate" = "Titel Neu Erstellen";
+"detail.title.generating" = "Titel wird erstellt…";
 "detail.wiki.title" = "Meeting-Wiki";
 "detail.wiki.updated" = "Aktualisiert am %@";
 

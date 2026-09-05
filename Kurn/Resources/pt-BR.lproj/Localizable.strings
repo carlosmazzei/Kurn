@@ -721,6 +721,7 @@
 "error.semantic_index" = "Não foi possível montar o índice semântico: %@";
 "error.wiki_generation" = "Não foi possível montar a wiki da reunião: %@";
 "error.wiki_unavailable" = "A wiki da reunião ainda não está pronta. Tente novamente depois que ela terminar de ser gerada.";
+"error.title_generation" = "Não foi possível gerar o título da reunião: %@";
 "error.embedding_no_model" = "Nenhum modelo de embedding no dispositivo está disponível para este aparelho.";
 "error.embedding_no_assets" = "Não foi possível baixar o modelo de linguagem no dispositivo.";
 "tab.chat" = "Chat";
@@ -774,6 +775,9 @@
 "detail.wiki.generate" = "Gerar Wiki";
 "detail.wiki.regenerate" = "Regenerar Wiki";
 "detail.wiki.generating" = "Gerando Wiki…";
+"detail.title.generate" = "Gerar Título";
+"detail.title.regenerate" = "Regenerar Título";
+"detail.title.generating" = "Gerando Título…";
 "detail.wiki.title" = "Wiki da Reunião";
 "detail.wiki.updated" = "Atualizada em %@";
 

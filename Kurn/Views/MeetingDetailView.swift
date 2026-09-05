@@ -162,6 +162,8 @@ struct MeetingDetailView: View {
         }
         .errorAlert(transcriptionErrorBinding)
         .errorAlert($autoTagError)
+        .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
+        .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
         .sheet(item: $autoTagSuggestion) { suggestion in
             AutoTagConfirmView(
                 meeting: meeting,
@@ -612,6 +614,18 @@ struct MeetingDetailView: View {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
                 .accessibilityIdentifier("detail.share")
+                if canGenerateTitle {
+                    Button { regenerateTitle() } label: {
+                        if isGeneratingTitle {
+                            Label(NSLocalizedString("detail.title.generating", comment: "Generating title"), systemImage: "ellipsis")
+                        } else if meeting.aiTitle != nil {
+                            Label(NSLocalizedString("detail.title.regenerate", comment: "Regenerate title"), systemImage: "arrow.clockwise")
+                        } else {
+                            Label(NSLocalizedString("detail.title.generate", comment: "Generate title"), systemImage: "text.quote")
+                        }
+                    }
+                    .disabled(isGeneratingTitle)
+                }
                 if meeting.wikiArticle != nil {
                     Button { showingWiki = true } label: {
                         Label(

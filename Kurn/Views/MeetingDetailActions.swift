@@ -195,6 +195,24 @@ extension MeetingDetailView {
         Task { await wiki.generate(meeting, trigger: .explicit, force: true) }
     }
 
+    /// Same gate as `canGenerateWiki`, for the AI title action.
+    var canGenerateTitle: Bool {
+        hasAnyTranscript && settings.aiProvider.isUsable
+    }
+
+    var isGeneratingTitle: Bool {
+        txVM?.isGeneratingTitle(for: meeting) ?? false
+    }
+
+    /// Build (or rebuild) this meeting's AI title from its own overflow
+    /// menu — the title analogue of `regenerateWiki()` above, and for the
+    /// same reason: an automatic title that never ran (off, blocked, or the
+    /// meeting predates the feature) shouldn't need a trip anywhere else to
+    /// get one.
+    func regenerateTitle() {
+        txVM?.regenerateTitle(for: meeting, settings: settings)
+    }
+
     func generateSummary() {
         showingTemplatePicker = true
     }

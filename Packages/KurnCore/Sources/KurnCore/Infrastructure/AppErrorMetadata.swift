@@ -74,7 +74,7 @@ extension AppError {
         case .modelDownloadRequired, .modelDownloadFailed, .embeddingUnavailable, .onDeviceModelUnavailable:
             return .model
         case .autoTaggingFailed, .summaryTruncated, .generationTruncated, .semanticIndexFailed,
-             .wikiGenerationFailed, .wikiUnavailable, .documentGenerationFailed:
+             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed, .documentGenerationFailed:
             return .generation
         case .transcriptIntegrityFailed:
             return .integrity
@@ -87,7 +87,7 @@ extension AppError {
         switch self {
         case .decodingError, .resourceUnavailable, .autoTaggingFailed, .summaryTruncated,
              .generationTruncated, .logExportFailed, .embeddingUnavailable, .semanticIndexFailed,
-             .wikiGenerationFailed, .wikiUnavailable:
+             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed:
             return .warning
         default:
             return .blocking
@@ -105,7 +105,8 @@ extension AppError {
         case .networkError, .apiError, .ambiguousProviderResult, .transcriptionFailed,
              .persistenceFailed, .modelDownloadFailed, .resourceUnavailable, .authenticationFailed,
              .autoTaggingFailed, .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed,
-             .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed:
+             .titleGenerationFailed, .documentGenerationFailed, .transcriptIntegrityFailed,
+             .keychainAccessFailed:
             return true
         default:
             return false
@@ -119,7 +120,7 @@ extension AppError {
         switch self {
         case .networkError, .apiError, .ambiguousProviderResult, .transcriptionFailed,
              .persistenceFailed, .modelDownloadFailed, .authenticationFailed, .autoTaggingFailed,
-             .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed,
+             .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed, .titleGenerationFailed,
              .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed:
             return .retry
         case .noAPIKey, .invalidProviderURL, .networkPolicyRestricted, .permissionDenied,
@@ -160,6 +161,7 @@ extension AppError {
              .embeddingUnavailable(let detail),
              .semanticIndexFailed(let detail),
              .wikiGenerationFailed(let detail),
+             .titleGenerationFailed(let detail),
              .documentGenerationFailed(let detail),
              .onDeviceModelUnavailable(let detail):
             return detail
