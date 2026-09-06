@@ -91,6 +91,10 @@ struct MeetingChatView: View {
             // convenience over the whole scroll area — so `.isButton` would
             // misrepresent it to VoiceOver rather than fix anything.
             .background(
+                // This `onTapGesture` gets its own enclosing declaration
+                // (`Color.clear`, not the ScrollView above), so it needs its
+                // own disable comment even though the rationale is the same.
+                // swiftlint:disable:next accessibility_trait_for_button
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture { dismissKeyboard() }
