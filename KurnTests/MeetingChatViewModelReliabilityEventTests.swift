@@ -32,10 +32,14 @@ struct MeetingChatViewModelReliabilityEventTests {
     }
 
     /// Same defensive shape as
-    /// `MeetingChatReliabilityEventTests.appleOnDeviceProviderResolutionReliabilityMatchesAvailability`:
-    /// CI's simulator has no Apple Intelligence, so the on-device provider
-    /// deterministically fails to resolve here, but the assertion still
-    /// checks live availability rather than assuming it.
+    /// `MeetingChatReliabilityEventTests.appleOnDeviceProviderResolutionReliabilityMatchesAvailability`,
+    /// and for the same reason that test only asserts its deterministic
+    /// branch: when the device reports itself available, `send` goes on to a
+    /// real on-device generation call whose outcome CI has shown can be a
+    /// `LanguageModelSession.GenerationError` even then — not something this
+    /// test can predict. Only the "unavailable" branch (deterministic:
+    /// resolution fails with `.onDeviceModelUnavailable`, reported as one
+    /// failed "view_model" event) is asserted.
     @Test func sendReportsOneViewModelStageEventMatchingOutcome() async {
         let reason = OnDeviceModelAvailability.unavailableReason
         let capture = ReliabilityEventCapture()
@@ -54,13 +58,9 @@ struct MeetingChatViewModelReliabilityEventTests {
 
         let events = capture.recorded.filter { $0.operation == "meeting_chat" && $0.stage == "view_model" }
         #expect(events.count == 1)
-        if reason == nil {
-            #expect(events.first?.outcome == .succeeded)
-            #expect(viewModel.error == nil)
-        } else {
-            #expect(events.first?.outcome == .failed)
-            #expect(events.first?.code == "on_device_model_unavailable")
-            #expect(viewModel.error != nil)
-        }
+        guard reason != nil else { return }
+        #expect(events.first?.outcome == .failed)
+        #expect(events.first?.code == "on_device_model_unavailable")
+        #expect(viewModel.error != nil)
     }
 }
