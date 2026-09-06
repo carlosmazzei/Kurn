@@ -109,21 +109,30 @@ struct KurnModelGraphTests {
             ObjectIdentifier(SmartFolder.self),
             ObjectIdentifier(SemanticChunk.self),
             ObjectIdentifier(WikiArticle.self),
-            ObjectIdentifier(GeneratedDocument.self)
+            ObjectIdentifier(GeneratedDocument.self),
+            ObjectIdentifier(ChatSession.self)
         ]))
     }
 
-    @Test func migrationPlanDeclaresOnlyTheCurrentSchemaWithNoStagesYet() {
-        // Correct and complete for a first-ever versioned schema: there is
-        // nothing to migrate *from* yet. The next non-additive model change
-        // must add KurnSchemaV2 here rather than editing KurnSchemaV1 in place.
-        #expect(KurnSchemaMigrationPlan.schemas.count == 1)
-        #expect(KurnSchemaMigrationPlan.schemas.map { ObjectIdentifier($0) } == [ObjectIdentifier(KurnSchemaV1.self)])
-        #expect(KurnSchemaMigrationPlan.stages.isEmpty)
+    @Test func firstVersionedSchemaHasExactlyElevenModelsAndNoStages() {
+        // Historical shape, frozen: `KurnSchemaV1` describes exactly what a
+        // store created before `KurnSchemaV2` existed actually contained.
+        #expect(KurnSchemaV1.models.count == 11)
+        #expect(!KurnSchemaV1.models.contains { ObjectIdentifier($0) == ObjectIdentifier(ChatSession.self) })
+    }
+
+    @Test func migrationPlanDeclaresBothSchemasWithOneLightweightStage() {
+        // KurnSchemaV2 added ChatSession — the first real use of this plan.
+        // The next *non*-additive model change must add KurnSchemaV3 here
+        // rather than editing KurnSchemaV1/KurnSchemaV2 in place.
+        #expect(KurnSchemaMigrationPlan.schemas.map { ObjectIdentifier($0) } == [
+            ObjectIdentifier(KurnSchemaV1.self), ObjectIdentifier(KurnSchemaV2.self)
+        ])
+        #expect(KurnSchemaMigrationPlan.stages.count == 1)
     }
 
     @Test func versionedSchemaModelsMatchTheCentralizedGraph() {
-        let versionedIdentifiers = Set(KurnSchemaV1.models.map { ObjectIdentifier($0) })
+        let versionedIdentifiers = Set(KurnSchemaV2.models.map { ObjectIdentifier($0) })
         let graphIdentifiers = Set(KurnModelGraph.currentModels.map { ObjectIdentifier($0) })
         #expect(versionedIdentifiers == graphIdentifiers)
     }

@@ -751,6 +751,11 @@
 "chat.usage.cost" = "~US$ %.4f";
 "chat.usage.duration" = "%.1fs";
 "chat.phase.progress_fraction" = "(%d/%d)";
+"chat.history.title" = "Histórico de conversas";
+"chat.history.button" = "Histórico de conversas";
+"chat.history.empty.title" = "Nenhuma conversa salva";
+"chat.history.empty.subtitle" = "As conversas são salvas automaticamente ao enviar uma mensagem.";
+"chat.new.button" = "Nova conversa";
 "settings.semantic_search_title" = "Busca semântica e chat";
 "settings.semantic_search" = "Busca semântica";
 "settings.semantic_indexed_passages" = "Trechos indexados";

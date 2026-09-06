@@ -32,6 +32,7 @@ struct MeetingChatView: View {
     /// Anchor for the "thinking for Ns" live timer in `respondingRow`, reset
     /// each time a new reply starts.
     @State private var respondingStartedAt = Date()
+    @State private var showingHistory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,6 +50,41 @@ struct MeetingChatView: View {
         // keyboard avoidance instead of a hand-drawn `.bar` strip.
         .safeAreaBar(edge: .bottom) { composer }
         .errorAlert($vm.error)
+        .toolbar { historyToolbar }
+        .sheet(isPresented: $showingHistory) {
+            ChatSessionListView(
+                sessions: vm.pastSessions(),
+                currentSessionID: vm.currentSessionID,
+                onSelect: { vm.load(session: $0) },
+                onDelete: { vm.delete($0) }
+            )
+        }
+        // Wiring the persistence scope is cheap and idempotent, so redoing it
+        // on every appearance (rather than a one-shot `.task`) needs no extra
+        // state to guard against `meeting`/`modelContext` changing under it.
+        .onAppear { vm.configure(meeting: meeting, modelContext: modelContext) }
+    }
+
+    /// "New conversation" and "History" — mirrors Claude's own chat history
+    /// affordances: start fresh, or reopen a saved one. Shown regardless of
+    /// `canChat` so past conversations stay reachable even if semantic search
+    /// is currently off or unindexed.
+    @ToolbarContentBuilder
+    private var historyToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button {
+                showingHistory = true
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .accessibilityLabel(NSLocalizedString("chat.history.button", comment: "Open chat history"))
+            Button {
+                vm.reset()
+            } label: {
+                Image(systemName: "square.and.pencil")
+            }
+            .accessibilityLabel(NSLocalizedString("chat.new.button", comment: "Start a new conversation"))
+        }
     }
 
     // MARK: - Conversation

@@ -751,6 +751,11 @@
 "chat.usage.cost" = "~%.4f $ US";
 "chat.usage.duration" = "%.1f s";
 "chat.phase.progress_fraction" = "(%d/%d)";
+"chat.history.title" = "Historique des discussions";
+"chat.history.button" = "Historique des discussions";
+"chat.history.empty.title" = "Aucune conversation enregistrée";
+"chat.history.empty.subtitle" = "Les conversations sont enregistrées automatiquement dès l'envoi d'un message.";
+"chat.new.button" = "Nouvelle conversation";
 "settings.semantic_search_title" = "Recherche sémantique et chat";
 "settings.semantic_search" = "Recherche sémantique";
 "settings.semantic_indexed_passages" = "Passages indexés";

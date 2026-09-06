@@ -68,6 +68,12 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \WikiArticle.meeting)
     var wikiArticle: WikiArticle?
 
+    /// Saved "chat with your meetings" conversations scoped to this meeting.
+    /// A meeting can accumulate several, like `summaries`; cascade-deleted
+    /// with the meeting, same as every other transcript-derived artifact.
+    @Relationship(deleteRule: .cascade, inverse: \ChatSession.meeting)
+    var chatSessions: [ChatSession]
+
     /// JSON-encoded `SummaryMapCheckpoint` while a staged (map-reduce) summary
     /// or wiki generation is in flight for this meeting (SwiftData can't store
     /// arbitrary `Codable` values directly). Cleared on success; kept on
@@ -102,6 +108,7 @@ final class Meeting {
         self.summaries = []
         self.semanticChunks = []
         self.wikiArticle = nil
+        self.chatSessions = []
     }
 
     /// Convenience: whether the meeting is currently archived.
