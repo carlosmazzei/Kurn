@@ -13,6 +13,16 @@ class AccessibilityLabels
     supportsVoiceControl
     supportsVoiceover
   ].freeze
+  # App Store Connect rejects `supportsVoiceControl` outright for the
+  # APPLE_WATCH device family (Voice Control isn't a watchOS feature),
+  # regardless of the value sent.
+  UNSUPPORTED_KEYS_BY_FAMILY = {
+    "APPLE_WATCH" => %w[supportsVoiceControl]
+  }.freeze
+
+  def self.support_keys(device_family)
+    SUPPORT_KEYS - UNSUPPORTED_KEYS_BY_FAMILY.fetch(device_family, [])
+  end
 
   def self.load(path)
     config = JSON.parse(File.read(path))
@@ -22,7 +32,8 @@ class AccessibilityLabels
     raise "declarations must contain #{DEVICE_FAMILIES.join(', ')}" unless declarations.keys.sort == DEVICE_FAMILIES.sort
 
     declarations.each do |device_family, attributes|
-      raise "Invalid attributes for #{device_family}" unless attributes.keys.sort == SUPPORT_KEYS.sort
+      expected_keys = support_keys(device_family)
+      raise "Invalid attributes for #{device_family}" unless attributes.keys.sort == expected_keys.sort
       raise "All attributes for #{device_family} must be boolean" unless attributes.values.all? { |value| value == true || value == false }
     end
 
@@ -102,7 +113,7 @@ class AccessibilityLabels
       return [response.body.fetch("data"), "Created #{device_family} accessibility draft"]
     end
 
-    current = declaration.fetch("attributes").slice(*SUPPORT_KEYS)
+    current = declaration.fetch("attributes").slice(*self.class.support_keys(device_family))
     return [declaration, "#{device_family} accessibility declaration unchanged"] if current == support
 
     response = @client.patch(
