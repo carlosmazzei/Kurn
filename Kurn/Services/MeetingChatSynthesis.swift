@@ -114,6 +114,15 @@ extension MeetingChatService {
         var partials: [String] = []
         for (index, block) in blocks.enumerated() {
             try Task.checkCancellation()
+            // A large library can mean several map calls in a row with no
+            // other visible change — without this, "Reading meeting notes…"
+            // sits static long enough to read as stuck. Skipped for a single
+            // block, where there's nothing to count.
+            if blocks.count > 1 {
+                onEvent(.progress(String(format: NSLocalizedString(
+                    "chat.phase.progress_fraction", comment: "Step N of M within a chat phase"
+                ), index + 1, blocks.count)))
+            }
             let userPrompt = Self.synthesisMapPrompt(
                 question: question, articlesBlock: block, part: index + 1, total: blocks.count
             )

@@ -750,6 +750,7 @@
 "chat.usage.tokens" = "%d 个词元";
 "chat.usage.cost" = "~$%.4f";
 "chat.usage.duration" = "%.1f 秒";
+"chat.phase.progress_fraction" = "(%d/%d)";
 "settings.semantic_search_title" = "语义搜索与聊天";
 "settings.semantic_search" = "语义搜索";
 "settings.semantic_indexed_passages" = "已索引的片段";

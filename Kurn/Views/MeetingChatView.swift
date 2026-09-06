@@ -103,26 +103,35 @@ struct MeetingChatView: View {
             HStack {
                 Spacer(minLength: 40)
                 Text(turn.text)
+                    .textSelection(.enabled)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .textSelection(.enabled)
             }
         case .assistant, .system:
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .lastTextBaseline, spacing: 4) {
-                    MarkdownText(turn.text)
-                        .foregroundStyle(Theme.textPrimary)
+                    // Claude/ChatGPT-style "not yet confirmed" cue: while a
+                    // reply is streaming in, its text is plain (not
+                    // Markdown-rendered) and reads as provisional — italic
+                    // and dimmed. Rendering plain text while streaming keeps
+                    // each delta cheap to apply (no re-parsing the whole
+                    // growing string into blocks on every fragment), which is
+                    // what makes the answer actually appear incrementally
+                    // rather than in occasional bursts; the instant it's the
+                    // finished answer, it swaps to full Markdown at full
+                    // weight/opacity.
                     if isStreaming(turn) {
+                        Text(turn.text)
+                            .italic()
+                            .opacity(0.7)
                         StreamingCursor()
+                    } else {
+                        MarkdownText(turn.text)
                     }
                 }
-                // Claude/ChatGPT-style "not yet confirmed" cue: while a reply
-                // is still streaming in, its text reads as provisional —
-                // italic and dimmed — snapping to full weight/opacity the
-                // instant it's the finished answer.
-                .italic(isStreaming(turn))
-                .opacity(isStreaming(turn) ? 0.7 : 1)
+                .foregroundStyle(Theme.textPrimary)
+                .textSelection(.enabled)
                 .kurnAnimation(.easeInOut(duration: 0.2), value: isStreaming(turn))
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -131,9 +140,6 @@ struct MeetingChatView: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Theme.separator, lineWidth: 1)
                 )
-                // Selectable once it's readable at all — including mid-stream,
-                // since a slow answer is still worth copying from as it grows.
-                .textSelection(.enabled)
                 if !turn.citations.isEmpty {
                     citations(turn.citations)
                 } else if meeting != nil {
@@ -237,7 +243,7 @@ struct MeetingChatView: View {
     /// shimmer and a live elapsed-time readout, so a long wait still reads as
     /// active work rather than a stall.
     private var respondingRow: some View {
-        ThinkingRow(phase: vm.currentPhase, startedAt: respondingStartedAt)
+        ThinkingRow(phase: vm.currentPhase, detail: vm.currentPhaseDetail, startedAt: respondingStartedAt)
     }
 
     /// Shown under an unanswered question — cancelled mid-stream, or failed
@@ -478,25 +484,34 @@ private struct StreamingCursor: View {
 /// full opacity and drops the pulse entirely, matching `StreamingCursor`.
 private struct ThinkingRow: View {
     let phase: ChatPhase?
+    let detail: String?
     let startedAt: Date
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmer = false
 
+    /// Before the first `ChatPhase` arrives there's nothing to name yet, but
+    /// the row still needs an icon — reusing the platform `ProgressView`
+    /// spinner here reads as a different control from every other phase's
+    /// icon+label row that follows it. An SF Symbol in the same family (and
+    /// the same "breathing" treatment as the rest of this row) keeps the
+    /// very first moment visually consistent with the phases after it.
+    private static let defaultSystemImage = "ellipsis"
+
+    private var label: String {
+        let base = phase?.displayName ?? NSLocalizedString("chat.thinking", comment: "Assistant thinking")
+        guard let detail else { return base }
+        return "\(base) \(detail)"
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            if let phase {
-                Image(systemName: phase.systemImage)
-                    .font(.system(size: 12))
-                    .accessibilityHidden(true)
-                Text(phase.displayName)
-                    .font(Theme.footnote)
-                    .contentTransition(.opacity)
-            } else {
-                ProgressView()
-                Text(NSLocalizedString("chat.thinking", comment: "Assistant thinking"))
-                    .font(Theme.footnote)
-            }
+            Image(systemName: phase?.systemImage ?? Self.defaultSystemImage)
+                .font(.system(size: 12))
+                .accessibilityHidden(true)
+            Text(label)
+                .font(Theme.footnote)
+                .contentTransition(.opacity)
             Text(startedAt, style: .timer)
                 .font(Theme.footnote.monospacedDigit())
                 .foregroundStyle(Theme.textTertiary)
@@ -504,7 +519,7 @@ private struct ThinkingRow: View {
         }
         .foregroundStyle(Theme.textSecondary)
         .opacity(shimmer ? 0.55 : 1)
-        .kurnAnimation(.easeInOut(duration: 0.2), value: phase)
+        .kurnAnimation(.easeInOut(duration: 0.2), value: label)
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
