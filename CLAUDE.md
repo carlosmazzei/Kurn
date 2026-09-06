@@ -1561,9 +1561,9 @@ enforced by lint and by a CI audit test, not just convention:
   as a build artifact.
 - **`KurnUITests/AccessibilityAuditUITests.swift`** — runs
   `XCUIApplication.performAccessibilityAudit(for: [.sufficientElementDescription,
-  .trait])` over five screens, one test each: the meetings list
-  (`testMeetingsList`), the Meeting Detail Recordings, Transcript and Summary
-  tabs, and the Settings root. It reuses the same seeded
+  .trait])` over six screens, one test each: the meetings list
+  (`testMeetingsList`), the Meeting Detail Recordings, Transcript, Summary and
+  Chat tabs, and the Settings root. It reuses the same seeded
   `"UI-Testing-Screenshots"` launch state and identifiers as the screenshot
   tests. It's wired into the `Kurn.xcscheme`'s default `TestAction` alongside
   `KurnTests` (`KurnUITests` wasn't in the scheme before this was added, so it
@@ -1602,9 +1602,14 @@ enforced by lint and by a CI audit test, not just convention:
   `$IOS_DESTINATION`), so Watch VoiceOver is verified manually, not by CI.
   **`RecorderView` and `FolderFormView` are not audited either** — worth
   knowing before trusting the audit as a safety net, since the recorder is the
-  screen with the most icon-only controls. Adding a test for a new screen is
-  the cheap part; the audit's coverage is exactly the five tests listed above
-  and nothing more.
+  screen with the most icon-only controls. `testMeetingDetailChat` audits the
+  Chat tab's structural chrome only: seeded data carries no semantic index, so
+  the run never leaves the empty/disabled state and composer — the actual
+  conversation UI (the "thinking" reasoning row, a streaming reply, the retry
+  affordance, citation and timestamp chips) only renders once a configured
+  provider returns a real answer, so it stays a manual/on-device check. Adding
+  a test for a new screen is the cheap part; the audit's coverage is exactly
+  the six tests listed above and nothing more.
 
 ## Conventions
 
