@@ -8,7 +8,7 @@
 [![iOS CI](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml/badge.svg)](https://github.com/carlosmazzei/Kurn/actions/workflows/swift.yml)
 [![codecov](https://codecov.io/gh/carlosmazzei/Kurn/branch/main/graph/badge.svg)](https://codecov.io/gh/carlosmazzei/Kurn)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-iOS%2017%2B%20%7C%20watchOS%2010%2B-blue.svg)
+![Platform](https://img.shields.io/badge/platform-iOS%2026%2B%20%7C%20watchOS%2010%2B-blue.svg)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF.svg)
 ![Architecture](https://img.shields.io/badge/architecture-local--first-2F855A.svg)
@@ -519,36 +519,12 @@ is shared into the `KurnLiveActivityExtension` target rather than duplicated.
 ### Resilience
 
 Kurn is local-first, so a recording is usually the only copy of the audio.
-The resilience track in [`docs/roadmap.md`](docs/roadmap.md) (H1–H10) turns
-that into concrete rules the code follows:
-
-- **Capture never loses audio silently.** `AudioRecorderService` writes
-  through an `AudioSinkWriting` seam; a sink failure or stall stops the
-  recording, marks it for recovery, and emits a reliability event.
-- **The store boots or asks for help.** `ModelStoreBootCoordinator` takes a
-  pre-open backup and, if Application Support cannot be resolved or the
-  store cannot open, enters an explicit recovery screen instead of silently
-  falling back to a temporary directory. Restore/salvage/fresh-start actions
-  are only offered when a durable directory exists.
-- **File operations are journaled.** `RecordingOperationJournal` records
-  intent → trashed → committed for every destructive file operation and
-  replays it on launch; records it cannot read are quarantined under
-  `Journal/Unreadable` rather than dropped.
-- **Versioned JSON is validated.** `JSONStorage` distinguishes corruption from
-  an envelope written by a newer app version and preserves the original bytes
-  in both cases.
-- **Network and models have limits.** `ProviderCircuitBreaker` opens after
-  repeated provider failures; `ModelFileDownloader` verifies each download
-  (size plus the integrity hash the origin publishes for that transfer) and
-  installs atomically, so a failed download never replaces a working model.
-- **Concurrency has one owner.** Heavy work is admitted through
-  `withResourceReservation` on `ResourceScheduler`, which releases the
-  reservation on success, error and cancellation alike.
-- **Failures are observable and redacted.** `ReliabilityEvent`s carry an
-  operation, stage, outcome and code — never paths, titles, audio or raw error
-  text — into a bounded on-device store surfaced in Settings → Health &
-  Recovery. Public `os.Logger` lines use `Error.publicLogCode`; the static
-  policy check enforces this in CI.
+The completed H1–H10 resilience track (tracked in
+[`docs/resilience.md`](docs/resilience.md)) covers capture failures, store
+boot/recovery, journaled file operations, versioned JSON validation,
+network/model download limits, a single concurrency admission scheduler, and
+redacted on-device reliability diagnostics. See CLAUDE.md's "Durability &
+recovery" section for the concrete types and invariants.
 
 ## Important Implementation Notes
 
@@ -621,7 +597,7 @@ Kurn is released under the [MIT License](LICENSE). It includes and downloads
 third-party components under their own licenses; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Privacy
+## Privacy Policy
 
 Kurn's data handling is described in [PRIVACY.md](PRIVACY.md).
 
