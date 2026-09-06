@@ -11,6 +11,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct MeetingChatView: View {
     /// The meeting to chat about, or `nil` to ask across the whole library.
@@ -75,13 +76,26 @@ struct MeetingChatView: View {
                 .padding(.vertical, 16)
             }
             .scrollDismissesKeyboard(.interactively)
-            // Tap on the message area lowers the keyboard. `simultaneousGesture`
-            // (not `onTapGesture`) so it doesn't swallow citation-button taps or
-            // block scrolling. Not a button semantically — it's a
-            // dismiss-keyboard convenience on the whole scroll area — so
-            // `.isButton` would misrepresent it to VoiceOver rather than fix
-            // anything.
-            .simultaneousGesture(TapGesture().onEnded { inputFocused = false })
+            // A short conversation leaves most of the ScrollView's own frame
+            // as blank space below the last row — a `LazyVStack` only lays
+            // out to fit its content, so a gesture that only sees that
+            // content never gets a chance to fire there. `.background` takes
+            // the ScrollView's own (full) size regardless of content height,
+            // so this catches a tap anywhere in the visible conversation
+            // area, not just on a rendered row. `.onTapGesture` (a discrete
+            // tap, no movement) rather than the ScrollView's own drag-based
+            // scroll gesture, so it doesn't compete with scrolling; sitting
+            // behind the real content means a citation/retry button or
+            // selectable text still claims the touch first where they
+            // overlap it. Not a button semantically — it's a dismiss-keyboard
+            // convenience over the whole scroll area — so `.isButton` would
+            // misrepresent it to VoiceOver rather than fix anything.
+            .background(
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissKeyboard() }
+            )
+            .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
             .onChange(of: vm.turns.count) { _, _ in
                 guard let last = vm.turns.last else { return }
                 if reduceMotion {
@@ -375,7 +389,18 @@ struct MeetingChatView: View {
     private func send() {
         sendQuestion(input)
         input = ""
+        dismissKeyboard()
+    }
+
+    /// Resigns the composer's focus and, belt and suspenders, asks UIKit to
+    /// resign whatever is first responder. `@FocusState` alone is usually
+    /// enough, but a multi-line (`axis: .vertical`) `TextField` has had
+    /// edge cases across iOS versions where setting it from outside the
+    /// field's own update cycle doesn't reliably release the keyboard —
+    /// this doesn't depend on that working.
+    private func dismissKeyboard() {
         inputFocused = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     /// Re-sends an interrupted question. `retryableQuestion` only reports a
