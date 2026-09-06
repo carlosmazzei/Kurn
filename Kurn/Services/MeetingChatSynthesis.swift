@@ -34,7 +34,7 @@ extension MeetingChatService {
         summaries: [UUID: String],
         articles: [UUID: WikiArticleSnapshot],
         llm: LLMProvider,
-        onEvent: ChatEventHandler = { _ in },
+        onEvent: @escaping ChatEventHandler = { _ in },
         runID: OperationID
     ) async throws -> Answer {
         let passages = try await retrievePassages(
@@ -107,7 +107,7 @@ extension MeetingChatService {
         blocks: [String],
         passagesBlock: String,
         llm: LLMProvider,
-        onEvent: ChatEventHandler,
+        onEvent: @escaping ChatEventHandler,
         runID: OperationID
     ) async throws -> String {
         onEvent(.phase(.synthesizing))

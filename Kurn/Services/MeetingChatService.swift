@@ -241,7 +241,7 @@ struct MeetingChatService {
         systemPrompt: String,
         messages: [ChatMessage],
         llm: LLMProvider,
-        onEvent: ChatEventHandler,
+        onEvent: @escaping ChatEventHandler,
         runID: OperationID
     ) async throws -> String {
         onEvent(.phase(.answering))
@@ -297,7 +297,7 @@ struct MeetingChatService {
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
         llm: LLMProvider,
-        onEvent: ChatEventHandler = { _ in },
+        onEvent: @escaping ChatEventHandler = { _ in },
         runID: OperationID
     ) async throws -> Answer {
         let top = try await retrievePassages(
