@@ -39,7 +39,7 @@ package is FluidAudio.
 
 ## Commands
 
-Builds/tests require macOS with Xcode 16+. CI uses `iPhone 17` as the simulator
+Builds/tests require macOS with Xcode 26+ (the iOS 26 SDK). CI uses `iPhone 17` as the simulator
 destination (see `.github/workflows/swift.yml`); substitute an installed simulator
 name locally if needed.
 
@@ -1252,9 +1252,9 @@ microphone permission and actual capture.
 
 ### Durability & recovery (`Infrastructure/`)
 
-The resilience track (H1–H10 in `docs/roadmap.md`, detail in
-`docs/resilience-megaplan.md`) is built on a few invariants; keep them when
-touching anything that writes audio, the store, or the network:
+The resilience track (H1–H10, fully detailed in `docs/resilience.md`) is built
+on a few invariants; keep them when touching anything that writes audio, the
+store, or the network:
 
 - **The store never silently opens somewhere else.** `ModelStoreBootCoordinator`
   is a boot state machine (`KurnSchema` is the versioned SwiftData schema
