@@ -44,6 +44,11 @@ extension LLMHTTP {
             now: { clock.now },
             onPayload: onPayload
         )
+        // Short-lived, custom-delegate session needed to enforce this same
+        // origin-locked, deadline-bounded policy on a streaming response —
+        // the same shape as ProviderHTTPTransport.swift's
+        // BoundedHTTPDataDelegate, not a bypass of it.
+        // static-policy:allow custom-url-session
         let controlledSession = URLSession(
             configuration: session.configuration,
             delegate: delegate,

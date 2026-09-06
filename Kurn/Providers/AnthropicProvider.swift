@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct AnthropicProvider: LLMProvider {
     let provider: AIProvider
