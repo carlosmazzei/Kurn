@@ -1655,8 +1655,21 @@ enforced by lint and by a CI audit test, not just convention:
 - **Git & PRs:** write all commit messages and pull request titles/descriptions in
   English, regardless of the language used in chat. (User-facing app strings are
   still localized per the localization convention above — this rule is only about
-  repository metadata.)
+  repository metadata.) Use **Conventional Commits** for the commit subject line:
+  `<type>(<optional scope>): <summary>`, type one of `feat`, `fix`, `docs`,
+  `chore`, `refactor`, `test`, `perf`, `style`, `build`, `ci` — e.g.
+  `fix(chat): dismiss the keyboard on tap outside the composer`. Existing history
+  is mixed (older commits predate this rule); new commits should follow it.
 - **Do not commit directly to `main`:** create a feature branch for every change,
   push it, and open a pull request. Only merge through the GitHub PR workflow so
   CI runs before the change lands on `main`. The only exceptions are fastlane
   version/tag bumps run explicitly by a maintainer.
+- **Accessibility is not optional on any UI change:** every new icon-only
+  control needs an `.accessibilityLabel`, every view carrying a tap/long-press
+  gesture needs either an `.isButton`/`.isLink` trait or a documented
+  `// swiftlint:disable:next accessibility_trait_for_button` with the reasoning
+  (see "Accessibility" above for the existing pattern and why the disable
+  comment attributes to the *enclosing view's declaration line*, not the
+  modifier). Both rules are `severity: error` in `.swiftlint.yml` and fail CI,
+  not just warn — check this before pushing UI changes, not after `lint-and-validate`
+  fails.
