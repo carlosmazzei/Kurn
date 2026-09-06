@@ -750,6 +750,7 @@
 "chat.usage.tokens" = "%d token";
 "chat.usage.cost" = "~$%.4f";
 "chat.usage.duration" = "%.1f s";
+"chat.phase.progress_fraction" = "(%d/%d)";
 "settings.semantic_search_title" = "Ricerca semantica e chat";
 "settings.semantic_search" = "Ricerca semantica";
 "settings.semantic_indexed_passages" = "Passaggi indicizzati";

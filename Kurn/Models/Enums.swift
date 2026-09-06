@@ -148,6 +148,12 @@ enum ChatPhase: Sendable, Equatable {
 /// `TranscriptionService.PhaseHandler`.
 enum ChatStreamEvent: Sendable {
     case phase(ChatPhase)
+    /// Supplementary status detail for the current phase, e.g. "(2/5)" while
+    /// `.synthesizing` works through several map-reduce blocks of meeting
+    /// notes — so a phase that can legitimately take a while (a large
+    /// library) still visibly advances instead of sitting on one static
+    /// label. Cleared whenever the phase changes or the first delta arrives.
+    case progress(String)
     case delta(String)
 }
 

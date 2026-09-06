@@ -42,6 +42,10 @@ final class MeetingChatViewModel {
     /// once the reply starts streaming (the growing text bubble replaces it)
     /// and whenever a turn finishes, errors, or is cancelled.
     private(set) var currentPhase: ChatPhase?
+    /// Supplementary detail for `currentPhase`, e.g. "(2/5)" while a
+    /// large-library "Ask" works through several blocks of meeting notes —
+    /// see `ChatStreamEvent.progress`. Cleared alongside `currentPhase`.
+    private(set) var currentPhaseDetail: String?
     var error: AppError?
 
     private let chatService = MeetingChatService()
@@ -100,6 +104,7 @@ final class MeetingChatViewModel {
         turns.append(Turn(role: .user, text: trimmed))
         isResponding = true
         currentPhase = nil
+        currentPhaseDetail = nil
         let history = Self.buildHistory(from: Array(turns.dropLast()))
         // Streaming can append a partial assistant turn before cancellation is
         // observed (unlike the old atomic-answer flow, which only appended on
@@ -125,9 +130,13 @@ final class MeetingChatViewModel {
                 switch event {
                 case .phase(let phase):
                     self.currentPhase = phase
+                    self.currentPhaseDetail = nil
+                case .progress(let detail):
+                    self.currentPhaseDetail = detail
                 case .delta(let text):
                     if assistantIndex == nil {
                         self.currentPhase = nil
+                        self.currentPhaseDetail = nil
                         self.turns.append(Turn(role: .assistant, text: ""))
                         assistantIndex = self.turns.count - 1
                     }
@@ -210,6 +219,7 @@ final class MeetingChatViewModel {
             }
             self.isResponding = false
             self.currentPhase = nil
+            self.currentPhaseDetail = nil
             self.task = nil
         }
     }
