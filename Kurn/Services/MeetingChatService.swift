@@ -115,24 +115,33 @@ struct MeetingChatService {
         candidates: [SemanticSearchService.Candidate],
         provider: AIProvider,
         model: String,
+        runID: OperationID = OperationID(),
         onEvent: @escaping ChatEventHandler = { _ in }
     ) async throws -> Answer {
-        let trimmed = try Self.requireQuestion(question)
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let startedAt = Date()
+        let trimmed = try Self.requireQuestion(question, runID: runID)
+        let llm = try Self.resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
         let transcript = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        let answer: Answer
         if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars(for: provider) {
             let userPrompt = Self.fullContextPrompt(question: trimmed, transcript: transcript)
             let text = try await streamAnswer(
                 systemPrompt: Self.fullContextSystemPrompt,
                 messages: history + [ChatMessage(role: .user, content: userPrompt)],
-                llm: llm, onEvent: onEvent
+                llm: llm, onEvent: onEvent, runID: runID
             )
-            return Answer(text: text, citations: [])
+            answer = Answer(text: text, citations: [])
+        } else {
+            answer = try await retrievedAnswer(
+                question: trimmed, history: history, candidates: candidates, llm: llm, onEvent: onEvent, runID: runID
+            )
         }
-        return try await retrievedAnswer(
-            question: trimmed, history: history, candidates: candidates, llm: llm, onEvent: onEvent
-        )
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat",
+            outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+        ))
+        return answer
     }
 
     /// Answer across the whole library (the "Ask" sheet). Gives the model BOTH
@@ -150,14 +159,42 @@ struct MeetingChatService {
         articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
         provider: AIProvider,
         model: String,
+        runID: OperationID = OperationID(),
         onEvent: @escaping ChatEventHandler = { _ in }
     ) async throws -> Answer {
-        let trimmed = try Self.requireQuestion(question)
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
-        return try await libraryCombinedAnswer(
+        let startedAt = Date()
+        let trimmed = try Self.requireQuestion(question, runID: runID)
+        let llm = try Self.resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
+        let answer = try await libraryCombinedAnswer(
             question: trimmed, history: history, candidates: candidates,
-            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm, onEvent: onEvent
+            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm, onEvent: onEvent, runID: runID
         )
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat",
+            outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+        ))
+        return answer
+    }
+
+    /// Resolve the LLM provider, reporting a `"provider"`-stage failure (bad
+    /// key, invalid URL, on-device model unavailable) the same way
+    /// `DocumentGenerationService` reports its own provider-resolution step.
+    private static func resolveProvider(
+        provider: AIProvider,
+        model: String,
+        runID: OperationID,
+        startedAt: Date
+    ) throws -> LLMProvider {
+        do {
+            return try ProviderFactory.summaryProvider(for: provider, model: model)
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "provider",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: errorCode(error)
+            ))
+            throw error
+        }
     }
 
     // MARK: - Retrieval pipeline
@@ -195,19 +232,40 @@ struct MeetingChatService {
 
     /// Runs the final, user-visible generation call, forwarding each text
     /// delta through `onEvent` as it arrives and returning the concatenated
-    /// answer. Not `private`: reused by `MeetingChatSynthesis.swift`.
+    /// answer. Reports a `"answer"`-stage reliability event on cancellation or
+    /// failure, the same way `DocumentGenerationService.requestText` reports
+    /// its own per-call LLM failures (final success is reported once, by the
+    /// entry point, not here). Not `private`: reused by
+    /// `MeetingChatSynthesis.swift`.
     func streamAnswer(
         systemPrompt: String,
         messages: [ChatMessage],
         llm: LLMProvider,
-        onEvent: ChatEventHandler
+        onEvent: ChatEventHandler,
+        runID: OperationID
     ) async throws -> String {
         onEvent(.phase(.answering))
+        let startedAt = Date()
         let accumulator = StreamingAccumulator()
-        try await llm.streamChat(systemPrompt: systemPrompt, messages: messages) { delta in
-            guard !delta.isEmpty else { return }
-            accumulator.append(delta)
-            onEvent(.delta(delta))
+        do {
+            try await llm.streamChat(systemPrompt: systemPrompt, messages: messages) { delta in
+                guard !delta.isEmpty else { return }
+                accumulator.append(delta)
+                onEvent(.delta(delta))
+            }
+        } catch is CancellationError {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "answer",
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
+            throw CancellationError()
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "answer",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: Self.errorCode(error)
+            ))
+            throw error
         }
         return accumulator.value
     }
@@ -239,7 +297,8 @@ struct MeetingChatService {
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
         llm: LLMProvider,
-        onEvent: ChatEventHandler = { _ in }
+        onEvent: ChatEventHandler = { _ in },
+        runID: OperationID
     ) async throws -> Answer {
         let top = try await retrievePassages(
             question: question, candidates: candidates,
@@ -250,7 +309,7 @@ struct MeetingChatService {
         let text = try await streamAnswer(
             systemPrompt: Self.systemPrompt(for: .singleMeeting),
             messages: history + [ChatMessage(role: .user, content: userPrompt)],
-            llm: llm, onEvent: onEvent
+            llm: llm, onEvent: onEvent, runID: runID
         )
         return Answer(text: text, citations: top)
     }
@@ -341,15 +400,24 @@ struct MeetingChatService {
 
     // MARK: - Prompts
 
-    private static func requireQuestion(_ question: String) throws -> String {
+    private static func requireQuestion(_ question: String, runID: OperationID) throws -> String {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "validation",
+                outcome: .failed, code: "empty_question"
+            ))
             throw AppError.apiError(
                 statusCode: 0,
                 message: NSLocalizedString("chat.error.empty_question", comment: "Empty chat question")
             )
         }
         return trimmed
+    }
+
+    /// Not `private`: reused by `MeetingChatSynthesis.swift`'s own error reporting.
+    static func errorCode(_ error: Error) -> String {
+        (error as? AppError)?.logCode ?? "unexpected"
     }
 
     /// Grounding for the full-transcript path.

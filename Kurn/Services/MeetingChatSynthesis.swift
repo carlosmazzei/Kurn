@@ -21,6 +21,7 @@
 //
 
 import Foundation
+import KurnCore
 
 extension MeetingChatService {
 
@@ -33,7 +34,8 @@ extension MeetingChatService {
         summaries: [UUID: String],
         articles: [UUID: WikiArticleSnapshot],
         llm: LLMProvider,
-        onEvent: ChatEventHandler = { _ in }
+        onEvent: ChatEventHandler = { _ in },
+        runID: OperationID
     ) async throws -> Answer {
         let passages = try await retrievePassages(
             question: question, candidates: candidates,
@@ -53,7 +55,7 @@ extension MeetingChatService {
             let text = try await streamAnswer(
                 systemPrompt: Self.systemPrompt(for: .library),
                 messages: history + [ChatMessage(role: .user, content: empty)],
-                llm: llm, onEvent: onEvent
+                llm: llm, onEvent: onEvent, runID: runID
             )
             return Answer(text: text, citations: [])
         }
@@ -71,7 +73,7 @@ extension MeetingChatService {
             let text = try await streamAnswer(
                 systemPrompt: Self.combinedSystemPrompt,
                 messages: history + [ChatMessage(role: .user, content: userPrompt)],
-                llm: llm, onEvent: onEvent
+                llm: llm, onEvent: onEvent, runID: runID
             )
             return Answer(text: text, citations: passages)
         }
@@ -79,7 +81,8 @@ extension MeetingChatService {
         // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
         let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars(for: llm.provider))
         let text = try await synthesizeMapReduce(
-            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm, onEvent: onEvent
+            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm,
+            onEvent: onEvent, runID: runID
         )
         return Answer(text: text, citations: passages)
     }
@@ -104,7 +107,8 @@ extension MeetingChatService {
         blocks: [String],
         passagesBlock: String,
         llm: LLMProvider,
-        onEvent: ChatEventHandler
+        onEvent: ChatEventHandler,
+        runID: OperationID
     ) async throws -> String {
         onEvent(.phase(.synthesizing))
         var partials: [String] = []
@@ -113,10 +117,28 @@ extension MeetingChatService {
             let userPrompt = Self.synthesisMapPrompt(
                 question: question, articlesBlock: block, part: index + 1, total: blocks.count
             )
-            let partial = try await llm.chat(
-                systemPrompt: Self.synthesisMapSystemPrompt,
-                messages: [ChatMessage(role: .user, content: userPrompt)]
-            )
+            let stage = "map_\(index + 1)_of_\(blocks.count)"
+            let startedAt = Date()
+            let partial: String
+            do {
+                partial = try await llm.chat(
+                    systemPrompt: Self.synthesisMapSystemPrompt,
+                    messages: [ChatMessage(role: .user, content: userPrompt)]
+                )
+            } catch is CancellationError {
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "meeting_chat", stage: stage,
+                    outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+                ))
+                throw CancellationError()
+            } catch {
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "meeting_chat", stage: stage,
+                    outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: MeetingChatService.errorCode(error)
+                ))
+                throw error
+            }
             partials.append(partial)
         }
         try Task.checkCancellation()
@@ -129,7 +151,7 @@ extension MeetingChatService {
         return try await streamAnswer(
             systemPrompt: Self.combinedSystemPrompt,
             messages: history + [ChatMessage(role: .user, content: reducePrompt)],
-            llm: llm, onEvent: onEvent
+            llm: llm, onEvent: onEvent, runID: runID
         )
     }
 

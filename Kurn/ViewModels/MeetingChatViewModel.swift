@@ -97,6 +97,13 @@ final class MeetingChatViewModel {
         // success). Remember where the reply would start so a cancel can drop
         // it, keeping the "silently drop the pending turn" behavior intact.
         let turnCountBeforeReply = turns.count
+        // `runID` correlates every `ReliabilityEvent` this turn produces — the
+        // service's own per-stage events (validation, provider, answer) and
+        // this view model's own outcome event below — the same
+        // caller-generates-the-id convention `DocumentGenerationViewModel`
+        // uses for `DocumentGenerationService`.
+        let runID = OperationID()
+        let startedAt = Date()
 
         let (stream, continuation) = AsyncStream<ChatStreamEvent>.makeStream()
         let onEvent: MeetingChatService.ChatEventHandler = { event in
@@ -138,29 +145,53 @@ final class MeetingChatViewModel {
                 if let transcriptText {
                     answer = try await chatService.answerAboutMeeting(
                         question: trimmed, history: history, transcriptText: transcriptText,
-                        candidates: candidates, provider: provider, model: model, onEvent: onEvent
+                        candidates: candidates, provider: provider, model: model,
+                        runID: runID, onEvent: onEvent
                     )
                 } else {
                     answer = try await chatService.answerAcrossLibrary(
                         question: trimmed, history: history, candidates: candidates,
                         summariesByMeeting: summariesByMeeting, articlesByMeeting: articlesByMeeting,
-                        provider: provider, model: model, onEvent: onEvent
+                        provider: provider, model: model, runID: runID, onEvent: onEvent
                     )
                 }
                 await drainEvents()
                 self.applyFinal(answer)
+                // Reported at "view_model" stage, distinct from the service's
+                // own unstaged success event — the same two-tier shape
+                // `DocumentGenerationViewModel`/`DocumentGenerationService`
+                // use (one signal per layer: did the API call succeed, did
+                // the whole user-visible round trip succeed).
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "meeting_chat", stage: "view_model",
+                    outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+                ))
             } catch is CancellationError {
                 // User cancelled; drop whatever streamed in so far, silently.
                 await drainEvents()
                 if self.turns.count > turnCountBeforeReply {
                     self.turns.removeLast(self.turns.count - turnCountBeforeReply)
                 }
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "meeting_chat", stage: "view_model",
+                    outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+                ))
             } catch let appError as AppError {
                 await drainEvents()
                 self.error = appError
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "meeting_chat", stage: "view_model",
+                    outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: appError.logCode
+                ))
             } catch {
                 await drainEvents()
                 self.error = .apiError(statusCode: 0, message: error.localizedDescription)
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: runID, operation: "meeting_chat", stage: "view_model",
+                    outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: "unexpected"
+                ))
             }
             self.isResponding = false
             self.currentPhase = nil
