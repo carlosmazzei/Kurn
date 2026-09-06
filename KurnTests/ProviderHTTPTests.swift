@@ -671,4 +671,59 @@ struct ProviderHTTPTests {
             Issue.record("unexpected error: \(error)")
         }
     }
+
+    // MARK: - Chat (streaming token usage)
+
+    @Test func openAIStreamChatReportsUsageFromTheFinalChoicelessChunk() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"choices":[{"delta":{"content":"Hi."}}]}"#,
+                #"{"choices":[],"usage":{"prompt_tokens":42,"completion_tokens":7,"total_tokens":49}}"#
+            ]), headers: [:])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        let usage = try await provider.streamChat(
+            systemPrompt: "sys", messages: [ChatMessage(role: .user, content: "hi")], options: .chat
+        ) { _ in }
+
+        #expect(usage == TokenUsage(promptTokens: 42, completionTokens: 7))
+        let request = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        let streamOptions = body?["stream_options"] as? [String: Any]
+        #expect(streamOptions?["include_usage"] as? Bool == true)
+    }
+
+    @Test func anthropicStreamChatMergesUsageFromMessageStartAndMessageDelta() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"type":"message_start","message":{"usage":{"input_tokens":30}}}"#,
+                #"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi."}}"#,
+                #"{"type":"message_delta","delta":{},"usage":{"output_tokens":5}}"#
+            ]), headers: [:])
+        ])
+        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+
+        let usage = try await provider.streamChat(
+            systemPrompt: "sys", messages: [ChatMessage(role: .user, content: "hi")], options: .chat
+        ) { _ in }
+
+        #expect(usage == TokenUsage(promptTokens: 30, completionTokens: 5))
+    }
+
+    @Test func googleStreamChatReportsTheLastUsageMetadataSeen() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"candidates":[{"content":{"parts":[{"text":"Hi"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":1}}"#,
+                #"{"candidates":[{"content":{"parts":[{"text":"."}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2}}"#
+            ]), headers: [:])
+        ])
+        let provider = GoogleProvider(apiKey: "gk", session: MockURLProtocol.session())
+
+        let usage = try await provider.streamChat(
+            systemPrompt: "sys", messages: [ChatMessage(role: .user, content: "hi")], options: .chat
+        ) { _ in }
+
+        #expect(usage == TokenUsage(promptTokens: 10, completionTokens: 2))
+    }
 }

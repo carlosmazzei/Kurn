@@ -746,6 +746,10 @@
 "chat.no_index.title" = "暂时没有可聊天的内容";
 "chat.no_index.subtitle" = "请先转录一次会议，然后就所说内容提问。";
 "chat.ask.title" = "询问你的会议";
+"chat.retry" = "重试";
+"chat.usage.tokens" = "%d 个词元";
+"chat.usage.cost" = "~$%.4f";
+"chat.usage.duration" = "%.1f 秒";
 "settings.semantic_search_title" = "语义搜索与聊天";
 "settings.semantic_search" = "语义搜索";
 "settings.semantic_indexed_passages" = "已索引的片段";

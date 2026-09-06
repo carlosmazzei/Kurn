@@ -90,6 +90,35 @@ final class StreamingAccumulator: @unchecked Sendable {
     var receivedText: Bool { lock.withLock { !text.isEmpty } }
 }
 
+/// Thread-safe accumulator for the token usage a streaming response reports —
+/// usually once, in a final chunk or event distinct from the text deltas
+/// themselves (OpenAI's last `data:` line, Anthropic's `message_delta`
+/// event, Gemini's per-chunk `usageMetadata`). Same shape as
+/// `StreamingAccumulator` and for the same reason: usage callbacks arrive
+/// from a URLSession delegate queue, so folding them into one value needs
+/// something the compiler can see is safe across the `@Sendable` closure
+/// boundary. `set` overwrites only the fields it's given, since some vendors
+/// report prompt and completion counts in separate events.
+final class UsageAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var promptTokens: Int?
+    private var completionTokens: Int?
+
+    func set(promptTokens: Int? = nil, completionTokens: Int? = nil) {
+        lock.withLock {
+            if let promptTokens { self.promptTokens = promptTokens }
+            if let completionTokens { self.completionTokens = completionTokens }
+        }
+    }
+
+    var value: TokenUsage? {
+        lock.withLock {
+            guard promptTokens != nil || completionTokens != nil else { return nil }
+            return TokenUsage(promptTokens: promptTokens ?? 0, completionTokens: completionTokens ?? 0)
+        }
+    }
+}
+
 /// Drives one streaming request and incrementally parses its
 /// `text/event-stream` body into SSE payload lines, forwarding each through
 /// `onPayload`. Mirrors `BoundedHTTPDataDelegate`'s redirect lock, deadline,
