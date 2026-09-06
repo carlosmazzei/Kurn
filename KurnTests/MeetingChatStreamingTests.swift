@@ -24,11 +24,13 @@ private final class ScriptedStreamingLLM: LLMProvider, @unchecked Sendable {
     private let deltas: [String]
     private let failure: Error?
     private let cancels: Bool
+    private let usage: TokenUsage?
 
-    init(deltas: [String] = [], failure: Error? = nil, cancels: Bool = false) {
+    init(deltas: [String] = [], failure: Error? = nil, cancels: Bool = false, usage: TokenUsage? = nil) {
         self.deltas = deltas
         self.failure = failure
         self.cancels = cancels
+        self.usage = usage
     }
 
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
@@ -44,10 +46,11 @@ private final class ScriptedStreamingLLM: LLMProvider, @unchecked Sendable {
         messages: [ChatMessage],
         options: TextGenerationOptions,
         onDelta: @escaping @Sendable (String) -> Void
-    ) async throws {
+    ) async throws -> TokenUsage? {
         if cancels { throw CancellationError() }
         if let failure { throw failure }
         for delta in deltas { onDelta(delta) }
+        return usage
     }
 }
 
@@ -71,7 +74,7 @@ struct MeetingChatStreamingTests {
         let llm = ScriptedStreamingLLM(deltas: ["Hello", ", ", "world."])
         let service = MeetingChatService()
 
-        let text = try await service.streamAnswer(
+        let result = try await service.streamAnswer(
             systemPrompt: "sys",
             messages: [ChatMessage(role: .user, content: "hi")],
             llm: llm,
@@ -79,7 +82,8 @@ struct MeetingChatStreamingTests {
             runID: OperationID()
         )
 
-        #expect(text == "Hello, world.")
+        #expect(result.text == "Hello, world.")
+        #expect(result.usage == nil)
         let events = recorder.recorded
         guard case .phase(.answering) = events.first else {
             Issue.record("expected the first event to be .phase(.answering), got \(events)")
@@ -90,6 +94,25 @@ struct MeetingChatStreamingTests {
             return nil
         }
         #expect(deltas == ["Hello", ", ", "world."])
+    }
+
+    @Test func forwardsTheProviderReportedUsage() async throws {
+        let llm = ScriptedStreamingLLM(
+            deltas: ["An answer."],
+            usage: TokenUsage(promptTokens: 120, completionTokens: 40)
+        )
+        let service = MeetingChatService()
+
+        let result = try await service.streamAnswer(
+            systemPrompt: "sys",
+            messages: [ChatMessage(role: .user, content: "hi")],
+            llm: llm,
+            onEvent: { _ in },
+            runID: OperationID()
+        )
+
+        #expect(result.usage == TokenUsage(promptTokens: 120, completionTokens: 40))
+        #expect(result.usage?.totalTokens == 160)
     }
 
     @Test func failureReportsOneFailedAnswerStageEvent() async {

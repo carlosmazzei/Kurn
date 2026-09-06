@@ -746,6 +746,10 @@
 "chat.no_index.title" = "Nothing to chat about yet";
 "chat.no_index.subtitle" = "Transcribe a meeting first, then ask questions about what was said.";
 "chat.ask.title" = "Ask your meetings";
+"chat.retry" = "Retry";
+"chat.usage.tokens" = "%d tokens";
+"chat.usage.cost" = "~$%.4f";
+"chat.usage.duration" = "%.1fs";
 "settings.semantic_search_title" = "Semantic Search & Chat";
 "settings.semantic_search" = "Semantic search";
 "settings.semantic_indexed_passages" = "Indexed passages";

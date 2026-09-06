@@ -47,6 +47,18 @@ struct TextGenerationOptions: Sendable, Equatable {
     )
 }
 
+/// Token counts a provider reported for one `streamChat` call, when the
+/// vendor's API exposes them. Never estimated or inferred locally — only
+/// what the provider itself returned in-band with the response, so a cost
+/// estimate built on it (`ModelPricing`) inherits the same accuracy the
+/// vendor's own billing does. `nil` at the call site (rather than this type)
+/// is how "this vendor/response didn't report usage" is expressed.
+struct TokenUsage: Sendable, Equatable {
+    let promptTokens: Int
+    let completionTokens: Int
+    var totalTokens: Int { promptTokens + completionTokens }
+}
+
 protocol LLMProvider: Sendable {
     /// Vendor this provider represents.
     var provider: AIProvider { get }
@@ -82,12 +94,17 @@ protocol LLMProvider: Sendable {
     /// itself. A conformer with no true streaming transport falls back to the
     /// `LLMProvider` extension's default below, which just delivers the whole
     /// `chat` reply as one fragment — still correct, just not incremental.
+    /// Returns the token usage the vendor reported for this call, when its
+    /// streaming response exposed one — `nil` for a vendor/response that
+    /// didn't. This is the only place `streamChat` reports anything beyond
+    /// text: never estimated locally, only relayed from the provider.
+    @discardableResult
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
         options: TextGenerationOptions,
         onDelta: @escaping @Sendable (String) -> Void
-    ) async throws
+    ) async throws -> TokenUsage?
 }
 
 extension LLMProvider {
@@ -102,24 +119,28 @@ extension LLMProvider {
         try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
     }
 
+    @discardableResult
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
         onDelta: @escaping @Sendable (String) -> Void
-    ) async throws {
+    ) async throws -> TokenUsage? {
         try await streamChat(systemPrompt: systemPrompt, messages: messages, options: .chat, onDelta: onDelta)
     }
 
     /// Default streaming implementation: awaits the whole `chat` reply and
     /// delivers it as one fragment. Correct for any conformer (including test
-    /// doubles that only implement `chat`), just not incremental.
+    /// doubles that only implement `chat`), just not incremental — and `chat`
+    /// exposes no usage, so this always reports `nil` rather than guessing.
+    @discardableResult
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
         options: TextGenerationOptions,
         onDelta: @escaping @Sendable (String) -> Void
-    ) async throws {
+    ) async throws -> TokenUsage? {
         let text = try await chat(systemPrompt: systemPrompt, messages: messages, options: options)
         onDelta(text)
+        return nil
     }
 }

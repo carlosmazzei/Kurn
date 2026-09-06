@@ -746,6 +746,10 @@
 "chat.no_index.title" = "Noch nichts zum Chatten";
 "chat.no_index.subtitle" = "Transkribiere zuerst ein Meeting und stelle dann Fragen zum Gesagten.";
 "chat.ask.title" = "Frag deine Meetings";
+"chat.retry" = "Erneut versuchen";
+"chat.usage.tokens" = "%d Token";
+"chat.usage.cost" = "~%.4f $";
+"chat.usage.duration" = "%.1f s";
 "settings.semantic_search_title" = "Semantische Suche & Chat";
 "settings.semantic_search" = "Semantische Suche";
 "settings.semantic_indexed_passages" = "Indizierte Passagen";

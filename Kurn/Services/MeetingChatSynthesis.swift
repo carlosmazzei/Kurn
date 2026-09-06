@@ -52,12 +52,12 @@ extension MeetingChatService {
 
         guard !passages.isEmpty || !selected.isEmpty else {
             let empty = Self.userPrompt(question: question, hits: [], scope: .library, summaries: [:])
-            let text = try await streamAnswer(
+            let result = try await streamAnswer(
                 systemPrompt: Self.systemPrompt(for: .library),
                 messages: history + [ChatMessage(role: .user, content: empty)],
                 llm: llm, onEvent: onEvent, runID: runID
             )
-            return Answer(text: text, citations: [])
+            return Answer(text: result.text, citations: [], usage: result.usage)
         }
 
         let rendered = selected.map(Self.renderArticle)
@@ -70,21 +70,21 @@ extension MeetingChatService {
 
         // Fits in one pass → a single call that can quote and aggregate directly.
         if userPrompt.count <= SummaryService.maxSinglePassChars(for: llm.provider) {
-            let text = try await streamAnswer(
+            let result = try await streamAnswer(
                 systemPrompt: Self.combinedSystemPrompt,
                 messages: history + [ChatMessage(role: .user, content: userPrompt)],
                 llm: llm, onEvent: onEvent, runID: runID
             )
-            return Answer(text: text, citations: passages)
+            return Answer(text: result.text, citations: passages, usage: result.usage)
         }
 
         // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
         let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars(for: llm.provider))
-        let text = try await synthesizeMapReduce(
+        let result = try await synthesizeMapReduce(
             question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm,
             onEvent: onEvent, runID: runID
         )
-        return Answer(text: text, citations: passages)
+        return Answer(text: result.text, citations: passages, usage: result.usage)
     }
 
     // MARK: - Article selection
@@ -109,7 +109,7 @@ extension MeetingChatService {
         llm: LLMProvider,
         onEvent: @escaping ChatEventHandler,
         runID: OperationID
-    ) async throws -> String {
+    ) async throws -> (text: String, usage: TokenUsage?) {
         onEvent(.phase(.synthesizing))
         var partials: [String] = []
         for (index, block) in blocks.enumerated() {

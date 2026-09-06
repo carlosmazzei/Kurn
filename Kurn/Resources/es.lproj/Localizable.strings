@@ -746,6 +746,10 @@
 "chat.no_index.title" = "Aún no hay nada de qué hablar";
 "chat.no_index.subtitle" = "Transcribe una reunión primero y luego haz preguntas sobre lo que se dijo.";
 "chat.ask.title" = "Pregunta a tus reuniones";
+"chat.retry" = "Reintentar";
+"chat.usage.tokens" = "%d tokens";
+"chat.usage.cost" = "~US$ %.4f";
+"chat.usage.duration" = "%.1fs";
 "settings.semantic_search_title" = "Búsqueda semántica y chat";
 "settings.semantic_search" = "Búsqueda semántica";
 "settings.semantic_indexed_passages" = "Fragmentos indexados";

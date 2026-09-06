@@ -118,12 +118,13 @@ struct GoogleProvider: LLMProvider {
 
     // MARK: - Chat (streamGenerateContent, streaming)
 
+    @discardableResult
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
         options: TextGenerationOptions,
         onDelta: @escaping @Sendable (String) -> Void
-    ) async throws {
+    ) async throws -> TokenUsage? {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
         var contents: [[String: Any]] = []
@@ -147,20 +148,29 @@ struct GoogleProvider: LLMProvider {
         )
 
         let accumulator = StreamingAccumulator()
+        let usage = UsageAccumulator()
         try await LLMHTTP.streamSSE(
             request,
             session: session,
             policy: .interactive(totalDeadline: options.timeout)
         ) { payload in
             guard let data = payload.data(using: .utf8),
-                  let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data),
-                  let delta = Self.text(from: chunk), !delta.isEmpty else { return }
-            accumulator.append(delta)
-            onDelta(delta)
+                  let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data) else { return }
+            if let delta = Self.text(from: chunk), !delta.isEmpty {
+                accumulator.append(delta)
+                onDelta(delta)
+            }
+            // Each chunk repeats Gemini's running cumulative counts, so the
+            // last chunk that carries one is the final tally — overwriting on
+            // every occurrence rather than only the first gets that for free.
+            if let metadata = chunk.usageMetadata {
+                usage.set(promptTokens: metadata.promptTokenCount, completionTokens: metadata.candidatesTokenCount)
+            }
         }
         guard accumulator.receivedText else {
             throw AppError.decodingError("empty Gemini response")
         }
+        return usage.value
     }
 
     // MARK: - Helpers
@@ -210,6 +220,14 @@ struct GoogleProvider: LLMProvider {
 
 private struct GeminiResponse: Decodable {
     let candidates: [GeminiCandidate]?
+    let usageMetadata: GeminiUsageMetadata?
+}
+
+/// Gemini reports cumulative token counts on (typically) every streamed
+/// chunk rather than once at the end, unlike OpenAI/Anthropic.
+private struct GeminiUsageMetadata: Decodable {
+    let promptTokenCount: Int?
+    let candidatesTokenCount: Int?
 }
 
 private struct GeminiCandidate: Decodable {

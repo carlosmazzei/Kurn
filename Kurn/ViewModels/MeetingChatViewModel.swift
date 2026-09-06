@@ -24,6 +24,15 @@ final class MeetingChatViewModel {
         let role: ChatMessage.Role
         var text: String
         var citations: [SemanticSearchService.Hit] = []
+        /// Token usage the provider reported for this reply, and its
+        /// estimated USD cost (`ModelPricing`, `nil` for an unrecognized
+        /// model) — both `nil` until the reply finishes, and permanently
+        /// `nil` for a provider/response that never reports usage.
+        var usage: TokenUsage?
+        var costUSD: Double?
+        /// Wall-clock time the reply took to fully generate, set once it
+        /// finishes.
+        var elapsedSeconds: TimeInterval?
     }
 
     private(set) var turns: [Turn] = []
@@ -156,7 +165,7 @@ final class MeetingChatViewModel {
                     )
                 }
                 await drainEvents()
-                self.applyFinal(answer)
+                self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt))
                 // Reported at "view_model" stage, distinct from the service's
                 // own unstaged success event — the same two-tier shape
                 // `DocumentGenerationViewModel`/`DocumentGenerationService`
@@ -168,16 +177,21 @@ final class MeetingChatViewModel {
                 ))
             } catch is CancellationError {
                 // User cancelled; drop whatever streamed in so far, silently.
+                // Leaving the question turn in place is what makes it
+                // `retryableQuestion` afterward.
                 await drainEvents()
-                if self.turns.count > turnCountBeforeReply {
-                    self.turns.removeLast(self.turns.count - turnCountBeforeReply)
-                }
+                self.dropPartialReply(keeping: turnCountBeforeReply)
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
                 ))
             } catch let appError as AppError {
+                // Same drop as cancellation: a half-streamed answer next to
+                // an error alert reads as a broken reply, not a retryable
+                // question, so `retryableQuestion` needs the turn list back
+                // at just the question for this to be one clean asset.
                 await drainEvents()
+                self.dropPartialReply(keeping: turnCountBeforeReply)
                 self.error = appError
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
@@ -186,6 +200,7 @@ final class MeetingChatViewModel {
                 ))
             } catch {
                 await drainEvents()
+                self.dropPartialReply(keeping: turnCountBeforeReply)
                 self.error = .apiError(statusCode: 0, message: error.localizedDescription)
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
@@ -202,10 +217,43 @@ final class MeetingChatViewModel {
     /// Replace the streamed-in assistant text with the service's final answer
     /// (they should already match) and attach its citations, which only
     /// arrive with the completed `Answer` — streaming deltas carry text only.
-    private func applyFinal(_ answer: MeetingChatService.Answer) {
+    /// Also attaches the provider's token usage (if it reported one), the
+    /// estimated cost that implies under `model`, and how long the reply
+    /// took to generate.
+    private func applyFinal(_ answer: MeetingChatService.Answer, model: String, elapsed: TimeInterval) {
         guard let index = turns.lastIndex(where: { $0.role == .assistant }) else { return }
         turns[index].text = answer.text
         turns[index].citations = answer.citations
+        turns[index].usage = answer.usage
+        turns[index].elapsedSeconds = elapsed
+        turns[index].costUSD = answer.usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
+    }
+
+    /// Removes any turn appended after `count` — the partial assistant reply
+    /// a cancellation or failure leaves behind — so the conversation reads as
+    /// "the question is still unanswered" rather than a broken half-answer
+    /// sitting next to an error. Leaves the question turn itself untouched.
+    private func dropPartialReply(keeping count: Int) {
+        guard turns.count > count else { return }
+        turns.removeLast(turns.count - count)
+    }
+
+    /// The question of the most recent turn when it ended without a reply —
+    /// cancelled or failed before (or without) producing an answer — mirroring
+    /// the retry affordance Claude/ChatGPT-style chat UIs show under an
+    /// interrupted turn. `nil` while a reply is in flight or once the last
+    /// turn has a real answer.
+    var retryableQuestion: String? {
+        guard !isResponding, let last = turns.last, last.role == .user else { return nil }
+        return last.text
+    }
+
+    /// Removes the trailing unanswered user turn so a retry can re-send it
+    /// without leaving a duplicate question bubble behind. No-op unless
+    /// `retryableQuestion` is non-nil.
+    func dropRetryableQuestion() {
+        guard retryableQuestion != nil else { return }
+        turns.removeLast()
     }
 
     /// Prior turns as chat history. Turns are plain text to keep token cost

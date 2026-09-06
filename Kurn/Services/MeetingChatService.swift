@@ -41,6 +41,16 @@ struct MeetingChatService {
     struct Answer: Sendable {
         var text: String
         var citations: [SemanticSearchService.Hit]
+        /// Token usage the provider reported for the final generation call,
+        /// when it exposed one. `nil` for the on-device provider (no usage
+        /// concept) or a cloud response that didn't report it.
+        var usage: TokenUsage?
+
+        init(text: String, citations: [SemanticSearchService.Hit], usage: TokenUsage? = nil) {
+            self.text = text
+            self.citations = citations
+            self.usage = usage
+        }
     }
 
     /// Whether retrieval is grounding a single meeting or the whole library.
@@ -126,12 +136,12 @@ struct MeetingChatService {
         let answer: Answer
         if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars(for: provider) {
             let userPrompt = Self.fullContextPrompt(question: trimmed, transcript: transcript)
-            let text = try await streamAnswer(
+            let result = try await streamAnswer(
                 systemPrompt: Self.fullContextSystemPrompt,
                 messages: history + [ChatMessage(role: .user, content: userPrompt)],
                 llm: llm, onEvent: onEvent, runID: runID
             )
-            answer = Answer(text: text, citations: [])
+            answer = Answer(text: result.text, citations: [], usage: result.usage)
         } else {
             answer = try await retrievedAnswer(
                 question: trimmed, history: history, candidates: candidates, llm: llm, onEvent: onEvent, runID: runID
@@ -243,12 +253,13 @@ struct MeetingChatService {
         llm: LLMProvider,
         onEvent: @escaping ChatEventHandler,
         runID: OperationID
-    ) async throws -> String {
+    ) async throws -> (text: String, usage: TokenUsage?) {
         onEvent(.phase(.answering))
         let startedAt = Date()
         let accumulator = StreamingAccumulator()
+        let usage: TokenUsage?
         do {
-            try await llm.streamChat(systemPrompt: systemPrompt, messages: messages) { delta in
+            usage = try await llm.streamChat(systemPrompt: systemPrompt, messages: messages) { delta in
                 guard !delta.isEmpty else { return }
                 accumulator.append(delta)
                 onEvent(.delta(delta))
@@ -267,7 +278,7 @@ struct MeetingChatService {
             ))
             throw error
         }
-        return accumulator.value
+        return (accumulator.value, usage)
     }
 
     /// Distinct meetings whose best passage is semantically relevant to the
@@ -306,12 +317,12 @@ struct MeetingChatService {
             onEvent: onEvent
         )
         let userPrompt = Self.userPrompt(question: question, hits: top, scope: .singleMeeting, summaries: [:])
-        let text = try await streamAnswer(
+        let result = try await streamAnswer(
             systemPrompt: Self.systemPrompt(for: .singleMeeting),
             messages: history + [ChatMessage(role: .user, content: userPrompt)],
             llm: llm, onEvent: onEvent, runID: runID
         )
-        return Answer(text: text, citations: top)
+        return Answer(text: result.text, citations: top, usage: result.usage)
     }
 
     /// One LLM call producing extra search terms / a hypothetical answer sentence
