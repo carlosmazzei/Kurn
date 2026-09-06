@@ -96,29 +96,38 @@ struct AnthropicProvider: LLMProvider {
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
-        options: TextGenerationOptions
-    ) -> AsyncThrowingStream<String, Error> {
-        LLMHTTP.streamChatDeltas(
-            session: session,
-            emptyMessage: "empty Anthropic response",
-            makeRequest: {
-                try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-                let wire = messages
-                    .filter { $0.role != .system }
-                    .map { ["role": $0.role.rawValue, "content": $0.content] }
-                return try makeRequest(
-                    timeout: options.timeout,
-                    body: [
-                        "model": model,
-                        "max_tokens": options.maxOutputTokens,
-                        "system": systemPrompt,
-                        "messages": wire,
-                        "stream": true
-                    ]
-                )
-            },
-            mapPayload: Self.textDelta
+        options: TextGenerationOptions,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        let wire = messages
+            .filter { $0.role != .system }
+            .map { ["role": $0.role.rawValue, "content": $0.content] }
+        let request = try makeRequest(
+            timeout: options.timeout,
+            body: [
+                "model": model,
+                "max_tokens": options.maxOutputTokens,
+                "system": systemPrompt,
+                "messages": wire,
+                "stream": true
+            ]
         )
+
+        let accumulator = StreamingAccumulator()
+        try await LLMHTTP.streamSSE(
+            request,
+            session: session,
+            policy: .interactive(totalDeadline: options.timeout)
+        ) { payload in
+            guard let delta = try Self.textDelta(from: payload), !delta.isEmpty else { return }
+            accumulator.append(delta)
+            onDelta(delta)
+        }
+        guard accumulator.receivedText else {
+            throw AppError.decodingError("empty Anthropic response")
+        }
     }
 
     /// One SSE event's incremental text. Anthropic's stream carries several

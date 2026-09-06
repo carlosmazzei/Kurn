@@ -11,17 +11,22 @@ extension LLMHTTP {
         validatedBaseURLComponents(baseURLString) != nil
     }
 
-    static func endpoint(baseURLString: String, path: String) -> URL? {
+    static func endpoint(baseURLString: String, path: String, queryItems: [URLQueryItem] = []) -> URL? {
         guard var components = validatedBaseURLComponents(baseURLString),
               !containsUnsafePath(path) else { return nil }
         let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let endpointPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         components.path = "/" + [basePath, endpointPath].filter { !$0.isEmpty }.joined(separator: "/")
+        // Only ever appended here, after the base URL itself has already
+        // been validated query-free above — this is an internal transport
+        // detail (e.g. Gemini's `alt=sse`), never something the user's
+        // configured base URL supplies.
+        if !queryItems.isEmpty { components.queryItems = queryItems }
         return components.url
     }
 
-    static func requireEndpoint(provider: AIProvider, path: String) throws -> URL {
-        guard let url = endpoint(baseURLString: provider.baseURLString, path: path) else {
+    static func requireEndpoint(provider: AIProvider, path: String, queryItems: [URLQueryItem] = []) throws -> URL {
+        guard let url = endpoint(baseURLString: provider.baseURLString, path: path, queryItems: queryItems) else {
             throw AppError.invalidProviderURL
         }
         return url
@@ -52,9 +57,10 @@ extension LLMHTTP {
         path: String,
         timeout: TimeInterval,
         headers: [String: String],
+        queryItems: [URLQueryItem] = [],
         body: [String: Any]
     ) throws -> URLRequest {
-        var request = URLRequest(url: try requireEndpoint(provider: provider, path: path))
+        var request = URLRequest(url: try requireEndpoint(provider: provider, path: path, queryItems: queryItems))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

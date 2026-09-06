@@ -203,13 +203,13 @@ struct MeetingChatService {
         onEvent: ChatEventHandler
     ) async throws -> String {
         onEvent(.phase(.answering))
-        var text = ""
-        for try await delta in llm.streamChat(systemPrompt: systemPrompt, messages: messages) {
-            guard !delta.isEmpty else { continue }
-            text += delta
+        let accumulator = StreamingAccumulator()
+        try await llm.streamChat(systemPrompt: systemPrompt, messages: messages) { delta in
+            guard !delta.isEmpty else { return }
+            accumulator.append(delta)
             onEvent(.delta(delta))
         }
-        return text
+        return accumulator.value
     }
 
     /// Distinct meetings whose best passage is semantically relevant to the
