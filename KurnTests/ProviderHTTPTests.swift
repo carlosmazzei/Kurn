@@ -558,14 +558,14 @@ struct ProviderHTTPTests {
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-test", session: MockURLProtocol.session())
 
-        var received = ""
+        let received = StreamingAccumulator()
         try await provider.streamChat(
             systemPrompt: "sys",
             messages: [ChatMessage(role: .user, content: "hi")],
             options: .chat
-        ) { delta in received += delta }
+        ) { delta in received.append(delta) }
 
-        #expect(received == "Hello, world.")
+        #expect(received.value == "Hello, world.")
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["stream"] as? Bool == true)
@@ -595,14 +595,14 @@ struct ProviderHTTPTests {
         ])
         let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
 
-        var received = ""
+        let received = StreamingAccumulator()
         try await provider.streamChat(
             systemPrompt: "sys",
             messages: [ChatMessage(role: .user, content: "hi")],
             options: .chat
-        ) { delta in received += delta }
+        ) { delta in received.append(delta) }
 
-        #expect(received == "Grounded.")
+        #expect(received.value == "Grounded.")
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["stream"] as? Bool == true)
@@ -639,14 +639,14 @@ struct ProviderHTTPTests {
         ])
         let provider = GoogleProvider(apiKey: "gk", session: MockURLProtocol.session())
 
-        var received = ""
+        let received = StreamingAccumulator()
         try await provider.streamChat(
             systemPrompt: "sys",
             messages: [ChatMessage(role: .user, content: "hi")],
             options: .chat
-        ) { delta in received += delta }
+        ) { delta in received.append(delta) }
 
-        #expect(received == "Gemini reply.")
+        #expect(received.value == "Gemini reply.")
         let request = try #require(MockURLProtocol.lastRequest)
         #expect(request.url?.absoluteString.contains("streamGenerateContent") == true)
         #expect(request.url?.query == "alt=sse")
