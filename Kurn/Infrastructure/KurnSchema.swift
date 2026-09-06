@@ -48,18 +48,48 @@ enum KurnSchemaV1: VersionedSchema {
     }
 }
 
-/// The app's migration plan. A single schema with no stages is the correct,
-/// documented shape for "this is the first version we've ever declared" —
-/// there is nothing to migrate *from* yet. The next non-additive model change
-/// adds `KurnSchemaV2` to `schemas` and a `MigrationStage` (lightweight or
-/// custom) to `stages`; it must never edit `KurnSchemaV1` in place.
+/// Version 1.1.0: adds `ChatSession` (saved "chat with your meetings"
+/// conversations) and its cascade relationship on `Meeting`. Both are
+/// additive — a new entity and a new to-many relationship, nothing renamed or
+/// removed — which is exactly what `MigrationStage.lightweight` below exists
+/// for: SwiftData infers the migration from the two schemas without a custom
+/// transform. `KurnSchemaV1` stays untouched, so a store created before this
+/// version still describes accurately what it actually contained.
+enum KurnSchemaV2: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(1, 1, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [
+            Meeting.self,
+            Recording.self,
+            Transcript.self,
+            Speaker.self,
+            Summary.self,
+            Folder.self,
+            Tag.self,
+            SmartFolder.self,
+            SemanticChunk.self,
+            WikiArticle.self,
+            GeneratedDocument.self,
+            ChatSession.self
+        ]
+    }
+}
+
+/// The app's migration plan. `KurnSchemaV1` shipped with no stages — the
+/// correct, documented shape for "this is the first version we've ever
+/// declared", nothing to migrate *from* yet. `KurnSchemaV2` is the first real
+/// use of this plan: a lightweight stage covers it because the change is
+/// purely additive (see `KurnSchemaV2`'s doc comment). The next
+/// *non*-additive model change adds `KurnSchemaV3` here with a `.custom`
+/// stage; it must never edit `KurnSchemaV1`/`KurnSchemaV2` in place.
 enum KurnSchemaMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [KurnSchemaV1.self]
+        [KurnSchemaV1.self, KurnSchemaV2.self]
     }
 
     static var stages: [MigrationStage] {
-        []
+        [.lightweight(fromVersion: KurnSchemaV1.self, toVersion: KurnSchemaV2.self)]
     }
 }
 
@@ -70,12 +100,12 @@ enum KurnModelGraph {
     /// The current model graph, for call sites that need the bare type list
     /// (e.g. an in-memory test container with no migration concerns).
     static var currentModels: [any PersistentModel.Type] {
-        KurnSchemaV1.models
+        KurnSchemaV2.models
     }
 
     /// The versioned schema production and screenshot containers should use.
     static var schema: Schema {
-        Schema(versionedSchema: KurnSchemaV1.self)
+        Schema(versionedSchema: KurnSchemaV2.self)
     }
 
     /// The migration plan production and screenshot containers should use.

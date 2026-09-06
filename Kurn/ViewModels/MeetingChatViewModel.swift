@@ -4,10 +4,16 @@
 //
 //  Drives "chat with your meetings": owns the in-memory conversation, gathers
 //  the pre-embedded passages to search over, and calls `MeetingChatService` for
-//  a grounded answer. History lives only in memory for the session — nothing is
-//  written to disk, so there is nothing here to encrypt. All SwiftData reads
-//  happen on the main actor; the retrieval + LLM call run off-main in the
-//  service.
+//  a grounded answer. All SwiftData reads happen on the main actor; the
+//  retrieval + LLM call run off-main in the service.
+//
+//  A conversation is also the unit of persistence: `configure(meeting:modelContext:)`
+//  wires up the `ChatSession` scope (per-meeting or library-wide), and a
+//  successfully completed exchange is saved into `session` — created lazily on
+//  the first one, so a conversation the user opens and abandons never leaves an
+//  empty row in the history list. Only finished exchanges are persisted; a
+//  cancelled or failed reply is dropped from `turns` (see `dropPartialReply`)
+//  before `persist()` would ever see it.
 //
 
 import Foundation
@@ -20,7 +26,7 @@ import SwiftData
 final class MeetingChatViewModel {
     /// One rendered turn in the conversation.
     struct Turn: Identifiable {
-        let id = UUID()
+        let id: UUID
         let role: ChatMessage.Role
         var text: String
         var citations: [SemanticSearchService.Hit] = []
@@ -33,10 +39,44 @@ final class MeetingChatViewModel {
         /// Wall-clock time the reply took to fully generate, set once it
         /// finishes.
         var elapsedSeconds: TimeInterval?
+
+        /// `id` defaults to a fresh `UUID` for a brand-new turn; restoring a
+        /// saved one (`Turn.init(_ persisted:)` below) passes its stored id
+        /// through instead, so a turn's identity survives a save/load
+        /// round trip.
+        init(
+            id: UUID = UUID(),
+            role: ChatMessage.Role,
+            text: String,
+            citations: [SemanticSearchService.Hit] = [],
+            usage: TokenUsage? = nil,
+            costUSD: Double? = nil,
+            elapsedSeconds: TimeInterval? = nil
+        ) {
+            self.id = id
+            self.role = role
+            self.text = text
+            self.citations = citations
+            self.usage = usage
+            self.costUSD = costUSD
+            self.elapsedSeconds = elapsedSeconds
+        }
     }
 
     private(set) var turns: [Turn] = []
     private(set) var isResponding = false
+    /// The saved conversation backing `turns`, or `nil` for a not-yet-saved
+    /// one — set by `configure`, `startNewSession`, or `load(session:)`, and
+    /// created lazily by `persist()` on the first successful exchange.
+    @ObservationIgnored private var session: ChatSession?
+    @ObservationIgnored private var modelContext: ModelContext?
+    /// Scopes both retrieval-independent persistence (which `Meeting`, if
+    /// any, a new `ChatSession` belongs to) and `pastSessions()`'s filter.
+    /// `nil` for the library-wide "Ask".
+    @ObservationIgnored private var meeting: Meeting?
+    /// `session`'s id, exposed for the history list to highlight the
+    /// currently open conversation. `nil` for one not yet saved.
+    var currentSessionID: UUID? { session?.id }
     /// The pipeline stage currently reported by `MeetingChatService`, shown as
     /// a "reasoning" row while the assistant's turn has no text yet. Cleared
     /// once the reply starts streaming (the growing text bubble replaces it)
@@ -237,6 +277,34 @@ final class MeetingChatViewModel {
         turns[index].usage = answer.usage
         turns[index].elapsedSeconds = elapsed
         turns[index].costUSD = answer.usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
+        persist()
+    }
+
+    // MARK: - Persistence
+
+    /// Saves the whole conversation so far into `session`, creating it (and
+    /// deriving its title from the first question) on the first successful
+    /// exchange. Never called for a cancelled/failed reply — `dropPartialReply`
+    /// removes those turns before `applyFinal`, the only caller, is reached.
+    /// A save failure is logged and surfaced but leaves the conversation on
+    /// screen exactly as it is — the user's answer is not lost, only its
+    /// persistence.
+    private func persist() {
+        guard let modelContext else { return }
+        let target: ChatSession
+        if let session {
+            target = session
+        } else {
+            let firstQuestion = turns.first(where: { $0.role == .user })?.text ?? ""
+            target = ChatSession(meeting: meeting, title: ChatSession.title(from: firstQuestion))
+            modelContext.insert(target)
+            session = target
+        }
+        target.turns = turns.map(PersistedChatTurn.init)
+        target.updatedAt = Date()
+        if let saveError = modelContext.saveOrError() {
+            self.error = saveError
+        }
     }
 
     /// Removes any turn appended after `count` — the partial assistant reply
@@ -296,10 +364,118 @@ final class MeetingChatViewModel {
         isResponding = false
     }
 
-    /// Clear the conversation.
+    /// Starts a brand-new, unsaved conversation — the "new chat" affordance.
+    /// Nothing is written until the first exchange completes (`persist()`),
+    /// so an abandoned new chat never leaves an empty row in history.
     func reset() {
         cancel()
         turns.removeAll()
         error = nil
+        session = nil
+    }
+
+    // MARK: - Session history
+
+    /// Must be called once before `send`/`pastSessions`, from the owning
+    /// view, so replies can be persisted and past ones listed. `meeting`
+    /// scopes both the same way it scopes retrieval — `nil` for the
+    /// library-wide "Ask".
+    func configure(meeting: Meeting?, modelContext: ModelContext) {
+        self.meeting = meeting
+        self.modelContext = modelContext
+    }
+
+    /// Saved conversations in the current scope, most-recently-active first.
+    /// Fetches every `ChatSession` and filters in memory rather than a
+    /// predicate over the optional `meeting` relationship, the same
+    /// resolve-scope-in-Swift shape `MeetingChatView`'s own
+    /// `summariesByMeeting`/`articlesByMeeting` already use for a fetch this
+    /// infrequent.
+    func pastSessions() -> [ChatSession] {
+        guard let modelContext else { return [] }
+        let all = (try? modelContext.fetch(FetchDescriptor<ChatSession>())) ?? []
+        let meetingID = meeting?.id
+        return all
+            .filter { $0.meeting?.id == meetingID }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    /// Loads a previously saved conversation for display and continuation.
+    func load(session: ChatSession) {
+        cancel()
+        self.session = session
+        turns = session.turns.map(Turn.init)
+        error = nil
+    }
+
+    /// Permanently deletes `target`. If it was the open conversation, starts
+    /// a fresh one in its place so the view doesn't keep showing turns that
+    /// no longer exist on disk.
+    func delete(_ target: ChatSession) {
+        guard let modelContext else { return }
+        let wasCurrent = target.id == session?.id
+        modelContext.delete(target)
+        if let saveError = modelContext.saveOrError() {
+            self.error = saveError
+        }
+        if wasCurrent { reset() }
+    }
+}
+
+private extension PersistedChatTurn {
+    /// Snapshot of a rendered `Turn` for JSON storage.
+    init(_ turn: MeetingChatViewModel.Turn) {
+        self.init(
+            id: turn.id,
+            role: turn.role,
+            text: turn.text,
+            citations: turn.citations.map(PersistedCitation.init),
+            usage: turn.usage,
+            costUSD: turn.costUSD,
+            elapsedSeconds: turn.elapsedSeconds
+        )
+    }
+}
+
+private extension PersistedCitation {
+    init(_ hit: SemanticSearchService.Hit) {
+        self.init(
+            meetingID: hit.meetingID,
+            recordingID: hit.recordingID,
+            meetingTitle: hit.meetingTitle,
+            start: hit.start,
+            speakerLabel: hit.speakerLabel,
+            text: hit.text
+        )
+    }
+}
+
+private extension MeetingChatViewModel.Turn {
+    /// Restores a rendered `Turn` from a saved session. `end`/`score` have no
+    /// persisted counterpart (unused once retrieval ranking is done), so
+    /// reconstructed citations zero them — display and jump-to-citation only
+    /// ever read `start`/`speakerLabel`/`text`/the two ids.
+    init(_ persisted: PersistedChatTurn) {
+        self.init(
+            id: persisted.id,
+            role: persisted.role,
+            text: persisted.text,
+            citations: persisted.citations.map { citation in
+                SemanticSearchService.Hit(
+                    chunkID: UUID(),
+                    meetingID: citation.meetingID,
+                    recordingID: citation.recordingID,
+                    text: citation.text,
+                    start: citation.start,
+                    end: citation.start,
+                    speakerLabel: citation.speakerLabel,
+                    score: 0,
+                    meetingTitle: citation.meetingTitle
+                )
+            },
+            usage: persisted.usage,
+            costUSD: persisted.costUSD,
+            elapsedSeconds: persisted.elapsedSeconds
+        )
     }
 }

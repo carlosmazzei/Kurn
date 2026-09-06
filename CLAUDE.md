@@ -325,9 +325,9 @@ file/type limits as a refactoring signal rather than using the remaining line bu
 ### Data model
 
 `Meeting` is the aggregate root. It cascades deletes to its `recordings`,
-`speakers`, `summaries`, `semanticChunks`, and `wikiArticle` — every
-transcript-derived artifact dies with the meeting it came from, which is what
-makes "delete the meeting" a complete erasure rather than a partial one.
+`speakers`, `summaries`, `semanticChunks`, `wikiArticle`, and `chatSessions` —
+every transcript-derived artifact dies with the meeting it came from, which is
+what makes "delete the meeting" a complete erasure rather than a partial one.
 `GeneratedDocument` is the deliberate exception: it snapshots its sources
 instead of relating to them, so deleting a meeting cannot destroy a document
 already generated from it.
@@ -1345,11 +1345,27 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   dense (`NLContextualEmbedding` cosine) + lexical (BM25) retrieval fused with
   Reciprocal Rank Fusion (`SemanticSearchService.hybridSearch`) → LLM rerank →
   grounded answer. All prompts cite `[mm:ss]` and reply in the transcript
-  language. `MeetingChatViewModel` + `MeetingChatView` drive an in-memory
-  conversation, surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a
-  library-wide "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are
-  tappable and seek the transcript. History is in-memory only — nothing
-  chat-related is persisted, so there is nothing extra to encrypt. When
+  language. `MeetingChatViewModel` + `MeetingChatView` drive the conversation,
+  surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a library-wide
+  "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are tappable and
+  seek the transcript. Conversations are saved as `ChatSession`
+  (`Models/ChatSession.swift`) — the same "reopen a past chat, start a new one,
+  delete one" affordances Claude's own mobile app offers, via the history/new
+  toolbar buttons on `MeetingChatView` and `Views/ChatSessionListView.swift`'s
+  history sheet. A session is created lazily, on the conversation's first
+  *successfully completed* exchange (`MeetingChatViewModel.persist()`) — a
+  cancelled/failed reply never reaches it (`dropPartialReply` removes those
+  turns first), and a chat opened and abandoned with nothing sent leaves no
+  row in history. Turns (including citations and token usage/cost) are
+  JSON-encoded into `ChatSession.turnsData`, the same `Transcript.segmentsData`
+  pattern; like every other `@Model`, it's encrypted at rest by
+  `ModelStoreProtection` with the rest of the store. Scoped like the feature
+  itself: a per-meeting conversation's `ChatSession.meeting` cascade-deletes
+  with the meeting, same as `summaries`/`semanticChunks`; a library-wide one
+  has `meeting == nil` and its own history list. `KurnSchemaV2`
+  (`Infrastructure/KurnSchema.swift`) is the first real use of
+  `KurnSchemaMigrationPlan` — a lightweight stage, since adding `ChatSession`
+  and its relationship is purely additive. When
   `wikiEnabled` is on, the library-wide path additionally grounds on the
   condensed per-meeting articles — see "Derived artifacts" below for why that
   answers synthesis and counting questions retrieval alone cannot.

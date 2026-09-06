@@ -20,7 +20,7 @@ struct SummaryResult: Sendable {
 /// One turn in a chat conversation. `system` is passed separately to
 /// `LLMProvider.chat`, so message lists normally hold only `user`/`assistant`.
 struct ChatMessage: Sendable, Equatable {
-    enum Role: String, Sendable { case system, user, assistant }
+    enum Role: String, Sendable, Codable { case system, user, assistant }
     let role: Role
     let content: String
 
@@ -53,7 +53,7 @@ struct TextGenerationOptions: Sendable, Equatable {
 /// estimate built on it (`ModelPricing`) inherits the same accuracy the
 /// vendor's own billing does. `nil` at the call site (rather than this type)
 /// is how "this vendor/response didn't report usage" is expressed.
-struct TokenUsage: Sendable, Equatable {
+struct TokenUsage: Sendable, Equatable, Codable {
     let promptTokens: Int
     let completionTokens: Int
     var totalTokens: Int { promptTokens + completionTokens }

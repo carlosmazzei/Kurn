@@ -9,10 +9,13 @@
 //  opened with a bare, unversioned `Schema([...])` — there is no earlier
 //  released layout to fabricate, because this is the very first time the app
 //  has declared a schema version at all. So "the oldest supported released
-//  layout" and "today's schema" are the same set of eleven entities; what
-//  needs proving is only that opening an unversioned store through
-//  `KurnModelGraph`'s versioned schema + `KurnSchemaMigrationPlan` does not
-//  reset, corrupt, or drop it.
+//  layout" is exactly `KurnSchemaV1`'s eleven entities; what needs proving is
+//  only that opening an unversioned store through `KurnModelGraph`'s
+//  versioned schema + `KurnSchemaMigrationPlan` does not reset, corrupt, or
+//  drop it. `KurnSchemaV2` later added a twelfth, additive entity
+//  (`ChatSession`) — this fixture deliberately still writes the V1 shape, so
+//  the reopen below also exercises that migration stage, not a same-shape
+//  no-op.
 //
 //  A real device-produced binary `.store` file would be a stronger fixture,
 //  but hand-crafting SwiftData's on-disk (Core Data-backed) format without
@@ -41,7 +44,12 @@ struct LegacyStoreAdoptionTests {
     /// existed — populates one of every model type with representative
     /// relationships and JSON-backed content, then closes it.
     private func writeLegacyStore(at url: URL) throws {
-        let legacySchema = Schema(KurnModelGraph.currentModels)
+        // The eleven-entity `KurnSchemaV1` shape specifically, not
+        // `KurnModelGraph.currentModels` — that now includes `ChatSession`
+        // (added in `KurnSchemaV2`), which a store built before this file
+        // existed never had. Using the current graph here would silently
+        // stop testing the V1→V2 migration this fixture exists to exercise.
+        let legacySchema = Schema(KurnSchemaV1.models)
         let configuration = ModelConfiguration(schema: legacySchema, url: url)
         let container = try ModelContainer(for: legacySchema, configurations: [configuration])
         let context = container.mainContext
