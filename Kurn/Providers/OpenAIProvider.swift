@@ -287,29 +287,38 @@ struct OpenAIProvider: LLMProvider {
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
-        options: TextGenerationOptions
-    ) -> AsyncThrowingStream<String, Error> {
-        LLMHTTP.streamChatDeltas(
+        options: TextGenerationOptions,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
+        wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
+        var body: [String: Any] = [
+            "model": chatModel,
+            "max_completion_tokens": options.maxOutputTokens,
+            "messages": wire,
+            "stream": true
+        ]
+        if provider.id == AIProvider.openAI.id,
+           chatModel.lowercased().hasPrefix("gpt-5") {
+            body["reasoning_effort"] = "low"
+        }
+        let request = try makeRequest(timeout: options.timeout, body: body)
+
+        let accumulator = StreamingAccumulator()
+        try await LLMHTTP.streamSSE(
+            request,
             session: session,
-            emptyMessage: "empty chat response",
-            makeRequest: {
-                try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-                var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
-                wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
-                var body: [String: Any] = [
-                    "model": chatModel,
-                    "max_completion_tokens": options.maxOutputTokens,
-                    "messages": wire,
-                    "stream": true
-                ]
-                if provider.id == AIProvider.openAI.id,
-                   chatModel.lowercased().hasPrefix("gpt-5") {
-                    body["reasoning_effort"] = "low"
-                }
-                return try makeRequest(timeout: options.timeout, body: body)
-            },
-            mapPayload: Self.textDelta
-        )
+            policy: .interactive(totalDeadline: options.timeout)
+        ) { payload in
+            guard let delta = Self.textDelta(from: payload), !delta.isEmpty else { return }
+            accumulator.append(delta)
+            onDelta(delta)
+        }
+        guard accumulator.receivedText else {
+            throw AppError.decodingError("empty chat response")
+        }
     }
 
     /// One `data:` chunk's incremental text, or `nil` for a chunk with none

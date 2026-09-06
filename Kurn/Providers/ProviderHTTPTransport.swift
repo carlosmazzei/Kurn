@@ -241,7 +241,9 @@ extension LLMHTTP {
         return nil
     }
 
-    private static func decodeErrorMessage(_ data: Data) -> String? {
+    /// Not `private`: `ProviderHTTPStreaming.swift`'s SSE delegate decodes a
+    /// non-2xx response's buffered error body the same way.
+    static func decodeErrorMessage(_ data: Data) -> String? {
         struct Envelope: Decodable { struct E: Decodable { let message: String }; let error: E }
         return try? JSONDecoder().decode(Envelope.self, from: data).error.message
     }

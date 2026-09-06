@@ -120,39 +120,46 @@ struct GoogleProvider: LLMProvider {
     func streamChat(
         systemPrompt: String,
         messages: [ChatMessage],
-        options: TextGenerationOptions
-    ) -> AsyncThrowingStream<String, Error> {
-        LLMHTTP.streamChatDeltas(
-            session: session,
-            emptyMessage: "empty Gemini response",
-            makeRequest: {
-                try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-                var contents: [[String: Any]] = []
-                for (index, message) in messages.enumerated() where message.role != .system {
-                    let role = message.role == .assistant ? "model" : "user"
-                    var text = message.content
-                    if index == 0 && message.role == .user {
-                        text = "\(systemPrompt)\n\n\(text)"
-                    }
-                    contents.append(["role": role, "parts": [["text": text]]])
-                }
-                if contents.isEmpty {
-                    contents = [["role": "user", "parts": [["text": systemPrompt]]]]
-                }
-                return try makeStreamRequest(
-                    timeout: options.timeout,
-                    body: [
-                        "contents": contents,
-                        "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
-                    ]
-                )
-            },
-            mapPayload: { payload in
-                guard let data = payload.data(using: .utf8),
-                      let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data) else { return nil }
-                return Self.text(from: chunk)
+        options: TextGenerationOptions,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        var contents: [[String: Any]] = []
+        for (index, message) in messages.enumerated() where message.role != .system {
+            let role = message.role == .assistant ? "model" : "user"
+            var text = message.content
+            if index == 0 && message.role == .user {
+                text = "\(systemPrompt)\n\n\(text)"
             }
+            contents.append(["role": role, "parts": [["text": text]]])
+        }
+        if contents.isEmpty {
+            contents = [["role": "user", "parts": [["text": systemPrompt]]]]
+        }
+        let request = try makeStreamRequest(
+            timeout: options.timeout,
+            body: [
+                "contents": contents,
+                "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
+            ]
         )
+
+        let accumulator = StreamingAccumulator()
+        try await LLMHTTP.streamSSE(
+            request,
+            session: session,
+            policy: .interactive(totalDeadline: options.timeout)
+        ) { payload in
+            guard let data = payload.data(using: .utf8),
+                  let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data),
+                  let delta = Self.text(from: chunk), !delta.isEmpty else { return }
+            accumulator.append(delta)
+            onDelta(delta)
+        }
+        guard accumulator.receivedText else {
+            throw AppError.decodingError("empty Gemini response")
+        }
     }
 
     // MARK: - Helpers
@@ -166,7 +173,7 @@ struct GoogleProvider: LLMProvider {
 
     /// The `streamGenerateContent` route for the configured model, SSE-shaped
     /// (`alt=sse`) rather than the newline-delimited JSON array the endpoint
-    /// returns by default — `sseLines` only understands `data:` framing.
+    /// returns by default — `LLMHTTP.streamSSE` only understands `data:` framing.
     private var streamGenerateContentPath: String {
         "models/\(model.replacingOccurrences(of: "models/", with: "")):streamGenerateContent"
     }
@@ -177,7 +184,6 @@ struct GoogleProvider: LLMProvider {
         try LLMHTTP.jsonRequest(
             provider: provider,
             path: streamGenerateContentPath,
-            fallbackURL: "https://generativelanguage.googleapis.com/v1beta/\(streamGenerateContentPath)?alt=sse",
             timeout: timeout,
             headers: ["x-goog-api-key": apiKey],
             queryItems: [URLQueryItem(name: "alt", value: "sse")],
