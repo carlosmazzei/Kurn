@@ -535,4 +535,140 @@ struct ProviderHTTPTests {
         let transportError = await corrector.requestBatch(for: [a], vocabulary: [], language: .english, llm: provider)
         #expect(transportError.failed)
     }
+
+    // MARK: - Chat (streaming)
+
+    // These live in this suite (not their own) for the same reason as the
+    // ProviderModelsService/chat tests above: they script the process-global
+    // MockURLProtocol, and `.serialized` only orders tests WITHIN a suite — a
+    // separate suite would run in parallel and race this one for the stubs.
+
+    /// A raw SSE body: one `data: <payload>` line per element, terminated with
+    /// the `[DONE]` sentinel `BoundedSSEDataDelegate` is expected to skip.
+    private func sseBody(_ payloads: [String]) -> Data {
+        Data((payloads.map { "data: \($0)\n\n" }.joined() + "data: [DONE]\n\n").utf8)
+    }
+
+    @Test func openAIStreamChatAccumulatesDeltasAndSetsStreamFlag() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"choices":[{"delta":{"content":"Hello"}}]}"#,
+                #"{"choices":[{"delta":{"content":", world."}}]}"#
+            ]), headers: [:])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", model: "gpt-test", session: MockURLProtocol.session())
+
+        var received = ""
+        try await provider.streamChat(
+            systemPrompt: "sys",
+            messages: [ChatMessage(role: .user, content: "hi")],
+            options: .chat
+        ) { delta in received += delta }
+
+        #expect(received == "Hello, world.")
+        let request = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        #expect(body?["stream"] as? Bool == true)
+    }
+
+    @Test func openAIStreamChatEmptyStreamThrows() async {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([#"{"choices":[{"delta":{}}]}"#]), headers: [:])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        await #expect(throws: AppError.self) {
+            try await provider.streamChat(
+                systemPrompt: "s", messages: [ChatMessage(role: .user, content: "q")], options: .chat
+            ) { _ in }
+        }
+    }
+
+    @Test func anthropicStreamChatAccumulatesContentBlockDeltas() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"type":"message_start"}"#,
+                #"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Gro"}}"#,
+                #"{"type":"content_block_delta","delta":{"type":"text_delta","text":"unded."}}"#,
+                #"{"type":"message_stop"}"#
+            ]), headers: [:])
+        ])
+        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+
+        var received = ""
+        try await provider.streamChat(
+            systemPrompt: "sys",
+            messages: [ChatMessage(role: .user, content: "hi")],
+            options: .chat
+        ) { delta in received += delta }
+
+        #expect(received == "Grounded.")
+        let request = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
+        #expect(body?["stream"] as? Bool == true)
+    }
+
+    @Test func anthropicStreamChatMidStreamErrorEventThrows() async {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"type":"content_block_delta","delta":{"type":"text_delta","text":"partial"}}"#,
+                #"{"type":"error","error":{"message":"overloaded"}}"#
+            ]), headers: [:])
+        ])
+        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+
+        do {
+            try await provider.streamChat(
+                systemPrompt: "s", messages: [ChatMessage(role: .user, content: "q")], options: .chat
+            ) { _ in }
+            Issue.record("expected an error")
+        } catch AppError.apiError(let statusCode, let message) {
+            #expect(statusCode == 0)
+            #expect(message == "overloaded")
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
+    @Test func googleStreamChatUsesAltSSEQueryParamAndStreamGenerateContentPath() async throws {
+        MockURLProtocol.enqueue([
+            .success(status: 200, body: sseBody([
+                #"{"candidates":[{"content":{"parts":[{"text":"Gemini "}]}}]}"#,
+                #"{"candidates":[{"content":{"parts":[{"text":"reply."}]}}]}"#
+            ]), headers: [:])
+        ])
+        let provider = GoogleProvider(apiKey: "gk", session: MockURLProtocol.session())
+
+        var received = ""
+        try await provider.streamChat(
+            systemPrompt: "sys",
+            messages: [ChatMessage(role: .user, content: "hi")],
+            options: .chat
+        ) { delta in received += delta }
+
+        #expect(received == "Gemini reply.")
+        let request = try #require(MockURLProtocol.lastRequest)
+        #expect(request.url?.absoluteString.contains("streamGenerateContent") == true)
+        #expect(request.url?.query == "alt=sse")
+        #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
+    }
+
+    @Test func streamChatNon2xxStatusSurfacesAPIError() async {
+        MockURLProtocol.enqueue([
+            .success(status: 500, body: Data(#"{"error":{"message":"server exploded"}}"#.utf8), headers: [:])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        do {
+            try await provider.streamChat(
+                systemPrompt: "s", messages: [ChatMessage(role: .user, content: "q")], options: .chat
+            ) { _ in }
+            Issue.record("expected an error")
+        } catch AppError.apiError(let statusCode, let message) {
+            #expect(statusCode == 500)
+            #expect(message.contains("server exploded"))
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
 }
