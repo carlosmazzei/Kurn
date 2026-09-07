@@ -511,8 +511,11 @@
 "settings.recognition_pipeline" = "Recognition Pipeline";
 "pipeline.transcription_engine" = "Transcription Engine";
 "pipeline.preprocessing" = "Audio Cleanup";
+"pipeline.preprocessing_footer" = "Reduces noise and normalizes level before transcription.";
 "pipeline.vad" = "Voice Activity Detection";
+"pipeline.vad_footer" = "Detects speech versus silence to trim what's sent to the transcriber.";
 "pipeline.language_detection" = "Language Detection";
+"pipeline.language_detection_footer" = "Chooses the spoken language automatically instead of relying on the transcriber's guess.";
 "settings.transcription_provider" = "Transcription Provider";
 "settings.whisper_provider_key_footer" = "Whisper API transcription uses the provider selected above, independently of the summary provider. Any OpenAI-compatible provider with an API key (such as OpenAI or Groq) can be used.";
 "settings.whisper_provider_key_missing_footer" = "Configure an OpenAI-compatible API key (such as OpenAI or Groq) in AI Providers to enable Whisper API transcription.";
@@ -551,20 +554,21 @@
 "settings.language_support_footer" = "⚠ = may not be supported by the selected transcription engine.";
 "lang.unsupported_a11y" = "May not be supported by the selected transcription engine";
 "settings.mic_pickup" = "Microphone";
-"settings.mic_pickup_footer" = "Whole room captures everyone (omnidirectional); Focus on speaker favours the person in front (directional). Only affects the built-in mic.";
+"settings.mic_pickup_footer" = "Whole room captures everyone; Focus on speaker favours who’s in front.";
 "micpickup.whole_room" = "Whole room";
 "micpickup.focus_speaker" = "Focus on speaker";
 "settings.always_use_built_in_mic" = "Always Use iPhone Microphone";
-"settings.always_use_built_in_mic_footer" = "Skips asking and always records with the iPhone's built-in mic, even if a Bluetooth accessory is connected. When off, you'll be asked which microphone to use if more than one is available.";
+"settings.always_use_built_in_mic_footer" = "Always records with the iPhone’s built-in mic, even if a Bluetooth accessory is connected.";
 "settings.diagnostics" = "Diagnostics";
 "settings.log_level" = "Logging";
-"settings.log_level_footer" = "Controls how much detail the app writes to the system log (Console.app, subsystem ai.kurn.app). Off disables logging entirely; Verbose includes high-frequency traces useful when reporting a bug.";
+"settings.log_level_footer" = "Off disables logging entirely; Verbose adds detail useful for bug reports.";
 "settings.export_logs" = "Export Logs";
-"settings.export_logs_footer" = "Shares the last 24 hours of the app's own log entries as a text file, for support or bug reports.";
+"settings.export_logs_footer" = "Shares the last 24 hours of logs as a text file.";
 "settings.view_logs" = "View Recent Logs";
 "settings.view_logs.empty" = "No log entries in the last 24 hours";
 "settings.diagnostic_reports" = "Diagnostic Reports";
-"settings.diagnostic_reports_footer" = "When on, crash and freeze reports captured on this device are saved here. Nothing is ever sent anywhere automatically — reports only leave the device if you tap Share on one.";
+"settings.diagnostic_reports_footer" = "Saves crash and freeze reports captured on this device.";
+"settings.diagnostic_reports_share_footer" = "Nothing is sent anywhere automatically — a report only leaves the device if you tap Share on it.";
 "settings.diagnostic_reports.consent_title" = "Enable Diagnostic Reports";
 "settings.diagnostic_reports.consent_message" = "Kurn will save crash and freeze reports on this device only. Nothing is sent anywhere automatically — you choose if and when to share a report.";
 "settings.diagnostic_reports.enable" = "Enable";
@@ -585,7 +589,7 @@
 "settings.audio_quality" = "Audio quality";
 "settings.audio_quality.usage" = "Storage";
 "settings.audio_quality.per_hour" = "About %@ per hour";
-"settings.audio_quality_footer" = "Recordings are stored as mono speech audio, so every level keeps the full range of the human voice — the levels differ in how much detail is kept, not in what is captured.";
+"settings.audio_quality_footer" = "Every level keeps the full range of the voice — they differ only in file size.";
 "settings.audio_usage" = "Audio Files";
 "settings.free_space" = "Free Space";
 "settings.compact.section" = "Reclaim Space";
@@ -610,6 +614,7 @@
 "settings.delete_all.message" = "This permanently removes every meeting, transcript, and audio file. This cannot be undone.";
 "settings.delete_all.residual" = "%d audio file(s) could not be removed and remain on disk. Try again, or free up space and retry.";
 "settings.diarization_engine" = "Diarization Engine";
+"settings.diarization_engine_footer" = "Neural engines are more accurate but need a download; Heuristic works offline immediately.";
 "settings.diarization_speaker_count" = "Number of Speakers";
 "settings.diarization_speaker_count_auto" = "Auto";
 "settings.diarization_speaker_count_footer" = "Set this when you know how many people are in the meeting. On Auto the engine decides, and Kurn re-clusters the audio itself if the engine merged everyone into one speaker.";
@@ -671,7 +676,8 @@
 
 /* Recordings security */
 "settings.require_auth_for_recordings" = "Require Authentication";
-"settings.require_auth_for_recordings_footer" = "Ask for Face ID, Touch ID, or your device passcode once per session before showing meetings and recordings. Audio files are always encrypted on disk using the device passcode.";
+"settings.require_auth_for_recordings_footer" = "Face ID, Touch ID, or your device passcode, once per session.";
+"settings.recording_section_privacy_footer" = "Audio files are always encrypted on disk using your device passcode, regardless of these settings.";
 "settings.hide_live_activity_meeting_title" = "Hide Meeting Title on Lock Screen";
 "settings.hide_live_activity_meeting_title_footer" = "Shows a generic \"Recording…\" label on the Lock Screen, Dynamic Island, and paired Apple Watch instead of the real meeting title while recording.";
 "recordings.locked_title" = "Recordings Locked";
@@ -782,7 +788,8 @@
 "settings.wiki_rebuilding" = "Rebuilding All…";
 "settings.wiki_bulk_progress" = "%1$d of %2$d meetings";
 "settings.wiki_clear" = "Clear wiki";
-"settings.wiki_footer" = "Uses your summary AI provider to build a condensed article per meeting, so the library-wide Ask can answer questions that span or compare meetings. Off by default — it makes cloud calls. \"Generate Missing\" only builds articles that don't exist yet; \"Rebuild All\" regenerates every article, including ones already up to date.";
+"settings.wiki_footer" = "Builds a condensed article per meeting, using your AI provider. Off by default.";
+"settings.wiki_section_footer" = "\"Generate Missing\" only builds articles that don't exist yet; \"Rebuild All\" regenerates every article, including ones already up to date.";
 "settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";
 "settings.correction_title" = "AI Correction";
 "settings.correction" = "Correct transcription errors";

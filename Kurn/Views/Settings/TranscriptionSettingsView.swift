@@ -232,48 +232,64 @@ struct TranscriptionSettingsView: View {
         Section {
             // Audio cleanup/normalization.
             Toggle(
-                NSLocalizedString("pipeline.preprocessing", comment: "Audio cleanup"),
                 isOn: Binding(
                     get: { settings.preprocessingEngine == .standardDSP },
                     set: { enabled in
                         settings.preprocessingEngine = enabled ? .standardDSP : .none
                     }
                 )
-            )
+            ) {
+                SettingsRowLabel(
+                    title: NSLocalizedString("pipeline.preprocessing", comment: "Audio cleanup"),
+                    detail: NSLocalizedString("pipeline.preprocessing_footer", comment: "Explains audio cleanup")
+                )
+            }
 
             // Voice-activity detection.
             Picker(
-                NSLocalizedString("pipeline.vad", comment: "Voice activity detection"),
                 selection: Binding(
                     get: { settings.vadEngine },
                     set: { downloads.selectVADEngine($0, settings: settings) }
                 )
             ) {
                 ForEach(VADEngine.allCases) { Text($0.displayName).tag($0) }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("pipeline.vad", comment: "Voice activity detection"),
+                    detail: NSLocalizedString("pipeline.vad_footer", comment: "Explains voice activity detection")
+                )
             }
             .disabled(downloads.isDownloading)
 
             // Language detection.
             Picker(
-                NSLocalizedString("pipeline.language_detection", comment: "Language detection"),
                 selection: Binding(
                     get: { settings.languageDetectionEngine },
                     set: { downloads.selectLanguageDetectionEngine($0, settings: settings) }
                 )
             ) {
                 ForEach(LanguageDetectionEngine.allCases) { Text($0.displayName).tag($0) }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("pipeline.language_detection", comment: "Language detection"),
+                    detail: NSLocalizedString("pipeline.language_detection_footer", comment: "Explains language detection")
+                )
             }
             .disabled(downloads.isDownloading)
 
             // Speaker diarization.
             Picker(
-                NSLocalizedString("settings.diarization_engine", comment: "Diarization engine"),
                 selection: Binding(
                     get: { settings.diarizationEngine },
                     set: { downloads.selectDiarizationEngine($0, settings: settings) }
                 )
             ) {
                 ForEach(DiarizationEngine.allCases) { Text($0.displayName).tag($0) }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.diarization_engine", comment: "Diarization engine"),
+                    detail: NSLocalizedString("settings.diarization_engine_footer", comment: "Explains diarization engine choice")
+                )
             }
             .disabled(downloads.isDownloading)
 

@@ -511,8 +511,11 @@
 "settings.recognition_pipeline" = "识别流水线";
 "pipeline.transcription_engine" = "转录引擎";
 "pipeline.preprocessing" = "音频清理";
+"pipeline.preprocessing_footer" = "在转录前降噪并规范音量。";
 "pipeline.vad" = "语音活动检测";
+"pipeline.vad_footer" = "检测语音与静音，以减少发送给转录器的内容。";
 "pipeline.language_detection" = "语言检测";
+"pipeline.language_detection_footer" = "自动判断所说的语言，而不是依赖转录器的猜测。";
 "settings.transcription_provider" = "转录提供方";
 "settings.whisper_provider_key_footer" = "Whisper API 转录使用上方选定的提供方，与摘要提供方相互独立。可使用任何配置了 API 密钥的 OpenAI 兼容提供方（如 OpenAI 或 Groq）。";
 "settings.whisper_provider_key_missing_footer" = "请在「AI 提供方」中配置一个 OpenAI 兼容的 API 密钥（如 OpenAI 或 Groq），以启用 Whisper API 转录。";
@@ -551,20 +554,21 @@
 "settings.language_support_footer" = "⚠ = 所选转录引擎可能不支持。";
 "lang.unsupported_a11y" = "所选转录引擎可能不支持";
 "settings.mic_pickup" = "麦克风";
-"settings.mic_pickup_footer" = "全房间可采集所有人的声音（全向）；聚焦发言人更偏向正前方的人（定向）。仅影响内置麦克风。";
+"settings.mic_pickup_footer" = "全房间可采集所有人的声音；聚焦发言人更偏向正前方的人。";
 "micpickup.whole_room" = "全房间";
 "micpickup.focus_speaker" = "聚焦发言人";
 "settings.always_use_built_in_mic" = "始终使用 iPhone 麦克风";
-"settings.always_use_built_in_mic_footer" = "跳过询问，始终使用 iPhone 内置麦克风录制，即使已连接蓝牙配件。关闭时，如果有多个麦克风可用，将询问您使用哪一个。";
+"settings.always_use_built_in_mic_footer" = "始终使用 iPhone 内置麦克风录制，即使已连接蓝牙配件。";
 "settings.diagnostics" = "诊断";
 "settings.log_level" = "日志记录";
-"settings.log_level_footer" = "控制应用写入系统日志（Console.app，子系统 ai.kurn.app）的详细程度。「关闭」将完全禁用日志；「详尽」包含高频跟踪信息，适用于报告问题时使用。";
+"settings.log_level_footer" = "「关闭」将完全禁用日志；「详尽」会添加对报告问题有用的细节。";
 "settings.export_logs" = "导出日志";
-"settings.export_logs_footer" = "将应用最近 24 小时的日志记录以文本文件形式分享，用于支持或错误报告。";
+"settings.export_logs_footer" = "将最近 24 小时的日志以文本文件形式分享。";
 "settings.view_logs" = "查看最近日志";
 "settings.view_logs.empty" = "过去24小时内没有日志条目";
 "settings.diagnostic_reports" = "诊断报告";
-"settings.diagnostic_reports_footer" = "开启后，在本设备上捕获的崩溃和卡死报告将保存在这里。不会自动发送到任何地方——只有当你点击某条报告的「分享」时，报告才会离开设备。";
+"settings.diagnostic_reports_footer" = "保存在本设备上捕获的崩溃和卡死报告。";
+"settings.diagnostic_reports_share_footer" = "不会自动发送到任何地方——只有当你点击某条报告的「分享」时，报告才会离开设备。";
 "settings.diagnostic_reports.consent_title" = "启用诊断报告";
 "settings.diagnostic_reports.consent_message" = "Kurn 只会将崩溃和卡死报告保存在本设备上，不会自动发送到任何地方——是否以及何时分享报告由你决定。";
 "settings.diagnostic_reports.enable" = "启用";
@@ -585,7 +589,7 @@
 "settings.audio_quality" = "音频质量";
 "settings.audio_quality.usage" = "占用空间";
 "settings.audio_quality.per_hour" = "每小时约 %@";
-"settings.audio_quality_footer" = "录音以单声道语音格式存储，因此每个级别都保留完整的人声频段——级别只影响保留多少细节，不影响录下的内容。";
+"settings.audio_quality_footer" = "每个级别都保留完整的人声频段——仅文件大小不同。";
 "settings.audio_usage" = "音频文件";
 "settings.free_space" = "可用空间";
 "settings.compact.section" = "回收空间";
@@ -610,6 +614,7 @@
 "settings.delete_all.message" = "这将永久删除所有会议、转录内容和音频文件，此操作无法撤销。";
 "settings.delete_all.residual" = "%d 个音频文件无法删除，仍保留在设备上。请重试或释放空间后再试。";
 "settings.diarization_engine" = "说话人分离引擎";
+"settings.diarization_engine_footer" = "神经网络引擎更准确但需要下载；启发式引擎可立即离线使用。";
 "settings.diarization_speaker_count" = "发言人数";
 "settings.diarization_speaker_count_auto" = "自动";
 "settings.diarization_speaker_count_footer" = "如果你知道会议有多少人参加，请在此设置。选择“自动”时由引擎判断；若引擎把所有人合并成了一位发言人，Kurn 会自行重新聚类音频。";
@@ -671,7 +676,8 @@
 
 /* 录音安全 */
 "settings.require_auth_for_recordings" = "需要身份验证";
-"settings.require_auth_for_recordings_footer" = "在显示会议和录音前，每个使用会话要求进行一次 Face ID、Touch ID 或设备密码验证。音频文件始终使用设备密码在磁盘上加密。";
+"settings.require_auth_for_recordings_footer" = "每个使用会话一次 Face ID、Touch ID 或设备密码验证。";
+"settings.recording_section_privacy_footer" = "无论这些设置如何，音频文件始终使用设备密码在磁盘上加密。";
 "settings.hide_live_activity_meeting_title" = "在锁屏上隐藏会议标题";
 "settings.hide_live_activity_meeting_title_footer" = "录音时，在锁屏、灵动岛和已配对的 Apple Watch 上显示通用的「正在录音…」标签，而非真实的会议标题。";
 "recordings.locked_title" = "录音已锁定";
@@ -782,7 +788,8 @@
 "settings.wiki_rebuilding" = "正在重建全部…";
 "settings.wiki_bulk_progress" = "%1$d / %2$d 场会议";
 "settings.wiki_clear" = "清除维基";
-"settings.wiki_footer" = "使用你的摘要 AI 提供方为每场会议构建一篇精简条目，让全库“提问”能够回答跨越或比较多场会议的问题。默认关闭——会进行云端调用。“生成缺失项”仅创建尚不存在的条目；“重建全部”会重新生成所有条目，包括已是最新的条目。";
+"settings.wiki_footer" = "使用你的 AI 提供方为每场会议生成一篇精简条目。默认关闭。";
+"settings.wiki_section_footer" = "“生成缺失项”仅创建尚不存在的条目；“重建全部”会重新生成所有条目，包括已是最新的条目。";
 "settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";
 "settings.correction_title" = "AI 校正";
 "settings.correction" = "校正转录错误";

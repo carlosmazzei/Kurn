@@ -110,6 +110,8 @@ struct WikiSettingsView: View {
                 .disabled(isBusy || wikiArticleCount == 0)
             } header: {
                 Text(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki section title"))
+            } footer: {
+                Text(NSLocalizedString("settings.wiki_section_footer", comment: "Explains Generate Missing vs. Rebuild All"))
             }
         }
         .navigationTitle(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"))
