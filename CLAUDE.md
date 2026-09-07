@@ -1365,7 +1365,18 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   has `meeting == nil` and its own history list. `KurnSchemaV2`
   (`Infrastructure/KurnSchema.swift`) is the first real use of
   `KurnSchemaMigrationPlan` — a lightweight stage, since adding `ChatSession`
-  and its relationship is purely additive. When
+  and its relationship is purely additive. **Only the current version lists
+  the live `@Model` classes.** `KurnSchemaV1.models` resolves to the frozen
+  copies in `Infrastructure/KurnSchemaV1Models.swift` (`KurnSchemaV1.Meeting`,
+  …, nested types with just the stored properties), because a `VersionedSchema`
+  built from the live classes is redefined by every edit to them: the first
+  cut of V2 did exactly that, so "V1" already contained `chatSessions`, no
+  real 1.0.0 store matched it, and the migration failed on upgrade while
+  `LegacyStoreAdoptionTests` stayed green (its fixture was written with the
+  same live classes). The next model change therefore means: edit the live
+  class, add `KurnSchemaV3` listing the live classes, demote `KurnSchemaV2` to
+  frozen copies in a `KurnSchemaV2Models.swift`, add the stage, and bump
+  `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
   `wikiEnabled` is on, the library-wide path additionally grounds on the
   condensed per-meeting articles — see "Derived artifacts" below for why that
   answers synthesis and counting questions retrieval alone cannot.

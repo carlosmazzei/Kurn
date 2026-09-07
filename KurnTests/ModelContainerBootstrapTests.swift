@@ -121,6 +121,28 @@ struct KurnModelGraphTests {
         #expect(!KurnSchemaV1.models.contains { ObjectIdentifier($0) == ObjectIdentifier(ChatSession.self) })
     }
 
+    @Test func firstVersionedSchemaIsFrozenApartFromTheLiveClasses() {
+        // A versioned schema that lists the live `@Model` classes is not a
+        // version at all — it is redefined by every edit to them (the live
+        // `Meeting` already carries `chatSessions`) and stops matching the
+        // stores it claims to describe. V1 must therefore consist entirely of
+        // its own frozen types, and each must still name the same entity as
+        // its live counterpart so the store's tables line up across versions.
+        let liveIdentifiers = Set(KurnSchemaV2.models.map { ObjectIdentifier($0) })
+        #expect(KurnSchemaV1.models.allSatisfy { !liveIdentifiers.contains(ObjectIdentifier($0)) })
+
+        let frozenEntityNames = Set(Schema(KurnSchemaV1.models).entities.map(\.name))
+        let liveEntityNames = Set(Schema(KurnSchemaV2.models).entities.map(\.name))
+        #expect(frozenEntityNames.count == 11)
+        #expect(frozenEntityNames.isSubset(of: liveEntityNames))
+        #expect(liveEntityNames.subtracting(frozenEntityNames) == ["ChatSession"])
+
+        let frozenMeeting = Schema(KurnSchemaV1.models).entities.first { $0.name == "Meeting" }
+        #expect(frozenMeeting?.relationships.contains { $0.name == "chatSessions" } == false)
+        let liveMeeting = Schema(KurnSchemaV2.models).entities.first { $0.name == "Meeting" }
+        #expect(liveMeeting?.relationships.contains { $0.name == "chatSessions" } == true)
+    }
+
     @Test func migrationPlanDeclaresBothSchemasWithOneLightweightStage() {
         // KurnSchemaV2 added ChatSession — the first real use of this plan.
         // The next *non*-additive model change must add KurnSchemaV3 here
