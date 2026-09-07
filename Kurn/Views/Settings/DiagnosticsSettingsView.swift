@@ -21,63 +21,9 @@ struct DiagnosticsSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                Picker(
-                    NSLocalizedString("settings.log_level", comment: "Logging level"),
-                    selection: Binding(
-                        get: { settings.logLevel },
-                        set: { settings.logLevel = $0 }
-                    )
-                ) {
-                    ForEach(LogLevel.allCases) { Text($0.displayName).tag($0) }
-                }
-                Button {
-                    exportLogs()
-                } label: {
-                    Label(NSLocalizedString("settings.export_logs", comment: "Export logs"), systemImage: "square.and.arrow.up")
-                }
-                NavigationLink {
-                    LogEntriesListView()
-                } label: {
-                    Label(NSLocalizedString("settings.view_logs", comment: "View recent logs"), systemImage: "doc.text.magnifyingglass")
-                }
-                Toggle(
-                    NSLocalizedString("settings.diagnostic_reports", comment: "Diagnostic reports"),
-                    isOn: Binding(
-                        get: { settings.diagnosticReportsConsented },
-                        set: { enabled in
-                            if enabled {
-                                showingDiagnosticReportsConsent = true
-                            } else {
-                                settings.diagnosticReportsConsented = false
-                            }
-                        }
-                    )
-                )
-                NavigationLink {
-                    DiagnosticReportsListView()
-                } label: {
-                    Label(
-                        NSLocalizedString("settings.diagnostic_reports.view", comment: "View diagnostic reports"),
-                        systemImage: "exclamationmark.triangle"
-                    )
-                }
-                NavigationLink {
-                    ReliabilityEventsListView()
-                } label: {
-                    Label(
-                        NSLocalizedString("settings.reliability_events.view", comment: "View reliability events"),
-                        systemImage: "checklist"
-                    )
-                }
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels"))
-                    Text(NSLocalizedString("settings.export_logs_footer", comment: "Explains log export"))
-                    Text(NSLocalizedString("settings.diagnostic_reports_footer", comment: "Explains diagnostic reports"))
-                    Text(NSLocalizedString("settings.reliability_events_footer", comment: "Explains reliability events"))
-                }
-            }
+            loggingSection
+            diagnosticReportsSection
+            reliabilityEventsSection
         }
         .navigationTitle(NSLocalizedString("settings.diagnostics", comment: "Diagnostics"))
         .sheet(item: $shareItem) { item in
@@ -94,6 +40,93 @@ struct DiagnosticsSettingsView: View {
             primaryAction: { settings.diagnosticReportsConsented = true },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
+    }
+
+    // MARK: - Sections
+
+    // One section per topic (logging / crash reports / reliability events) so
+    // each control's explanation sits under it, not in a shared footer four
+    // rows below the toggle it describes.
+    private var loggingSection: some View {
+        Section {
+            Picker(
+                selection: Binding(
+                    get: { settings.logLevel },
+                    set: { settings.logLevel = $0 }
+                )
+            ) {
+                ForEach(LogLevel.allCases) { Text($0.displayName).tag($0) }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.log_level", comment: "Logging level"),
+                    detail: NSLocalizedString("settings.log_level_footer", comment: "Explains logging levels")
+                )
+            }
+            Button {
+                exportLogs()
+            } label: {
+                Label {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("settings.export_logs", comment: "Export logs"),
+                        detail: NSLocalizedString("settings.export_logs_footer", comment: "Explains log export")
+                    )
+                } icon: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+            NavigationLink {
+                LogEntriesListView()
+            } label: {
+                Label(NSLocalizedString("settings.view_logs", comment: "View recent logs"), systemImage: "doc.text.magnifyingglass")
+            }
+        }
+    }
+
+    private var diagnosticReportsSection: some View {
+        Section {
+            Toggle(
+                isOn: Binding(
+                    get: { settings.diagnosticReportsConsented },
+                    set: { enabled in
+                        if enabled {
+                            showingDiagnosticReportsConsent = true
+                        } else {
+                            settings.diagnosticReportsConsented = false
+                        }
+                    }
+                )
+            ) {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.diagnostic_reports", comment: "Diagnostic reports"),
+                    detail: NSLocalizedString("settings.diagnostic_reports_footer", comment: "Explains diagnostic reports")
+                )
+            }
+            NavigationLink {
+                DiagnosticReportsListView()
+            } label: {
+                Label(
+                    NSLocalizedString("settings.diagnostic_reports.view", comment: "View diagnostic reports"),
+                    systemImage: "exclamationmark.triangle"
+                )
+            }
+        }
+    }
+
+    private var reliabilityEventsSection: some View {
+        Section {
+            NavigationLink {
+                ReliabilityEventsListView()
+            } label: {
+                Label(
+                    NSLocalizedString("settings.reliability_events.view", comment: "View reliability events"),
+                    systemImage: "checklist"
+                )
+            }
+        } header: {
+            Text(NSLocalizedString("settings.reliability_events", comment: "Reliability events"))
+        } footer: {
+            Text(NSLocalizedString("settings.reliability_events_footer", comment: "Explains reliability events"))
+        }
     }
 
     private func exportLogs() {

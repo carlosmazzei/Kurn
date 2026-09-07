@@ -5,9 +5,9 @@
 //  Capture-time preferences: which microphone and quality to record at, the
 //  opt-in live transcript preview, and the two privacy switches that guard
 //  recordings on device and on the Lock Screen. Split into named sections
-//  (Capture / Live Transcription / Playback / Privacy) so each control's
-//  explanation sits with the group it belongs to, instead of one long
-//  unordered footer at the bottom of a flat list.
+//  (Capture / Live Transcription / Playback / Privacy); where a section has
+//  several controls, each one carries its own explanation under its title
+//  (`SettingsRowLabel`) instead of a footer paragraph per control.
 //
 
 import SwiftUI
@@ -33,22 +33,30 @@ struct RecordingSettingsView: View {
     private var captureSection: some View {
         Section {
             Picker(
-                NSLocalizedString("settings.mic_pickup", comment: "Microphone"),
                 selection: Binding(
                     get: { settings.micPickup },
                     set: { settings.micPickup = $0 }
                 )
             ) {
                 ForEach(MicPickup.allCases) { Text($0.displayName).tag($0) }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.mic_pickup", comment: "Microphone"),
+                    detail: NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes")
+                )
             }
             Picker(
-                NSLocalizedString("settings.audio_quality", comment: "Audio quality"),
                 selection: Binding(
                     get: { settings.audioQuality },
                     set: { settings.audioQuality = $0 }
                 )
             ) {
                 ForEach(AudioQuality.allCases) { Text($0.displayName).tag($0) }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.audio_quality", comment: "Audio quality"),
+                    detail: NSLocalizedString("settings.audio_quality_footer", comment: "Explains that every tier preserves speech")
+                )
             }
             LabeledContent(
                 NSLocalizedString("settings.audio_quality.usage", comment: "Storage per hour"),
@@ -58,20 +66,18 @@ struct RecordingSettingsView: View {
                 )
             )
             Toggle(
-                NSLocalizedString("settings.always_use_built_in_mic", comment: "Always use iPhone microphone"),
                 isOn: Binding(
                     get: { settings.alwaysUseBuiltInMic },
                     set: { settings.alwaysUseBuiltInMic = $0 }
                 )
-            )
+            ) {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.always_use_built_in_mic", comment: "Always use iPhone microphone"),
+                    detail: NSLocalizedString("settings.always_use_built_in_mic_footer", comment: "Explains forcing the iPhone mic vs. being asked")
+                )
+            }
         } header: {
             Text(NSLocalizedString("settings.recording_section_capture", comment: "Capture"))
-        } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString("settings.mic_pickup_footer", comment: "Explains pickup modes"))
-                Text(NSLocalizedString("settings.audio_quality_footer", comment: "Explains that every tier preserves speech"))
-                Text(NSLocalizedString("settings.always_use_built_in_mic_footer", comment: "Explains forcing the iPhone mic vs. being asked"))
-            }
         }
     }
 
@@ -126,26 +132,29 @@ struct RecordingSettingsView: View {
     private var privacySection: some View {
         Section {
             Toggle(
-                NSLocalizedString("settings.require_auth_for_recordings", comment: "Require authentication for recordings"),
                 isOn: Binding(
                     get: { settings.requireAuthForRecordings },
                     set: { settings.requireAuthForRecordings = $0 }
                 )
-            )
+            ) {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.require_auth_for_recordings", comment: "Require authentication for recordings"),
+                    detail: NSLocalizedString("settings.require_auth_for_recordings_footer", comment: "Explains authentication and at-rest encryption")
+                )
+            }
             Toggle(
-                NSLocalizedString("settings.hide_live_activity_meeting_title", comment: "Hide meeting title on Lock Screen"),
                 isOn: Binding(
                     get: { settings.hideLiveActivityMeetingTitle },
                     set: { settings.hideLiveActivityMeetingTitle = $0 }
                 )
-            )
+            ) {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.hide_live_activity_meeting_title", comment: "Hide meeting title on Lock Screen"),
+                    detail: NSLocalizedString("settings.hide_live_activity_meeting_title_footer", comment: "Explains Live Activity title redaction")
+                )
+            }
         } header: {
             Text(NSLocalizedString("settings.recording_section_privacy", comment: "Privacy"))
-        } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString("settings.require_auth_for_recordings_footer", comment: "Explains authentication and at-rest encryption"))
-                Text(NSLocalizedString("settings.hide_live_activity_meeting_title_footer", comment: "Explains Live Activity title redaction"))
-            }
         }
     }
 }
