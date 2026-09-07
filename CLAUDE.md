@@ -1538,8 +1538,10 @@ toolbar would be the wrong control**:
 - Two places deliberately stay custom content: `RecorderView`'s transport
   controls (full-width, thumb-sized targets mid-recording — they take
   `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), and
-  `MeetingChatView`'s composer (an input surface, attached via
-  `.safeAreaBar(edge: .bottom)`).
+  `MeetingChatView`'s composer (an input surface: an inset glass card laid
+  over the transcript with `.overlay(alignment: .bottom)` rather than a
+  `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
+  and the keyboard instead of stopping above them).
 - `MeetingDetailView`'s four sections are a segmented `Picker`, not a bottom
   bar: they're view modes of one meeting rather than top-level destinations, and
   a bottom bar there would collide with the Chat tab's composer.

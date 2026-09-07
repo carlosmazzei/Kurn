@@ -34,12 +34,10 @@ struct MeetingChatView: View {
     /// each time a new reply starts.
     @State private var respondingStartedAt = Date()
     @State private var showingHistory = false
-    /// The floating composer's own keyboard-avoidance is separate from the
-    /// transcript's — see `conversation`'s `.ignoresSafeArea(.keyboard)` —
-    /// so this tracks the keyboard itself, letting scrolling to the latest
-    /// message still clear it. Updated by the `.onReceive` pair in
-    /// `conversation`.
-    @State private var keyboardHeight: CGFloat = 0
+    /// Measured height of the floating composer card. The transcript scrolls
+    /// beneath it (see `conversation`), so scrolling to the latest message has
+    /// to clear this much on top of the bottom safe area.
+    @State private var composerHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,15 +50,17 @@ struct MeetingChatView: View {
             }
         }
         .background(Theme.background)
-        // A composer is an input surface, not a toolbar, so it stays custom —
-        // but as a safe-area bar it gets the system's keyboard avoidance
-        // instead of a hand-drawn `.bar` strip. The composer itself is an
-        // inset glass card (see `composer`) floating over the transcript, so
-        // the bar has no background of its own: the transcript shows through
-        // around the card and the keyboard's system-drawn chrome sits
-        // directly beneath it with nothing to seam against.
-        .safeAreaBar(edge: .bottom) {
+        // A composer is an input surface, not a toolbar, so it stays custom.
+        // It's an overlay rather than a `.safeAreaBar`: a bar reserves its own
+        // strip of safe area, which the transcript would stop above — as an
+        // overlay the card floats over the transcript, which keeps running
+        // beneath it and the keyboard (the keyboard's glass is only
+        // translucent when there's content behind it). This VStack still
+        // respects the keyboard safe area, so the bottom-aligned overlay
+        // rides up with it for free.
+        .overlay(alignment: .bottom) {
             composer
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
         }
         .errorAlert($vm.error)
         .toolbar { historyToolbar }
@@ -103,6 +103,15 @@ struct MeetingChatView: View {
     // MARK: - Conversation
 
     private var conversation: some View {
+        // The reader's bottom inset is the keyboard while it's up and the
+        // home indicator otherwise — exactly the region the ScrollView below
+        // extends into, so it's what the content padding has to clear.
+        GeometryReader { geometry in
+            conversationScroll(bottomInset: geometry.safeAreaInsets.bottom)
+        }
+    }
+
+    private func conversationScroll(bottomInset: CGFloat) -> some View {
         ScrollViewReader { proxy in
             // SwiftLint attributes the accessibility_trait_for_button
             // violation from the `.simultaneousGesture` below to this
@@ -123,14 +132,14 @@ struct MeetingChatView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-                // The ScrollView below ignores the keyboard's safe area (so
+                // The ScrollView below runs to the screen's bottom edge (so
                 // the transcript itself doesn't resize when the keyboard
-                // shows), which means nothing else reserves room for it —
-                // without this, `proxy.scrollTo(anchor: .bottom)` would park
-                // the latest message right behind the floating composer and
-                // keyboard instead of above them.
-                .padding(.bottom, 16 + keyboardHeight)
-                .kurnAnimation(.easeInOut(duration: 0.25), value: keyboardHeight)
+                // shows), which means nothing reserves room for the composer
+                // card or the keyboard — without this, `proxy.scrollTo(anchor:
+                // .bottom)` would park the latest message right behind them
+                // instead of above them.
+                .padding(.bottom, 16 + composerHeight + bottomInset)
+                .kurnAnimation(.easeInOut(duration: 0.25), value: bottomInset)
             }
             .scrollDismissesKeyboard(.interactively)
             // A short conversation leaves most of the ScrollView's own frame
@@ -172,22 +181,12 @@ struct MeetingChatView: View {
             // pushing it up: the keyboard and the composer read as a layer in
             // front, and the last few rows are simply covered (scrollable
             // back into view) rather than the whole conversation reflowing.
-            // Without this, the ScrollView's own keyboard-avoidance shrinks
-            // it by the keyboard's height on top of the composer's own
-            // reserved space, so the content visibly jumps every time the
-            // keyboard shows or hides.
-            .ignoresSafeArea(.keyboard, edges: .bottom)
-            // Tracks the keyboard ourselves (via `keyboardHeight`) since the
-            // ScrollView above no longer does: `keyboardWillChangeFrame`
-            // covers both showing and resizing (e.g. QuickType bar toggling),
-            // `keyboardWillHide` is the belt-and-suspenders zero-out.
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-                guard let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
-                keyboardHeight = max(0, UIScreen.main.bounds.height - frame.origin.y)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                keyboardHeight = 0
-            }
+            // Ignoring the whole bottom safe area (not just `.keyboard`) is
+            // what lets the transcript run under the home indicator and the
+            // keyboard so both stay translucent; without it, the ScrollView's
+            // own keyboard-avoidance shrinks it by the keyboard's height and
+            // the content visibly jumps every time the keyboard shows or hides.
+            .ignoresSafeArea(edges: .bottom)
         }
     }
 
