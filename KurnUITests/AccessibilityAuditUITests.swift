@@ -52,6 +52,16 @@ final class AccessibilityAuditUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
     }
 
+    /// Seeded data has no semantic index, so this only reaches the chat's
+    /// empty/disabled state and composer — not the conversation UI (thinking
+    /// row, streaming reply, retry, citations), which needs a real answer
+    /// from a configured provider and so stays a manual/on-device check.
+    func testMeetingDetailChat() throws {
+        openFirstMeeting()
+        app.buttons["tab.chat"].tap()
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+    }
+
     func testSettings() throws {
         app.buttons["nav.settings"].tap()
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])

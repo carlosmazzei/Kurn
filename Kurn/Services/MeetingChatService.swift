@@ -29,12 +29,28 @@ struct MeetingChatService {
         self.searchService = searchService
     }
 
+    /// Progress/streaming callback fired as an answer is retrieved and
+    /// generated. May be called from a background executor; the receiver hops
+    /// to the main actor itself — the same contract as
+    /// `TranscriptionService.PhaseHandler`.
+    typealias ChatEventHandler = @Sendable (ChatStreamEvent) -> Void
+
     /// An answer plus the passages it was grounded on (retrieval mode). In
     /// full-context mode `citations` is empty — the view makes the `[mm:ss]`
     /// timestamps the model cites tappable instead.
     struct Answer: Sendable {
         var text: String
         var citations: [SemanticSearchService.Hit]
+        /// Token usage the provider reported for the final generation call,
+        /// when it exposed one. `nil` for the on-device provider (no usage
+        /// concept) or a cloud response that didn't report it.
+        var usage: TokenUsage?
+
+        init(text: String, citations: [SemanticSearchService.Hit], usage: TokenUsage? = nil) {
+            self.text = text
+            self.citations = citations
+            self.usage = usage
+        }
     }
 
     /// Whether retrieval is grounding a single meeting or the whole library.
@@ -108,23 +124,34 @@ struct MeetingChatService {
         transcriptText: String,
         candidates: [SemanticSearchService.Candidate],
         provider: AIProvider,
-        model: String
+        model: String,
+        runID: OperationID = OperationID(),
+        onEvent: @escaping ChatEventHandler = { _ in }
     ) async throws -> Answer {
-        let trimmed = try Self.requireQuestion(question)
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let startedAt = Date()
+        let trimmed = try Self.requireQuestion(question, runID: runID)
+        let llm = try Self.resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
         let transcript = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        let answer: Answer
         if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars(for: provider) {
             let userPrompt = Self.fullContextPrompt(question: trimmed, transcript: transcript)
-            let text = try await llm.chat(
+            let result = try await streamAnswer(
                 systemPrompt: Self.fullContextSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)]
+                messages: history + [ChatMessage(role: .user, content: userPrompt)],
+                llm: llm, onEvent: onEvent, runID: runID
             )
-            return Answer(text: text, citations: [])
+            answer = Answer(text: result.text, citations: [], usage: result.usage)
+        } else {
+            answer = try await retrievedAnswer(
+                question: trimmed, history: history, candidates: candidates, llm: llm, onEvent: onEvent, runID: runID
+            )
         }
-        return try await retrievedAnswer(
-            question: trimmed, history: history, candidates: candidates, llm: llm
-        )
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat",
+            outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+        ))
+        return answer
     }
 
     /// Answer across the whole library (the "Ask" sheet). Gives the model BOTH
@@ -141,14 +168,43 @@ struct MeetingChatService {
         summariesByMeeting: [UUID: String] = [:],
         articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
         provider: AIProvider,
-        model: String
+        model: String,
+        runID: OperationID = OperationID(),
+        onEvent: @escaping ChatEventHandler = { _ in }
     ) async throws -> Answer {
-        let trimmed = try Self.requireQuestion(question)
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
-        return try await libraryCombinedAnswer(
+        let startedAt = Date()
+        let trimmed = try Self.requireQuestion(question, runID: runID)
+        let llm = try Self.resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
+        let answer = try await libraryCombinedAnswer(
             question: trimmed, history: history, candidates: candidates,
-            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm
+            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm, onEvent: onEvent, runID: runID
         )
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat",
+            outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+        ))
+        return answer
+    }
+
+    /// Resolve the LLM provider, reporting a `"provider"`-stage failure (bad
+    /// key, invalid URL, on-device model unavailable) the same way
+    /// `DocumentGenerationService` reports its own provider-resolution step.
+    private static func resolveProvider(
+        provider: AIProvider,
+        model: String,
+        runID: OperationID,
+        startedAt: Date
+    ) throws -> LLMProvider {
+        do {
+            return try ProviderFactory.summaryProvider(for: provider, model: model)
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "provider",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: errorCode(error)
+            ))
+            throw error
+        }
     }
 
     // MARK: - Retrieval pipeline
@@ -163,12 +219,15 @@ struct MeetingChatService {
         poolSize: Int,
         limit: Int,
         diversify: Bool,
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: ChatEventHandler = { _ in }
     ) async throws -> [SemanticSearchService.Hit] {
+        onEvent(.phase(.rewritingQuery))
         let expansion = try? await rewriteQuery(question, llm: llm)
         let denseText = expansion.map { "\(question)\n\($0)" } ?? question
         let lexicalQuery = expansion.map { "\(question) \($0)" } ?? question
 
+        onEvent(.phase(.retrieving))
         var pool = try await searchService.hybridSearch(
             query: lexicalQuery, denseText: denseText, in: candidates, poolSize: poolSize
         )
@@ -176,8 +235,50 @@ struct MeetingChatService {
         if diversify {
             pool = SemanticSearchService.diversify(pool, maxPerMeeting: Self.maxHitsPerMeeting)
         }
+        onEvent(.phase(.reranking))
         return (try? await rerank(question: question, pool: pool, limit: limit, llm: llm))
             ?? Array(pool.prefix(limit))
+    }
+
+    /// Runs the final, user-visible generation call, forwarding each text
+    /// delta through `onEvent` as it arrives and returning the concatenated
+    /// answer. Reports a `"answer"`-stage reliability event on cancellation or
+    /// failure, the same way `DocumentGenerationService.requestText` reports
+    /// its own per-call LLM failures (final success is reported once, by the
+    /// entry point, not here). Not `private`: reused by
+    /// `MeetingChatSynthesis.swift`.
+    func streamAnswer(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        llm: LLMProvider,
+        onEvent: @escaping ChatEventHandler,
+        runID: OperationID
+    ) async throws -> (text: String, usage: TokenUsage?) {
+        onEvent(.phase(.answering))
+        let startedAt = Date()
+        let accumulator = StreamingAccumulator()
+        let usage: TokenUsage?
+        do {
+            usage = try await llm.streamChat(systemPrompt: systemPrompt, messages: messages) { delta in
+                guard !delta.isEmpty else { return }
+                accumulator.append(delta)
+                onEvent(.delta(delta))
+            }
+        } catch is CancellationError {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "answer",
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
+            throw CancellationError()
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "answer",
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: Self.errorCode(error)
+            ))
+            throw error
+        }
+        return (accumulator.value, usage)
     }
 
     /// Distinct meetings whose best passage is semantically relevant to the
@@ -206,18 +307,22 @@ struct MeetingChatService {
         question: String,
         history: [ChatMessage],
         candidates: [SemanticSearchService.Candidate],
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: @escaping ChatEventHandler = { _ in },
+        runID: OperationID
     ) async throws -> Answer {
         let top = try await retrievePassages(
             question: question, candidates: candidates,
-            poolSize: Self.poolSize(for: llm.provider), limit: Self.retrievalLimit(for: llm.provider), diversify: false, llm: llm
+            poolSize: Self.poolSize(for: llm.provider), limit: Self.retrievalLimit(for: llm.provider), diversify: false, llm: llm,
+            onEvent: onEvent
         )
         let userPrompt = Self.userPrompt(question: question, hits: top, scope: .singleMeeting, summaries: [:])
-        let text = try await llm.chat(
+        let result = try await streamAnswer(
             systemPrompt: Self.systemPrompt(for: .singleMeeting),
-            messages: history + [ChatMessage(role: .user, content: userPrompt)]
+            messages: history + [ChatMessage(role: .user, content: userPrompt)],
+            llm: llm, onEvent: onEvent, runID: runID
         )
-        return Answer(text: text, citations: top)
+        return Answer(text: result.text, citations: top, usage: result.usage)
     }
 
     /// One LLM call producing extra search terms / a hypothetical answer sentence
@@ -306,15 +411,24 @@ struct MeetingChatService {
 
     // MARK: - Prompts
 
-    private static func requireQuestion(_ question: String) throws -> String {
+    private static func requireQuestion(_ question: String, runID: OperationID) throws -> String {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: "validation",
+                outcome: .failed, code: "empty_question"
+            ))
             throw AppError.apiError(
                 statusCode: 0,
                 message: NSLocalizedString("chat.error.empty_question", comment: "Empty chat question")
             )
         }
         return trimmed
+    }
+
+    /// Not `private`: reused by `MeetingChatSynthesis.swift`'s own error reporting.
+    static func errorCode(_ error: Error) -> String {
+        (error as? AppError)?.logCode ?? "unexpected"
     }
 
     /// Grounding for the full-transcript path.

@@ -9,10 +9,23 @@
 //  opened with a bare, unversioned `Schema([...])` — there is no earlier
 //  released layout to fabricate, because this is the very first time the app
 //  has declared a schema version at all. So "the oldest supported released
-//  layout" and "today's schema" are the same set of eleven entities; what
-//  needs proving is only that opening an unversioned store through
-//  `KurnModelGraph`'s versioned schema + `KurnSchemaMigrationPlan` does not
-//  reset, corrupt, or drop it.
+//  layout" is exactly `KurnSchemaV1`'s eleven entities; what needs proving is
+//  only that opening an unversioned store through `KurnModelGraph`'s
+//  versioned schema + `KurnSchemaMigrationPlan` does not reset, corrupt, or
+//  drop it. `KurnSchemaV2` later added a twelfth, additive entity
+//  (`ChatSession`) and `Meeting.chatSessions` — this fixture deliberately
+//  still writes the V1 shape, so the reopen below also exercises that
+//  migration stage, not a same-shape no-op.
+//
+//  "The V1 shape" has to mean the *frozen* `KurnSchemaV1.*` classes in
+//  `KurnSchemaV1Models.swift`, never the live ones: the live `Meeting` already
+//  carries `chatSessions`, so a store written with it is a V2 store wearing a
+//  V1 label, and reopening it proves nothing about migrating from 1.0.0. That
+//  is exactly the bug this fixture once had. The frozen classes only have
+//  stored properties and a raw-value initializer, so the rows below are
+//  written the way they sit on disk (`languageRaw`, `highlightsData`, …) using
+//  the same encoders the live classes use, and read back through the live
+//  classes' typed accessors.
 //
 //  A real device-produced binary `.store` file would be a stronger fixture,
 //  but hand-crafting SwiftData's on-disk (Core Data-backed) format without
@@ -41,7 +54,13 @@ struct LegacyStoreAdoptionTests {
     /// existed — populates one of every model type with representative
     /// relationships and JSON-backed content, then closes it.
     private func writeLegacyStore(at url: URL) throws {
-        let legacySchema = Schema(KurnModelGraph.currentModels)
+        // The eleven-entity `KurnSchemaV1` shape specifically, built from the
+        // frozen `KurnSchemaV1.*` classes, not `KurnModelGraph.currentModels`
+        // — that now includes `ChatSession` and `Meeting.chatSessions` (added
+        // in `KurnSchemaV2`), which a store built before this file existed
+        // never had. Using the live graph here would silently stop testing
+        // the V1→V2 migration this fixture exists to exercise.
+        let legacySchema = Schema(KurnSchemaV1.models)
         let configuration = ModelConfiguration(schema: legacySchema, url: url)
         let container = try ModelContainer(for: legacySchema, configurations: [configuration])
         let context = container.mainContext
@@ -56,25 +75,27 @@ struct LegacyStoreAdoptionTests {
 
     /// Folder, tag, meeting and speaker — the core rows every other fixture
     /// below hangs off.
-    private func insertMeetingCore(into context: ModelContext) -> (meeting: Meeting, tag: Kurn.Tag) {
-        let folder = Folder(name: "Legacy Folder", iconName: "folder.fill", colorHex: "#5E5CE6")
+    private func insertMeetingCore(
+        into context: ModelContext
+    ) -> (meeting: KurnSchemaV1.Meeting, tag: KurnSchemaV1.Tag) {
+        let folder = KurnSchemaV1.Folder(name: "Legacy Folder", iconName: "folder.fill", colorHex: "#5E5CE6")
         context.insert(folder)
 
-        let tag = Tag(name: "Legacy Tag", colorHex: "#FF9500")
+        let tag = KurnSchemaV1.Tag(name: "Legacy Tag", colorHex: "#FF9500")
         context.insert(tag)
 
-        let meeting = Meeting(
+        let meeting = KurnSchemaV1.Meeting(
             title: "Legacy Meeting",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             notes: "Notes written before versioning existed.",
-            language: .english,
+            languageRaw: MeetingLanguage.english.rawValue,
             isFavorite: true,
             folder: folder
         )
         meeting.tags = [tag]
         context.insert(meeting)
 
-        let speaker = Speaker(
+        let speaker = KurnSchemaV1.Speaker(
             meeting: meeting,
             label: "Speaker 1",
             name: "Ana",
@@ -88,32 +109,37 @@ struct LegacyStoreAdoptionTests {
 
     /// A recording that finished cleanly, carrying highlights and a completed
     /// transcript — the common case.
-    private func insertDoneRecording(for meeting: Meeting, into context: ModelContext) -> Recording {
-        let doneRecording = Recording(
+    private func insertDoneRecording(
+        for meeting: KurnSchemaV1.Meeting,
+        into context: ModelContext
+    ) -> KurnSchemaV1.Recording {
+        let doneRecording = KurnSchemaV1.Recording(
             meeting: meeting,
             fileName: "legacy-done.m4a",
             duration: 623.5,
             recordedAt: Date(timeIntervalSince1970: 1_700_000_100),
-            transcriptionStatus: .done,
-            transcriptionMode: .onDevice,
-            captureState: .ready,
+            transcriptionStatusRaw: TranscriptionStatus.done.rawValue,
+            transcriptionModeRaw: TranscriptionMode.onDevice.rawValue,
+            captureStateRaw: RecordingCaptureState.ready.rawValue,
             fileSize: 4_200_000,
-            highlights: [Highlight(timestamp: 12.5)]
+            highlightsData: JSONStorage.encode([Highlight(timestamp: 12.5)])
         )
-        doneRecording.speakerVoiceprints = ["Speaker 1": [0.1, 0.2, 0.3, 0.4]]
+        let speakerVoiceprints: [String: [Float]] = ["Speaker 1": [0.1, 0.2, 0.3, 0.4]]
+        doneRecording.speakerVoiceprintsData = JSONStorage.encode(speakerVoiceprints)
         context.insert(doneRecording)
 
-        let transcript = Transcript(
+        let segments = [
+            TranscriptSegment(
+                speakerLabel: "Speaker 1",
+                startTime: 0,
+                endTime: 5.2,
+                text: "Let's start the legacy meeting.",
+                confidence: 0.92
+            )
+        ]
+        let transcript = KurnSchemaV1.Transcript(
             recording: doneRecording,
-            segments: [
-                TranscriptSegment(
-                    speakerLabel: "Speaker 1",
-                    startTime: 0,
-                    endTime: 5.2,
-                    text: "Let's start the legacy meeting.",
-                    confidence: 0.92
-                )
-            ],
+            segmentsData: JSONStorage.encodeAuthoritative(segments) ?? Data(),
             language: "en",
             createdAt: Date(timeIntervalSince1970: 1_700_000_200)
         )
@@ -125,19 +151,19 @@ struct LegacyStoreAdoptionTests {
     /// A second recording still carrying an in-flight checkpoint and an
     /// explicit capture-recovery state — the H1/H4 durability state this
     /// adoption path must not silently drop.
-    private func insertRecoveringRecording(for meeting: Meeting, into context: ModelContext) {
-        let recoveringRecording = Recording(
+    private func insertRecoveringRecording(for meeting: KurnSchemaV1.Meeting, into context: ModelContext) {
+        let recoveringRecording = KurnSchemaV1.Recording(
             meeting: meeting,
             fileName: "legacy-recovering.m4a",
             duration: 240,
             recordedAt: Date(timeIntervalSince1970: 1_700_000_300),
-            transcriptionStatus: .inProgress,
-            transcriptionMode: .onDevice,
-            captureState: .recoveryNeeded,
-            captureRecoveryReason: .writeFailed,
+            transcriptionStatusRaw: TranscriptionStatus.inProgress.rawValue,
+            transcriptionModeRaw: TranscriptionMode.onDevice.rawValue,
+            captureStateRaw: RecordingCaptureState.recoveryNeeded.rawValue,
+            captureRecoveryReasonRaw: CaptureRecoveryReason.writeFailed.rawValue,
             fileSize: 1_800_000
         )
-        recoveringRecording.transcriptionCheckpoint = .fixture(
+        let checkpoint = TranscriptionCheckpoint.fixture(
             engine: .appleSpeech,
             language: .english,
             compacted: false,
@@ -148,48 +174,54 @@ struct LegacyStoreAdoptionTests {
                 TranscriptionCheckpoint.Span(text: "First chunk.", start: 0, end: 30, confidence: 0.8)
             ]
         )
+        recoveringRecording.transcriptionCheckpointData = JSONStorage.encodeAuthoritative(checkpoint)
         context.insert(recoveringRecording)
     }
 
     /// Summary, smart folder, semantic chunk, wiki article and generated
     /// document — the LLM-derived and index artifacts layered on the meeting.
     private func insertDerivedArtifacts(
-        for meeting: Meeting,
-        tag: Kurn.Tag,
-        doneRecording: Recording,
+        for meeting: KurnSchemaV1.Meeting,
+        tag: KurnSchemaV1.Tag,
+        doneRecording: KurnSchemaV1.Recording,
         into context: ModelContext
     ) {
-        let summary = Summary(
+        let sections = [SummarySection(title: "Overview", body: "A legacy summary.", items: ["Item one"])]
+        let summary = KurnSchemaV1.Summary(
             meeting: meeting,
-            sections: [SummarySection(title: "Overview", body: "A legacy summary.", items: ["Item one"])],
+            sectionsData: JSONStorage.encodeAuthoritative(sections) ?? Data(),
             templateName: "General",
-            provider: .openAI,
-            model: "gpt-5.4",
+            providerRaw: AIProvider.openAI.rawValue,
+            modelRaw: "gpt-5.4",
             createdAt: Date(timeIntervalSince1970: 1_700_000_400)
         )
         context.insert(summary)
 
-        let smartFolder = SmartFolder(
+        let smartFolder = KurnSchemaV1.SmartFolder(
             name: "Legacy Smart Folder",
-            filter: MeetingFilter(tagIDs: [tag.id]),
+            iconName: "folder.badge.gearshape",
+            colorHex: "#FF2D55",
+            predicateData: JSONStorage.encode(MeetingFilter(tagIDs: [tag.id])),
             createdAt: Date(timeIntervalSince1970: 1_700_000_500)
         )
         context.insert(smartFolder)
 
-        let semanticChunk = SemanticChunk(
+        let vector: [Float] = [0.5, 0.25, 0.125]
+        let semanticChunk = KurnSchemaV1.SemanticChunk(
             meeting: meeting,
             recordingID: doneRecording.id,
             text: "Let's start the legacy meeting.",
             startTime: 0,
             endTime: 5.2,
             speakerLabel: "Speaker 1",
-            vector: [0.5, 0.25, 0.125],
+            vectorData: VectorData.encode(vector),
+            dimension: vector.count,
             modelIdentifier: "legacy-embedder-v1",
             createdAt: Date(timeIntervalSince1970: 1_700_000_600)
         )
         context.insert(semanticChunk)
 
-        let wikiArticle = WikiArticle(
+        let wikiArticle = KurnSchemaV1.WikiArticle(
             meeting: meeting,
             bodyMarkdown: "# Legacy Meeting\n- Decision point at 00:12",
             meetingTitleSnapshot: meeting.title,
@@ -201,13 +233,13 @@ struct LegacyStoreAdoptionTests {
         )
         context.insert(wikiArticle)
 
-        let generatedDocument = GeneratedDocument(
+        let generatedDocument = KurnSchemaV1.GeneratedDocument(
             title: "Legacy Digest",
             bodyMarkdown: "# Legacy Digest\nSynthesized before versioning existed.",
             userPrompt: "Summarize everything about the legacy meeting.",
-            sourceKind: .transcripts,
-            sourceNames: [meeting.title],
-            sourceMeetingIDs: [meeting.id],
+            sourceKindRaw: DocumentSourceKind.transcripts.rawValue,
+            sourceNamesData: JSONStorage.encode([meeting.title]),
+            sourceMeetingIDsData: JSONStorage.encode([meeting.id]),
             generatorModelIdentifier: "openAI:gpt-5.4",
             createdAt: Date(timeIntervalSince1970: 1_700_000_800)
         )
@@ -284,6 +316,16 @@ struct LegacyStoreAdoptionTests {
         let generatedDocuments = try context.fetch(FetchDescriptor<GeneratedDocument>())
         #expect(generatedDocuments.count == 1)
         #expect(generatedDocuments.first?.sourceMeetingIDs == [meeting.id])
+
+        // The V2 additions are present and usable on the migrated store: the
+        // new to-many is empty rather than faulting, and the new entity can
+        // be fetched and written against the same file.
+        #expect(meeting.chatSessions.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<ChatSession>()).isEmpty)
+        let chatSession = ChatSession(meeting: meeting, title: "After migration")
+        context.insert(chatSession)
+        try context.save()
+        #expect(meeting.chatSessions.map(\.title) == ["After migration"])
     }
 
     private func tagID(from meeting: Meeting) -> UUID {

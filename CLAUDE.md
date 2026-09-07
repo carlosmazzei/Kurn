@@ -325,9 +325,9 @@ file/type limits as a refactoring signal rather than using the remaining line bu
 ### Data model
 
 `Meeting` is the aggregate root. It cascades deletes to its `recordings`,
-`speakers`, `summaries`, `semanticChunks`, and `wikiArticle` — every
-transcript-derived artifact dies with the meeting it came from, which is what
-makes "delete the meeting" a complete erasure rather than a partial one.
+`speakers`, `summaries`, `semanticChunks`, `wikiArticle`, and `chatSessions` —
+every transcript-derived artifact dies with the meeting it came from, which is
+what makes "delete the meeting" a complete erasure rather than a partial one.
 `GeneratedDocument` is the deliberate exception: it snapshots its sources
 instead of relating to them, so deleting a meeting cannot destroy a document
 already generated from it.
@@ -1345,11 +1345,38 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   dense (`NLContextualEmbedding` cosine) + lexical (BM25) retrieval fused with
   Reciprocal Rank Fusion (`SemanticSearchService.hybridSearch`) → LLM rerank →
   grounded answer. All prompts cite `[mm:ss]` and reply in the transcript
-  language. `MeetingChatViewModel` + `MeetingChatView` drive an in-memory
-  conversation, surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a
-  library-wide "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are
-  tappable and seek the transcript. History is in-memory only — nothing
-  chat-related is persisted, so there is nothing extra to encrypt. When
+  language. `MeetingChatViewModel` + `MeetingChatView` drive the conversation,
+  surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a library-wide
+  "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are tappable and
+  seek the transcript. Conversations are saved as `ChatSession`
+  (`Models/ChatSession.swift`) — the same "reopen a past chat, start a new one,
+  delete one" affordances Claude's own mobile app offers, via the history/new
+  toolbar buttons on `MeetingChatView` and `Views/ChatSessionListView.swift`'s
+  history sheet. A session is created lazily, on the conversation's first
+  *successfully completed* exchange (`MeetingChatViewModel.persist()`) — a
+  cancelled/failed reply never reaches it (`dropPartialReply` removes those
+  turns first), and a chat opened and abandoned with nothing sent leaves no
+  row in history. Turns (including citations and token usage/cost) are
+  JSON-encoded into `ChatSession.turnsData`, the same `Transcript.segmentsData`
+  pattern; like every other `@Model`, it's encrypted at rest by
+  `ModelStoreProtection` with the rest of the store. Scoped like the feature
+  itself: a per-meeting conversation's `ChatSession.meeting` cascade-deletes
+  with the meeting, same as `summaries`/`semanticChunks`; a library-wide one
+  has `meeting == nil` and its own history list. `KurnSchemaV2`
+  (`Infrastructure/KurnSchema.swift`) is the first real use of
+  `KurnSchemaMigrationPlan` — a lightweight stage, since adding `ChatSession`
+  and its relationship is purely additive. **Only the current version lists
+  the live `@Model` classes.** `KurnSchemaV1.models` resolves to the frozen
+  copies in `Infrastructure/KurnSchemaV1Models.swift` (`KurnSchemaV1.Meeting`,
+  …, nested types with just the stored properties), because a `VersionedSchema`
+  built from the live classes is redefined by every edit to them: the first
+  cut of V2 did exactly that, so "V1" already contained `chatSessions`, no
+  real 1.0.0 store matched it, and the migration failed on upgrade while
+  `LegacyStoreAdoptionTests` stayed green (its fixture was written with the
+  same live classes). The next model change therefore means: edit the live
+  class, add `KurnSchemaV3` listing the live classes, demote `KurnSchemaV2` to
+  frozen copies in a `KurnSchemaV2Models.swift`, add the stage, and bump
+  `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
   `wikiEnabled` is on, the library-wide path additionally grounds on the
   condensed per-meeting articles — see "Derived artifacts" below for why that
   answers synthesis and counting questions retrieval alone cannot.
@@ -1511,8 +1538,10 @@ toolbar would be the wrong control**:
 - Two places deliberately stay custom content: `RecorderView`'s transport
   controls (full-width, thumb-sized targets mid-recording — they take
   `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), and
-  `MeetingChatView`'s composer (an input surface, attached via
-  `.safeAreaBar(edge: .bottom)`).
+  `MeetingChatView`'s composer (an input surface: an inset glass card laid
+  over the transcript with `.overlay(alignment: .bottom)` rather than a
+  `.safeAreaBar`, so the conversation keeps scrolling beneath both the card
+  and the keyboard instead of stopping above them).
 - `MeetingDetailView`'s four sections are a segmented `Picker`, not a bottom
   bar: they're view modes of one meeting rather than top-level destinations, and
   a bottom bar there would collide with the Chat tab's composer.
@@ -1561,9 +1590,9 @@ enforced by lint and by a CI audit test, not just convention:
   as a build artifact.
 - **`KurnUITests/AccessibilityAuditUITests.swift`** — runs
   `XCUIApplication.performAccessibilityAudit(for: [.sufficientElementDescription,
-  .trait])` over five screens, one test each: the meetings list
-  (`testMeetingsList`), the Meeting Detail Recordings, Transcript and Summary
-  tabs, and the Settings root. It reuses the same seeded
+  .trait])` over six screens, one test each: the meetings list
+  (`testMeetingsList`), the Meeting Detail Recordings, Transcript, Summary and
+  Chat tabs, and the Settings root. It reuses the same seeded
   `"UI-Testing-Screenshots"` launch state and identifiers as the screenshot
   tests. It's wired into the `Kurn.xcscheme`'s default `TestAction` alongside
   `KurnTests` (`KurnUITests` wasn't in the scheme before this was added, so it
@@ -1602,9 +1631,14 @@ enforced by lint and by a CI audit test, not just convention:
   `$IOS_DESTINATION`), so Watch VoiceOver is verified manually, not by CI.
   **`RecorderView` and `FolderFormView` are not audited either** — worth
   knowing before trusting the audit as a safety net, since the recorder is the
-  screen with the most icon-only controls. Adding a test for a new screen is
-  the cheap part; the audit's coverage is exactly the five tests listed above
-  and nothing more.
+  screen with the most icon-only controls. `testMeetingDetailChat` audits the
+  Chat tab's structural chrome only: seeded data carries no semantic index, so
+  the run never leaves the empty/disabled state and composer — the actual
+  conversation UI (the "thinking" reasoning row, a streaming reply, the retry
+  affordance, citation and timestamp chips) only renders once a configured
+  provider returns a real answer, so it stays a manual/on-device check. Adding
+  a test for a new screen is the cheap part; the audit's coverage is exactly
+  the six tests listed above and nothing more.
 
 ## Conventions
 
@@ -1655,8 +1689,21 @@ enforced by lint and by a CI audit test, not just convention:
 - **Git & PRs:** write all commit messages and pull request titles/descriptions in
   English, regardless of the language used in chat. (User-facing app strings are
   still localized per the localization convention above — this rule is only about
-  repository metadata.)
+  repository metadata.) Use **Conventional Commits** for the commit subject line:
+  `<type>(<optional scope>): <summary>`, type one of `feat`, `fix`, `docs`,
+  `chore`, `refactor`, `test`, `perf`, `style`, `build`, `ci` — e.g.
+  `fix(chat): dismiss the keyboard on tap outside the composer`. Existing history
+  is mixed (older commits predate this rule); new commits should follow it.
 - **Do not commit directly to `main`:** create a feature branch for every change,
   push it, and open a pull request. Only merge through the GitHub PR workflow so
   CI runs before the change lands on `main`. The only exceptions are fastlane
   version/tag bumps run explicitly by a maintainer.
+- **Accessibility is not optional on any UI change:** every new icon-only
+  control needs an `.accessibilityLabel`, every view carrying a tap/long-press
+  gesture needs either an `.isButton`/`.isLink` trait or a documented
+  `// swiftlint:disable:next accessibility_trait_for_button` with the reasoning
+  (see "Accessibility" above for the existing pattern and why the disable
+  comment attributes to the *enclosing view's declaration line*, not the
+  modifier). Both rules are `severity: error` in `.swiftlint.yml` and fail CI,
+  not just warn — check this before pushing UI changes, not after `lint-and-validate`
+  fails.

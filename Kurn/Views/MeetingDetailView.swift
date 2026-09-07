@@ -131,7 +131,10 @@ struct MeetingDetailView: View {
             Divider().overlay(Theme.separator)
             tabContent
         }
-        .background(Theme.background.ignoresSafeArea())
+        // The Chat tab sits on the system background so the keyboard blends
+        // with it (see `MeetingChatView`); the header follows so the two
+        // don't meet in a visible seam at the divider.
+        .background((tab == .chat ? Color(uiColor: .systemBackground) : Theme.background).ignoresSafeArea())
         .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }

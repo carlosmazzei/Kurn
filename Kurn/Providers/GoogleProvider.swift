@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 
 struct GoogleProvider: LLMProvider {
     let provider: AIProvider
@@ -115,6 +116,63 @@ struct GoogleProvider: LLMProvider {
         )
     }
 
+    // MARK: - Chat (streamGenerateContent, streaming)
+
+    @discardableResult
+    func streamChat(
+        systemPrompt: String,
+        messages: [ChatMessage],
+        options: TextGenerationOptions,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> TokenUsage? {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        var contents: [[String: Any]] = []
+        for (index, message) in messages.enumerated() where message.role != .system {
+            let role = message.role == .assistant ? "model" : "user"
+            var text = message.content
+            if index == 0 && message.role == .user {
+                text = "\(systemPrompt)\n\n\(text)"
+            }
+            contents.append(["role": role, "parts": [["text": text]]])
+        }
+        if contents.isEmpty {
+            contents = [["role": "user", "parts": [["text": systemPrompt]]]]
+        }
+        let request = try makeStreamRequest(
+            timeout: options.timeout,
+            body: [
+                "contents": contents,
+                "generationConfig": ["maxOutputTokens": options.maxOutputTokens]
+            ]
+        )
+
+        let accumulator = StreamingAccumulator()
+        let usage = UsageAccumulator()
+        try await LLMHTTP.streamSSE(
+            request,
+            session: session,
+            policy: .interactive(totalDeadline: options.timeout)
+        ) { payload in
+            guard let data = payload.data(using: .utf8),
+                  let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data) else { return }
+            if let delta = Self.text(from: chunk), !delta.isEmpty {
+                accumulator.append(delta)
+                onDelta(delta)
+            }
+            // Each chunk repeats Gemini's running cumulative counts, so the
+            // last chunk that carries one is the final tally — overwriting on
+            // every occurrence rather than only the first gets that for free.
+            if let metadata = chunk.usageMetadata {
+                usage.set(promptTokens: metadata.promptTokenCount, completionTokens: metadata.candidatesTokenCount)
+            }
+        }
+        guard accumulator.receivedText else {
+            throw AppError.decodingError("empty Gemini response")
+        }
+        return usage.value
+    }
+
     // MARK: - Helpers
 
     /// The `generateContent` route for the configured model. Gemini model IDs are
@@ -122,6 +180,26 @@ struct GoogleProvider: LLMProvider {
     /// rather than emit `models/models/…`.
     private var generateContentPath: String {
         "models/\(model.replacingOccurrences(of: "models/", with: "")):generateContent"
+    }
+
+    /// The `streamGenerateContent` route for the configured model, SSE-shaped
+    /// (`alt=sse`) rather than the newline-delimited JSON array the endpoint
+    /// returns by default — `LLMHTTP.streamSSE` only understands `data:` framing.
+    private var streamGenerateContentPath: String {
+        "models/\(model.replacingOccurrences(of: "models/", with: "")):streamGenerateContent"
+    }
+
+    /// A `streamGenerateContent` request with Gemini's API-key header and
+    /// `alt=sse` query item.
+    private func makeStreamRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
+        try LLMHTTP.jsonRequest(
+            provider: provider,
+            path: streamGenerateContentPath,
+            timeout: timeout,
+            headers: ["x-goog-api-key": apiKey],
+            queryItems: [URLQueryItem(name: "alt", value: "sse")],
+            body: body
+        )
     }
 
     /// A `generateContent` request with Gemini's API-key header.
@@ -142,6 +220,14 @@ struct GoogleProvider: LLMProvider {
 
 private struct GeminiResponse: Decodable {
     let candidates: [GeminiCandidate]?
+    let usageMetadata: GeminiUsageMetadata?
+}
+
+/// Gemini reports cumulative token counts on (typically) every streamed
+/// chunk rather than once at the end, unlike OpenAI/Anthropic.
+private struct GeminiUsageMetadata: Decodable {
+    let promptTokenCount: Int?
+    let candidatesTokenCount: Int?
 }
 
 private struct GeminiCandidate: Decodable {

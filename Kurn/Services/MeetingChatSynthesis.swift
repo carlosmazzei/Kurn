@@ -21,6 +21,7 @@
 //
 
 import Foundation
+import KurnCore
 
 extension MeetingChatService {
 
@@ -32,26 +33,31 @@ extension MeetingChatService {
         candidates: [SemanticSearchService.Candidate],
         summaries: [UUID: String],
         articles: [UUID: WikiArticleSnapshot],
-        llm: LLMProvider
+        llm: LLMProvider,
+        onEvent: @escaping ChatEventHandler = { _ in },
+        runID: OperationID
     ) async throws -> Answer {
         let passages = try await retrievePassages(
             question: question, candidates: candidates,
-            poolSize: Self.libraryPoolSize(for: llm.provider), limit: Self.libraryRetrievalLimit(for: llm.provider), diversify: true, llm: llm
+            poolSize: Self.libraryPoolSize(for: llm.provider), limit: Self.libraryRetrievalLimit(for: llm.provider), diversify: true, llm: llm,
+            onEvent: onEvent
         )
         // Adaptive breadth: the wiki articles of every meeting whose best passage
         // clears the relevance floor, ordered chronologically. One path serves
         // pinpoint, evolution, and aggregate questions — the floor decides how
         // wide it goes, not a per-type classifier.
+        onEvent(.phase(.synthesizing))
         let meetingIDs = try await selectRelevantMeetings(question: question, candidates: candidates)
         let selected = Self.orderedArticles(meetingIDs: meetingIDs, articles: articles)
 
         guard !passages.isEmpty || !selected.isEmpty else {
             let empty = Self.userPrompt(question: question, hits: [], scope: .library, summaries: [:])
-            let text = try await llm.chat(
+            let result = try await streamAnswer(
                 systemPrompt: Self.systemPrompt(for: .library),
-                messages: history + [ChatMessage(role: .user, content: empty)]
+                messages: history + [ChatMessage(role: .user, content: empty)],
+                llm: llm, onEvent: onEvent, runID: runID
             )
-            return Answer(text: text, citations: [])
+            return Answer(text: result.text, citations: [], usage: result.usage)
         }
 
         let rendered = selected.map(Self.renderArticle)
@@ -64,19 +70,21 @@ extension MeetingChatService {
 
         // Fits in one pass → a single call that can quote and aggregate directly.
         if userPrompt.count <= SummaryService.maxSinglePassChars(for: llm.provider) {
-            let text = try await llm.chat(
+            let result = try await streamAnswer(
                 systemPrompt: Self.combinedSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)]
+                messages: history + [ChatMessage(role: .user, content: userPrompt)],
+                llm: llm, onEvent: onEvent, runID: runID
             )
-            return Answer(text: text, citations: passages)
+            return Answer(text: result.text, citations: passages, usage: result.usage)
         }
 
         // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
         let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars(for: llm.provider))
-        let text = try await synthesizeMapReduce(
-            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm
+        let result = try await synthesizeMapReduce(
+            question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm,
+            onEvent: onEvent, runID: runID
         )
-        return Answer(text: text, citations: passages)
+        return Answer(text: result.text, citations: passages, usage: result.usage)
     }
 
     // MARK: - Article selection
@@ -98,20 +106,14 @@ extension MeetingChatService {
         history: [ChatMessage],
         blocks: [String],
         passagesBlock: String,
-        llm: LLMProvider
-    ) async throws -> String {
-        var partials: [String] = []
-        for (index, block) in blocks.enumerated() {
-            try Task.checkCancellation()
-            let userPrompt = Self.synthesisMapPrompt(
-                question: question, articlesBlock: block, part: index + 1, total: blocks.count
-            )
-            let partial = try await llm.chat(
-                systemPrompt: Self.synthesisMapSystemPrompt,
-                messages: [ChatMessage(role: .user, content: userPrompt)]
-            )
-            partials.append(partial)
-        }
+        llm: LLMProvider,
+        onEvent: @escaping ChatEventHandler,
+        runID: OperationID
+    ) async throws -> (text: String, usage: TokenUsage?) {
+        onEvent(.phase(.synthesizing))
+        let partials = try await Self.condenseBlocksConcurrently(
+            question: question, blocks: blocks, llm: llm, onEvent: onEvent, runID: runID
+        )
         try Task.checkCancellation()
         let combined = partials.enumerated()
             .map { "Part \($0.offset + 1):\n\($0.element)" }
@@ -119,10 +121,118 @@ extension MeetingChatService {
         let reducePrompt = Self.combinedReducePrompt(
             question: question, partials: combined, passagesBlock: passagesBlock
         )
-        return try await llm.chat(
+        return try await streamAnswer(
             systemPrompt: Self.combinedSystemPrompt,
-            messages: history + [ChatMessage(role: .user, content: reducePrompt)]
+            messages: history + [ChatMessage(role: .user, content: reducePrompt)],
+            llm: llm, onEvent: onEvent, runID: runID
         )
+    }
+
+    /// Upper bound on simultaneous map calls, so a large library doesn't fire
+    /// dozens of requests at the provider at once and trip a rate limit.
+    private static let maxConcurrentMapCalls = 4
+
+    /// Condenses every block concurrently (bounded by `maxConcurrentMapCalls`)
+    /// instead of one at a time. Safe to parallelize here — unlike
+    /// `SummaryService.mapReduce`, which stays sequential specifically so a
+    /// long-running *background* summary can checkpoint and resume block by
+    /// block across app suspension, this is a live, interactive chat call
+    /// with no resume path, so sequential order buys nothing but a slower
+    /// wait. Progress is reported by completion count rather than start
+    /// order, since with several calls in flight at once "starting block 3"
+    /// is no longer a meaningful milestone the way "3 of 5 done" still is.
+    /// Not `private`: covered directly by
+    /// `MeetingChatSynthesisConcurrencyTests`, which scripts an `LLMProvider`
+    /// and checks the reordering-by-index logic without needing to also
+    /// fabricate retrieval/embedding fixtures to reach it indirectly.
+    static func condenseBlocksConcurrently(
+        question: String,
+        blocks: [String],
+        llm: LLMProvider,
+        onEvent: @escaping ChatEventHandler,
+        runID: OperationID
+    ) async throws -> [String] {
+        var results = [String?](repeating: nil, count: blocks.count)
+        var completedCount = 0
+        var nextIndex = 0
+
+        try await withThrowingTaskGroup(of: (Int, String).self) { group in
+            func addTask(_ index: Int) {
+                let block = blocks[index]
+                group.addTask {
+                    try await Self.condenseBlock(
+                        question: question, block: block, index: index, total: blocks.count,
+                        llm: llm, runID: runID
+                    )
+                }
+            }
+
+            while nextIndex < min(maxConcurrentMapCalls, blocks.count) {
+                addTask(nextIndex)
+                nextIndex += 1
+            }
+
+            while let (index, partial) = try await group.next() {
+                results[index] = partial
+                completedCount += 1
+                // A large library can mean several map calls before there's
+                // any other visible change — without this, "Reading meeting
+                // notes…" sits static long enough to read as stuck. Skipped
+                // for a single block, where there's nothing to count.
+                if blocks.count > 1 {
+                    onEvent(.progress(String(format: NSLocalizedString(
+                        "chat.phase.progress_fraction", comment: "Step N of M within a chat phase"
+                    ), completedCount, blocks.count)))
+                }
+                if nextIndex < blocks.count {
+                    addTask(nextIndex)
+                    nextIndex += 1
+                }
+            }
+        }
+        // Every index in 0..<blocks.count had exactly one task added and
+        // awaited above, so every slot is filled.
+        return results.compactMap { $0 }
+    }
+
+    /// Condenses one block, reporting a `"map_N_of_M"`-stage reliability
+    /// event on cancellation or failure — the same per-block granularity the
+    /// previous sequential loop reported, just from a task that may now be
+    /// running alongside its siblings rather than alone.
+    private static func condenseBlock(
+        question: String,
+        block: String,
+        index: Int,
+        total: Int,
+        llm: LLMProvider,
+        runID: OperationID
+    ) async throws -> (Int, String) {
+        try Task.checkCancellation()
+        let userPrompt = Self.synthesisMapPrompt(
+            question: question, articlesBlock: block, part: index + 1, total: total
+        )
+        let stage = "map_\(index + 1)_of_\(total)"
+        let startedAt = Date()
+        do {
+            let partial = try await llm.chat(
+                systemPrompt: Self.synthesisMapSystemPrompt,
+                messages: [ChatMessage(role: .user, content: userPrompt)]
+            )
+            return (index, partial)
+        } catch is CancellationError {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: stage,
+                outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
+            ))
+            throw CancellationError()
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: runID, operation: "meeting_chat", stage: stage,
+                outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                code: MeetingChatService.errorCode(error)
+            ))
+            throw error
+        }
     }
 
     // MARK: - Rendering / packing
