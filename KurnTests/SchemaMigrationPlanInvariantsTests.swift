@@ -28,7 +28,7 @@ struct SchemaMigrationPlanInvariantsTests {
     private var schemas: [any VersionedSchema.Type] { KurnSchemaMigrationPlan.schemas }
 
     @Test func versionsAreStrictlyIncreasingAndTheLastOneIsTheCurrentGraph() throws {
-        let versions = schemas.map(\.versionIdentifier)
+        let versions = schemas.map { $0.versionIdentifier }
         #expect(versions.count >= 2)
         for (older, newer) in zip(versions, versions.dropFirst()) {
             #expect(older < newer, "\(older) must precede \(newer)")
