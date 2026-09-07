@@ -62,6 +62,10 @@ struct ModelStoreBackupManagerTests {
             #expect(generations.first?.id == generation?.id)
             // The live files must be untouched — backup only ever copies.
             #expect(readLiveStoreContent(in: directory) == "v1")
+            // Provenance records the version the store is actually at, not
+            // whichever schema was current when the backup code was written.
+            #expect(generation?.schemaVersion == "\(KurnModelGraph.currentSchemaVersion)")
+            #expect(generation?.schemaVersion == "\(KurnSchemaV2.versionIdentifier)")
         }
     }
 

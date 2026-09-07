@@ -212,7 +212,7 @@ struct ModelStoreBackupManager {
     }
 
     private static var currentSchemaVersionString: String {
-        "\(KurnSchemaV1.versionIdentifier)"
+        "\(KurnModelGraph.currentSchemaVersion)"
     }
 
     private static var appVersion: String {
