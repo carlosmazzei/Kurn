@@ -46,9 +46,16 @@ struct MeetingChatView: View {
         }
         .background(Theme.background)
         // A composer is an input surface, not a toolbar, so it stays custom —
-        // but as a safe-area bar it gets the system's glass background and
-        // keyboard avoidance instead of a hand-drawn `.bar` strip.
-        .safeAreaBar(edge: .bottom) { composer }
+        // but as a safe-area bar it gets the system's keyboard avoidance
+        // instead of a hand-drawn `.bar` strip. Its own backdrop is pinned to
+        // the system background color rather than inheriting `Theme.background`
+        // (a custom near-black in dark mode): the keyboard tray right below it
+        // is drawn by iOS itself in the system's own tone, so a custom brand
+        // color here reads as a visible seam — exactly what Claude's own
+        // composer avoids by staying on the system tone.
+        .safeAreaBar(edge: .bottom) {
+            composer.background(Color(uiColor: .systemBackground))
+        }
         .errorAlert($vm.error)
         .toolbar { historyToolbar }
         .sheet(isPresented: $showingHistory) {
