@@ -9,6 +9,7 @@
 //  on-device retrieved passages; tapping a citation calls `onJump`.
 //
 
+import Combine
 import SwiftData
 import SwiftUI
 import UIKit
@@ -33,6 +34,12 @@ struct MeetingChatView: View {
     /// each time a new reply starts.
     @State private var respondingStartedAt = Date()
     @State private var showingHistory = false
+    /// The floating composer's own keyboard-avoidance is separate from the
+    /// transcript's — see `conversation`'s `.ignoresSafeArea(.keyboard)` —
+    /// so this tracks the keyboard itself, letting scrolling to the latest
+    /// message still clear it. Updated by the `.onReceive` pair in
+    /// `conversation`.
+    @State private var keyboardHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,14 +54,14 @@ struct MeetingChatView: View {
         .background(Theme.background)
         // A composer is an input surface, not a toolbar, so it stays custom —
         // but as a safe-area bar it gets the system's keyboard avoidance
-        // instead of a hand-drawn `.bar` strip. Its own backdrop is pinned to
-        // the system background color rather than inheriting `Theme.background`
-        // (a custom near-black in dark mode): the keyboard tray right below it
-        // is drawn by iOS itself in the system's own tone, so a custom brand
-        // color here reads as a visible seam — exactly what Claude's own
-        // composer avoids by staying on the system tone.
+        // instead of a hand-drawn `.bar` strip. Claude's own composer reads as
+        // a translucent glass panel floating over the transcript rather than
+        // an opaque bar matched to any one background color, so this uses the
+        // same `.ultraThinMaterial` as the text field pill instead of
+        // `Theme.background` (a custom near-black in dark mode that would
+        // otherwise seam against the keyboard's own system-drawn chrome).
         .safeAreaBar(edge: .bottom) {
-            composer.background(Color(uiColor: .systemBackground))
+            composer.background(.ultraThinMaterial)
         }
         .errorAlert($vm.error)
         .toolbar { historyToolbar }
@@ -116,7 +123,15 @@ struct MeetingChatView: View {
                     if let question = vm.retryableQuestion { retryRow(question: question) }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.top, 16)
+                // The ScrollView below ignores the keyboard's safe area (so
+                // the transcript itself doesn't resize when the keyboard
+                // shows), which means nothing else reserves room for it —
+                // without this, `proxy.scrollTo(anchor: .bottom)` would park
+                // the latest message right behind the floating composer and
+                // keyboard instead of above them.
+                .padding(.bottom, 16 + keyboardHeight)
+                .kurnAnimation(.easeInOut(duration: 0.25), value: keyboardHeight)
             }
             .scrollDismissesKeyboard(.interactively)
             // A short conversation leaves most of the ScrollView's own frame
@@ -153,6 +168,26 @@ struct MeetingChatView: View {
             }
             .onChange(of: vm.isResponding) { _, isResponding in
                 if isResponding { respondingStartedAt = Date() }
+            }
+            // Claude's own composer floats over the transcript instead of
+            // pushing it up: the keyboard and the composer read as a layer in
+            // front, and the last few rows are simply covered (scrollable
+            // back into view) rather than the whole conversation reflowing.
+            // Without this, the ScrollView's own keyboard-avoidance shrinks
+            // it by the keyboard's height on top of the composer's own
+            // reserved space, so the content visibly jumps every time the
+            // keyboard shows or hides.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            // Tracks the keyboard ourselves (via `keyboardHeight`) since the
+            // ScrollView above no longer does: `keyboardWillChangeFrame`
+            // covers both showing and resizing (e.g. QuickType bar toggling),
+            // `keyboardWillHide` is the belt-and-suspenders zero-out.
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+                guard let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
+                keyboardHeight = max(0, UIScreen.main.bounds.height - frame.origin.y)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardHeight = 0
             }
         }
     }
@@ -360,7 +395,7 @@ struct MeetingChatView: View {
             .focused($inputFocused)
             .accessibilityIdentifier("chat.input")
             .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.separator, lineWidth: 1))
             .disabled(!canChat)
 
