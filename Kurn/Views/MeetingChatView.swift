@@ -49,7 +49,11 @@ struct MeetingChatView: View {
                 conversation
             }
         }
-        .background(Theme.background)
+        // The system background, not `Theme.background`: the keyboard's glass
+        // is tuned to blend with the system tone, and a custom near-black
+        // behind it reads as a lighter band where the keyboard begins.
+        // `MeetingDetailView` switches its own backdrop to match on this tab.
+        .background(Color(uiColor: .systemBackground))
         // A composer is an input surface, not a toolbar, so it stays custom.
         // It's an overlay rather than a `.safeAreaBar`: a bar reserves its own
         // strip of safe area, which the transcript would stop above — as an
