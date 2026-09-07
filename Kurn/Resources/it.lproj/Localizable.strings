@@ -740,6 +740,7 @@
 "chat.starter.library.subtitle" = "Le risposte si basano sulle riunioni trascritte nella tua libreria, con citazioni che puoi toccare per andare direttamente a ciò che è stato detto.";
 "chat.placeholder" = "Fai una domanda…";
 "chat.send" = "Invia";
+"chat.model_chip" = "Modello: %@";
 "chat.stop" = "Interrompi";
 "chat.disabled.title" = "La ricerca semantica è disattivata";
 "chat.disabled.subtitle" = "Attiva la ricerca semantica in Impostazioni per chattare sulle tue riunioni.";
