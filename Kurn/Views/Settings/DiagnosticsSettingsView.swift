@@ -109,6 +109,8 @@ struct DiagnosticsSettingsView: View {
                     systemImage: "exclamationmark.triangle"
                 )
             }
+        } footer: {
+            Text(NSLocalizedString("settings.diagnostic_reports_share_footer", comment: "Explains reports never leave the device automatically"))
         }
     }
 

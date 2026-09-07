@@ -511,8 +511,11 @@
 "settings.recognition_pipeline" = "Pipeline de reconnaissance";
 "pipeline.transcription_engine" = "Moteur de transcription";
 "pipeline.preprocessing" = "Nettoyage audio";
+"pipeline.preprocessing_footer" = "Réduit le bruit et normalise le niveau avant la transcription.";
 "pipeline.vad" = "Détection d'activité vocale";
+"pipeline.vad_footer" = "Détecte la parole et le silence pour réduire ce qui est envoyé au transcripteur.";
 "pipeline.language_detection" = "Détection de la langue";
+"pipeline.language_detection_footer" = "Choisit automatiquement la langue parlée plutôt que de se fier à l'estimation du transcripteur.";
 "settings.transcription_provider" = "Fournisseur de transcription";
 "settings.whisper_provider_key_footer" = "La transcription via l'API Whisper utilise le fournisseur sélectionné ci-dessus, indépendamment du fournisseur de résumé. Tout fournisseur compatible OpenAI disposant d'une clé API (comme OpenAI ou Groq) peut être utilisé.";
 "settings.whisper_provider_key_missing_footer" = "Configurez une clé API compatible OpenAI (comme OpenAI ou Groq) dans Fournisseurs d'IA pour activer la transcription via l'API Whisper.";
@@ -551,20 +554,21 @@
 "settings.language_support_footer" = "⚠ = peut ne pas être pris en charge par le moteur de transcription sélectionné.";
 "lang.unsupported_a11y" = "Peut ne pas être pris en charge par le moteur de transcription sélectionné";
 "settings.mic_pickup" = "Microphone";
-"settings.mic_pickup_footer" = "Toute la pièce capte tout le monde (omnidirectionnel) ; Focus sur l'intervenant privilégie la personne en face (directionnel). Concerne uniquement le micro intégré.";
+"settings.mic_pickup_footer" = "Toute la pièce capte tout le monde ; Focus sur l’intervenant privilégie la personne en face.";
 "micpickup.whole_room" = "Toute la pièce";
 "micpickup.focus_speaker" = "Focus sur l'intervenant";
 "settings.always_use_built_in_mic" = "Toujours utiliser le micro de l'iPhone";
-"settings.always_use_built_in_mic_footer" = "Ignore la question et enregistre toujours avec le micro intégré de l'iPhone, même si un accessoire Bluetooth est connecté. Si désactivé, on vous demandera quel microphone utiliser lorsque plusieurs sont disponibles.";
+"settings.always_use_built_in_mic_footer" = "Enregistre toujours avec le micro intégré de l’iPhone, même si un accessoire Bluetooth est connecté.";
 "settings.diagnostics" = "Diagnostics";
 "settings.log_level" = "Journalisation";
-"settings.log_level_footer" = "Contrôle le niveau de détail que l'app écrit dans le journal système (Console.app, sous-système ai.kurn.app). Désactivé coupe entièrement la journalisation ; Détaillé inclut des traces fréquentes utiles pour signaler un bug.";
+"settings.log_level_footer" = "Désactivé coupe entièrement la journalisation ; Détaillé ajoute des informations utiles pour signaler un bug.";
 "settings.export_logs" = "Exporter les journaux";
-"settings.export_logs_footer" = "Partage les dernières 24 heures des journaux de l'app sous forme de fichier texte, pour le support ou les rapports de bugs.";
+"settings.export_logs_footer" = "Partage les dernières 24 heures de journaux sous forme de fichier texte.";
 "settings.view_logs" = "Afficher les journaux récents";
 "settings.view_logs.empty" = "Aucune entrée de journal au cours des 24 dernières heures";
 "settings.diagnostic_reports" = "Rapports de diagnostic";
-"settings.diagnostic_reports_footer" = "Lorsque c'est activé, les rapports de plantage et de blocage capturés sur cet appareil sont enregistrés ici. Rien n'est jamais envoyé automatiquement où que ce soit — les rapports ne quittent l'appareil que si vous appuyez sur Partager sur l'un d'eux.";
+"settings.diagnostic_reports_footer" = "Enregistre les rapports de plantage et de blocage capturés sur cet appareil.";
+"settings.diagnostic_reports_share_footer" = "Rien n'est jamais envoyé automatiquement où que ce soit — un rapport ne quitte l'appareil que si vous appuyez sur Partager dessus.";
 "settings.diagnostic_reports.consent_title" = "Activer les rapports de diagnostic";
 "settings.diagnostic_reports.consent_message" = "Kurn enregistrera les rapports de plantage et de blocage uniquement sur cet appareil. Rien n'est jamais envoyé automatiquement où que ce soit — vous choisissez si et quand partager un rapport.";
 "settings.diagnostic_reports.enable" = "Activer";
@@ -585,7 +589,7 @@
 "settings.audio_quality" = "Qualité audio";
 "settings.audio_quality.usage" = "Stockage";
 "settings.audio_quality.per_hour" = "Environ %@ par heure";
-"settings.audio_quality_footer" = "Les enregistrements sont stockés en audio vocal mono : tous les niveaux conservent donc toute la plage de la voix humaine — les niveaux changent le niveau de détail conservé, pas ce qui est capté.";
+"settings.audio_quality_footer" = "Tous les niveaux conservent toute la plage de la voix — ils diffèrent uniquement par la taille du fichier.";
 "settings.audio_usage" = "Fichiers audio";
 "settings.free_space" = "Espace libre";
 "settings.compact.section" = "Libérer de l'espace";
@@ -610,6 +614,7 @@
 "settings.delete_all.message" = "Cela supprime définitivement chaque réunion, transcription et fichier audio. Cette action est irréversible.";
 "settings.delete_all.residual" = "%d fichier(s) audio n'ont pas pu être supprimés et restent sur l'appareil. Réessayez ou libérez de l'espace.";
 "settings.diarization_engine" = "Moteur de diarisation";
+"settings.diarization_engine_footer" = "Les moteurs neuronaux sont plus précis mais nécessitent un téléchargement ; l'Heuristique fonctionne hors ligne immédiatement.";
 "settings.diarization_speaker_count" = "Nombre d'intervenants";
 "settings.diarization_speaker_count_auto" = "Auto";
 "settings.diarization_speaker_count_footer" = "Renseignez-le lorsque vous savez combien de personnes ont participé à la réunion. En mode auto, le moteur décide, et Kurn regroupe lui-même l'audio si le moteur a fusionné tout le monde en un seul intervenant.";
@@ -671,7 +676,8 @@
 
 /* Sécurité des enregistrements */
 "settings.require_auth_for_recordings" = "Exiger l'authentification";
-"settings.require_auth_for_recordings_footer" = "Demande Face ID, Touch ID ou le code de l'appareil une fois par session avant d'afficher les réunions et enregistrements. Les fichiers audio sont toujours chiffrés sur le disque à l'aide du code de l'appareil.";
+"settings.require_auth_for_recordings_footer" = "Face ID, Touch ID ou le code de l’appareil, une fois par session.";
+"settings.recording_section_privacy_footer" = "Les fichiers audio sont toujours chiffrés sur le disque à l'aide du code de l'appareil, quels que soient ces réglages.";
 "settings.hide_live_activity_meeting_title" = "Masquer le titre sur l'écran verrouillé";
 "settings.hide_live_activity_meeting_title_footer" = "Affiche un intitulé générique \"Enregistrement…\" sur l'écran verrouillé, la Dynamic Island et l'Apple Watch associée, à la place du titre réel de la réunion pendant l'enregistrement.";
 "recordings.locked_title" = "Enregistrements verrouillés";
@@ -782,7 +788,8 @@
 "settings.wiki_rebuilding" = "Recréation de Tout…";
 "settings.wiki_bulk_progress" = "%1$d sur %2$d réunions";
 "settings.wiki_clear" = "Effacer le wiki";
-"settings.wiki_footer" = "Utilise votre fournisseur d'IA de résumé pour créer un article condensé par réunion, afin que la fonction « Demander » de la bibliothèque réponde aux questions qui couvrent ou comparent plusieurs réunions. Désactivé par défaut — effectue des appels au cloud. « Générer les Manquants » ne crée que les articles qui n'existent pas encore ; « Tout Recréer » régénère tous les articles, y compris ceux déjà à jour.";
+"settings.wiki_footer" = "Crée un article condensé par réunion, à l’aide de votre fournisseur d’IA. Désactivé par défaut.";
+"settings.wiki_section_footer" = "« Générer les Manquants » ne crée que les articles qui n'existent pas encore ; « Tout Recréer » régénère tous les articles, y compris ceux déjà à jour.";
 "settings.wiki_needs_key" = "Ajoutez une clé d'API pour votre fournisseur de résumé afin de créer le wiki des réunions.";
 "settings.correction_title" = "Correction par IA";
 "settings.correction" = "Corriger les erreurs de transcription";

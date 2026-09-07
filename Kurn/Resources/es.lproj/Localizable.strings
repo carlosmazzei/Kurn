@@ -511,8 +511,11 @@
 "settings.recognition_pipeline" = "Pipeline de Reconocimiento";
 "pipeline.transcription_engine" = "Motor de Transcripción";
 "pipeline.preprocessing" = "Limpieza de Audio";
+"pipeline.preprocessing_footer" = "Reduce el ruido y normaliza el nivel antes de la transcripción.";
 "pipeline.vad" = "Detección de Actividad de Voz";
+"pipeline.vad_footer" = "Detecta habla frente a silencio para recortar lo que se envía al transcriptor.";
 "pipeline.language_detection" = "Detección de Idioma";
+"pipeline.language_detection_footer" = "Elige el idioma hablado automáticamente, en lugar de depender de la suposición del transcriptor.";
 "settings.transcription_provider" = "Proveedor de Transcripción";
 "settings.whisper_provider_key_footer" = "La transcripción con la API de Whisper usa el proveedor seleccionado arriba, con independencia del proveedor de resumen. Se puede usar cualquier proveedor compatible con OpenAI que tenga una clave de API (como OpenAI o Groq).";
 "settings.whisper_provider_key_missing_footer" = "Configura una clave de API compatible con OpenAI (como OpenAI o Groq) en Proveedores de IA para habilitar la transcripción con la API de Whisper.";
@@ -551,20 +554,21 @@
 "settings.language_support_footer" = "⚠ = puede no ser compatible con el motor de transcripción seleccionado.";
 "lang.unsupported_a11y" = "Puede no ser compatible con el motor de transcripción seleccionado";
 "settings.mic_pickup" = "Micrófono";
-"settings.mic_pickup_footer" = "Toda la sala capta a todos (omnidireccional); Enfocar al hablante prioriza a la persona de delante (direccional). Solo afecta al micrófono integrado.";
+"settings.mic_pickup_footer" = "Toda la sala capta a todos; Enfocar al hablante prioriza a la persona de delante.";
 "micpickup.whole_room" = "Toda la sala";
 "micpickup.focus_speaker" = "Enfocar al hablante";
 "settings.always_use_built_in_mic" = "Usar siempre el micrófono del iPhone";
-"settings.always_use_built_in_mic_footer" = "Omite la pregunta y graba siempre con el micrófono integrado del iPhone, incluso si hay un accesorio Bluetooth conectado. Si está desactivado, se te preguntará qué micrófono usar cuando haya más de uno disponible.";
+"settings.always_use_built_in_mic_footer" = "Siempre graba con el micrófono integrado del iPhone, incluso si hay un accesorio Bluetooth conectado.";
 "settings.diagnostics" = "Diagnóstico";
 "settings.log_level" = "Registro";
-"settings.log_level_footer" = "Controla el nivel de detalle que la app escribe en el registro del sistema (Console.app, subsistema ai.kurn.app). Desactivado inhabilita el registro por completo; Detallado incluye trazas de alta frecuencia útiles para reportar un problema.";
+"settings.log_level_footer" = "Desactivado inhabilita el registro por completo; Detallado añade información útil para reportar errores.";
 "settings.export_logs" = "Exportar Registros";
-"settings.export_logs_footer" = "Comparte las últimas 24 horas de los registros de la app como un archivo de texto, para soporte o reportes de errores.";
+"settings.export_logs_footer" = "Comparte las últimas 24 horas de registros como un archivo de texto.";
 "settings.view_logs" = "Ver Registros Recientes";
 "settings.view_logs.empty" = "No hay entradas de registro en las últimas 24 horas";
 "settings.diagnostic_reports" = "Informes de Diagnóstico";
-"settings.diagnostic_reports_footer" = "Cuando está activado, los informes de fallos y bloqueos capturados en este dispositivo se guardan aquí. Nunca se envía nada automáticamente a ningún lugar — los informes solo salen del dispositivo si tocas Compartir en uno.";
+"settings.diagnostic_reports_footer" = "Guarda los informes de fallos y bloqueos capturados en este dispositivo.";
+"settings.diagnostic_reports_share_footer" = "Nunca se envía nada automáticamente a ningún lugar — un informe solo sale del dispositivo si tocas Compartir en él.";
 "settings.diagnostic_reports.consent_title" = "Activar Informes de Diagnóstico";
 "settings.diagnostic_reports.consent_message" = "Kurn guardará los informes de fallos y bloqueos solo en este dispositivo. Nunca se envía nada automáticamente a ningún lugar — tú decides si y cuándo compartir un informe.";
 "settings.diagnostic_reports.enable" = "Activar";
@@ -585,7 +589,7 @@
 "settings.audio_quality" = "Calidad de audio";
 "settings.audio_quality.usage" = "Almacenamiento";
 "settings.audio_quality.per_hour" = "Unos %@ por hora";
-"settings.audio_quality_footer" = "Las grabaciones se guardan como audio de voz mono, así que todos los niveles conservan todo el rango de la voz humana: los niveles cambian cuánto detalle se guarda, no qué se captura.";
+"settings.audio_quality_footer" = "Todos los niveles conservan todo el rango de la voz — solo difieren en el tamaño del archivo.";
 "settings.audio_usage" = "Archivos de Audio";
 "settings.free_space" = "Espacio Libre";
 "settings.compact.section" = "Recuperar Espacio";
@@ -610,6 +614,7 @@
 "settings.delete_all.message" = "Esto elimina permanentemente todas las reuniones, transcripciones y archivos de audio. No se puede deshacer.";
 "settings.delete_all.residual" = "%d archivo(s) de audio no se pudieron eliminar y permanecen en el dispositivo. Inténtalo de nuevo o libera espacio.";
 "settings.diarization_engine" = "Motor de Diarización";
+"settings.diarization_engine_footer" = "Los motores neuronales son más precisos, pero requieren descarga; el Heurístico funciona sin conexión de inmediato.";
 "settings.diarization_speaker_count" = "Número de Hablantes";
 "settings.diarization_speaker_count_auto" = "Automático";
 "settings.diarization_speaker_count_footer" = "Indícalo cuando sepas cuántas personas participaron en la reunión. En automático decide el motor, y Kurn vuelve a agrupar el audio por su cuenta si el motor unió a todos en un solo hablante.";
@@ -671,7 +676,8 @@
 
 /* Seguridad de las grabaciones */
 "settings.require_auth_for_recordings" = "Requerir Autenticación";
-"settings.require_auth_for_recordings_footer" = "Pide Face ID, Touch ID o el código del dispositivo una vez por sesión antes de mostrar las reuniones y grabaciones. Los archivos de audio siempre están cifrados en disco con el código del dispositivo.";
+"settings.require_auth_for_recordings_footer" = "Face ID, Touch ID o el código del dispositivo, una vez por sesión.";
+"settings.recording_section_privacy_footer" = "Los archivos de audio siempre están cifrados en disco con el código del dispositivo, independientemente de estos ajustes.";
 "settings.hide_live_activity_meeting_title" = "Ocultar Título en Pantalla Bloqueada";
 "settings.hide_live_activity_meeting_title_footer" = "Muestra la etiqueta genérica \"Grabando…\" en la pantalla bloqueada, la Dynamic Island y el Apple Watch emparejado en lugar del título real de la reunión mientras grabas.";
 "recordings.locked_title" = "Grabaciones Bloqueadas";
@@ -782,7 +788,8 @@
 "settings.wiki_rebuilding" = "Recreando Todo…";
 "settings.wiki_bulk_progress" = "%1$d de %2$d reuniones";
 "settings.wiki_clear" = "Borrar wiki";
-"settings.wiki_footer" = "Usa tu proveedor de IA de resúmenes para crear un artículo condensado por reunión, para que la función \"Preguntar\" de la biblioteca responda preguntas que abarcan o comparan reuniones. Desactivado por defecto: hace llamadas a la nube. \"Generar Faltantes\" solo crea los artículos que aún no existen; \"Recrear Todo\" regenera todos los artículos, incluidos los ya actualizados.";
+"settings.wiki_footer" = "Crea un artículo condensado por reunión, usando tu proveedor de IA. Desactivado por defecto.";
+"settings.wiki_section_footer" = "\"Generar Faltantes\" solo crea los artículos que aún no existen; \"Recrear Todo\" regenera todos los artículos, incluidos los ya actualizados.";
 "settings.wiki_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para crear la wiki de reuniones.";
 "settings.correction_title" = "Corrección con IA";
 "settings.correction" = "Corregir errores de transcripción";

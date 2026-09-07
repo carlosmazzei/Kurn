@@ -155,6 +155,8 @@ struct RecordingSettingsView: View {
             }
         } header: {
             Text(NSLocalizedString("settings.recording_section_privacy", comment: "Privacy"))
+        } footer: {
+            Text(NSLocalizedString("settings.recording_section_privacy_footer", comment: "Explains audio is always encrypted regardless of these toggles"))
         }
     }
 }
