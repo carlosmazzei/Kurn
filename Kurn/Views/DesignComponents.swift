@@ -148,6 +148,24 @@ struct FilterChip: View {
     }
 }
 
+/// Title with its explanation directly underneath, for Form rows (toggles,
+/// pickers, buttons) whose meaning would otherwise live in a section footer
+/// several rows away from the control it describes.
+struct SettingsRowLabel: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 enum KurnDialogActionRole: Equatable {
     case normal
     case destructive
@@ -212,28 +230,18 @@ struct KurnDialogModifier: ViewModifier {
                 }
             }
 
-            HStack(spacing: 10) {
-                if let secondaryTitle {
-                    dialogButton(
-                        title: secondaryTitle,
-                        role: .normal,
-                        isPrimary: false
-                    ) {
-                        secondaryAction()
-                        isPresented = false
-                    }
-                    .accessibilityIdentifier("dialog.secondary")
+            // Side by side while both titles fit on one line each; otherwise
+            // stacked full-width (primary first, as native alerts do), so a
+            // long localized title wraps instead of shrinking or truncating.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    secondaryButton(singleLine: true)
+                    primaryButton(singleLine: true)
                 }
-
-                dialogButton(
-                    title: primaryTitle,
-                    role: primaryRole,
-                    isPrimary: true
-                ) {
-                    primaryAction()
-                    isPresented = false
+                VStack(spacing: 10) {
+                    primaryButton(singleLine: false)
+                    secondaryButton(singleLine: false)
                 }
-                .accessibilityIdentifier("dialog.primary")
             }
         }
         .padding(18)
@@ -247,10 +255,43 @@ struct KurnDialogModifier: ViewModifier {
         .accessibilityElement(children: .contain)
     }
 
+    private func primaryButton(singleLine: Bool) -> some View {
+        dialogButton(
+            title: primaryTitle,
+            role: primaryRole,
+            isPrimary: true,
+            singleLine: singleLine
+        ) {
+            primaryAction()
+            isPresented = false
+        }
+        .accessibilityIdentifier("dialog.primary")
+    }
+
+    @ViewBuilder
+    private func secondaryButton(singleLine: Bool) -> some View {
+        if let secondaryTitle {
+            dialogButton(
+                title: secondaryTitle,
+                role: .normal,
+                isPrimary: false,
+                singleLine: singleLine
+            ) {
+                secondaryAction()
+                isPresented = false
+            }
+            .accessibilityIdentifier("dialog.secondary")
+        }
+    }
+
+    /// `singleLine` keeps the title unwrapped and reports its full width, so
+    /// `ViewThatFits` can reject the side-by-side layout when the titles
+    /// would not fit; the stacked variant wraps instead.
     private func dialogButton(
         title: String,
         role: KurnDialogActionRole,
         isPrimary: Bool,
+        singleLine: Bool,
         action: @escaping () -> Void
     ) -> some View {
         let background = isPrimary
@@ -261,10 +302,12 @@ struct KurnDialogModifier: ViewModifier {
         return Button(action: action) {
             Text(title)
                 .font(Theme.footnoteEmphasized)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
+                .lineLimit(singleLine ? 1 : 2)
+                .fixedSize(horizontal: singleLine, vertical: true)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 42)
                 .foregroundStyle(foreground)
                 .background(background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }

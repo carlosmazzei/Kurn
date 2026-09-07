@@ -44,12 +44,18 @@ struct WikiSettingsView: View {
         Form {
             Section {
                 Toggle(
-                    NSLocalizedString("settings.wiki", comment: "Meeting wiki toggle"),
                     isOn: Binding(
                         get: { settings.wikiEnabled && hasKey },
                         set: { settings.wikiEnabled = $0 }
                     )
-                )
+                ) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("settings.wiki", comment: "Meeting wiki toggle"),
+                        detail: hasKey
+                            ? NSLocalizedString("settings.wiki_footer", comment: "Meeting wiki footer")
+                            : unavailableFooter
+                    )
+                }
                 .disabled(!hasKey)
                 LabeledContent(
                     NSLocalizedString("settings.wiki_articles", comment: "Wiki article count"),
@@ -104,10 +110,6 @@ struct WikiSettingsView: View {
                 .disabled(isBusy || wikiArticleCount == 0)
             } header: {
                 Text(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki section title"))
-            } footer: {
-                Text(hasKey
-                    ? NSLocalizedString("settings.wiki_footer", comment: "Meeting wiki footer")
-                    : unavailableFooter)
             }
         }
         .navigationTitle(NSLocalizedString("settings.wiki_title", comment: "Meeting wiki"))

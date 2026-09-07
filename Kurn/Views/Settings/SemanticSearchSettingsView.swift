@@ -23,12 +23,16 @@ struct SemanticSearchSettingsView: View {
         Form {
             Section {
                 Toggle(
-                    NSLocalizedString("settings.semantic_search", comment: "Semantic search toggle"),
                     isOn: Binding(
                         get: { settings.semanticSearchEnabled },
                         set: { settings.semanticSearchEnabled = $0 }
                     )
-                )
+                ) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("settings.semantic_search", comment: "Semantic search toggle"),
+                        detail: NSLocalizedString("settings.semantic_search_footer", comment: "Semantic search footer")
+                    )
+                }
                 LabeledContent(
                     NSLocalizedString("settings.semantic_indexed_passages", comment: "Indexed passages"),
                     value: "\(semanticChunkCount)"
@@ -66,8 +70,6 @@ struct SemanticSearchSettingsView: View {
                 .disabled(isRebuildingIndex || semanticChunkCount == 0)
             } header: {
                 Text(NSLocalizedString("settings.semantic_search_title", comment: "Semantic search section title"))
-            } footer: {
-                Text(NSLocalizedString("settings.semantic_search_footer", comment: "Semantic search footer"))
             }
         }
         .navigationTitle(NSLocalizedString("settings.semantic_search_title", comment: "Semantic search"))

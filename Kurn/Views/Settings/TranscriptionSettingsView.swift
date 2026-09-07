@@ -103,6 +103,17 @@ struct TranscriptionSettingsView: View {
             .accessibilityIdentifier("settings.transcription.engine")
             .disabled(downloads.isDownloading)
 
+            // Why the Whisper option is greyed out, right under the picker
+            // that greys it out.
+            if !hasAnyTranscriptionProvider {
+                Text(NSLocalizedString(
+                    "settings.whisper_provider_key_missing_footer",
+                    comment: "Whisper transcription provider key dependency"
+                ))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+
             // Cloud transcription provider + model, chosen independently of the
             // summary provider. Only shown for the Whisper engine.
             if settings.transcriptionEngine == .whisperAPI {
@@ -128,6 +139,12 @@ struct TranscriptionSettingsView: View {
                     provider: settings.transcriptionProvider,
                     revision: keyRevision
                 )
+                Text(NSLocalizedString(
+                    "settings.whisper_provider_key_footer",
+                    comment: "Whisper transcription provider key dependency"
+                ))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
 
             // Which GGML weight file the on-device Whisper engine loads. Each
@@ -151,7 +168,6 @@ struct TranscriptionSettingsView: View {
             }
 
             Picker(
-                NSLocalizedString("settings.default_language", comment: "Default language"),
                 selection: Binding(
                     get: { settings.defaultLanguage },
                     set: { settings.defaultLanguage = $0 }
@@ -160,6 +176,11 @@ struct TranscriptionSettingsView: View {
                 ForEach(MeetingLanguage.allCases) { lang in
                     LanguagePickerRow(language: lang, engine: settings.transcriptionEngine).tag(lang)
                 }
+            } label: {
+                SettingsRowLabel(
+                    title: NSLocalizedString("settings.default_language", comment: "Default language"),
+                    detail: NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon")
+                )
             }
 
             if downloads.downloadingModel == .onDeviceASR || Self.isDownloadingWhisperCpp(downloads) {
@@ -167,16 +188,6 @@ struct TranscriptionSettingsView: View {
             }
         } header: {
             Text(NSLocalizedString("settings.recognition_pipeline", comment: "Recognition pipeline"))
-        } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(NSLocalizedString(
-                    hasAnyTranscriptionProvider
-                        ? "settings.whisper_provider_key_footer"
-                        : "settings.whisper_provider_key_missing_footer",
-                    comment: "Whisper transcription provider key dependency"
-                ))
-                Text(NSLocalizedString("settings.language_support_footer", comment: "Explains the unsupported-language warning icon"))
-            }
         }
     }
 
