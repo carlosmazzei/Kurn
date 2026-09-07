@@ -54,14 +54,13 @@ struct MeetingChatView: View {
         .background(Theme.background)
         // A composer is an input surface, not a toolbar, so it stays custom —
         // but as a safe-area bar it gets the system's keyboard avoidance
-        // instead of a hand-drawn `.bar` strip. Claude's own composer reads as
-        // a translucent glass panel floating over the transcript rather than
-        // an opaque bar matched to any one background color, so this uses the
-        // same `.ultraThinMaterial` as the text field pill instead of
-        // `Theme.background` (a custom near-black in dark mode that would
-        // otherwise seam against the keyboard's own system-drawn chrome).
+        // instead of a hand-drawn `.bar` strip. The composer itself is an
+        // inset glass card (see `composer`) floating over the transcript, so
+        // the bar has no background of its own: the transcript shows through
+        // around the card and the keyboard's system-drawn chrome sits
+        // directly beneath it with nothing to seam against.
         .safeAreaBar(edge: .bottom) {
-            composer.background(.ultraThinMaterial)
+            composer
         }
         .errorAlert($vm.error)
         .toolbar { historyToolbar }
@@ -383,39 +382,84 @@ struct MeetingChatView: View {
 
     // MARK: - Composer
 
+    /// Inset glass card, two rows: the text field across the top, then a
+    /// row with the model chip on the left and the send/stop control on
+    /// the right — the field gets the card's full width instead of sharing
+    /// a line with the button.
     private var composer: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             TextField(
                 NSLocalizedString("chat.placeholder", comment: "Chat input placeholder"),
                 text: $input,
                 axis: .vertical
             )
-            .lineLimit(1...4)
+            .lineLimit(1...5)
             .textFieldStyle(.plain)
             .focused($inputFocused)
             .accessibilityIdentifier("chat.input")
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.separator, lineWidth: 1))
             .disabled(!canChat)
 
-            if vm.isResponding {
-                Button { vm.cancel() } label: {
-                    Image(systemName: "stop.circle.fill").font(.system(size: 30)).foregroundStyle(Theme.warning)
-                }
-                .accessibilityLabel(NSLocalizedString("chat.stop", comment: "Stop"))
-            } else {
-                Button { send() } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(canSend ? Theme.accent : Theme.textTertiary)
-                }
-                .disabled(!canSend)
-                .accessibilityLabel(NSLocalizedString("chat.send", comment: "Send"))
-                .accessibilityIdentifier("chat.send")
+            HStack(spacing: 10) {
+                modelChip
+                Spacer(minLength: 0)
+                sendOrStopButton
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(Theme.separator, lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+
+    /// Which model answers — the summary provider's model, since chat shares
+    /// it (see `sendQuestion`). Informational; the choice lives in Settings.
+    private var modelChip: some View {
+        let provider = settings.aiProvider
+        let model = provider.kind == .appleOnDevice
+            ? NSLocalizedString("settings.on_device_model_name", comment: "Apple Intelligence")
+            : settings.summaryModel(for: provider)
+        return Text(model)
+            .font(.footnote)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Theme.fill, in: Capsule())
+            .accessibilityLabel(String(
+                format: NSLocalizedString("chat.model_chip", comment: "Model in use"),
+                model
+            ))
+    }
+
+    @ViewBuilder
+    private var sendOrStopButton: some View {
+        if vm.isResponding {
+            Button { vm.cancel() } label: {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.warning, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("chat.stop", comment: "Stop"))
+        } else {
+            Button { send() } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(canSend ? .white : Theme.textTertiary)
+                    .frame(width: 36, height: 36)
+                    .background(canSend ? Theme.accent : Theme.fill, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSend)
+            .accessibilityLabel(NSLocalizedString("chat.send", comment: "Send"))
+            .accessibilityIdentifier("chat.send")
+        }
     }
 
     // MARK: - Empty / disabled states

@@ -740,6 +740,7 @@
 "chat.starter.library.subtitle" = "回答基于你资料库中已转录的会议，并附有可点按的引用，可直接跳转到相关内容。";
 "chat.placeholder" = "输入问题…";
 "chat.send" = "发送";
+"chat.model_chip" = "模型：%@";
 "chat.stop" = "停止";
 "chat.disabled.title" = "语义搜索已关闭";
 "chat.disabled.subtitle" = "在设置中开启语义搜索，即可就会议内容进行聊天。";

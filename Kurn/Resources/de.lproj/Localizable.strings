@@ -740,6 +740,7 @@
 "chat.starter.library.subtitle" = "Antworten basieren auf den transkribierten Meetings deiner Bibliothek, mit antippbaren Zitaten, die direkt zur jeweiligen Stelle springen.";
 "chat.placeholder" = "Stelle eine Frage …";
 "chat.send" = "Senden";
+"chat.model_chip" = "Modell: %@";
 "chat.stop" = "Stopp";
 "chat.disabled.title" = "Semantische Suche ist aus";
 "chat.disabled.subtitle" = "Aktiviere die semantische Suche in den Einstellungen, um über deine Meetings zu chatten.";

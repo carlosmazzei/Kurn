@@ -740,6 +740,7 @@
 "chat.starter.library.subtitle" = "Answers are grounded in your library's transcribed meetings, with citations you can tap to jump to what was said.";
 "chat.placeholder" = "Ask a question…";
 "chat.send" = "Send";
+"chat.model_chip" = "Model: %@";
 "chat.stop" = "Stop";
 "chat.disabled.title" = "Semantic search is off";
 "chat.disabled.subtitle" = "Turn on semantic search in Settings to chat about your meetings.";
