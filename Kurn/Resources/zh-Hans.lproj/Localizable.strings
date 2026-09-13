@@ -469,6 +469,8 @@
 
 /* 摘要翻译 */
 "detail.summary.translate" = "翻译";
+"detail.summary.translating" = "正在翻译为%@…";
+"detail.summary.cancel_translate" = "取消翻译";
 "detail.summary.choose_language" = "翻译成";
 "detail.summary.choose_language.suggested" = "建议";
 

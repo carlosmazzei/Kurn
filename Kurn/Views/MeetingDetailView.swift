@@ -293,6 +293,7 @@ struct MeetingDetailView: View {
                     isSummarizing: txVM?.isSummarizing == true,
                     isCancellingSummary: txVM?.isCancellingSummary == true,
                     isTranslatingSummary: txVM?.isTranslatingSummary == true,
+                    translationTargetLanguage: txVM?.translationTargetLanguage,
                     summaryProgress: txVM?.summaryProgress,
                     selectedSummaryID: selectedSummaryID,
                     hasAnyTranscript: hasAnyTranscript,
@@ -300,7 +301,8 @@ struct MeetingDetailView: View {
                     onCancel: { cancelSummary() },
                     onSelectSummary: { selectedSummaryID = $0.id },
                     onDeleteSummary: { pendingDeleteSummary = $0 },
-                    onTranslateSummary: { pendingTranslateSummary = $0 }
+                    onTranslateSummary: { pendingTranslateSummary = $0 },
+                    onCancelTranslateSummary: { cancelTranslateSummary() }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
             }

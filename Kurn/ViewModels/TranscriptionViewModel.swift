@@ -51,6 +51,11 @@ final class TranscriptionViewModel {
     /// is always single-pass so it needs no staged progress. Not `private` —
     /// `TranscriptionViewModel+SummaryTranslation.swift` needs it.
     var isTranslatingSummary = false
+    /// The source summary and target language of the in-flight translation,
+    /// so the Summary tab can show *which* chip is translating rather than a
+    /// generic spinner. Set together with `isTranslatingSummary`.
+    var translatingSummaryID: UUID?
+    var translationTargetLanguage: MeetingLanguage?
     /// Failures not tied to any one recording — a generic `persist()` save
     /// (which commits whatever is pending across the whole context, not one
     /// recording's own changes) or AI title generation for a meeting.

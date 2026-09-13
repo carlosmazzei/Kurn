@@ -26,6 +26,8 @@ extension TranscriptionViewModel {
     ) {
         guard !isTranslatingSummary else { return }
         isTranslatingSummary = true
+        translatingSummaryID = source.id
+        translationTargetLanguage = targetLanguage
         translationTask = Task { [weak self] in
             await self?.translateSummary(
                 source: source,
@@ -54,6 +56,8 @@ extension TranscriptionViewModel {
 
         defer {
             isTranslatingSummary = false
+            translatingSummaryID = nil
+            translationTargetLanguage = nil
             translationTask = nil
         }
 

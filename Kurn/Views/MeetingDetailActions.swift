@@ -247,6 +247,10 @@ extension MeetingDetailView {
         )
     }
 
+    func cancelTranslateSummary() {
+        txVM?.cancelTranslateSummary()
+    }
+
     func deleteSummary(_ summary: Summary) {
         modelContext.delete(summary)
         if let failure = modelContext.saveOrError() { txVM?.error = failure }

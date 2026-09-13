@@ -469,6 +469,8 @@
 
 /* Traduzione del riassunto */
 "detail.summary.translate" = "Traduci";
+"detail.summary.translating" = "Traduzione in %@…";
+"detail.summary.cancel_translate" = "Annulla traduzione";
 "detail.summary.choose_language" = "Traduci In";
 "detail.summary.choose_language.suggested" = "Suggerito";
 

@@ -7,6 +7,7 @@
 //  speaker renaming) and the AI summary tab.
 //
 
+import KurnCore
 import SwiftUI
 
 /// Transcript tab content: speaker filter chips + speaker-attributed bubbles +
@@ -121,6 +122,9 @@ struct SummaryTab: View {
     let isSummarizing: Bool
     let isCancellingSummary: Bool
     let isTranslatingSummary: Bool
+    /// The language an in-flight translation targets, to label the inline
+    /// progress chip. `nil` whenever `isTranslatingSummary` is false.
+    var translationTargetLanguage: MeetingLanguage?
     /// (stage, total) when a long transcript is summarized in parts; nil for
     /// single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
@@ -133,6 +137,7 @@ struct SummaryTab: View {
     let onSelectSummary: (Summary) -> Void
     let onDeleteSummary: (Summary) -> Void
     let onTranslateSummary: (Summary) -> Void
+    let onCancelTranslateSummary: () -> Void
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -188,6 +193,9 @@ struct SummaryTab: View {
                         }
                     }
                 }
+                if isTranslatingSummary, let translationTargetLanguage {
+                    translatingChip(to: translationTargetLanguage)
+                }
                 FilterChip(title: "+", isSelected: false) {
                     onGenerate()
                 }
@@ -195,6 +203,37 @@ struct SummaryTab: View {
                 .accessibilityLabel(NSLocalizedString("detail.summary.new", comment: "New Summary"))
             }
         }
+    }
+
+    /// Sits inline in the summary switcher's horizontal scroll rather than
+    /// blocking the tab with a panel like `summaryProgressPanel` — translation
+    /// is quick and starts from an existing, already-visible summary, so the
+    /// only thing worth signaling is "this is in progress", not staged
+    /// progress or a cancel button that takes over the screen.
+    private func translatingChip(to language: MeetingLanguage) -> some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityHidden(true)
+            Text(String(
+                format: NSLocalizedString("detail.summary.translating", comment: "Translating…"),
+                language.displayName
+            ))
+            .font(.system(.footnote, design: .default, weight: .regular))
+            .lineLimit(1)
+            .foregroundStyle(Theme.textSecondary)
+            Button {
+                onCancelTranslateSummary()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(NSLocalizedString("detail.summary.cancel_translate", comment: "Cancel translation"))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(Theme.fill, in: Capsule())
     }
 
     private func chipTitle(for summary: Summary) -> String {
