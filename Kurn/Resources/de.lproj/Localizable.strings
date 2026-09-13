@@ -467,6 +467,11 @@
 "summary.footer_with_model" = "Erstellt von %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Vorlage: %@";
 
+/* Zusammenfassungsübersetzung */
+"detail.summary.translate" = "Übersetzen";
+"detail.summary.choose_language" = "Übersetzen Nach";
+"detail.summary.choose_language.suggested" = "Vorgeschlagen";
+
 /* Zusammenfassungsvorlagen */
 "detail.summary.choose_template" = "Vorlage auswählen";
 "settings.templates" = "Zusammenfassungsvorlagen";
@@ -829,6 +834,10 @@
 "documents.error.no_transcripts" = "Wähle mindestens eine Quelle mit einem Transkript.";
 "documents.error.empty_response" = "Der KI-Anbieter hat ein leeres Dokument zurückgegeben.";
 "error.document_generation" = "Dokument konnte nicht erstellt werden: %@";
+"error.summary_translation" = "Die Zusammenfassung konnte nicht übersetzt werden: %@";
+"error.summary_translation_empty" = "Die Übersetzung kam leer zurück.";
+"error.summary_translation_mismatch" = "Die Übersetzung hat die Abschnitte der Zusammenfassung nicht beibehalten.";
+"error.summary_translation_source_empty" = "Diese Zusammenfassung enthält nichts zum Übersetzen.";
 "error.on_device_model_unavailable" = "On-Device-Modell nicht verfügbar: %@";
 "error.on_device_generation_timeout" = "Die Generierung auf dem Gerät hat das Zeitlimit überschritten.";
 

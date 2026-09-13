@@ -120,6 +120,7 @@ struct SummaryTab: View {
     let settings: AppSettings
     let isSummarizing: Bool
     let isCancellingSummary: Bool
+    let isTranslatingSummary: Bool
     /// (stage, total) when a long transcript is summarized in parts; nil for
     /// single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
@@ -131,6 +132,7 @@ struct SummaryTab: View {
     let onCancel: () -> Void
     let onSelectSummary: (Summary) -> Void
     let onDeleteSummary: (Summary) -> Void
+    let onTranslateSummary: (Summary) -> Void
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -173,6 +175,12 @@ struct SummaryTab: View {
                         onSelectSummary(summary)
                     }
                     .contextMenu {
+                        Button {
+                            onTranslateSummary(summary)
+                        } label: {
+                            Label(NSLocalizedString("detail.summary.translate", comment: "Translate"), systemImage: "character.bubble")
+                        }
+                        .disabled(isTranslatingSummary)
                         Button(role: .destructive) {
                             onDeleteSummary(summary)
                         } label: {

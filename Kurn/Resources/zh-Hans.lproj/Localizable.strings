@@ -467,6 +467,11 @@
 "summary.footer_with_model" = "由 %1$@ 生成 · %2$@ · %3$@";
 "summary.template_label" = "模板：%@";
 
+/* 摘要翻译 */
+"detail.summary.translate" = "翻译";
+"detail.summary.choose_language" = "翻译成";
+"detail.summary.choose_language.suggested" = "建议";
+
 /* 摘要模板 */
 "detail.summary.choose_template" = "选择模板";
 "settings.templates" = "摘要模板";
@@ -829,6 +834,10 @@
 "documents.error.no_transcripts" = "请至少选择一个包含转写的来源。";
 "documents.error.empty_response" = "AI 提供商返回了空文档。";
 "error.document_generation" = "无法生成文档：%@";
+"error.summary_translation" = "无法翻译摘要：%@";
+"error.summary_translation_empty" = "翻译结果为空。";
+"error.summary_translation_mismatch" = "翻译未能保留摘要的各个部分。";
+"error.summary_translation_source_empty" = "此摘要没有可翻译的内容。";
 "error.on_device_model_unavailable" = "设备端模型不可用：%@";
 "error.on_device_generation_timeout" = "设备端生成超时。";
 
