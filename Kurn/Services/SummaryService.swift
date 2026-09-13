@@ -318,6 +318,54 @@ struct SummaryService {
         return title
     }
 
+    /// Translate an already-generated summary's sections into another
+    /// language, preserving structure exactly (section count/order,
+    /// markdown formatting). Unlike `generate`, the input is the summary
+    /// itself rather than a transcript, so it's always short enough for a
+    /// single request — no map-reduce/checkpointing needed. Best-effort like
+    /// `generateTitle`: callers construct the new `Summary` from the result.
+    func translate(
+        sections: [SummarySection],
+        to targetLanguage: MeetingLanguage,
+        provider: AIProvider,
+        model: String
+    ) async throws -> SummaryResult {
+        let llm = try resolveProvider(provider, model)
+        try Task.checkCancellation()
+        let system = """
+        You translate meeting summaries. Translate the markdown below into \
+        \(targetLanguage.displayName), preserving structure exactly: the same \
+        number of sections in the same order, and the same markdown formatting \
+        inside each section's body and bullet items (bold/italic, headings, \
+        lists, task checkboxes, blockquotes, tables, code fences). Do not add, \
+        remove, merge, or reorder sections. Translate only the text content — \
+        section titles, body prose, and item text.
+        Each "## " line starts a new section title; everything until the next \
+        "## " line (or the end) is that section's body, with "- " lines as its \
+        bullet items.
+        Output valid JSON with this shape:
+        {"sections":[{"title":"...","body":"...","items":["..."]}]}
+        Use real line breaks inside "body" — never write the two characters \
+        backslash-n.
+        Output ONLY the JSON object itself — no markdown fences around it.
+        """
+        let userPrompt = "Summary:\n\(Self.markdownText(from: sections))"
+        let result = try await llm.summarize(systemPrompt: system, userPrompt: userPrompt)
+        guard !result.sections.isEmpty else {
+            throw AppError.summaryTranslationFailed(NSLocalizedString(
+                "error.summary_translation_empty",
+                comment: "Translation returned no sections"
+            ))
+        }
+        guard result.sections.count == sections.count else {
+            throw AppError.summaryTranslationFailed(NSLocalizedString(
+                "error.summary_translation_mismatch",
+                comment: "Translation returned a different number of sections"
+            ))
+        }
+        return result
+    }
+
     /// Assemble a single prompt-ready transcript string from per-recording
     /// segment lists. `[mm:ss] Speaker: text` lines, one per segment. Each group
     /// carries the recording's `offset` (seconds from the meeting start), so the

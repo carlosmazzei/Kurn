@@ -40,6 +40,7 @@ public enum AppError: LocalizedError, Identifiable {
     case wikiUnavailable
     case titleGenerationFailed(String)
     case documentGenerationFailed(String)
+    case summaryTranslationFailed(String)
     case onDeviceModelUnavailable(String)
     /// A finished transcription run failed the final integrity gate (H5 PR
     /// 12) and was discarded before it could replace an existing transcript.
@@ -91,6 +92,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .wikiUnavailable: return "wiki_unavailable"
         case .titleGenerationFailed: return "title_generation"
         case .documentGenerationFailed: return "document_generation"
+        case .summaryTranslationFailed: return "summary_translation"
         case .onDeviceModelUnavailable: return "on_device_model_unavailable"
         case .transcriptIntegrityFailed: return "transcript_integrity"
         case .keychainAccessFailed: return "keychain_access"
@@ -248,6 +250,11 @@ public enum AppError: LocalizedError, Identifiable {
         case .documentGenerationFailed(let detail):
             return String(
                 format: NSLocalizedString("error.document_generation", comment: "Document generation failed"),
+                detail
+            )
+        case .summaryTranslationFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.summary_translation", comment: "Summary translation failed"),
                 detail
             )
         case .onDeviceModelUnavailable(let detail):

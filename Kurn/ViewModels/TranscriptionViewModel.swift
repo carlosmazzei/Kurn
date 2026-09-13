@@ -45,6 +45,17 @@ final class TranscriptionViewModel {
     /// Staged-summary progress as (stage, total) when a long transcript is
     /// being summarized in parts; nil for single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
+    /// True while an existing summary is being translated into another
+    /// language. Independent of `isSummarizing`/`summaryTask`: translating a
+    /// summary neither blocks nor is blocked by generating a new one, and it
+    /// is always single-pass so it needs no staged progress. Not `private` —
+    /// `TranscriptionViewModel+SummaryTranslation.swift` needs it.
+    var isTranslatingSummary = false
+    /// The source summary and target language of the in-flight translation,
+    /// so the Summary tab can show *which* chip is translating rather than a
+    /// generic spinner. Set together with `isTranslatingSummary`.
+    var translatingSummaryID: UUID?
+    var translationTargetLanguage: MeetingLanguage?
     /// Failures not tied to any one recording — a generic `persist()` save
     /// (which commits whatever is pending across the whole context, not one
     /// recording's own changes) or AI title generation for a meeting.
@@ -101,6 +112,10 @@ final class TranscriptionViewModel {
     /// Active summary task, owned here so the detail screen can cancel it.
     /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
     var summaryTask: Task<Void, Never>?
+    /// Active summary-translation task, owned here so the detail screen can
+    /// cancel it. Not `private` —
+    /// `TranscriptionViewModel+SummaryTranslation.swift` needs it.
+    var translationTask: Task<Void, Never>?
     /// Recordings in flight across ALL instances — `KurnApp`'s shared
     /// instance (the one every `MeetingDetailView` reads via `@Environment`)
     /// and the app-level `TranscriptionScheduler` resume coordinator's own

@@ -234,6 +234,23 @@ extension MeetingDetailView {
         txVM?.cancelSummary()
     }
 
+    func runTranslateSummary(_ summary: Summary, to language: MeetingLanguage) {
+        guard let txVM else { return }
+        let provider = settings.aiProvider
+        let model = settings.summaryModel(for: provider)
+        txVM.startTranslateSummary(
+            source: summary,
+            meeting: meeting,
+            targetLanguage: language,
+            provider: provider,
+            model: model
+        )
+    }
+
+    func cancelTranslateSummary() {
+        txVM?.cancelTranslateSummary()
+    }
+
     func deleteSummary(_ summary: Summary) {
         modelContext.delete(summary)
         if let failure = modelContext.saveOrError() { txVM?.error = failure }

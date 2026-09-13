@@ -100,6 +100,9 @@ struct MeetingDetailView: View {
     /// Set when the user picks "Delete" on a summary chip; drives the
     /// confirmation dialog.
     @State var pendingDeleteSummary: Summary?
+    /// Set when the user picks "Translate" on a summary chip; drives the
+    /// target-language picker sheet.
+    @State var pendingTranslateSummary: Summary?
     /// Set when the user taps redo on a transcribed recording; drives the
     /// per-segment re-transcription confirmation dialog.
     @State private var pendingRetranscribe: Recording?
@@ -164,6 +167,13 @@ struct MeetingDetailView: View {
                 selectedID: settings.lastSummaryTemplateID
             ) { template in
                 runSummary(with: template)
+            }
+        }
+        .sheet(item: $pendingTranslateSummary) { summary in
+            SummaryTranslateLanguagePicker(
+                suggestedLanguage: meeting.transcribedLanguage ?? meeting.language
+            ) { language in
+                runTranslateSummary(summary, to: language)
             }
         }
         .errorAlert(transcriptionErrorBinding)
@@ -282,13 +292,17 @@ struct MeetingDetailView: View {
                     settings: settings,
                     isSummarizing: txVM?.isSummarizing == true,
                     isCancellingSummary: txVM?.isCancellingSummary == true,
+                    isTranslatingSummary: txVM?.isTranslatingSummary == true,
+                    translationTargetLanguage: txVM?.translationTargetLanguage,
                     summaryProgress: txVM?.summaryProgress,
                     selectedSummaryID: selectedSummaryID,
                     hasAnyTranscript: hasAnyTranscript,
                     onGenerate: { generateSummary() },
                     onCancel: { cancelSummary() },
                     onSelectSummary: { selectedSummaryID = $0.id },
-                    onDeleteSummary: { pendingDeleteSummary = $0 }
+                    onDeleteSummary: { pendingDeleteSummary = $0 },
+                    onTranslateSummary: { pendingTranslateSummary = $0 },
+                    onCancelTranslateSummary: { cancelTranslateSummary() }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
             }

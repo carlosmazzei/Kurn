@@ -74,7 +74,8 @@ extension AppError {
         case .modelDownloadRequired, .modelDownloadFailed, .embeddingUnavailable, .onDeviceModelUnavailable:
             return .model
         case .autoTaggingFailed, .summaryTruncated, .generationTruncated, .semanticIndexFailed,
-             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed, .documentGenerationFailed:
+             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed, .documentGenerationFailed,
+             .summaryTranslationFailed:
             return .generation
         case .transcriptIntegrityFailed:
             return .integrity

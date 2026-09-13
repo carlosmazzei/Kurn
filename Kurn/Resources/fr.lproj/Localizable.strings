@@ -467,6 +467,13 @@
 "summary.footer_with_model" = "Généré par %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Modèle : %@";
 
+/* Traduction de résumé */
+"detail.summary.translate" = "Traduire";
+"detail.summary.translating" = "Traduction en %@…";
+"detail.summary.cancel_translate" = "Annuler la traduction";
+"detail.summary.choose_language" = "Traduire Vers";
+"detail.summary.choose_language.suggested" = "Suggéré";
+
 /* Modèles de résumé */
 "detail.summary.choose_template" = "Choisir un modèle";
 "settings.templates" = "Modèles de résumé";
@@ -829,6 +836,10 @@
 "documents.error.no_transcripts" = "Sélectionnez au moins une source contenant une transcription.";
 "documents.error.empty_response" = "Le fournisseur d'IA a renvoyé un document vide.";
 "error.document_generation" = "Impossible de générer le document : %@";
+"error.summary_translation" = "Impossible de traduire le résumé : %@";
+"error.summary_translation_empty" = "La traduction est revenue vide.";
+"error.summary_translation_mismatch" = "La traduction n'a pas conservé les sections du résumé.";
+"error.summary_translation_source_empty" = "Ce résumé n'a rien à traduire.";
 "error.on_device_model_unavailable" = "Modèle sur l'appareil indisponible : %@";
 "error.on_device_generation_timeout" = "La génération sur l'appareil a expiré.";
 
