@@ -12,7 +12,6 @@ import Foundation
 import KurnCore
 
 struct ReminderExportService: Sendable {
-    private let eventStore = EKEventStore()
 
     /// Current authorization state for creating reminders, without prompting.
     var authorizationStatus: EKAuthorizationStatus {
@@ -20,9 +19,11 @@ struct ReminderExportService: Sendable {
     }
 
     /// Prompts the user if needed. Returns whether the app can create
-    /// reminders once the request completes.
+    /// reminders once the request completes. `EKEventStore` isn't `Sendable`,
+    /// so a fresh instance is created per call rather than stored — access
+    /// authorization is app-level, not tied to a particular instance.
     func requestAccess() async throws -> Bool {
-        try await eventStore.requestFullAccessToReminders()
+        try await EKEventStore().requestFullAccessToReminders()
     }
 
     /// Creates one reminder per non-empty item in the user's default
@@ -35,6 +36,7 @@ struct ReminderExportService: Sendable {
         meetingTitle: String,
         meetingDate: Date
     ) throws -> Int {
+        let eventStore = EKEventStore()
         guard let calendar = eventStore.defaultCalendarForNewReminders() else {
             throw AppError.reminderCreationFailed("no_default_list")
         }
