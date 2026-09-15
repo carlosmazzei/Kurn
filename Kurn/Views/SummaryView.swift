@@ -11,6 +11,10 @@ import SwiftUI
 
 struct SummaryView: View {
     let summary: Summary
+    /// Sends a section's items to Reminders, opening a review sheet first.
+    /// `nil` (the default) hides the affordance entirely, for call sites that
+    /// only render a summary (e.g. share/export previews).
+    var onSendItemsToReminders: ((SummarySection) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -48,9 +52,22 @@ struct SummaryView: View {
     @ViewBuilder
     private func sectionCard(_ section: SummarySection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !section.title.isEmpty {
-                markdownInlineText(section.title)
-                    .font(.headline)
+            if !section.title.isEmpty || (!section.items.isEmpty && onSendItemsToReminders != nil) {
+                HStack(alignment: .firstTextBaseline) {
+                    if !section.title.isEmpty {
+                        markdownInlineText(section.title)
+                            .font(.headline)
+                    }
+                    Spacer()
+                    if !section.items.isEmpty, let onSendItemsToReminders {
+                        Button {
+                            onSendItemsToReminders(section)
+                        } label: {
+                            Image(systemName: "checklist")
+                        }
+                        .accessibilityLabel(NSLocalizedString("reminders.export.button", comment: "Send to Reminders"))
+                    }
+                }
             }
             if !section.body.isEmpty {
                 MarkdownText(section.body)

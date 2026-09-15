@@ -138,6 +138,7 @@ struct SummaryTab: View {
     let onDeleteSummary: (Summary) -> Void
     let onTranslateSummary: (Summary) -> Void
     let onCancelTranslateSummary: () -> Void
+    let onSendItemsToReminders: (SummarySection) -> Void
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -154,7 +155,7 @@ struct SummaryTab: View {
                 if isSummarizing {
                     summaryProgressPanel
                 }
-                SummaryView(summary: selectedSummary)
+                SummaryView(summary: selectedSummary, onSendItemsToReminders: onSendItemsToReminders)
                 if !isSummarizing {
                     newSummaryButton
                 }

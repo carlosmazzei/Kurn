@@ -910,3 +910,11 @@
 "quarantine.reason.too_short" = "Gravação curta demais";
 "quarantine.reason.collision" = "Conflito de nome durante a migração";
 "quarantine.reason.unknown" = "Motivo desconhecido";
+
+/* Reminders export (F5) */
+"error.reminders_access_denied" = "O Kurn não tem permissão para adicionar lembretes. Abra os Ajustes para permitir o acesso ao Lembretes.";
+"error.reminder_creation_failed" = "Não foi possível salvar no Lembretes: %@";
+"reminders.export.button" = "Enviar para o Lembretes";
+"reminders.export.title" = "Enviar para o Lembretes";
+"reminders.export.disclaimer" = "Os itens selecionados são salvos como lembretes na sua lista padrão do Lembretes.";
+"reminders.export.note" = "Da reunião: %@ (%@)";

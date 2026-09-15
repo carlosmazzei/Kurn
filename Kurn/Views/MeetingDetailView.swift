@@ -115,6 +115,13 @@ struct MeetingDetailView: View {
     @State var autoTagSuggestion: AutoTaggingService.Suggestion?
     /// Auto-tagging failure surfaced to the user.
     @State var autoTagError: AppError?
+    /// Set when the user requests review of a summary section's items before
+    /// sending them to Reminders; drives the confirm sheet.
+    @State var remindersSection: SummarySection?
+    /// Set while a Reminders access request is in flight.
+    @State var isRequestingRemindersAccess = false
+    /// Reminders export failure surfaced to the user.
+    @State var remindersError: AppError?
 
     init(meeting: Meeting) {
         self.meeting = meeting
@@ -178,6 +185,7 @@ struct MeetingDetailView: View {
         }
         .errorAlert(transcriptionErrorBinding)
         .errorAlert($autoTagError)
+        .errorAlert($remindersError)
         .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
         .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
         .sheet(item: $autoTagSuggestion) { suggestion in
@@ -190,6 +198,18 @@ struct MeetingDetailView: View {
             )
         }
         .sheet(item: crossMeetingMatchBinding, content: crossMeetingMatchSheetContent)
+        .sheet(
+            isPresented: Binding(
+                get: { remindersSection != nil },
+                set: { if !$0 { remindersSection = nil } }
+            )
+        ) {
+            if let remindersSection {
+                ReminderExportConfirmView(section: remindersSection) { items in
+                    applyReminderExport(items)
+                }
+            }
+        }
         .kurnDialog(
             isPresented: Binding(
                 get: { pendingRetranscribe != nil },
@@ -302,7 +322,8 @@ struct MeetingDetailView: View {
                     onSelectSummary: { selectedSummaryID = $0.id },
                     onDeleteSummary: { pendingDeleteSummary = $0 },
                     onTranslateSummary: { pendingTranslateSummary = $0 },
-                    onCancelTranslateSummary: { cancelTranslateSummary() }
+                    onCancelTranslateSummary: { cancelTranslateSummary() },
+                    onSendItemsToReminders: { exportItemsToReminders($0) }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
             }

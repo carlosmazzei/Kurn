@@ -49,6 +49,8 @@
 	<string>Kurn uses Face ID to protect your meeting recordings from unauthorized access.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Kurn needs the microphone to record meetings.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Kurn uses Reminders to save action items from your meeting summaries.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Kurn uses speech recognition to transcribe your meetings on-device.</string>
 	<key>NSSupportsLiveActivities</key>

@@ -910,3 +910,11 @@
 "quarantine.reason.too_short" = "Aufnahme zu kurz";
 "quarantine.reason.collision" = "Namenskonflikt bei der Migration";
 "quarantine.reason.unknown" = "Unbekannter Grund";
+
+/* Reminders export (F5) */
+"error.reminders_access_denied" = "Kurn hat keine Berechtigung, Erinnerungen hinzuzufügen. Öffne die Einstellungen, um den Zugriff auf Erinnerungen zu erlauben.";
+"error.reminder_creation_failed" = "Konnte nicht in Erinnerungen gespeichert werden: %@";
+"reminders.export.button" = "An Erinnerungen senden";
+"reminders.export.title" = "An Erinnerungen senden";
+"reminders.export.disclaimer" = "Ausgewählte Einträge werden als Erinnerungen in deiner Standardliste gespeichert.";
+"reminders.export.note" = "Aus dem Meeting: %@ (%@)";

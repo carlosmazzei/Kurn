@@ -910,3 +910,11 @@
 "quarantine.reason.too_short" = "Enregistrement trop court";
 "quarantine.reason.collision" = "Conflit de nom pendant la migration";
 "quarantine.reason.unknown" = "Raison inconnue";
+
+/* Reminders export (F5) */
+"error.reminders_access_denied" = "Kurn n'a pas l'autorisation d'ajouter des rappels. Ouvrez Réglages pour autoriser l'accès à Rappels.";
+"error.reminder_creation_failed" = "Impossible d'enregistrer dans Rappels : %@";
+"reminders.export.button" = "Envoyer vers Rappels";
+"reminders.export.title" = "Envoyer vers Rappels";
+"reminders.export.disclaimer" = "Les éléments sélectionnés sont enregistrés comme rappels dans votre liste Rappels par défaut.";
+"reminders.export.note" = "Depuis la réunion : %@ (%@)";
