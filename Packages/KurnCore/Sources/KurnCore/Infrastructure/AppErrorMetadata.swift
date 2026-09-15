@@ -79,6 +79,10 @@ extension AppError {
             return .generation
         case .transcriptIntegrityFailed:
             return .integrity
+        case .remindersAccessDenied:
+            return .permission
+        case .reminderCreationFailed:
+            return .storage
         }
     }
 
@@ -107,7 +111,7 @@ extension AppError {
              .persistenceFailed, .modelDownloadFailed, .resourceUnavailable, .authenticationFailed,
              .autoTaggingFailed, .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed,
              .titleGenerationFailed, .documentGenerationFailed, .transcriptIntegrityFailed,
-             .keychainAccessFailed:
+             .keychainAccessFailed, .reminderCreationFailed:
             return true
         default:
             return false
@@ -122,10 +126,11 @@ extension AppError {
         case .networkError, .apiError, .ambiguousProviderResult, .transcriptionFailed,
              .persistenceFailed, .modelDownloadFailed, .authenticationFailed, .autoTaggingFailed,
              .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed, .titleGenerationFailed,
-             .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed:
+             .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed,
+             .reminderCreationFailed:
             return .retry
         case .noAPIKey, .invalidProviderURL, .networkPolicyRestricted, .permissionDenied,
-             .authenticationNotAvailable:
+             .authenticationNotAvailable, .remindersAccessDenied:
             return .openSettings
         case .resourceUnavailable:
             return .freeSpace
@@ -164,7 +169,8 @@ extension AppError {
              .wikiGenerationFailed(let detail),
              .titleGenerationFailed(let detail),
              .documentGenerationFailed(let detail),
-             .onDeviceModelUnavailable(let detail):
+             .onDeviceModelUnavailable(let detail),
+             .reminderCreationFailed(let detail):
             return detail
         case .networkError(let urlError):
             return urlError.localizedDescription
