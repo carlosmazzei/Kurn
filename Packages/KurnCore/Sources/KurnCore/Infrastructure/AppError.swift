@@ -53,6 +53,14 @@ public enum AppError: LocalizedError, Identifiable {
     /// `KeychainFailureReason` raw value ("locked"/"denied"/"transient"),
     /// never a raw `OSStatus` or free text.
     case keychainAccessFailed(String)
+    /// The user has not granted (or has revoked) access to Reminders, so a
+    /// summary item can't be written there. Never thrown for a mid-batch
+    /// EventKit save failure — see `reminderCreationFailed` for that.
+    case remindersAccessDenied
+    /// An `EKReminder` save/commit failed after access was granted. The
+    /// associated string is EventKit's own error description, for display
+    /// only — never logged at `.public`.
+    case reminderCreationFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     public var id: String { errorDescription ?? "AppError" }
@@ -96,6 +104,8 @@ public enum AppError: LocalizedError, Identifiable {
         case .onDeviceModelUnavailable: return "on_device_model_unavailable"
         case .transcriptIntegrityFailed: return "transcript_integrity"
         case .keychainAccessFailed: return "keychain_access"
+        case .remindersAccessDenied: return "reminders_access_denied"
+        case .reminderCreationFailed: return "reminder_creation_failed"
         }
     }
 
@@ -271,6 +281,16 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.keychain_access_failed", comment: "Keychain access failed"),
                 reason
+            )
+        case .remindersAccessDenied:
+            return NSLocalizedString(
+                "error.reminders_access_denied",
+                comment: "Reminders access denied"
+            )
+        case .reminderCreationFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.reminder_creation_failed", comment: "Reminder creation failed"),
+                detail
             )
         }
     }

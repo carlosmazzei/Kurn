@@ -910,3 +910,11 @@
 "quarantine.reason.too_short" = "Registrazione troppo breve";
 "quarantine.reason.collision" = "Conflitto di nome durante la migrazione";
 "quarantine.reason.unknown" = "Motivo sconosciuto";
+
+/* Reminders export (F5) */
+"error.reminders_access_denied" = "Kurn non ha l'autorizzazione ad aggiungere promemoria. Apri Impostazioni per consentire l'accesso a Promemoria.";
+"error.reminder_creation_failed" = "Impossibile salvare in Promemoria: %@";
+"reminders.export.button" = "Invia a Promemoria";
+"reminders.export.title" = "Invia a Promemoria";
+"reminders.export.disclaimer" = "Gli elementi selezionati vengono salvati come promemoria nella tua lista Promemoria predefinita.";
+"reminders.export.note" = "Dalla riunione: %@ (%@)";

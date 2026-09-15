@@ -910,3 +910,11 @@
 "quarantine.reason.too_short" = "录音过短";
 "quarantine.reason.collision" = "迁移期间的名称冲突";
 "quarantine.reason.unknown" = "未知原因";
+
+/* Reminders export (F5) */
+"error.reminders_access_denied" = "Kurn 没有添加提醒事项的权限。请前往设置以允许访问提醒事项。";
+"error.reminder_creation_failed" = "无法保存到提醒事项：%@";
+"reminders.export.button" = "发送到提醒事项";
+"reminders.export.title" = "发送到提醒事项";
+"reminders.export.disclaimer" = "所选内容将作为提醒事项保存到你的默认提醒事项列表中。";
+"reminders.export.note" = "来自会议：%@（%@）";
