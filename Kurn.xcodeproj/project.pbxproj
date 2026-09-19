@@ -1168,7 +1168,7 @@
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.15.6;
+				version = 0.15.7;
 			};
 		};
 		2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */ = {
