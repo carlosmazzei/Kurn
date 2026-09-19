@@ -63,12 +63,24 @@ struct RecognitionPipelineTests {
         #expect(TranscriptionEngine.fluidAudioParakeet.storageMode == .onDevice)
         #expect(TranscriptionEngine.whisperCpp.storageMode == .onDevice)
         #expect(TranscriptionEngine.whisperAPI.storageMode == .whisperAPI)
+        // A second cloud vendor reuses the legacy "cloud API" storage value
+        // rather than getting its own `TranscriptionMode` case.
+        #expect(TranscriptionEngine.elevenLabsScribe.storageMode == .whisperAPI)
+    }
+
+    @Test func isCloudTranscriptionIsTrueOnlyForTheTwoCloudEngines() {
+        #expect(TranscriptionEngine.whisperAPI.isCloudTranscription)
+        #expect(TranscriptionEngine.elevenLabsScribe.isCloudTranscription)
+        #expect(!TranscriptionEngine.appleSpeech.isCloudTranscription)
+        #expect(!TranscriptionEngine.fluidAudioParakeet.isCloudTranscription)
+        #expect(!TranscriptionEngine.whisperCpp.isCloudTranscription)
     }
 
     @Test func requiredModelSetOnlyForDownloadedEngines() {
         let model = WhisperCppModel.default
         #expect(TranscriptionEngine.appleSpeech.requiredModelSet(whisperCppModel: model) == nil)
         #expect(TranscriptionEngine.whisperAPI.requiredModelSet(whisperCppModel: model) == nil)
+        #expect(TranscriptionEngine.elevenLabsScribe.requiredModelSet(whisperCppModel: model) == nil)
         #expect(TranscriptionEngine.fluidAudioParakeet.requiredModelSet(whisperCppModel: model) == .onDeviceASR)
         #expect(LanguageDetectionEngine.byTranscriber.requiredModelSet == nil)
         #expect(LanguageDetectionEngine.fluidAudioLID.requiredModelSet == .onDeviceASR)

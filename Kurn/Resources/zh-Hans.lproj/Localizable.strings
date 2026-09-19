@@ -68,6 +68,7 @@
 "transcription.fluid_parakeet" = "FluidAudio（多语言）";
 "transcription.whisper" = "Whisper API";
 "transcription.whisper_cpp" = "Whisper（设备端）";
+"transcription.eleven_labs_scribe" = "ElevenLabs Scribe";
 "preprocessing.standard" = "标准清理";
 "preprocessing.none" = "无";
 "vad.energy" = "能量阈值";
@@ -525,6 +526,7 @@
 "pipeline.language_detection_footer" = "自动判断所说的语言，而不是依赖转录器的猜测。";
 "settings.transcription_provider" = "转录提供方";
 "settings.whisper_provider_key_footer" = "Whisper API 转录使用上方选定的提供方，与摘要提供方相互独立。可使用任何配置了 API 密钥的 OpenAI 兼容提供方（如 OpenAI 或 Groq）。";
+"settings.scribe_provider_key_footer" = "ElevenLabs Scribe 转录需要上方填写的 ElevenLabs API 密钥。";
 "settings.whisper_provider_key_missing_footer" = "请在「AI 提供方」中配置一个 OpenAI 兼容的 API 密钥（如 OpenAI 或 Groq），以启用 Whisper API 转录。";
 "settings.summary" = "摘要";
 "settings.recording" = "录音";

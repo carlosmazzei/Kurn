@@ -20,7 +20,7 @@ extension TranscriptionEngine {
     /// defaulted parameter would let a caller silently download the wrong one.
     func requiredModelSet(whisperCppModel: WhisperCppModel) -> ModelSet? {
         switch self {
-        case .appleSpeech, .whisperAPI: return nil
+        case .appleSpeech, .whisperAPI, .elevenLabsScribe: return nil
         case .fluidAudioParakeet: return .onDeviceASR
         case .whisperCpp: return .whisperCppASR(whisperCppModel)
         }

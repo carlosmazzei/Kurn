@@ -29,6 +29,10 @@ public enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identi
     /// coverage as `.whisperAPI` with nothing leaving the phone, at the cost of
     /// a one-time GGML weight download (see `WhisperCppModel`).
     case whisperCpp
+    /// ElevenLabs Scribe cloud API (chunked upload). Requires an ElevenLabs API
+    /// key. A second cloud vendor alongside `.whisperAPI`, added for
+    /// side-by-side accuracy comparison rather than to replace it.
+    case elevenLabsScribe
 
     public var id: String { rawValue }
 
@@ -38,15 +42,29 @@ public enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identi
         case .fluidAudioParakeet: return NSLocalizedString("transcription.fluid_parakeet", comment: "FluidAudio multilingual")
         case .whisperAPI: return NSLocalizedString("transcription.whisper", comment: "Whisper API")
         case .whisperCpp: return NSLocalizedString("transcription.whisper_cpp", comment: "Whisper on-device")
+        case .elevenLabsScribe: return NSLocalizedString("transcription.eleven_labs_scribe", comment: "ElevenLabs Scribe")
         }
     }
 
     /// The legacy `TranscriptionMode` to persist on `Recording` so the stored
-    /// field stays valid without a SwiftData migration.
+    /// field stays valid without a SwiftData migration. `.elevenLabsScribe`
+    /// reuses `.whisperAPI`'s value — the field means "cloud API
+    /// transcription" for back-compat purposes, not "OpenAI-shaped".
     public var storageMode: TranscriptionMode {
         switch self {
         case .appleSpeech, .fluidAudioParakeet, .whisperCpp: return .onDevice
-        case .whisperAPI: return .whisperAPI
+        case .whisperAPI, .elevenLabsScribe: return .whisperAPI
+        }
+    }
+
+    /// Whether this engine uploads audio to a cloud vendor, as opposed to
+    /// running entirely on device. Used to gate the "we will upload your
+    /// audio" consent dialog and the concurrent transcribe+diarize path,
+    /// which only makes sense when transcription keeps almost nothing local.
+    public var isCloudTranscription: Bool {
+        switch self {
+        case .whisperAPI, .elevenLabsScribe: return true
+        case .appleSpeech, .fluidAudioParakeet, .whisperCpp: return false
         }
     }
 }

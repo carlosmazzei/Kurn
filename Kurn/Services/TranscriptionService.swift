@@ -205,7 +205,7 @@ struct TranscriptionService {
         let gated: GatedTranscription
         let diarization: DiarizationOutcome
         let diarizationProgress = DiarizationPhaseRelay(onPhase: onPhase)
-        if config.transcription == .whisperAPI {
+        if config.transcription.isCloudTranscription {
             AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
             async let rawTranscript = transcribeGated(
                 cleanedURL: cleanedURL,
@@ -546,6 +546,7 @@ struct TranscriptionService {
         switch engine {
         case .whisperAPI: checkpointProviderID = transcriptionProvider.id
         case .whisperCpp: checkpointProviderID = "whispercpp:\(whisperCppModel.rawValue)"
+        case .elevenLabsScribe: checkpointProviderID = "elevenLabsScribe"
         case .appleSpeech, .fluidAudioParakeet: checkpointProviderID = nil
         }
         // H4: the compaction map's own identity, not just "compaction ran" —
@@ -588,7 +589,7 @@ struct TranscriptionService {
         let targetSize = (try? target.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let targetDuration = (try? await AVURLAsset(url: target).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("transcribe: engine input \(target.lastPathComponent, privacy: .public) size=\(targetSize, privacy: .public) bytes duration=\(String(format: "%.1f", targetDuration), privacy: .public)s compacted=\(compacted, privacy: .public)")
-        if engine == .whisperAPI, !cloudTransfer.consented {
+        if engine.isCloudTranscription, !cloudTransfer.consented {
             throw AppError.permissionDenied(NSLocalizedString(
                 "error.cloud_transcription_consent_required",
                 comment: "Cloud transcription requires upload consent"

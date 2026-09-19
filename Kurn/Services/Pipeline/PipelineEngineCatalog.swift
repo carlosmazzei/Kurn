@@ -104,6 +104,7 @@ struct PipelineEngineCatalog: Sendable {
         let fluidAudioTranscriber = FluidAudioTranscriber()
         let whisperTranscriber = WhisperTranscriber()
         let whisperCppTranscriber = WhisperCppTranscriber()
+        let scribeTranscriber = ScribeTranscriber()
         let heuristicDiarizer = SpeakerDiarizer()
         let fluidAudioDiarizer = FluidAudioDiarizer()
         let sherpaOnnxDiarizer = SherpaOnnxDiarizer()
@@ -134,6 +135,7 @@ struct PipelineEngineCatalog: Sendable {
                 case .fluidAudioParakeet: return fluidAudioTranscriber
                 case .whisperAPI: return whisperTranscriber
                 case .whisperCpp: return whisperCppTranscriber
+                case .elevenLabsScribe: return scribeTranscriber
                 }
             },
             diarizer: { engine in
@@ -164,6 +166,22 @@ extension WhisperTranscriber: PipelineTranscribing {
             language: request.language,
             provider: request.provider,
             model: request.model,
+            transferPolicy: request.transferPolicy,
+            cutPoints: request.cutPoints,
+            resume: request.resume,
+            onChunkCompleted: request.onChunkCompleted,
+            onProgress: { progress, completed, total in
+                request.onProgress(progress, total > 0 ? ChunkProgress(completed: completed, total: total) : nil)
+            }
+        )
+    }
+}
+
+extension ScribeTranscriber: PipelineTranscribing {
+    func transcribe(_ request: EngineTranscriptionRequest) async throws -> RawTranscript {
+        try await transcribeResumable(
+            url: request.url,
+            language: request.language,
             transferPolicy: request.transferPolicy,
             cutPoints: request.cutPoints,
             resume: request.resume,

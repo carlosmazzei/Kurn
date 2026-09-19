@@ -27,6 +27,11 @@ enum KeychainKey: String, CaseIterable {
     case anthropic = "anthropic_api_key"
     case google = "google_api_key"
     case groq = "groq_api_key"
+    /// ElevenLabs Scribe's key. Not an `AIProvider` account — Scribe is a
+    /// transcription-only `TranscriptionEngine`, not a selectable summary
+    /// provider — so it is read/written directly by this case rather than
+    /// through `AIProvider.keychainAccount`.
+    case elevenLabs = "elevenlabs_api_key"
 }
 
 /// Why a Keychain operation didn't simply succeed — retryable, and never to

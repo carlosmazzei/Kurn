@@ -79,7 +79,7 @@ struct PublicDatasetEvaluationHarnessTests {
         print("[pipeline-eval]   preprocessing: \(PreprocessingEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   VAD: \(VADEngine.allCases.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   diarization: \(diarizers)")
-        print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { $0 != .whisperAPI }.map(\.rawValue).joined(separator: ", "))")
+        print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { !$0.isCloudTranscription }.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   whisper.cpp models: \(whisperModels)")
         print("[pipeline-eval]   cloud mode: \(cloudMode)")
         if cloudProviders.isEmpty {

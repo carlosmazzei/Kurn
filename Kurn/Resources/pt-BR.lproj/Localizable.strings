@@ -68,6 +68,7 @@
 "transcription.fluid_parakeet" = "FluidAudio (multilíngue)";
 "transcription.whisper" = "API Whisper";
 "transcription.whisper_cpp" = "Whisper (no dispositivo)";
+"transcription.eleven_labs_scribe" = "ElevenLabs Scribe";
 "preprocessing.standard" = "Limpeza padrão";
 "preprocessing.none" = "Nenhuma";
 "vad.energy" = "Limiar de energia";
@@ -525,6 +526,7 @@
 "pipeline.language_detection_footer" = "Escolhe o idioma falado automaticamente, em vez de depender da suposição do transcritor.";
 "settings.transcription_provider" = "Provedor de Transcrição";
 "settings.whisper_provider_key_footer" = "A transcrição via Whisper API usa o provedor selecionado acima, de forma independente do provedor de resumo. Pode-se usar qualquer provedor compatível com a OpenAI que tenha uma chave de API (como OpenAI ou Groq).";
+"settings.scribe_provider_key_footer" = "A transcrição via ElevenLabs Scribe exige uma chave de API da ElevenLabs, informada acima.";
 "settings.whisper_provider_key_missing_footer" = "Configure uma chave de API compatível com a OpenAI (como OpenAI ou Groq) em Provedores de IA para habilitar a transcrição via Whisper API.";
 "settings.summary" = "Resumo";
 "settings.recording" = "Gravação";
