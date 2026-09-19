@@ -588,19 +588,29 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     /// otherwise-valid key with a 403) or returns an empty list. Empty when no
     /// such fallback is known for this provider.
     var fallbackModels: [String] {
-        guard id == AIProvider.groq.id else { return [] }
-        return [
-            "llama-3.3-70b-versatile",
-            "llama-3.3-70b-specdec",
-            "llama-3.1-8b-instant",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "gemma2-9b-it",
-            "deepseek-r1-distill-llama-70b",
-            "qwen/qwen3-32b",
-            "whisper-large-v3",
-            "whisper-large-v3-turbo"
-        ].sorted()
+        if id == AIProvider.groq.id {
+            return [
+                "llama-3.3-70b-versatile",
+                "llama-3.3-70b-specdec",
+                "llama-3.1-8b-instant",
+                "meta-llama/llama-4-scout-17b-16e-instruct",
+                "meta-llama/llama-4-maverick-17b-128e-instruct",
+                "gemma2-9b-it",
+                "deepseek-r1-distill-llama-70b",
+                "qwen/qwen3-32b",
+                "whisper-large-v3",
+                "whisper-large-v3-turbo"
+            ].sorted()
+        }
+        if id == AIProvider.openAI.id {
+            // OpenAI's /models response is dominated by chat models, so the
+            // transcription picker's filter can be left with nothing to show
+            // if the live fetch succeeds but returns none of these names
+            // (or the endpoint is briefly unreachable) — keep the known-good
+            // transcription models available regardless.
+            return ["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"].sorted()
+        }
+        return []
     }
 
     static let openAI = AIProvider(

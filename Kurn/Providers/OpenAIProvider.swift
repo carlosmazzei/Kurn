@@ -49,6 +49,22 @@ struct OpenAIProvider: LLMProvider {
         let url = try LLMHTTP.requireEndpoint(provider: provider, path: "audio/transcriptions")
         AppLog.transcription.atInfo.info("OpenAIProvider: transcribing \(audioData.count, privacy: .public) bytes via \(provider.displayName, privacy: .public), model=\(transcriptionModel, privacy: .public)")
 
+        guard Self.supportsVerboseJSON(transcriptionModel) else {
+            // gpt-4o-transcribe/gpt-4o-mini-transcribe only support the plain
+            // `json`/`text` response formats — no `verbose_json`, no
+            // `timestamp_granularities[]` — so there is nothing to retry
+            // without on a 400/422 the way there is for whisper-1. Go straight
+            // to the one request shape these models accept.
+            let data = try await send(
+                audioData: audioData,
+                fileName: fileName,
+                language: language,
+                url: url,
+                wordTimestamps: false
+            )
+            return try Self.transcript(from: data, provider: provider)
+        }
+
         do {
             let data = try await send(
                 audioData: audioData,
@@ -77,6 +93,14 @@ struct OpenAIProvider: LLMProvider {
         }
     }
 
+    /// `gpt-4o-transcribe`/`gpt-4o-mini-transcribe` (and any future
+    /// `gpt-4o*-transcribe` variant) reject `response_format: verbose_json`
+    /// outright — only `whisper`-family models support it. `static`, like
+    /// `transcript(from:provider:)`, so it is reachable from tests.
+    static func supportsVerboseJSON(_ model: String) -> Bool {
+        !model.lowercased().hasPrefix("gpt-4o")
+    }
+
     private func send(
         audioData: Data,
         fileName: String,
@@ -98,14 +122,15 @@ struct OpenAIProvider: LLMProvider {
             forHTTPHeaderField: "Content-Type"
         )
 
+        let supportsVerboseJSON = Self.supportsVerboseJSON(transcriptionModel)
         var fields: [(name: String, value: String)] = [
             ("model", transcriptionModel),
-            ("response_format", "verbose_json")
+            ("response_format", supportsVerboseJSON ? "verbose_json" : "json")
         ]
         if let code = language.whisperCode {
             fields.append(("language", code))
         }
-        if wordTimestamps {
+        if wordTimestamps && supportsVerboseJSON {
             // A repeated field name is how a multipart array is expressed.
             // `segment` has to be asked for explicitly: naming any granularity
             // replaces the default rather than adding to it, and the segment

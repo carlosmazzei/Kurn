@@ -277,8 +277,14 @@ struct TranscriptionModelPicker: View {
                 set: { settings.setTranscriptionModel($0, for: provider) }
             ),
             filter: { loaded in
-                let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
-                return whisperModels.isEmpty ? loaded : whisperModels
+                // "whisper" covers whisper-1/whisper-large-v3(-turbo); "transcribe"
+                // covers OpenAI's newer gpt-4o-transcribe/gpt-4o-mini-transcribe,
+                // which carry no "whisper" in their name.
+                let transcriptionModels = loaded.filter {
+                    $0.localizedCaseInsensitiveContains("whisper")
+                        || $0.localizedCaseInsensitiveContains("transcribe")
+                }
+                return transcriptionModels.isEmpty ? loaded : transcriptionModels
             }
         )
     }
