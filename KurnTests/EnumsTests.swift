@@ -96,6 +96,27 @@ struct EnumsTests {
         #expect(AIProvider.groq.defaultTranscriptionModel == "whisper-large-v3")
     }
 
+    @Test func groqFallbackModelsIncludeBothWhisperVariants() {
+        // Regression guard: Groq's cheaper/faster whisper-large-v3-turbo must
+        // stay selectable in Settings even when the live /models fetch fails
+        // and ProviderModelsService falls back to this static list.
+        #expect(AIProvider.groq.fallbackModels.contains("whisper-large-v3"))
+        #expect(AIProvider.groq.fallbackModels.contains("whisper-large-v3-turbo"))
+    }
+
+    @Test func transcriptionModelPickerWhisperFilterKeepsGroqTurboModel() {
+        // Mirrors TranscriptionModelPicker's filter closure (SettingsProviderViews.swift):
+        // narrows a provider's loaded model list to Whisper-family names.
+        let whisperFilter: ([String]) -> [String] = { loaded in
+            let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
+            return whisperModels.isEmpty ? loaded : whisperModels
+        }
+        let filtered = whisperFilter(AIProvider.groq.fallbackModels)
+        #expect(filtered.contains("whisper-large-v3-turbo"))
+        #expect(filtered.contains("whisper-large-v3"))
+        #expect(!filtered.contains("llama-3.3-70b-versatile"))
+    }
+
     @Test func appleOnDeviceIsABuiltInWithNoTranscriptionSupport() {
         #expect(AIProvider.appleOnDevice.kind == .appleOnDevice)
         #expect(AIProvider.appleOnDevice.isBuiltIn)
