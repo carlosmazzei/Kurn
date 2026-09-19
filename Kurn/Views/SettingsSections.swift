@@ -54,6 +54,18 @@ extension SettingsView {
         }
     }
 
+    /// Same invariant as `ensureWhisperSelectionIsAllowed()`, for ElevenLabs
+    /// Scribe: a key removed anywhere must never leave the transcription
+    /// engine pointing at a cloud vendor with no credential. Scribe has no
+    /// `AIProvider` to repoint at (one vendor, one key), so there is only the
+    /// "consented" and "not consented" case, unlike Whisper's provider list.
+    func ensureScribeSelectionIsAllowed() {
+        guard settings.transcriptionEngine == .elevenLabsScribe else { return }
+        if !KeychainManager.shared.hasValue(for: .elevenLabs) {
+            settings.transcriptionEngine = .appleSpeech
+        }
+    }
+
     func deleteAllData() {
         do {
             try modelContext.delete(model: Meeting.self)

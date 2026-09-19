@@ -15,15 +15,15 @@ struct TranscriptionSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelDownloadController.self) private var downloads
     @State private var cloudConsent = CloudTranscriptionConsentController()
-    /// Bumped locally when the ElevenLabs Scribe key row saves/clears a key,
-    /// so `hasScribeKey` re-reads Keychain state. Scoped to this view (unlike
-    /// `keyRevision` below) since nothing else in Settings depends on Scribe's
-    /// key.
-    @State private var scribeKeyRevision = 0
 
     /// Bumped by the root when an API key changes, so the Whisper provider rows
-    /// re-read Keychain state.
-    let keyRevision: Int
+    /// re-read Keychain state. A `Binding` (unlike `SummarySettingsView`'s/
+    /// `WikiSettingsView`'s read-only copy) because this screen also *writes*
+    /// a key itself (the Scribe row below) and must propagate that change back
+    /// to the root's `.onChange(of: keyRevision)`, which is what makes
+    /// `ensureScribeSelectionIsAllowed()` react immediately instead of only on
+    /// the next time Settings is reopened.
+    @Binding var keyRevision: Int
 
     private var transcriptionProviders: [AIProvider] {
         _ = keyRevision
@@ -33,7 +33,7 @@ struct TranscriptionSettingsView: View {
     private var hasAnyTranscriptionProvider: Bool { !transcriptionProviders.isEmpty }
 
     private var hasScribeKey: Bool {
-        _ = scribeKeyRevision
+        _ = keyRevision
         return KeychainManager.shared.hasValue(for: .elevenLabs)
     }
 
@@ -163,7 +163,7 @@ struct TranscriptionSettingsView: View {
             // ElevenLabs Scribe: a single vendor and model, so just the API
             // key — no provider/model pickers like the Whisper block above.
             if settings.transcriptionEngine == .elevenLabsScribe {
-                ScribeAPIKeyRow(onChange: { scribeKeyRevision += 1 })
+                ScribeAPIKeyRow(onChange: { keyRevision += 1 })
                 Text(NSLocalizedString(
                     "settings.scribe_provider_key_footer",
                     comment: "ElevenLabs Scribe key dependency"
