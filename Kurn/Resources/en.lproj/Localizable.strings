@@ -68,7 +68,7 @@
 /* Recognition pipeline engines */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingual)";
-"transcription.whisper" = "Whisper API";
+"transcription.cloud_provider" = "Cloud Provider";
 "transcription.whisper_cpp" = "Whisper (on-device)";
 "preprocessing.standard" = "Standard cleanup";
 "preprocessing.none" = "None";

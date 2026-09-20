@@ -68,7 +68,7 @@
 /* 识别流水线引擎 */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio（多语言）";
-"transcription.whisper" = "Whisper API";
+"transcription.cloud_provider" = "云端提供方";
 "transcription.whisper_cpp" = "Whisper（设备端）";
 "preprocessing.standard" = "标准清理";
 "preprocessing.none" = "无";

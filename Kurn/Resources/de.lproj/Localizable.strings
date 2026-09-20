@@ -68,7 +68,7 @@
 /* Engines der Erkennungspipeline */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (mehrsprachig)";
-"transcription.whisper" = "Whisper API";
+"transcription.cloud_provider" = "Cloud-Anbieter";
 "transcription.whisper_cpp" = "Whisper (auf dem Gerät)";
 "preprocessing.standard" = "Standardbereinigung";
 "preprocessing.none" = "Keine";
