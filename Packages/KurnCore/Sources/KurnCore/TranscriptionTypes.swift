@@ -72,10 +72,18 @@ public struct RawTranscript: Sendable {
     public var spans: [TranscribedSpan]
     /// BCP-47 (or two-letter) locale string, may be empty if unknown.
     public var language: String
+    /// Speaker turns returned natively by the transcription provider's own
+    /// response (e.g. ElevenLabs Scribe's `diarize` parameter), when it
+    /// supports that. `nil` means the engine either doesn't support native
+    /// diarization or didn't return any this time — never a genuine
+    /// zero-speaker result, which callers must distinguish from an empty
+    /// array.
+    public var speakerTurns: [SpeakerTurn]?
 
-    public init(spans: [TranscribedSpan], language: String) {
+    public init(spans: [TranscribedSpan], language: String, speakerTurns: [SpeakerTurn]? = nil) {
         self.spans = spans
         self.language = language
+        self.speakerTurns = speakerTurns
     }
 }
 

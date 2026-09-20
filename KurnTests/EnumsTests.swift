@@ -146,6 +146,15 @@ struct EnumsTests {
         #expect(AIProviderKind.networkCases.count == AIProviderKind.allCases.count - 1)
     }
 
+    @Test func onlyElevenLabsSupportsNativeDiarization() {
+        #expect(AIProvider.elevenLabs.supportsNativeDiarization)
+        #expect(!AIProvider.openAI.supportsNativeDiarization)
+        #expect(!AIProvider.groq.supportsNativeDiarization)
+        #expect(!AIProvider.anthropic.supportsNativeDiarization)
+        #expect(!AIProvider.google.supportsNativeDiarization)
+        #expect(!AIProvider.appleOnDevice.supportsNativeDiarization)
+    }
+
     // MARK: - TranscriptionMode
 
     @Test func transcriptionModeIdMatchesRawValue() {
@@ -160,6 +169,10 @@ struct EnumsTests {
         for engine in DiarizationEngine.allCases {
             #expect(engine.id == engine.rawValue)
         }
+    }
+
+    @Test func transcriptionProviderNativeDiarizationNeedsNoModelDownload() {
+        #expect(DiarizationEngine.transcriptionProviderNative.requiredModelSet == nil)
     }
 
     // MARK: - AudioQuality

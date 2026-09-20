@@ -403,6 +403,14 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     /// `fluidAudio` — a deliberate trade for collapse-resistance, not a
     /// straight upgrade.
     case sherpaOnnx
+    /// Speaker labels returned natively by the selected `.whisperAPI`
+    /// transcription provider's own response (e.g. ElevenLabs Scribe),
+    /// instead of running a separate local diarization pass. Only honored
+    /// when the transcription engine is `.whisperAPI` and the selected
+    /// provider's `supportsNativeDiarization` is true — see
+    /// `PipelineConfiguration.effectiveDiarization`, which falls back to
+    /// `.heuristic` otherwise. No download, like `.heuristic`.
+    case transcriptionProviderNative
 
     var id: String { rawValue }
 
@@ -411,6 +419,7 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         case .heuristic: return NSLocalizedString("diarization.heuristic", comment: "Heuristic")
         case .fluidAudio: return NSLocalizedString("diarization.fluid_audio", comment: "FluidAudio")
         case .sherpaOnnx: return NSLocalizedString("diarization.sherpa_onnx", comment: "Sherpa-ONNX")
+        case .transcriptionProviderNative: return NSLocalizedString("diarization.transcription_provider_native", comment: "Transcription provider's native diarization")
         }
     }
 
@@ -418,7 +427,7 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     /// when it needs no download.
     var requiredModelSet: ModelSet? {
         switch self {
-        case .heuristic: return nil
+        case .heuristic, .transcriptionProviderNative: return nil
         case .fluidAudio: return .diarization
         case .sherpaOnnx: return .sherpaOnnxDiarization
         }
@@ -588,6 +597,12 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     /// of `supportsTranscription` for Anthropic/Gemini, and true alongside it
     /// for OpenAI-compatible vendors.
     var supportsSummarization: Bool { kind != .elevenLabs }
+
+    /// Whether this provider's transcription route can return native speaker
+    /// diarization in the same response (e.g. ElevenLabs Scribe's `diarize`
+    /// parameter). Keyed off `kind`, like the other capability flags, so a
+    /// future provider of the same shape inherits this for free.
+    var supportsNativeDiarization: Bool { kind == .elevenLabs }
 
     /// Default transcription model to request when the user hasn't picked
     /// one. Keyed off `kind` (not `id`) so a custom provider of the same kind

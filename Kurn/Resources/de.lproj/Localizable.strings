@@ -59,6 +59,7 @@
 "diarization.heuristic" = "Heuristisch";
 "diarization.fluid_audio" = "FluidAudio";
 "diarization.sherpa_onnx" = "Sherpa-ONNX";
+"diarization.transcription_provider_native" = "Nativ (Transkriptionsanbieter)";
 
 /* Correction engines */
 "correction.none" = "Aus";
@@ -426,6 +427,7 @@
 "detail.skip_forward" = "15 Sekunden vor";
 "detail.download_diarization_models" = "Sprechermodelle laden";
 "warning.diarization_models_not_downloaded" = "Die Sprechertrennung nutzt die einfache Engine. Lade die neuronalen Modelle für genauere Sprecher.";
+"warning.diarization_requires_native_provider" = "Die Sprechertrennung nutzt die einfache Engine. Wähle zusammen mit der Whisper-Engine einen Transkriptionsanbieter mit nativer Sprechertrennung (z. B. ElevenLabs), um sie zu nutzen.";
 "speaker.cross_meeting_match.title" = "Bekannte Stimme";
 "speaker.cross_meeting_match.message" = "Das klingt nach %1$@ aus „%2$@“. Namen übernehmen?";
 "speaker.cross_meeting_match.disclaimer" = "Basiert auf einem Stimmabgleich. Vor dem Übernehmen prüfen — dies lässt sich durch Bearbeiten des Sprechernamens rückgängig machen.";

@@ -61,13 +61,18 @@ struct ElevenLabsProvider: LLMProvider {
             forHTTPHeaderField: "Content-Type"
         )
 
-        var fields: [(name: String, value: String)] = [("model_id", transcriptionModel)]
+        var fields: [(name: String, value: String)] = [
+            ("model_id", transcriptionModel),
+            ("diarize", "true")
+        ]
         if let code = language.whisperCode {
             fields.append(("language_code", code))
         }
-        // Diarization is deliberately left off: the app's own diarizer +
-        // `TranscriptFusion` already attributes speakers independently, and
-        // merging two diarization sources is out of scope for this first cut.
+        // Diarization is always requested: it costs nothing extra to ask for,
+        // and whether it's actually *used* (vs. the app's own diarizers) is
+        // decided independently by `DiarizationEngine.transcriptionProviderNative`
+        // — see `RawTranscript.speakerTurns` and
+        // `TranscriptionService.nativeDiarizationOutcome`.
 
         request.httpBody = multipartBody(
             boundary: boundary,
@@ -100,20 +105,48 @@ struct ElevenLabsProvider: LLMProvider {
         do {
             let decoded = try JSONDecoder().decode(ScribeResponse.self, from: data)
             let duration = decoded.audioDurationSecs ?? 0
-            let words: [TimedWord] = (decoded.words ?? [])
-                .filter { $0.type == "word" }
-                .map { TimedWord(text: $0.text, start: $0.start, end: $0.end) }
+            let wordEntries = (decoded.words ?? []).filter { $0.type == "word" }
+            let words: [TimedWord] = wordEntries.map { TimedWord(text: $0.text, start: $0.start, end: $0.end) }
             let spans = TimedWordSpanBuilder.spans(
                 from: words,
                 fallbackText: decoded.text,
                 duration: duration
             )
-            AppLog.transcription.atInfo.info("ElevenLabsProvider: transcription succeeded for \(provider.displayName, privacy: .public), spans=\(spans.count, privacy: .public)")
-            return RawTranscript(spans: spans, language: decoded.languageCode ?? "")
+            let speakerTurns = Self.speakerTurns(from: wordEntries)
+            AppLog.transcription.atInfo.info("ElevenLabsProvider: transcription succeeded for \(provider.displayName, privacy: .public), spans=\(spans.count, privacy: .public), speakerTurns=\(speakerTurns?.count ?? 0, privacy: .public)")
+            return RawTranscript(spans: spans, language: decoded.languageCode ?? "", speakerTurns: speakerTurns)
         } catch {
             AppLog.transcription.atError.error("ElevenLabsProvider: failed to decode transcription response from \(provider.displayName, privacy: .public) code=decode_failed")
             throw AppError.decodingError(error.localizedDescription)
         }
+    }
+
+    /// Group consecutive same-speaker words into `SpeakerTurn`s, mapping
+    /// Scribe's raw `speaker_id` values (e.g. `"speaker_0"`) to the app's own
+    /// `"Speaker N"` label convention, numbered by order of first appearance
+    /// — the same convention the local diarizers use. Returns `nil` (not an
+    /// empty array) when no word carries a `speaker_id`, so callers can tell
+    /// "diarization wasn't returned" apart from a genuine zero-turn result.
+    private static func speakerTurns(from words: [ScribeResponse.Word]) -> [SpeakerTurn]? {
+        guard words.contains(where: { $0.speakerId != nil }) else { return nil }
+
+        var labelsByRawID: [String: String] = [:]
+        var turns: [SpeakerTurn] = []
+        for word in words {
+            let rawID = word.speakerId ?? "unknown"
+            let label = labelsByRawID[rawID] ?? {
+                let assigned = "Speaker \(labelsByRawID.count + 1)"
+                labelsByRawID[rawID] = assigned
+                return assigned
+            }()
+            if var last = turns.last, last.speakerLabel == label {
+                last.end = word.end
+                turns[turns.count - 1] = last
+            } else {
+                turns.append(SpeakerTurn(speakerLabel: label, start: word.start, end: word.end))
+            }
+        }
+        return turns
     }
 
     private func multipartBody(
@@ -167,6 +200,14 @@ struct ScribeResponse: Decodable {
         /// for span-building; spacing/event tokens carry no transcript text
         /// worth timestamping on their own.
         let type: String
+        /// Present only when diarization was requested and Scribe could
+        /// separate speakers (e.g. `"speaker_0"`). `nil` otherwise.
+        let speakerId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case text, start, end, type
+            case speakerId = "speaker_id"
+        }
     }
 
     let text: String

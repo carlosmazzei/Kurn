@@ -59,6 +59,7 @@
 "diarization.heuristic" = "Heuristique";
 "diarization.fluid_audio" = "FluidAudio";
 "diarization.sherpa_onnx" = "Sherpa-ONNX";
+"diarization.transcription_provider_native" = "Native (fournisseur de transcription)";
 
 /* Correction engines */
 "correction.none" = "Désactivé";
@@ -426,6 +427,7 @@
 "detail.skip_forward" = "Avancer de 15 secondes";
 "detail.download_diarization_models" = "Télécharger les modèles";
 "warning.diarization_models_not_downloaded" = "La séparation des locuteurs utilise le moteur de base. Téléchargez les modèles neuronaux pour des locuteurs plus précis.";
+"warning.diarization_requires_native_provider" = "La séparation des locuteurs utilise le moteur de base. Sélectionnez, avec le moteur Whisper, un fournisseur de transcription prenant en charge la diarisation native (comme ElevenLabs) pour l'utiliser.";
 "speaker.cross_meeting_match.title" = "Voix familière";
 "speaker.cross_meeting_match.message" = "Cela ressemble à %1$@, de « %2$@ ». Appliquer ce nom ?";
 "speaker.cross_meeting_match.disclaimer" = "Basé sur une correspondance vocale. Vérifiez avant d'appliquer — cela peut être annulé en modifiant le nom du locuteur.";

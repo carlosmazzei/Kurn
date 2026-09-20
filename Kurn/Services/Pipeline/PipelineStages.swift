@@ -191,11 +191,21 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// single value: without consent the selection falls back rather than
     /// downloading or degrading silently. The caller reports the fallback so it
     /// can be acted on instead of merely being true.
+    ///
+    /// `.transcriptionProviderNative` needs no consent flag — it downloads
+    /// nothing — but is a pair with a different condition: it's only honored
+    /// when the current transcription setup can actually supply it
+    /// (`.whisperAPI` with a provider whose `supportsNativeDiarization` is
+    /// true), otherwise it falls back the same way.
     var effectiveDiarization: DiarizationEngine {
         switch diarization {
         case .heuristic: return .heuristic
         case .fluidAudio: return diarizationConsented ? .fluidAudio : .heuristic
         case .sherpaOnnx: return sherpaOnnxConsented ? .sherpaOnnx : .heuristic
+        case .transcriptionProviderNative:
+            return (transcription == .whisperAPI && transcriptionProvider.supportsNativeDiarization)
+                ? .transcriptionProviderNative
+                : .heuristic
         }
     }
 
