@@ -105,7 +105,13 @@ struct ProviderEditor: View {
         .navigationTitle(provider.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if canEditDetails {
+            // Every provider except the on-device one has something worth
+            // saving here — for a built-in vendor (OpenAI, Anthropic, Google,
+            // Groq, ElevenLabs) that's just the API key, since `canEditDetails`
+            // already locks its name/kind/base URL. Gating this button on
+            // `canEditDetails` instead of that would hide Save for every
+            // built-in provider entirely, making its key field unsavable.
+            if provider.kind != .appleOnDevice {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.save", comment: "Save")) {
                         commitAndSave()
