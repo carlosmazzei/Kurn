@@ -14,9 +14,66 @@ import KurnCore
 import Testing
 @testable import Kurn
 
-// Serialized because `transcribeRequestAlwaysIncludesDiarizeField` uses
-// `MockURLProtocol`, whose scripted state is process-global (see its header).
-@Suite(.serialized)
+/// A single-response `URLProtocol` double, private to this file. Deliberately
+/// not `MockURLProtocol`: that one's scripted state is process-global, and
+/// `@Suite(.serialized)` only serializes tests *within* one suite — it does
+/// not stop Swift Testing from running a different suite (e.g.
+/// `ProviderHTTPTests`) at the same time, which raced with this file's one
+/// network test in CI. See `ModelFileDownloaderTests.swift`'s header for the
+/// same failure mode and the fix it already established: a private,
+/// dedicated protocol instead of trying to serialize the whole test target.
+private final class DiarizeFieldCaptureProtocol: URLProtocol {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var capturedBody: Data?
+
+    static func session() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [DiarizeFieldCaptureProtocol.self]
+        return URLSession(configuration: config)
+    }
+
+    static var lastRequestBody: Data? {
+        lock.lock(); defer { lock.unlock() }
+        return capturedBody
+    }
+
+    private static func body(of request: URLRequest) -> Data {
+        if let data = request.httpBody { return data }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
+
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let body = Self.body(of: request)
+        Self.lock.lock(); Self.capturedBody = body; Self.lock.unlock()
+
+        guard let url = request.url,
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("{ \"text\": \"hi\" }".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 struct ElevenLabsProviderTests {
 
     @Test func wordTypedEntriesBecomeTimedSpans() throws {
@@ -149,13 +206,10 @@ struct ElevenLabsProviderTests {
     }
 
     @Test func transcribeRequestAlwaysIncludesDiarizeField() async throws {
-        MockURLProtocol.enqueue([
-            .success(status: 200, body: Data("{ \"text\": \"hi\" }".utf8), headers: [:])
-        ])
-        let provider = ElevenLabsProvider(apiKey: "test-key", session: MockURLProtocol.session())
+        let provider = ElevenLabsProvider(apiKey: "test-key", session: DiarizeFieldCaptureProtocol.session())
         _ = try await provider.transcribe(audioData: Data("audio".utf8), fileName: "clip.m4a", language: .autoDetect)
 
-        let body = try #require(MockURLProtocol.lastRequest.map(MockURLProtocol.body(of:)))
+        let body = try #require(DiarizeFieldCaptureProtocol.lastRequestBody)
         let bodyText = String(decoding: body, as: UTF8.self)
         #expect(bodyText.contains("name=\"diarize\""))
         #expect(bodyText.contains("true"))
