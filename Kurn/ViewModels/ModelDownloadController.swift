@@ -318,14 +318,13 @@ final class ModelDownloadController {
     ) {
         downloadingModel = set
         downloadProgress = ModelDownloadStatus(fractionCompleted: 0, phase: .preparing)
-        activeDownloadTask = Task {
+        activeDownloadTask = Task { [self] in
             let background = BackgroundActivity()
             background.begin(name: "ai.kurn.modelDownload")
             defer { background.end() }
             do {
                 let before = ModelStore.snapshot()
-                try await downloader(set, policy) { [weak self] status in
-                    guard let self else { return }
+                try await downloader(set, policy) { status in
                     Task { @MainActor in
                         guard self.downloadingModel == set else { return }
                         self.downloadProgress = status
