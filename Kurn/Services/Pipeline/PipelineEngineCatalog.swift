@@ -141,6 +141,13 @@ struct PipelineEngineCatalog: Sendable {
                 case .heuristic: return heuristicDiarizer
                 case .fluidAudio: return fluidAudioDiarizer
                 case .sherpaOnnx: return sherpaOnnxDiarizer
+                case .transcriptionProviderNative:
+                    // Reachable only defensively — `TranscriptionService`
+                    // never calls `diarizer(_:)` for this engine: it derives
+                    // the `DiarizationOutcome` directly from the
+                    // transcription provider's own response instead of
+                    // running a separate `PipelineDiarizing` pass.
+                    return heuristicDiarizer
                 }
             },
             corrector: { engine in

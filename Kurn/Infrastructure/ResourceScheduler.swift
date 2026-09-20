@@ -75,7 +75,11 @@ enum ResourceWorkKind: Sendable, Equatable {
             }
         case .diarization(let engine):
             switch engine {
-            case .heuristic: return 10
+            // `.transcriptionProviderNative` runs no separate diarization
+            // pass at all — it derives turns from the transcription
+            // response already in hand — so it costs no more than the
+            // heuristic engine's own light footprint.
+            case .heuristic, .transcriptionProviderNative: return 10
             case .fluidAudio, .sherpaOnnx: return 50
             }
         case .enhancement:
