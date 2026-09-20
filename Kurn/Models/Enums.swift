@@ -419,7 +419,11 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         case .heuristic: return NSLocalizedString("diarization.heuristic", comment: "Heuristic")
         case .fluidAudio: return NSLocalizedString("diarization.fluid_audio", comment: "FluidAudio")
         case .sherpaOnnx: return NSLocalizedString("diarization.sherpa_onnx", comment: "Sherpa-ONNX")
-        case .transcriptionProviderNative: return NSLocalizedString("diarization.transcription_provider_native", comment: "Transcription provider's native diarization")
+        case .transcriptionProviderNative:
+            return NSLocalizedString(
+                "diarization.transcription_provider_native",
+                comment: "Transcription provider's native diarization"
+            )
         }
     }
 

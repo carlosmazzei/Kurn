@@ -156,16 +156,16 @@ struct ElevenLabsProvider: LLMProvider {
     ) -> Data {
         var body = Data()
         for field in fields {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(field.name)\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(field.value)\r\n".data(using: .utf8)!)
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"\(field.name)\"\r\n\r\n".utf8))
+            body.append(Data("\(field.value)\r\n".utf8))
         }
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"\(file.field)\"; filename=\"\(file.name)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"\(file.field)\"; filename=\"\(file.name)\"\r\n".utf8))
+        body.append(Data("Content-Type: \(file.mimeType)\r\n\r\n".utf8))
         body.append(file.data)
-        body.append("\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n".utf8))
+        body.append(Data("--\(boundary)--\r\n".utf8))
         return body
     }
 
