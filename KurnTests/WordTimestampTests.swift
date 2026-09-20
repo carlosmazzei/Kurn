@@ -196,15 +196,22 @@ struct WordTimestampTests {
         #expect(transcript.spans.isEmpty)
     }
 
-    // MARK: - gpt-4o-transcribe / gpt-4o-mini-transcribe (no verbose_json)
+    // MARK: - Non-Whisper transcription models (no verbose_json)
 
-    @Test func supportsVerboseJSONIsFalseOnlyForGPT4oTranscribeModels() {
+    @Test func supportsVerboseJSONIsTrueOnlyForWhisperFamilyModels() {
         #expect(OpenAIProvider.supportsVerboseJSON("whisper-1"))
         #expect(OpenAIProvider.supportsVerboseJSON("whisper-large-v3"))
         #expect(OpenAIProvider.supportsVerboseJSON("whisper-large-v3-turbo"))
+        #expect(OpenAIProvider.supportsVerboseJSON("WHISPER-1"))
         #expect(!OpenAIProvider.supportsVerboseJSON("gpt-4o-transcribe"))
         #expect(!OpenAIProvider.supportsVerboseJSON("gpt-4o-mini-transcribe"))
         #expect(!OpenAIProvider.supportsVerboseJSON("GPT-4O-TRANSCRIBE"))
+        // Regression: a live OpenAI account surfaced this exact model name
+        // (a newer transcription model, not `gpt-4o*`-prefixed) rejecting
+        // verbose_json with a 400 — the old `!hasPrefix("gpt-4o")` denylist
+        // wrongly assumed it supported verbose_json since it didn't match
+        // the one prefix it knew about.
+        #expect(!OpenAIProvider.supportsVerboseJSON("gpt-transcribe-api-ev3"))
     }
 
     /// gpt-4o-transcribe/gpt-4o-mini-transcribe only support `response_format:

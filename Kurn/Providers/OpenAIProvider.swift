@@ -50,11 +50,13 @@ struct OpenAIProvider: LLMProvider {
         AppLog.transcription.atInfo.info("OpenAIProvider: transcribing \(audioData.count, privacy: .public) bytes via \(provider.displayName, privacy: .public), model=\(transcriptionModel, privacy: .public)")
 
         guard Self.supportsVerboseJSON(transcriptionModel) else {
-            // gpt-4o-transcribe/gpt-4o-mini-transcribe only support the plain
-            // `json`/`text` response formats — no `verbose_json`, no
-            // `timestamp_granularities[]` — so there is nothing to retry
-            // without on a 400/422 the way there is for whisper-1. Go straight
-            // to the one request shape these models accept.
+            // Every non-Whisper transcription model (gpt-4o-transcribe,
+            // gpt-4o-mini-transcribe, and whatever OpenAI names the next one)
+            // only supports the plain `json`/`text` response formats — no
+            // `verbose_json`, no `timestamp_granularities[]` — so there is
+            // nothing to retry without on a 400/422 the way there is for
+            // whisper-1. Go straight to the one request shape these models
+            // accept.
             let data = try await send(
                 audioData: audioData,
                 fileName: fileName,
@@ -93,12 +95,19 @@ struct OpenAIProvider: LLMProvider {
         }
     }
 
-    /// `gpt-4o-transcribe`/`gpt-4o-mini-transcribe` (and any future
-    /// `gpt-4o*-transcribe` variant) reject `response_format: verbose_json`
-    /// outright — only `whisper`-family models support it. `static`, like
-    /// `transcript(from:provider:)`, so it is reachable from tests.
+    /// `verbose_json` is a Whisper-specific response format; every other
+    /// OpenAI transcription model (`gpt-4o-transcribe`, `gpt-4o-mini-transcribe`,
+    /// and whatever OpenAI names the next one — `gpt-transcribe-api-ev3` was
+    /// the one that surfaced this as a live API error, since it doesn't
+    /// start with `gpt-4o` either) rejects it outright. Allowlisting the
+    /// `whisper` family instead of denylisting `gpt-4o*` is what makes this
+    /// resilient to a transcription model name we've never seen: any name
+    /// OpenAI mints for a non-Whisper transcription model is denied
+    /// `verbose_json` by default, rather than only the ones already known
+    /// about. `static`, like `transcript(from:provider:)`, so it is
+    /// reachable from tests.
     static func supportsVerboseJSON(_ model: String) -> Bool {
-        !model.lowercased().hasPrefix("gpt-4o")
+        model.lowercased().hasPrefix("whisper")
     }
 
     private func send(
