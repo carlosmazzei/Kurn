@@ -606,6 +606,30 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     /// diarization in the same response (e.g. ElevenLabs Scribe's `diarize`
     /// parameter). Keyed off `kind`, like the other capability flags, so a
     /// future provider of the same shape inherits this for free.
+    ///
+    /// This is the whole seam for adding a new native-diarization provider:
+    /// flip this to `true` for its `kind`, and have its `LLMProvider.transcribe`
+    /// populate `RawTranscript.speakerTurns` however its API shapes that data
+    /// (per-word speaker ids, per-segment labels, whatever it returns) — no
+    /// other file needs to know the wire format. Everything downstream
+    /// (`DiarizationEngine.transcriptionProviderNative`,
+    /// `PipelineConfiguration.effectiveDiarization`, the Settings picker,
+    /// `TranscriptionService.transcribeAndDiarize`) is already generic over
+    /// "some provider said yes here", not over ElevenLabs specifically.
+    ///
+    /// Transcription and diarization otherwise remain fully independent
+    /// axes — this flag only ever *adds* one extra diarization option
+    /// (`.transcriptionProviderNative`) for a provider that raises it; it
+    /// never restricts which of the three local diarizers
+    /// (`.heuristic`/`.fluidAudio`/`.sherpaOnnx`) can be paired with any
+    /// transcription engine or provider, including one that could diarize
+    /// natively. Composing e.g. ElevenLabs for transcription with FluidAudio
+    /// for diarization, or Apple Speech for transcription with sherpa-onnx
+    /// for diarization, works with no special-casing anywhere, because the
+    /// diarization stage never looks at which transcription engine/provider
+    /// ran except to decide whether `.transcriptionProviderNative` applies.
+    /// See `DiarizationSelectionTests`/`TranscriptionServicePipelineTests`
+    /// for the tests that pin this down.
     var supportsNativeDiarization: Bool { kind == .elevenLabs }
 
     /// Default transcription model to request when the user hasn't picked

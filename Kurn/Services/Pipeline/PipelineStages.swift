@@ -197,6 +197,15 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// when the current transcription setup can actually supply it
     /// (`.whisperAPI` with a provider whose `supportsNativeDiarization` is
     /// true), otherwise it falls back the same way.
+    ///
+    /// `transcription`/`transcriptionProvider` are read here *only* to
+    /// decide that one thing. Picking `.heuristic`/`.fluidAudio`/`.sherpaOnnx`
+    /// always runs that exact engine regardless of which transcription
+    /// engine or provider is configured — the two axes stay fully
+    /// independent (e.g. ElevenLabs for transcription with FluidAudio for
+    /// diarization is an ordinary, unremarkable combination). See
+    /// `AIProvider.supportsNativeDiarization`'s doc for how a future
+    /// provider plugs into this without touching this switch.
     var effectiveDiarization: DiarizationEngine {
         switch diarization {
         case .heuristic: return .heuristic
