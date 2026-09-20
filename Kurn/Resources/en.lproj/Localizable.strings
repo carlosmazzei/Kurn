@@ -49,6 +49,7 @@
 "error.authentication_required" = "Authentication is required to access your recordings.";
 "error.authentication_failed" = "Authentication failed: %@";
 "error.keychain_access_failed" = "Could not access your saved credential right now (%@). Try again.";
+"error.summarization_unsupported" = "%@ does not support generating summaries.";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
@@ -68,7 +69,6 @@
 "transcription.fluid_parakeet" = "FluidAudio (multilingual)";
 "transcription.whisper" = "Whisper API";
 "transcription.whisper_cpp" = "Whisper (on-device)";
-"transcription.eleven_labs_scribe" = "ElevenLabs Scribe";
 "preprocessing.standard" = "Standard cleanup";
 "preprocessing.none" = "None";
 "vad.energy" = "Energy threshold";
@@ -525,8 +525,7 @@
 "pipeline.language_detection" = "Language Detection";
 "pipeline.language_detection_footer" = "Chooses the spoken language automatically instead of relying on the transcriber's guess.";
 "settings.transcription_provider" = "Transcription Provider";
-"settings.whisper_provider_key_footer" = "Whisper API transcription uses the provider selected above, independently of the summary provider. Any OpenAI-compatible provider with an API key (such as OpenAI or Groq) can be used.";
-"settings.scribe_provider_key_footer" = "ElevenLabs Scribe transcription requires an ElevenLabs API key, entered above.";
+"settings.whisper_provider_key_footer" = "Transcription uses the provider selected above, independently of the summary provider. Any configured provider that supports transcription (such as OpenAI, Groq, or ElevenLabs) can be used.";
 "settings.whisper_provider_key_missing_footer" = "Configure an OpenAI-compatible API key (such as OpenAI or Groq) in AI Providers to enable Whisper API transcription.";
 "settings.summary" = "Summary";
 "settings.recording" = "Recording";

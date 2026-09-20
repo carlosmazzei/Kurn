@@ -546,7 +546,6 @@ struct TranscriptionService {
         switch engine {
         case .whisperAPI: checkpointProviderID = transcriptionProvider.id
         case .whisperCpp: checkpointProviderID = "whispercpp:\(whisperCppModel.rawValue)"
-        case .elevenLabsScribe: checkpointProviderID = "elevenLabsScribe"
         case .appleSpeech, .fluidAudioParakeet: checkpointProviderID = nil
         }
         // H4: the compaction map's own identity, not just "compaction ran" —

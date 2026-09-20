@@ -1,10 +1,11 @@
 //
-//  ElevenLabsScribeClientTests.swift
+//  ElevenLabsProviderTests.swift
 //  KurnTests
 //
 //  Response decoding for ElevenLabs Scribe, mirroring WordTimestampTests'
 //  coverage of OpenAIProvider.transcript(from:) — no network involved, just
-//  captured response shapes.
+//  captured response shapes. Also covers the two unsupported-capability
+//  throws that make ElevenLabs a transcription-only `LLMProvider`.
 //
 
 import Foundation
@@ -12,7 +13,7 @@ import KurnCore
 import Testing
 @testable import Kurn
 
-struct ElevenLabsScribeClientTests {
+struct ElevenLabsProviderTests {
 
     @Test func wordTypedEntriesBecomeTimedSpans() throws {
         let json = """
@@ -27,7 +28,7 @@ struct ElevenLabsScribeClientTests {
           ]
         }
         """
-        let transcript = try ElevenLabsScribeClient.transcript(from: Data(json.utf8))
+        let transcript = try ElevenLabsProvider.transcript(from: Data(json.utf8), provider: .elevenLabs)
         #expect(transcript.spans.map(\.text) == ["primeiro", "ponto"])
         #expect(transcript.spans[0].start == 0.0)
         #expect(transcript.spans[1].end == 1.5)
@@ -46,7 +47,7 @@ struct ElevenLabsScribeClientTests {
         """
         // No "word"-type entries survive the filter, so this falls back to the
         // whole-blob span rather than fabricating spans from noise.
-        let transcript = try ElevenLabsScribeClient.transcript(from: Data(json.utf8))
+        let transcript = try ElevenLabsProvider.transcript(from: Data(json.utf8), provider: .elevenLabs)
         #expect(transcript.spans.map(\.text) == ["hello"])
     }
 
@@ -59,7 +60,7 @@ struct ElevenLabsScribeClientTests {
           "language_code": "por"
         }
         """
-        let transcript = try ElevenLabsScribeClient.transcript(from: Data(json.utf8))
+        let transcript = try ElevenLabsProvider.transcript(from: Data(json.utf8), provider: .elevenLabs)
         #expect(transcript.spans.map(\.text) == ["primeiro ponto, segundo ponto"])
     }
 
@@ -67,14 +68,34 @@ struct ElevenLabsScribeClientTests {
         let json = """
         { "text": "hello" }
         """
-        let transcript = try ElevenLabsScribeClient.transcript(from: Data(json.utf8))
+        let transcript = try ElevenLabsProvider.transcript(from: Data(json.utf8), provider: .elevenLabs)
         #expect(transcript.language == "")
     }
 
     @Test func malformedResponseThrowsDecodingError() {
         let json = "{ not valid json"
         #expect(throws: AppError.self) {
-            try ElevenLabsScribeClient.transcript(from: Data(json.utf8))
+            try ElevenLabsProvider.transcript(from: Data(json.utf8), provider: .elevenLabs)
+        }
+    }
+
+    // MARK: - Unsupported capabilities
+
+    @Test func summarizeThrowsSummarizationUnsupported() async throws {
+        let provider = ElevenLabsProvider(apiKey: "test-key")
+        await #expect(throws: AppError.self) {
+            try await provider.summarize(systemPrompt: "system", userPrompt: "user")
+        }
+    }
+
+    @Test func chatThrowsSummarizationUnsupported() async throws {
+        let provider = ElevenLabsProvider(apiKey: "test-key")
+        await #expect(throws: AppError.self) {
+            try await provider.chat(
+                systemPrompt: "system",
+                messages: [ChatMessage(role: .user, content: "hi")],
+                options: .chat
+            )
         }
     }
 }

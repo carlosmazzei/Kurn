@@ -279,10 +279,14 @@ struct TranscriptionModelPicker: View {
             filter: { loaded in
                 // "whisper" covers whisper-1/whisper-large-v3(-turbo); "transcribe"
                 // covers OpenAI's newer gpt-4o-transcribe/gpt-4o-mini-transcribe,
-                // which carry no "whisper" in their name.
+                // which carry no "whisper" in their name; "scribe" covers
+                // ElevenLabs' scribe_v1 (irrelevant in practice today since
+                // ElevenLabs has no `/models` endpoint and always falls back
+                // to its known model list, but correct if that ever changes).
                 let transcriptionModels = loaded.filter {
                     $0.localizedCaseInsensitiveContains("whisper")
                         || $0.localizedCaseInsensitiveContains("transcribe")
+                        || $0.localizedCaseInsensitiveContains("scribe")
                 }
                 return transcriptionModels.isEmpty ? loaded : transcriptionModels
             }

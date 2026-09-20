@@ -29,12 +29,20 @@ extension AppSettings {
     var configuredTranscriptionProviders: [AIProvider] {
         configuredProviders.filter(\.supportsTranscription)
     }
+
+    /// Configured providers that can generate summaries/chat replies — the
+    /// candidate list for the summary-provider picker. Narrower than
+    /// `configuredProviders`: a transcription-only provider (ElevenLabs) is
+    /// usable but must never be offered as a summary provider.
+    var configuredSummaryProviders: [AIProvider] {
+        configuredProviders.filter(\.supportsSummarization)
+    }
 }
 
 extension SettingsView {
 
     func ensureSelectedProviderIsConfigured() {
-        let providers = settings.configuredProviders
+        let providers = settings.configuredSummaryProviders
         guard !providers.isEmpty else { return }
         if !providers.contains(where: { $0.id == settings.aiProviderID }) {
             settings.aiProviderID = providers[0].id
@@ -51,18 +59,6 @@ extension SettingsView {
             settings.transcriptionEngine = .appleSpeech
         } else if !providers.contains(where: { $0.id == settings.transcriptionProviderID }) {
             settings.transcriptionProviderID = providers[0].id
-        }
-    }
-
-    /// Same invariant as `ensureWhisperSelectionIsAllowed()`, for ElevenLabs
-    /// Scribe: a key removed anywhere must never leave the transcription
-    /// engine pointing at a cloud vendor with no credential. Scribe has no
-    /// `AIProvider` to repoint at (one vendor, one key), so there is only the
-    /// "consented" and "not consented" case, unlike Whisper's provider list.
-    func ensureScribeSelectionIsAllowed() {
-        guard settings.transcriptionEngine == .elevenLabsScribe else { return }
-        if !KeychainManager.shared.hasValue(for: .elevenLabs) {
-            settings.transcriptionEngine = .appleSpeech
         }
     }
 

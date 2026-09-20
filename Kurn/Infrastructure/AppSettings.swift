@@ -293,9 +293,7 @@ final class AppSettings {
             transcription: transcriptionEngine,
             transcriptionProvider: transcriptionProvider,
             transcriptionModel: transcriptionModel(for: transcriptionProvider),
-            cloudTranscriptionConsented: transcriptionEngine == .elevenLabsScribe
-                ? hasCloudTranscriptionConsent(forKey: Self.elevenLabsScribeConsentKey)
-                : hasCloudTranscriptionConsent(for: transcriptionProvider),
+            cloudTranscriptionConsented: hasCloudTranscriptionConsent(for: transcriptionProvider),
             largeTransferPolicy: largeTransferPolicy,
             fluidAudioSpeakerCount: fluidAudioSpeakerCount,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
@@ -384,33 +382,16 @@ final class AppSettings {
     }
 
     func hasCloudTranscriptionConsent(for provider: AIProvider) -> Bool {
-        hasCloudTranscriptionConsent(forKey: cloudTranscriptionConsentKey(for: provider))
+        cloudTranscriptionConsentKeys.contains(cloudTranscriptionConsentKey(for: provider))
     }
 
     func recordCloudTranscriptionConsent(for provider: AIProvider) {
-        recordCloudTranscriptionConsent(forKey: cloudTranscriptionConsentKey(for: provider))
-    }
-
-    /// The generic form the `AIProvider`-typed overloads above delegate to.
-    /// Not every cloud transcription engine has an `AIProvider` — ElevenLabs
-    /// Scribe is a `TranscriptionEngine`, not a selectable provider — so this
-    /// is the seam `CloudTranscriptionConsentController` uses for that case,
-    /// keyed by `elevenLabsScribeConsentKey` below.
-    func hasCloudTranscriptionConsent(forKey key: String) -> Bool {
-        cloudTranscriptionConsentKeys.contains(key)
-    }
-
-    func recordCloudTranscriptionConsent(forKey key: String) {
-        cloudTranscriptionConsentKeys.insert(key)
+        cloudTranscriptionConsentKeys.insert(cloudTranscriptionConsentKey(for: provider))
     }
 
     private func cloudTranscriptionConsentKey(for provider: AIProvider) -> String {
         "\(provider.id)|\(provider.baseURLString)"
     }
-
-    /// Fixed consent key for ElevenLabs Scribe — a single vendor/model, unlike
-    /// `.whisperAPI` which is keyed per configured `AIProvider`.
-    static let elevenLabsScribeConsentKey = "elevenLabsScribe|https://api.elevenlabs.io"
 
     /// Whether the user has opted in to on-device MetricKit diagnostic reports
     /// (crashes + hangs). Off by default: until this is `true`,

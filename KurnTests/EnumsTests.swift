@@ -84,16 +84,33 @@ struct EnumsTests {
         #expect(AIProvider.google.kind == .googleGemini)
     }
 
-    @Test func onlyOpenAICompatibleProvidersSupportTranscription() {
+    @Test func onlyOpenAICompatibleAndElevenLabsProvidersSupportTranscription() {
         #expect(AIProvider.openAI.supportsTranscription)
         #expect(AIProvider.groq.supportsTranscription)
+        #expect(AIProvider.elevenLabs.supportsTranscription)
         #expect(!AIProvider.anthropic.supportsTranscription)
         #expect(!AIProvider.google.supportsTranscription)
+    }
+
+    @Test func onlyElevenLabsIsExcludedFromSummarization() {
+        // ElevenLabs is transcription-only; every other built-in provider
+        // (including on-device) still summarizes.
+        #expect(!AIProvider.elevenLabs.supportsSummarization)
+        #expect(AIProvider.openAI.supportsSummarization)
+        #expect(AIProvider.groq.supportsSummarization)
+        #expect(AIProvider.anthropic.supportsSummarization)
+        #expect(AIProvider.google.supportsSummarization)
+        #expect(AIProvider.appleOnDevice.supportsSummarization)
     }
 
     @Test func defaultTranscriptionModelIsPerVendorWhisper() {
         #expect(AIProvider.openAI.defaultTranscriptionModel == "whisper-1")
         #expect(AIProvider.groq.defaultTranscriptionModel == "whisper-large-v3")
+        #expect(AIProvider.elevenLabs.defaultTranscriptionModel == "scribe_v1")
+    }
+
+    @Test func elevenLabsFallbackModelsIsJustScribe() {
+        #expect(AIProvider.elevenLabs.fallbackModels == ["scribe_v1"])
     }
 
     @Test func groqFallbackModelsIncludeBothWhisperVariants() {

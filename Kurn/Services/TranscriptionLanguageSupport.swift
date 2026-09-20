@@ -20,11 +20,10 @@ enum TranscriptionLanguageSupport {
         case .whisperAPI, .whisperCpp:
             // Whisper's cloud API is the source of our language table, and
             // whisper.cpp runs the same models, so both cover all of it.
-            return true
-        case .elevenLabsScribe:
-            // ElevenLabs documents broad multilingual coverage (99 languages,
-            // including Portuguese) for Scribe — treated as covering the whole
-            // table like the Whisper engines above, same as they were on launch.
+            // `.whisperAPI` now covers every configurable cloud vendor
+            // (OpenAI, Groq, ElevenLabs, or a custom endpoint) — ElevenLabs
+            // also documents broad multilingual coverage (99 languages,
+            // including Portuguese), so treating it the same is accurate.
             return true
         case .fluidAudioParakeet:
             return fluidAudioCodes.contains(code)

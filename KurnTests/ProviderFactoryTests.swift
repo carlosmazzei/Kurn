@@ -114,6 +114,22 @@ struct ProviderFactoryTests {
         }
     }
 
+    @Test func whisperProviderBuildsElevenLabsProviderWhenKeyPresent() throws {
+        try withKey(.elevenLabs, value: "eleven-key") {
+            let provider = try ProviderFactory.whisperProvider(for: .elevenLabs, model: "scribe_v1")
+            #expect(provider.provider == .elevenLabs)
+            #expect(provider is ElevenLabsProvider)
+        }
+    }
+
+    @Test func summaryProviderThrowsSummarizationUnsupportedForElevenLabs() throws {
+        try withKey(.elevenLabs, value: "eleven-key") {
+            #expect(throws: AppError.self) {
+                _ = try ProviderFactory.summaryProvider(for: .elevenLabs, model: "")
+            }
+        }
+    }
+
     @Test func factoriesRejectInvalidCustomURLsBeforeReadingCredentials() {
         let provider = AIProvider.custom(
             displayName: "Broken",

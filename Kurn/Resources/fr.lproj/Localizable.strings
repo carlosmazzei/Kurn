@@ -49,6 +49,7 @@
 "error.authentication_required" = "Une authentification est requise pour accéder à vos enregistrements.";
 "error.authentication_failed" = "Échec de l'authentification : %@";
 "error.keychain_access_failed" = "Impossible d'accéder à votre identifiant enregistré pour le moment (%@). Réessayez.";
+"error.summarization_unsupported" = "%@ ne prend pas en charge la génération de résumés.";
 
 /* Modes de transcription */
 "mode.on_device" = "Sur l'appareil";
@@ -68,7 +69,6 @@
 "transcription.fluid_parakeet" = "FluidAudio (multilingue)";
 "transcription.whisper" = "API Whisper";
 "transcription.whisper_cpp" = "Whisper (sur l'appareil)";
-"transcription.eleven_labs_scribe" = "ElevenLabs Scribe";
 "preprocessing.standard" = "Nettoyage standard";
 "preprocessing.none" = "Aucun";
 "vad.energy" = "Seuil d'énergie";
@@ -525,8 +525,7 @@
 "pipeline.language_detection" = "Détection de la langue";
 "pipeline.language_detection_footer" = "Choisit automatiquement la langue parlée plutôt que de se fier à l'estimation du transcripteur.";
 "settings.transcription_provider" = "Fournisseur de transcription";
-"settings.whisper_provider_key_footer" = "La transcription via l'API Whisper utilise le fournisseur sélectionné ci-dessus, indépendamment du fournisseur de résumé. Tout fournisseur compatible OpenAI disposant d'une clé API (comme OpenAI ou Groq) peut être utilisé.";
-"settings.scribe_provider_key_footer" = "La transcription via ElevenLabs Scribe nécessite une clé API ElevenLabs, saisie ci-dessus.";
+"settings.whisper_provider_key_footer" = "La transcription utilise le fournisseur sélectionné ci-dessus, indépendamment du fournisseur de résumé. Tout fournisseur configuré prenant en charge la transcription (comme OpenAI, Groq ou ElevenLabs) peut être utilisé.";
 "settings.whisper_provider_key_missing_footer" = "Configurez une clé API compatible OpenAI (comme OpenAI ou Groq) dans Fournisseurs d'IA pour activer la transcription via l'API Whisper.";
 "settings.summary" = "Résumé";
 "settings.recording" = "Enregistrement";

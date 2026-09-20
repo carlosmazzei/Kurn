@@ -49,6 +49,7 @@
 "error.authentication_required" = "访问您的录音需要进行身份验证。";
 "error.authentication_failed" = "身份验证失败：%@";
 "error.keychain_access_failed" = "暂时无法访问已保存的凭据（%@）。请重试。";
+"error.summarization_unsupported" = "%@ 不支持生成摘要。";
 
 /* 转录模式 */
 "mode.on_device" = "设备端";
@@ -68,7 +69,6 @@
 "transcription.fluid_parakeet" = "FluidAudio（多语言）";
 "transcription.whisper" = "Whisper API";
 "transcription.whisper_cpp" = "Whisper（设备端）";
-"transcription.eleven_labs_scribe" = "ElevenLabs Scribe";
 "preprocessing.standard" = "标准清理";
 "preprocessing.none" = "无";
 "vad.energy" = "能量阈值";
@@ -525,8 +525,7 @@
 "pipeline.language_detection" = "语言检测";
 "pipeline.language_detection_footer" = "自动判断所说的语言，而不是依赖转录器的猜测。";
 "settings.transcription_provider" = "转录提供方";
-"settings.whisper_provider_key_footer" = "Whisper API 转录使用上方选定的提供方，与摘要提供方相互独立。可使用任何配置了 API 密钥的 OpenAI 兼容提供方（如 OpenAI 或 Groq）。";
-"settings.scribe_provider_key_footer" = "ElevenLabs Scribe 转录需要上方填写的 ElevenLabs API 密钥。";
+"settings.whisper_provider_key_footer" = "转录使用上方选定的提供方，与摘要提供方相互独立。可使用任何支持转录的已配置提供方（如 OpenAI、Groq 或 ElevenLabs）。";
 "settings.whisper_provider_key_missing_footer" = "请在「AI 提供方」中配置一个 OpenAI 兼容的 API 密钥（如 OpenAI 或 Groq），以启用 Whisper API 转录。";
 "settings.summary" = "摘要";
 "settings.recording" = "录音";

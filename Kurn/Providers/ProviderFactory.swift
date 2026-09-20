@@ -45,21 +45,26 @@ enum ProviderFactory {
             return AnthropicProvider(provider: provider, apiKey: key, model: resolvedModel)
         case .googleGemini:
             return GoogleProvider(provider: provider, apiKey: key, model: resolvedModel)
+        case .elevenLabs:
+            // Reachable only defensively — `configuredSummaryProviders`
+            // already excludes transcription-only providers from the
+            // summary-provider picker.
+            throw AppError.summarizationUnsupported(provider: provider.displayName)
         case .appleOnDevice:
             preconditionFailure("handled above")
         }
     }
 
-    /// Build the cloud transcription (Whisper) provider chosen in Settings. Any
-    /// OpenAI-compatible provider (OpenAI, Groq, or a custom endpoint) can serve
-    /// the `/audio/transcriptions` route, so this resolves the selected provider's
-    /// key and base URL independently of the summary provider. Throws `.noAPIKey`
-    /// when the chosen provider has no stored key.
+    /// Build the cloud transcription provider chosen in Settings. Any provider
+    /// with `supportsTranscription` (OpenAI-compatible vendors via the Whisper
+    /// route, or ElevenLabs via its own Scribe route) can serve this, resolved
+    /// independently of the summary provider. Throws `.noAPIKey` when the
+    /// chosen provider has no stored key.
     static func whisperProvider(
         for provider: AIProvider,
         model: String,
         transferPolicy: LargeTransferPolicy = .wifiOnly
-    ) throws -> OpenAIProvider {
+    ) throws -> any LLMProvider {
         guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
             throw AppError.invalidProviderURL
         }
@@ -71,12 +76,25 @@ enum ProviderFactory {
             throw error
         }
         let resolvedModel = model.isEmpty ? provider.defaultTranscriptionModel : model
-        AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for Whisper transcription, model=\(resolvedModel, privacy: .public)")
-        return OpenAIProvider(
-            provider: provider,
-            apiKey: key,
-            transcriptionModel: resolvedModel,
-            largeTransferPolicy: transferPolicy
-        )
+        AppLog.transcription.atInfo.info("ProviderFactory: using \(provider.displayName, privacy: .public) for cloud transcription, model=\(resolvedModel, privacy: .public)")
+        switch provider.kind {
+        case .elevenLabs:
+            return ElevenLabsProvider(
+                provider: provider,
+                apiKey: key,
+                transcriptionModel: resolvedModel,
+                largeTransferPolicy: transferPolicy
+            )
+        case .openAICompatible, .anthropic, .googleGemini, .appleOnDevice:
+            // Reachable only defensively for anthropic/googleGemini/appleOnDevice —
+            // `configuredTranscriptionProviders` already excludes them via
+            // `supportsTranscription`.
+            return OpenAIProvider(
+                provider: provider,
+                apiKey: key,
+                transcriptionModel: resolvedModel,
+                largeTransferPolicy: transferPolicy
+            )
+        }
     }
 }

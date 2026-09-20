@@ -69,7 +69,7 @@ enum ResourceWorkKind: Sendable, Equatable {
             return 15
         case .transcription(let engine):
             switch engine {
-            case .whisperAPI, .elevenLabsScribe: return 5
+            case .whisperAPI: return 5
             case .appleSpeech: return 55
             case .fluidAudioParakeet, .whisperCpp: return 60
             }

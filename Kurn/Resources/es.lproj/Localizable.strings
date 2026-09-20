@@ -49,6 +49,7 @@
 "error.authentication_required" = "Se requiere autenticación para acceder a tus grabaciones.";
 "error.authentication_failed" = "Error de autenticación: %@";
 "error.keychain_access_failed" = "No se pudo acceder a tu credencial guardada en este momento (%@). Inténtalo de nuevo.";
+"error.summarization_unsupported" = "%@ no admite la generación de resúmenes.";
 
 /* Modos de transcripción */
 "mode.on_device" = "En el dispositivo";
@@ -68,7 +69,6 @@
 "transcription.fluid_parakeet" = "FluidAudio (multilingüe)";
 "transcription.whisper" = "API de Whisper";
 "transcription.whisper_cpp" = "Whisper (en el dispositivo)";
-"transcription.eleven_labs_scribe" = "ElevenLabs Scribe";
 "preprocessing.standard" = "Limpieza estándar";
 "preprocessing.none" = "Ninguna";
 "vad.energy" = "Umbral de energía";
@@ -525,8 +525,7 @@
 "pipeline.language_detection" = "Detección de Idioma";
 "pipeline.language_detection_footer" = "Elige el idioma hablado automáticamente, en lugar de depender de la suposición del transcriptor.";
 "settings.transcription_provider" = "Proveedor de Transcripción";
-"settings.whisper_provider_key_footer" = "La transcripción con la API de Whisper usa el proveedor seleccionado arriba, con independencia del proveedor de resumen. Se puede usar cualquier proveedor compatible con OpenAI que tenga una clave de API (como OpenAI o Groq).";
-"settings.scribe_provider_key_footer" = "La transcripción con ElevenLabs Scribe requiere una clave de API de ElevenLabs, indicada arriba.";
+"settings.whisper_provider_key_footer" = "La transcripción usa el proveedor seleccionado arriba, con independencia del proveedor de resumen. Se puede usar cualquier proveedor configurado que admita transcripción (como OpenAI, Groq o ElevenLabs).";
 "settings.whisper_provider_key_missing_footer" = "Configura una clave de API compatible con OpenAI (como OpenAI o Groq) en Proveedores de IA para habilitar la transcripción con la API de Whisper.";
 "settings.summary" = "Resumen";
 "settings.recording" = "Grabación";

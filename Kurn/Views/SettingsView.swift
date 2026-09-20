@@ -86,7 +86,7 @@ struct SettingsView: View {
                     systemImage: "waveform",
                     identifier: "settings.link.transcription"
                 ) {
-                    TranscriptionSettingsView(keyRevision: $keyRevision)
+                    TranscriptionSettingsView(keyRevision: keyRevision)
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.capture", comment: "Capture group"))
@@ -166,12 +166,10 @@ struct SettingsView: View {
         .onAppear {
             ensureSelectedProviderIsConfigured()
             ensureWhisperSelectionIsAllowed()
-            ensureScribeSelectionIsAllowed()
         }
         .onChange(of: keyRevision) { _, _ in
             ensureSelectedProviderIsConfigured()
             ensureWhisperSelectionIsAllowed()
-            ensureScribeSelectionIsAllowed()
         }
         .kurnDialog(
             isPresented: $showingDeleteConfirm,

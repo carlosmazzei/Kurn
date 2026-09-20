@@ -17,13 +17,8 @@ struct TranscriptionSettingsView: View {
     @State private var cloudConsent = CloudTranscriptionConsentController()
 
     /// Bumped by the root when an API key changes, so the Whisper provider rows
-    /// re-read Keychain state. A `Binding` (unlike `SummarySettingsView`'s/
-    /// `WikiSettingsView`'s read-only copy) because this screen also *writes*
-    /// a key itself (the Scribe row below) and must propagate that change back
-    /// to the root's `.onChange(of: keyRevision)`, which is what makes
-    /// `ensureScribeSelectionIsAllowed()` react immediately instead of only on
-    /// the next time Settings is reopened.
-    @Binding var keyRevision: Int
+    /// re-read Keychain state.
+    let keyRevision: Int
 
     private var transcriptionProviders: [AIProvider] {
         _ = keyRevision
@@ -31,11 +26,6 @@ struct TranscriptionSettingsView: View {
     }
 
     private var hasAnyTranscriptionProvider: Bool { !transcriptionProviders.isEmpty }
-
-    private var hasScribeKey: Bool {
-        _ = keyRevision
-        return KeychainManager.shared.hasValue(for: .elevenLabs)
-    }
 
     /// Recomputed whenever `keyRevision` bumps (the root counter shared with
     /// `WikiSettingsView`, incremented on any provider key add/remove) — the
@@ -107,10 +97,7 @@ struct TranscriptionSettingsView: View {
                 ForEach(TranscriptionEngine.allCases) { engine in
                     Text(engine.displayName)
                         .tag(engine)
-                        .disabled(
-                            (engine == .whisperAPI && !hasAnyTranscriptionProvider)
-                                || (engine == .elevenLabsScribe && !hasScribeKey)
-                        )
+                        .disabled(engine == .whisperAPI && !hasAnyTranscriptionProvider)
                 }
             }
             .accessibilityIdentifier("settings.transcription.engine")
@@ -155,18 +142,6 @@ struct TranscriptionSettingsView: View {
                 Text(NSLocalizedString(
                     "settings.whisper_provider_key_footer",
                     comment: "Whisper transcription provider key dependency"
-                ))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-
-            // ElevenLabs Scribe: a single vendor and model, so just the API
-            // key — no provider/model pickers like the Whisper block above.
-            if settings.transcriptionEngine == .elevenLabsScribe {
-                ScribeAPIKeyRow(onChange: { keyRevision += 1 })
-                Text(NSLocalizedString(
-                    "settings.scribe_provider_key_footer",
-                    comment: "ElevenLabs Scribe key dependency"
                 ))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -391,59 +366,5 @@ struct TranscriptionSettingsView: View {
                 ? NSLocalizedString("settings.correction_footer", comment: "AI transcription correction footer")
                 : correctionUnavailableFooter)
         }
-    }
-}
-
-/// ElevenLabs Scribe's API key entry. Scribe has no `AIProvider` to edit
-/// (no name/type/URL, just one vendor and one key), so this is a minimal
-/// stand-in for `ProviderEditor`'s credentials section rather than that full
-/// screen. Same explicit-Save-with-diff discipline (H7 PR 14): the Keychain is
-/// only touched when the field actually changed, and a write failure surfaces
-/// an alert instead of silently discarding the edit.
-private struct ScribeAPIKeyRow: View {
-    let onChange: () -> Void
-
-    @State private var key = ""
-    @State private var originalKey = ""
-    @State private var saveError: AppError?
-
-    var body: some View {
-        HStack {
-            SecureField(NSLocalizedString("settings.api_key", comment: "API Key"), text: $key)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            if key != originalKey {
-                Button(NSLocalizedString("common.save", comment: "Save")) { save() }
-            }
-        }
-        .onAppear {
-            switch KeychainManager.shared.get(.elevenLabs) {
-            case .found(let value):
-                key = value
-                originalKey = value
-            case .absent:
-                key = ""
-                originalKey = ""
-            case .failed(let reason):
-                key = ""
-                originalKey = ""
-                saveError = .keychainAccessFailed(reason.rawValue)
-            }
-        }
-        .errorAlert($saveError)
-    }
-
-    private func save() {
-        let outcome: KeychainWriteOutcome = key.isEmpty
-            ? KeychainManager.shared.delete(.elevenLabs)
-            : KeychainManager.shared.set(key, for: .elevenLabs)
-        guard case .success = outcome else {
-            if case .failed(let reason) = outcome {
-                saveError = .keychainAccessFailed(reason.rawValue)
-            }
-            return
-        }
-        originalKey = key
-        onChange()
     }
 }
