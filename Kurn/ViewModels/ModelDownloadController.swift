@@ -325,9 +325,10 @@ final class ModelDownloadController {
             do {
                 let before = ModelStore.snapshot()
                 try await downloader(set, policy) { [weak self] status in
-                    Task { @MainActor [weak self] in
-                        guard self?.downloadingModel == set else { return }
-                        self?.downloadProgress = status
+                    guard let self else { return }
+                    Task { @MainActor in
+                        guard self.downloadingModel == set else { return }
+                        self.downloadProgress = status
                     }
                 }
                 ModelStore.recordDownload(for: group, before: before)
