@@ -268,7 +268,8 @@ struct SummaryModelPicker: View {
 
 /// Picker for the cloud transcription (Whisper) model of a given provider,
 /// mirroring `SummaryModelPicker` but filtering the provider's model list to
-/// Whisper-family models (falling back to the full list when none are tagged).
+/// Whisper-family models — falling back to `provider.fallbackModels` when
+/// none are tagged, and only to the unfiltered list when that's empty too.
 struct TranscriptionModelPicker: View {
     let settings: AppSettings
     let provider: AIProvider
@@ -294,7 +295,14 @@ struct TranscriptionModelPicker: View {
                         || $0.localizedCaseInsensitiveContains("transcribe")
                         || $0.localizedCaseInsensitiveContains("scribe")
                 }
-                return transcriptionModels.isEmpty ? loaded : transcriptionModels
+                if !transcriptionModels.isEmpty { return transcriptionModels }
+                // The loaded list has nothing tagged as a transcription model —
+                // e.g. OpenAI's /models response is dominated by chat models
+                // and the account's active list omits every whisper/transcribe
+                // name. Prefer the provider's known-good transcription models
+                // over falling through to `loaded`, which would otherwise show
+                // chat model names (gpt-4o, o1, …) in a transcription picker.
+                return provider.fallbackModels.isEmpty ? loaded : provider.fallbackModels
             }
         )
     }

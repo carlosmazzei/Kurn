@@ -134,6 +134,28 @@ struct EnumsTests {
         #expect(!filtered.contains("llama-3.3-70b-versatile"))
     }
 
+    @Test func transcriptionModelPickerFiltersFallsBackToProviderFallbackModelsNotChatModels() {
+        // Mirrors TranscriptionModelPicker's filter closure (SettingsProviderViews.swift)
+        // for the case none of the three tags matches: OpenAI's live /models
+        // response can be dominated by chat models with no whisper/transcribe/
+        // scribe name at all. The picker must prefer the provider's known-good
+        // transcription models over showing chat models in a transcription
+        // picker.
+        let pickerFilter: (AIProvider, [String]) -> [String] = { provider, loaded in
+            let tagged = loaded.filter {
+                $0.localizedCaseInsensitiveContains("whisper")
+                    || $0.localizedCaseInsensitiveContains("transcribe")
+                    || $0.localizedCaseInsensitiveContains("scribe")
+            }
+            if !tagged.isEmpty { return tagged }
+            return provider.fallbackModels.isEmpty ? loaded : provider.fallbackModels
+        }
+        let chatOnlyModels = ["gpt-5.4", "o1", "gpt-5.4-mini"]
+        let filtered = pickerFilter(.openAI, chatOnlyModels)
+        #expect(filtered == AIProvider.openAI.fallbackModels)
+        #expect(!filtered.contains("gpt-5.4"))
+    }
+
     @Test func appleOnDeviceIsABuiltInWithNoTranscriptionSupport() {
         #expect(AIProvider.appleOnDevice.kind == .appleOnDevice)
         #expect(AIProvider.appleOnDevice.isBuiltIn)
