@@ -102,9 +102,16 @@ struct TranscriptionService {
     /// real engines, created once and shared across concurrent transcriptions;
     /// tests inject fakes per stage.
     let engines: PipelineEngineCatalog
+    /// Live network path, read once up front so a cloud transcription the
+    /// transfer policy is about to refuse fails before the local stages run.
+    let network: any NetworkPathSnapshotProviding
 
-    init(engines: PipelineEngineCatalog = .live) {
+    init(
+        engines: PipelineEngineCatalog = .live,
+        network: any NetworkPathSnapshotProviding = NetworkPathObserver.shared
+    ) {
         self.engines = engines
+        self.network = network
     }
 
     /// Transcribe one recording file and return diarized segments, driving each
@@ -134,6 +141,7 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) size=\(fileSize, privacy: .public) bytes duration=\(String(format: "%.1f", fileDuration), privacy: .public)s engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
         try await ResourceGuard.requireTranscriptionHeadroom()
         try validateModelTransferPolicy(config)
+        try validateCloudUploadPolicy(config)
 
         // H4 pipeline fingerprint: identity of the *source* recording, so a
         // checkpoint from an earlier run can only resume this exact file, not
@@ -502,6 +510,22 @@ struct TranscriptionService {
             for: sets.compactMap { $0 },
             policy: config.largeTransferPolicy
         )
+    }
+
+    /// Cloud transcription uploads the whole recording, so it follows the
+    /// large-transfer policy. Checked here, before cleanup, VAD and chunking,
+    /// because otherwise a cellular or Low Data Mode path is only discovered
+    /// when the first chunk is sent — minutes into a run the user watched
+    /// "transcribing" the whole time. Only a path the policy positively
+    /// refuses fails early; an unknown one is left to the upload itself.
+    private func validateCloudUploadPolicy(_ config: PipelineConfiguration) throws {
+        // Without upload consent nothing is sent, and the consent refusal
+        // further down is the more useful error.
+        guard config.transcription.isCloudTranscription, config.cloudTranscriptionConsented else { return }
+        let snapshot = network.snapshot
+        guard snapshot.isKnown, config.largeTransferPolicy.blocks(snapshot) else { return }
+        AppLog.transcription.atNotice.notice("transcribe: cloud upload blocked by transfer policy expensive=\(snapshot.isExpensive, privacy: .public) constrained=\(snapshot.isConstrained, privacy: .public)")
+        throw AppError.networkPolicyRestricted
     }
 
     // MARK: - VAD-gated transcription

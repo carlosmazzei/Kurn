@@ -28,12 +28,14 @@ struct LargeTransferPolicy: Equatable, Sendable {
 
     func validate(_ snapshot: NetworkPathSnapshot) throws {
         guard snapshot.isKnown else { throw AppError.networkPolicyRestricted }
-        if snapshot.isConstrained && !allowsConstrainedAccess {
-            throw AppError.networkPolicyRestricted
-        }
-        if snapshot.isExpensive && !allowsExpensiveAccess {
-            throw AppError.networkPolicyRestricted
-        }
+        if blocks(snapshot) { throw AppError.networkPolicyRestricted }
+    }
+
+    /// Whether this policy refuses the given (known) path: cellular while
+    /// cellular is off, or Low Data Mode while that is off.
+    func blocks(_ snapshot: NetworkPathSnapshot) -> Bool {
+        (snapshot.isConstrained && !allowsConstrainedAccess)
+            || (snapshot.isExpensive && !allowsExpensiveAccess)
     }
 
     static func restrictionError(for error: Error) -> AppError? {
@@ -44,6 +46,31 @@ struct LargeTransferPolicy: Equatable, Sendable {
         default:
             return nil
         }
+    }
+
+    /// `restrictionError(for:)`, plus the case the native reason misses.
+    /// URLSession does not always populate `networkUnavailableReason` when a
+    /// request that disallows expensive/constrained access meets a cellular or
+    /// Low Data Mode path; the failure then arrives as a bare
+    /// `.notConnectedToInternet`, which read to the user as "you are offline"
+    /// while they plainly had signal — and got retried as a transient blip.
+    /// Judging it against the live path and the request's own flags tells the
+    /// two apart: a genuinely offline device has neither an expensive nor a
+    /// constrained path, so it keeps the plain network error.
+    static func restrictionError(
+        for error: Error,
+        request: URLRequest,
+        snapshot: NetworkPathSnapshot
+    ) -> AppError? {
+        if let native = restrictionError(for: error) { return native }
+        guard let urlError = error as? URLError,
+              urlError.code == .notConnectedToInternet,
+              snapshot.isKnown else { return nil }
+        let requestPolicy = LargeTransferPolicy(
+            allowsExpensiveAccess: request.allowsExpensiveNetworkAccess,
+            allowsConstrainedAccess: request.allowsConstrainedNetworkAccess
+        )
+        return requestPolicy.blocks(snapshot) ? .networkPolicyRestricted : nil
     }
 
     func apply(to request: inout URLRequest) {

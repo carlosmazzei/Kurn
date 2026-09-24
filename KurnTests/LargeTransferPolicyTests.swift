@@ -48,6 +48,46 @@ struct LargeTransferPolicyTests {
         }
     }
 
+    @Test func bareOfflineErrorOnABlockedPathIsReportedAsPolicy() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://api.example.com/upload")))
+        LargeTransferPolicy.wifiOnly.apply(to: &request)
+        let offline = URLError(.notConnectedToInternet)
+
+        for snapshot in [
+            NetworkPathSnapshot(isExpensive: true, isConstrained: false),
+            NetworkPathSnapshot(isExpensive: false, isConstrained: true)
+        ] {
+            let mapped = LargeTransferPolicy.restrictionError(for: offline, request: request, snapshot: snapshot)
+            #expect(mapped?.logCode == "network_policy_restricted")
+        }
+    }
+
+    @Test func genuinelyOfflineStaysANetworkError() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://api.example.com/upload")))
+        LargeTransferPolicy.wifiOnly.apply(to: &request)
+
+        // No usable path at all: neither expensive nor constrained.
+        #expect(LargeTransferPolicy.restrictionError(
+            for: URLError(.notConnectedToInternet),
+            request: request,
+            snapshot: NetworkPathSnapshot(isExpensive: false, isConstrained: false)
+        ) == nil)
+        // A request that already allows the path was not blocked by policy.
+        var permissive = request
+        LargeTransferPolicy(allowsExpensiveAccess: true, allowsConstrainedAccess: true).apply(to: &permissive)
+        #expect(LargeTransferPolicy.restrictionError(
+            for: URLError(.notConnectedToInternet),
+            request: permissive,
+            snapshot: NetworkPathSnapshot(isExpensive: true, isConstrained: true)
+        ) == nil)
+        // Other transport failures are never reclassified.
+        #expect(LargeTransferPolicy.restrictionError(
+            for: URLError(.timedOut),
+            request: request,
+            snapshot: NetworkPathSnapshot(isExpensive: true, isConstrained: false)
+        ) == nil)
+    }
+
     @Test func modelDownloadFailsBeforeStartingOnBlockedPath() async {
         await #expect(throws: AppError.self) {
             try await ModelDownloadConsent.download(

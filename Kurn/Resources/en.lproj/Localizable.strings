@@ -7,7 +7,9 @@
 "error.invalid_provider_url" = "The provider URL is invalid or not allowed. Use a public HTTPS hostname without credentials, query parameters, fragments, or custom ports.";
 "error.provider_response_too_large" = "The provider response exceeded the safe size limit.";
 "error.ambiguous_provider_result" = "The connection ended before the provider result could be confirmed. Kurn did not retry automatically to avoid duplicate charges. Check the provider before retrying.";
-"error.network_policy_restricted" = "This large transfer is blocked by your network policy. Connect to Wi-Fi or allow cellular and Low Data Mode transfers in Transcription settings.";
+"error.network_policy_restricted" = "Uploads and model downloads are set to Wi-Fi only, and this device is on cellular data or Low Data Mode. Connect to Wi-Fi, or allow cellular and Low Data Mode under Large Transfers in Transcription settings, then try again.";
+"error.network_policy_restricted.title" = "Wi-Fi Required";
+"error.network_policy_restricted.open_settings" = "Open Settings";
 "error.cloud_transcription_consent_required" = "Cloud transcription requires upload consent. Review the destination and transfer policy in Transcription settings.";
 "settings.network.large_transfers" = "Large Transfers";
 "settings.network.allow_expensive" = "Allow Cellular Transfers";

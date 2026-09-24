@@ -7,7 +7,9 @@
 "error.invalid_provider_url" = "La URL del proveedor no es válida o no está permitida. Usa un nombre de host HTTPS público sin credenciales, parámetros de consulta, fragmentos ni puertos personalizados.";
 "error.provider_response_too_large" = "La respuesta del proveedor superó el límite de tamaño seguro.";
 "error.ambiguous_provider_result" = "La conexión terminó antes de poder confirmar el resultado del proveedor. Kurn no reintentó automáticamente para evitar cargos duplicados. Comprueba el proveedor antes de volver a intentarlo.";
-"error.network_policy_restricted" = "Esta transferencia grande está bloqueada por tu política de red. Conéctate a Wi-Fi o permite transferencias por red celular y modo de datos reducidos en los ajustes de Transcripción.";
+"error.network_policy_restricted" = "Las cargas de audio y descargas de modelos están configuradas solo para Wi-Fi, y este dispositivo usa datos móviles o el modo de datos reducidos. Conéctate a Wi-Fi, o permite datos móviles y el modo de datos reducidos en Transferencias grandes, en los ajustes de Transcripción, y vuelve a intentarlo.";
+"error.network_policy_restricted.title" = "Se requiere Wi-Fi";
+"error.network_policy_restricted.open_settings" = "Abrir ajustes";
 "error.cloud_transcription_consent_required" = "La transcripción en la nube requiere consentimiento para subir audio. Revisa el destino y la política en los ajustes de Transcripción.";
 "settings.network.large_transfers" = "Transferencias grandes";
 "settings.network.allow_expensive" = "Permitir red celular";

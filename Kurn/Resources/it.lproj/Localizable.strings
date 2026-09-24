@@ -7,7 +7,9 @@
 "error.invalid_provider_url" = "L’URL del provider non è valida o consentita. Usa un nome host HTTPS pubblico senza credenziali, parametri di query, frammenti o porte personalizzate.";
 "error.provider_response_too_large" = "La risposta del provider ha superato il limite di dimensione sicuro.";
 "error.ambiguous_provider_result" = "La connessione è terminata prima di poter confermare il risultato del provider. Kurn non ha riprovato automaticamente per evitare addebiti duplicati. Verifica il provider prima di riprovare.";
-"error.network_policy_restricted" = "Questo trasferimento di grandi dimensioni è bloccato dalla tua politica di rete. Connettiti al Wi-Fi o consenti rete cellulare e modalità Dati ridotti nelle impostazioni Trascrizione.";
+"error.network_policy_restricted" = "Upload audio e download dei modelli sono impostati solo su Wi-Fi, e questo dispositivo è su rete cellulare o in modalità Dati ridotti. Connettiti al Wi-Fi, oppure consenti rete cellulare e modalità Dati ridotti in Trasferimenti di grandi dimensioni nelle impostazioni Trascrizione, poi riprova.";
+"error.network_policy_restricted.title" = "Wi-Fi necessario";
+"error.network_policy_restricted.open_settings" = "Apri impostazioni";
 "error.cloud_transcription_consent_required" = "La trascrizione cloud richiede il consenso all’invio dell’audio. Verifica destinazione e politica nelle impostazioni Trascrizione.";
 "settings.network.large_transfers" = "Trasferimenti di grandi dimensioni";
 "settings.network.allow_expensive" = "Consenti rete cellulare";

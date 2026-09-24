@@ -91,6 +91,9 @@ struct MeetingDetailView: View {
     /// primary workflow, so it lives in the overflow menu. Not `private` —
     /// `MeetingDetailToolbar.swift` needs it.
     @State var showingWiki = false
+    /// Opened from a transcription failure the large-transfer policy caused,
+    /// so the cellular / Low Data Mode switches are one tap from the error.
+    @State private var showingNetworkSettings = false
     @State var showingTemplatePicker = false
     @State var shareItem: ShareItem?
     @State var showingShareSelection = false
@@ -176,7 +179,19 @@ struct MeetingDetailView: View {
                 runTranslateSummary(summary, to: language)
             }
         }
-        .errorAlert(transcriptionErrorBinding)
+        .errorAlert(transcriptionErrorBinding, onOpenNetworkSettings: { showingNetworkSettings = true })
+        .sheet(isPresented: $showingNetworkSettings) {
+            NavigationStack {
+                TranscriptionSettingsView(keyRevision: 0)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) {
+                                showingNetworkSettings = false
+                            }
+                        }
+                    }
+            }
+        }
         .errorAlert($autoTagError)
         .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
         .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
