@@ -400,6 +400,9 @@ private struct ProviderModelPicker: View {
 struct ModelDownloadAlerts: ViewModifier {
     @Bindable var downloads: ModelDownloadController
     let settings: AppSettings
+    /// Offered on a download the large-transfer policy refused. `nil` on the
+    /// Transcription screen, where the switches are already on screen.
+    var onOpenNetworkSettings: (() -> Void)?
 
     func body(content: Content) -> some View {
         content
@@ -458,7 +461,7 @@ struct ModelDownloadAlerts: ViewModifier {
             } message: {
                 Text(NSLocalizedString("settings.model_download.message_whisper_cpp", comment: ""))
             }
-            .errorAlert($downloads.error)
+            .errorAlert($downloads.error, onOpenNetworkSettings: onOpenNetworkSettings)
     }
 
     /// Size to download, or a note that it's already on disk — so the cost of
@@ -473,11 +476,18 @@ struct ModelDownloadAlerts: ViewModifier {
 
 extension View {
     /// Attach the model-download consent dialogs and failure alert.
+    /// `onOpenNetworkSettings` adds an Open Settings action to a download the
+    /// large-transfer policy refused (see `errorAlert`).
     func modelDownloadAlerts(
         _ downloads: ModelDownloadController,
-        settings: AppSettings
+        settings: AppSettings,
+        onOpenNetworkSettings: (() -> Void)? = nil
     ) -> some View {
-        modifier(ModelDownloadAlerts(downloads: downloads, settings: settings))
+        modifier(ModelDownloadAlerts(
+            downloads: downloads,
+            settings: settings,
+            onOpenNetworkSettings: onOpenNetworkSettings
+        ))
     }
 }
 

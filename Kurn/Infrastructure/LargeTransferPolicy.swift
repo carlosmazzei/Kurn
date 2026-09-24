@@ -59,18 +59,31 @@ struct LargeTransferPolicy: Equatable, Sendable {
     /// constrained path, so it keeps the plain network error.
     static func restrictionError(
         for error: Error,
-        request: URLRequest,
+        policy: LargeTransferPolicy,
         snapshot: NetworkPathSnapshot
     ) -> AppError? {
         if let native = restrictionError(for: error) { return native }
         guard let urlError = error as? URLError,
               urlError.code == .notConnectedToInternet,
               snapshot.isKnown else { return nil }
-        let requestPolicy = LargeTransferPolicy(
-            allowsExpensiveAccess: request.allowsExpensiveNetworkAccess,
-            allowsConstrainedAccess: request.allowsConstrainedNetworkAccess
+        return policy.blocks(snapshot) ? .networkPolicyRestricted : nil
+    }
+
+    /// Same judgement, reading the policy off the request's own flags — for
+    /// the shared HTTP transport, which sees requests rather than policies.
+    static func restrictionError(
+        for error: Error,
+        request: URLRequest,
+        snapshot: NetworkPathSnapshot
+    ) -> AppError? {
+        restrictionError(
+            for: error,
+            policy: LargeTransferPolicy(
+                allowsExpensiveAccess: request.allowsExpensiveNetworkAccess,
+                allowsConstrainedAccess: request.allowsConstrainedNetworkAccess
+            ),
+            snapshot: snapshot
         )
-        return requestPolicy.blocks(snapshot) ? .networkPolicyRestricted : nil
     }
 
     func apply(to request: inout URLRequest) {

@@ -144,7 +144,7 @@ struct MeetingDetailView: View {
         .navigationTitle(meeting.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .modelDownloadAlerts(downloads, settings: settings)
+        .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
         .onDisappear { player.stop() }
         .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
         .sheet(isPresented: $showingRecorder) {

@@ -115,7 +115,11 @@ struct ModelDownloadConsent {
         } catch let appError as AppError {
             throw appError
         } catch {
-            if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+            if let restriction = LargeTransferPolicy.restrictionError(
+                for: error,
+                policy: policy,
+                snapshot: network.snapshot
+            ) {
                 throw restriction
             }
             try ResourceGuard.rethrowIfResourceFailure(error)

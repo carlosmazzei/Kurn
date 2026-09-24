@@ -15,6 +15,9 @@ import SwiftUI
 struct RecordingSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ModelDownloadController.self) private var downloads
+    /// Pushed from a live-preview model download the large-transfer policy
+    /// refused; the switches live on the Transcription screen.
+    @State private var showingNetworkSettings = false
 
     var body: some View {
         Form {
@@ -24,7 +27,10 @@ struct RecordingSettingsView: View {
             privacySection
         }
         .navigationTitle(NSLocalizedString("settings.recording", comment: "Recording"))
-        .modelDownloadAlerts(downloads, settings: settings)
+        .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
+        .navigationDestination(isPresented: $showingNetworkSettings) {
+            TranscriptionSettingsView(keyRevision: 0)
+        }
     }
 
     // MARK: - Capture

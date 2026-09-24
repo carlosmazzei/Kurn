@@ -88,6 +88,27 @@ struct LargeTransferPolicyTests {
         ) == nil)
     }
 
+    /// The model downloaders hold a policy rather than a request; the same
+    /// judgement must come out of either entry point.
+    @Test func policyEntryPointMatchesTheRequestOne() {
+        let offline = URLError(.notConnectedToInternet)
+        let cellular = NetworkPathSnapshot(isExpensive: true, isConstrained: false)
+
+        #expect(LargeTransferPolicy.restrictionError(
+            for: offline, policy: .wifiOnly, snapshot: cellular
+        )?.logCode == "network_policy_restricted")
+        #expect(LargeTransferPolicy.restrictionError(
+            for: offline,
+            policy: LargeTransferPolicy(allowsExpensiveAccess: true, allowsConstrainedAccess: false),
+            snapshot: cellular
+        ) == nil)
+        #expect(LargeTransferPolicy.restrictionError(
+            for: offline,
+            policy: .wifiOnly,
+            snapshot: NetworkPathSnapshot(isExpensive: true, isConstrained: false, isKnown: false)
+        ) == nil)
+    }
+
     @Test func modelDownloadFailsBeforeStartingOnBlockedPath() async {
         await #expect(throws: AppError.self) {
             try await ModelDownloadConsent.download(

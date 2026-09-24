@@ -64,7 +64,11 @@ extension LLMHTTP {
         } catch let error as URLError where error.code == .cancelled && Task.isCancelled {
             throw CancellationError()
         } catch let error as URLError {
-            if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+            if let restriction = LargeTransferPolicy.restrictionError(
+                for: error,
+                request: boundedRequest,
+                snapshot: NetworkPathObserver.shared.snapshot
+            ) {
                 throw restriction
             }
             throw AppError.networkError(error)
