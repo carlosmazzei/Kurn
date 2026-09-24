@@ -7,7 +7,9 @@
 "error.invalid_provider_url" = "提供方 URL 无效或不被允许。请使用不含凭据、查询参数、片段或自定义端口的公共 HTTPS 主机名。";
 "error.provider_response_too_large" = "提供方响应超过了安全大小限制。";
 "error.ambiguous_provider_result" = "连接在提供方结果得到确认前中断。为避免重复计费，Kurn 未自动重试。请先检查提供方，再重试。";
-"error.network_policy_restricted" = "此大型传输已被网络策略阻止。请连接 Wi-Fi，或在“转录”设置中允许蜂窝网络和低数据模式传输。";
+"error.network_policy_restricted" = "音频上传和模型下载设置为仅使用 Wi-Fi，而此设备正在使用蜂窝数据或低数据模式。请连接 Wi-Fi，或在“转录”设置的“大型传输”中允许蜂窝网络和低数据模式，然后重试。";
+"error.network_policy_restricted.title" = "需要 Wi-Fi";
+"error.network_policy_restricted.open_settings" = "打开设置";
 "error.cloud_transcription_consent_required" = "云端转录需要获得音频上传许可。请在“转录”设置中查看目的地和传输策略。";
 "settings.network.large_transfers" = "大型传输";
 "settings.network.allow_expensive" = "允许蜂窝网络";

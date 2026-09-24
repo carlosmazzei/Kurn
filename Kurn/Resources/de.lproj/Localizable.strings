@@ -7,7 +7,9 @@
 "error.invalid_provider_url" = "Die Anbieter-URL ist ungültig oder nicht zulässig. Verwenden Sie einen öffentlichen HTTPS-Hostnamen ohne Zugangsdaten, Abfrageparameter, Fragmente oder benutzerdefinierte Ports.";
 "error.provider_response_too_large" = "Die Anbieterantwort hat das sichere Größenlimit überschritten.";
 "error.ambiguous_provider_result" = "Die Verbindung wurde beendet, bevor das Anbieterergebnis bestätigt werden konnte. Kurn hat nicht automatisch wiederholt, um doppelte Kosten zu vermeiden. Prüfen Sie den Anbieter vor einem erneuten Versuch.";
-"error.network_policy_restricted" = "Diese große Übertragung wird durch Ihre Netzwerkrichtlinie blockiert. Stellen Sie eine WLAN-Verbindung her oder erlauben Sie Mobilfunk und den Datensparmodus in den Transkriptionseinstellungen.";
+"error.network_policy_restricted" = "Audio-Uploads und Modelldownloads sind auf WLAN beschränkt, und dieses Gerät nutzt Mobilfunk oder den Datensparmodus. Stellen Sie eine WLAN-Verbindung her oder erlauben Sie Mobilfunk und den Datensparmodus unter „Große Übertragungen“ in den Transkriptionseinstellungen und versuchen Sie es erneut.";
+"error.network_policy_restricted.title" = "WLAN erforderlich";
+"error.network_policy_restricted.open_settings" = "Einstellungen öffnen";
 "error.cloud_transcription_consent_required" = "Cloud-Transkription erfordert Ihre Zustimmung zum Audio-Upload. Prüfen Sie Ziel und Richtlinie in den Transkriptionseinstellungen.";
 "settings.network.large_transfers" = "Große Übertragungen";
 "settings.network.allow_expensive" = "Mobilfunk erlauben";

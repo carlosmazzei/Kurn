@@ -7,7 +7,9 @@
 "error.invalid_provider_url" = "L’URL du fournisseur est invalide ou non autorisée. Utilisez un nom d’hôte HTTPS public sans identifiants, paramètres de requête, fragment ni port personnalisé.";
 "error.provider_response_too_large" = "La réponse du fournisseur dépasse la limite de taille autorisée.";
 "error.ambiguous_provider_result" = "La connexion s’est interrompue avant la confirmation du résultat du fournisseur. Kurn n’a pas réessayé automatiquement afin d’éviter une double facturation. Vérifiez le fournisseur avant de réessayer.";
-"error.network_policy_restricted" = "Ce transfert volumineux est bloqué par votre politique réseau. Connectez-vous au Wi-Fi ou autorisez les transferts cellulaires et le mode Faibles données dans les réglages de Transcription.";
+"error.network_policy_restricted" = "Les envois audio et téléchargements de modèles sont limités au Wi-Fi, et cet appareil utilise les données cellulaires ou le mode Faibles données. Connectez-vous au Wi-Fi, ou autorisez le réseau cellulaire et le mode Faibles données sous Transferts volumineux dans les réglages de Transcription, puis réessayez.";
+"error.network_policy_restricted.title" = "Wi-Fi requis";
+"error.network_policy_restricted.open_settings" = "Ouvrir les réglages";
 "error.cloud_transcription_consent_required" = "La transcription cloud nécessite votre accord pour envoyer l’audio. Vérifiez la destination et la politique dans les réglages de Transcription.";
 "settings.network.large_transfers" = "Transferts volumineux";
 "settings.network.allow_expensive" = "Autoriser le réseau cellulaire";
