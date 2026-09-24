@@ -65,6 +65,13 @@ struct RecognitionPipelineTests {
         #expect(TranscriptionEngine.whisperAPI.storageMode == .whisperAPI)
     }
 
+    @Test func isCloudTranscriptionIsTrueOnlyForWhisperAPI() {
+        #expect(TranscriptionEngine.whisperAPI.isCloudTranscription)
+        #expect(!TranscriptionEngine.appleSpeech.isCloudTranscription)
+        #expect(!TranscriptionEngine.fluidAudioParakeet.isCloudTranscription)
+        #expect(!TranscriptionEngine.whisperCpp.isCloudTranscription)
+    }
+
     @Test func requiredModelSetOnlyForDownloadedEngines() {
         let model = WhisperCppModel.default
         #expect(TranscriptionEngine.appleSpeech.requiredModelSet(whisperCppModel: model) == nil)

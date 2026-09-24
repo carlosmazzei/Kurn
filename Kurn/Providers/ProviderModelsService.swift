@@ -26,6 +26,9 @@ struct ProviderModelsService: Sendable {
     func models(for provider: AIProvider) async throws -> [String] {
         // There is exactly one on-device model and no `/models` endpoint to ask.
         guard provider.kind != .appleOnDevice else { return [provider.defaultModel] }
+        // ElevenLabs has no `/models` endpoint compatible with any of the
+        // shapes below; its one supported model is the known fallback list.
+        guard provider.kind != .elevenLabs else { return provider.fallbackModels }
 
         let apiKey = apiKey ?? KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
         do {
@@ -82,6 +85,8 @@ struct ProviderModelsService: Sendable {
             }
             AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
             return models
+        case .elevenLabs:
+            preconditionFailure("handled above")
         case .appleOnDevice:
             preconditionFailure("handled above")
         }

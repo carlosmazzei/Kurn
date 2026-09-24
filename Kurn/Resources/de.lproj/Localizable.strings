@@ -49,6 +49,7 @@
 "error.authentication_required" = "Für den Zugriff auf Ihre Aufnahmen ist eine Authentifizierung erforderlich.";
 "error.authentication_failed" = "Authentifizierung fehlgeschlagen: %@";
 "error.keychain_access_failed" = "Ihre gespeicherten Zugangsdaten konnten gerade nicht abgerufen werden (%@). Versuchen Sie es erneut.";
+"error.summarization_unsupported" = "%@ unterstützt keine Zusammenfassungen.";
 
 /* Transkriptionsmodi */
 "mode.on_device" = "Auf dem Gerät";
@@ -58,6 +59,7 @@
 "diarization.heuristic" = "Heuristisch";
 "diarization.fluid_audio" = "FluidAudio";
 "diarization.sherpa_onnx" = "Sherpa-ONNX";
+"diarization.transcription_provider_native" = "Nativ (Transkriptionsanbieter)";
 
 /* Correction engines */
 "correction.none" = "Aus";
@@ -66,7 +68,7 @@
 /* Engines der Erkennungspipeline */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (mehrsprachig)";
-"transcription.whisper" = "Whisper API";
+"transcription.cloud_provider" = "Cloud-Anbieter";
 "transcription.whisper_cpp" = "Whisper (auf dem Gerät)";
 "preprocessing.standard" = "Standardbereinigung";
 "preprocessing.none" = "Keine";
@@ -425,6 +427,7 @@
 "detail.skip_forward" = "15 Sekunden vor";
 "detail.download_diarization_models" = "Sprechermodelle laden";
 "warning.diarization_models_not_downloaded" = "Die Sprechertrennung nutzt die einfache Engine. Lade die neuronalen Modelle für genauere Sprecher.";
+"warning.diarization_requires_native_provider" = "Die Sprechertrennung nutzt die einfache Engine. Wähle zusammen mit der Whisper-Engine einen Transkriptionsanbieter mit nativer Sprechertrennung (z. B. ElevenLabs), um sie zu nutzen.";
 "speaker.cross_meeting_match.title" = "Bekannte Stimme";
 "speaker.cross_meeting_match.message" = "Das klingt nach %1$@ aus „%2$@“. Namen übernehmen?";
 "speaker.cross_meeting_match.disclaimer" = "Basiert auf einem Stimmabgleich. Vor dem Übernehmen prüfen — dies lässt sich durch Bearbeiten des Sprechernamens rückgängig machen.";
@@ -524,7 +527,7 @@
 "pipeline.language_detection" = "Spracherkennung";
 "pipeline.language_detection_footer" = "Wählt die gesprochene Sprache automatisch, statt sich auf die Vermutung des Transkriptors zu verlassen.";
 "settings.transcription_provider" = "Transkriptions-Anbieter";
-"settings.whisper_provider_key_footer" = "Die Transkription über die Whisper API verwendet den oben ausgewählten Anbieter, unabhängig vom Zusammenfassungs-Anbieter. Jeder OpenAI-kompatible Anbieter mit einem API-Schlüssel (z. B. OpenAI oder Groq) kann verwendet werden.";
+"settings.whisper_provider_key_footer" = "Die Transkription verwendet den oben ausgewählten Anbieter, unabhängig vom Zusammenfassungs-Anbieter. Jeder konfigurierte Anbieter mit Transkriptionsunterstützung (z. B. OpenAI, Groq oder ElevenLabs) kann verwendet werden.";
 "settings.whisper_provider_key_missing_footer" = "Konfigurieren Sie einen OpenAI-kompatiblen API-Schlüssel (z. B. OpenAI oder Groq) unter KI-Anbieter, um die Transkription über die Whisper API zu aktivieren.";
 "settings.summary" = "Zusammenfassung";
 "settings.recording" = "Aufnahme";

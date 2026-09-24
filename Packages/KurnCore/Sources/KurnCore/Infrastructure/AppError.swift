@@ -53,6 +53,10 @@ public enum AppError: LocalizedError, Identifiable {
     /// `KeychainFailureReason` raw value ("locked"/"denied"/"transient"),
     /// never a raw `OSStatus` or free text.
     case keychainAccessFailed(String)
+    /// A provider was asked to summarize/chat but its `AIProviderKind`
+    /// doesn't expose that route (e.g. ElevenLabs, transcription-only). The
+    /// associated string is the provider's display name for the message.
+    case summarizationUnsupported(provider: String)
 
     /// Stable identity for item-based presentation and comparisons.
     public var id: String { errorDescription ?? "AppError" }
@@ -96,6 +100,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .onDeviceModelUnavailable: return "on_device_model_unavailable"
         case .transcriptIntegrityFailed: return "transcript_integrity"
         case .keychainAccessFailed: return "keychain_access"
+        case .summarizationUnsupported: return "summarization_unsupported"
         }
     }
 
@@ -271,6 +276,11 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.keychain_access_failed", comment: "Keychain access failed"),
                 reason
+            )
+        case .summarizationUnsupported(let provider):
+            return String(
+                format: NSLocalizedString("error.summarization_unsupported", comment: "Provider does not support summarization"),
+                provider
             )
         }
     }

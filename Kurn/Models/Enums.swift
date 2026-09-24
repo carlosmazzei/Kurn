@@ -403,6 +403,14 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     /// `fluidAudio` — a deliberate trade for collapse-resistance, not a
     /// straight upgrade.
     case sherpaOnnx
+    /// Speaker labels returned natively by the selected `.whisperAPI`
+    /// transcription provider's own response (e.g. ElevenLabs Scribe),
+    /// instead of running a separate local diarization pass. Only honored
+    /// when the transcription engine is `.whisperAPI` and the selected
+    /// provider's `supportsNativeDiarization` is true — see
+    /// `PipelineConfiguration.effectiveDiarization`, which falls back to
+    /// `.heuristic` otherwise. No download, like `.heuristic`.
+    case transcriptionProviderNative
 
     var id: String { rawValue }
 
@@ -411,6 +419,11 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         case .heuristic: return NSLocalizedString("diarization.heuristic", comment: "Heuristic")
         case .fluidAudio: return NSLocalizedString("diarization.fluid_audio", comment: "FluidAudio")
         case .sherpaOnnx: return NSLocalizedString("diarization.sherpa_onnx", comment: "Sherpa-ONNX")
+        case .transcriptionProviderNative:
+            return NSLocalizedString(
+                "diarization.transcription_provider_native",
+                comment: "Transcription provider's native diarization"
+            )
         }
     }
 
@@ -418,7 +431,7 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     /// when it needs no download.
     var requiredModelSet: ModelSet? {
         switch self {
-        case .heuristic: return nil
+        case .heuristic, .transcriptionProviderNative: return nil
         case .fluidAudio: return .diarization
         case .sherpaOnnx: return .sherpaOnnxDiarization
         }
@@ -521,6 +534,10 @@ enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
     case openAICompatible
     case anthropic
     case googleGemini
+    /// ElevenLabs' own API shape (`xi-api-key` auth, Scribe speech-to-text) —
+    /// transcription-only, no chat/summarize route. See
+    /// `AIProvider.supportsSummarization`.
+    case elevenLabs
     /// Apple's on-device `FoundationModels` framework. Unlike the other kinds,
     /// this speaks no HTTP at all — no base URL, no API key — so it is excluded
     /// from `AddProviderView`'s type picker and never reaches `LLMHTTP`.
@@ -533,6 +550,7 @@ enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
         case .openAICompatible: return "OpenAI-compatible"
         case .anthropic: return "Anthropic"
         case .googleGemini: return "Google Gemini"
+        case .elevenLabs: return "ElevenLabs"
         case .appleOnDevice: return "On-Device"
         }
     }
@@ -542,6 +560,7 @@ enum AIProviderKind: String, Codable, Sendable, CaseIterable, Identifiable {
         case .openAICompatible: return "https://api.openai.com/v1"
         case .anthropic: return "https://api.anthropic.com/v1"
         case .googleGemini: return "https://generativelanguage.googleapis.com/v1beta"
+        case .elevenLabs: return "https://api.elevenlabs.io/v1"
         case .appleOnDevice: return ""
         }
     }
@@ -570,17 +589,57 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
         legacyKeychainAccount ?? "provider_\(id)_api_key"
     }
 
-    /// Whether this provider can run cloud transcription. Only OpenAI-compatible
+    /// Whether this provider can run cloud transcription. OpenAI-compatible
     /// vendors expose the `/audio/transcriptions` (Whisper) route — OpenAI, Groq,
-    /// and any custom OpenAI-compatible endpoint. Anthropic/Gemini have no such
-    /// route, so they're excluded from the transcription-provider picker.
-    var supportsTranscription: Bool { kind == .openAICompatible }
+    /// and any custom OpenAI-compatible endpoint. ElevenLabs exposes its own
+    /// Scribe speech-to-text route. Anthropic/Gemini have no such route, so
+    /// they're excluded from the transcription-provider picker.
+    var supportsTranscription: Bool { kind == .openAICompatible || kind == .elevenLabs }
 
-    /// Default Whisper model to request when the user hasn't picked one. Groq's
-    /// OpenAI-compatible audio route serves `whisper-large-v3` (not `whisper-1`),
-    /// so key off the built-in id; everything else defaults to OpenAI's `whisper-1`.
+    /// Whether this provider can generate summaries/chat replies. Every kind
+    /// except `.elevenLabs` (transcription-only) supports this — the inverse
+    /// of `supportsTranscription` for Anthropic/Gemini, and true alongside it
+    /// for OpenAI-compatible vendors.
+    var supportsSummarization: Bool { kind != .elevenLabs }
+
+    /// Whether this provider's transcription route can return native speaker
+    /// diarization in the same response (e.g. ElevenLabs Scribe's `diarize`
+    /// parameter). Keyed off `kind`, like the other capability flags, so a
+    /// future provider of the same shape inherits this for free.
+    ///
+    /// This is the whole seam for adding a new native-diarization provider:
+    /// flip this to `true` for its `kind`, and have its `LLMProvider.transcribe`
+    /// populate `RawTranscript.speakerTurns` however its API shapes that data
+    /// (per-word speaker ids, per-segment labels, whatever it returns) — no
+    /// other file needs to know the wire format. Everything downstream
+    /// (`DiarizationEngine.transcriptionProviderNative`,
+    /// `PipelineConfiguration.effectiveDiarization`, the Settings picker,
+    /// `TranscriptionService.transcribeAndDiarize`) is already generic over
+    /// "some provider said yes here", not over ElevenLabs specifically.
+    ///
+    /// Transcription and diarization otherwise remain fully independent
+    /// axes — this flag only ever *adds* one extra diarization option
+    /// (`.transcriptionProviderNative`) for a provider that raises it; it
+    /// never restricts which of the three local diarizers
+    /// (`.heuristic`/`.fluidAudio`/`.sherpaOnnx`) can be paired with any
+    /// transcription engine or provider, including one that could diarize
+    /// natively. Composing e.g. ElevenLabs for transcription with FluidAudio
+    /// for diarization, or Apple Speech for transcription with sherpa-onnx
+    /// for diarization, works with no special-casing anywhere, because the
+    /// diarization stage never looks at which transcription engine/provider
+    /// ran except to decide whether `.transcriptionProviderNative` applies.
+    /// See `DiarizationSelectionTests`/`TranscriptionServicePipelineTests`
+    /// for the tests that pin this down.
+    var supportsNativeDiarization: Bool { kind == .elevenLabs }
+
+    /// Default transcription model to request when the user hasn't picked
+    /// one. Keyed off `kind` (not `id`) so a custom provider of the same kind
+    /// gets the right default too. Groq's OpenAI-compatible audio route
+    /// serves `whisper-large-v3` (not `whisper-1`); ElevenLabs serves
+    /// `scribe_v1`.
     var defaultTranscriptionModel: String {
-        id == AIProvider.groq.id ? "whisper-large-v3" : "whisper-1"
+        if kind == .elevenLabs { return "scribe_v1" }
+        return id == AIProvider.groq.id ? "whisper-large-v3" : "whisper-1"
     }
 
     /// Known-good models to fall back to when this provider's `/models`
@@ -588,19 +647,33 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     /// otherwise-valid key with a 403) or returns an empty list. Empty when no
     /// such fallback is known for this provider.
     var fallbackModels: [String] {
-        guard id == AIProvider.groq.id else { return [] }
-        return [
-            "llama-3.3-70b-versatile",
-            "llama-3.3-70b-specdec",
-            "llama-3.1-8b-instant",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "gemma2-9b-it",
-            "deepseek-r1-distill-llama-70b",
-            "qwen/qwen3-32b",
-            "whisper-large-v3",
-            "whisper-large-v3-turbo"
-        ].sorted()
+        if kind == .elevenLabs {
+            // No /models-equivalent endpoint at all — this is the only model.
+            return ["scribe_v1"]
+        }
+        if id == AIProvider.groq.id {
+            return [
+                "llama-3.3-70b-versatile",
+                "llama-3.3-70b-specdec",
+                "llama-3.1-8b-instant",
+                "meta-llama/llama-4-scout-17b-16e-instruct",
+                "meta-llama/llama-4-maverick-17b-128e-instruct",
+                "gemma2-9b-it",
+                "deepseek-r1-distill-llama-70b",
+                "qwen/qwen3-32b",
+                "whisper-large-v3",
+                "whisper-large-v3-turbo"
+            ].sorted()
+        }
+        if id == AIProvider.openAI.id {
+            // OpenAI's /models response is dominated by chat models, so the
+            // transcription picker's filter can be left with nothing to show
+            // if the live fetch succeeds but returns none of these names
+            // (or the endpoint is briefly unreachable) — keep the known-good
+            // transcription models available regardless.
+            return ["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"].sorted()
+        }
+        return []
     }
 
     static let openAI = AIProvider(
@@ -647,6 +720,20 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
         legacyKeychainAccount: KeychainKey.groq.rawValue
     )
 
+    /// Transcription-only — no chat/summarize route, see
+    /// `AIProviderKind.elevenLabs`. `defaultModel` is empty since it has no
+    /// chat model to pick.
+    static let elevenLabs = AIProvider(
+        id: "elevenLabs",
+        displayName: "ElevenLabs",
+        kind: .elevenLabs,
+        baseURLString: "https://api.elevenlabs.io/v1",
+        brandHex: "#000000",
+        defaultModel: "",
+        isBuiltIn: true,
+        legacyKeychainAccount: KeychainKey.elevenLabs.rawValue
+    )
+
     /// The on-device provider: no base URL, no API key, and — unlike the other
     /// built-ins — exactly one model, so `defaultModel` is a fixed placeholder
     /// rather than something surfaced as a choice.
@@ -660,7 +747,7 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
         isBuiltIn: true
     )
 
-    static let defaultProviders: [AIProvider] = [.appleOnDevice, .openAI, .anthropic, .google, .groq]
+    static let defaultProviders: [AIProvider] = [.appleOnDevice, .openAI, .anthropic, .google, .groq, .elevenLabs]
 
     init(
         id: String,

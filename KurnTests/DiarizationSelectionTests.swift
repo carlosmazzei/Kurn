@@ -12,6 +12,7 @@
 //
 
 import Foundation
+import KurnCore
 import Testing
 @testable import Kurn
 
@@ -78,5 +79,43 @@ struct DiarizationSelectionTests {
             sherpaOnnxConsented: false
         )
         #expect(sherpaSelectedButOnlyFluidAudioConsented.effectiveDiarization == .heuristic)
+    }
+
+    // MARK: - transcriptionProviderNative (fourth engine)
+
+    /// No download, so no consent flag — but it only makes sense paired with
+    /// `.whisperAPI` and a provider that can actually supply it.
+    @Test func withWhisperAPIAndACapableProviderItRuns() {
+        let config = PipelineConfiguration(
+            diarization: .transcriptionProviderNative,
+            transcription: .whisperAPI,
+            transcriptionProvider: .elevenLabs
+        )
+        #expect(config.effectiveDiarization == .transcriptionProviderNative)
+        #expect(!config.diarizationFellBack)
+    }
+
+    @Test func withWhisperAPIButAnIncapableProviderItFallsBackToTheHeuristic() {
+        let config = PipelineConfiguration(
+            diarization: .transcriptionProviderNative,
+            transcription: .whisperAPI,
+            transcriptionProvider: .openAI
+        )
+        #expect(config.effectiveDiarization == .heuristic)
+        #expect(config.diarizationFellBack)
+    }
+
+    /// Even a capable provider is irrelevant when a different transcription
+    /// engine is selected — there is no cloud response to derive turns from.
+    @Test func withANonWhisperEngineItFallsBackRegardlessOfProvider() {
+        for engine: TranscriptionEngine in [.appleSpeech, .fluidAudioParakeet, .whisperCpp] {
+            let config = PipelineConfiguration(
+                diarization: .transcriptionProviderNative,
+                transcription: engine,
+                transcriptionProvider: .elevenLabs
+            )
+            #expect(config.effectiveDiarization == .heuristic)
+            #expect(config.diarizationFellBack)
+        }
     }
 }

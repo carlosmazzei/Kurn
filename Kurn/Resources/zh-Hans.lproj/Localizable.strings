@@ -49,6 +49,7 @@
 "error.authentication_required" = "访问您的录音需要进行身份验证。";
 "error.authentication_failed" = "身份验证失败：%@";
 "error.keychain_access_failed" = "暂时无法访问已保存的凭据（%@）。请重试。";
+"error.summarization_unsupported" = "%@ 不支持生成摘要。";
 
 /* 转录模式 */
 "mode.on_device" = "设备端";
@@ -58,6 +59,7 @@
 "diarization.heuristic" = "启发式";
 "diarization.fluid_audio" = "FluidAudio";
 "diarization.sherpa_onnx" = "Sherpa-ONNX";
+"diarization.transcription_provider_native" = "原生（转录提供商）";
 
 /* Correction engines */
 "correction.none" = "关闭";
@@ -66,7 +68,7 @@
 /* 识别流水线引擎 */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio（多语言）";
-"transcription.whisper" = "Whisper API";
+"transcription.cloud_provider" = "云端提供方";
 "transcription.whisper_cpp" = "Whisper（设备端）";
 "preprocessing.standard" = "标准清理";
 "preprocessing.none" = "无";
@@ -425,6 +427,7 @@
 "detail.skip_forward" = "前进 15 秒";
 "detail.download_diarization_models" = "下载说话人模型";
 "warning.diarization_models_not_downloaded" = "说话人分离正在使用基础引擎。下载神经网络模型可获得更准确的说话人识别。";
+"warning.diarization_requires_native_provider" = "说话人分离正在使用基础引擎。请在使用 Whisper 引擎的同时选择支持原生说话人分离的转录提供商（例如 ElevenLabs）以启用此功能。";
 "speaker.cross_meeting_match.title" = "熟悉的声音";
 "speaker.cross_meeting_match.message" = "这听起来像是「%2$@」中的 %1$@。应用此名称吗？";
 "speaker.cross_meeting_match.disclaimer" = "基于声音匹配。应用前请核实——可通过编辑说话人姓名撤销。";
@@ -524,7 +527,7 @@
 "pipeline.language_detection" = "语言检测";
 "pipeline.language_detection_footer" = "自动判断所说的语言，而不是依赖转录器的猜测。";
 "settings.transcription_provider" = "转录提供方";
-"settings.whisper_provider_key_footer" = "Whisper API 转录使用上方选定的提供方，与摘要提供方相互独立。可使用任何配置了 API 密钥的 OpenAI 兼容提供方（如 OpenAI 或 Groq）。";
+"settings.whisper_provider_key_footer" = "转录使用上方选定的提供方，与摘要提供方相互独立。可使用任何支持转录的已配置提供方（如 OpenAI、Groq 或 ElevenLabs）。";
 "settings.whisper_provider_key_missing_footer" = "请在「AI 提供方」中配置一个 OpenAI 兼容的 API 密钥（如 OpenAI 或 Groq），以启用 Whisper API 转录。";
 "settings.summary" = "摘要";
 "settings.recording" = "录音";

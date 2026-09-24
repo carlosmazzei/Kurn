@@ -20,7 +20,7 @@ struct SummarySettingsView: View {
 
     private var configuredProviders: [AIProvider] {
         _ = keyRevision
-        return settings.configuredProviders
+        return settings.configuredSummaryProviders
     }
 
     var body: some View {

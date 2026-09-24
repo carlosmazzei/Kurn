@@ -27,6 +27,10 @@ enum KeychainKey: String, CaseIterable {
     case anthropic = "anthropic_api_key"
     case google = "google_api_key"
     case groq = "groq_api_key"
+    /// `AIProvider.elevenLabs`'s built-in account, same pattern as the other
+    /// four built-ins above (transcription-only — see
+    /// `AIProvider.supportsSummarization`).
+    case elevenLabs = "elevenlabs_api_key"
 }
 
 /// Why a Keychain operation didn't simply succeed — retryable, and never to

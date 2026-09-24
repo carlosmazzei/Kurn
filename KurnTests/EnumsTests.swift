@@ -84,16 +84,76 @@ struct EnumsTests {
         #expect(AIProvider.google.kind == .googleGemini)
     }
 
-    @Test func onlyOpenAICompatibleProvidersSupportTranscription() {
+    @Test func onlyOpenAICompatibleAndElevenLabsProvidersSupportTranscription() {
         #expect(AIProvider.openAI.supportsTranscription)
         #expect(AIProvider.groq.supportsTranscription)
+        #expect(AIProvider.elevenLabs.supportsTranscription)
         #expect(!AIProvider.anthropic.supportsTranscription)
         #expect(!AIProvider.google.supportsTranscription)
+    }
+
+    @Test func onlyElevenLabsIsExcludedFromSummarization() {
+        // ElevenLabs is transcription-only; every other built-in provider
+        // (including on-device) still summarizes.
+        #expect(!AIProvider.elevenLabs.supportsSummarization)
+        #expect(AIProvider.openAI.supportsSummarization)
+        #expect(AIProvider.groq.supportsSummarization)
+        #expect(AIProvider.anthropic.supportsSummarization)
+        #expect(AIProvider.google.supportsSummarization)
+        #expect(AIProvider.appleOnDevice.supportsSummarization)
     }
 
     @Test func defaultTranscriptionModelIsPerVendorWhisper() {
         #expect(AIProvider.openAI.defaultTranscriptionModel == "whisper-1")
         #expect(AIProvider.groq.defaultTranscriptionModel == "whisper-large-v3")
+        #expect(AIProvider.elevenLabs.defaultTranscriptionModel == "scribe_v1")
+    }
+
+    @Test func elevenLabsFallbackModelsIsJustScribe() {
+        #expect(AIProvider.elevenLabs.fallbackModels == ["scribe_v1"])
+    }
+
+    @Test func groqFallbackModelsIncludeBothWhisperVariants() {
+        // Regression guard: Groq's cheaper/faster whisper-large-v3-turbo must
+        // stay selectable in Settings even when the live /models fetch fails
+        // and ProviderModelsService falls back to this static list.
+        #expect(AIProvider.groq.fallbackModels.contains("whisper-large-v3"))
+        #expect(AIProvider.groq.fallbackModels.contains("whisper-large-v3-turbo"))
+    }
+
+    @Test func transcriptionModelPickerWhisperFilterKeepsGroqTurboModel() {
+        // Mirrors TranscriptionModelPicker's filter closure (SettingsProviderViews.swift):
+        // narrows a provider's loaded model list to Whisper-family names.
+        let whisperFilter: ([String]) -> [String] = { loaded in
+            let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
+            return whisperModels.isEmpty ? loaded : whisperModels
+        }
+        let filtered = whisperFilter(AIProvider.groq.fallbackModels)
+        #expect(filtered.contains("whisper-large-v3-turbo"))
+        #expect(filtered.contains("whisper-large-v3"))
+        #expect(!filtered.contains("llama-3.3-70b-versatile"))
+    }
+
+    @Test func transcriptionModelPickerFiltersFallsBackToProviderFallbackModelsNotChatModels() {
+        // Mirrors TranscriptionModelPicker's filter closure (SettingsProviderViews.swift)
+        // for the case none of the three tags matches: OpenAI's live /models
+        // response can be dominated by chat models with no whisper/transcribe/
+        // scribe name at all. The picker must prefer the provider's known-good
+        // transcription models over showing chat models in a transcription
+        // picker.
+        let pickerFilter: (AIProvider, [String]) -> [String] = { provider, loaded in
+            let tagged = loaded.filter {
+                $0.localizedCaseInsensitiveContains("whisper")
+                    || $0.localizedCaseInsensitiveContains("transcribe")
+                    || $0.localizedCaseInsensitiveContains("scribe")
+            }
+            if !tagged.isEmpty { return tagged }
+            return provider.fallbackModels.isEmpty ? loaded : provider.fallbackModels
+        }
+        let chatOnlyModels = ["gpt-5.4", "o1", "gpt-5.4-mini"]
+        let filtered = pickerFilter(.openAI, chatOnlyModels)
+        #expect(filtered == AIProvider.openAI.fallbackModels)
+        #expect(!filtered.contains("gpt-5.4"))
     }
 
     @Test func appleOnDeviceIsABuiltInWithNoTranscriptionSupport() {
@@ -106,6 +166,15 @@ struct EnumsTests {
     @Test func networkCasesExcludeAppleOnDevice() {
         #expect(!AIProviderKind.networkCases.contains(.appleOnDevice))
         #expect(AIProviderKind.networkCases.count == AIProviderKind.allCases.count - 1)
+    }
+
+    @Test func onlyElevenLabsSupportsNativeDiarization() {
+        #expect(AIProvider.elevenLabs.supportsNativeDiarization)
+        #expect(!AIProvider.openAI.supportsNativeDiarization)
+        #expect(!AIProvider.groq.supportsNativeDiarization)
+        #expect(!AIProvider.anthropic.supportsNativeDiarization)
+        #expect(!AIProvider.google.supportsNativeDiarization)
+        #expect(!AIProvider.appleOnDevice.supportsNativeDiarization)
     }
 
     // MARK: - TranscriptionMode
@@ -122,6 +191,10 @@ struct EnumsTests {
         for engine in DiarizationEngine.allCases {
             #expect(engine.id == engine.rawValue)
         }
+    }
+
+    @Test func transcriptionProviderNativeDiarizationNeedsNoModelDownload() {
+        #expect(DiarizationEngine.transcriptionProviderNative.requiredModelSet == nil)
     }
 
     // MARK: - AudioQuality

@@ -23,7 +23,12 @@ public enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identi
     /// FluidAudio multilingual on-device batch ASR (Parakeet TDT v3), detects
     /// the spoken language from the audio. Requires a model download.
     case fluidAudioParakeet
-    /// OpenAI Whisper cloud API (chunked upload). Requires an OpenAI API key.
+    /// Cloud transcription via whichever `AIProvider` is selected as the
+    /// transcription provider (chunked upload) — OpenAI/Groq's Whisper route,
+    /// ElevenLabs' Scribe route, or a custom OpenAI-compatible endpoint. The
+    /// name predates that generalization (it used to be OpenAI-only); see
+    /// `isCloudTranscription`'s doc below and `displayName`, which reads
+    /// "Cloud Provider" rather than "Whisper" for exactly this reason.
     case whisperAPI
     /// Whisper running fully on device through whisper.cpp. Same language
     /// coverage as `.whisperAPI` with nothing leaving the phone, at the cost of
@@ -36,7 +41,13 @@ public enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identi
         switch self {
         case .appleSpeech: return NSLocalizedString("transcription.apple_speech", comment: "Apple Speech")
         case .fluidAudioParakeet: return NSLocalizedString("transcription.fluid_parakeet", comment: "FluidAudio multilingual")
-        case .whisperAPI: return NSLocalizedString("transcription.whisper", comment: "Whisper API")
+        // Named generically, not "Whisper API": this engine now covers any
+        // configured cloud transcription provider (OpenAI/Groq's Whisper
+        // route, ElevenLabs' Scribe route, or a custom endpoint), and a
+        // label naming Whisper specifically would be actively wrong when the
+        // selected provider is ElevenLabs. The "Transcription provider"
+        // picker right below this one in Settings names the actual vendor.
+        case .whisperAPI: return NSLocalizedString("transcription.cloud_provider", comment: "Cloud Provider")
         case .whisperCpp: return NSLocalizedString("transcription.whisper_cpp", comment: "Whisper on-device")
         }
     }
@@ -47,6 +58,20 @@ public enum TranscriptionEngine: String, Codable, Sendable, CaseIterable, Identi
         switch self {
         case .appleSpeech, .fluidAudioParakeet, .whisperCpp: return .onDevice
         case .whisperAPI: return .whisperAPI
+        }
+    }
+
+    /// Whether this engine uploads audio to a cloud vendor, as opposed to
+    /// running entirely on device. Used to gate the "we will upload your
+    /// audio" consent dialog and the concurrent transcribe+diarize path,
+    /// which only makes sense when transcription keeps almost nothing local.
+    /// `.whisperAPI` covers every cloud vendor now (OpenAI, Groq, ElevenLabs,
+    /// or a custom endpoint) — which one is resolved by the selected
+    /// `AIProvider`, not by this enum.
+    public var isCloudTranscription: Bool {
+        switch self {
+        case .whisperAPI: return true
+        case .appleSpeech, .fluidAudioParakeet, .whisperCpp: return false
         }
     }
 }

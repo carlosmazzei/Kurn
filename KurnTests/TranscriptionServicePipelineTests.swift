@@ -108,6 +108,118 @@ struct TranscriptionServicePipelineTests {
         #expect(diarization?.effectiveEngine == DiarizationEngine.heuristic.rawValue)
     }
 
+    // MARK: - Stage decoupling: transcription engine/provider and diarization
+    // engine are independent axes. `.transcriptionProviderNative` is the one
+    // deliberate coupling (it only makes sense with `.whisperAPI` and a
+    // capable provider — see `PipelineConfiguration.effectiveDiarization`);
+    // every other diarization choice must keep running regardless of which
+    // transcription provider is selected, so picking a provider that
+    // *could* diarize natively (e.g. ElevenLabs) never silently overrides an
+    // explicit choice of a different diarizer (e.g. FluidAudio).
+
+    @Test func explicitLocalDiarizerStillRunsWhenTranscriptionProviderCouldDiarizeNatively() async throws {
+        let url = try Self.fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let harness = FakeEngines(regions: Self.regions)
+        var config = Self.config(transcription: .whisperAPI)
+        // ElevenLabs supports native diarization, but the user asked for
+        // FluidAudio specifically — that choice must be honored, not
+        // coerced into `.transcriptionProviderNative` just because it's
+        // available.
+        config.transcriptionProvider = .elevenLabs
+        config.diarization = .fluidAudio
+        config.diarizationConsented = true
+
+        let output = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: config
+        )
+
+        #expect(harness.diarizer.requestedEngines == [.fluidAudio])
+        #expect(output.turns.count == 2)
+        let diarization = output.report.stages.first { $0.stage == .diarization }
+        #expect(diarization?.outcome == .succeeded)
+        #expect(diarization?.effectiveEngine == DiarizationEngine.fluidAudio.rawValue)
+    }
+
+    @Test func nativeDiarizationDerivesTurnsFromTheTranscriptionResponseWithoutRunningTheLocalDiarizer() async throws {
+        let url = try Self.fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let harness = FakeEngines(regions: Self.regions)
+        harness.transcriber.setSpeakerTurns([
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0.0, end: 1.0),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 1.0, end: 3.0)
+        ])
+        var config = Self.config(transcription: .whisperAPI)
+        config.transcriptionProvider = .elevenLabs
+        config.diarization = .transcriptionProviderNative
+
+        let output = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: config
+        )
+
+        // The local diarizer (`PipelineEngineCatalog.diarizer`) is never
+        // asked to run — the turns came from the transcription response.
+        #expect(harness.diarizer.requestedEngines.isEmpty)
+        #expect(output.turns.map(\.speakerLabel) == ["Speaker 1", "Speaker 2"])
+        let diarization = output.report.stages.first { $0.stage == .diarization }
+        #expect(diarization?.outcome == .succeeded)
+        #expect(diarization?.effectiveEngine == DiarizationEngine.transcriptionProviderNative.rawValue)
+    }
+
+    @Test func nativeDiarizationFallsBackToASyntheticTurnWhenTheProviderReturnsNone() async throws {
+        let url = try Self.fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let harness = FakeEngines(regions: Self.regions)
+        // Default fake transcriber output has no speaker turns attached.
+        var config = Self.config(transcription: .whisperAPI)
+        config.transcriptionProvider = .elevenLabs
+        config.diarization = .transcriptionProviderNative
+
+        let output = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: config
+        )
+
+        #expect(harness.diarizer.requestedEngines.isEmpty)
+        #expect(output.turns.count == 1)
+        let diarization = output.report.stages.first { $0.stage == .diarization }
+        #expect(diarization?.outcome == .degraded)
+        #expect(diarization?.reason == .syntheticSingleTurn)
+    }
+
+    @Test func nonWhisperEngineFallsBackToHeuristicEvenWithACapableProviderSelected() async throws {
+        let url = try Self.fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let harness = FakeEngines(regions: Self.regions)
+        let warnings = WarningRecorder()
+        // `.transcriptionProviderNative` needs a `.whisperAPI` response to
+        // derive turns from; an on-device engine has none, so it must fall
+        // back exactly like an unconsented neural engine would, even though
+        // `transcriptionProvider` here is capable in principle.
+        var config = Self.config(transcription: .appleSpeech)
+        config.transcriptionProvider = .elevenLabs
+        config.diarization = .transcriptionProviderNative
+
+        _ = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: config,
+            onDiarizationWarning: warnings.append
+        )
+
+        #expect(warnings.values.count == 1)
+        #expect(harness.diarizer.requestedEngines == [.heuristic])
+    }
+
     @Test func checkpointFromMatchingRunIsResumedAndMismatchIsDiscarded() async throws {
         let url = try Self.fixture()
         defer { try? FileManager.default.removeItem(at: url) }

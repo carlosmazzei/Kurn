@@ -197,6 +197,80 @@ struct ChunkedTranscriptionRunnerTests {
         #expect(await transcribedIndexes.values == [0])
     }
 
+    // MARK: - Native diarization speaker turns
+
+    @Test func speakerTurnsFromEachChunkAreAccumulatedAndOffsetToTheInputTimeline() async throws {
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: chunks([0, 600]),
+            planDigest: planDigest([0, 600]),
+            resume: nil,
+            transcribeChunk: { _, index in
+                RawTranscript(
+                    spans: [TranscribedSpan(text: "chunk \(index)", start: 0, end: 1, confidence: nil)],
+                    language: "en",
+                    speakerTurns: [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 1)]
+                )
+            }
+        )
+
+        let turns = try #require(result.speakerTurns)
+        #expect(turns.count == 2)
+        #expect(turns[0].start == 0)
+        #expect(turns[0].end == 1)
+        #expect(turns[1].start == 600)
+        #expect(turns[1].end == 601)
+    }
+
+    /// A provider that never returns native diarization (Apple Speech,
+    /// whisper-1, any non-diarizing route) must leave `speakerTurns` `nil`,
+    /// not an empty array — `nil` is what tells `TranscriptionService` this
+    /// engine didn't attempt native diarization at all, as opposed to a
+    /// diarizing provider that genuinely found zero turns.
+    @Test func speakerTurnsStaysNilWhenNoChunkReturnsAny() async throws {
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: chunks([0, 600]),
+            planDigest: planDigest([0, 600]),
+            resume: nil,
+            transcribeChunk: { _, _ in
+                RawTranscript(spans: [], language: "en")
+            }
+        )
+
+        #expect(result.speakerTurns == nil)
+    }
+
+    /// Documented trade-off: speaker turns are not part of the persisted
+    /// `Progress` checkpoint, so a resumed run only carries native
+    /// diarization for chunks it actually re-transcribes — turns from a
+    /// prior interrupted run's already-completed chunks are not recovered.
+    @Test func resumeOnlyCarriesSpeakerTurnsFromChunksItActuallyRetranscribes() async throws {
+        let resume = ChunkedTranscriptionRunner.Progress(
+            totalChunks: 2,
+            completedChunks: 1,
+            detectedLanguage: "en",
+            planDigest: planDigest([0, 600]),
+            spans: [TranscribedSpan(text: "earlier", start: 0, end: 1, confidence: nil)]
+        )
+
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: chunks([0, 600]),
+            planDigest: planDigest([0, 600]),
+            resume: resume,
+            transcribeChunk: { _, index in
+                RawTranscript(
+                    spans: [TranscribedSpan(text: "new", start: 0, end: 1, confidence: nil)],
+                    language: "en",
+                    speakerTurns: [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: 1)]
+                )
+            }
+        )
+
+        let turns = try #require(result.speakerTurns)
+        // Only chunk 1 (the resumed-past chunk 0 contributes nothing).
+        #expect(turns.count == 1)
+        #expect(turns[0].start == 600)
+    }
+
     @Test func completedResumeTranscribesNothing() async throws {
         let resume = ChunkedTranscriptionRunner.Progress(
             totalChunks: 1,

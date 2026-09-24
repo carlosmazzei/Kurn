@@ -57,7 +57,7 @@ extension AppError {
         case .networkError, .networkPolicyRestricted:
             return .network
         case .noAPIKey, .apiError, .invalidProviderURL, .providerResponseTooLarge,
-             .ambiguousProviderResult:
+             .ambiguousProviderResult, .summarizationUnsupported:
             return .provider
         case .transcriptionFailed, .transcriptionLanguageUnsupported:
             return .transcription
@@ -129,7 +129,7 @@ extension AppError {
             return .openSettings
         case .resourceUnavailable:
             return .freeSpace
-        case .transcriptionLanguageUnsupported:
+        case .transcriptionLanguageUnsupported, .summarizationUnsupported:
             return .changeProviderOrModel
         default:
             return nil

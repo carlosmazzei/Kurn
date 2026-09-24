@@ -12,7 +12,10 @@ import Observation
 final class CloudTranscriptionConsentController {
     var isPresented = false
     private var pendingProviderID: String?
-    private var pendingEngineSelection = false
+    /// The engine to select once consent is granted, or `nil` when the
+    /// pending dialog is only about switching the Whisper *provider* (the
+    /// engine is already `.whisperAPI` and stays that way).
+    private var pendingEngine: TranscriptionEngine?
 
     func selectEngine(
         _ engine: TranscriptionEngine,
@@ -25,7 +28,7 @@ final class CloudTranscriptionConsentController {
                 $0.id == settings.transcriptionProviderID
             }) ?? providers.first else { return }
             guard settings.hasCloudTranscriptionConsent(for: provider) else {
-                requestConsent(for: provider, selectingEngine: true)
+                requestConsent(for: provider, selectingEngine: engine)
                 return
             }
         }
@@ -43,7 +46,7 @@ final class CloudTranscriptionConsentController {
     ) {
         guard let provider = providers.first(where: { $0.id == providerID }) else { return }
         guard settings.hasCloudTranscriptionConsent(for: provider) else {
-            requestConsent(for: provider, selectingEngine: false)
+            requestConsent(for: provider, selectingEngine: nil)
             return
         }
         settings.transcriptionProviderID = providerID
@@ -54,7 +57,7 @@ final class CloudTranscriptionConsentController {
         guard provider.isUsable else { return }
         if settings.transcriptionEngine == .whisperAPI,
            !settings.hasCloudTranscriptionConsent(for: provider) {
-            requestConsent(for: provider, selectingEngine: true)
+            requestConsent(for: provider, selectingEngine: .whisperAPI)
         }
     }
 
@@ -83,13 +86,13 @@ final class CloudTranscriptionConsentController {
             cancel()
             return
         }
-        let shouldSelectEngine = pendingEngineSelection
+        let engineToSelect = pendingEngine
         settings.recordCloudTranscriptionConsent(for: provider)
         settings.transcriptionProviderID = provider.id
         cancel()
-        if shouldSelectEngine {
+        if let engineToSelect {
             downloads.selectTranscriptionEngine(
-                .whisperAPI,
+                engineToSelect,
                 settings: settings,
                 transcriptionProviders: providers
             )
@@ -99,12 +102,12 @@ final class CloudTranscriptionConsentController {
     func cancel() {
         isPresented = false
         pendingProviderID = nil
-        pendingEngineSelection = false
+        pendingEngine = nil
     }
 
-    private func requestConsent(for provider: AIProvider, selectingEngine: Bool) {
+    private func requestConsent(for provider: AIProvider, selectingEngine engine: TranscriptionEngine?) {
         pendingProviderID = provider.id
-        pendingEngineSelection = selectingEngine
+        pendingEngine = engine
         isPresented = true
     }
 }

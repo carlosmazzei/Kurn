@@ -29,12 +29,20 @@ extension AppSettings {
     var configuredTranscriptionProviders: [AIProvider] {
         configuredProviders.filter(\.supportsTranscription)
     }
+
+    /// Configured providers that can generate summaries/chat replies — the
+    /// candidate list for the summary-provider picker. Narrower than
+    /// `configuredProviders`: a transcription-only provider (ElevenLabs) is
+    /// usable but must never be offered as a summary provider.
+    var configuredSummaryProviders: [AIProvider] {
+        configuredProviders.filter(\.supportsSummarization)
+    }
 }
 
 extension SettingsView {
 
     func ensureSelectedProviderIsConfigured() {
-        let providers = settings.configuredProviders
+        let providers = settings.configuredSummaryProviders
         guard !providers.isEmpty else { return }
         if !providers.contains(where: { $0.id == settings.aiProviderID }) {
             settings.aiProviderID = providers[0].id

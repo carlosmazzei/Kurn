@@ -49,6 +49,7 @@
 "error.authentication_required" = "Une authentification est requise pour accéder à vos enregistrements.";
 "error.authentication_failed" = "Échec de l'authentification : %@";
 "error.keychain_access_failed" = "Impossible d'accéder à votre identifiant enregistré pour le moment (%@). Réessayez.";
+"error.summarization_unsupported" = "%@ ne prend pas en charge la génération de résumés.";
 
 /* Modes de transcription */
 "mode.on_device" = "Sur l'appareil";
@@ -58,6 +59,7 @@
 "diarization.heuristic" = "Heuristique";
 "diarization.fluid_audio" = "FluidAudio";
 "diarization.sherpa_onnx" = "Sherpa-ONNX";
+"diarization.transcription_provider_native" = "Native (fournisseur de transcription)";
 
 /* Correction engines */
 "correction.none" = "Désactivé";
@@ -66,7 +68,7 @@
 /* Moteurs du pipeline de reconnaissance */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingue)";
-"transcription.whisper" = "API Whisper";
+"transcription.cloud_provider" = "Fournisseur cloud";
 "transcription.whisper_cpp" = "Whisper (sur l'appareil)";
 "preprocessing.standard" = "Nettoyage standard";
 "preprocessing.none" = "Aucun";
@@ -425,6 +427,7 @@
 "detail.skip_forward" = "Avancer de 15 secondes";
 "detail.download_diarization_models" = "Télécharger les modèles";
 "warning.diarization_models_not_downloaded" = "La séparation des locuteurs utilise le moteur de base. Téléchargez les modèles neuronaux pour des locuteurs plus précis.";
+"warning.diarization_requires_native_provider" = "La séparation des locuteurs utilise le moteur de base. Sélectionnez, avec le moteur Whisper, un fournisseur de transcription prenant en charge la diarisation native (comme ElevenLabs) pour l'utiliser.";
 "speaker.cross_meeting_match.title" = "Voix familière";
 "speaker.cross_meeting_match.message" = "Cela ressemble à %1$@, de « %2$@ ». Appliquer ce nom ?";
 "speaker.cross_meeting_match.disclaimer" = "Basé sur une correspondance vocale. Vérifiez avant d'appliquer — cela peut être annulé en modifiant le nom du locuteur.";
@@ -524,7 +527,7 @@
 "pipeline.language_detection" = "Détection de la langue";
 "pipeline.language_detection_footer" = "Choisit automatiquement la langue parlée plutôt que de se fier à l'estimation du transcripteur.";
 "settings.transcription_provider" = "Fournisseur de transcription";
-"settings.whisper_provider_key_footer" = "La transcription via l'API Whisper utilise le fournisseur sélectionné ci-dessus, indépendamment du fournisseur de résumé. Tout fournisseur compatible OpenAI disposant d'une clé API (comme OpenAI ou Groq) peut être utilisé.";
+"settings.whisper_provider_key_footer" = "La transcription utilise le fournisseur sélectionné ci-dessus, indépendamment du fournisseur de résumé. Tout fournisseur configuré prenant en charge la transcription (comme OpenAI, Groq ou ElevenLabs) peut être utilisé.";
 "settings.whisper_provider_key_missing_footer" = "Configurez une clé API compatible OpenAI (comme OpenAI ou Groq) dans Fournisseurs d'IA pour activer la transcription via l'API Whisper.";
 "settings.summary" = "Résumé";
 "settings.recording" = "Enregistrement";

@@ -105,7 +105,13 @@ struct ProviderEditor: View {
         .navigationTitle(provider.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if canEditDetails {
+            // Every provider except the on-device one has something worth
+            // saving here — for a built-in vendor (OpenAI, Anthropic, Google,
+            // Groq, ElevenLabs) that's just the API key, since `canEditDetails`
+            // already locks its name/kind/base URL. Gating this button on
+            // `canEditDetails` instead of that would hide Save for every
+            // built-in provider entirely, making its key field unsavable.
+            if provider.kind != .appleOnDevice {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.save", comment: "Save")) {
                         commitAndSave()
@@ -262,7 +268,8 @@ struct SummaryModelPicker: View {
 
 /// Picker for the cloud transcription (Whisper) model of a given provider,
 /// mirroring `SummaryModelPicker` but filtering the provider's model list to
-/// Whisper-family models (falling back to the full list when none are tagged).
+/// Whisper-family models — falling back to `provider.fallbackModels` when
+/// none are tagged, and only to the unfiltered list when that's empty too.
 struct TranscriptionModelPicker: View {
     let settings: AppSettings
     let provider: AIProvider
@@ -277,8 +284,25 @@ struct TranscriptionModelPicker: View {
                 set: { settings.setTranscriptionModel($0, for: provider) }
             ),
             filter: { loaded in
-                let whisperModels = loaded.filter { $0.localizedCaseInsensitiveContains("whisper") }
-                return whisperModels.isEmpty ? loaded : whisperModels
+                // "whisper" covers whisper-1/whisper-large-v3(-turbo); "transcribe"
+                // covers OpenAI's newer gpt-4o-transcribe/gpt-4o-mini-transcribe,
+                // which carry no "whisper" in their name; "scribe" covers
+                // ElevenLabs' scribe_v1 (irrelevant in practice today since
+                // ElevenLabs has no `/models` endpoint and always falls back
+                // to its known model list, but correct if that ever changes).
+                let transcriptionModels = loaded.filter {
+                    $0.localizedCaseInsensitiveContains("whisper")
+                        || $0.localizedCaseInsensitiveContains("transcribe")
+                        || $0.localizedCaseInsensitiveContains("scribe")
+                }
+                if !transcriptionModels.isEmpty { return transcriptionModels }
+                // The loaded list has nothing tagged as a transcription model —
+                // e.g. OpenAI's /models response is dominated by chat models
+                // and the account's active list omits every whisper/transcribe
+                // name. Prefer the provider's known-good transcription models
+                // over falling through to `loaded`, which would otherwise show
+                // chat model names (gpt-4o, o1, …) in a transcription picker.
+                return provider.fallbackModels.isEmpty ? loaded : provider.fallbackModels
             }
         )
     }

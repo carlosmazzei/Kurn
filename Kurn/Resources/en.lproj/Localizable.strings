@@ -49,6 +49,7 @@
 "error.authentication_required" = "Authentication is required to access your recordings.";
 "error.authentication_failed" = "Authentication failed: %@";
 "error.keychain_access_failed" = "Could not access your saved credential right now (%@). Try again.";
+"error.summarization_unsupported" = "%@ does not support generating summaries.";
 
 /* Transcription modes */
 "mode.on_device" = "On-device";
@@ -58,6 +59,7 @@
 "diarization.heuristic" = "Heuristic";
 "diarization.fluid_audio" = "FluidAudio";
 "diarization.sherpa_onnx" = "Sherpa-ONNX";
+"diarization.transcription_provider_native" = "Native (transcription provider)";
 
 /* Correction engines */
 "correction.none" = "Off";
@@ -66,7 +68,7 @@
 /* Recognition pipeline engines */
 "transcription.apple_speech" = "Apple Speech";
 "transcription.fluid_parakeet" = "FluidAudio (multilingual)";
-"transcription.whisper" = "Whisper API";
+"transcription.cloud_provider" = "Cloud Provider";
 "transcription.whisper_cpp" = "Whisper (on-device)";
 "preprocessing.standard" = "Standard cleanup";
 "preprocessing.none" = "None";
@@ -425,6 +427,7 @@
 "detail.skip_forward" = "Skip forward 15 seconds";
 "detail.download_diarization_models" = "Download speaker models";
 "warning.diarization_models_not_downloaded" = "Speaker separation is using the basic engine. Download the neural models for more accurate speakers.";
+"warning.diarization_requires_native_provider" = "Speaker separation is using the basic engine. Select a transcription provider that supports native diarization (e.g. ElevenLabs) with the Whisper engine to use it.";
 "speaker.cross_meeting_match.title" = "Familiar voice";
 "speaker.cross_meeting_match.message" = "This sounds like %1$@ from \"%2$@\". Apply the name?";
 "speaker.cross_meeting_match.disclaimer" = "Based on a voice match. Review before applying — this can be undone by editing the speaker's name.";
@@ -524,7 +527,7 @@
 "pipeline.language_detection" = "Language Detection";
 "pipeline.language_detection_footer" = "Chooses the spoken language automatically instead of relying on the transcriber's guess.";
 "settings.transcription_provider" = "Transcription Provider";
-"settings.whisper_provider_key_footer" = "Whisper API transcription uses the provider selected above, independently of the summary provider. Any OpenAI-compatible provider with an API key (such as OpenAI or Groq) can be used.";
+"settings.whisper_provider_key_footer" = "Transcription uses the provider selected above, independently of the summary provider. Any configured provider that supports transcription (such as OpenAI, Groq, or ElevenLabs) can be used.";
 "settings.whisper_provider_key_missing_footer" = "Configure an OpenAI-compatible API key (such as OpenAI or Groq) in AI Providers to enable Whisper API transcription.";
 "settings.summary" = "Summary";
 "settings.recording" = "Recording";

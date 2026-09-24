@@ -62,7 +62,7 @@ enum TranscriptionRecovery {
                 )
                 recording.transcriptionStatus = .failed
             } else if let checkpoint = outcome.decodedValue,
-                      checkpoint.engineRaw != TranscriptionEngine.whisperAPI.rawValue {
+                      !(TranscriptionEngine(rawValue: checkpoint.engineRaw)?.isCloudTranscription ?? false) {
                 // A checkpoint that decoded and verified but fails its own
                 // structural sanity check (H4) is just as unsafe to resume
                 // from as a corrupted one — it just happens to still parse.

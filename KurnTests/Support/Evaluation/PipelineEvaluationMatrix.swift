@@ -63,7 +63,11 @@ enum PipelineEvaluationMatrix {
     /// GitHub Actions minutes and real LLM API calls), so a targeted run
     /// should not have to pay for engines nobody asked about.
     static func transcriptionEnginesFromEnvironment() -> [TranscriptionEngine] {
-        let onDeviceEngines = TranscriptionEngine.allCases.filter { $0 != .whisperAPI }
+        // The cloud engine (`.whisperAPI`, which now covers any configured
+        // provider with `supportsTranscription` — OpenAI, Groq, ElevenLabs,
+        // …) is opt-in and additive, not part of the on-device base — see the
+        // file header.
+        let onDeviceEngines = TranscriptionEngine.allCases.filter { !$0.isCloudTranscription }
         let environment = ProcessInfo.processInfo.environment
         guard let raw = environment["KURN_PUBLIC_EVAL_ENGINES"], !raw.isEmpty else {
             return onDeviceEngines

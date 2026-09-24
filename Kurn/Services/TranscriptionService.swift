@@ -191,85 +191,36 @@ struct TranscriptionService {
         // never asked for, or failing and returning one turn for the meeting.
         let diarizationEngine = config.effectiveDiarization
         if config.diarizationFellBack {
-            AppLog.transcription.atNotice.notice("transcribe: diarization falling back to \(diarizationEngine.rawValue, privacy: .public); FluidAudio models are not consented to")
-            onDiarizationWarning?(
-                NSLocalizedString(
+            AppLog.transcription.atNotice.notice("transcribe: diarization falling back to \(diarizationEngine.rawValue, privacy: .public); requested=\(config.diarization.rawValue, privacy: .public)")
+            let fallbackMessage = config.diarization == .transcriptionProviderNative
+                ? NSLocalizedString(
+                    "warning.diarization_requires_native_provider",
+                    comment: "Speaker separation is using the basic engine because the transcription setup doesn't support native diarization"
+                )
+                : NSLocalizedString(
                     "warning.diarization_models_not_downloaded",
                     comment: "Speaker separation is using the basic engine"
                 )
-            )
+            onDiarizationWarning?(fallbackMessage)
         }
 
         onPhase(.transcribing(progress: nil))
         let txStart = Date()
-        let gated: GatedTranscription
-        let diarization: DiarizationOutcome
-        let diarizationProgress = DiarizationPhaseRelay(onPhase: onPhase)
-        if config.transcription == .whisperAPI {
-            AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
-            async let rawTranscript = transcribeGated(
-                cleanedURL: cleanedURL,
-                regions: regions,
-                engine: config.transcription,
-                transcriptionProvider: config.transcriptionProvider,
-                transcriptionModel: config.transcriptionModel,
-                cloudTransfer: config.cloudTransfer,
-                whisperCppModel: config.whisperCppModel,
-                language: resolvedLanguage,
-                sourceFileSize: Int64(fileSize),
-                sourceDuration: fileDuration,
-                sourceDigest: sourceDigest,
-                preprocessing: config.preprocessing,
-                vad: config.vad,
-                checkpoint: checkpoint,
-                onPhase: onPhase,
-                onCheckpoint: onCheckpoint
-            )
-            async let speakerOutcome = diarize(
-                originalURL: fileURL,
-                engine: diarizationEngine,
-                diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
-                regions: regions,
-                speakerCount: config.fluidAudioSpeakerCount,
-                onWarning: onDiarizationWarning,
-                onProgress: diarizationProgress.update
-            )
-            gated = try await rawTranscript
-            AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(gated.raw.spans.count, privacy: .public) — waiting for diarization")
-            diarizationProgress.reveal()
-            diarization = try await speakerOutcome
-            AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(diarization.turns.count, privacy: .public)")
-        } else {
-            AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
-            gated = try await transcribeGated(
-                cleanedURL: cleanedURL,
-                regions: regions,
-                engine: config.transcription,
-                transcriptionProvider: config.transcriptionProvider,
-                transcriptionModel: config.transcriptionModel,
-                cloudTransfer: config.cloudTransfer,
-                whisperCppModel: config.whisperCppModel,
-                language: resolvedLanguage,
-                sourceFileSize: Int64(fileSize),
-                sourceDuration: fileDuration,
-                sourceDigest: sourceDigest,
-                preprocessing: config.preprocessing,
-                vad: config.vad,
-                checkpoint: checkpoint,
-                onPhase: onPhase,
-                onCheckpoint: onCheckpoint
-            )
-            diarizationProgress.reveal()
-            diarization = try await diarize(
-                originalURL: fileURL,
-                engine: diarizationEngine,
-                diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
-                regions: regions,
-                speakerCount: config.fluidAudioSpeakerCount,
-                onWarning: onDiarizationWarning,
-                onProgress: diarizationProgress.update
-            )
-        }
+        let (gated, diarization) = try await transcribeAndDiarize(
+            fileURL: fileURL,
+            cleanedURL: cleanedURL,
+            regions: regions,
+            config: config,
+            diarizationEngine: diarizationEngine,
+            resolvedLanguage: resolvedLanguage,
+            sourceFileSize: Int64(fileSize),
+            sourceDuration: fileDuration,
+            sourceDigest: sourceDigest,
+            checkpoint: checkpoint,
+            onPhase: onPhase,
+            onDiarizationWarning: onDiarizationWarning,
+            onCheckpoint: onCheckpoint
+        )
         try await ResourceGuard.requireTranscriptionHeadroom()
         let raw = gated.raw
         reportBuilder.record(contentsOf: gated.stages)
@@ -351,6 +302,142 @@ struct TranscriptionService {
             turns: turns,
             report: reportBuilder.report
         )
+    }
+
+    /// Run the transcription and diarization stages, choosing between three
+    /// shapes based on `diarizationEngine`/`config.transcription`: native
+    /// diarization piggybacks entirely on the transcription call (no separate
+    /// audio pass at all), cloud transcription overlaps with a separate local
+    /// diarization pass for speed, and on-device transcription runs the two
+    /// sequentially to stay under the memory limit — see the comment above
+    /// this function's one call site in `transcribe` for why.
+    // swiftlint:disable:next function_parameter_count
+    private func transcribeAndDiarize(
+        fileURL: URL,
+        cleanedURL: URL,
+        regions: [SpeechRegion],
+        config: PipelineConfiguration,
+        diarizationEngine: DiarizationEngine,
+        resolvedLanguage: MeetingLanguage,
+        sourceFileSize: Int64,
+        sourceDuration: TimeInterval,
+        sourceDigest: String?,
+        checkpoint: TranscriptionCheckpoint?,
+        onPhase: @escaping PhaseHandler,
+        onDiarizationWarning: DiarizationWarningHandler?,
+        onCheckpoint: CheckpointHandler?
+    ) async throws -> (gated: GatedTranscription, diarization: DiarizationOutcome) {
+        let diarizationProgress = DiarizationPhaseRelay(onPhase: onPhase)
+        let gated: GatedTranscription
+        let diarization: DiarizationOutcome
+        if diarizationEngine == .transcriptionProviderNative {
+            // Diarization is derived from the transcription provider's own
+            // response, not a separate pass over a separately-cleaned audio
+            // copy — there is nothing to run concurrently or sequentially
+            // here beyond the transcription call itself.
+            AppLog.transcription.atDebug.debug("transcribe: diarization derived from transcription provider's own response…")
+            gated = try await transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                transcriptionProvider: config.transcriptionProvider,
+                transcriptionModel: config.transcriptionModel,
+                cloudTransfer: config.cloudTransfer,
+                whisperCppModel: config.whisperCppModel,
+                language: resolvedLanguage,
+                sourceFileSize: sourceFileSize,
+                sourceDuration: sourceDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: config.preprocessing,
+                vad: config.vad,
+                checkpoint: checkpoint,
+                onPhase: onPhase,
+                onCheckpoint: onCheckpoint
+            )
+            diarization = Self.nativeDiarizationOutcome(from: gated.raw, sourceDuration: sourceDuration)
+        } else if config.transcription.isCloudTranscription {
+            AppLog.transcription.atDebug.debug("transcribe: transcribing + diarizing (concurrent)…")
+            async let rawTranscript = transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                transcriptionProvider: config.transcriptionProvider,
+                transcriptionModel: config.transcriptionModel,
+                cloudTransfer: config.cloudTransfer,
+                whisperCppModel: config.whisperCppModel,
+                language: resolvedLanguage,
+                sourceFileSize: sourceFileSize,
+                sourceDuration: sourceDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: config.preprocessing,
+                vad: config.vad,
+                checkpoint: checkpoint,
+                onPhase: onPhase,
+                onCheckpoint: onCheckpoint
+            )
+            async let speakerOutcome = diarize(
+                originalURL: fileURL,
+                engine: diarizationEngine,
+                diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
+                regions: regions,
+                speakerCount: config.fluidAudioSpeakerCount,
+                onWarning: onDiarizationWarning,
+                onProgress: diarizationProgress.update
+            )
+            gated = try await rawTranscript
+            AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(gated.raw.spans.count, privacy: .public) — waiting for diarization")
+            diarizationProgress.reveal()
+            diarization = try await speakerOutcome
+            AppLog.transcription.atNotice.notice("transcribe: diarization complete, turns=\(diarization.turns.count, privacy: .public)")
+        } else {
+            AppLog.transcription.atDebug.debug("transcribe: transcribing then diarizing (sequential, on-device)…")
+            gated = try await transcribeGated(
+                cleanedURL: cleanedURL,
+                regions: regions,
+                engine: config.transcription,
+                transcriptionProvider: config.transcriptionProvider,
+                transcriptionModel: config.transcriptionModel,
+                cloudTransfer: config.cloudTransfer,
+                whisperCppModel: config.whisperCppModel,
+                language: resolvedLanguage,
+                sourceFileSize: sourceFileSize,
+                sourceDuration: sourceDuration,
+                sourceDigest: sourceDigest,
+                preprocessing: config.preprocessing,
+                vad: config.vad,
+                checkpoint: checkpoint,
+                onPhase: onPhase,
+                onCheckpoint: onCheckpoint
+            )
+            diarizationProgress.reveal()
+            diarization = try await diarize(
+                originalURL: fileURL,
+                engine: diarizationEngine,
+                diarizationPreprocessingEnabled: config.diarizationPreprocessingEnabled,
+                regions: regions,
+                speakerCount: config.fluidAudioSpeakerCount,
+                onWarning: onDiarizationWarning,
+                onProgress: diarizationProgress.update
+            )
+        }
+        return (gated, diarization)
+    }
+
+    /// Build a `DiarizationOutcome` from the transcription provider's own
+    /// response, for `.transcriptionProviderNative`. When the provider didn't
+    /// return any speaker turns this time (a transient gap in its response,
+    /// not a genuine one-speaker meeting), fall back to a single synthetic
+    /// turn covering the whole recording — the same shape every other
+    /// diarizer's own failure fallback produces — rather than leaving fusion
+    /// with no speaker at all.
+    private static func nativeDiarizationOutcome(from raw: RawTranscript, sourceDuration: TimeInterval) -> DiarizationOutcome {
+        guard let turns = raw.speakerTurns, !turns.isEmpty else {
+            return DiarizationOutcome(
+                turns: [SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, sourceDuration))],
+                degradation: .syntheticSingleTurn
+            )
+        }
+        return DiarizationOutcome(turns: turns)
     }
 
     /// Map a finished diarization pass to its stage report. Three different
@@ -588,7 +675,7 @@ struct TranscriptionService {
         let targetSize = (try? target.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let targetDuration = (try? await AVURLAsset(url: target).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("transcribe: engine input \(target.lastPathComponent, privacy: .public) size=\(targetSize, privacy: .public) bytes duration=\(String(format: "%.1f", targetDuration), privacy: .public)s compacted=\(compacted, privacy: .public)")
-        if engine == .whisperAPI, !cloudTransfer.consented {
+        if engine.isCloudTranscription, !cloudTransfer.consented {
             throw AppError.permissionDenied(NSLocalizedString(
                 "error.cloud_transcription_consent_required",
                 comment: "Cloud transcription requires upload consent"

@@ -100,6 +100,11 @@ final class FakeTranscriber: PipelineTranscribing {
             TranscribedSpan(text: "hello", start: 0.2, end: 1.2),
             TranscribedSpan(text: "world", start: 1.8, end: 2.8)
         ]
+        /// Speaker turns to attach to the returned `RawTranscript`, for
+        /// exercising `.transcriptionProviderNative` — a real provider like
+        /// `ElevenLabsProvider` populates this from its own response; this
+        /// fake lets orchestration tests set it directly without a network.
+        var speakerTurns: [SpeakerTurn]?
         var failure: Error?
         var holdsAfterFirstChunk = false
     }
@@ -109,13 +114,16 @@ final class FakeTranscriber: PipelineTranscribing {
     var requests: [EngineTranscriptionRequest] { state.read { $0.requests } }
 
     func setSpans(_ spans: [TranscribedSpan]) { state.write { $0.spans = spans } }
+    func setSpeakerTurns(_ turns: [SpeakerTurn]?) { state.write { $0.speakerTurns = turns } }
     func setFailure(_ error: Error) { state.write { $0.failure = error } }
     /// Park after the first chunk's checkpoint until the run is cancelled, so
     /// a test can observe the "half done" state and then cancel or stop it.
     func holdAfterFirstChunk() { state.write { $0.holdsAfterFirstChunk = true } }
 
     func transcribe(_ request: EngineTranscriptionRequest) async throws -> RawTranscript {
-        let (spans, failure, holds) = state.read { ($0.spans, $0.failure, $0.holdsAfterFirstChunk) }
+        let (spans, speakerTurns, failure, holds) = state.read {
+            ($0.spans, $0.speakerTurns, $0.failure, $0.holdsAfterFirstChunk)
+        }
         state.write { $0.requests.append(request) }
         if let failure { throw failure }
         let total = 2
@@ -133,7 +141,7 @@ final class FakeTranscriber: PipelineTranscribing {
         }
         try Task.checkCancellation()
         request.onProgress(1.0, ChunkProgress(completed: total, total: total))
-        return RawTranscript(spans: spans, language: "en")
+        return RawTranscript(spans: spans, language: "en", speakerTurns: speakerTurns)
     }
 }
 

@@ -131,6 +131,35 @@ struct ProviderHTTPTests {
         #expect(!bodyString.contains("whisper-1"))
     }
 
+    /// Regression guard for the exact failure `gpt-4o-transcribe` reports
+    /// when asked for `verbose_json`: the request must go out with
+    /// `response_format=json` and no `timestamp_granularities[]` field at
+    /// all, on the very first attempt — not as a fallback after a rejected
+    /// first try, since these models don't retry, they go straight to the
+    /// one shape they accept (`OpenAIProvider.transcribe`'s guard branch).
+    @Test func gpt4oTranscribeRequestNeverAsksForVerboseJSON() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["text": "hello"])
+        ])
+        let provider = OpenAIProvider(
+            apiKey: "secret",
+            transcriptionModel: "gpt-4o-transcribe",
+            session: MockURLProtocol.session()
+        )
+
+        _ = try await provider.transcribe(
+            audioData: Data([1, 2, 3]), fileName: "clip.m4a", language: .english
+        )
+
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+        let request = try #require(MockURLProtocol.lastRequest)
+        let bodyString = String(bytes: MockURLProtocol.body(of: request), encoding: .utf8) ?? ""
+        #expect(bodyString.contains("name=\"model\"") && bodyString.contains("gpt-4o-transcribe"))
+        #expect(bodyString.contains("name=\"response_format\""))
+        #expect(!bodyString.contains("verbose_json"))
+        #expect(!bodyString.contains("timestamp_granularities"))
+    }
+
     // MARK: - Anthropic
 
     @Test func anthropicSummarizeSendsVersionHeaderAndParsesContent() async throws {

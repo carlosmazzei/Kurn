@@ -31,6 +31,32 @@ enum ChunkedTranscriptionRunner {
         var spans: [TranscribedSpan]
     }
 
+    /// Speaker turns accumulated across chunks this run, offset to the input
+    /// file's timeline. Deliberately *not* part of `Progress` (so it isn't
+    /// persisted in the durable checkpoint): a resumed run therefore only
+    /// carries native diarization for the chunks it actually re-transcribes,
+    /// not ones a prior interrupted run already completed. That is a lesser
+    /// degradation than the one this fixes — every chunk's `speakerTurns`
+    /// being silently dropped, which left `.transcriptionProviderNative`
+    /// permanently falling back to a single synthetic turn in production.
+    private struct SpeakerTurnAccumulator {
+        var turns: [SpeakerTurn] = []
+        var sawAny = false
+
+        mutating func append(_ chunkTurns: [SpeakerTurn]?, offset: TimeInterval) {
+            guard let chunkTurns else { return }
+            sawAny = true
+            turns.append(contentsOf: chunkTurns.map {
+                SpeakerTurn(speakerLabel: $0.speakerLabel, start: $0.start + offset, end: $0.end + offset)
+            })
+        }
+
+        /// `nil` when no chunk ever returned speaker turns, `[]` distinguished
+        /// from a genuine (if empty) result — same convention as
+        /// `RawTranscript.speakerTurns`.
+        var result: [SpeakerTurn]? { sawAny ? turns : nil }
+    }
+
     /// Run the chunk loop, optionally resuming from prior progress.
     /// - Parameters:
     ///   - chunks: the (re-)derived chunk plan for the input file.
@@ -67,6 +93,7 @@ enum ChunkedTranscriptionRunner {
             }
             state = Progress(totalChunks: chunks.count, completedChunks: 0, detectedLanguage: "", planDigest: planDigest, spans: [])
         }
+        var speakerTurns = SpeakerTurnAccumulator()
 
         let total = max(1, chunks.count)
         onProgress(
@@ -88,6 +115,7 @@ enum ChunkedTranscriptionRunner {
             if state.detectedLanguage.isEmpty {
                 state.detectedLanguage = result.language
             }
+            speakerTurns.append(result.speakerTurns, offset: chunk.offset)
             // Offset chunk-local timestamps back to the input's timeline.
             for span in result.spans {
                 state.spans.append(
@@ -115,7 +143,7 @@ enum ChunkedTranscriptionRunner {
             onProgress(Double(index + 1) / Double(total), currentChunk, total)
         }
 
-        return RawTranscript(spans: state.spans, language: state.detectedLanguage)
+        return RawTranscript(spans: state.spans, language: state.detectedLanguage, speakerTurns: speakerTurns.result)
     }
 }
 

@@ -195,4 +195,42 @@ struct WordTimestampTests {
         )
         #expect(transcript.spans.isEmpty)
     }
+
+    // MARK: - Non-Whisper transcription models (no verbose_json)
+
+    @Test func supportsVerboseJSONIsTrueOnlyForWhisperFamilyModels() {
+        #expect(OpenAIProvider.supportsVerboseJSON("whisper-1"))
+        #expect(OpenAIProvider.supportsVerboseJSON("whisper-large-v3"))
+        #expect(OpenAIProvider.supportsVerboseJSON("whisper-large-v3-turbo"))
+        #expect(OpenAIProvider.supportsVerboseJSON("WHISPER-1"))
+        #expect(!OpenAIProvider.supportsVerboseJSON("gpt-4o-transcribe"))
+        #expect(!OpenAIProvider.supportsVerboseJSON("gpt-4o-mini-transcribe"))
+        #expect(!OpenAIProvider.supportsVerboseJSON("GPT-4O-TRANSCRIBE"))
+        // Regression: a live OpenAI account surfaced this exact model name
+        // (a newer transcription model, not `gpt-4o*`-prefixed) rejecting
+        // verbose_json with a 400 — the old `!hasPrefix("gpt-4o")` denylist
+        // wrongly assumed it supported verbose_json since it didn't match
+        // the one prefix it knew about.
+        #expect(!OpenAIProvider.supportsVerboseJSON("gpt-transcribe-api-ev3"))
+    }
+
+    /// gpt-4o-transcribe/gpt-4o-mini-transcribe only support `response_format:
+    /// json`, which returns a flat `{"text": ...}` body with no `segments` —
+    /// the same shape `aResponseWithoutWordsStillProducesSegments` already
+    /// covers for a plain vendor, confirmed here explicitly for these models
+    /// since it's the shape their whole response format is limited to, not
+    /// just an occasional omission.
+    @Test func aFlatGPT4oTranscribeResponseProducesOneSpan() throws {
+        let json = """
+        {
+          "text": "primeiro ponto, segundo ponto"
+        }
+        """
+        let transcript = try OpenAIProvider.transcript(
+            from: Data(json.utf8),
+            provider: .openAI
+        )
+        #expect(transcript.spans.map(\.text) == ["primeiro ponto, segundo ponto"])
+        #expect(transcript.language == "")
+    }
 }
