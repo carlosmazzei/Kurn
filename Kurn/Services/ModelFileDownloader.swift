@@ -143,7 +143,13 @@ actor ModelFileDownloader: ModelDownloading {
                 Self.report(runID, logLabel: logLabel, stage: "transfer", outcome: .cancelled, code: nil)
                 throw CancellationError()
             }
-            try Self.translate(interruption.underlying, runID: runID, stage: "transfer", logLabel: logLabel)
+            try Self.translate(
+                interruption.underlying,
+                policy: policy,
+                runID: runID,
+                stage: "transfer",
+                logLabel: logLabel
+            )
         }
 
         do {
@@ -164,12 +170,25 @@ actor ModelFileDownloader: ModelDownloading {
                 Self.report(runID, logLabel: logLabel, stage: "install", outcome: .failed, code: appError.logCode)
                 throw appError
             }
-            try Self.translate(error, runID: runID, stage: "install", logLabel: logLabel)
+            try Self.translate(error, policy: nil, runID: runID, stage: "install", logLabel: logLabel)
         }
     }
 
-    private static func translate(_ error: Error, runID: OperationID, stage: String, logLabel: String) throws -> Never {
-        if let restriction = LargeTransferPolicy.restrictionError(for: error) {
+    /// `policy` is the transfer's own, for the transfer stage only: it lets a
+    /// bare `.notConnectedToInternet` on a path the policy refuses read as the
+    /// policy block it is (see `LargeTransferPolicy.restrictionError`). The
+    /// install stage touches no network and passes `nil`.
+    private static func translate(
+        _ error: Error,
+        policy: LargeTransferPolicy?,
+        runID: OperationID,
+        stage: String,
+        logLabel: String
+    ) throws -> Never {
+        let restriction = policy.map {
+            LargeTransferPolicy.restrictionError(for: error, policy: $0, snapshot: NetworkPathObserver.shared.snapshot)
+        } ?? LargeTransferPolicy.restrictionError(for: error)
+        if let restriction {
             report(runID, logLabel: logLabel, stage: stage, outcome: .failed, code: restriction.logCode)
             throw restriction
         }
