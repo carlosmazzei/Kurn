@@ -19,6 +19,8 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
+import os
 
 /// Pure decision of which input a recording uses, kept apart from
 /// `AVAudioSession` so it is testable without real hardware.
