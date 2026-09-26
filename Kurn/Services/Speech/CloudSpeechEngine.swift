@@ -96,25 +96,39 @@ final class CloudSpeechEngine: NSObject, ReadAloudEngine {
     private func handle(_ result: Result<Data, Error>, for index: Int, token: Int) {
         guard token == generation else { return }
         fetches[index] = nil
-        do {
-            let player = try AVAudioPlayer(data: try result.get())
-            player.delegate = self
-            player.enableRate = true
-            player.rate = rate
-            player.prepareToPlay()
-            self.player = player
-            if !isPaused { player.play() }
-            if chunks.indices.contains(index + 1) { _ = fetch(index + 1) }
-            onChunkStarted?(index)
-        } catch is CancellationError {
-            return
-        } catch let error as AppError {
-            AppLog.generation.atError.error("CloudSpeechEngine: chunk \(index, privacy: .public) failed code=\(error.logCode, privacy: .public)")
-            onFailed?(error)
-        } catch {
-            AppLog.generation.atError.error("CloudSpeechEngine: chunk \(index, privacy: .public) failed code=\(error.publicLogCode, privacy: .public)")
-            onFailed?(.speechSynthesisFailed(error.localizedDescription))
+        Task { [weak self, rate] in
+            guard let self else { return }
+            do {
+                let data = try result.get()
+                // `AVAudioPlayer`'s initializer and `prepareToPlay()` both touch
+                // `AVAudioSession` internally — a synchronous, blocking check —
+                // and this runs once per chunk, so it is offloaded the same way
+                // `AudioSessionActivation` keeps the explicit activation off-main.
+                let player = try await Self.preparedPlayer(data: data, rate: rate)
+                guard token == self.generation else { return }
+                player.delegate = self
+                self.player = player
+                if !self.isPaused { player.play() }
+                if self.chunks.indices.contains(index + 1) { _ = self.fetch(index + 1) }
+                self.onChunkStarted?(index)
+            } catch is CancellationError {
+                return
+            } catch let error as AppError {
+                AppLog.generation.atError.error("CloudSpeechEngine: chunk \(index, privacy: .public) failed code=\(error.logCode, privacy: .public)")
+                self.onFailed?(error)
+            } catch {
+                AppLog.generation.atError.error("CloudSpeechEngine: chunk \(index, privacy: .public) failed code=\(error.publicLogCode, privacy: .public)")
+                self.onFailed?(.speechSynthesisFailed(error.localizedDescription))
+            }
         }
+    }
+
+    private nonisolated static func preparedPlayer(data: Data, rate: Float) async throws -> AVAudioPlayer {
+        let player = try AVAudioPlayer(data: data)
+        player.enableRate = true
+        player.rate = rate
+        player.prepareToPlay()
+        return player
     }
 
     private func playerDidFinish(_ id: ObjectIdentifier) {
