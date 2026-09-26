@@ -2,15 +2,18 @@
 //  FolderSidebarView.swift
 //  Kurn
 //
-//  Sheet-presented drawer that drives the `LibrarySelection` shown by
-//  `MeetingsListView`. The root level lists every built-in bucket
+//  Drives the `LibrarySelection` shown by `MeetingsListView` — presented as a
+//  sheet on compact width (from `MeetingsListView`'s toolbar) and as
+//  `ContentView`'s persistent `NavigationSplitView` sidebar column on regular
+//  width (D6, docs/design-review-liquid-glass.md), both against the same
+//  `Binding<LibrarySelection>`. The root level lists every built-in bucket
 //  (All / Inbox / Favorites / Archive) and the user's root folders; tapping a
-//  folder's row body selects it and closes the sheet, while tapping the
-//  trailing chevron drills into its subfolders (with breadcrumb via the
-//  enclosing NavigationStack). "+ New" always creates a folder at the level
-//  the user is currently looking at. Deletion uses `.nullify`, so meetings
-//  only move back to the Inbox — their audio, transcripts and summaries are
-//  preserved.
+//  folder's row body selects it (and calls `dismiss()`, a no-op when this is
+//  the sidebar column rather than a sheet), while tapping the trailing
+//  chevron drills into its subfolders (with breadcrumb via the enclosing
+//  NavigationStack). "+ New" always creates a folder at the level the user is
+//  currently looking at. Deletion uses `.nullify`, so meetings only move back
+//  to the Inbox — their audio, transcripts and summaries are preserved.
 //
 
 import SwiftData

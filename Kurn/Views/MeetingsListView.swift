@@ -57,7 +57,13 @@ struct MeetingsListView: View {
     @State var showingDocuments = false
     private let semanticSearchService = SemanticSearchService()
     @State var filter = MeetingFilter()
-    @State var selection: LibrarySelection = .allMeetings
+    /// Owned by `ContentView`, not this view — on iPad-regular width the same
+    /// binding also drives `FolderSidebarView`'s persistent `NavigationSplitView`
+    /// sidebar column (D6, docs/design-review-liquid-glass.md), so a folder tap
+    /// there updates this list without a sheet round-trip. On compact width
+    /// `ContentView` still owns the state, just with no sidebar column reading it.
+    @Binding var selection: LibrarySelection
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var showingSidebar = false
     @State var showingFilterBar = false
     /// Set when the context-menu "Move to folder…" action is invoked; presents
