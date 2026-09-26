@@ -194,6 +194,12 @@ jobs:
               --csv "$RUNNER_TEMP/rescore.csv" \
               --markdown "$RUNNER_TEMP/rescore.md" || true
           fi
+          # Also into the job log: the summary and artifact are not reachable
+          # from every environment that reads a run back (artifact downloads
+          # redirect to blob storage), but the log API is.
+          if [ -s "$RUNNER_TEMP/rescore.md" ]; then
+            sed 's/^/[rescore] /' "$RUNNER_TEMP/rescore.md"
+          fi
           {
             echo "## Pipeline evaluation report"
             echo
