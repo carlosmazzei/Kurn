@@ -88,6 +88,9 @@ struct AutoTagConfirmView: View {
                 }
             }
         }
+        // A handful of suggested tags is a quick review task, not one that
+        // needs the full screen.
+        .presentationDetents([.medium, .large])
     }
 
     private var existingTags: [Tag] {

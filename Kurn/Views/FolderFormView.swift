@@ -93,6 +93,9 @@ struct FolderFormView: View {
         return LazyVGrid(columns: columns, spacing: 12) {
             ForEach(FolderIconCatalog.icons, id: \.self) { symbol in
                 Button { iconName = symbol } label: {
+                    // Fixed size to fit the fixed 40x40 grid cell — a glyph
+                    // picker grid, not reading text, so it doesn't need to
+                    // track Dynamic Type the way the rest of the app does.
                     Image(systemName: symbol)
                         .font(.system(size: 18))
                         .frame(width: 40, height: 40)
@@ -122,6 +125,7 @@ struct FolderFormView: View {
                             .fill(Color(hex: hex))
                             .frame(width: 30, height: 30)
                         if colorHex == hex {
+                            // Same fixed-grid reasoning as the icon grid above.
                             Image(systemName: "checkmark")
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(.white)

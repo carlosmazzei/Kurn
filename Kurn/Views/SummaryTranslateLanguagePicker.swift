@@ -46,6 +46,9 @@ struct SummaryTranslateLanguagePicker: View {
                 }
             }
         }
+        // A fixed 7-language list is a quick pick, not a task that needs the
+        // full screen.
+        .presentationDetents([.medium])
     }
 
     private func row(_ language: MeetingLanguage) -> some View {

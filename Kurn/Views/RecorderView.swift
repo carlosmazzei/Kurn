@@ -109,7 +109,17 @@ private struct RecorderContent: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button(NSLocalizedString("common.cancel", comment: "Cancel")) {
+                // `cancel()` deletes the in-progress recording once one
+                // exists, so the label and role must say so — a plain
+                // "Cancel" here would misrepresent a destructive action as a
+                // no-op dismiss, unlike every other exit affordance in the app.
+                let hasRecordingInProgress = vm.state != .idle || vm.isStarting
+                Button(
+                    hasRecordingInProgress
+                        ? NSLocalizedString("recorder.discard", comment: "Discard the in-progress recording")
+                        : NSLocalizedString("common.cancel", comment: "Cancel"),
+                    role: hasRecordingInProgress ? .destructive : .cancel
+                ) {
                     vm.cancel()
                     onFinished()
                 }
@@ -214,8 +224,9 @@ private struct RecorderContent: View {
         }
     }
 
+    @ViewBuilder
     private var timer: some View {
-        VStack(spacing: 4) {
+        let content = VStack(spacing: 4) {
             Text(vm.elapsed.clockDisplay)
                 .font(.system(size: timerFontSize, weight: .ultraLight, design: .default))
                 .monospacedDigit()
@@ -228,6 +239,27 @@ private struct RecorderContent: View {
                     .contentTransition(.numericText())
             }
         }
+        // Elapsed time and highlight count used to be two separate VoiceOver
+        // stops; combined into one composed phrase (e.g. "12:34, 2
+        // highlights") instead of leaving them as unrelated elements.
+        if vm.highlightCount > 0 {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(timerAccessibilityLabel)
+        } else {
+            content
+        }
+    }
+
+    private var timerAccessibilityLabel: String {
+        String(
+            format: NSLocalizedString(
+                "recorder.accessibility.timer_with_highlights",
+                comment: "Elapsed time, highlight count"
+            ),
+            vm.elapsed.clockDisplay,
+            vm.highlightCount
+        )
     }
 
     private var titleField: some View {
@@ -240,6 +272,12 @@ private struct RecorderContent: View {
             .font(Theme.body)
             .foregroundStyle(.white)
             .tint(Theme.accent)
+            // Explicit, persistent label — VoiceOver stops reading the
+            // placeholder as soon as the field has a value, unlike a label.
+            .accessibilityLabel(NSLocalizedString(
+                "recorder.title_field.accessibility_label",
+                comment: "Meeting title text field (VoiceOver)"
+            ))
             Rectangle()
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)

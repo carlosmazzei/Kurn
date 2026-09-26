@@ -134,7 +134,7 @@ struct DocumentCreateView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaBar(edge: .bottom) {
             if let progress = viewModel.progress {
                 Text(
                     String(
@@ -147,7 +147,6 @@ struct DocumentCreateView: View {
                 .foregroundStyle(Theme.textSecondary)
                 .padding(10)
                 .frame(maxWidth: .infinity)
-                .background(.bar)
             }
         }
         .errorAlert($viewModel.error)

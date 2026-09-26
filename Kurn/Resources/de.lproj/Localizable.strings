@@ -202,6 +202,9 @@
 "recorder.partial_saved" = "Nach einem Fehler bei der Audioaufnahme wurde eine Teilaufnahme gespeichert. Prüfen Sie den freien Speicher, bevor Sie erneut aufnehmen.";
 "recorder.recovery_failed" = "Die Aufnahme ist weiterhin nicht verfügbar. Das Audio wurde für einen erneuten Wiederherstellungsversuch erhalten.";
 "recorder.title" = "Neue Aufnahme";
+"recorder.discard" = "Aufnahme verwerfen";
+"recorder.title_field.accessibility_label" = "Besprechungstitel";
+"recorder.accessibility.timer_with_highlights" = "%1$@, %2$d Markierungen";
 "recorder.add_title" = "Titel hinzufügen…";
 "recorder.pause" = "Pause";
 "recorder.resume" = "Fortsetzen";

@@ -47,6 +47,7 @@ struct TranscriptView: View {
             HStack(spacing: 8) {
                 ZStack {
                     Circle().fill(color.opacity(0.2)).frame(width: 26, height: 26)
+                    // Fixed size to fit the fixed 26x26 avatar circle.
                     Text(String(name.prefix(1)).uppercased())
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(color)
@@ -62,7 +63,7 @@ struct TranscriptView: View {
                         onSeek(highlight.timestamp)
                     } label: {
                         Image(systemName: "bookmark.fill")
-                            .font(.system(size: 11))
+                            .font(.caption2)
                             .foregroundStyle(Theme.warning)
                     }
                     .buttonStyle(.plain)

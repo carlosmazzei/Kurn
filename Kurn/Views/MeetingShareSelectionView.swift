@@ -177,7 +177,7 @@ struct MeetingShareSelectionView: View {
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                 }

@@ -202,6 +202,9 @@
 "recorder.partial_saved" = "A partial recording was saved after an audio capture failure. Check available storage before recording again.";
 "recorder.recovery_failed" = "The recording is still unavailable. Its audio was preserved so you can try recovery again.";
 "recorder.title" = "New Recording";
+"recorder.discard" = "Discard Recording";
+"recorder.title_field.accessibility_label" = "Meeting title";
+"recorder.accessibility.timer_with_highlights" = "%1$@, %2$d highlights";
 "recorder.add_title" = "Add title…";
 "recorder.pause" = "Pause";
 "recorder.resume" = "Resume";

@@ -255,6 +255,7 @@ struct SummaryTab: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
+                        // Fixed size to fit the fixed 42x42 well.
                         Image(systemName: "sparkles")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(Theme.accent)
@@ -312,7 +313,7 @@ struct SummaryTab: View {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .fill(Theme.fill)
                     .frame(width: 72, height: 72)
-                Image(systemName: "sparkles").font(.system(size: 30)).foregroundStyle(Theme.textTertiary)
+                Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(Theme.textTertiary)
                     .accessibilityHidden(true)
             }
             VStack(spacing: 8) {

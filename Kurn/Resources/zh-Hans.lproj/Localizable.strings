@@ -202,6 +202,9 @@
 "recorder.partial_saved" = "音频采集失败后已保存部分录音。再次录音前请检查可用存储空间。";
 "recorder.recovery_failed" = "录音仍不可用。音频已保留，您可以再次尝试恢复。";
 "recorder.title" = "新建录音";
+"recorder.discard" = "放弃录音";
+"recorder.title_field.accessibility_label" = "会议标题";
+"recorder.accessibility.timer_with_highlights" = "%1$@，%2$d 个标记";
 "recorder.add_title" = "添加标题…";
 "recorder.pause" = "暂停";
 "recorder.resume" = "恢复";

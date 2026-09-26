@@ -67,8 +67,6 @@ final class WatchConnectivityManager: NSObject {
     private(set) var state: RemoteRecordingState = .idle
     /// True once the iPhone has reported a recording session exists to control.
     private(set) var isAvailable = false
-    /// Normalized 0...1 level mirrored from the iPhone, best-effort.
-    private(set) var level: Float = 0
     /// Set when the last command failed to reach the iPhone.
     private(set) var lastCommandFailed = false
 
@@ -93,7 +91,6 @@ final class WatchConnectivityManager: NSObject {
     /// entirely rather than waiting on a session that will never activate.
     private func seedForScreenshot() {
         isAvailable = true
-        level = 0.6
         state = .recording(
             meetingTitle: "Product Roadmap Sync",
             referenceDate: Date().addingTimeInterval(-642),
@@ -154,10 +151,8 @@ final class WatchConnectivityManager: NSObject {
                 accumulatedElapsed: context.accumulatedElapsed,
                 highlightCount: context.highlightCount
             )
-            level = 0
         default:
             state = .idle
-            level = 0
         }
     }
 }
@@ -179,13 +174,6 @@ extension WatchConnectivityManager: WCSessionDelegate {
         let context = WatchRecordingContext(applicationContext)
         Task { @MainActor in
             self.applyContext(context)
-        }
-    }
-
-    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        guard let level = message[WatchSessionKey.level] as? Float else { return }
-        Task { @MainActor in
-            self.level = level
         }
     }
 }

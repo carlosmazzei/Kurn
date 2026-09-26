@@ -69,7 +69,7 @@ struct MeetingFormView: View {
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(.footnote, weight: .semibold))
                                 .foregroundStyle(Theme.textTertiary)
                                 .accessibilityHidden(true)
                         }
