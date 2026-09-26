@@ -103,6 +103,34 @@ enum Theme {
     //   content remains correct — most of the app's `.plain` buttons are
     //   this case and do not need migrating.
 
+    // MARK: - Modal weight
+    //
+    // Two confirmation shapes exist on purpose — pick by content, not by
+    // habit or by which one looks nicer for a given screen.
+    //
+    // - **A quick binary decision with no illustration or extra context**
+    //   ("Delete this tag?", "Restore this backup?"): `kurnDialog` (or a
+    //   native `.alert`/`.confirmationDialog` where the OS must own the
+    //   control). Reserve this for exactly what HIG reserves alerts for —
+    //   essential, short, low-effort decisions that shouldn't cost more than
+    //   a glance and a tap.
+    // - **A decision that carries genuine extra content** — an illustration,
+    //   an explanation the user should actually read, more than one line of
+    //   context (`CrossMeetingSpeakerMatchView`'s voice-match confirmation is
+    //   the reference example): a real `.sheet` with `NavigationStack`, an
+    //   inline title, a `.cancellationAction` toolbar button, and full-width
+    //   `.glassProminent`/`.glass` buttons, sized with
+    //   `.presentationDetents([.medium])` (or `[.medium, .large]` if the
+    //   content can grow). This is the same "content sheet" shape
+    //   `MeetingShareSelectionView`/`SummaryTemplatePicker`/`MeetingFormView`
+    //   already use — reuse it rather than inventing a third shape.
+    //
+    // Do not promote the sheet shape to a house style for every confirmation:
+    // wrapping a one-line "Delete this tag?" in a `NavigationStack` sheet asks
+    // for more attention and more steps (an extra transition, a swipe-down or
+    // Cancel tap) than that task needs, which is the same "simplicity" failure
+    // a plain alert avoids by design.
+
     // MARK: - Helpers
 
     private static func adaptive(dark: Int, light: Int?, lightSystem: UIColor) -> Color {
