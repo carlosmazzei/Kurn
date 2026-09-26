@@ -38,10 +38,17 @@ final class NowPlayingController {
 
     /// Matches the skip interval the in-app transport offers, and is what the
     /// Lock Screen renders inside the arrow glyphs.
-    static let skipInterval: TimeInterval = 15
+    nonisolated static let skipInterval: TimeInterval = 15
 
     private var handlers: Handlers?
     private var isActive = false
+    /// What `addTarget` returned, per command. Two owners exist — recording
+    /// playback and read-aloud — so `deactivate` removes exactly these rather
+    /// than `removeTarget(nil)`, which would also detach the other owner.
+    private var targets: [(command: MPRemoteCommand, token: Any)] = []
+    /// Whichever controller published `nowPlayingInfo` last. Only it may
+    /// clear the process-wide metadata on deactivation.
+    private static weak var publisher: NowPlayingController?
 
     // MARK: - Lifecycle
 
@@ -57,21 +64,21 @@ final class NowPlayingController {
         // better but *traps* if the system ever delivers a command off the main
         // thread, which is a crash on the Lock Screen in exchange for a return
         // value nothing acts on.
-        _ = center.playCommand.addTarget { [weak self] _ in
+        register(center.playCommand) { [weak self] _ in
             Task { @MainActor in self?.handlers?.play() }
             return .success
         }
-        _ = center.pauseCommand.addTarget { [weak self] _ in
+        register(center.pauseCommand) { [weak self] _ in
             Task { @MainActor in self?.handlers?.pause() }
             return .success
         }
-        _ = center.togglePlayPauseCommand.addTarget { [weak self] _ in
+        register(center.togglePlayPauseCommand) { [weak self] _ in
             Task { @MainActor in self?.handlers?.toggle() }
             return .success
         }
 
         center.skipForwardCommand.preferredIntervals = [NSNumber(value: Self.skipInterval)]
-        _ = center.skipForwardCommand.addTarget { [weak self] event in
+        register(center.skipForwardCommand) { [weak self] event in
             // Read off the event before the hop: it is not `Sendable`, and the
             // system reuses it once the handler returns.
             let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? Self.skipInterval
@@ -79,13 +86,13 @@ final class NowPlayingController {
             return .success
         }
         center.skipBackwardCommand.preferredIntervals = [NSNumber(value: Self.skipInterval)]
-        _ = center.skipBackwardCommand.addTarget { [weak self] event in
+        register(center.skipBackwardCommand) { [weak self] event in
             let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? Self.skipInterval
             Task { @MainActor in self?.handlers?.skip(-interval) }
             return .success
         }
 
-        _ = center.changePlaybackPositionCommand.addTarget { [weak self] event in
+        register(center.changePlaybackPositionCommand) { [weak self] event in
             guard let position = (event as? MPChangePlaybackPositionCommandEvent)?.positionTime else {
                 return .commandFailed
             }
@@ -111,15 +118,24 @@ final class NowPlayingController {
         // loaded too, and `nowPlayingInfo` is process-wide.
         guard isActive else { return }
         isActive = false
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        if Self.publisher === self {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            Self.publisher = nil
+        }
+        for target in targets {
+            target.command.removeTarget(target.token)
+        }
+        targets.removeAll()
+    }
 
-        let center = MPRemoteCommandCenter.shared()
-        center.playCommand.removeTarget(nil)
-        center.pauseCommand.removeTarget(nil)
-        center.togglePlayPauseCommand.removeTarget(nil)
-        center.skipForwardCommand.removeTarget(nil)
-        center.skipBackwardCommand.removeTarget(nil)
-        center.changePlaybackPositionCommand.removeTarget(nil)
+    /// `addTarget`, remembering the token so `deactivate` can remove it.
+    private func register(
+        _ command: MPRemoteCommand,
+        // `@Sendable` so the literal stays nonisolated: the system may call it
+        // off the main thread, where a main-actor-inferred closure would trap.
+        _ handler: @escaping @Sendable (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus
+    ) {
+        targets.append((command, command.addTarget(handler: handler)))
     }
 
     // MARK: - Metadata
@@ -134,6 +150,7 @@ final class NowPlayingController {
         rate: Float
     ) {
         guard isActive else { return }
+        Self.publisher = self
         MPNowPlayingInfoCenter.default().nowPlayingInfo = Self.info(
             title: title,
             subtitle: subtitle,

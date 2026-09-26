@@ -915,3 +915,33 @@
 "quarantine.reason.too_short" = "录音过短";
 "quarantine.reason.collision" = "迁移期间的名称冲突";
 "quarantine.reason.unknown" = "未知原因";
+
+/* Read aloud (text-to-speech) */
+"error.speech_synthesis" = "无法朗读：%@";
+"read_aloud.error.unsupported" = "%@ 无法朗读文本。";
+"read_aloud.error.no_audio" = "语音提供商未返回可播放的音频。";
+"read_aloud.error.invalid_voice" = "语音 ID 只能包含字母和数字。";
+"read_aloud.error.empty" = "没有可朗读的内容。";
+"read_aloud.progress" = "%1$d / %2$d";
+"read_aloud.previous" = "上一段";
+"read_aloud.next" = "下一段";
+"read_aloud.stop" = "停止朗读";
+"read_aloud.dismiss_error" = "关闭";
+"read_aloud.start" = "朗读";
+"read_aloud.pause" = "暂停";
+"read_aloud.resume" = "继续";
+"read_aloud.kind.summary" = "摘要";
+"read_aloud.kind.wiki" = "会议维基";
+"read_aloud.kind.document" = "文档";
+"settings.read_aloud.title" = "朗读";
+"settings.read_aloud.voice_section" = "语音";
+"settings.read_aloud.voice" = "语音";
+"settings.read_aloud.voice_automatic" = "自动（匹配文本语言）";
+"settings.read_aloud.custom_voice" = "自定义语音 ID";
+"settings.read_aloud.custom_model" = "自定义模型";
+"settings.read_aloud.on_device_footer" = "设备端语音可离线使用，任何内容都不会离开你的 iPhone。可在 iOS 设置 › 辅助功能 › 朗读内容 › 声音 中下载更高质量的语音。";
+"settings.read_aloud.cloud_footer" = "朗读的文本会发送至 %@ 以生成语音。音频仅在内存中播放，从不保存。";
+"settings.read_aloud.speed" = "语速";
+"settings.read_aloud.preview" = "试听";
+"settings.read_aloud.preview_footer" = "朗读功能适用于摘要、会议维基文章和生成的文档。";
+"settings.read_aloud.sample" = "这就是你的摘要、维基文章和文档被朗读时的声音。";

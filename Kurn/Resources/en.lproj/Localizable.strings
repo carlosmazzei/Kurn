@@ -915,3 +915,33 @@
 "quarantine.reason.too_short" = "Recording too short";
 "quarantine.reason.collision" = "Name conflict during migration";
 "quarantine.reason.unknown" = "Unknown reason";
+
+/* Read aloud (text-to-speech) */
+"error.speech_synthesis" = "Couldn't read aloud: %@";
+"read_aloud.error.unsupported" = "%@ can't read text aloud.";
+"read_aloud.error.no_audio" = "The voice provider returned no playable audio.";
+"read_aloud.error.invalid_voice" = "The voice ID may contain only letters and numbers.";
+"read_aloud.error.empty" = "There is nothing to read.";
+"read_aloud.progress" = "%1$d of %2$d";
+"read_aloud.previous" = "Previous paragraph";
+"read_aloud.next" = "Next paragraph";
+"read_aloud.stop" = "Stop reading";
+"read_aloud.dismiss_error" = "Dismiss";
+"read_aloud.start" = "Read aloud";
+"read_aloud.pause" = "Pause";
+"read_aloud.resume" = "Resume";
+"read_aloud.kind.summary" = "Summary";
+"read_aloud.kind.wiki" = "Meeting wiki";
+"read_aloud.kind.document" = "Document";
+"settings.read_aloud.title" = "Read Aloud";
+"settings.read_aloud.voice_section" = "Voice";
+"settings.read_aloud.voice" = "Voice";
+"settings.read_aloud.voice_automatic" = "Automatic (matches the text's language)";
+"settings.read_aloud.custom_voice" = "Custom voice ID";
+"settings.read_aloud.custom_model" = "Custom model";
+"settings.read_aloud.on_device_footer" = "The on-device voice works offline and nothing leaves your iPhone. Higher-quality voices can be downloaded in iOS Settings › Accessibility › Spoken Content › Voices.";
+"settings.read_aloud.cloud_footer" = "The text being read is sent to %@ to generate speech. The audio is played from memory and never saved.";
+"settings.read_aloud.speed" = "Speed";
+"settings.read_aloud.preview" = "Preview";
+"settings.read_aloud.preview_footer" = "Read aloud is available on summaries, meeting wiki articles and generated documents.";
+"settings.read_aloud.sample" = "This is how your summaries, wiki articles and documents will sound when read aloud.";

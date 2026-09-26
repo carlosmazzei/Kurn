@@ -915,3 +915,33 @@
 "quarantine.reason.too_short" = "Gravação curta demais";
 "quarantine.reason.collision" = "Conflito de nome durante a migração";
 "quarantine.reason.unknown" = "Motivo desconhecido";
+
+/* Read aloud (text-to-speech) */
+"error.speech_synthesis" = "Não foi possível ler em voz alta: %@";
+"read_aloud.error.unsupported" = "%@ não consegue ler texto em voz alta.";
+"read_aloud.error.no_audio" = "O provedor de voz não retornou áudio reproduzível.";
+"read_aloud.error.invalid_voice" = "O ID da voz pode conter apenas letras e números.";
+"read_aloud.error.empty" = "Não há nada para ler.";
+"read_aloud.progress" = "%1$d de %2$d";
+"read_aloud.previous" = "Parágrafo anterior";
+"read_aloud.next" = "Próximo parágrafo";
+"read_aloud.stop" = "Parar leitura";
+"read_aloud.dismiss_error" = "Dispensar";
+"read_aloud.start" = "Ler em voz alta";
+"read_aloud.pause" = "Pausar";
+"read_aloud.resume" = "Continuar";
+"read_aloud.kind.summary" = "Resumo";
+"read_aloud.kind.wiki" = "Wiki da reunião";
+"read_aloud.kind.document" = "Documento";
+"settings.read_aloud.title" = "Leitura em voz alta";
+"settings.read_aloud.voice_section" = "Voz";
+"settings.read_aloud.voice" = "Voz";
+"settings.read_aloud.voice_automatic" = "Automática (conforme o idioma do texto)";
+"settings.read_aloud.custom_voice" = "ID de voz personalizado";
+"settings.read_aloud.custom_model" = "Modelo personalizado";
+"settings.read_aloud.on_device_footer" = "A voz no dispositivo funciona offline e nada sai do seu iPhone. Vozes de maior qualidade podem ser baixadas em Ajustes do iOS › Acessibilidade › Conteúdo Falado › Vozes.";
+"settings.read_aloud.cloud_footer" = "O texto lido é enviado para %@ para gerar a fala. O áudio é reproduzido da memória e nunca é salvo.";
+"settings.read_aloud.speed" = "Velocidade";
+"settings.read_aloud.preview" = "Prévia";
+"settings.read_aloud.preview_footer" = "A leitura em voz alta está disponível em resumos, artigos da wiki das reuniões e documentos gerados.";
+"settings.read_aloud.sample" = "É assim que seus resumos, artigos da wiki e documentos vão soar quando lidos em voz alta.";

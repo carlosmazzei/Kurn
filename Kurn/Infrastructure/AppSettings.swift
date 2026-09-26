@@ -65,6 +65,7 @@ final class AppSettings {
         static let wikiEnabled = "settings.wikiEnabled"
         static let correctionEnabled = "settings.correctionEnabled"
         static let templatesSyncEnabled = "settings.templatesSyncEnabled"
+        static let readAloud = "settings.readAloud"
     }
 
     /// iCloud key-value storage key for the synced custom-template payload.
@@ -425,6 +426,24 @@ final class AppSettings {
         }
     }
 
+    /// Read-aloud provider, voice, model and speed (`ReadAloudPreferences`).
+    /// On-device by default, so nothing is sent anywhere until the user picks
+    /// a cloud voice in Settings.
+    var readAloud: ReadAloudPreferences {
+        didSet {
+            if let data = try? JSONEncoder().encode(readAloud) {
+                defaults.set(data, forKey: Keys.readAloud)
+            }
+        }
+    }
+
+    /// The provider that reads aloud: the stored choice while it still exists
+    /// and has its key, otherwise the always-available on-device voice — so
+    /// removing a key never leaves reading aloud pointing at a dead provider.
+    var speechProvider: AIProvider {
+        providers.first { $0.id == readAloud.providerID && $0.isUsableForSpeech } ?? .appleOnDevice
+    }
+
     /// Read-only snapshot for the "My Data" screen.
     var usageStatsSnapshot: UsageStats { usageStats }
 
@@ -659,6 +678,7 @@ final class AppSettings {
         summaryModels = defaults.decoded([String: String].self, forKey: Keys.summaryModels) ?? [:]
         transcriptionModels = defaults.decoded([String: String].self, forKey: Keys.transcriptionModels) ?? [:]
         usageStats = defaults.decoded(UsageStats.self, forKey: Keys.usageStats) ?? UsageStats()
+        readAloud = defaults.decoded(ReadAloudPreferences.self, forKey: Keys.readAloud) ?? ReadAloudPreferences()
         // As with `providers`, an empty stored list re-seeds the built-in presets.
         let loadedTemplates = defaults.decoded([SummaryTemplate].self, forKey: Keys.summaryTemplates)
             .flatMap { $0.isEmpty ? nil : $0 }

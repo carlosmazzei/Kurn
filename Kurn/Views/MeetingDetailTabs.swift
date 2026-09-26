@@ -154,6 +154,7 @@ struct SummaryTab: View {
                 if isSummarizing {
                     summaryProgressPanel
                 }
+                ReadAloudControl(item: .summary(selectedSummary, meeting: meeting))
                 SummaryView(summary: selectedSummary)
                 if !isSummarizing {
                     newSummaryButton

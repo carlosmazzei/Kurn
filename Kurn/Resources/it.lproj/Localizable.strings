@@ -915,3 +915,33 @@
 "quarantine.reason.too_short" = "Registrazione troppo breve";
 "quarantine.reason.collision" = "Conflitto di nome durante la migrazione";
 "quarantine.reason.unknown" = "Motivo sconosciuto";
+
+/* Read aloud (text-to-speech) */
+"error.speech_synthesis" = "Impossibile leggere ad alta voce: %@";
+"read_aloud.error.unsupported" = "%@ non può leggere il testo ad alta voce.";
+"read_aloud.error.no_audio" = "Il fornitore della voce non ha restituito audio riproducibile.";
+"read_aloud.error.invalid_voice" = "L'ID della voce può contenere solo lettere e numeri.";
+"read_aloud.error.empty" = "Non c'è niente da leggere.";
+"read_aloud.progress" = "%1$d di %2$d";
+"read_aloud.previous" = "Paragrafo precedente";
+"read_aloud.next" = "Paragrafo successivo";
+"read_aloud.stop" = "Interrompi lettura";
+"read_aloud.dismiss_error" = "Ignora";
+"read_aloud.start" = "Leggi ad alta voce";
+"read_aloud.pause" = "Pausa";
+"read_aloud.resume" = "Riprendi";
+"read_aloud.kind.summary" = "Riepilogo";
+"read_aloud.kind.wiki" = "Wiki della riunione";
+"read_aloud.kind.document" = "Documento";
+"settings.read_aloud.title" = "Lettura ad alta voce";
+"settings.read_aloud.voice_section" = "Voce";
+"settings.read_aloud.voice" = "Voce";
+"settings.read_aloud.voice_automatic" = "Automatica (in base alla lingua del testo)";
+"settings.read_aloud.custom_voice" = "ID voce personalizzato";
+"settings.read_aloud.custom_model" = "Modello personalizzato";
+"settings.read_aloud.on_device_footer" = "La voce sul dispositivo funziona offline e nulla lascia il tuo iPhone. Puoi scaricare voci di qualità superiore in Impostazioni iOS › Accessibilità › Contenuto letto › Voci.";
+"settings.read_aloud.cloud_footer" = "Il testo letto viene inviato a %@ per generare la voce. L'audio viene riprodotto dalla memoria e non viene mai salvato.";
+"settings.read_aloud.speed" = "Velocità";
+"settings.read_aloud.preview" = "Anteprima";
+"settings.read_aloud.preview_footer" = "La lettura ad alta voce è disponibile per riepiloghi, articoli della wiki delle riunioni e documenti generati.";
+"settings.read_aloud.sample" = "Ecco come suoneranno i tuoi riepiloghi, articoli della wiki e documenti quando letti ad alta voce.";

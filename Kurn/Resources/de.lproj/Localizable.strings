@@ -915,3 +915,33 @@
 "quarantine.reason.too_short" = "Aufnahme zu kurz";
 "quarantine.reason.collision" = "Namenskonflikt bei der Migration";
 "quarantine.reason.unknown" = "Unbekannter Grund";
+
+/* Read aloud (text-to-speech) */
+"error.speech_synthesis" = "Vorlesen fehlgeschlagen: %@";
+"read_aloud.error.unsupported" = "%@ kann keinen Text vorlesen.";
+"read_aloud.error.no_audio" = "Der Sprachanbieter hat kein abspielbares Audio geliefert.";
+"read_aloud.error.invalid_voice" = "Die Stimmen-ID darf nur Buchstaben und Ziffern enthalten.";
+"read_aloud.error.empty" = "Es gibt nichts vorzulesen.";
+"read_aloud.progress" = "%1$d von %2$d";
+"read_aloud.previous" = "Vorheriger Absatz";
+"read_aloud.next" = "Nächster Absatz";
+"read_aloud.stop" = "Vorlesen beenden";
+"read_aloud.dismiss_error" = "Schließen";
+"read_aloud.start" = "Vorlesen";
+"read_aloud.pause" = "Pause";
+"read_aloud.resume" = "Fortsetzen";
+"read_aloud.kind.summary" = "Zusammenfassung";
+"read_aloud.kind.wiki" = "Meeting-Wiki";
+"read_aloud.kind.document" = "Dokument";
+"settings.read_aloud.title" = "Vorlesen";
+"settings.read_aloud.voice_section" = "Stimme";
+"settings.read_aloud.voice" = "Stimme";
+"settings.read_aloud.voice_automatic" = "Automatisch (passend zur Sprache des Textes)";
+"settings.read_aloud.custom_voice" = "Eigene Stimmen-ID";
+"settings.read_aloud.custom_model" = "Eigenes Modell";
+"settings.read_aloud.on_device_footer" = "Die Stimme auf dem Gerät funktioniert offline, nichts verlässt dein iPhone. Hochwertigere Stimmen kannst du unter iOS-Einstellungen › Bedienungshilfen › Gesprochene Inhalte › Stimmen laden.";
+"settings.read_aloud.cloud_footer" = "Der vorgelesene Text wird an %@ gesendet, um Sprache zu erzeugen. Das Audio wird aus dem Speicher abgespielt und nie gesichert.";
+"settings.read_aloud.speed" = "Geschwindigkeit";
+"settings.read_aloud.preview" = "Vorschau";
+"settings.read_aloud.preview_footer" = "Vorlesen ist für Zusammenfassungen, Artikel im Meeting-Wiki und erstellte Dokumente verfügbar.";
+"settings.read_aloud.sample" = "So klingen deine Zusammenfassungen, Wiki-Artikel und Dokumente, wenn sie vorgelesen werden.";

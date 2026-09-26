@@ -1444,6 +1444,54 @@ synthesized from one or more transcripts against a user's prompt, surfaced by
 - `DocumentGenerationService` map/reduces long selections, so picking a folder
   never silently truncates the meetings that happen to sort last.
 
+### Read aloud (text-to-speech)
+
+Summaries, wiki articles and generated documents can be read aloud from an
+inline `ReadAloudControl` above each (`Views/ReadAloudControl.swift`: play/pause,
+previous/next paragraph, stop, progress, and the failure shown inline under the
+control whose text failed — an alert could land behind the wiki sheet).
+
+- **The on-device voice is the default.** `ReadAloudPreferences`
+  (`Models/SpeechSynthesisCatalog.swift`, one JSON blob in
+  `AppSettings.readAloud`) starts on `.appleOnDevice`, which here means
+  `AVSpeechSynthesizer` — not FoundationModels, so `isUsableForSpeech`, unlike
+  `isUsable`, is true on every device. Picking a cloud voice in Settings → Read
+  Aloud is the opt-in for sending the text being read to that provider.
+  `AppSettings.speechProvider` falls back to on-device when the stored choice
+  loses its key.
+- **Which providers speak is keyed off `AIProviderKind`**
+  (`AIProvider.speechSynthesisAPI`): OpenAI-compatible `/audio/speech`,
+  ElevenLabs `/text-to-speech/{voice_id}`, Gemini `generateContent` with an
+  `AUDIO` modality; Anthropic has none. Groq is special-cased by id like
+  `defaultTranscriptionModel`: Orpheus models, WAV only, 200 characters per
+  request. Voices and models are suggestions — Settings also accepts free text.
+- **`SpeechSynthesisProvider` is a separate protocol from `LLMProvider`**
+  (`Providers/SpeechSynthesisProvider.swift`, conformers in
+  `CloudSpeechProviders.swift`), so ElevenLabs stays transcription-only as an
+  `LLMProvider`. Request builders are `static` for tests; speech requests are
+  marked idempotent (a replay only costs money) and a 2xx body that is not audio
+  is rejected before `AVAudioPlayer` sees it. Gemini's bare PCM is wrapped by
+  KurnCore's `PCMWaveFile`.
+- **What is said comes from KurnCore's `SpokenText`**, not the raw Markdown:
+  headings and bullets become sentences, `[mm:ss]` citations, links, emphasis,
+  code fences and URLs are dropped, tables read row by row. It also chunks the
+  text to `maxSpeechCharacters` at paragraph → sentence → word boundaries,
+  never dropping a word. Pure Foundation, tested on Linux.
+- **Audio never touches disk.** `CloudSpeechEngine` plays each chunk with
+  `AVAudioPlayer(data:)` and prefetches the next one; the audio is as
+  meeting-derived as the text it speaks.
+- **One reader for the app.** `ReadAloudController.shared` (a singleton like
+  `RecordingCommandRouter`, which also keeps it reachable from Settings in the
+  security cover window) owns the `.playback`/`.spokenAudio` session, Now
+  Playing (skip = paragraph) and interruption/route-change pauses. It shares
+  the route with `AudioPlayerService` through `readAloudCoordination`
+  (`Views/MeetingDetailReadAloud.swift`): starting to read calls
+  `player.yieldToOtherAudio()` (pause, keep position, release Lock Screen
+  controls), playing a recording stops reading *without* deactivating the
+  session under the player, and leaving a meeting or document stops what it
+  owns. This is also why `NowPlayingController` removes only the command
+  targets it added — `removeTarget(nil)` would detach the other owner.
+
 ### Settings & secrets
 
 `AppSettings` (`@MainActor @Observable`) holds non-secret preferences in
