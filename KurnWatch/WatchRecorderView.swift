@@ -43,7 +43,7 @@ struct WatchRecorderView: View {
     private var idleView: some View {
         VStack(spacing: 8) {
             Image(systemName: "iphone.gen3")
-                .font(.system(size: 32))
+                .font(.largeTitle)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Text("watch.open_iphone")
@@ -75,13 +75,6 @@ struct WatchRecorderView: View {
                 Label("\(highlightCount)", systemImage: "bookmark.fill")
                     .font(.caption2)
                     .foregroundStyle(.orange)
-            }
-
-            if !isPaused {
-                // Decorative: the timer and title already communicate that
-                // recording is active, and this has no other accessible value.
-                LevelMeter(level: connectivity.level)
-                    .accessibilityHidden(true)
             }
 
             HStack(spacing: 16) {
@@ -117,23 +110,6 @@ struct WatchRecorderView: View {
                     .foregroundStyle(.red)
             }
         }
-    }
-}
-
-private struct LevelMeter: View {
-    let level: Float
-
-    var body: some View {
-        GeometryReader { geometry in
-            Capsule()
-                .fill(.secondary.opacity(0.3))
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(.green)
-                        .frame(width: geometry.size.width * CGFloat(level))
-                }
-        }
-        .frame(height: 6)
     }
 }
 

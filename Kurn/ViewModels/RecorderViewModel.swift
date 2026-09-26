@@ -106,9 +106,6 @@ final class RecorderViewModel {
             self?.lockScreenController.update(state: state, elapsed: elapsed, highlightCount: self?.recorder.highlights.count ?? 0)
             self?.pushWatchState(state: state, elapsed: elapsed)
         }
-        self.recorder.onLevelChanged = { level in
-            PhoneSessionController.shared.pushLevel(level)
-        }
         // Marking a highlight doesn't change `state`/`elapsed`, so
         // `onStateChanged` above never fires for it — this is the only signal
         // that re-pushes the updated count to the Lock Screen and the Watch.

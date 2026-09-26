@@ -148,9 +148,6 @@ final class AudioRecorderService: NSObject {
     /// appended while `state == .recording`, so append order == time order).
     private(set) var highlights: [Highlight] = []
     @ObservationIgnored var onStateChanged: ((State, TimeInterval) -> Void)?
-    /// Fired on every metering tick (~50ms) while recording, for low-latency
-    /// mirroring (e.g. to the Watch app). Not used for UI state transitions.
-    @ObservationIgnored var onLevelChanged: ((Float) -> Void)?
     /// Fired synchronously right after a highlight is captured — unlike
     /// `onStateChanged`, marking a highlight does not change `state`/`elapsed`,
     /// so this is the only signal callers get to re-push the Lock Screen /
@@ -561,7 +558,6 @@ final class AudioRecorderService: NSObject {
         if pollCaptureProgress(snapshot: snapshot, now: monotonicNow()) { return }
         // Level is computed off the render thread by the sink; just publish it.
         level = sink.currentLevel
-        onLevelChanged?(level)
         if let start = segmentStart {
             let newElapsed = accumulated + Date().timeIntervalSince(start)
             // The on-screen counter only shows whole seconds, so publish `elapsed`

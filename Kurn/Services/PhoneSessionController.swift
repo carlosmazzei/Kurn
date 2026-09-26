@@ -23,11 +23,6 @@ private struct WatchCommandReplyHandler: @unchecked Sendable {
 final class PhoneSessionController: NSObject {
     static let shared = PhoneSessionController()
 
-    /// Minimum spacing between level pushes to the Watch, to avoid flooding
-    /// WatchConnectivity with a message on every 50ms metering tick.
-    private let levelPushInterval: TimeInterval = 0.2
-    private var lastLevelPushDate: Date?
-
     private override init() {
         super.init()
     }
@@ -70,29 +65,6 @@ final class PhoneSessionController: NSObject {
             isAvailable: false,
             highlightCount: 0
         )
-    }
-
-    func pushLevel(_ level: Float) {
-        guard WCSession.isSupported() else { return }
-        let session = WCSession.default
-        guard session.activationState == .activated, session.isReachable else { return }
-
-        let now = Date()
-        if let last = lastLevelPushDate, now.timeIntervalSince(last) < levelPushInterval { return }
-        lastLevelPushDate = now
-
-        // Send off the main thread: this runs from the recorder's 20 Hz metering
-        // tick, and WatchConnectivity IPC on the main thread caused periodic UI
-        // hitches. Capturing only `level` (Sendable) keeps it data-race free.
-        Self.sendLevelOffMain(level)
-    }
-
-    private nonisolated static func sendLevelOffMain(_ level: Float) {
-        DispatchQueue.global(qos: .utility).async {
-            let session = WCSession.default
-            guard session.activationState == .activated, session.isReachable else { return }
-            session.sendMessage([WatchSessionKey.level: level], replyHandler: nil, errorHandler: nil)
-        }
     }
 
     private func stateString(_ state: AudioRecorderService.State) -> String {
