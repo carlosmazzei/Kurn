@@ -73,7 +73,7 @@ final class AudioPlayerService: NSObject {
         title: String? = nil,
         subtitle: String? = nil,
         enhanced: Bool = false
-    ) throws {
+    ) async throws {
         if loadedFileName == fileName, isPlayingEnhanced == enhanced, player != nil { return }
         // Not `stop()`: that hands the audio session back to whatever was playing
         // before, and this is about to take it again. Switching recordings — or
@@ -94,7 +94,7 @@ final class AudioPlayerService: NSObject {
             // music: it ducks other audio correctly, and CarPlay and AirPods
             // apply their speech-tuned behaviour to it.
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
-            try AVAudioSession.sharedInstance().setActive(true)
+            try await AudioSessionActivation.setActive(true)
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = self
             player.enableRate = true
@@ -171,13 +171,13 @@ final class AudioPlayerService: NSObject {
     /// Switch between the original and the enhanced copy without losing the
     /// listener's place. `load` goes through `stop()`, which resets position and
     /// duration, so both are captured first and restored after.
-    func reload(enhanced: Bool) throws {
+    func reload(enhanced: Bool) async throws {
         guard let fileName = loadedFileName, isPlayingEnhanced != enhanced else { return }
         let position = currentTime
         let wasPlaying = isPlaying
         let title = nowPlayingTitle
         let subtitle = nowPlayingSubtitle
-        try load(fileName: fileName, title: title, subtitle: subtitle, enhanced: enhanced)
+        try await load(fileName: fileName, title: title, subtitle: subtitle, enhanced: enhanced)
         seek(to: position)
         if wasPlaying { play() }
     }
@@ -213,8 +213,10 @@ final class AudioPlayerService: NSObject {
         guard deactivatingSession else { return }
         // Hand the route back so whatever was playing before (music, a podcast)
         // can resume. Leaving the session active holds it for the whole app
-        // lifetime, since nothing else deactivates it.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // lifetime, since nothing else deactivates it. Fire-and-forget: this was
+        // already best-effort (`try?`), and running it off the main actor keeps
+        // the blocking `setActive` call from stalling `teardown`'s caller.
+        Task { try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation) }
     }
 
     // MARK: - System transport
@@ -283,7 +285,7 @@ final class AudioPlayerService: NSObject {
             }
             Task { @MainActor in
                 if self.wasPlayingBeforeInterruption, shouldResume, self.player != nil {
-                    try? AVAudioSession.sharedInstance().setActive(true)
+                    try? await AudioSessionActivation.setActive(true)
                     self.play()
                 }
                 self.wasPlayingBeforeInterruption = false

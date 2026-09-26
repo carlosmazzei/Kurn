@@ -50,22 +50,24 @@ extension MeetingDetailView {
         // fresh player for the same file. The shared coordinator keeps this
         // guard true even after leaving and reopening the detail screen.
         guard !enhancement.isEnhancing(recording) else { return }
-        do {
-            if player.loadedFileName == recording.fileName {
-                player.togglePlayPause()
-            } else {
-                try player.load(
+        if player.loadedFileName == recording.fileName {
+            player.togglePlayPause()
+            return
+        }
+        Task {
+            do {
+                try await player.load(
                     fileName: recording.fileName,
                     title: meeting.title,
                     subtitle: recording.recordedAt.formatted(date: .abbreviated, time: .shortened),
                     enhanced: shouldUseEnhanced(recording)
                 )
                 player.play()
+            } catch let error as AppError {
+                txVM?.error = error
+            } catch {
+                txVM?.error = .audioError(error.localizedDescription)
             }
-        } catch let error as AppError {
-            txVM?.error = error
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
         }
     }
 
@@ -96,32 +98,36 @@ extension MeetingDetailView {
     }
 
     private func applyEnhancement(_ enhanced: Bool) {
-        do {
-            try player.reload(enhanced: enhanced)
-        } catch let error as AppError {
-            txVM?.error = error
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
+        Task {
+            do {
+                try await player.reload(enhanced: enhanced)
+            } catch let error as AppError {
+                txVM?.error = error
+            } catch {
+                txVM?.error = .audioError(error.localizedDescription)
+            }
         }
     }
 
     func seek(_ recording: Recording, to time: TimeInterval) {
         guard !enhancement.isEnhancing(recording) else { return }
-        do {
-            if player.loadedFileName != recording.fileName {
-                try player.load(
-                    fileName: recording.fileName,
-                    title: meeting.title,
-                    subtitle: recording.recordedAt.formatted(date: .abbreviated, time: .shortened),
-                    enhanced: shouldUseEnhanced(recording)
-                )
+        Task {
+            do {
+                if player.loadedFileName != recording.fileName {
+                    try await player.load(
+                        fileName: recording.fileName,
+                        title: meeting.title,
+                        subtitle: recording.recordedAt.formatted(date: .abbreviated, time: .shortened),
+                        enhanced: shouldUseEnhanced(recording)
+                    )
+                }
+                player.seek(to: time)
+                player.play()
+            } catch let error as AppError {
+                txVM?.error = error
+            } catch {
+                txVM?.error = .audioError(error.localizedDescription)
             }
-            player.seek(to: time)
-            player.play()
-        } catch let error as AppError {
-            txVM?.error = error
-        } catch {
-            txVM?.error = .audioError(error.localizedDescription)
         }
     }
 

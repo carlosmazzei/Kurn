@@ -374,11 +374,10 @@ enum AudioRecorderEngineSupport {
         }
     }
 
-    static func deactivateSession() {
-        try? AVAudioSession.sharedInstance().setActive(
-            false,
-            options: [.notifyOthersOnDeactivation]
-        )
+    /// `async` so the (synchronously blocking) `setActive` call runs off
+    /// whichever actor its caller is isolated to, rather than stalling it.
+    static func deactivateSession() async {
+        try? await AudioSessionActivation.setActive(false, options: [.notifyOthersOnDeactivation])
     }
 
     /// Human-readable description of `AVAudioSessionInterruptionReasonKey`

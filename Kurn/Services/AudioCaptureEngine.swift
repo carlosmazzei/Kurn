@@ -94,11 +94,15 @@ final class AVFoundationCaptureEngine: AudioCaptureEngine, @unchecked Sendable {
     }
 
     func reactivateSession() {
-        try? AVAudioSession.sharedInstance().setActive(true)
+        // `setActive` is a synchronous, blocking AVFoundation call; hopping
+        // through the nonisolated `AudioSessionActivation` helper keeps that
+        // block off whichever thread called `reactivateSession()` (the
+        // recorder is `@MainActor`) instead of stalling it.
+        Task { try? await AudioSessionActivation.setActive(true) }
     }
 
     func deactivateSession() {
-        AudioRecorderEngineSupport.deactivateSession()
+        Task { await AudioRecorderEngineSupport.deactivateSession() }
     }
 
     func openOutputFile(at url: URL, bitRate: Int) throws -> any AudioFileWriting {

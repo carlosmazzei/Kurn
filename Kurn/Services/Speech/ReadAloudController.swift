@@ -113,31 +113,46 @@ final class ReadAloudController: NSObject {
         let engine: ReadAloudEngine
         do {
             engine = try Self.makeEngine(provider: provider, preferences: settings.readAloud, languageCode: language)
-            try activateAudioSession()
         } catch {
             if hadAudioSession {
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                Task { try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation) }
             }
             fail(item.id, error)
             return
         }
-        AppLog.generation.atNotice.notice("ReadAloud: start provider=\(provider.displayName, privacy: .public) chunks=\(chunks.count, privacy: .public)")
-        engine.onChunkStarted = { [weak self] index in self?.chunkStarted(index) }
-        engine.onFinished = { [weak self] in self?.stop() }
-        engine.onFailed = { [weak self] error in
-            guard let self, let id = self.item?.id else { return }
-            self.stop()
-            self.failure = (id, error)
+        // Activation is the (synchronously blocking) AVFoundation call, run
+        // through `activateAudioSession`'s `await` so it does not stall this
+        // main-actor method; everything that depends on it succeeding —
+        // wiring the engine up and starting it — waits inside the same task.
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.activateAudioSession()
+            } catch {
+                if hadAudioSession {
+                    try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation)
+                }
+                self.fail(item.id, error)
+                return
+            }
+            AppLog.generation.atNotice.notice("ReadAloud: start provider=\(provider.displayName, privacy: .public) chunks=\(chunks.count, privacy: .public)")
+            engine.onChunkStarted = { [weak self] index in self?.chunkStarted(index) }
+            engine.onFinished = { [weak self] in self?.stop() }
+            engine.onFailed = { [weak self] error in
+                guard let self, let id = self.item?.id else { return }
+                self.stop()
+                self.failure = (id, error)
+            }
+            self.engine = engine
+            self.chunks = chunks
+            self.item = item
+            self.chunkIndex = 0
+            self.chunkCount = chunks.count
+            self.phase = .preparing
+            self.nowPlaying.activate(handlers: self.makeHandlers())
+            self.publishNowPlaying()
+            engine.start(chunks, at: 0)
         }
-        self.engine = engine
-        self.chunks = chunks
-        self.item = item
-        chunkIndex = 0
-        chunkCount = chunks.count
-        phase = .preparing
-        nowPlaying.activate(handlers: makeHandlers())
-        publishNowPlaying()
-        engine.start(chunks, at: 0)
     }
 
     func pause() {
@@ -181,7 +196,7 @@ final class ReadAloudController: NSObject {
         if holdsAudioSession {
             holdsAudioSession = false
             if releasingAudioSession {
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                Task { try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation) }
             }
         }
     }
@@ -228,10 +243,10 @@ final class ReadAloudController: NSObject {
         return CloudSpeechEngine(provider: speech, languageCode: languageCode, rate: preferences.rate)
     }
 
-    private func activateAudioSession() throws {
+    private func activateAudioSession() async throws {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
-            try AVAudioSession.sharedInstance().setActive(true)
+            try await AudioSessionActivation.setActive(true)
             holdsAudioSession = true
         } catch {
             throw AppError.audioError(error.localizedDescription)
