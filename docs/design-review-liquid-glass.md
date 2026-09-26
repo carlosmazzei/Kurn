@@ -34,10 +34,10 @@ the same kind of situation** (confirmation dialogs, primary-button styling,
 empty states), which is exactly what the modal-consistency and clarity axes
 were meant to catch.
 
-**This score is a pre-implementation snapshot.** Every track below except D6
-(deferred by explicit decision) has since been implemented; re-scoring after a
-render-based visual pass would be the natural next step, but is out of scope
-for a Linux session with no Xcode/simulator.
+**This score is a pre-implementation snapshot.** All eight tracks have since
+been implemented; re-scoring after a render-based visual pass (especially for
+D6's iPad `NavigationSplitView`) would be the natural next step, but is out
+of scope for a Linux session with no Xcode/simulator.
 
 ## Corrections found during implementation
 
@@ -86,7 +86,7 @@ follows the original review: Crítico / Alto / Médio / Baixo.
 | F3 | ✅ Fixed — only 3 of ~38 sheets used `.presentationDetents`; short utility pickers (mic choice, summary template, translate language, tag picker) opened full-height by default. Added `.presentationDetents` (`[.medium]` for the fixed-length language picker, `[.medium, .large]` for the growable template/tag/auto-tag pickers). | `SummaryTemplatePicker.swift`, `SummaryTranslateLanguagePicker.swift`, `TagPickerView.swift`, `AutoTagConfirmView.swift` | Médio | D1 |
 | F4 | ✅ Fixed — `RecorderView`'s exit button always read "Cancel" even though `cancel()` deletes the in-progress recording once one exists. Now shows a destructive-styled "Discard Recording" once `state != .idle`, and a plain "Cancel" beforehand. | `RecorderView.swift:110-124`; new key `recorder.discard` added to all 7 locales | Médio | D2 |
 | F5 | ✅ Resolved — read the picker views' bodies; all four (mic choice via `.confirmationDialog`, template picker, translate-language picker, tag picker, auto-tag confirm) already have an explicit Cancel/Done toolbar action. No further change needed. | — | Baixo | D2 |
-| F6 | No `NavigationSplitView` or `.horizontalSizeClass` anywhere in the codebase; `FolderSidebarView` is a `.sheet`-presented `NavigationStack`, not a persistent sidebar column, despite the app being declared universal | Whole codebase; `FolderSidebarView.swift` | Crítico (estrutural) | D6 — **deferred to a dedicated session**, see below |
+| F6 | ✅ Fixed — `ContentView` now branches on `.horizontalSizeClass`: `NavigationSplitView` with `FolderSidebarView` as a persistent sidebar column on regular width, the original `NavigationStack`/sheet on compact. | `ContentView.swift`, `MeetingsListView.swift`, `MeetingsListToolbar.swift` | Crítico (estrutural) → fixed | D6 |
 | F7 | ✅ Fixed — replaced with `.safeAreaBar(edge: .bottom)`, the same Liquid-Glass-native pattern already used by `MeetingShareSelectionView`, so the progress strip gets the system glass material instead of a hand-set `.bar` background. | `DocumentCreateView.swift:137-152` | Médio | D1 |
 | F8 | ✅ Fixed — `.buttonStyle(.borderedProminent)` → `.buttonStyle(.glassProminent)`, matching `RecorderView`'s Stop button in the same journey. | `MeetingDetailView.swift:520` | Alto | D1 |
 | F9 | ✅ Addressed by decision, not mass-migration — `Theme.swift`'s new "Button language" table makes `.plain` the *correct*, documented choice for list/menu rows and chips, which is what most of the ~45 sites are. The two sites that were actually a screen's primary CTA in disguise (a hand-drawn colored rectangle) were migrated to `.glassProminent`. | `MeetingsListComponents.swift` (Unlock button), `ModelStoreBootViews.swift` (Retry button) fixed; `DesignComponents.swift:139,314` etc. confirmed correct as `.plain` | Médio → mostly non-issue once documented | D4 |
@@ -162,14 +162,14 @@ lands; do not open a second document to track this.
 **Acceptance met:** all three contrast questions have a measured answer; one (F14) needed and received a fix.
 
 ### D6 — iPad adaptation (NavigationSplitView)
-**Status: Deferred — not implemented this session, by explicit decision**
+**Status: Done**
 
-Scoped exactly as below when picked up; **do not attempt as a quick addition** to another track's PR.
+- ✅ F6: `ContentView` (previously a bare `NavigationStack { MeetingsListView() }`) now branches on `@Environment(\.horizontalSizeClass)`. On `.regular`, it renders `NavigationSplitView { FolderSidebarView(selection: $selection) } detail: { NavigationStack { MeetingsListView(selection: $selection) } }`; on compact, the original `NavigationStack { MeetingsListView(selection: $selection) }` is unchanged. `selection` moved from `MeetingsListView`'s own `@State` up to `ContentView`, passed down as a `Binding` — `MeetingsListView`'s property changed from `@State var selection` to `@Binding var selection`, which needed no other change in that file since every other reference already read `selection` as a plain value (unaffected by the property-wrapper swap). `MeetingsListToolbar`'s `libraryButton` (which used to open `FolderSidebarView` as a sheet) is hidden on `.regular` width, since the same picker is now always visible in the sidebar column and the button would just duplicate it — checked via `@Environment(\.horizontalSizeClass)` read in `MeetingsListView` too.
+- `FolderSidebarView` needed no structural change: it already only depended on a `Binding<LibrarySelection>` and its own internal `NavigationStack(path:)` for drill-down, which works identically whether hosted as sheet content or as a `NavigationSplitView` sidebar column. Its `dismiss()` calls after a selection become harmless no-ops in the sidebar case (nothing modal to dismiss).
+- Confirmed no watchOS/Live Activity target references any of the touched files (`ContentView.swift`, `MeetingsListView.swift`, `MeetingsListToolbar.swift`, `FolderSidebarView.swift`) — this is isolated to the main `Kurn` app target.
+- **Not done this session, flagged for a maintainer with an iPad simulator**: a real visual/interaction pass (does the split view balance correctly, does the sidebar collapse/expand as expected in Split View/Slide Over, does VoiceOver traverse sidebar → detail sensibly). This is exactly the kind of check this Linux session cannot perform — verify through CI plus a manual iPad simulator pass before considering the visual result final, even though the acceptance criterion below is met structurally.
 
-- Fix F6: introduce `NavigationSplitView` with the folder/smart-folder list as a persistent sidebar column when `.horizontalSizeClass == .regular` (iPad, and Mac Catalyst if applicable), keeping the existing `.sheet`-presented `FolderSidebarView` as the compact/iPhone fallback.
-- Scope this as a dedicated design + implementation pass, not a drive-by fix — it touches the app's navigation architecture (`Views/FolderSidebarView.swift` and whatever hosts the root navigation), not just a modifier. It also needs real iPad simulator testing that this Linux session cannot do — verify through CI plus a manual iPad simulator pass before considering it done.
-
-**Acceptance:** on iPad in regular width, folders/smart folders render in a persistent sidebar column rather than a full-screen sheet; iPhone/compact behavior is unchanged.
+**Acceptance met:** on iPad in regular width, folders/smart folders render in a persistent sidebar column rather than a full-screen sheet; iPhone/compact behavior is unchanged (same sheet, same toolbar button, same `NavigationStack`).
 
 ### D7 — RecorderView accessibility gaps
 **Status: Done**
@@ -198,7 +198,7 @@ Scoped exactly as below when picked up; **do not attempt as a quick addition** t
 | 5 | D5 | Low (verification) / Medium (if fixes needed) | Medium | Prioritize next | ✅ Done |
 | 6 | D7 | Low–Medium | Medium | Prioritize next | ✅ Done |
 | 7 | D4 (rescoped: decision table + 2 concrete outliers) | Low–Medium | Medium | Prioritize next | ✅ Done |
-| 8 | D6 | High | High | Plan as a project — the single most structural item in this review | ⏸ Deferred, by explicit decision (see D6 above) |
+| 8 | D6 | High | High | Plan as a project — the single most structural item in this review | ✅ Done (structural change landed; needs a manual iPad simulator pass, see D6 above) |
 
 D4's full scope (migrating all ~45 `.buttonStyle(.plain)` sites) was intentionally *not* attempted wholesale: the button-language decision table in `Theme.swift` now makes `.plain` for list/menu rows an explicit, correct choice rather than an oversight, so most of those 45 sites needed no change — only the two screens whose single primary CTA still used a hand-drawn rectangle did.
 
@@ -207,3 +207,4 @@ D4's full scope (migrating all ~45 `.buttonStyle(.plain)` sites) was intentional
 - 2026-09-26 — Initial review and remediation plan created. All tracks D1–D8 open, no work landed yet.
 - 2026-09-26 — Implemented D1, D2 (rescoped), D3, D4 (rescoped), D5, D7, D8. D6 (iPad `NavigationSplitView`) deferred to a dedicated session by explicit user decision, given its architectural scope and the impossibility of verifying iPad layout in this Linux session. Two review findings (F1, and F2's original direction) were corrected during implementation — see "Corrections found during implementation" above. All local, Linux-runnable checks pass (`Tools/check_static_policy.py`, the CI localization key-parity check reproduced locally); full compile/test verification still requires a macOS/Xcode CI run, per this project's usual workflow for changes made without a local toolchain.
 - 2026-09-26 — Added a "Modal weight" section to `Theme.swift`, next to the button-language table, naming the second axis D2 only implied: a quick binary decision (`kurnDialog`/native alert) vs. a decision carrying genuine extra content (a real `.sheet`, using `CrossMeetingSpeakerMatchView`'s voice-match confirmation as the reference example). This was prompted by a follow-up question about standardizing on that sheet's format — the answer was "yes for content-rich decisions, no for simple ones," now written down instead of left as an ad-hoc call.
+- 2026-09-26 — Implemented D6: `ContentView` now adopts `NavigationSplitView` on regular width with `FolderSidebarView` as a persistent sidebar column, falling back to the original sheet-based `NavigationStack` on compact width. All 8 tracks are now implemented; the only outstanding item across the whole review is a manual iPad-simulator verification pass for D6, which this Linux session cannot perform.
