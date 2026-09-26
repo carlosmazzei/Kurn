@@ -36,6 +36,14 @@ struct ReadAloudControl: View {
                 }
                 Spacer(minLength: 0)
             }
+            // The toggle button's own label swaps size/content (icon <-> spinner,
+            // "Read aloud" <-> "Pause reading") in the same instant the transport
+            // buttons and progress text appear from `if phase != .idle` above —
+            // with no explicit transition, an inherited implicit animation would
+            // otherwise interpolate through a transient, wrong-sized frame where
+            // the still-resizing button overlaps the just-appeared controls
+            // before settling. This phase change should be instant, not tweened.
+            .animation(nil, value: phase)
             if let error = controller.error(for: item.id) {
                 errorRow(error)
             }
@@ -47,14 +55,20 @@ struct ReadAloudControl: View {
             controller.toggle(item, settings: settings)
         } label: {
             HStack(spacing: 6) {
-                if phase == .preparing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: Self.icon(for: phase))
-                        .accessibilityHidden(true)
+                // Fixed-size slot: a ProgressView's intrinsic size can measure
+                // differently from the static icon it replaces on its first
+                // layout pass, which is what let the button's width fluctuate
+                // during the `.idle` -> `.preparing` transition.
+                Group {
+                    if phase == .preparing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: Self.icon(for: phase))
+                    }
                 }
+                .frame(width: 16, height: 16)
+                .accessibilityHidden(true)
                 Text(Self.title(for: phase))
             }
             .font(Theme.subheadlineEmphasized)

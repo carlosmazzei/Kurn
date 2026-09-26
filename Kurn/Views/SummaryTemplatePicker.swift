@@ -41,6 +41,10 @@ struct SummaryTemplatePicker: View {
                 }
             }
         }
+        // A short template list fits `.medium`; a longer user-defined set can
+        // grow into `.large` rather than always opening full-height for a
+        // quick "pick one" task, matching `MeetingShareSelectionView`.
+        .presentationDetents([.medium, .large])
     }
 
     private func row(_ template: SummaryTemplate) -> some View {
@@ -51,7 +55,7 @@ struct SummaryTemplatePicker: View {
                     .fill(Theme.fill)
                     .frame(width: 44, height: 44)
                 Image(systemName: template.iconName)
-                    .font(.system(size: 18))
+                    .font(.headline)
                     .foregroundStyle(Theme.accent)
                     .accessibilityHidden(true)
             }

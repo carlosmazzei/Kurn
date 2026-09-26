@@ -202,6 +202,9 @@
 "recorder.partial_saved" = "Se guardó una grabación parcial tras un fallo de captura de audio. Comprueba el espacio disponible antes de volver a grabar.";
 "recorder.recovery_failed" = "La grabación sigue sin estar disponible. El audio se conservó para que puedas volver a intentar la recuperación.";
 "recorder.title" = "Nueva Grabación";
+"recorder.discard" = "Descartar Grabación";
+"recorder.title_field.accessibility_label" = "Título de la reunión";
+"recorder.accessibility.timer_with_highlights" = "%1$@, %2$d destacados";
 "recorder.add_title" = "Añadir título…";
 "recorder.pause" = "Pausar";
 "recorder.resume" = "Reanudar";

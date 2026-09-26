@@ -38,7 +38,11 @@ struct ChatSessionListView: View {
         NavigationStack {
             Group {
                 if sessions.isEmpty {
-                    emptyState
+                    ContentUnavailableView(
+                        NSLocalizedString("chat.history.empty.title", comment: "No saved conversations title"),
+                        systemImage: "clock.arrow.circlepath",
+                        description: Text(NSLocalizedString("chat.history.empty.subtitle", comment: "No saved conversations subtitle"))
+                    )
                 } else {
                     List {
                         ForEach(sessions) { session in
@@ -90,24 +94,5 @@ struct ChatSessionListView: View {
     private func delete(at offsets: IndexSet) {
         for index in offsets { onDelete(sessions[index]) }
         sessions.remove(atOffsets: offsets)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.largeTitle)
-                .foregroundStyle(Theme.textTertiary)
-                .accessibilityHidden(true)
-            Text(NSLocalizedString("chat.history.empty.title", comment: "No saved conversations title"))
-                .font(.headline)
-                .foregroundStyle(Theme.textPrimary)
-            Text(NSLocalizedString("chat.history.empty.subtitle", comment: "No saved conversations subtitle"))
-                .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 32)
-        .accessibilityElement(children: .contain)
     }
 }

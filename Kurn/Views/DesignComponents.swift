@@ -210,6 +210,7 @@ struct KurnDialogModifier: ViewModifier {
                     Circle()
                         .fill(iconTint.opacity(0.14))
                         .frame(width: 36, height: 36)
+                    // Fixed size to fit the fixed 36x36 icon well.
                     Image(systemName: iconSystemName)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(iconTint)
@@ -301,7 +302,12 @@ struct KurnDialogModifier: ViewModifier {
 
         return Button(action: action) {
             Text(title)
-                .font(Theme.footnoteEmphasized)
+                // White text on `Theme.accent`/`Theme.info` measures ~3.55:1 /
+                // ~3.65:1 contrast — below the 4.5:1 WCAG AA floor for normal
+                // text, but above the 3:1 floor for "large text" (>=14pt
+                // bold). Bold `.subheadline` (15pt) clears that bar without
+                // touching the brand colors used identically elsewhere.
+                .font(isPrimary ? .system(.subheadline, design: .default, weight: .bold) : Theme.footnoteEmphasized)
                 .lineLimit(singleLine ? 1 : 2)
                 .fixedSize(horizontal: singleLine, vertical: true)
                 .multilineTextAlignment(.center)

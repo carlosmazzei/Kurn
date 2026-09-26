@@ -14,7 +14,7 @@ struct PrivacyCoverView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             Image(systemName: "waveform")
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.accent)
                 .accessibilityHidden(true)
         }

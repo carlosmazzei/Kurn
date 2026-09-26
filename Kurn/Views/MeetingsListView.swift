@@ -57,7 +57,13 @@ struct MeetingsListView: View {
     @State var showingDocuments = false
     private let semanticSearchService = SemanticSearchService()
     @State var filter = MeetingFilter()
-    @State var selection: LibrarySelection = .allMeetings
+    /// Owned by `ContentView`, not this view — on iPad-regular width the same
+    /// binding also drives `FolderSidebarView`'s persistent `NavigationSplitView`
+    /// sidebar column (D6, docs/design-review-liquid-glass.md), so a folder tap
+    /// there updates this list without a sheet round-trip. On compact width
+    /// `ContentView` still owns the state, just with no sidebar column reading it.
+    @Binding var selection: LibrarySelection
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var showingSidebar = false
     @State var showingFilterBar = false
     /// Set when the context-menu "Move to folder…" action is invoked; presents
@@ -196,7 +202,12 @@ struct MeetingsListView: View {
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
 
             if filtered.isEmpty {
-                emptyState.clearListRow()
+                ContentUnavailableView(
+                    NSLocalizedString("meetings.empty.title", comment: "No meetings"),
+                    systemImage: "mic.fill",
+                    description: Text(NSLocalizedString("meetings.empty.subtitle", comment: ""))
+                )
+                .clearListRow()
             } else {
                 ForEach(filtered) { meeting in
                     Button { selectedMeeting = meeting } label: {
@@ -419,22 +430,6 @@ extension MeetingsListView {
             }
             Spacer(minLength: 0)
         }
-    }
-
-    var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "mic.fill")
-                .font(.largeTitle)
-                .foregroundStyle(Theme.textTertiary)
-            Text(NSLocalizedString("meetings.empty.title", comment: "No meetings"))
-                .font(.headline)
-            Text(NSLocalizedString("meetings.empty.subtitle", comment: ""))
-                .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 80)
     }
 
     func preview(for meeting: Meeting) -> String {

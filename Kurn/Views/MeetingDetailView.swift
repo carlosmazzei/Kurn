@@ -517,7 +517,7 @@ struct MeetingDetailView: View {
                     ))
                     .font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .tint(Theme.accent)
                 .disabled(downloads.isDownloading)
             }
