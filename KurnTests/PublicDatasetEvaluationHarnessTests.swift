@@ -131,6 +131,9 @@ struct PublicDatasetEvaluationHarnessTests {
         let writer = try PublicEvaluationDataset.reportPath.map {
             try CSVReportWriter(path: $0, resuming: Self.isResuming)
         }
+        let hypothesisWriter = try PublicEvaluationDataset.hypothesesPath.map {
+            try PublicEvaluationHypothesisWriter(path: $0, resuming: Self.isResuming)
+        }
         var rows: [Row] = writer?.resumedRows ?? []
         if let resumed = writer?.resumedRows, !resumed.isEmpty {
             print("[pipeline-eval] resuming: reusing \(resumed.count) row(s) already in the report")
@@ -168,6 +171,13 @@ struct PublicDatasetEvaluationHarnessTests {
                         // limit, or is cancelled, keeps everything it had already
                         // measured instead of yielding nothing.
                         writer?.append(csvRow(for: row))
+                        hypothesisWriter?.append(
+                            corpus: item.corpusName,
+                            name: item.name,
+                            language: info.language,
+                            configuration: entry.label,
+                            output: output
+                        )
                     } catch let error as AppError {
                         if case .transcriptionLanguageUnsupported = error {
                             let reason = error.localizedDescription
@@ -242,7 +252,7 @@ struct PublicDatasetEvaluationHarnessTests {
     /// WER-only run still exercises the configuration users actually get.
     private static let diarizerForWEROnlyCorpora: DiarizationEngine = .fluidAudio
 
-    /// Writes `OPENAI_API_KEY`/`GROQ_API_KEY` (when set) into the Keychain
+    /// Writes `OPENAI_API_KEY`/`GROQ_API_KEY`/`ELEVENLABS_API_KEY` (when set) into the Keychain
     /// under the same account `ProviderFactory.whisperProvider` reads, exactly
     /// as if the user had pasted the key into Settings. This is what lets the
     /// `.whisperAPI` entries `PipelineEvaluationMatrix` adds for those
@@ -251,7 +261,7 @@ struct PublicDatasetEvaluationHarnessTests {
     /// harness".
     private func seedCloudProviderKeysFromEnvironment() {
         let environment = ProcessInfo.processInfo.environment
-        for (provider, variable) in [(AIProvider.openAI, "OPENAI_API_KEY"), (AIProvider.groq, "GROQ_API_KEY")] {
+        for (provider, variable) in PipelineEvaluationMatrix.cloudProviderKeyVariables {
             guard let key = environment[variable], !key.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
             KeychainManager.shared.set(key, for: provider.keychainAccount)
             print("[pipeline-eval] seeded \(provider.displayName) API key from \(variable)")

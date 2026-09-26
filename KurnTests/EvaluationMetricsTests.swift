@@ -160,6 +160,27 @@ struct EvaluationMetricsTests {
         #expect(result.missed == 5)
     }
 
+    /// The mapping has to be the *optimal* one, at any speaker count. Taking
+    /// the largest overlap first (Ana→S1, 10 s) strands Bruno, whose only
+    /// overlap is also S1; the optimum pairs Ana→S2 and Bruno→S1 and matches
+    /// 18 s instead of 10. Six padding speakers push the count past seven,
+    /// where the mapping used to fall back to exactly that greedy choice.
+    @Test func mappingStaysOptimalAboveSevenSpeakers() {
+        var reference = [segment("Ana", 0, 19), segment("Bruno", 19, 28)]
+        var hypothesis = [segment("S1", 0, 10), segment("S2", 10, 19), segment("S1", 19, 28)]
+        for index in 3...8 {
+            let start = TimeInterval(20 + 10 * index)
+            reference.append(segment("P\(index)", start, start + 10))
+            hypothesis.append(segment("X\(index)", start, start + 10))
+        }
+
+        let result = DiarizationErrorRate.compare(reference: reference, hypothesis: hypothesis, collar: 0)
+        #expect(result.mapping["Ana"] == "S2")
+        #expect(result.mapping["Bruno"] == "S1")
+        #expect(abs(result.confusion - 10) < 1e-9)
+        #expect(abs(result.rate - 10.0 / 88.0) < 1e-9)
+    }
+
     @Test func anEmptyHypothesisMissesEverything() {
         let result = DiarizationErrorRate.compare(
             reference: [segment("Ana", 0, 10)],

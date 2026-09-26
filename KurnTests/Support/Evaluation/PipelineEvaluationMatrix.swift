@@ -14,12 +14,12 @@
 //  diarization preprocessing is a smaller, separate knob from the four the
 //  original request asked about.
 //
-//  `.whisperAPI` (cloud Whisper — OpenAI, Groq) is opt-in and additive, not
+//  `.whisperAPI` (cloud transcription — OpenAI, Groq, ElevenLabs) is opt-in and additive, not
 //  part of the base 36. Every other engine here is on-device and free to run
 //  unattended; a cloud engine sends the recording to a third party and costs
 //  money per call, so it must never be exercised just because the matrix
 //  exists. It is included only for providers whose API key secret
-//  (`OPENAI_API_KEY` / `GROQ_API_KEY`) is actually set in the environment —
+//  (`OPENAI_API_KEY` / `GROQ_API_KEY` / `ELEVENLABS_API_KEY`) is actually set in the environment —
 //  see `.github/workflows/pipeline-eval.yml`, which wires those from repo
 //  secrets a maintainer opts into, and
 //  `PublicDatasetEvaluationHarnessTests.seedCloudProviderKeysFromEnvironment`,
@@ -44,14 +44,16 @@ enum PipelineEvaluationMatrix {
     /// The on-device combinations, expanded for every whisper.cpp model in
     /// `whisperCppModelsFromEnvironment()` when the transcription engine is
     /// `.whisperCpp`, plus for each cloud provider found in
-    /// `cloudProvidersFromEnvironment()` 8 more (preprocessing x VAD x
-    /// diarization) using `.whisperAPI` against that provider. Fixed order so
+    /// `cloudProvidersFromEnvironment()` one more per preprocessing x VAD x
+    /// diarization x model (`cloudModelsFromEnvironment()`) using `.whisperAPI`
+    /// against that provider. Fixed order so
     /// successive runs are diffable.
     static let all: [Entry] = build(
         whisperCppModels: whisperCppModelsFromEnvironment(),
         cloudProviders: cloudProvidersFromEnvironment(),
         transcriptionEngines: transcriptionEnginesFromEnvironment(),
-        diarizationEngines: diarizationEnginesFromEnvironment()
+        diarizationEngines: diarizationEnginesFromEnvironment(),
+        cloudModels: cloudModelsFromEnvironment()
     )
 
     /// On-device transcription engines to sweep. Defaults to every on-device
@@ -108,78 +110,137 @@ enum PipelineEvaluationMatrix {
         return WhisperCppModel.allCases.filter { tokens.contains($0.rawValue.lowercased()) }
     }
 
-    /// Cloud Whisper providers to add to the matrix. Decided by the
+    /// Cloud transcription providers to add to the matrix. Decided by the
     /// `KURN_PUBLIC_EVAL_CLOUD_PROVIDERS` environment variable:
     /// - `none` -> no cloud providers
-    /// - `openai`/`groq` -> only that provider (key must still be present)
-    /// - `both` or `auto` (default) -> every provider whose API key secret is
-    ///   present in the environment. This is never hardcoded as always-on.
+    /// - `openai`/`groq`/`elevenlabs`, or a comma-separated list of them ->
+    ///   only those (each key must still be present)
+    /// - `both` -> OpenAI and Groq, kept for dispatches recorded before
+    ///   ElevenLabs existed
+    /// - `auto` (default) -> every provider whose API key secret is present in
+    ///   the environment. This is never hardcoded as always-on.
     ///
     /// The CI workflow passes this as `TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS`.
     static func cloudProvidersFromEnvironment() -> [AIProvider] {
         let environment = ProcessInfo.processInfo.environment
-        let mode = environment["KURN_PUBLIC_EVAL_CLOUD_PROVIDERS"]?.lowercased() ?? "auto"
+        return cloudProviders(
+            from: environment["KURN_PUBLIC_EVAL_CLOUD_PROVIDERS"],
+            environment: environment
+        )
+    }
+
+    /// Each cloud provider the harness knows how to seed, with the secret that
+    /// carries its key. Order is the matrix order.
+    static let cloudProviderKeyVariables: [(provider: AIProvider, variable: String)] = [
+        (.openAI, "OPENAI_API_KEY"),
+        (.groq, "GROQ_API_KEY"),
+        (.elevenLabs, "ELEVENLABS_API_KEY")
+    ]
+
+    static func cloudProviders(from raw: String?, environment: [String: String]) -> [AIProvider] {
+        let mode = raw?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
         guard mode != "none" else { return [] }
 
-        let includeOpenAI = mode == "openai" || mode == "both" || mode == "auto"
-        let includeGroq = mode == "groq" || mode == "both" || mode == "auto"
+        let requested: Set<String>
+        switch mode {
+        case "", "auto":
+            requested = Set(cloudProviderKeyVariables.map { $0.provider.id.lowercased() })
+        case "both":
+            requested = [AIProvider.openAI.id.lowercased(), AIProvider.groq.id.lowercased()]
+        default:
+            requested = Set(mode.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+        }
 
-        var providers: [AIProvider] = []
-        if includeOpenAI, let key = environment["OPENAI_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
-            providers.append(.openAI)
+        return cloudProviderKeyVariables.compactMap { candidate in
+            guard requested.contains(candidate.provider.id.lowercased()),
+                  let key = environment[candidate.variable],
+                  !key.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            return candidate.provider
         }
-        if includeGroq, let key = environment["GROQ_API_KEY"], !key.trimmingCharacters(in: .whitespaces).isEmpty {
-            providers.append(.groq)
+    }
+
+    /// Transcription models to sweep per cloud provider, from
+    /// `KURN_PUBLIC_EVAL_CLOUD_MODELS` — comma-separated `provider:model`
+    /// pairs such as `openai:gpt-4o-transcribe,openai:whisper-1`. A provider
+    /// with no pair runs its `defaultTranscriptionModel` only, which is what
+    /// every run recorded before this variable existed measured.
+    static func cloudModelsFromEnvironment() -> [String: [String]] {
+        cloudModels(from: ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_CLOUD_MODELS"])
+    }
+
+    static func cloudModels(from raw: String?) -> [String: [String]] {
+        var models: [String: [String]] = [:]
+        for pair in (raw ?? "").split(separator: ",") {
+            let parts = pair.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { continue }
+            let provider = parts[0].lowercased()
+            if !(models[provider]?.contains(parts[1]) ?? false) {
+                models[provider, default: []].append(parts[1])
+            }
         }
-        return providers
+        return models
     }
 
     /// How a pipeline entry resolves its ASR: on-device engine with an optional
     /// whisper.cpp model variant, or a cloud Whisper provider.
     private enum ASRChoice {
         case onDevice(WhisperCppModel?)
-        case cloud(AIProvider)
+        case cloud(AIProvider, model: String)
     }
 
     static func build(
         whisperCppModels: [WhisperCppModel],
         cloudProviders: [AIProvider],
         transcriptionEngines: [TranscriptionEngine],
-        diarizationEngines: [DiarizationEngine]
+        diarizationEngines: [DiarizationEngine],
+        cloudModels: [String: [String]] = [:]
     ) -> [Entry] {
         var entries: [Entry] = []
         for preprocessing in PreprocessingEngine.allCases {
             for vad in VADEngine.allCases {
                 for diarization in diarizationEngines {
-                    for transcription in transcriptionEngines {
-                        if transcription == .whisperCpp {
-                            for model in whisperCppModels {
+                    // `.transcriptionProviderNative` is honored only for a cloud
+                    // provider that returns its own speaker labels; everywhere
+                    // else `effectiveDiarization` quietly runs `.heuristic`. Those
+                    // cells would re-measure the heuristic diarizer under another
+                    // name — same number, double the cost, misleading label.
+                    if diarization != .transcriptionProviderNative {
+                        for transcription in transcriptionEngines {
+                            if transcription == .whisperCpp {
+                                for model in whisperCppModels {
+                                    entries.append(entry(
+                                        preprocessing: preprocessing,
+                                        vad: vad,
+                                        diarization: diarization,
+                                        transcription: transcription,
+                                        asr: .onDevice(model)
+                                    ))
+                                }
+                            } else {
                                 entries.append(entry(
                                     preprocessing: preprocessing,
                                     vad: vad,
                                     diarization: diarization,
                                     transcription: transcription,
-                                    asr: .onDevice(model)
+                                    asr: .onDevice(nil)
                                 ))
                             }
-                        } else {
+                        }
+                    }
+                    for provider in cloudProviders {
+                        if diarization == .transcriptionProviderNative, !provider.supportsNativeDiarization {
+                            continue
+                        }
+                        let models = cloudModels[provider.id.lowercased()] ?? [provider.defaultTranscriptionModel]
+                        for model in models {
                             entries.append(entry(
                                 preprocessing: preprocessing,
                                 vad: vad,
                                 diarization: diarization,
-                                transcription: transcription,
-                                asr: .onDevice(nil)
+                                transcription: .whisperAPI,
+                                asr: .cloud(provider, model: model)
                             ))
                         }
-                    }
-                    for provider in cloudProviders {
-                        entries.append(entry(
-                            preprocessing: preprocessing,
-                            vad: vad,
-                            diarization: diarization,
-                            transcription: .whisperAPI,
-                            asr: .cloud(provider)
-                        ))
                     }
                 }
             }
@@ -211,15 +272,18 @@ enum PipelineEvaluationMatrix {
             if let model { configuration.whisperCppModel = model }
             let modelSuffix = model.map { "@\($0.rawValue)" } ?? ""
             asrLabel = "\(transcription.rawValue)\(modelSuffix)"
-        case .cloud(let provider):
+        case .cloud(let provider, let model):
             configuration.transcriptionProvider = provider
-            configuration.transcriptionModel = provider.defaultTranscriptionModel
+            configuration.transcriptionModel = model
             configuration.cloudTranscriptionConsented = true
             configuration.largeTransferPolicy = LargeTransferPolicy(
                 allowsExpensiveAccess: true,
                 allowsConstrainedAccess: true
             )
-            asrLabel = "\(transcription.rawValue):\(provider.id)"
+            // The model is named only when it is not the provider's default,
+            // so labels recorded before models could be swept still match.
+            let modelSuffix = model == provider.defaultTranscriptionModel ? "" : "@\(model)"
+            asrLabel = "\(transcription.rawValue):\(provider.id)\(modelSuffix)"
         }
 
         // "|"-separated, not ","-separated: the label is embedded as a single

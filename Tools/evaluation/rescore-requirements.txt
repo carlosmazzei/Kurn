@@ -1,0 +1,4 @@
+jiwer>=4.0
+whisper-normalizer>=0.1.12
+pyannote.metrics>=4.0
+meeteval>=0.4.3

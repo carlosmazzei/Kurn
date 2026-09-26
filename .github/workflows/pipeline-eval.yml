@@ -23,10 +23,13 @@ on:
         type: string
         default: ""
       cloud_providers:
-        description: "cloud Whisper providers to benchmark (none, openai, groq, both, auto)"
-        type: choice
-        options: [none, openai, groq, both, auto]
+        description: "cloud transcription providers: none / auto (every key present) / both (openai+groq) / comma list of openai,groq,elevenlabs"
+        type: string
         default: auto
+      cloud_models:
+        description: "extra cloud transcription models as provider:model pairs, e.g. openai:gpt-4o-transcribe (blank = each provider's default)"
+        type: string
+        default: ""
       whispercpp_models:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
@@ -36,7 +39,7 @@ on:
         type: string
         default: ""
       diarization_engines:
-        description: "diarizers to sweep: heuristic,fluidAudio,sherpaOnnx / blank=all"
+        description: "diarizers to sweep: heuristic,fluidAudio,sherpaOnnx,transcriptionProviderNative / blank=all"
         type: string
         default: ""
       correction:
@@ -74,6 +77,7 @@ jobs:
       IOS_DESTINATION: platform=iOS Simulator,name=iPhone 17
       DATASET_DIR: ${{ github.workspace }}/.kurn-eval-public
       REPORT_PATH: ${{ github.workspace }}/.kurn-eval-public/report.csv
+      HYPOTHESES_PATH: ${{ github.workspace }}/.kurn-eval-public/hypotheses.jsonl
 
     steps:
       - name: Checkout
@@ -89,8 +93,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dataset-fetch dependencies
-        run: python3 -m pip install -r Tools/evaluation/public_datasets/requirements.txt
+      - name: Install dataset-fetch and rescoring dependencies
+        run: |
+          python3 -m pip install -r Tools/evaluation/public_datasets/requirements.txt
+          python3 -m pip install -r Tools/evaluation/rescore-requirements.txt
 
       # ffmpeg for the AMI fetch (clipping each meeting to its first N minutes).
       - name: Install ffmpeg
@@ -99,12 +105,13 @@ jobs:
             brew install ffmpeg
           fi
 
-      # Datasets change rarely; keyed on the manifest so an edit invalidates it.
+      # Datasets change rarely; keyed on the manifest and fetchers so an edit
+      # to either (e.g. a new reference file) invalidates it.
       - name: Cache public datasets
         uses: actions/cache@v6
         with:
           path: ${{ env.DATASET_DIR }}
-          key: kurn-eval-public-${{ hashFiles('Tools/evaluation/public_datasets/manifest.json') }}
+          key: kurn-eval-public-${{ hashFiles('Tools/evaluation/public_datasets/**') }}
 
       - name: Fetch public datasets
         env:
@@ -127,8 +134,10 @@ jobs:
           # stripped before reaching ProcessInfo.processInfo.environment.
           TEST_RUNNER_KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_HYPOTHESES: ${{ env.HYPOTHESES_PATH }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_MODELS: ${{ github.event.inputs.cloud_models }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_ENGINES: ${{ github.event.inputs.transcription_engines }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_DIARIZATION_ENGINES: ${{ github.event.inputs.diarization_engines }}
@@ -148,6 +157,7 @@ jobs:
           # corresponding key is actually present. See public_datasets/README.md.
           TEST_RUNNER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TEST_RUNNER_GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TEST_RUNNER_ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         run: |
           set -o pipefail
           xcodebuild \
@@ -172,6 +182,18 @@ jobs:
             --commit "${{ github.sha }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --out "$RUNNER_TEMP/pipeline-evaluation.md" || true
+          # The same pipeline output, re-scored by the reference tools
+          # (Whisper normalizers + jiwer, pyannote.metrics, meeteval). Adds the
+          # numbers comparable to published results, cpWER for meetings, and a
+          # cross-check of the harness's own scorer against the CSV.
+          if [ -s "$HYPOTHESES_PATH" ]; then
+            python3 Tools/evaluation/rescore.py \
+              --data "$DATASET_DIR" \
+              --hypotheses "$HYPOTHESES_PATH" \
+              --report "$REPORT_PATH" \
+              --csv "$RUNNER_TEMP/rescore.csv" \
+              --markdown "$RUNNER_TEMP/rescore.md" || true
+          fi
           {
             echo "## Pipeline evaluation report"
             echo
@@ -179,6 +201,10 @@ jobs:
               cat "$RUNNER_TEMP/pipeline-evaluation.md"
               echo
               echo "Paste the above into \`docs/pipeline-evaluation.md\` to record this run."
+              echo
+            fi
+            if [ -s "$RUNNER_TEMP/rescore.md" ]; then
+              cat "$RUNNER_TEMP/rescore.md"
               echo
             fi
             echo "<details><summary>Raw <code>[pipeline-eval]</code> output</summary>"
@@ -197,6 +223,9 @@ jobs:
           name: pipeline-eval-report
           path: |
             ${{ env.REPORT_PATH }}
+            ${{ env.HYPOTHESES_PATH }}
+            ${{ runner.temp }}/rescore.csv
+            ${{ runner.temp }}/rescore.md
             ${{ runner.temp }}/pipeline-eval.log
             ${{ runner.temp }}/pipeline-evaluation.md
           if-no-files-found: warn

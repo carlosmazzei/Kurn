@@ -154,14 +154,19 @@ def speech_seconds(rttm_text: str) -> float:
 
 
 def words_from_xml(data: bytes) -> list[tuple[float, str]]:
-    """`(starttime, word)` for every timed, non-punctuation `<w>` in one file.
+    """`(starttime, word)` for every timed, non-punctuation `<w>` in one file."""
+    return [(start, text) for start, _end, text in timed_words_from_xml(data)]
+
+
+def timed_words_from_xml(data: bytes) -> list[tuple[float, float, str]]:
+    """`(starttime, endtime, word)` for every timed, non-punctuation `<w>`.
 
     Everything else in the file -- `<vocalsound>`, `<gap>`, `<disfmarker>` --
     is not lexical content and is skipped by only ever looking at `w` tags.
     Untimed words exist (a handful per meeting) and are dropped rather than
     guessed at: without a time they cannot be ordered against other speakers.
     """
-    words: list[tuple[float, str]] = []
+    words: list[tuple[float, float, str]] = []
     root = ET.fromstring(data)
     for element in root.iter():
         if element.tag.rsplit("}", 1)[-1] != "w":
@@ -173,9 +178,11 @@ def words_from_xml(data: bytes) -> list[tuple[float, str]]:
         if start is None or not text:
             continue
         try:
-            words.append((float(start), text))
+            begin = float(start)
+            end = float(element.get("endtime", start))
         except ValueError:
             continue
+        words.append((begin, max(begin, end), text))
     return words
 
 
@@ -252,6 +259,38 @@ def transcript_for(
         return None
 
     return " ".join(text for _, text in words) + "\n"
+
+
+def speaker_attributed_reference(
+    archive: zipfile.ZipFile,
+    members: list[str],
+    meeting_id: str,
+    clip_seconds: float,
+) -> list[dict]:
+    """The clip's words as SegLST, one entry per word, labelled by AMI agent.
+
+    SegLST is `meeteval`'s native format, and what its speaker-attributed
+    metrics (cpWER, tcpWER -- the CHiME and NOTSOFAR meeting-transcription
+    measures) read. Speaker labels are AMI's agent slots (`A`-`E`), which is
+    fine: those metrics score under the best speaker permutation, like DER.
+    Called only once `transcript_for` accepted the same words, so it needs no
+    plausibility check of its own.
+    """
+    entries: list[dict] = []
+    for member in members:
+        agent = WORDS_MEMBER.search(member)["agent"]
+        for start, end, text in timed_words_from_xml(archive.read(member)):
+            if start >= clip_seconds:
+                continue
+            entries.append({
+                "session_id": meeting_id,
+                "speaker": agent,
+                "start_time": round(start, 3),
+                "end_time": round(min(end, clip_seconds), 3),
+                "words": text,
+            })
+    entries.sort(key=lambda entry: (entry["start_time"], entry["speaker"]))
+    return entries
 
 
 def fetch(entry: dict, out_dir: Path) -> None:
@@ -343,6 +382,10 @@ def fetch(entry: dict, out_dir: Path) -> None:
             )
             if transcript:
                 (out_dir / f"{meeting_id}.reference.txt").write_text(transcript, encoding="utf-8")
+                seglst = speaker_attributed_reference(archive, words_index[meeting_id], meeting_id, clip_seconds)
+                (out_dir / f"{meeting_id}.reference.seglst.json").write_text(
+                    json.dumps(seglst, ensure_ascii=False) + "\n", encoding="utf-8"
+                )
                 scored_wer += 1
         elif archive is not None:
             print(

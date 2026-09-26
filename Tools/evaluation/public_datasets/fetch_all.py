@@ -55,7 +55,7 @@ def print_summary(manifest: dict, token: str | None, only: list[str] | None) -> 
         if only and entry["id"] not in only:
             skipped.append((entry, "not selected by --only"))
             continue
-        if not entry.get("enabled", True):
+        if not entry.get("enabled", True) and not (only and entry["id"] in only):
             skipped.append((entry, "disabled in manifest"))
             continue
         if entry.get("requires_token") and not token:
@@ -97,7 +97,10 @@ def main() -> None:
     for entry in manifest["corpora"]:
         if args.only and entry["id"] not in args.only:
             continue
-        if not entry.get("enabled", True):
+        # Naming a corpus in --only is an explicit opt-in, and is the only way
+        # to reach a disabled one: it stays out of a default sweep, but a
+        # dispatch that asks for it by id gets it.
+        if not entry.get("enabled", True) and not (args.only and entry["id"] in args.only):
             print(f"[fetch] skipping {entry['id']} (disabled in manifest.json)", flush=True)
             continue
         if entry.get("requires_token") and not token:

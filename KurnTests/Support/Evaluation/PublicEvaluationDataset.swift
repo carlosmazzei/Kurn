@@ -42,6 +42,20 @@ enum PublicEvaluationDataset {
     /// printed regardless of whether this is set.
     static let reportVariable = "KURN_PUBLIC_EVAL_REPORT"
 
+    /// Optional path to a JSON Lines file receiving every cell's hypothesis —
+    /// fused segments (speaker, times, text) and the diarizer's raw turns — so
+    /// `Tools/evaluation/rescore.py` can re-score the same output with the
+    /// industry's reference tools (Whisper's normalizers + `jiwer`,
+    /// `pyannote.metrics`, `meeteval`). Public audio only, so nothing private
+    /// is written.
+    static let hypothesesVariable = "KURN_PUBLIC_EVAL_HYPOTHESES"
+
+    static var hypothesesPath: String? {
+        guard let raw = ProcessInfo.processInfo.environment[hypothesesVariable],
+              !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return NSString(string: raw).expandingTildeInPath
+    }
+
     static var directoryPath: String? {
         guard let raw = ProcessInfo.processInfo.environment[directoryVariable],
               !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
