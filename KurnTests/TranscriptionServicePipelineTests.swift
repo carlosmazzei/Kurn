@@ -82,6 +82,37 @@ struct TranscriptionServicePipelineTests {
         #expect(harness.diarizer.requestedEngines == [.heuristic])
     }
 
+    /// A cloud model answers a clip with no intelligible speech with `""`.
+    /// That used to reach fusion as an empty segment and make the integrity
+    /// gate reject the whole transcription (`emptySegmentText`) — 8 of 1080
+    /// cells in the 2026-09-26 public-dataset run.
+    @Test func whitespaceOnlySpansAreDroppedInsteadOfFailingTheRun() async throws {
+        let url = try Self.fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let harness = FakeEngines(regions: Self.regions)
+        harness.transcriber.setSpans([
+            TranscribedSpan(text: "hello", start: 0.2, end: 1.2),
+            TranscribedSpan(text: "  ", start: 1.8, end: 2.8)
+        ])
+
+        let output = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: Self.config()
+        )
+        #expect(output.segments.map(\.text) == ["hello"])
+
+        harness.transcriber.setSpans([TranscribedSpan(text: "", start: 0, end: 0)])
+        let silent = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: Self.config()
+        )
+        #expect(silent.segments.isEmpty)
+    }
+
     @Test func unconsentedNeuralDiarizerFallsBackWithWarningAndDegradedReport() async throws {
         let url = try Self.fixture()
         defer { try? FileManager.default.removeItem(at: url) }

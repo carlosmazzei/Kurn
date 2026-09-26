@@ -247,10 +247,16 @@ struct TranscriptionService {
         AppLog.transcription.atNotice.notice("transcribe: engine done in \(Date().timeIntervalSince(txStart), privacy: .public)s spans=\(raw.spans.count, privacy: .public) turns=\(turns.count, privacy: .public) turnSpeakers=\(turnSpeakers.count, privacy: .public) [\(turnSpeakers.sorted().joined(separator: ", "), privacy: .public)]")
 
         // 5. Fuse text spans with speaker turns into attributed segments.
+        // Whitespace-only spans carry no content — a cloud model answers a
+        // clip with no intelligible speech with `""` rather than nothing — and
+        // fused into a segment they made the integrity gate reject the *whole*
+        // transcription as `emptySegmentText`. Dropped here, before anything
+        // counts them as input.
+        let spans = raw.spans.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         onPhase(.finalizing)
         try await ResourceGuard.requireTranscriptionHeadroom()
         let segments = TranscriptFusion.segments(
-            spans: raw.spans,
+            spans: spans,
             turns: turns,
             maxSegmentDuration: maxSegmentDuration
         )
@@ -260,8 +266,8 @@ struct TranscriptionService {
         // of storing it.
         reportBuilder.record(
             .fusion,
-            segments.isEmpty && !raw.spans.isEmpty ? .failed : .succeeded,
-            reason: segments.isEmpty && !raw.spans.isEmpty ? .noInput : nil
+            segments.isEmpty && !spans.isEmpty ? .failed : .succeeded,
+            reason: segments.isEmpty && !spans.isEmpty ? .noInput : nil
         )
 
         // 6. Optionally correct transcription errors via the opt-in LLM stage —
@@ -286,7 +292,7 @@ struct TranscriptionService {
         if let failure = TranscriptIntegrityGate.validate(
             segments: correctedSegments,
             sourceDuration: fileDuration,
-            hadTranscribedInput: !raw.spans.isEmpty
+            hadTranscribedInput: !spans.isEmpty
         ) {
             AppLog.transcription.atError.error("transcribe: integrity gate rejected output: \(failure.rawValue, privacy: .public)")
             throw AppError.transcriptIntegrityFailed(failure.rawValue)
