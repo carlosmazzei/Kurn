@@ -34,8 +34,15 @@ class FlowUITestCase: XCTestCase {
     /// Pushes one Settings destination by its hub-row identifier.
     func openSettingsScreen(_ identifier: String) {
         openSettings()
+        // The hub is a lazy `Form`: a row below the fold is not in the
+        // hierarchy at all until scrolled to, so wait for the hub itself, then
+        // swipe until the row materializes.
+        XCTAssertTrue(app.buttons["settings.link.providers"].waitForExistence(timeout: 10), "Settings hub missing")
         let row = app.buttons[identifier]
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Settings row \(identifier) missing")
+        for _ in 0..<6 where !row.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "Settings row \(identifier) missing")
         scrollIntoSafeArea(row)
         row.tap()
     }
