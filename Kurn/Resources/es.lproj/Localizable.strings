@@ -915,3 +915,33 @@
 "quarantine.reason.too_short" = "Grabación demasiado corta";
 "quarantine.reason.collision" = "Conflicto de nombre durante la migración";
 "quarantine.reason.unknown" = "Motivo desconocido";
+
+/* Read aloud (text-to-speech) */
+"error.speech_synthesis" = "No se pudo leer en voz alta: %@";
+"read_aloud.error.unsupported" = "%@ no puede leer texto en voz alta.";
+"read_aloud.error.no_audio" = "El proveedor de voz no devolvió audio reproducible.";
+"read_aloud.error.invalid_voice" = "El ID de voz solo puede contener letras y números.";
+"read_aloud.error.empty" = "No hay nada que leer.";
+"read_aloud.progress" = "%1$d de %2$d";
+"read_aloud.previous" = "Párrafo anterior";
+"read_aloud.next" = "Párrafo siguiente";
+"read_aloud.stop" = "Detener lectura";
+"read_aloud.dismiss_error" = "Descartar";
+"read_aloud.start" = "Leer en voz alta";
+"read_aloud.pause" = "Pausar";
+"read_aloud.resume" = "Reanudar";
+"read_aloud.kind.summary" = "Resumen";
+"read_aloud.kind.wiki" = "Wiki de la reunión";
+"read_aloud.kind.document" = "Documento";
+"settings.read_aloud.title" = "Lectura en voz alta";
+"settings.read_aloud.voice_section" = "Voz";
+"settings.read_aloud.voice" = "Voz";
+"settings.read_aloud.voice_automatic" = "Automática (según el idioma del texto)";
+"settings.read_aloud.custom_voice" = "ID de voz personalizado";
+"settings.read_aloud.custom_model" = "Modelo personalizado";
+"settings.read_aloud.on_device_footer" = "La voz en el dispositivo funciona sin conexión y nada sale de tu iPhone. Puedes descargar voces de mayor calidad en Ajustes de iOS › Accesibilidad › Contenido leído › Voces.";
+"settings.read_aloud.cloud_footer" = "El texto que se lee se envía a %@ para generar la voz. El audio se reproduce desde la memoria y nunca se guarda.";
+"settings.read_aloud.speed" = "Velocidad";
+"settings.read_aloud.preview" = "Vista previa";
+"settings.read_aloud.preview_footer" = "La lectura en voz alta está disponible en resúmenes, artículos de la wiki de reuniones y documentos generados.";
+"settings.read_aloud.sample" = "Así sonarán tus resúmenes, artículos de la wiki y documentos cuando se lean en voz alta.";

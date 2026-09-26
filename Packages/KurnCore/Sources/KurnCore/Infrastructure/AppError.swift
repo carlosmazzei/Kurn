@@ -57,6 +57,10 @@ public enum AppError: LocalizedError, Identifiable {
     /// doesn't expose that route (e.g. ElevenLabs, transcription-only). The
     /// associated string is the provider's display name for the message.
     case summarizationUnsupported(provider: String)
+    /// Reading a summary, wiki article or document aloud failed — the speech
+    /// provider returned nothing playable, or the audio could not be opened.
+    /// Provider HTTP failures keep their own cases (`.apiError`, `.noAPIKey`, …).
+    case speechSynthesisFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     public var id: String { errorDescription ?? "AppError" }
@@ -101,6 +105,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .transcriptIntegrityFailed: return "transcript_integrity"
         case .keychainAccessFailed: return "keychain_access"
         case .summarizationUnsupported: return "summarization_unsupported"
+        case .speechSynthesisFailed: return "speech_synthesis"
         }
     }
 
@@ -281,6 +286,11 @@ public enum AppError: LocalizedError, Identifiable {
             return String(
                 format: NSLocalizedString("error.summarization_unsupported", comment: "Provider does not support summarization"),
                 provider
+            )
+        case .speechSynthesisFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.speech_synthesis", comment: "Read aloud failed"),
+                detail
             )
         }
     }

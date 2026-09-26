@@ -11,7 +11,8 @@
 //  summary-provider picker. `summarize`/`chat` throw
 //  `AppError.summarizationUnsupported` rather than being implemented —
 //  `streamChat` needs no override, since `LLMProvider`'s own extension falls
-//  back to `chat`, which already throws the right error.
+//  back to `chat`, which already throws the right error. Its text-to-speech
+//  route is a separate seam, `ElevenLabsSpeechProvider` (read aloud).
 //
 
 import Foundation

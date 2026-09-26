@@ -116,6 +116,9 @@ final class AudioPlayerService: NSObject {
 
     func play() {
         guard let player else { return }
+        // Re-claims the Lock Screen controls after `yieldToOtherAudio()` handed
+        // them to read-aloud; a no-op while this player already holds them.
+        nowPlaying.activate(handlers: makeHandlers())
         player.play()
         player.rate = playbackRate
         isPlaying = true
@@ -181,6 +184,17 @@ final class AudioPlayerService: NSObject {
 
     func stop() {
         teardown(deactivatingSession: true)
+    }
+
+    /// Pause and release the Lock Screen controls, keeping the loaded file and
+    /// position, because other in-app audio (read-aloud) is taking over. The
+    /// audio session stays active — the other player is using it now.
+    func yieldToOtherAudio() {
+        guard player != nil else { return }
+        // Deactivate first so `pause()` publishes nothing over the metadata
+        // the other player has just put on the Lock Screen.
+        nowPlaying.deactivate()
+        pause()
     }
 
     private func teardown(deactivatingSession: Bool) {

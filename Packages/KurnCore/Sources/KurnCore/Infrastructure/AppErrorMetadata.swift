@@ -61,7 +61,7 @@ extension AppError {
             return .provider
         case .transcriptionFailed, .transcriptionLanguageUnsupported:
             return .transcription
-        case .audioError:
+        case .audioError, .speechSynthesisFailed:
             return .audio
         case .decodingError, .persistenceFailed, .protectedStorageUnavailable, .logExportFailed:
             return .storage
@@ -107,7 +107,7 @@ extension AppError {
              .persistenceFailed, .modelDownloadFailed, .resourceUnavailable, .authenticationFailed,
              .autoTaggingFailed, .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed,
              .titleGenerationFailed, .documentGenerationFailed, .transcriptIntegrityFailed,
-             .keychainAccessFailed:
+             .keychainAccessFailed, .speechSynthesisFailed:
             return true
         default:
             return false
@@ -122,7 +122,8 @@ extension AppError {
         case .networkError, .apiError, .ambiguousProviderResult, .transcriptionFailed,
              .persistenceFailed, .modelDownloadFailed, .authenticationFailed, .autoTaggingFailed,
              .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed, .titleGenerationFailed,
-             .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed:
+             .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed,
+             .speechSynthesisFailed:
             return .retry
         case .noAPIKey, .invalidProviderURL, .networkPolicyRestricted, .permissionDenied,
              .authenticationNotAvailable:
@@ -164,7 +165,8 @@ extension AppError {
              .wikiGenerationFailed(let detail),
              .titleGenerationFailed(let detail),
              .documentGenerationFailed(let detail),
-             .onDeviceModelUnavailable(let detail):
+             .onDeviceModelUnavailable(let detail),
+             .speechSynthesisFailed(let detail):
             return detail
         case .networkError(let urlError):
             return urlError.localizedDescription

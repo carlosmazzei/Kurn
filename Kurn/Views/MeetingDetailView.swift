@@ -146,6 +146,7 @@ struct MeetingDetailView: View {
         .toolbar { toolbarContent }
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
         .onDisappear { player.stop() }
+        .readAloudCoordination(player: player, meetingID: meeting.id, isRecording: showingRecorder)
         .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
         .sheet(isPresented: $showingRecorder) {
             NavigationStack { RecorderView(meeting: meeting) }

@@ -30,6 +30,8 @@ struct MeetingWikiView: View {
                 .font(.caption)
                 .foregroundStyle(Theme.textSecondary)
 
+                ReadAloudControl(item: .wiki(article))
+
                 MarkdownText(article.bodyMarkdown)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)

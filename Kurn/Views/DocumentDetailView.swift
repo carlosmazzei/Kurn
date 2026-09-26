@@ -12,6 +12,8 @@ struct DocumentDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                ReadAloudControl(item: .document(document))
+
                 MarkdownText(document.bodyMarkdown)
                     .textSelection(.enabled)
 
@@ -52,6 +54,7 @@ struct DocumentDetailView: View {
         .sheet(item: $shareItem) { item in
             ActivityView(items: item.urls)
         }
+        .onDisappear { ReadAloudController.shared.stop(owner: document.id) }
     }
 
     private func detailRow(title: String, value: String) -> some View {

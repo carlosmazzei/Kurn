@@ -69,6 +69,13 @@ struct SettingsView: View {
                 ) {
                     WikiSettingsView(keyRevision: keyRevision)
                 }
+                link(
+                    NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
+                    systemImage: "speaker.wave.2",
+                    identifier: "settings.link.readAloud"
+                ) {
+                    ReadAloudSettingsView(keyRevision: keyRevision)
+                }
             } header: {
                 Text(NSLocalizedString("settings.group.intelligence", comment: "Intelligence group"))
             }
