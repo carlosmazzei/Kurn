@@ -114,7 +114,7 @@ struct FolderPickerView: View {
             if hasChildren {
                 Button { path.append(folder) } label: {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.textTertiary)
                         .padding(.leading, 10)
                         .padding(.vertical, 6)
@@ -136,7 +136,7 @@ struct FolderPickerView: View {
             Spacer()
             if isSelected {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, weight: .semibold))
                     .foregroundStyle(Theme.accent)
                     .accessibilityHidden(true)
             }

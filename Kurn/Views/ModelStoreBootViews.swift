@@ -102,20 +102,25 @@ struct ModelStoreRecoveryView: View {
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
-        .alert(
-            NSLocalizedString("common.error", comment: "Error"),
-            isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.errorMessage = nil } })
-        ) {
-            Button(NSLocalizedString("common.ok", comment: "OK")) { viewModel.errorMessage = nil }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
-        }
+        // `kurnDialog`, not a bare native `.alert`, to match every other
+        // confirmation/error surface in the app (`.errorAlert` above wraps the
+        // same component) — this was the one screen still using the system
+        // alert directly, which is now the outlier rather than the pattern.
+        .kurnDialog(
+            isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.errorMessage = nil } }),
+            iconSystemName: "exclamationmark.triangle.fill",
+            iconTint: Theme.warning,
+            title: NSLocalizedString("common.error", comment: "Error"),
+            message: viewModel.errorMessage ?? "",
+            primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
+            primaryAction: { viewModel.errorMessage = nil }
+        )
     }
 
     private var header: some View {
         VStack(spacing: 18) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 44))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.warning)
                 .accessibilityHidden(true)
             Text(NSLocalizedString("store_recovery.title", comment: "Kurn couldn't open your data"))
@@ -131,15 +136,16 @@ struct ModelStoreRecoveryView: View {
     }
 
     private var retryButton: some View {
+        // The one action this screen exists for — Liquid Glass primary
+        // button language (Theme.swift, "Button language").
         Button(action: retry) {
             Text(NSLocalizedString("store_recovery.retry", comment: "Retry"))
                 .font(Theme.subheadlineEmphasized)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .foregroundStyle(.white)
+                .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glassProminent)
+        .tint(Theme.accent)
         .accessibilityIdentifier("storeRecovery.retryButton")
     }
 

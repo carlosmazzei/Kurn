@@ -15,6 +15,7 @@ struct TemplateRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            // Fixed size to fit the fixed 32x32 icon well.
             Image(systemName: template.iconName)
                 .font(.system(size: 16))
                 .foregroundStyle(Theme.accent)
