@@ -75,4 +75,11 @@ struct PipelineEvaluationMatrixTests {
         #expect(labels == ["whisperAPI:openAI@gpt-4o-transcribe", "whisperAPI:openAI"])
         #expect(Set(entries.map(\.configuration.transcriptionModel)) == ["gpt-4o-transcribe", "whisper-1"])
     }
+
+    @Test func corpusSelectionAcceptsSpacesOrCommasAndBlankMeansAll() {
+        #expect(PublicEvaluationDataset.selectedCorpora(from: nil) == nil)
+        #expect(PublicEvaluationDataset.selectedCorpora(from: "  ") == nil)
+        #expect(PublicEvaluationDataset.selectedCorpora(from: "ami-en voxconverse-en") == ["ami-en", "voxconverse-en"])
+        #expect(PublicEvaluationDataset.selectedCorpora(from: "ami-en,coraa-pt") == ["ami-en", "coraa-pt"])
+    }
 }

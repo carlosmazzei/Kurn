@@ -94,7 +94,11 @@ def kurn_tokens(text: str) -> list[str]:
     folded = unicodedata.normalize("NFKC", text).lower()
     words, current = [], []
     for character in folded:
-        if character.isalnum():
+        # Swift splits on `Character`s, which are grapheme clusters: a
+        # combining mark (Devanagari vowel signs, Arabic harakat) belongs to
+        # the letter before it. Python iterates code points, where `isalnum()`
+        # is false for those marks and would cut the word in two.
+        if character.isalnum() or (current and unicodedata.category(character).startswith("M")):
             current.append(character)
         elif current:
             words.append("".join(current))
@@ -266,6 +270,7 @@ def cross_check(rows: list[dict], report: Path) -> str:
             harness[(line["corpus"], line["name"], line["configuration"])] = line
 
     worst_wer, worst_der, compared = 0.0, 0.0, 0
+    mismatches: list[tuple[float, str]] = []
     for row in rows:
         line = harness.get((row["corpus"], row["name"], row["configuration"]))
         if line is None:
@@ -275,17 +280,30 @@ def cross_check(rows: list[dict], report: Path) -> str:
             errors, length = wer_pair(row["kurn"])
             harness_errors = sum(int(line[key]) for key in ("wer_sub", "wer_ins", "wer_del"))
             if length:
-                worst_wer = max(worst_wer, abs(errors - harness_errors) / length * 100)
+                gap = abs(errors - harness_errors) / length * 100
+                worst_wer = max(worst_wer, gap)
+                if gap > 1e-9:
+                    mismatches.append((
+                        gap,
+                        f"{row['corpus']}/{row['name']} [{row['configuration']}]: "
+                        f"rescore {errors}/{length}, harness {harness_errors}/{line['wer_ref']}",
+                    ))
         if "der_fused_nist" in row and line.get("der_pct"):
             errors, total = row["der_fused_nist"]
             if total:
                 worst_der = max(worst_der, abs(100 * errors / total - float(line["der_pct"])))
+    detail = ""
+    if mismatches:
+        mismatches.sort(reverse=True)
+        detail = "\n\nLargest WER disagreements (errors/reference tokens):\n\n" + "\n".join(
+            f"- {text}" for _, text in mismatches[:10]
+        )
     return (
         f"Cross-check against the harness CSV over {compared} cell(s): "
         f"max |ΔWER| = {worst_wer:.4f} pp (kurn normalizer), "
         f"max |ΔDER| = {worst_der:.4f} pp (fused, ±0.25 s). "
         "Anything above rounding noise means the two scorers disagree."
-    )
+    ) + detail
 
 
 def main() -> None:

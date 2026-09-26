@@ -56,6 +56,20 @@ enum PublicEvaluationDataset {
         return NSString(string: raw).expandingTildeInPath
     }
 
+    /// Optional corpus ids (directory names, space- or comma-separated) to
+    /// evaluate; everything else under the data directory is ignored. The
+    /// workflow's dataset cache keeps every corpus a previous run fetched, so
+    /// narrowing only the *fetch* still scored all of them — and for a cloud
+    /// engine that is paid calls nobody asked for.
+    static let corporaVariable = "KURN_PUBLIC_EVAL_CORPORA"
+
+    static func selectedCorpora(from raw: String?) -> Set<String>? {
+        let ids = (raw ?? "")
+            .split(whereSeparator: { $0 == "," || $0.isWhitespace })
+            .map(String.init)
+        return ids.isEmpty ? nil : Set(ids)
+    }
+
     static var directoryPath: String? {
         guard let raw = ProcessInfo.processInfo.environment[directoryVariable],
               !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
@@ -122,9 +136,11 @@ enum PublicEvaluationDataset {
             at: root, includingPropertiesForKeys: [.isDirectoryKey]
         )
 
+        let selected = selectedCorpora(from: ProcessInfo.processInfo.environment[corporaVariable])
         var results: [(CorpusInfo, [Item])] = []
         for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
+            if let selected, !selected.contains(entry.lastPathComponent) { continue }
             let infoURL = entry.appendingPathComponent("dataset.json")
             guard let data = try? Data(contentsOf: infoURL),
                   let info = try? JSONDecoder().decode(CorpusInfo.self, from: data) else { continue }

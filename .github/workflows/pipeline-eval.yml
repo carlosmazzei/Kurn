@@ -134,6 +134,9 @@ jobs:
           # stripped before reaching ProcessInfo.processInfo.environment.
           TEST_RUNNER_KURN_PUBLIC_EVAL_DATA: ${{ env.DATASET_DIR }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_REPORT: ${{ env.REPORT_PATH }}
+          # The dataset cache holds every corpus earlier runs fetched, so the
+          # selection has to reach the harness too, not just the fetch.
+          TEST_RUNNER_KURN_PUBLIC_EVAL_CORPORA: ${{ github.event.inputs.corpora }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_HYPOTHESES: ${{ env.HYPOTHESES_PATH }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_MATRIX: ${{ github.event.inputs.matrix }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
