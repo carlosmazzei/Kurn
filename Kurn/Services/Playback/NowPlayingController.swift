@@ -38,7 +38,7 @@ final class NowPlayingController {
 
     /// Matches the skip interval the in-app transport offers, and is what the
     /// Lock Screen renders inside the arrow glyphs.
-    static let skipInterval: TimeInterval = 15
+    nonisolated static let skipInterval: TimeInterval = 15
 
     private var handlers: Handlers?
     private var isActive = false
