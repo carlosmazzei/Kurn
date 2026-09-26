@@ -123,7 +123,7 @@ struct AcknowledgementsView: View {
                     content
                     Spacer()
                     Image(systemName: "arrow.up.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(.caption, weight: .semibold))
                         .foregroundStyle(Theme.textTertiary)
                 }
             }

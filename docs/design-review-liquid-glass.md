@@ -34,6 +34,46 @@ the same kind of situation** (confirmation dialogs, primary-button styling,
 empty states), which is exactly what the modal-consistency and clarity axes
 were meant to catch.
 
+**This score is a pre-implementation snapshot.** Every track below except D6
+(deferred by explicit decision) has since been implemented; re-scoring after a
+render-based visual pass would be the natural next step, but is out of scope
+for a Linux session with no Xcode/simulator.
+
+## Corrections found during implementation
+
+Two findings from the original code-only review turned out to be wrong once
+implementation cross-checked them against files the review's Explore pass
+didn't read in full (`Theme.swift`, `View+ErrorAlert.swift`, and the UI test
+suite). Both are corrected here rather than silently fixed, since the original
+severity ratings and the D2 track description above were written on the wrong
+premise.
+
+- **F1 was a false positive.** `Theme.accent` is not a neutral brand color —
+  it's defined as `Color(hex: "#FF3B30")`, which *is* system red. `kurnDialog`
+  already renders its destructive button in `Theme.accent` (red) and its
+  normal primary button in `Theme.info` (blue): the destructive/non-destructive
+  color distinction was correct all along. No code change was needed for F1;
+  it is closed as verified-correct rather than fixed.
+- **F2's direction was backwards.** The review read "3 competing confirmation
+  mechanisms" as the custom `kurnDialog` being 25 outliers against 1 native
+  `.alert`. In fact the app's shared `errorAlert(_:)` view modifier — used
+  across most of `Views/` for surfacing `AppError` — itself wraps `kurnDialog`,
+  making `kurnDialog` the deliberate, established convention, not a deviation
+  from it. The lone native `.alert` in `ModelStoreBootViews.swift` was the
+  actual outlier and has been migrated to `kurnDialog` for consistency (see D2
+  below) — the reverse of the original recommendation to migrate `kurnDialog`
+  to native `.alert`.
+- **Migrating `kurnDialog` wholesale would have broken CI.**
+  `KurnUITests/Flows/LibraryFlowUITests.swift` and `SettingsFlowUITests.swift`
+  drive `kurnDialog` directly through its `dialog.title`/`dialog.primary`/
+  `dialog.secondary` accessibility identifiers (also documented in this
+  project's CLAUDE.md, "Accessibility" section). A native SwiftUI `.alert`
+  does not expose equivalent stable per-button identifiers, so replacing the
+  ~25 `kurnDialog` call sites with native alerts, as the original F2
+  recommended, would have broken these required `ui-accessibility-tests`. D2 is
+  rescoped accordingly: **keep `kurnDialog`** as the app's confirmation/alert
+  component; only the single native-`.alert` outlier moves.
+
 ## Findings register
 
 Each finding below is tagged with the track (D1–D8) that will fix it. Severity
@@ -41,24 +81,24 @@ follows the original review: Crítico / Alto / Médio / Baixo.
 
 | ID | Finding | File(s) | Severity | Track |
 |----|---------|---------|----------|-------|
-| F1 | `kurnDialog`'s destructive button uses `Theme.accent`, not a semantic red — a destructive action is visually indistinguishable from a normal primary action | `DesignComponents.swift:298` | Crítico | D2 |
-| F2 | Three competing confirmation mechanisms: native `.alert` (1 use), native `.confirmationDialog` (3 uses), custom `kurnDialog` (~25 uses) that redraws system-alert chrome with `RoundedRectangle` buttons | `DesignComponents.swift:230-316` + ~25 call sites | Alto | D2 |
-| F3 | Only 3 of ~38 sheets use `.presentationDetents`; short utility pickers (mic choice, summary template, translate language, tag picker) open full-height by default | `CrossMeetingSpeakerMatchView.swift:86`, `MeetingShareSelectionView.swift:89`, `MeetingsListView.swift:347`, and the pickers lacking detents | Médio | D1 |
-| F4 | `RecorderView`'s dismiss chrome (title-bar "Cancel" text only, no Done/X) differs from the Cancel/Done toolbar pattern used by `MeetingFormView`/`DocumentCreateView`, and from the Share sheet's pure-swipe pattern | `RecorderView.swift:110-117,177` | Médio | D2 |
-| F5 | Sheets for mic choice / template picker / translate-language picker / tag picker have no confirmed toolbar dismiss at the call site | Various pickers | Baixo–Médio (unconfirmed) | D2 |
-| F6 | No `NavigationSplitView` or `.horizontalSizeClass` anywhere in the codebase; `FolderSidebarView` is a `.sheet`-presented `NavigationStack`, not a persistent sidebar column, despite the app being declared universal | Whole codebase; `FolderSidebarView.swift` | Crítico (estrutural) | D6 |
-| F7 | Single `.background(.bar)` leftover, likely a pre-Liquid-Glass custom bottom bar | `DocumentCreateView.swift:150` | Médio | D1 |
-| F8 | Sole remaining `.buttonStyle(.borderedProminent)` in the app, in the same recording/detail journey where `RecorderView`'s Stop button uses `.glassProminent` | `MeetingDetailView.swift:520` | Alto | D1 |
-| F9 | ~45 uses of `.buttonStyle(.plain)` with hand-drawn backgrounds standing in for real buttons, each reimplementing press feedback and material independently | `DesignComponents.swift:139,314`, `FolderPickerView.swift`, `MeetingChatView.swift`, `TagManagementView.swift`, others | Médio | D4 |
-| F10 | Four coexisting "primary button" visual languages: `.glassProminent`, `.borderedProminent`, `kurnDialog`'s custom colored buttons, and unstyled `.plain` rows | App-wide | Alto | D4 |
-| F11 | ~35 call sites use `.font(.system(size:))` with no `@ScaledMetric`/Theme font, so that text does not scale with Dynamic Type unlike the rest of the app | `FolderSidebarView.swift`, `MeetingChatView.swift`, `FilterBarView.swift`, `TranscriptView.swift`, ~30 more (full list in review transcript) | Alto | D3 |
-| F12 | `SummaryView.swift:80` uses `.font(.system(size: 6))` — verify whether decorative or real text | `SummaryView.swift:80` | Médio (pending verification) | D3 |
-| F13 | `DesignComponents.swift:193` scrim uses fixed `Color.black.opacity(0.42)` instead of an adaptive `Material` | `DesignComponents.swift:193` | Médio (not verifiable without render) | D5 |
-| F14 | `DesignComponents.swift:300` uses fixed `Color.white` foreground on `kurnDialog`'s primary button, whose background is `Theme.accent` — contrast in light mode unverified | `DesignComponents.swift:300` | Médio (not verifiable without render) | D5 |
-| F15 | `RecorderView`'s forced dark backdrop (`Color.black`, `.preferredColorScheme(.dark)`) and white text are an intentional, documented exception, but were never validated for WCAG AA contrast against the radial-gradient background | `RecorderView.swift:77,121,208,211,222,241,279,381` | Baixo (known, accepted exception) | D5 |
-| F16 | Recorder's status/timer/highlight-count cluster has no `.accessibilityElement(children: .combine)`, so VoiceOver announces three unrelated elements instead of one composed status | `RecorderView.swift` status cluster | Médio | D7 |
-| F17 | Recorder's title `TextField` has no explicit `.accessibilityLabel`, relying on the placeholder, which VoiceOver stops reading once the field has a value | `RecorderView.swift:233-247` | Médio | D7 |
-| F18 | Three divergent empty-state implementations: `ContentUnavailableView` (Documents, 2 uses) vs. two independently hand-rolled, near-identical `VStack` empty states | `DocumentsListView.swift:28`, `DocumentCreateView.swift:212`, `MeetingsListView.swift:424-438`, `ChatSessionListView.swift:95-109` | Médio | D8 |
+| F1 | ~~`kurnDialog`'s destructive button uses `Theme.accent`, not a semantic red~~ — **false positive, see "Corrections" above**: `Theme.accent` already *is* system red (`#FF3B30`); destructive/normal roles were already colored correctly | `DesignComponents.swift:298` | ~~Crítico~~ Closed, no change needed | D2 |
+| F2 | ~~Three competing confirmation mechanisms~~ — **direction corrected, see "Corrections" above**: `kurnDialog` is the app's deliberate, established convention (the shared `errorAlert` modifier wraps it), and is required as-is by `LibraryFlowUITests`/`SettingsFlowUITests`. The actual outlier was the single native `.alert` in `ModelStoreBootViews.swift`, migrated to `kurnDialog` instead. | `ModelStoreBootViews.swift:105` (fixed); `DesignComponents.swift:230-316` (kept, confirmed correct) | Médio (was Alto, rescoped) | D2 |
+| F3 | ✅ Fixed — only 3 of ~38 sheets used `.presentationDetents`; short utility pickers (mic choice, summary template, translate language, tag picker) opened full-height by default. Added `.presentationDetents` (`[.medium]` for the fixed-length language picker, `[.medium, .large]` for the growable template/tag/auto-tag pickers). | `SummaryTemplatePicker.swift`, `SummaryTranslateLanguagePicker.swift`, `TagPickerView.swift`, `AutoTagConfirmView.swift` | Médio | D1 |
+| F4 | ✅ Fixed — `RecorderView`'s exit button always read "Cancel" even though `cancel()` deletes the in-progress recording once one exists. Now shows a destructive-styled "Discard Recording" once `state != .idle`, and a plain "Cancel" beforehand. | `RecorderView.swift:110-124`; new key `recorder.discard` added to all 7 locales | Médio | D2 |
+| F5 | ✅ Resolved — read the picker views' bodies; all four (mic choice via `.confirmationDialog`, template picker, translate-language picker, tag picker, auto-tag confirm) already have an explicit Cancel/Done toolbar action. No further change needed. | — | Baixo | D2 |
+| F6 | No `NavigationSplitView` or `.horizontalSizeClass` anywhere in the codebase; `FolderSidebarView` is a `.sheet`-presented `NavigationStack`, not a persistent sidebar column, despite the app being declared universal | Whole codebase; `FolderSidebarView.swift` | Crítico (estrutural) | D6 — **deferred to a dedicated session**, see below |
+| F7 | ✅ Fixed — replaced with `.safeAreaBar(edge: .bottom)`, the same Liquid-Glass-native pattern already used by `MeetingShareSelectionView`, so the progress strip gets the system glass material instead of a hand-set `.bar` background. | `DocumentCreateView.swift:137-152` | Médio | D1 |
+| F8 | ✅ Fixed — `.buttonStyle(.borderedProminent)` → `.buttonStyle(.glassProminent)`, matching `RecorderView`'s Stop button in the same journey. | `MeetingDetailView.swift:520` | Alto | D1 |
+| F9 | ✅ Addressed by decision, not mass-migration — `Theme.swift`'s new "Button language" table makes `.plain` the *correct*, documented choice for list/menu rows and chips, which is what most of the ~45 sites are. The two sites that were actually a screen's primary CTA in disguise (a hand-drawn colored rectangle) were migrated to `.glassProminent`. | `MeetingsListComponents.swift` (Unlock button), `ModelStoreBootViews.swift` (Retry button) fixed; `DesignComponents.swift:139,314` etc. confirmed correct as `.plain` | Médio → mostly non-issue once documented | D4 |
+| F10 | ✅ Addressed — the button-language decision table now names exactly one style per situation (`Theme.swift`); the `.borderedProminent` outlier (F8) is fixed, and `kurnDialog`'s buttons are confirmed correct rather than a fourth competing language (see F1/F2 corrections). | `Theme.swift` "Button language" section | Alto → resolved | D4 |
+| F11 | ✅ Fixed — all ~35 call sites either moved to a `Theme` semantic font or a scalable `.system(.textStyle, weight:)` call (matching `Theme.swift`'s own construction), or were left as a documented fixed-geometry exception (icon inside a small fixed circle/grid cell, e.g. `RecorderView`'s transport buttons, folder icon/color pickers, chat composer send/stop buttons) with an inline comment explaining why. | ~35 sites across `Views/` (see D3 implementation notes) | Alto → fixed | D3 |
+| F12 | ✅ Verified — `SummaryView.swift:80`'s size-6 `circle.fill` is a decorative bullet marker (`.accessibilityHidden(true)`), not text. No change needed. | `SummaryView.swift:80` | Médio → closed, verified decorative | D3 |
+| F13 | ✅ Verified, no change needed — the scrim dims the background behind the dialog card the same way the system's own sheet/alert dimming does; WCAG contrast criteria apply to text/UI-component contrast, not a background-dimming layer. | `DesignComponents.swift:193` | Médio → closed, verified correct | D5 |
+| F14 | ✅ Confirmed via WCAG computation and fixed — white on `Theme.accent`/`Theme.info` measures ~3.55:1/~3.65:1, below the 4.5:1 AA floor for normal text. Fixed by using bold `.subheadline` (≥14pt bold "large text", 3:1 floor) for the button label instead of `Theme.footnoteEmphasized`. | `DesignComponents.swift:298-305` | Médio → confirmed real, fixed | D5 |
+| F15 | ✅ Verified via WCAG computation — worst-case background luminance (gradient center, `.recording` state) yields ~19:1 contrast for white text, far above AAA. The documented exception is confirmed safe. | `RecorderView.swift:77,121,208,211,222,241,279,381` | Baixo → verified safe | D5 |
+| F16 | ✅ Fixed, narrower than first proposed — the elapsed time and highlight count (`timer`) were the actual two-separate-nodes problem (`statusBadge`'s icon is already `.accessibilityHidden`, so it was already a single node); combining `statusBadge` into the same element would have required reordering `startingIndicator` out from between them, a layout change out of scope for an accessibility fix. `timer` now combines into one composed label ("12:34, 2 highlights") only when there's a count to report; visual layout is unchanged. | `RecorderView.swift` `timer` | Médio → fixed | D7 |
+| F17 | ✅ Fixed — explicit `.accessibilityLabel` added to the title `TextField`, independent of the placeholder. | `RecorderView.swift:243-260` | Médio → fixed | D7 |
+| F18 | ✅ Fixed — the two hand-rolled `VStack` empty states were migrated to `ContentUnavailableView`, matching the pattern already used in Documents. | `MeetingsListView.swift`, `ChatSessionListView.swift` (fixed); `DocumentsListView.swift:28`, `DocumentCreateView.swift:212` (already correct) | Médio → fixed | D8 |
 
 Findings confirmed as **already correct** (no action needed, kept here as a
 baseline so a future change doesn't regress them): consistent `role:
@@ -77,88 +117,92 @@ scope, acceptance criteria, and status. Mark a track's status inline as work
 lands; do not open a second document to track this.
 
 ### D1 — Low-effort / high-impact fixes (quick wins)
-**Status: Open**
+**Status: Done**
 
-- Fix F8: change `MeetingDetailView.swift:520` from `.buttonStyle(.borderedProminent)` to `.buttonStyle(.glassProminent)` with `.tint(Theme.accent)`, matching `RecorderView`'s Stop button.
-- Fix F3: add `.presentationDetents([.medium])` (or `[.medium, .large]` where content can grow, e.g. the template list) to the short utility pickers: mic choice, summary template picker, translate-language picker, tag picker.
-- Fix F7: replace `DocumentCreateView.swift:150`'s `.background(.bar)` with a `ToolbarItem`/`.safeAreaBar` using `.glassProminent`, consistent with `MeetingsListToolbar`.
+- ✅ F8: `MeetingDetailView.swift:520` changed from `.buttonStyle(.borderedProminent)` to `.buttonStyle(.glassProminent)`, matching `RecorderView`'s Stop button.
+- ✅ F3: added `.presentationDetents` to the short utility pickers: `[.medium]` on `SummaryTranslateLanguagePicker` (fixed 7-language list), `[.medium, .large]` on `SummaryTemplatePicker`, `TagPickerView` and `AutoTagConfirmView` (lists that can grow with user-created content).
+- ✅ F7: `DocumentCreateView.swift`'s `.safeAreaInset(edge: .bottom) { ... .background(.bar) }` replaced with `.safeAreaBar(edge: .bottom) { ... }`, the same Liquid-Glass pattern `MeetingShareSelectionView` already uses, so the generation-progress strip gets the system glass material automatically instead of a hand-set one.
 
-**Acceptance:** no more `.borderedProminent` in the codebase; the four named pickers open at `.medium` height; zero remaining `.background(.bar)` matches outside intentional system chrome.
+**Acceptance met:** no more `.borderedProminent` in the codebase; the four named pickers open at `.medium`/`[.medium, .large]` height; zero remaining `.background(.bar)` outside intentional system chrome.
 
 ### D2 — Unify confirmation/alert mechanisms
-**Status: Open**
+**Status: Done — rescoped, see "Corrections found during implementation" above**
 
-- Fix F1 first as a standalone, minimal patch (change `kurnDialog`'s destructive button color to the system red), since it's the most severe individual finding and safe to ship independently of the larger F2 migration.
-- Fix F2: migrate `kurnDialog` call sites to native `.alert(_:isPresented:actions:)` wherever the situation is a simple binary confirmation (the majority of the ~25 uses). Keep a custom component only where content genuinely exceeds what `.alert` supports.
-- Fix F4: align `RecorderView`'s exit affordance with the Cancel/Done vocabulary used by `MeetingFormView`/`DocumentCreateView`; keep the swipe-disable guard during active recording, but make the exit action's label reflect its real consequence (e.g. a destructive "Discard" once a recording exists).
-- Resolve F5: read the picker views' bodies to confirm whether they have their own dismiss affordance; if not, add a minimal `.cancellationAction` toolbar item, with particular attention to iPad/Mac Catalyst where swipe-to-dismiss may not be discoverable.
+- F1 required no change: verified `kurnDialog` already colors destructive vs. normal primary buttons correctly (`Theme.accent` red vs. `Theme.info` blue).
+- F2 rescoped: rather than migrating `kurnDialog` to native `.alert`, ✅ migrated the app's one native-`.alert` outlier (`ModelStoreBootViews.swift:105`, a single-OK-button error dialog) to `kurnDialog`, matching the convention the shared `errorAlert(_:)` modifier already establishes elsewhere. `kurnDialog` itself is kept as-is.
+- ✅ F4: `RecorderView`'s exit `ToolbarItem` now reads "Discard Recording" with `role: .destructive` once `vm.state != .idle || vm.isStarting` (the same condition already gating `.interactiveDismissDisabled`), and plain "Cancel" with `role: .cancel` beforehand — the label and role now match the real consequence of `RecorderViewModel.cancel()`, which deletes the in-progress recording. New localization key `recorder.discard` added to all 7 locales.
+- ✅ F5: confirmed all picker sheets (mic choice, template, translate-language, tag, auto-tag) already expose an explicit Cancel/Done or Cancel/Save toolbar action; no further change needed.
 
-**Acceptance:** every confirmation/alert in the app is either a native `.alert`, a native `.confirmationDialog`, or a documented exception; no destructive action renders in a non-destructive color; every sheet has a discoverable dismiss path independent of swipe.
+**Acceptance met:** the app's confirmation/alert surfaces are consistently `kurnDialog` (decisions) or `.confirmationDialog` (contextual choice among 3+ options), with the one-line exception now folded in; no destructive action renders in a non-destructive color; every sheet has a discoverable dismiss path independent of swipe.
 
 ### D3 — Dynamic Type coverage
-**Status: Open**
+**Status: Done**
 
-- Fix F11: audit and replace the ~35 `.font(.system(size:))` call sites with `Theme`'s semantic fonts where the text is real content (timestamps, chip labels, captions). Where a fixed size is intentional (a decorative glyph, a small badge), wrap in `@ScaledMetric`, following the pattern already used correctly in `RecorderView.swift:72,220`.
-- Resolve F12: confirm whether `SummaryView.swift:80`'s size-6 font is decorative; if not, raise it to at least `.caption2` with `@ScaledMetric` if a small size is still required by design.
+- ✅ F11: all ~35 `.font(.system(size:))` call sites were triaged individually. Real content next to or standing for text (checkmarks, chevrons, list icons, chat timestamp/citation icons) moved to a matching `Theme` semantic font or a scalable `.system(.textStyle, weight:)` call — the same construction `Theme.swift` itself uses, so it required no new API. Icons genuinely constrained by a small fixed well/circle/grid-cell (folder icon/color pickers, the chat composer's send/stop buttons, `kurnDialog`'s icon, avatar initials, `RecorderView`'s transport controls) were left at a fixed size with an inline comment explaining why scaling them would overflow their container — the same reasoning `RecorderView`'s existing `@ScaledMetric` exception already documents.
+- ✅ F12: confirmed `SummaryView.swift:80`'s size-6 `circle.fill` is a decorative, `.accessibilityHidden` bullet marker, not text. No change needed.
 
-**Acceptance:** no `.font(.system(size:))` call site outside `RecorderView`'s documented fixed-geometry exception lacks either a `Theme` semantic font or `@ScaledMetric`.
+**Acceptance met:** no `.font(.system(size:))` call site lacks either a `Theme`/scalable semantic font or an inline comment documenting a fixed-geometry exception.
 
 ### D4 — Unify primary-button visual language
-**Status: Open**
+**Status: Done — rescoped to a decision plus targeted fixes, not a full migration**
 
-- Define, in `Theme.swift` (or a short new "Button language" note near it), which style corresponds to: primary action of a screen, secondary action, and destructive confirmation. This is a decision to write down once, not a per-file judgment call each time.
-- Fix F10 by migrating outliers to that definition, starting with any screen's single clearest "primary action of this screen" button.
-- Fix F9 opportunistically as touched: prioritize `.plain`-styled elements that function as a screen's primary action over incidental list/menu rows, which may legitimately stay `.plain`.
+- ✅ Added a "Button language" section to `Theme.swift` naming exactly one style per situation: `.glassProminent` + `Theme.accent` for a screen's primary action, `.bordered` for a secondary action alongside one, `kurnDialog` for confirmation/destructive decisions (not a bespoke button — see D2/F1/F2 corrections), and `.plain` for list/menu rows and chips.
+- ✅ F10: resolved by that decision — the `.borderedProminent` outlier (F8) is fixed, and `kurnDialog` is confirmed correct rather than a fourth competing language, so no fourth visual language remains for "primary action of a screen."
+- ✅ F9, addressed by decision rather than mass migration: most of the ~45 `.buttonStyle(.plain)` sites are list/menu rows or chips, which the decision table now makes an explicit, correct choice, not an oversight. The two sites that actually were a screen's single primary CTA drawn as a hand-rolled colored rectangle — `LockedRecordingsView`'s "Unlock" button (`MeetingsListComponents.swift`) and `ModelStoreRecoveryView`'s "Retry" button (`ModelStoreBootViews.swift`) — were migrated to `.glassProminent`.
 
-**Acceptance:** a documented button-style decision table exists; the app has at most one visual language for "primary action of a screen" (excluding `kurnDialog`'s buttons, which D2 either removes or brings in line).
+**Acceptance met:** a documented button-style decision table exists in `Theme.swift`; the app has at most one visual language for "primary action of a screen." Full migration of every `.plain` site was deliberately not attempted — see the priority matrix note below.
 
 ### D5 — Contrast verification pass
-**Status: Open**
+**Status: Done**
 
-- Resolve F13: test `DesignComponents.swift:193`'s `Color.black.opacity(0.42)` scrim in Dark Mode; replace with an adaptive `Material` if contrast is insufficient.
-- Resolve F14: measure `Color.white` on `Theme.accent` (light mode) for `kurnDialog`'s primary button against WCAG AA (4.5:1); switch to an adaptive foreground if it fails. Superseded by D2 wherever `kurnDialog` itself is migrated to native `.alert`.
-- Resolve F15: manually check WCAG AA contrast for `RecorderView`'s white text against its radial-gradient background at both ends of the gradient. No structural change expected — this is a verification, not a redesign, of an accepted exception.
+- ✅ F13 verified, no change needed: the `Color.black.opacity(0.42)` scrim (`DesignComponents.swift:193`) sits behind the dialog card to dim whatever was on screen, the same role the system's own `.sheet`/`.alert` dimming layer plays — WCAG contrast criteria apply to text/UI-component contrast, not to a background-dimming layer, and the card's own text still reads against the adaptive `Theme.surface`. No render was needed to settle this, only the reasoning.
+- ✅ F14 confirmed and fixed by manual WCAG computation (no render needed — the color values are known constants): white text on `Theme.accent` (#FF3B30) measures **~3.55:1**, and on `Theme.info` (#0A84FF) **~3.65:1** — both below the 4.5:1 AA floor for normal text, though above the 3:1 floor for "large text" (≥14pt bold). Fixed by bumping `kurnDialog`'s primary-button label from `Theme.footnoteEmphasized` (13pt semibold) to bold `.subheadline` (15pt bold) in `DesignComponents.swift`, which clears the large-text 3:1 bar without changing the brand colors used identically across the app.
+- ✅ F15 verified safe by computation: `RecorderView`'s white text sits on a background whose worst case (center of the radial gradient, `.recording` state) is `Theme.accent` at 12% opacity over black — a luminance of ~0.0045, giving white text a contrast of **~19:1**, far above even AAA (7:1). The forced-dark exception is confirmed safe as documented, no change needed.
 
-**Acceptance:** all three contrast questions above have a measured answer (pass/fail with the actual ratio), not an assumption.
+**Acceptance met:** all three contrast questions have a measured answer; one (F14) needed and received a fix.
 
 ### D6 — iPad adaptation (NavigationSplitView)
-**Status: Open — largest single track, treat as its own mini-project**
+**Status: Deferred — not implemented this session, by explicit decision**
+
+Scoped exactly as below when picked up; **do not attempt as a quick addition** to another track's PR.
 
 - Fix F6: introduce `NavigationSplitView` with the folder/smart-folder list as a persistent sidebar column when `.horizontalSizeClass == .regular` (iPad, and Mac Catalyst if applicable), keeping the existing `.sheet`-presented `FolderSidebarView` as the compact/iPhone fallback.
-- Scope this as a dedicated design + implementation pass, not a drive-by fix — it touches the app's navigation architecture (`Views/FolderSidebarView.swift` and whatever hosts the root navigation), not just a modifier.
+- Scope this as a dedicated design + implementation pass, not a drive-by fix — it touches the app's navigation architecture (`Views/FolderSidebarView.swift` and whatever hosts the root navigation), not just a modifier. It also needs real iPad simulator testing that this Linux session cannot do — verify through CI plus a manual iPad simulator pass before considering it done.
 
 **Acceptance:** on iPad in regular width, folders/smart folders render in a persistent sidebar column rather than a full-screen sheet; iPhone/compact behavior is unchanged.
 
 ### D7 — RecorderView accessibility gaps
-**Status: Open**
+**Status: Done**
 
-- Fix F16: wrap the status/timer/highlight-count cluster in `.accessibilityElement(children: .combine)` with a composed label (e.g. "Recording, 12:34, 2 highlights").
-- Fix F17: add an explicit `.accessibilityLabel` to the meeting-title `TextField`, independent of its placeholder text.
-- Once F16/F17 land, consider bringing `RecorderView` into `KurnUITests/AccessibilityAuditUITests.swift`'s coverage (currently explicitly excluded per CLAUDE.md), adapting the audit for its fixed immersive layout.
+- ✅ F16, rescoped during implementation: combining the full status+timer+highlight cluster into one VoiceOver element would have required moving `startingIndicator` out from between `statusBadge` and `timer` in the view tree (SwiftUI accessibility grouping requires the grouped views to share a container), which is a layout change with no accessibility justification of its own — reverted after an initial attempt reordered it. `statusBadge` was already effectively a single node (its icon is `.accessibilityHidden`), so the real two-separate-nodes problem was only inside `timer` (elapsed time and highlight count), which now combines into one composed label ("12:34, 2 highlights") exactly when there's a count to report, with **zero layout change**. New localization key `recorder.accessibility.timer_with_highlights` (all 7 locales); `recorder.title_field.accessibility_label` (F17) unaffected.
+- ✅ F17: the meeting-title `TextField` now carries an explicit `.accessibilityLabel` (new key `recorder.title_field.accessibility_label`, all 7 locales), independent of its placeholder text.
+- Not done this session: bringing `RecorderView` into `KurnUITests/AccessibilityAuditUITests.swift`'s coverage — left as a follow-up, since it needs a macOS/Xcode toolchain to write and verify against.
 
-**Acceptance:** VoiceOver announces the Recorder's live status as one composed phrase; the title field has a label that survives once text is entered; `RecorderView` has a tracked path to audit coverage (even if not landed in this track).
+**Acceptance met (revised):** the elapsed-time/highlight-count pair reads as one composed phrase instead of two unrelated stops, without changing the screen's layout; the title field has a label that survives once text is entered. Audit-suite coverage remains a follow-up.
 
 ### D8 — Consolidate empty states
-**Status: Open**
+**Status: Done**
 
-- Fix F18: migrate `MeetingsListView.swift:424-438` and `ChatSessionListView.swift:95-109` to `ContentUnavailableView`, with `actions:` for the relevant CTAs ("Record a meeting", "New conversation"), matching the pattern already used in `DocumentsListView.swift:28` and `DocumentCreateView.swift:212`.
+- ✅ F18: `MeetingsListView`'s and `ChatSessionListView`'s hand-rolled `VStack` empty states were removed and replaced with `ContentUnavailableView`, matching the pattern already used in `DocumentsListView.swift`/`DocumentCreateView.swift`. No `actions:` CTA was added — the existing copy in both ("Tap + to create your first meeting…") refers to chrome outside the empty state itself (the toolbar's record button / the Ask sheet's own entry points), so adding a duplicate in-view action would have been a second way to do the same thing rather than a clarification.
 
-**Acceptance:** every empty state in the app is a `ContentUnavailableView`; zero hand-rolled `VStack`-based empty states remain.
+**Acceptance met:** every empty state in the app is now a `ContentUnavailableView`; zero hand-rolled `VStack`-based empty states remain.
 
 ## Priority matrix
 
-| # | Track | Effort | Impact | Quadrant |
-|---|-------|--------|--------|----------|
-| 1 | D1 (all three fixes) | Low | Medium–High | Do now |
-| 2 | D2 — F1 only (destructive color) | Low | High | Do now |
-| 3 | D8 | Low–Medium | Medium | Do now |
-| 4 | D3 | Medium | High | Prioritize next |
-| 5 | D5 | Low (verification) / Medium (if fixes needed) | Medium | Prioritize next |
-| 6 | D7 | Low–Medium | Medium | Prioritize next |
-| 7 | D2 — remaining `kurnDialog` migration | High | High | Plan as a project |
-| 8 | D4 (full unification) | High | High | Plan as a project |
-| 9 | D6 | High | High | Plan as a project — the single most structural item in this review |
+| # | Track | Effort | Impact | Quadrant | Outcome |
+|---|-------|--------|--------|----------|---------|
+| 1 | D1 (all three fixes) | Low | Medium–High | Do now | ✅ Done |
+| 2 | D2 (rescoped) | Low | Medium | Do now | ✅ Done |
+| 3 | D8 | Low–Medium | Medium | Do now | ✅ Done |
+| 4 | D3 | Medium | High | Prioritize next | ✅ Done |
+| 5 | D5 | Low (verification) / Medium (if fixes needed) | Medium | Prioritize next | ✅ Done |
+| 6 | D7 | Low–Medium | Medium | Prioritize next | ✅ Done |
+| 7 | D4 (rescoped: decision table + 2 concrete outliers) | Low–Medium | Medium | Prioritize next | ✅ Done |
+| 8 | D6 | High | High | Plan as a project — the single most structural item in this review | ⏸ Deferred, by explicit decision (see D6 above) |
+
+D4's full scope (migrating all ~45 `.buttonStyle(.plain)` sites) was intentionally *not* attempted wholesale: the button-language decision table in `Theme.swift` now makes `.plain` for list/menu rows an explicit, correct choice rather than an oversight, so most of those 45 sites needed no change — only the two screens whose single primary CTA still used a hand-drawn rectangle did.
 
 ## Change log
 
-- 2026-09-26 — Initial review and remediation plan created (this document). All tracks D1–D8 open, no work landed yet.
+- 2026-09-26 — Initial review and remediation plan created. All tracks D1–D8 open, no work landed yet.
+- 2026-09-26 — Implemented D1, D2 (rescoped), D3, D4 (rescoped), D5, D7, D8. D6 (iPad `NavigationSplitView`) deferred to a dedicated session by explicit user decision, given its architectural scope and the impossibility of verifying iPad layout in this Linux session. Two review findings (F1, and F2's original direction) were corrected during implementation — see "Corrections found during implementation" above. All local, Linux-runnable checks pass (`Tools/check_static_policy.py`, the CI localization key-parity check reproduced locally); full compile/test verification still requires a macOS/Xcode CI run, per this project's usual workflow for changes made without a local toolchain.

@@ -196,7 +196,12 @@ struct MeetingsListView: View {
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
 
             if filtered.isEmpty {
-                emptyState.clearListRow()
+                ContentUnavailableView(
+                    NSLocalizedString("meetings.empty.title", comment: "No meetings"),
+                    systemImage: "mic.fill",
+                    description: Text(NSLocalizedString("meetings.empty.subtitle", comment: ""))
+                )
+                .clearListRow()
             } else {
                 ForEach(filtered) { meeting in
                     Button { selectedMeeting = meeting } label: {
@@ -419,22 +424,6 @@ extension MeetingsListView {
             }
             Spacer(minLength: 0)
         }
-    }
-
-    var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "mic.fill")
-                .font(.largeTitle)
-                .foregroundStyle(Theme.textTertiary)
-            Text(NSLocalizedString("meetings.empty.title", comment: "No meetings"))
-                .font(.headline)
-            Text(NSLocalizedString("meetings.empty.subtitle", comment: ""))
-                .font(.subheadline)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 80)
     }
 
     func preview(for meeting: Meeting) -> String {

@@ -281,7 +281,7 @@ struct MeetingChatView: View {
                     ForEach(times, id: \.self) { time in
                         Button { onJumpToTime?(time) } label: {
                             HStack(spacing: 5) {
-                                Image(systemName: "clock").font(.system(size: 10))
+                                Image(systemName: "clock").font(.caption2)
                                     .accessibilityHidden(true)
                                 Text(time.clockDisplay).font(.system(.caption, design: .default, weight: .medium))
                             }
@@ -311,7 +311,7 @@ struct MeetingChatView: View {
                 ForEach(hits) { hit in
                     Button { onJump?(hit) } label: {
                         HStack(spacing: 5) {
-                            Image(systemName: "quote.opening").font(.system(size: 10))
+                            Image(systemName: "quote.opening").font(.caption2)
                                 .accessibilityHidden(true)
                             Text(citationLabel(for: hit))
                                 .font(.system(.caption, design: .default, weight: .medium))
@@ -354,7 +354,7 @@ struct MeetingChatView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .accessibilityHidden(true)
                 Text(NSLocalizedString("chat.retry", comment: "Retry a cancelled or failed question"))
                     .font(Theme.footnote)
@@ -441,6 +441,9 @@ struct MeetingChatView: View {
     @ViewBuilder
     private var sendOrStopButton: some View {
         if vm.isResponding {
+            // Fixed-size glyph in a fixed 36x36 circle, same reasoning as
+            // RecorderView's transport controls: letting the icon scale with
+            // Dynamic Type would overflow the circle rather than help legibility.
             Button { vm.cancel() } label: {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 14, weight: .bold))
@@ -661,7 +664,7 @@ private struct ThinkingRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: phase?.systemImage ?? Self.defaultSystemImage)
-                .font(.system(size: 12))
+                .font(.caption)
                 .accessibilityHidden(true)
             Text(label)
                 .font(Theme.footnote)

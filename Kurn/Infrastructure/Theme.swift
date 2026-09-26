@@ -78,6 +78,31 @@ enum Theme {
     static let caption2Emphasized = Font.system(.caption2, design: .default, weight: .semibold)
     static let caption2Bold = Font.system(.caption2, design: .default, weight: .bold)
 
+    // MARK: - Button language
+    //
+    // Which `.buttonStyle` a control gets is a decision, not a per-file
+    // judgment call (docs/design-review-liquid-glass.md, track D4). Four
+    // visual languages coexisted before that review: pick from this table
+    // instead of adding a fifth.
+    //
+    // - **Primary action of a screen** (the one thing this screen exists to
+    //   let you do — Stop recording, download a model, confirm a share):
+    //   `.buttonStyle(.glassProminent)` with `.tint(Theme.accent)`. This is
+    //   the Liquid Glass default; prefer it over `.borderedProminent` (kept
+    //   only where the OS itself renders the control, e.g. inside a native
+    //   `.alert`).
+    // - **Secondary action alongside a primary one** (Cancel next to
+    //   Generate, a form's secondary button): `.buttonStyle(.bordered)`.
+    // - **Confirmation/destructive decision** (delete, reset, restore):
+    //   `kurnDialog` (`DesignComponents.swift`), not a bespoke button — see
+    //   "Corrections found during implementation" in the design-review doc
+    //   for why this is the deliberate app-wide convention, required as-is
+    //   by `KurnUITests/Flows/LibraryFlowUITests`/`SettingsFlowUITests`.
+    // - **List/menu row, chip, or other incidental tap target** that is not
+    //   "the action this screen is for": `.buttonStyle(.plain)` with custom
+    //   content remains correct — most of the app's `.plain` buttons are
+    //   this case and do not need migrating.
+
     // MARK: - Helpers
 
     private static func adaptive(dark: Int, light: Int?, lightSystem: UIColor) -> Color {

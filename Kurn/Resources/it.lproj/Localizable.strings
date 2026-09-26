@@ -202,6 +202,9 @@
 "recorder.partial_saved" = "È stata salvata una registrazione parziale dopo un errore di acquisizione audio. Controlla lo spazio disponibile prima di registrare di nuovo.";
 "recorder.recovery_failed" = "La registrazione non è ancora disponibile. L’audio è stato conservato per consentire un nuovo tentativo di recupero.";
 "recorder.title" = "Nuova Registrazione";
+"recorder.discard" = "Elimina Registrazione";
+"recorder.title_field.accessibility_label" = "Titolo della riunione";
+"recorder.accessibility.timer_with_highlights" = "%1$@, %2$d segnalibri";
 "recorder.add_title" = "Aggiungi titolo…";
 "recorder.pause" = "Pausa";
 "recorder.resume" = "Riprendi";

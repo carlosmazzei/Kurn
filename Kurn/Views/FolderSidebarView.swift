@@ -170,7 +170,7 @@ struct FolderSidebarView: View {
                     creating = NewFolderContext(parent: parent)
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 18))
+                        .font(.headline)
                         .foregroundStyle(Theme.accent)
                 }
                 .accessibilityLabel(NSLocalizedString("folder.new", comment: "New folder"))
@@ -202,7 +202,7 @@ struct FolderSidebarView: View {
                     .foregroundStyle(Theme.textTertiary)
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                 }
@@ -232,7 +232,7 @@ struct FolderSidebarView: View {
                     .foregroundStyle(Theme.textTertiary)
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                 }
@@ -263,7 +263,7 @@ struct FolderSidebarView: View {
                         .foregroundStyle(Theme.textTertiary)
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(.footnote, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                             .accessibilityHidden(true)
                     }
@@ -275,7 +275,7 @@ struct FolderSidebarView: View {
 
             Button { path.append(folder) } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, weight: .semibold))
                     .foregroundStyle(Theme.textTertiary)
                     .padding(.leading, 10)
                     .padding(.vertical, 6)

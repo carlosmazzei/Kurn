@@ -89,6 +89,9 @@ struct TagPickerView: View {
             secondaryAction: { pendingDelete = nil }
         )
         .errorAlert($saveError)
+        // A short tag list is a quick toggle task; a large tag library can
+        // still grow into `.large` instead of always opening full-height.
+        .presentationDetents([.medium, .large])
     }
 
     private func tagRow(_ tag: Tag) -> some View {
@@ -105,7 +108,7 @@ struct TagPickerView: View {
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                 }

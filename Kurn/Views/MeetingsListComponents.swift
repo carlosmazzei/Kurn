@@ -22,7 +22,7 @@ struct LockedRecordingsView: View {
     var body: some View {
         VStack(spacing: 18) {
             Image(systemName: "lock.fill")
-                .font(.system(size: 44))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.textSecondary)
                 .accessibilityHidden(true)
             Text(NSLocalizedString("recordings.locked_title", comment: "Recordings Locked"))
@@ -38,17 +38,19 @@ struct LockedRecordingsView: View {
                     .foregroundStyle(Theme.warning)
                     .multilineTextAlignment(.center)
             }
+            // The one action this screen exists for — Liquid Glass primary
+            // button language (Theme.swift, "Button language"), not a
+            // hand-drawn rectangle.
             Button {
                 Task { await gate.authenticate() }
             } label: {
                 Text(NSLocalizedString("recordings.unlock_button", comment: "Unlock"))
                     .font(Theme.subheadlineEmphasized)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .foregroundStyle(.white)
+                    .padding(.vertical, 4)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glassProminent)
+            .tint(Theme.accent)
             .padding(.top, 4)
             Button {
                 showingSettings = true
@@ -76,7 +78,7 @@ struct MeetingCard: View {
                     if meeting.isFavorite {
                         Image(systemName: "star.fill")
                             .foregroundStyle(Theme.warning)
-                            .font(.system(size: 13))
+                            .font(.footnote)
                             .accessibilityLabel(NSLocalizedString("meetings.favorite", comment: "Favorite"))
                     }
                     Text(meeting.title)
@@ -98,7 +100,7 @@ struct MeetingCard: View {
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(.caption, weight: .semibold))
                 .foregroundStyle(Theme.textTertiary)
                 .accessibilityHidden(true)
         }
