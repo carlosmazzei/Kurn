@@ -347,6 +347,51 @@ struct TranscriptionServicePipelineTests {
         #expect(harness.compactor.cleanedUp == [compactedURL])
     }
 
+    /// A provider's own speaker turns arrive on the compacted timeline too.
+    /// They used to be dropped when the remapped transcript was rebuilt, so
+    /// with compaction `.transcriptionProviderNative` silently became one
+    /// synthetic speaker (64% raw DER on AMI with ElevenLabs).
+    @Test func compactedNativeSpeakerTurnsAreRemappedNotDropped() async throws {
+        let url = try Self.fixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let harness = FakeEngines(regions: Self.regions)
+        let compactedURL = AudioFixtures.tempURL(ext: "wav")
+        harness.compactor.setResult(.value(CompactionResult(
+            url: compactedURL,
+            map: [
+                TimelineSegment(compactedStart: 0, originalStart: 0.2, duration: 1.0),
+                TimelineSegment(compactedStart: 1.1, originalStart: 1.8, duration: 1.0)
+            ]
+        )))
+        harness.transcriber.setSpans([
+            TranscribedSpan(text: "hello", start: 0.0, end: 1.0),
+            TranscribedSpan(text: "world", start: 1.1, end: 2.1)
+        ])
+        harness.transcriber.setSpeakerTurns([
+            SpeakerTurn(speakerLabel: "Speaker 1", start: 0.0, end: 1.0),
+            SpeakerTurn(speakerLabel: "Speaker 2", start: 1.1, end: 2.1)
+        ])
+        var config = Self.config(transcription: .whisperAPI)
+        config.transcriptionProvider = .elevenLabs
+        config.diarization = .transcriptionProviderNative
+
+        let output = try await TranscriptionService(engines: harness.catalog).transcribe(
+            fileURL: url,
+            fileName: "fixture.wav",
+            language: .english,
+            config: config
+        )
+
+        #expect(output.turns.map(\.speakerLabel) == ["Speaker 1", "Speaker 2"])
+        let expected: [(start: Double, end: Double)] = [(0.2, 1.2), (1.8, 2.8)]
+        #expect(output.turns.count == expected.count)
+        for (turn, bounds) in zip(output.turns, expected) {
+            #expect(abs(turn.start - bounds.start) < 1e-9)
+            #expect(abs(turn.end - bounds.end) < 1e-9)
+        }
+        #expect(output.report.stages.first { $0.stage == .diarization }?.outcome == .succeeded)
+    }
+
     @Test func degradedPreprocessingAndCompactionAreReportedAndTheRunContinues() async throws {
         let url = try Self.fixture()
         defer { try? FileManager.default.removeItem(at: url) }

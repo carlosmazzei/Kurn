@@ -737,13 +737,25 @@ struct TranscriptionService {
         ))
         guard let map = compaction?.map else { return GatedTranscription(raw: raw, stages: stages) }
 
-        // Remap compacted-timeline spans back to the original timeline.
+        // Remap compacted-timeline spans back to the original timeline — and
+        // the provider's own speaker turns with them. Rebuilding the transcript
+        // from spans alone dropped `speakerTurns`, so whenever compaction ran,
+        // `.transcriptionProviderNative` fell back to one synthetic speaker
+        // (measured on AMI with ElevenLabs: 64% raw DER instead of ~39%).
         let spans = raw.spans.map { span -> TranscribedSpan in
             let start = VADAudioCompactor.remap(span.start, map: map)
             let end = VADAudioCompactor.remap(span.end, map: map)
             return TranscribedSpan(text: span.text, start: start, end: max(start, end), confidence: span.confidence)
         }
-        return GatedTranscription(raw: RawTranscript(spans: spans, language: raw.language), stages: stages)
+        let speakerTurns = raw.speakerTurns?.map { turn -> SpeakerTurn in
+            let start = VADAudioCompactor.remap(turn.start, map: map)
+            let end = VADAudioCompactor.remap(turn.end, map: map)
+            return SpeakerTurn(speakerLabel: turn.speakerLabel, start: start, end: max(start, end))
+        }
+        return GatedTranscription(
+            raw: RawTranscript(spans: spans, language: raw.language, speakerTurns: speakerTurns),
+            stages: stages
+        )
     }
 
     /// Dispatch to the chosen diarization engine. Both engines satisfy
