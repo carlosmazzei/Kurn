@@ -88,7 +88,7 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
-| 2026-09-26 | `986697b`…`8121208` | Six dispatches: AMI and VoxConverse × all three diarizers (Parakeet); full on-device baseline; OpenAI `whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe` (twice — before and after the untimed-span fix); Groq + LLM correction | AMI (4), VoxConverse (4, first run), LibriSpeech (6), CAMOES (40), CORAA (40) | [AMI diar](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898), [VoxConverse](https://github.com/carlosmazzei/Kurn/actions/runs/36258371882), [baseline](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738), [OpenAI](https://github.com/carlosmazzei/Kurn/actions/runs/36258538786), [OpenAI after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012), [Groq+corr](https://github.com/carlosmazzei/Kurn/actions/runs/36258540773) |
+| 2026-09-26 | `986697b`…`5ae7fed` | Nine dispatches: AMI and VoxConverse × all three diarizers (Parakeet); full on-device baseline; OpenAI `whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe` (before and after the untimed-span fix, plus a Portuguese confirmation); Groq + LLM correction; ElevenLabs Scribe with `fluidAudio` and its own diarization (before and after the compaction fix) | AMI (4), VoxConverse (4, first run), LibriSpeech (6), CAMOES (40), CORAA (40) | [AMI diar](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898), [VoxConverse](https://github.com/carlosmazzei/Kurn/actions/runs/36258371882), [baseline](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738), [OpenAI](https://github.com/carlosmazzei/Kurn/actions/runs/36258538786), [OpenAI after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012), [OpenAI pt](https://github.com/carlosmazzei/Kurn/actions/runs/36268996027), [Groq+corr](https://github.com/carlosmazzei/Kurn/actions/runs/36258540773), [ElevenLabs](https://github.com/carlosmazzei/Kurn/actions/runs/36270575700), [ElevenLabs after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
 | 2026-08-27 | `6f0a094` | `sherpaOnnx` diarizer only × `whisperCpp@small`, 4 configs (prep × VAD) — first runtime measurement of D4, not yet compared against `fluidAudio` | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [33029297796](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796) |
 | 2026-08-09 | `53db49c` | LLM transcript correction (D-stage), `essential`×`whisperCpp/small` paired on/off (16 rows) + `full`×`fluidAudioParakeet` corrected-only (8 rows) vs. the 2026-08-03 baseline | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [essential+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299) |
 | 2026-08-03 | `2644589` | `full` matrix — 32 English configs (on-device × `whisperAPI:groq`) + 16 Portuguese configs (diarizer axis collapsed, no PT reference RTTM) | AMI (4, WER+DER), LibriSpeech (6, WER), CAMOES (40, WER), CORAA (40, WER) | [30800039020](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
@@ -104,13 +104,15 @@ Open questions no run has answered yet:
 - **DER for Portuguese**: no public, freely downloadable multi-speaker
   Portuguese corpus with turn-level annotation comparable to AMI has been
   identified, so every Portuguese row is WER-only.
-- **ElevenLabs Scribe** (ASR and its native diarization) is wired into the
-  matrix but unmeasured: the `ELEVENLABS_API_KEY` secret is not set, so the
-  2026-09-26 dispatch built zero configurations.
+- **Native diarization vs. the local one, per file.** ElevenLabs' own speaker
+  turns give the best cpWER measured but a worse raw DER than `fluidAudio`
+  (see Cross-run findings), and swing with the VAD choice. Four meetings
+  cannot say whether that is the provider or the material.
 
 Answered on 2026-09-26: D4 (sherpa-onnx is behind FluidAudio on raw DER on
 both AMI and VoxConverse, same run), Groq + correction (ran clean, no 429),
-and the first cloud-model comparison beyond Groq.
+and the first cloud comparisons beyond Groq — OpenAI's three models and
+ElevenLabs Scribe.
 
 ## Cross-run findings
 
@@ -129,17 +131,21 @@ qualified.
 | Use case | Configuration | WER | DER (fused) | Source |
 | --- | --- | --- | --- | --- |
 | Meetings (AMI, en), on-device | `standardDSP` + `energyThreshold` + `fluidAudio` + `fluidAudioParakeet` | 22.73% | 33.26% | 2026-09-26 (22.70% / 32.89% on 2026-08-03) |
-| Meetings (AMI, en), cloud | `none` + `energyThreshold` + `fluidAudio` + `whisperAPI:openAI@gpt-4o-mini-transcribe` | 24.35% (19.05% standard) | 24.72% | 2026-09-26, after the untimed-span fix |
+| Meetings (AMI, en), cloud | `none` + `fluidAudio` VAD + `fluidAudio` + `whisperAPI:elevenLabs` | 15.67% (14.43% standard) | 32.26% | 2026-09-26 |
+| Meetings (AMI, en), who said what | `standardDSP` or `none` + `fluidAudio` VAD + `transcriptionProviderNative` + `whisperAPI:elevenLabs` | 16.40–16.51% | 24.72–28.08% (cpWER **18.19–18.47%**) | 2026-09-26, after the compaction fix |
 | Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet` | 26.43% | not measured | 2026-09-26 |
 | Portuguese, spontaneous interviews (CAMOES) | `standardDSP` + `energyThreshold` + `whisperAPI:groq` + LLM correction | 36.13% | not measured | 2026-09-26 (37.96% uncorrected, 2026-08-03) |
-| Portuguese, short clips (CORAA) | `none` + `energyThreshold` + `fluidAudioParakeet` | 15.31% | not measured | 2026-09-26 |
+| Portuguese, short clips (CORAA), on-device | `none` + `energyThreshold` + `fluidAudioParakeet` | 15.31% | not measured | 2026-09-26 |
+| Portuguese, short clips (CORAA), cloud | `standardDSP` + `energyThreshold` + `whisperAPI:elevenLabs` | 12.50% | not measured | 2026-09-26 |
 
 On AMI — the corpus that matches what the app records — Parakeet leads the
 on-device engines on both metrics at once, by ~5pp WER and ~15pp DER over
-Groq and ~20pp WER over whisper.cpp. `gpt-4o-mini-transcribe` is the best
-cloud model measured and the only one ahead of Parakeet on fused DER — but
-that DER is the diarizer's turns with words spread across them (the model
-returns no timings), not better timing. Portuguese has no single winner: the per-corpus rows reverse
+Groq and ~20pp WER over whisper.cpp. In the cloud, ElevenLabs Scribe is
+the most accurate recognizer measured on meetings and on CORAA (~6pp WER
+under Parakeet on AMI), and with its own diarization it produces the best
+speaker-attributed transcript measured: cpWER ~18% against ~33% for the same
+words attributed by `fluidAudio`. CAMOES remains the one corpus where no
+cloud model beats Groq + correction. Portuguese has no single winner: the per-corpus rows reverse
 each other, so the aggregate is a property of the corpus mix, not of an
 engine.
 
@@ -251,13 +257,14 @@ The measured consequence: the gated path produced the only real improvements
 
 ## Runs
 
-### 2026-09-26 — `986697b`…`8121208` (six dispatches, linked under Runs at a glance)
+### 2026-09-26 — `986697b`…`5ae7fed` (nine dispatches, linked under Runs at a glance)
 
 **First run of the reference-tool re-scoring, the first VoxConverse measurement,
 a same-run diarizer comparison, and the first OpenAI models beyond `whisper-1`.**
 The dispatches ran on consecutive commits of one branch; the pipeline code
-differs between them only in the two fixes named below, each of which moves
-exactly one cloud-engine column.
+differs between them only in the three fixes named below (untimed spans,
+whitespace-only spans, provider turns under compaction), each of which moves
+only the cloud rows it names.
 
 Measurement fixes in the same branch, before any number here:
 
@@ -335,6 +342,47 @@ What this says:
   whole transcript; fixed after this run by dropping whitespace-only spans)
   and 3 `ambiguousProviderResult` (upload interrupted; not retried on
   purpose, to avoid double billing).
+
+A confirmation dispatch on `37def97` (`whisper-1` and `gpt-4o-mini-transcribe`,
+CAMOES + CORAA only) ran all 640 cells with **no failures** after the
+whitespace-span fix, scored only the two selected corpora, and its rescore
+cross-check matched the harness to 0.0000pp on WER and DER.
+
+#### Cloud: ElevenLabs Scribe (`scribe_v1`)
+
+WER, range over preprocessing × VAD (harness normalizer): AMI **15.67–16.90%**
+(14.39–15.43% standard), LibriSpeech 0.53%, CAMOES 42.70–47.08%, CORAA
+**12.50–13.78%** — the best AMI and CORAA figures in this file.
+
+AMI speaker attribution, after the compaction fix (`5ae7fed`), re-scored:
+
+| Preprocessing | VAD | Diarization | cpWER | DER fused ±0.25 s | DER raw ±0.25 s |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | `fluidAudio` | 34.68% | 34.17% | 18.28% |
+| none | energyThreshold | native | 26.62% | 37.45% | 45.48% |
+| none | fluidAudio | `fluidAudio` | 33.64% | 37.16% | 18.28% |
+| none | fluidAudio | native | **18.19%** | 28.08% | 33.95% |
+| standardDSP | energyThreshold | `fluidAudio` | 33.88% | 38.13% | 18.28% |
+| standardDSP | energyThreshold | native | 26.29% | 41.26% | 42.70% |
+| standardDSP | fluidAudio | `fluidAudio` | 33.28% | 29.00% | 18.28% |
+| standardDSP | fluidAudio | native | **18.47%** | 24.72% | 31.26% |
+
+What this says:
+
+- **The native turns were being thrown away.** Before `5ae7fed` the native
+  rows with the FluidAudio VAD scored 64.25% raw DER and 55% cpWER: when VAD
+  compaction ran, `transcribeGated` rebuilt the transcript from spans alone
+  and dropped the provider's `speakerTurns`, so diarization fell back to one
+  synthetic speaker. They are now remapped with the spans.
+- **Raw DER and cpWER disagree, and cpWER is the one a user reads.**
+  `fluidAudio`'s turns are closer to the reference (18% raw DER), but
+  ElevenLabs attributes each word itself, so the text lands with the right
+  speaker far more often (cpWER 18% vs 33%). A local diarizer's turns are
+  only as useful as the word timings used to fuse text onto them.
+- **Native results move with the VAD** (cpWER 18% vs 26%) even though the
+  provider diarizes the audio it receives — compaction removes silence the
+  provider would otherwise have to segment around. Worth a per-file look
+  before recommending a default.
 
 #### Cloud: Groq `whisper-large-v3` + LLM correction (OpenAI)
 

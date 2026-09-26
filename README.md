@@ -152,6 +152,7 @@ Latest recorded results:
 | --- | --- | --- | --- | --- |
 | Portuguese | no preprocessing + FluidAudio Parakeet | 26.43% | not measured | 80 items from CAMOES + CORAA, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
 | English | standardDSP + FluidAudio Parakeet | 22.73% | 33.26% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
+| English, cloud | ElevenLabs Scribe + its own diarization | 16.51% (cpWER 18.47%) | 24.72% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
 
 Two caveats travel with every number above: there is deliberately no pass/fail
 threshold, and the rates are comparable between runs over the same material —
