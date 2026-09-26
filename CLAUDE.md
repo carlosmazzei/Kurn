@@ -422,6 +422,15 @@ Three things follow from the fixed format:
   input and keeps writing to the same `.m4a`; pausing with the
   `recorder.engine_stalled` banner is now only the fallback when that fails.
 
+The capture session's category follows the input, in
+`Services/CaptureAudioSession.swift`: the built-in mic records under `.record`,
+never `.playAndRecord`. An output route is what makes iOS stream to connected
+hearing aids or earbuds and switch them into their streaming program for the
+whole meeting, even when the iPhone mic is capturing and nothing is played.
+`.playAndRecord` + Bluetooth HFP is kept only when an external input is chosen
+or the system route is left alone. `CaptureInputSelection` is the pure,
+unit-tested decision.
+
 `Recording.fileSize` caches each file's byte count (`0` = not measured yet, which
 is also what lets the field be added without a SwiftData migration plan).
 `RecordingRecovery` backfills it during the launch/foreground sweep it already

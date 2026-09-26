@@ -86,7 +86,7 @@ final class AVFoundationCaptureEngine: AudioCaptureEngine, @unchecked Sendable {
     }
 
     func configureSession(pickup: MicPickup, forceBuiltIn: Bool, preferredInputUID: String?) async throws {
-        try await AudioRecorderEngineSupport.configureSession(
+        try await CaptureAudioSession.configure(
             pickup: pickup,
             forceBuiltIn: forceBuiltIn,
             preferredInputUID: preferredInputUID
