@@ -687,6 +687,20 @@ gate; **H6** is core-implemented with a few named follow-ups remaining. See
 `docs/resilience.md` for exactly what shipped, what's still open per track,
 and the underlying invariants and risk register.
 
+## Design review: Liquid Glass / HIG adherence track
+
+A HIG/Liquid Glass adherence review (2026-09-26) of `Kurn/Views/` found the
+navigation-chrome migration described elsewhere in this project's docs is
+real but incomplete elsewhere: three coexisting confirmation-dialog patterns,
+four coexisting "primary button" visual languages, ~35 call sites bypassing
+Dynamic Type, and no iPad-specific navigation (`NavigationSplitView`) despite
+the app being universal. The full findings register and an 8-track (D1–D8)
+remediation plan, ordered by an effort/impact matrix, live in
+[`docs/design-review-liquid-glass.md`](design-review-liquid-glass.md). All
+tracks are open as of the review date; the largest is D6 (iPad
+`NavigationSplitView` adoption), which is structural rather than cosmetic and
+should be planned as its own project.
+
 ## Suggested sequence
 
 Unlike the rest of this document, the numbering here is real — each step makes
