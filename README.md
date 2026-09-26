@@ -150,13 +150,16 @@ Latest recorded results:
 
 | Language | Best measured configuration | WER | DER | Material |
 | --- | --- | --- | --- | --- |
-| Portuguese | no preprocessing + FluidAudio Parakeet | 26.58% | not measured | 80 items from CAMOES + CORAA, [2026-08-03](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
-| English | standardDSP + FluidAudio Parakeet | 22.70% | 32.89% | AMI Meeting Corpus, 4 meetings, [2026-08-03](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
+| Portuguese | no preprocessing + FluidAudio Parakeet | 26.43% | not measured | 80 items from CAMOES + CORAA, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
+| English | standardDSP + FluidAudio Parakeet | 22.73% | 33.26% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
 
 Two caveats travel with every number above: there is deliberately no pass/fail
 threshold, and the rates are comparable between runs over the same material —
 **not** against published figures for the same corpora, since the text
-normalization here is language-neutral by design.
+normalization here is language-neutral by design. Since 2026-09-26 each run is
+also re-scored with the reference tools (Whisper's normalizers, `meeteval`,
+`pyannote.metrics`); those "standard" figures are the ones to compare with
+published results.
 
 Every recorded run, the full per-configuration tables, and what the numbers do
 and do not mean live in

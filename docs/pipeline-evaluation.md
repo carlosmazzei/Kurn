@@ -32,6 +32,16 @@ pipeline stage moves WER or DER, that shows up in a pull request.
   filler-word list — and for Chinese and Japanese the rate is a *character*
   error rate, because those are written without spaces. A LibriSpeech WER here
   and a LibriSpeech WER in a paper are not the same measurement.
+- **Since 2026-09-26 a second set of numbers comes from the reference tools.**
+  `Tools/evaluation/rescore.py` re-scores the same pipeline output with
+  Whisper's normalizers + `jiwer` ("WER standard" — the Open ASR Leaderboard
+  convention, the only WER here loosely comparable to a paper), `meeteval`
+  (cpWER, speaker-attributed WER on AMI) and `pyannote.metrics` (DER at
+  ±0.25 s and with no collar). It also cross-checks the harness: on 1071 real
+  cells its DER matched `pyannote.metrics` to 0.0000pp.
+- **DER here uses a ±0.25 s collar (NIST RT / VoxConverse).** pyannote's and
+  DIHARD's published AMI figures use none, which reads ~7pp higher on the same
+  output; state the collar with any DER quoted.
 - **Every rate is micro-averaged over the corpus**: total errors divided by
   total reference, not the mean of the per-file rates. A short file with one
   bad word cannot dominate — but the corpus with the most speech does. That is
@@ -78,6 +88,7 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
+| 2026-09-26 | `986697b`…`8121208` | Six dispatches: AMI and VoxConverse × all three diarizers (Parakeet); full on-device baseline; OpenAI `whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe` (twice — before and after the untimed-span fix); Groq + LLM correction | AMI (4), VoxConverse (4, first run), LibriSpeech (6), CAMOES (40), CORAA (40) | [AMI diar](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898), [VoxConverse](https://github.com/carlosmazzei/Kurn/actions/runs/36258371882), [baseline](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738), [OpenAI](https://github.com/carlosmazzei/Kurn/actions/runs/36258538786), [OpenAI after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012), [Groq+corr](https://github.com/carlosmazzei/Kurn/actions/runs/36258540773) |
 | 2026-08-27 | `6f0a094` | `sherpaOnnx` diarizer only × `whisperCpp@small`, 4 configs (prep × VAD) — first runtime measurement of D4, not yet compared against `fluidAudio` | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [33029297796](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796) |
 | 2026-08-09 | `53db49c` | LLM transcript correction (D-stage), `essential`×`whisperCpp/small` paired on/off (16 rows) + `full`×`fluidAudioParakeet` corrected-only (8 rows) vs. the 2026-08-03 baseline | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [essential+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299) |
 | 2026-08-03 | `2644589` | `full` matrix — 32 English configs (on-device × `whisperAPI:groq`) + 16 Portuguese configs (diarizer axis collapsed, no PT reference RTTM) | AMI (4, WER+DER), LibriSpeech (6, WER), CAMOES (40, WER), CORAA (40, WER) | [30800039020](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
@@ -85,22 +96,21 @@ everything.
 
 Open questions no run has answered yet:
 
-- **D4 collapse-resistance**: does `sherpaOnnx` resist FluidAudio's VBx
-  collapse *on the files where FluidAudio actually collapses*? Partially
-  answered — see "sherpa-onnx vs. FluidAudio" under Cross-run findings
-  below, which establishes that it is ~17pp behind on overall AMI DER. What
-  remains is per-file evidence: an aggregate cannot show whether any single
-  meeting exhibited the collapse pattern D4 targets.
+- **Apple Speech** — the app's default engine — **cannot be measured in CI.**
+  The 2026-09-26 baseline confirmed why every cell is skipped: in the
+  simulator `SpeechTranscriber` reports English and Portuguese as unsupported
+  (`isAvailable` / `supportedLocale(equivalentTo:)`), so this is not a
+  missing-asset problem a download would fix. It needs a device run.
 - **DER for Portuguese**: no public, freely downloadable multi-speaker
   Portuguese corpus with turn-level annotation comparable to AMI has been
-  identified, so every Portuguese row above is WER-only.
-- **Apple Speech**: absent from every run so far — the 2026-08-03 entry
-  found it silently skipping every locale attempt on the CI simulator
-  (unconfirmed root cause: likely no on-device Speech assets provisioned in
-  a headless runner). The app's actual default transcription engine has
-  never produced a measured row.
-- **Whisper via Groq + correction**: the 2026-08-09 dispatch hit Groq's rate
-  limit (429, 20 RPM) partway through and is not recorded.
+  identified, so every Portuguese row is WER-only.
+- **ElevenLabs Scribe** (ASR and its native diarization) is wired into the
+  matrix but unmeasured: the `ELEVENLABS_API_KEY` secret is not set, so the
+  2026-09-26 dispatch built zero configurations.
+
+Answered on 2026-09-26: D4 (sherpa-onnx is behind FluidAudio on raw DER on
+both AMI and VoxConverse, same run), Groq + correction (ran clean, no 429),
+and the first cloud-model comparison beyond Groq.
 
 ## Cross-run findings
 
@@ -118,14 +128,18 @@ qualified.
 
 | Use case | Configuration | WER | DER (fused) | Source |
 | --- | --- | --- | --- | --- |
-| Meetings (AMI, en) | `standardDSP` + `energyThreshold` + `fluidAudio` + `fluidAudioParakeet` | 22.70% | 32.89% | 2026-08-03 |
-| Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet` | 26.58% | not measured | 2026-08-03 |
-| Portuguese, spontaneous interviews (CAMOES) | `standardDSP` + `energyThreshold` + `whisperAPI:groq` | 37.96% | not measured | 2026-08-03 |
-| Portuguese, short clips (CORAA) | `standardDSP` + `energyThreshold` + `fluidAudioParakeet` | 16.58% | not measured | 2026-08-03 |
+| Meetings (AMI, en), on-device | `standardDSP` + `energyThreshold` + `fluidAudio` + `fluidAudioParakeet` | 22.73% | 33.26% | 2026-09-26 (22.70% / 32.89% on 2026-08-03) |
+| Meetings (AMI, en), cloud | `none` + `energyThreshold` + `fluidAudio` + `whisperAPI:openAI@gpt-4o-mini-transcribe` | 24.35% (19.05% standard) | 24.72% | 2026-09-26, after the untimed-span fix |
+| Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet` | 26.43% | not measured | 2026-09-26 |
+| Portuguese, spontaneous interviews (CAMOES) | `standardDSP` + `energyThreshold` + `whisperAPI:groq` + LLM correction | 36.13% | not measured | 2026-09-26 (37.96% uncorrected, 2026-08-03) |
+| Portuguese, short clips (CORAA) | `none` + `energyThreshold` + `fluidAudioParakeet` | 15.31% | not measured | 2026-09-26 |
 
-On AMI — the corpus that matches what the app records — Parakeet leads on
-both metrics at once, by ~5pp WER and ~15pp DER over Groq and ~20pp WER over
-whisper.cpp. Portuguese has no single winner: the per-corpus rows reverse
+On AMI — the corpus that matches what the app records — Parakeet leads the
+on-device engines on both metrics at once, by ~5pp WER and ~15pp DER over
+Groq and ~20pp WER over whisper.cpp. `gpt-4o-mini-transcribe` is the best
+cloud model measured and the only one ahead of Parakeet on fused DER — but
+that DER is the diarizer's turns with words spread across them (the model
+returns no timings), not better timing. Portuguese has no single winner: the per-corpus rows reverse
 each other, so the aggregate is a property of the corpus mix, not of an
 engine.
 
@@ -136,6 +150,22 @@ supports them. The transcription default (`.appleSpeech`) does not — not
 because it measured worse, but because **it has never measured at all** (see
 the open question above). Every number in this file is an alternative to the
 shipped default rather than the default itself.
+
+### Diarizers head to head, same run (supersedes the table below)
+
+2026-09-26, Parakeet ASR, raw DER (the diarizer's own turns, ±0.25 s) —
+constant across preprocessing × VAD, since the diarizer reads its own copy:
+
+| Corpus | `fluidAudio` | `sherpaOnnx` | `heuristic` |
+| --- | --- | --- | --- |
+| AMI (4 meetings, 4 speakers each) | **18.28%** | 37.41% | 49.92–78.27% |
+| VoxConverse (4 files, first run) | **10.62%** | 23.32% | 30.54–40.94% |
+
+This settles D4 as far as these eight files go: the segmentation-first
+engine is about twice FluidAudio's error on both corpora. FluidAudio's VBx
+step still collapses to two centroids on a four-speaker AMI meeting
+(`TS3003a`: 141/10 assignment) and still scores 11.7% there, so the
+collapse is real but not what dominates DER on this material.
 
 ### sherpa-onnx vs. FluidAudio: the diarizer axis, ASR held constant
 
@@ -220,6 +250,98 @@ The measured consequence: the gated path produced the only real improvements
 "correct what the decoder is unsure about" are not the same feature.
 
 ## Runs
+
+### 2026-09-26 — `986697b`…`8121208` (six dispatches, linked under Runs at a glance)
+
+**First run of the reference-tool re-scoring, the first VoxConverse measurement,
+a same-run diarizer comparison, and the first OpenAI models beyond `whisper-1`.**
+The dispatches ran on consecutive commits of one branch; the pipeline code
+differs between them only in the two fixes named below, each of which moves
+exactly one cloud-engine column.
+
+Measurement fixes in the same branch, before any number here:
+
+- DER's speaker mapping was exhaustive up to seven labels and **greedy** above
+  that. Against `pyannote.metrics` on random 8–12-speaker timelines the greedy
+  branch over-reported DER in 3 of 4 cases (up to ~8pp). Now Hungarian —
+  matters for VoxConverse (up to 21 speakers) and any 8-label heuristic run.
+  Earlier runs never had more than seven labels on either side, so their DER
+  is unaffected.
+- `transcriptionProviderNative` was swept against on-device engines, where it
+  silently runs `heuristic`; those duplicate cells are gone.
+
+#### Diarization (Parakeet ASR)
+
+See "Diarizers head to head" under Cross-run findings for raw DER. Fused DER
+(AMI, 4 meetings):
+
+| Preprocessing | VAD | `fluidAudio` | `sherpaOnnx` | `heuristic` |
+| --- | --- | --- | --- | --- |
+| none | energyThreshold | 34.00% | 46.52% | 67.17% |
+| none | fluidAudio | 48.00% | 62.96% | 73.25% |
+| standardDSP | energyThreshold | **33.26%** | 46.87% | 67.51% |
+| standardDSP | fluidAudio | 50.23% | 65.98% | 69.30% |
+
+The FluidAudio VAD adds ~15pp of fused DER with every diarizer while raw DER
+is unchanged — the VAD/compaction timeline lead in Cross-run findings, now
+reproduced in a single run.
+
+VoxConverse (4 files, 5 min each, DER only): `fluidAudio` 13.70–15.89% fused /
+10.62% raw; `sherpaOnnx` 24.60–26.67% / 23.32%; `heuristic` 31.84–39.97% /
+30.54–40.94%.
+
+#### On-device baseline (fluidAudio diarizer)
+
+Parakeet: AMI 21.31–24.31% WER, LibriSpeech 0.53%, CAMOES 42.34–42.70%,
+CORAA 15.31–17.09%. whisper.cpp `small` reproduced its 2026-08-27 WER in all
+four configurations. Apple Speech: skipped in every cell (see open questions).
+
+#### Cloud: OpenAI (fluidAudio diarizer)
+
+WER (harness normalizer), range over preprocessing × VAD:
+
+| Corpus | `whisper-1` | `gpt-4o-transcribe` | `gpt-4o-mini-transcribe` |
+| --- | --- | --- | --- |
+| AMI | 30.45–31.91% | 26.34–69.70% | **24.31–28.96%** |
+| LibriSpeech | 3.16–3.91% | 0.53–1.05% | **0.53–1.05%** |
+| CAMOES | **39.11–45.26%** | 46.35–58.03% | 46.35–51.82% |
+| CORAA | 18.96–21.68% | 27.04–31.38% | **17.69–22.05%** |
+
+AMI after the fix, re-scored with the reference tools (`none` + `energyThreshold`):
+
+| Model | WER | WER standard | cpWER | DER fused ±0.25 s | DER fused, no collar |
+| --- | --- | --- | --- | --- | --- |
+| `whisper-1` | 31.91% | 26.69% | 38.58% | 32.05% | 38.95% |
+| `gpt-4o-mini-transcribe` | 24.35% | **19.05%** | 39.14% | 24.72% | 31.80% |
+| `gpt-4o-transcribe` | 33.53% | 28.38% | 48.74% | 24.72% | 31.80% |
+
+What this says:
+
+- **`gpt-4o-*` scored 100% fused DER before the fix.** Both models return
+  plain text with no timings; `OpenAIProvider` emitted one zero-length span
+  per chunk, so every word of up to ten minutes sat on one instant and was
+  given to one speaker. `WhisperTranscriber` now gives such spans the chunk's
+  extent. Any user on those models had effectively single-speaker transcripts.
+- **`gpt-4o-mini-transcribe` is the best English cloud model; `gpt-4o-transcribe`
+  is erratic** (26–70% on AMI across configurations, never best in
+  Portuguese). On CAMOES `whisper-1` wins.
+- **~5pp of AMI WER is formatting.** The standard normalizer removes fillers
+  and normalizes numbers; AMI's manual transcript keeps "um"/"uh" and spells
+  numbers out. LibriSpeech and the Portuguese corpora do not move.
+- **cpWER is 7–15pp above WER**: that gap is speaker-attribution error in the
+  text a user reads, the one thing neither WER nor DER shows alone.
+- **9 of 1080 cells failed** — 6 `emptySegmentText` (a model returned `""`
+  for a clip with no intelligible speech and the integrity gate rejected the
+  whole transcript; fixed after this run by dropping whitespace-only spans)
+  and 3 `ambiguousProviderResult` (upload interrupted; not retried on
+  purpose, to avoid double billing).
+
+#### Cloud: Groq `whisper-large-v3` + LLM correction (OpenAI)
+
+All 360 cells ran; no rate limit this time. Against the uncorrected 2026-08-03
+Groq rows (cross-run, so a signal only): English −0.15 to +1.82pp, Portuguese
+−0.60 to +0.45pp — a wash in aggregate, as with whisper.cpp. Per corpus,
+CAMOES with `standardDSP` reached **36.13%**, the best CAMOES figure recorded.
 
 ### 2026-08-27 — `6f0a094` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796))
 
