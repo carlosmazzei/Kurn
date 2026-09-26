@@ -95,11 +95,12 @@ final class AudioPlayerService: NSObject {
             // apply their speech-tuned behaviour to it.
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
             try await AudioSessionActivation.setActive(true)
-            let player = try AVAudioPlayer(contentsOf: url)
+            // `AVAudioPlayer`'s initializer and `prepareToPlay()` both touch
+            // `AVAudioSession` internally (the same synchronous, blocking check
+            // `AudioSessionActivation` exists for above), so building the player
+            // is offloaded the same way.
+            let player = try await Self.preparedPlayer(contentsOf: url, rate: playbackRate)
             player.delegate = self
-            player.enableRate = true
-            player.rate = playbackRate
-            player.prepareToPlay()
             self.player = player
             self.duration = player.duration
             self.currentTime = 0
@@ -112,6 +113,18 @@ final class AudioPlayerService: NSObject {
         } catch {
             throw AppError.audioError(error.localizedDescription)
         }
+    }
+
+    /// `nonisolated` so `await`-ing it from this main-actor class hops onto the
+    /// cooperative thread pool for the duration of the call — see
+    /// `AudioSessionActivation` for why the construction/priming can't just be
+    /// synchronous here.
+    private nonisolated static func preparedPlayer(contentsOf url: URL, rate: Float) async throws -> AVAudioPlayer {
+        let player = try AVAudioPlayer(contentsOf: url)
+        player.enableRate = true
+        player.rate = rate
+        player.prepareToPlay()
+        return player
     }
 
     func play() {
