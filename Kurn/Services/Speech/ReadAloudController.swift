@@ -65,6 +65,20 @@ final class ReadAloudController: NSObject {
     @ObservationIgnored private var chunks: [String] = []
     @ObservationIgnored private let nowPlaying = NowPlayingController()
     @ObservationIgnored private var holdsAudioSession = false
+    /// Bumped by every `start` and `stop`. Activating the session is awaited
+    /// off the main actor, so a start's continuation checks it to find out
+    /// whether a later tap, a `stop()` or leaving the screen superseded it
+    /// while it waited — otherwise two voices could overlap, or reading could
+    /// begin after the user left.
+    @ObservationIgnored private var startGeneration = 0
+    /// The last off-main deactivation, awaited before the next activation so
+    /// a quick stop-then-start cannot land them in the wrong order and leave
+    /// the session inactive under a reader.
+    @ObservationIgnored private var pendingDeactivation: Task<Void, Never>?
+    /// Whether the most recent `stop` wanted the session released; a start
+    /// superseded mid-activation honours it (recording playback may now own
+    /// the route).
+    @ObservationIgnored private var lastStopReleasedSession = true
 
     override init() {
         super.init()
@@ -114,25 +128,47 @@ final class ReadAloudController: NSObject {
         do {
             engine = try Self.makeEngine(provider: provider, preferences: settings.readAloud, languageCode: language)
         } catch {
-            if hadAudioSession {
-                Task { try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation) }
-            }
+            if hadAudioSession { releaseAudioSession() }
             fail(item.id, error)
             return
         }
+        // The item is shown as preparing right away, so a second tap pauses
+        // it rather than starting another reader, and `stop(owner:)` can find
+        // it while the session is still being activated.
+        self.chunks = chunks
+        self.item = item
+        chunkIndex = 0
+        chunkCount = chunks.count
+        phase = .preparing
+        startGeneration += 1
+        let token = startGeneration
         // Activation is the (synchronously blocking) AVFoundation call, run
         // through `activateAudioSession`'s `await` so it does not stall this
         // main-actor method; everything that depends on it succeeding —
         // wiring the engine up and starting it — waits inside the same task.
+        let previousDeactivation = pendingDeactivation
         Task { [weak self] in
+            await previousDeactivation?.value
             guard let self else { return }
             do {
                 try await self.activateAudioSession()
             } catch {
-                if hadAudioSession {
-                    try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation)
-                }
+                guard token == self.startGeneration else { return }
+                if hadAudioSession { self.releaseAudioSession() }
                 self.fail(item.id, error)
+                return
+            }
+            guard token == self.startGeneration else {
+                // Superseded while activating. A newer start keeps the
+                // session; a stop that ran before activation finished could
+                // not release it, so release it here.
+                if self.phase == .idle {
+                    if self.lastStopReleasedSession {
+                        self.releaseAudioSession()
+                    } else {
+                        self.holdsAudioSession = false
+                    }
+                }
                 return
             }
             AppLog.generation.atNotice.notice("ReadAloud: start provider=\(provider.displayName, privacy: .public) chunks=\(chunks.count, privacy: .public)")
@@ -144,14 +180,11 @@ final class ReadAloudController: NSObject {
                 self.failure = (id, error)
             }
             self.engine = engine
-            self.chunks = chunks
-            self.item = item
-            self.chunkIndex = 0
-            self.chunkCount = chunks.count
-            self.phase = .preparing
             self.nowPlaying.activate(handlers: self.makeHandlers())
             self.publishNowPlaying()
             engine.start(chunks, at: 0)
+            // A pause tapped while the session was activating.
+            if self.phase == .paused { engine.pause() }
         }
     }
 
@@ -184,6 +217,8 @@ final class ReadAloudController: NSObject {
     /// straight to other in-app audio (recording playback): deactivating the
     /// shared session under a playing `AVAudioPlayer` would stop it too.
     func stop(releasingAudioSession: Bool = true) {
+        startGeneration += 1
+        lastStopReleasedSession = releasingAudioSession
         engine?.stop()
         engine = nil
         chunks = []
@@ -195,9 +230,7 @@ final class ReadAloudController: NSObject {
         nowPlaying.deactivate()
         if holdsAudioSession {
             holdsAudioSession = false
-            if releasingAudioSession {
-                Task { try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation) }
-            }
+            if releasingAudioSession { releaseAudioSession() }
         }
     }
 
@@ -241,6 +274,17 @@ final class ReadAloudController: NSObject {
             voice: preferences.voice(for: provider)
         )
         return CloudSpeechEngine(provider: speech, languageCode: languageCode, rate: preferences.rate)
+    }
+
+    /// Hand the route back off the main actor, recording the task so the
+    /// next activation waits for it.
+    private func releaseAudioSession() {
+        holdsAudioSession = false
+        let previous = pendingDeactivation
+        pendingDeactivation = Task {
+            await previous?.value
+            try? await AudioSessionActivation.setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     private func activateAudioSession() async throws {
