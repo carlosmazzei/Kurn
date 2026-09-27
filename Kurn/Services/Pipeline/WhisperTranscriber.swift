@@ -11,6 +11,7 @@
 //  uniformly protocol-typed.
 //
 
+import AVFoundation
 import Foundation
 import KurnCore
 
@@ -75,7 +76,9 @@ actor WhisperTranscriber: Transcribing {
                         )
                     }
                     AppLog.transcription.atNotice.notice("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) done in \(Date().timeIntervalSince(chunkStart), privacy: .public)s, spans=\(result.spans.count, privacy: .public) lang=\(result.language, privacy: .public)")
-                    return result
+                    guard Self.hasOnlyUntimedSpans(result) else { return result }
+                    let duration = (try? await AVURLAsset(url: chunk.url).load(.duration)).map(CMTimeGetSeconds) ?? 0
+                    return Self.spreadingUntimedSpans(result, across: duration)
                 } catch {
                     AppLog.transcription.atError.error("whisper: chunk \(index + 1, privacy: .public)/\(total, privacy: .public) failed for \(vendor, privacy: .public) after \(Date().timeIntervalSince(chunkStart), privacy: .public)s code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                     throw error
@@ -86,6 +89,37 @@ actor WhisperTranscriber: Transcribing {
                 onProgress(progress, currentChunk, total)
             }
         )
+    }
+
+    /// Whether every span came back without a time range — what a model that
+    /// only speaks plain `json` returns (`gpt-4o-transcribe`,
+    /// `gpt-4o-mini-transcribe`): one `start: 0, end: 0` span for the chunk.
+    static func hasOnlyUntimedSpans(_ transcript: RawTranscript) -> Bool {
+        !transcript.spans.isEmpty && transcript.spans.allSatisfy { $0.end <= $0.start }
+    }
+
+    /// Gives untimed spans the chunk's own extent, split evenly in order.
+    ///
+    /// Left at zero length, every word of a chunk (up to ten minutes) sat on
+    /// one instant: fusion handed all of it to whoever held the floor at that
+    /// instant, so the transcript read as one speaker per chunk and scored
+    /// 100% DER on AMI. With the real extent, `TranscriptFusion`'s
+    /// word-preserving `splitCoarseSpan` spreads the words over the diarizer's
+    /// turns — an estimate, as for any engine without word timings, but an
+    /// attribution rather than none. Text is never touched.
+    static func spreadingUntimedSpans(_ transcript: RawTranscript, across duration: TimeInterval) -> RawTranscript {
+        guard duration > 0, hasOnlyUntimedSpans(transcript) else { return transcript }
+        let share = duration / Double(transcript.spans.count)
+        var result = transcript
+        result.spans = transcript.spans.enumerated().map { index, span in
+            TranscribedSpan(
+                text: span.text,
+                start: Double(index) * share,
+                end: Double(index + 1) * share,
+                confidence: span.confidence
+            )
+        }
+        return result
     }
 
     static func estimatedProgress(completedChunks: Int, totalChunks: Int, elapsed: TimeInterval) -> Double {

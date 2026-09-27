@@ -48,7 +48,7 @@ points, and two unrelated engines landed on identical figures by coincidence
 (45 errors out of 143, from completely different transcripts). Item count here
 buys statistical resolution, and it is cheap — these are seconds of audio, not
 the minutes AMI contributes.
-| VoxConverse | English | DER | **no**, 4 | `diarizers-community/voxconverse`, `CC BY 4.0`. **1 to 21 speakers per recording** -- by far the widest speaker-count range available freely, which is exactly the pipeline's known failure (VBx collapsing to one speaker, see `SpeakerClusterRefiner`). Off by default because its column layout is a community convention this repo has not yet confirmed against a real fetch; turn it on for a diarization-focused run. |
+| VoxConverse | English | DER | **no**, 4 | `diarizers-community/voxconverse`, `CC BY 4.0`. **1 to 21 speakers per recording** -- by far the widest speaker-count range available freely, which is exactly the pipeline's known failure (VBx collapsing to one speaker, see `SpeakerClusterRefiner`). Off by default because its column layout is a community convention this repo has not yet confirmed against a real fetch; naming it in `corpora` (`--only voxconverse-en`) fetches it anyway, without enabling it for default sweeps. |
 | Common Voice 17.0 (pt) | Portuguese | WER | **no**, 12 | Broad accent coverage, but gated behind an `HF_TOKEN` (see below), so it is off by default to keep a fresh clone runnable with no credentials. |
 
 ### How the mix is weighted, and why
@@ -130,33 +130,45 @@ or set it to anything else, to run the full matrix. Both counts assume a single
 whisper.cpp model; sweeping more multiplies them (see below).
 
 `KURN_PUBLIC_EVAL_DIARIZATION_ENGINES` accepts a comma-separated subset of
-`heuristic`, `fluidAudio`, and `sherpaOnnx`; unset or `all` keeps every engine.
+`heuristic`, `fluidAudio`, `sherpaOnnx` and `transcriptionProviderNative`;
+unset or `all` keeps every engine.
 For example, `KURN_PUBLIC_EVAL_MATRIX=essential` together with
 `KURN_PUBLIC_EVAL_DIARIZATION_ENGINES=sherpaOnnx` runs only the four new-engine
 cells (cleanup on/off x the two VAD engines). The CI workflow exposes the same
 filter as its `diarization_engines` dispatch input.
 
-### Including cloud Whisper (OpenAI, Groq)
+### Including cloud transcription (OpenAI, Groq, ElevenLabs)
 
 Every engine above is on-device and free to run unattended. `.whisperAPI` is
-opt-in and additive on top of the base matrix: set `OPENAI_API_KEY` and/or
-`GROQ_API_KEY` in the environment the test process runs in, and the harness
-adds 8 more configurations per provider (preprocessing x VAD x diarization,
-against that provider's Whisper endpoint) -- the key never has to be pasted
-into Settings by hand, since the harness seeds it into the same Keychain
-account `ProviderFactory` reads. Costs real API usage per call; keep
-`sample_count` in `manifest.json` small if you enable this.
+opt-in and additive on top of the base matrix: set `OPENAI_API_KEY`,
+`GROQ_API_KEY` and/or `ELEVENLABS_API_KEY` in the environment the test process
+runs in, and the harness adds one configuration per provider per
+preprocessing x VAD x diarization cell -- the key never has to be pasted into
+Settings by hand, since the harness seeds it into the same Keychain account
+`ProviderFactory` reads. Costs real API usage per call; keep `sample_count` in
+`manifest.json` small if you enable this.
+
+`transcriptionProviderNative` (the provider's own speaker labels) is paired
+only with a provider that returns them -- today ElevenLabs Scribe. Anywhere
+else it falls back to `heuristic`, so the matrix leaves those cells out rather
+than re-measuring the heuristic diarizer under another name.
+
+Each provider runs its default transcription model. `cloud_models`
+(`KURN_PUBLIC_EVAL_CLOUD_MODELS`) sweeps others instead, as comma-separated
+`provider:model` pairs -- e.g. `openai:gpt-4o-transcribe,openai:whisper-1`.
+A non-default model shows up in the label as `asr=whisperAPI:openAI@<model>`.
 
 In CI, the `pipeline-eval` workflow wires `secrets.OPENAI_API_KEY` /
-`secrets.GROQ_API_KEY` into the test env unconditionally, and the
-`cloud_providers` dispatch input decides what to do with them:
+`secrets.GROQ_API_KEY` / `secrets.ELEVENLABS_API_KEY` into the test env
+unconditionally, and the `cloud_providers` dispatch input decides what to do
+with them:
 
 | `cloud_providers` | Effect |
 | --- | --- |
-| `auto` (default) | Include every provider whose key secret is actually present. A repository with neither secret set runs entirely on-device, so the workflow still costs third parties nothing. |
+| `auto` (default) | Include every provider whose key secret is actually present. A repository with no secret set runs entirely on-device, so the workflow still costs third parties nothing. |
 | `none` | Force cloud off, even with keys configured. Use this when you only want the on-device matrix. |
-| `openai` / `groq` | Force exactly that one provider. |
-| `both` | Force both, regardless of what `auto` would have detected. |
+| `openai` / `groq` / `elevenlabs`, or a comma list | Exactly those providers (each still needs its key). |
+| `both` | OpenAI and Groq, as before ElevenLabs existed. |
 
 Locally, the same choice is `KURN_PUBLIC_EVAL_CLOUD_PROVIDERS` -- read by
 `PipelineEvaluationMatrix.cloudProvidersFromEnvironment()`, which is where the
@@ -169,6 +181,31 @@ tables to compare between runs, and the per-corpus one is the one to trust when
 a language spans material as different as read speech and meeting speech.
 `KURN_PUBLIC_EVAL_REPORT` additionally writes every (item, configuration) row as
 CSV, for pulling into a spreadsheet or diffing between two runs.
+
+### Re-scoring with the industry's reference tools
+
+`KURN_PUBLIC_EVAL_HYPOTHESES` makes the harness also write what each cell
+produced -- fused segments with speaker, times and text, plus the diarizer's
+raw turns -- as JSON Lines. `Tools/evaluation/rescore.py` (dependencies in
+`Tools/evaluation/rescore-requirements.txt`) re-scores that output, with no
+re-run, using the implementations published results are computed with:
+
+| Column | Tool | Why it is there |
+| --- | --- | --- |
+| WER (kurn) | this repo's normalizer, aligned by `jiwer` | Cross-check: with `--report` it is compared to the harness CSV, and any gap is a scorer bug. |
+| WER (standard) | Whisper's `EnglishTextNormalizer` / `BasicTextNormalizer` + `jiwer` | The Open ASR Leaderboard convention: numbers, spellings, contractions and fillers normalized. The only WER here loosely comparable to a paper. |
+| cpWER | `meeteval` | CHiME-6/7 and NOTSOFAR's meeting metric: WER per speaker under the best speaker permutation, i.e. who said what. AMI only (`<name>.reference.seglst.json`, written by `fetch_ami.py`). |
+| DER ±0.25 s / no collar | `pyannote.metrics` | Both collar conventions in use: NIST RT/VoxConverse (±0.25 s, what the harness reports) and DIHARD/pyannote (none). Fused segments and raw turns. |
+
+The workflow runs it automatically and adds its tables to the job summary and
+`rescore.csv`/`rescore.md` to the artifact.
+
+**Why the standard WER matters most on AMI.** AMI's manual transcript keeps
+every filler ("um", "uh", "mm-hmm") and writes numbers as words; Whisper-family
+engines drop the fillers and write digits. Under the language-neutral
+normalizer each of those is an error, so WER (kurn) partly measures
+transcription *style*, and penalizes engines unevenly -- which matters when the
+question is which engine wins.
 
 ### The report is written as it goes, and can be resumed
 

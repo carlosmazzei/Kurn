@@ -42,6 +42,34 @@ enum PublicEvaluationDataset {
     /// printed regardless of whether this is set.
     static let reportVariable = "KURN_PUBLIC_EVAL_REPORT"
 
+    /// Optional path to a JSON Lines file receiving every cell's hypothesis —
+    /// fused segments (speaker, times, text) and the diarizer's raw turns — so
+    /// `Tools/evaluation/rescore.py` can re-score the same output with the
+    /// industry's reference tools (Whisper's normalizers + `jiwer`,
+    /// `pyannote.metrics`, `meeteval`). Public audio only, so nothing private
+    /// is written.
+    static let hypothesesVariable = "KURN_PUBLIC_EVAL_HYPOTHESES"
+
+    static var hypothesesPath: String? {
+        guard let raw = ProcessInfo.processInfo.environment[hypothesesVariable],
+              !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return NSString(string: raw).expandingTildeInPath
+    }
+
+    /// Optional corpus ids (directory names, space- or comma-separated) to
+    /// evaluate; everything else under the data directory is ignored. The
+    /// workflow's dataset cache keeps every corpus a previous run fetched, so
+    /// narrowing only the *fetch* still scored all of them — and for a cloud
+    /// engine that is paid calls nobody asked for.
+    static let corporaVariable = "KURN_PUBLIC_EVAL_CORPORA"
+
+    static func selectedCorpora(from raw: String?) -> Set<String>? {
+        let ids = (raw ?? "")
+            .split(whereSeparator: { $0 == "," || $0.isWhitespace })
+            .map(String.init)
+        return ids.isEmpty ? nil : Set(ids)
+    }
+
     static var directoryPath: String? {
         guard let raw = ProcessInfo.processInfo.environment[directoryVariable],
               !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
@@ -108,9 +136,11 @@ enum PublicEvaluationDataset {
             at: root, includingPropertiesForKeys: [.isDirectoryKey]
         )
 
+        let selected = selectedCorpora(from: ProcessInfo.processInfo.environment[corporaVariable])
         var results: [(CorpusInfo, [Item])] = []
         for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
+            if let selected, !selected.contains(entry.lastPathComponent) { continue }
             let infoURL = entry.appendingPathComponent("dataset.json")
             guard let data = try? Data(contentsOf: infoURL),
                   let info = try? JSONDecoder().decode(CorpusInfo.self, from: data) else { continue }
