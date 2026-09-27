@@ -32,13 +32,14 @@ enum RecordingTrash {
     /// order — mirrored here so a moved file always knows where it came from
     /// and can be put back exactly there.
     private enum SourceDirectory: String, CaseIterable {
-        case main, enhanced, legacy
+        case main, enhanced, legacy, photos
 
         var url: URL {
             switch self {
             case .main: return AudioFileStore.recordingsDirectoryURL
             case .enhanced: return AudioFileStore.enhancedDirectoryPath
             case .legacy: return AudioFileStore.documentsURL
+            case .photos: return PhotoFileStore.photosDirectoryURL
             }
         }
     }

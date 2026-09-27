@@ -71,7 +71,7 @@ extension SettingsView {
             dataError = .persistenceFailed(error.localizedDescription)
             return
         }
-        let residual = AudioFileStore.deleteAllAudio()
+        let residual = AudioFileStore.deleteAllAudio() + PhotoFileStore.deleteAllPhotos()
         if residual > 0 {
             AppLog.persistence.atError.error("Delete all left \(residual, privacy: .public) audio file(s) on disk")
             dataError = .audioError(String(

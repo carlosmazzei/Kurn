@@ -45,6 +45,12 @@ enum ResourceWorkKind: Sendable, Equatable {
     case diarization(DiarizationEngine)
     case enhancement
     case modelLoading
+    /// On-device Vision OCR over a captured meeting photo
+    /// (`PhotoTextRecognizer`). Light and brief relative to the other
+    /// kinds, but still reserved so a burst of photo captures during a
+    /// recording cannot stack unboundedly alongside a concurrent
+    /// transcription/diarization run on another meeting.
+    case photoTextRecognition
 
     /// Abstract units against `ResourceScheduler.defaultTotalWeight`'s
     /// budget of 100 — a first-cut estimate of relative memory cost, not a
@@ -86,6 +92,8 @@ enum ResourceWorkKind: Sendable, Equatable {
             return 30
         case .modelLoading:
             return 40
+        case .photoTextRecognition:
+            return 10
         }
     }
 }

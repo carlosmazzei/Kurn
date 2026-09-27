@@ -29,6 +29,11 @@ struct SummaryService {
         let offset: TimeInterval
         let segments: [TranscriptSegment]
         let highlights: [Highlight]
+        /// Photos captured during this recording, with recognized (OCR) text
+        /// where available — the additional context a "photo timeline"
+        /// contributes to summary/wiki/chat prompts. Defaulted so existing
+        /// call sites that predate photos don't need to change.
+        var photos: [MeetingPhoto] = []
     }
 
     /// Transcripts at or below this size are summarized in a single request.
@@ -381,6 +386,11 @@ struct SummaryService {
                 let isHighlighted = group.highlights.contains { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
                 let prefix = isHighlighted ? "⭐ " : ""
                 lines.append("\(prefix)[\(stamp)] \(segment.speakerLabel): \(segment.text)")
+                for photo in group.photos where photo.capturedAt >= segment.startTime && photo.capturedAt < segment.endTime {
+                    guard let text = photo.contextText else { continue }
+                    let photoStamp = (photo.capturedAt + group.offset).clockDisplay
+                    lines.append("[\(photoStamp)] 📷 Photo: \(text)")
+                }
             }
         }
         return lines.joined(separator: "\n")

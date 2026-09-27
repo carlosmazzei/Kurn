@@ -217,7 +217,8 @@ final class Meeting {
                 return SummaryService.TranscriptGroup(
                     offset: startOffset(of: recording),
                     segments: segments,
-                    highlights: recording.highlights
+                    highlights: recording.highlights,
+                    photos: recording.photos
                 )
             }
         return SummaryService.assembleTranscriptText(from: groups)

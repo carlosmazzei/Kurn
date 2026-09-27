@@ -53,6 +53,12 @@ enum RecordingProtection {
     /// shallow-scan invisibility as `trashDirectoryName`, for the same reason.
     static let journalDirectoryName = "Journal"
 
+    /// Subdirectory of the recordings directory holding photos captured
+    /// mid-recording (`PhotoFileStore`). Same shallow-scan invisibility as
+    /// `enhancedDirectoryName` — every `.m4a`-filtered sweep over the
+    /// recordings directory skips it by construction.
+    static let photosDirectoryName = "Photos"
+
     /// Protection class applied to the recordings directory. `.completeUnlessOpen`
     /// is chosen over `.complete` so that an in-progress recording survives the
     /// screen locking mid-meeting — the file stays writable while it is open,

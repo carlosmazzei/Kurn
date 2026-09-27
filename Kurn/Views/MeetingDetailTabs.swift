@@ -24,6 +24,7 @@ struct TranscriptTab: View {
     let onRenameCommit: () -> Void
 
     @State private var selectedSpeaker: String?
+    @State private var presentedPhoto: MeetingPhoto?
 
     /// Labels that actually say something in the transcripts on screen.
     ///
@@ -79,7 +80,9 @@ struct TranscriptTab: View {
                     activeTime: player.loadedFileName == recording.fileName ? player.currentTime : nil,
                     offset: offsetFor(recording),
                     highlights: recording.highlights,
-                    onSeek: { time in onSeek(recording, time) }
+                    photos: recording.photos,
+                    onSeek: { time in onSeek(recording, time) },
+                    onShowPhoto: { presentedPhoto = $0 }
                 )
             }
 
@@ -94,6 +97,9 @@ struct TranscriptTab: View {
                 Text(NSLocalizedString("detail.speakers.note", comment: "Auto-detected note"))
                     .font(.footnote).foregroundStyle(Theme.textTertiary)
             }
+        }
+        .sheet(item: $presentedPhoto) { photo in
+            PhotoViewerView(photo: photo)
         }
     }
 }

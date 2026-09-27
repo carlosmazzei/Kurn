@@ -64,6 +64,7 @@ private struct RecorderContent: View {
     let onFinished: () -> Void
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
+    @State private var showingPhotoCapture = false
     /// Fixed 20 Hz drive for the waveform scroll — the same cadence as the
     /// recorder's metering tick.
     private let waveformClock = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -185,6 +186,11 @@ private struct RecorderContent: View {
             }
         ))
         .interactiveDismissDisabled(vm.state != .idle || vm.isStarting)
+        .fullScreenCover(isPresented: $showingPhotoCapture) {
+            PhotoCaptureView { data in
+                vm.capturePhoto(jpegData: data)
+            }
+        }
     }
 
     // MARK: - Subviews
@@ -395,6 +401,22 @@ private struct RecorderContent: View {
             .disabled(vm.state != .recording)
             .sensoryFeedback(.success, trigger: vm.highlightCount)
             .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
+
+            // Photo. Same fixed-circle treatment and the same "recording only"
+            // guard as highlight — a photo needs an active recording to attach
+            // its timestamp to (see `AudioRecorderService.registerPhoto`).
+            Button {
+                AppLog.recorderUI.atInfo.info("UI: photo tapped, state=\(String(describing: vm.state), privacy: .public)")
+                showingPhotoCapture = true
+            } label: {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 58, height: 58)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .disabled(vm.state != .recording)
+            .accessibilityLabel(NSLocalizedString("recorder.photo", comment: "Photo"))
         }
         .opacity(vm.state == .idle ? 0.5 : 1)
     }

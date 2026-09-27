@@ -210,7 +210,12 @@
 "recorder.resume" = "Resume";
 "recorder.stop" = "Stop";
 "recorder.highlight" = "Highlight";
+"recorder.photo" = "Photo";
+"recorder.photo_shutter" = "Take Photo";
 "transcript.jump_to_highlight" = "Jump to highlight";
+"transcript.view_photo" = "View photo";
+"photo.unavailable" = "Photo unavailable";
+"photo.recognized_text" = "Recognized text";
 "recorder.paused" = "PAUSED";
 "recorder.permission.title" = "Microphone Access Needed";
 "recorder.permission.message" = "Kurn needs microphone access to record meetings. Enable it in Settings.";

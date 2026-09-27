@@ -64,7 +64,8 @@ extension TranscriptionViewModel {
                 return SummaryService.TranscriptGroup(
                     offset: meeting.startOffset(of: recording),
                     segments: segments,
-                    highlights: recording.highlights
+                    highlights: recording.highlights,
+                    photos: recording.photos
                 )
             }
         let transcriptText = SummaryService.assembleTranscriptText(from: groups)

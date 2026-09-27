@@ -372,6 +372,65 @@ final class RecorderViewModel {
         recorder.markHighlight()
     }
 
+    /// Write `jpegData` to protected storage and register it against the
+    /// active recording's timeline. Returns `false` (and discards the file)
+    /// when there is no active recording to attach it to — e.g. the sheet
+    /// stayed open across a stop/pause race.
+    @discardableResult
+    func capturePhoto(jpegData: Data) -> Bool {
+        guard let recording = activeRecording else { return false }
+        do {
+            let fileName = try PhotoFileStore.write(jpegData, recordingID: recording.id)
+            guard recorder.registerPhoto(fileName: fileName) != nil else {
+                PhotoFileStore.delete(fileName: fileName)
+                return false
+            }
+            return true
+        } catch {
+            AppLog.recorderUI.atError.error(
+                "capturePhoto: write failed code=\(error.publicLogCode, privacy: .public)"
+            )
+            return false
+        }
+    }
+
+    /// On-device OCR (Vision) over a just-captured photo, best-effort and
+    /// off-main. Never fails the capture itself — a failure just leaves
+    /// `recognizedText` nil, same as a photo with no legible text.
+    private func recognizePhotoText(_ photo: MeetingPhoto) {
+        let photoID = photo.id
+        let url = photo.fileURL
+        Task {
+            let operationID = OperationID()
+            do {
+                let text = try await withResourceReservation(.photoTextRecognition) {
+                    await Task.detached(priority: .utility) {
+                        await PhotoTextRecognizer.recognizeText(at: url)
+                    }.value
+                }
+                let descriptor = FetchDescriptor<MeetingPhoto>(predicate: #Predicate { $0.id == photoID })
+                if let row = try? modelContext.fetch(descriptor).first {
+                    row.recognizedText = text
+                    if let saveFailure = modelContext.saveOrError() {
+                        throw saveFailure
+                    }
+                }
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: operationID,
+                    operation: "photo_ocr",
+                    outcome: .succeeded
+                ))
+            } catch {
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: operationID,
+                    operation: "photo_ocr",
+                    outcome: .failed,
+                    code: error.publicLogCode
+                ))
+            }
+        }
+    }
+
     func togglePause() {
         AppLog.recorderUI.atInfo.info("togglePause: state=\(String(describing: self.recorder.state), privacy: .public)")
         switch recorder.state {
@@ -432,13 +491,24 @@ final class RecorderViewModel {
             let metadata = try fileFinalizer.finalize(fileName: recording.fileName)
             let recoveryReason = forcedReason ?? result?.captureFailure.map(CaptureRecoveryReason.init)
             if metadata.duration < 0.5, recoveryReason == nil {
-                return discardShortRecording(recording)
+                return discardShortRecording(recording, result: result)
             }
             recording.duration = metadata.duration
             recording.fileSize = metadata.fileSize
             recording.highlights = result?.highlights ?? recording.highlights
             recording.captureState = recoveryReason == nil ? .ready : .recoveryNeeded
             recording.captureRecoveryReason = recoveryReason
+            for capturedPhoto in result?.photos ?? [] {
+                let photo = MeetingPhoto(
+                    id: capturedPhoto.id,
+                    recording: recording,
+                    fileName: capturedPhoto.fileName,
+                    capturedAt: capturedPhoto.capturedAt,
+                    createdAt: capturedPhoto.createdAt
+                )
+                modelContext.insert(photo)
+                recognizePhotoText(photo)
+            }
         } catch let finalizationError as RecordingFileFinalizationError {
             recording.captureState = .recoveryNeeded
             recording.captureRecoveryReason = finalizationError.recoveryReason
@@ -470,8 +540,11 @@ final class RecorderViewModel {
     }
 
     @discardableResult
-    private func discardShortRecording(_ recording: Recording) -> Bool {
+    private func discardShortRecording(_ recording: Recording, result: AudioRecordingResult?) -> Bool {
         AudioFileStore.delete(fileName: recording.fileName)
+        for capturedPhoto in result?.photos ?? [] {
+            PhotoFileStore.delete(fileName: capturedPhoto.fileName)
+        }
         modelContext.delete(recording)
         do {
             try lifecycleSaver.save(modelContext)

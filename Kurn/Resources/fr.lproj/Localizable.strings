@@ -210,7 +210,12 @@
 "recorder.resume" = "Reprendre";
 "recorder.stop" = "Arrêter";
 "recorder.highlight" = "Marquer";
+"recorder.photo" = "Photo";
+"recorder.photo_shutter" = "Prendre une photo";
 "transcript.jump_to_highlight" = "Aller au marqueur";
+"transcript.view_photo" = "Voir la photo";
+"photo.unavailable" = "Photo indisponible";
+"photo.recognized_text" = "Texte reconnu";
 "recorder.paused" = "EN PAUSE";
 "recorder.permission.title" = "Accès au microphone requis";
 "recorder.permission.message" = "Kurn a besoin du microphone pour enregistrer les réunions. Activez-le dans Réglages.";

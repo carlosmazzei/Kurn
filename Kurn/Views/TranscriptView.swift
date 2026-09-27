@@ -22,7 +22,14 @@ struct TranscriptView: View {
     var offset: TimeInterval = 0
     /// Recording-relative highlight markers, same convention as `startTime`.
     var highlights: [Highlight] = []
+    /// Photos captured during this recording, same recording-relative
+    /// timestamp convention as `highlights`.
+    var photos: [MeetingPhoto] = []
     let onSeek: (TimeInterval) -> Void
+    /// Presents a photo full-screen. `nil` (the default) hides the inline
+    /// photo marker entirely, so call sites that don't pass `photos` don't
+    /// need to pass this either.
+    var onShowPhoto: ((MeetingPhoto) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -42,6 +49,7 @@ struct TranscriptView: View {
         let color = Color(hex: speaker?.color ?? "#888888")
         let isActive = activeTime.map { $0 >= segment.startTime && $0 < segment.endTime } ?? false
         let matchingHighlights = highlights.filter { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
+        let matchingPhotos = photos.filter { $0.capturedAt >= segment.startTime && $0.capturedAt < segment.endTime }
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
@@ -68,6 +76,17 @@ struct TranscriptView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(NSLocalizedString("transcript.jump_to_highlight", comment: "Jump to highlight"))
+                }
+                ForEach(matchingPhotos) { photo in
+                    Button {
+                        onShowPhoto?(photo)
+                    } label: {
+                        Image(systemName: "camera.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(NSLocalizedString("transcript.view_photo", comment: "View photo"))
                 }
                 Spacer()
             }

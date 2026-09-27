@@ -51,6 +51,7 @@ final class MeetingsViewModel {
     /// `RecordingOperationJournal`'s header comment.
     func delete(_ meeting: Meeting) {
         let fileNames = meeting.recordings.map(\.fileName)
+            + meeting.recordings.flatMap { $0.photos.map(\.fileName) }
         if let failure = RecordingOperationJournal.performDelete(fileNames: fileNames, commit: {
             modelContext.delete(meeting)
             return modelContext.saveOrError()
@@ -63,7 +64,8 @@ final class MeetingsViewModel {
     /// trash → commit → purge path as `delete(_:)`. Keeping this here (rather
     /// than in the view) makes the file-cleanup behavior unit-testable.
     func deleteRecording(_ recording: Recording) {
-        if let failure = RecordingOperationJournal.performDelete(fileNames: [recording.fileName], commit: {
+        let fileNames = [recording.fileName] + recording.photos.map(\.fileName)
+        if let failure = RecordingOperationJournal.performDelete(fileNames: fileNames, commit: {
             modelContext.delete(recording)
             return modelContext.saveOrError()
         }) {
