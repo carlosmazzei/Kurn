@@ -168,17 +168,18 @@ struct ProviderEditor: View {
     /// "keep the previous state until the replacement is durable" shape H5
     /// PR 12 established for transcripts.
     private func commitAndSave() {
-        if key != originalKey {
-            let outcome: KeychainWriteOutcome = key.isEmpty
+        let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedKey != originalKey {
+            let outcome: KeychainWriteOutcome = trimmedKey.isEmpty
                 ? KeychainManager.shared.delete(provider.keychainAccount)
-                : KeychainManager.shared.set(key, for: provider.keychainAccount)
+                : KeychainManager.shared.set(trimmedKey, for: provider.keychainAccount)
             guard case .success = outcome else {
                 if case .failed(let reason) = outcome {
                     saveError = .keychainAccessFailed(reason.rawValue)
                 }
                 return
             }
-            originalKey = key
+            originalKey = trimmedKey
             onChange()
         }
         var updated = provider
@@ -238,7 +239,7 @@ struct AddProviderView: View {
                         kind: kind,
                         baseURLString: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
-                    onAdd(provider, key)
+                    onAdd(provider, key.trimmingCharacters(in: .whitespacesAndNewlines))
                 }
                 .disabled(!canSave)
             }
