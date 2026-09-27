@@ -104,13 +104,17 @@ generates a summary with a configured AI provider.
   language), or with Whisper itself via whisper.cpp — Whisper's accuracy and
   language coverage with nothing leaving the device.
 - Optionally transcribes with a cloud Whisper-compatible API using chunked
-  uploads for longer recordings. The transcription provider (OpenAI, Groq, or
-  a custom OpenAI-compatible endpoint) is chosen independently of the summary
-  provider.
+  uploads for longer recordings. The transcription provider (OpenAI —
+  `whisper-1`, `gpt-4o-transcribe`, or `gpt-4o-mini-transcribe` — Groq,
+  ElevenLabs Scribe, or a custom OpenAI-compatible endpoint) is chosen
+  independently of the summary provider.
 - Runs speaker diarization with a choice of three on-device engines — a
   lightweight built-in heuristic, FluidAudio's neural engine, or sherpa-onnx's
   segmentation-first engine (a collapse-resistant alternative for far-field
-  audio, CPU-only) — and fuses speaker turns with transcript spans.
+  audio, CPU-only) — and fuses speaker turns with transcript spans. A
+  transcription provider whose own response already includes speaker turns
+  (currently ElevenLabs Scribe) can be used as a fourth, no-download
+  diarization source instead.
 - Voice-activity detection and language detection are each independently
   configurable between an always-available built-in engine and a FluidAudio
   on-device model.
@@ -188,14 +192,17 @@ Supported summary providers:
 - Google AI
 - Groq
 
+ElevenLabs is also a built-in provider, but transcription-only — it has no
+chat/summarize route, so it never appears as a summary provider choice.
+
 All LLM-backed features (summaries, chat, tag suggestions, wiki, documents,
 transcript correction) resolve through the same `ProviderFactory`, so the
 selected provider applies everywhere. Each cloud provider has selectable
-models in Settings. Cloud transcription uses a
-Whisper-compatible API chosen independently of the summary provider, from
-whichever OpenAI-compatible provider (OpenAI, Groq, or a custom endpoint) has
-a configured key — Anthropic and Google AI don't expose a transcription API,
-so they're only usable for summaries.
+models in Settings. Cloud transcription uses a Whisper-compatible API chosen
+independently of the summary provider, from whichever provider that supports
+transcription (any OpenAI-compatible provider — OpenAI, Groq, or a custom
+endpoint — plus ElevenLabs) has a configured key — Anthropic and Google AI
+don't expose a transcription API, so they're only usable for summaries.
 
 ## Configuration
 
@@ -203,11 +210,13 @@ Kurn works without cloud credentials when using on-device transcription.
 Cloud features require user-provided API keys.
 
 - OpenAI key: required for OpenAI summaries, and usable for Whisper
-  transcription.
+  transcription (`whisper-1`, `gpt-4o-transcribe`, or `gpt-4o-mini-transcribe`).
 - Anthropic key: required for Anthropic summaries.
 - Google AI key: required for Gemini summaries.
 - Groq key: required for Groq summaries, and usable for Whisper transcription
   (Groq serves `whisper-large-v3`).
+- ElevenLabs key: usable for Whisper-compatible transcription only (Scribe,
+  `scribe_v1`), including its own native speaker diarization — no summary use.
 - API keys are stored in the Keychain; saving a key is an explicit action with
   a typed success/failure outcome rather than a silent write.
 - Non-secret preferences are stored in `UserDefaults`.
@@ -285,7 +294,7 @@ Kurn is designed to avoid a backend service controlled by the app.
 - watchOS 10.0 or newer for the Watch app.
 - An iOS simulator or a physical iPhone/iPad.
 - Optional: a paired Apple Watch or watchOS simulator for Watch remote control.
-- Optional: API keys for OpenAI, Anthropic, Google AI, or Groq.
+- Optional: API keys for OpenAI, Anthropic, Google AI, Groq, or ElevenLabs.
 
 ## Getting Started
 
@@ -488,8 +497,8 @@ Kurn/
 ├── Services/                    # Audio, diarization, live preview, summaries, folder analytics
 │   └── Pipeline/                # Transcription pipeline stages (protocol seams,
 │                                 # each with a built-in and a FluidAudio engine)
-├── Providers/                   # Apple Foundation Models, OpenAI, Anthropic, Google AI
-│                                 # and Groq clients behind one LLMProvider seam
+├── Providers/                   # Apple Foundation Models, OpenAI, Anthropic, Google AI,
+│                                 # Groq, and ElevenLabs clients behind one LLMProvider seam
 ├── AppIntents/                  # Siri / Shortcuts start-recording intent
 ├── Infrastructure/              # Keychain, settings, export, store boot, journal,
 │                                 # recovery, reliability events, resource scheduler
@@ -532,19 +541,21 @@ recovery" section for the concrete types and invariants.
 
 ## Important Implementation Notes
 
-- Cloud transcription uses a Whisper-compatible API (OpenAI or Groq today),
-  chosen independently of the summary provider.
+- Cloud transcription uses a Whisper-compatible API (OpenAI, Groq, or
+  ElevenLabs today), chosen independently of the summary provider.
 - Summary generation can use OpenAI, Anthropic, Google AI, or Groq, and long
   transcripts use a staged map-reduce pass with progress and cancellation in
-  the Summary tab.
+  the Summary tab. ElevenLabs is transcription-only and never appears here.
 - Voice-activity detection, transcription, and language detection are each
   independently configurable between a built-in engine (available offline, no
-  download) and a FluidAudio on-device engine. Speaker diarization has a third
-  option too: sherpa-onnx's segmentation-first engine, offered alongside
+  download) and a FluidAudio on-device engine. Speaker diarization has two
+  further options: sherpa-onnx's segmentation-first engine, offered alongside
   FluidAudio's neural engine as a collapse-resistant alternative for far-field
-  audio (CPU-only, no Apple Neural Engine acceleration). The built-in diarizer
-  is heuristic and approximate by design; both neural engines require a
-  one-time, opt-in download.
+  audio (CPU-only, no Apple Neural Engine acceleration); and, no download
+  either, using the selected cloud transcription provider's own speaker turns
+  when it supports native diarization (ElevenLabs Scribe today). The built-in
+  diarizer is heuristic and approximate by design; both neural engines require
+  a one-time, opt-in download.
 - On-device transcription availability depends on Apple's Speech framework
   or the downloaded FluidAudio model, simulator/device support, and the
   selected language.
