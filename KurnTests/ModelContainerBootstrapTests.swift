@@ -110,7 +110,8 @@ struct KurnModelGraphTests {
             ObjectIdentifier(SemanticChunk.self),
             ObjectIdentifier(WikiArticle.self),
             ObjectIdentifier(GeneratedDocument.self),
-            ObjectIdentifier(ChatSession.self)
+            ObjectIdentifier(ChatSession.self),
+            ObjectIdentifier(MeetingPhoto.self)
         ]))
     }
 
@@ -143,18 +144,19 @@ struct KurnModelGraphTests {
         #expect(liveMeeting?.relationships.contains { $0.name == "chatSessions" } == true)
     }
 
-    @Test func migrationPlanDeclaresBothSchemasWithOneLightweightStage() {
-        // KurnSchemaV2 added ChatSession — the first real use of this plan.
-        // The next *non*-additive model change must add KurnSchemaV3 here
-        // rather than editing KurnSchemaV1/KurnSchemaV2 in place.
+    @Test func migrationPlanDeclaresAllSchemasWithLightweightStages() {
+        // KurnSchemaV2 added ChatSession; KurnSchemaV3 added MeetingPhoto —
+        // both purely additive, so each gets its own lightweight stage. The
+        // next *non*-additive model change must add KurnSchemaV4 here rather
+        // than editing KurnSchemaV1/KurnSchemaV2/KurnSchemaV3 in place.
         #expect(KurnSchemaMigrationPlan.schemas.map { ObjectIdentifier($0) } == [
-            ObjectIdentifier(KurnSchemaV1.self), ObjectIdentifier(KurnSchemaV2.self)
+            ObjectIdentifier(KurnSchemaV1.self), ObjectIdentifier(KurnSchemaV2.self), ObjectIdentifier(KurnSchemaV3.self)
         ])
-        #expect(KurnSchemaMigrationPlan.stages.count == 1)
+        #expect(KurnSchemaMigrationPlan.stages.count == 2)
     }
 
     @Test func versionedSchemaModelsMatchTheCentralizedGraph() {
-        let versionedIdentifiers = Set(KurnSchemaV2.models.map { ObjectIdentifier($0) })
+        let versionedIdentifiers = Set(KurnSchemaV3.models.map { ObjectIdentifier($0) })
         let graphIdentifiers = Set(KurnModelGraph.currentModels.map { ObjectIdentifier($0) })
         #expect(versionedIdentifiers == graphIdentifiers)
     }
