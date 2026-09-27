@@ -25,6 +25,10 @@ struct PhotoViewerView: View {
                             .resizable()
                             .scaledToFit()
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .accessibilityLabel(NSLocalizedString(
+                                "photo.captured_image",
+                                comment: "Accessibility label for a photo captured during recording"
+                            ))
                     } else {
                         ContentUnavailableView(
                             NSLocalizedString("photo.unavailable", comment: "Photo unavailable"),

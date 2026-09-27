@@ -10,7 +10,11 @@
 //  session category.
 //
 
-import AVFoundation
+// `AVCaptureSession`/`AVCapturePhotoOutput` predate Swift 6 Sendable auditing,
+// so passing them into a `Task.detached` closure needs the same
+// `@preconcurrency` treatment `VADAudioCompactor.swift` already uses for
+// `AVAudioEngine`.
+@preconcurrency import AVFoundation
 import Foundation
 
 @MainActor

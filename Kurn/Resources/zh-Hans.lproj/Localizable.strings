@@ -216,6 +216,7 @@
 "transcript.view_photo" = "查看照片";
 "photo.unavailable" = "照片不可用";
 "photo.recognized_text" = "识别的文字";
+"photo.captured_image" = "录音期间拍摄的照片";
 "recorder.paused" = "已暂停";
 "recorder.permission.title" = "需要麦克风权限";
 "recorder.permission.message" = "Kurn 需要麦克风权限来录制会议。请在设置中启用。";

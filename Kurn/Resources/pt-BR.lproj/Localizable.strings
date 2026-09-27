@@ -216,6 +216,7 @@
 "transcript.view_photo" = "Ver foto";
 "photo.unavailable" = "Foto indisponível";
 "photo.recognized_text" = "Texto reconhecido";
+"photo.captured_image" = "Foto tirada durante a gravação";
 "recorder.paused" = "PAUSADO";
 "recorder.permission.title" = "Acesso ao Microfone Necessário";
 "recorder.permission.message" = "O Kurn precisa do microfone para gravar reuniões. Ative o acesso nos Ajustes.";
