@@ -387,7 +387,7 @@ struct LegacyStoreAdoptionTests {
             // Every migrated meeting must expose the V3 relationship, ready to
             // use, not merely present — an empty collection that faults on
             // access would look identical to data loss from the UI.
-            #expect(meeting.recordings.allSatisfy(\.photos.isEmpty))
+            #expect(meeting.recordings.allSatisfy { $0.photos.isEmpty })
         }
 
         let totalRecordings = try context.fetchCount(FetchDescriptor<Recording>())
