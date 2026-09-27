@@ -346,7 +346,7 @@ features, so they carry a different kind of urgency.
 | ------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **D1** | Speaker labels conflated across recordings in one meeting  | Fixed                                                                                                                                                                   |
 | **D2** | Raw diarizer turns are not measurable                      | Implemented                                                                                                                                                             |
-| **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Evaluate                                                                                                                                                                |
+| **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Shipped                                                                                                                                                                 |
 | **D4** | A segmentation-first diarizer as a third engine            | Shipped as an opt-in alternative; measures ~17pp behind `fluidAudio` on AMI, but the collapse case it targets is still untested (needs a per-file, same-run comparison) |
 | **D5** | Overlapping speech is not representable                    | Decided — keep truncating; no engine here has overlap-aware ASR anyway                                                                                                  |
 | **D6** | Voiceprints never cross meetings                           | Implemented (standalone; F4 half still open)                                                                                                                            |
@@ -434,6 +434,24 @@ recomputed locally over the same file.
 Shape of the change: widen the seam so a transcription result can carry optional
 speaker turns, and add a diarization engine case that consumes them rather than
 opening the audio. Fusion is unaffected — it already takes turns plus spans.
+
+**What shipped** (`feat(transcription): ElevenLabs provider, gpt-4o-transcribe
+support, and generalized native diarization`, #218): `RawTranscript` gained an
+optional `speakerTurns`; `AIProvider.supportsNativeDiarization` is the
+capability flag (true today only for the new `.elevenLabs` kind, whose Scribe
+API returns `diarize`d output) and is the whole seam for a future provider of
+the same shape — flip the flag and populate `speakerTurns` from that
+provider's own response format, nothing else needs to change. The new
+`DiarizationEngine.transcriptionProviderNative` case is honored by
+`PipelineConfiguration.effectiveDiarization` only when the transcription
+engine is `.whisperAPI` and the selected provider supports it, falling back to
+`.heuristic` otherwise (no download, no consent flag — it fetches nothing).
+The two axes stay fully independent: any of the three local diarizers can
+still be paired with any transcription engine or provider, including one
+that could diarize natively. See CLAUDE.md's Providers section for the
+architecture and `docs/pipeline-evaluation.md`'s 2026-09-26 run for measured
+accuracy (ElevenLabs' native turns beat `fluidAudio` on cpWER but not on raw
+DER).
 
 **Effort:** medium, and it presumes adding a provider whose API offers this,
 which is a separate decision from the seam.
@@ -696,10 +714,12 @@ four coexisting "primary button" visual languages, ~35 call sites bypassing
 Dynamic Type, and no iPad-specific navigation (`NavigationSplitView`) despite
 the app being universal. The full findings register and an 8-track (D1–D8)
 remediation plan, ordered by an effort/impact matrix, live in
-[`docs/design-review-liquid-glass.md`](design-review-liquid-glass.md). All
-tracks are open as of the review date; the largest is D6 (iPad
-`NavigationSplitView` adoption), which is structural rather than cosmetic and
-should be planned as its own project.
+[`docs/design-review-liquid-glass.md`](design-review-liquid-glass.md). **All
+8 tracks are now done**, including D6 (iPad `NavigationSplitView` adoption,
+the largest and most structural item — `ContentView` now branches on
+`horizontalSizeClass`). The one item that doc still lists as outstanding is a
+manual iPad simulator/device verification pass, which no Linux CI session can
+perform.
 
 ## Suggested sequence
 
@@ -749,5 +769,7 @@ defects and because D2 is a prerequisite rather than a feature:
   justified purely by VBx-collapse resistance on far-field audio (measurable
   via D2's raw-turn DER), not by overlap handling. Still just "evaluate", not
   scheduled.
-- **D3 whenever the provider question is reopened**, not before: it presumes a
-  transcription provider the app does not have today.
+- **D3 — done.** The ElevenLabs provider (#218) answered the provider question
+  this depended on: it exposes native diarization, and `AIProvider.supportsNativeDiarization`
+  plus `DiarizationEngine.transcriptionProviderNative` are the shipped seam —
+  see D3's own entry above.

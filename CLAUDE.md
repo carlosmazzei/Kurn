@@ -170,12 +170,25 @@ which is what every claim about this pipeline had been until it existed.
   the same material, not against published figures.
 - `DiarizationErrorRate` — NIST DER: missed + false alarm + confusion over
   reference speech, scored under the label mapping that maximises agreement
-  (a diarizer's own labels are arbitrary) with a ±0.25 s collar around reference
-  boundaries. Confusion is reported apart from missed time because this app's
-  known failure — the clustering step collapsing to one speaker — is *all*
-  confusion and *no* missed time.
+  (a diarizer's own labels are arbitrary — exhaustive search up to 7 labels,
+  the Hungarian algorithm above that; the earlier greedy fallback over-reported
+  DER by up to ~8pp against `pyannote.metrics` on synthetic 8–12-speaker
+  timelines, which matters once VoxConverse's up-to-21-speaker files are in
+  play) with a ±0.25 s collar around reference boundaries. Confusion is
+  reported apart from missed time because this app's known failure — the
+  clustering step collapsing to one speaker — is *all* confusion and *no*
+  missed time.
 - `RTTM` — reads and writes the annotation format the corpora and external
   scorers use.
+- **Since 2026-09-26, `Tools/evaluation/rescore.py` re-scores every dispatch's
+  raw output a second way**, with the reference tools themselves — Whisper's
+  own normalizer + `jiwer` for a "WER standard" figure (the one loosely
+  comparable to a published number), `meeteval` for cpWER (speaker-attributed
+  WER, the one number that reflects what a user actually reads when
+  diarization and transcription both have errors), and `pyannote.metrics` for
+  DER at both a ±0.25 s collar and none. It exists as a cross-check on the
+  harness above, not a replacement for it — on 1071 real cells its DER matched
+  `pyannote.metrics` to 0.0000pp.
 
 The corpus cannot live in the repository: meeting recordings are the most
 private thing the app touches. `EvaluationDataset` reads `KURN_EVAL_DATA`
@@ -373,6 +386,15 @@ root:
   `FolderColorPalette`) via `Views/FolderFormView.swift`, so free-form
   icon/hex entry can't produce an invalid symbol or color. `FolderPickerView`
   mirrors the same drill-down to move a meeting into a folder.
+  `FolderSidebarView` itself is host-agnostic — it only depends on a
+  `Binding<LibrarySelection>` — so `ContentView` presents it two ways off the
+  same binding: a sheet on compact width (from `MeetingsListView`'s toolbar,
+  unchanged) and, on regular width (iPad, Mac Catalyst), a persistent
+  `NavigationSplitView` sidebar column (D6, `docs/design-review-liquid-glass.md`).
+  `selection` lives on `ContentView` for both paths, so `MeetingsListView`
+  holds it as a `@Binding` rather than owning it; `MeetingsListToolbar`'s
+  library button is hidden on regular width since the sidebar column already
+  shows the same picker persistently.
 - `Tag` (`Models/Tag.swift`) — many-to-many via `Meeting.tags` (`.nullify`).
   `AutoTaggingService` (`Services/AutoTaggingService.swift`) can suggest
   existing/new tags from a transcript excerpt through the configured summary
@@ -678,8 +700,8 @@ stage (enums in `Models/Enums.swift`) are:
 | Preprocessing      | `preprocessingEngine`     | `.standardDSP` (`AudioPreprocessor`)                                                                                                                                             | `.none` (passthrough — not FluidAudio, just skips cleanup)                                                                                                                                               |
 | VAD                | `vadEngine`               | `.energyThreshold` (`Pipeline/EnergyVAD.swift`)                                                                                                                                  | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD)                                                                                                                                               |
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber)                                                                                                                              | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`)                    |
-| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) is the no-download fallback                                                                                                                    |
-| Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud) |
+| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering), `.sherpaOnnx`, or `.transcriptionProviderNative` (speaker turns from the `.whisperAPI` provider's own response, e.g. ElevenLabs Scribe) are the no-download alternatives |
+| Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud, any provider whose `AIProvider.supportsTranscription` is true — OpenAI's `whisper-1`/`gpt-4o-transcribe`/`gpt-4o-mini-transcribe`, Groq, ElevenLabs Scribe, or a custom OpenAI-compatible endpoint) |
 | Correction         | `correctionEnabled`       | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work)                                                                                       | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below)                                                          |
 
 `TranscriptionService.transcribe` drives the stages in order:
@@ -809,6 +831,18 @@ word near zero, which nothing downstream could detect.
 not implement, so a `400`/`422` retries the upload once without it — losing word
 timings to an old endpoint is acceptable, losing the transcription is not.
 
+**A model that only speaks plain `json` reports no timings at all, not
+degraded ones.** `gpt-4o-transcribe`/`gpt-4o-mini-transcribe` don't support
+`timestamp_granularities[]`, so `OpenAIProvider` used to return one
+zero-length (`start: 0, end: 0`) span per chunk — every word of up to ten
+minutes sitting on one instant, which `TranscriptFusion` then handed in its
+entirety to whoever held the floor at that instant (measured as 100% fused DER
+on AMI). `WhisperTranscriber.spreadingUntimedSpans` detects an
+all-zero-duration result (`hasOnlyUntimedSpans`) and gives it the chunk's own
+duration, split evenly across its spans in order, before fusion ever sees it —
+still an estimate, like any engine without real word timings, but an
+attribution rather than none. Text is never touched.
+
 #### Where chunks are cut
 
 `ChunkBoundary` (bottom of `Services/AudioChunker.swift`) moves each nominal
@@ -824,6 +858,19 @@ in which case the safe cuts are the gaps the compactor itself wrote
 and must stay deterministic — a resumed transcription reuses its checkpoint only
 when the chunk plan comes out identical, so a boundary that wandered between
 runs would silently discard every completed chunk.
+
+Remapping compacted-timeline spans back to the original timeline
+(`TranscriptionService`) must remap the provider's own `speakerTurns` with
+them, not just the text spans — rebuilding the transcript from spans alone
+silently dropped `speakerTurns`, so `.transcriptionProviderNative` fell back to
+one synthetic speaker for the whole meeting whenever VAD compaction ran
+(measured on AMI with ElevenLabs: 64% raw DER instead of ~18%). The same
+per-chunk loss applied across `ChunkedTranscriptionRunner`'s chunk boundaries
+until it started accumulating `speakerTurns` alongside spans (offset per
+chunk, kept out of the durable `Progress` checkpoint on purpose — a resumed
+run then only carries native diarization for the chunks it actually
+re-transcribes, which is a lesser degradation than losing every chunk's turns
+outright).
 
 #### Choosing the diarizer
 
@@ -1133,7 +1180,13 @@ never falls behind the microphone.
 + Keychain and throws `AppError.noAPIKey` when a cloud key is missing or
 `AppError.onDeviceModelUnavailable` when the on-device model can't run. Vendor
 API shapes are modeled by `AIProviderKind` (`openAICompatible`, `anthropic`,
-`googleGemini`, `appleOnDevice`); Groq reuses the OpenAI-compatible client.
+`googleGemini`, `elevenLabs`, `appleOnDevice`); Groq reuses the OpenAI-compatible
+client. `.elevenLabs` (`Providers/ElevenLabsProvider.swift`) is its own shape
+(`xi-api-key` auth, Scribe speech-to-text) and is **transcription-only** — it
+has no chat/summarize route, so `AIProvider.supportsSummarization` is false only
+for this kind (true for every other kind, including on-device), and it's
+excluded from the summary/chat provider pickers the same way Anthropic/Gemini
+are excluded from the transcription picker.
 `.appleOnDevice` is `FoundationModelsProvider`
 (`Providers/FoundationModelsProvider.swift`, Apple's `FoundationModels`, no
 `#available` guard because the floor is iOS 26): no key, no network, and the
@@ -1146,14 +1199,38 @@ and `Infrastructure/ProviderCircuitBreaker.swift` (a per-provider breaker that
 opens after repeated failures so a failing vendor is not hammered on every
 retry, and emits a reliability event when it trips). **Cloud (`.whisperAPI`) transcription is not pinned to
 OpenAI** — `AIProvider.supportsTranscription` is true for any `openAICompatible`
-provider (OpenAI, Groq, or a custom OpenAI-compatible endpoint the user adds),
-since they're the only ones exposing a Whisper-shaped `/audio/transcriptions`
-route; Anthropic/Gemini are excluded. `AppSettings.transcriptionProviderID`
+provider (OpenAI, Groq, or a custom OpenAI-compatible endpoint the user adds)
+plus `.elevenLabs`, since between them they're the only kinds exposing a
+transcription route (a Whisper-shaped `/audio/transcriptions` for the former,
+Scribe for the latter); Anthropic/Gemini are excluded. OpenAI itself now offers
+three transcription models — `whisper-1`, `gpt-4o-transcribe`,
+`gpt-4o-mini-transcribe` — kept in `AIProvider.fallbackModels` regardless of
+what the live `/models` fetch returns, since that endpoint is dominated by chat
+models and can otherwise leave the transcription picker with nothing to show.
+`AppSettings.transcriptionProviderID`
 picks which one to use, independently of the summary provider, surfaced as a
 "Transcription provider" picker in Settings shown only when the Whisper engine
 is selected. `ProviderFactory.whisperProvider(for:model:)` resolves the chosen
-provider + model (Groq defaults to `whisper-large-v3`; everything else to
-`whisper-1`).
+provider + model (Groq defaults to `whisper-large-v3`, ElevenLabs to
+`scribe_v1`, everything else to `whisper-1`).
+
+**Native diarization is a provider capability, not an ElevenLabs special
+case.** `AIProvider.supportsNativeDiarization` (true only for `.elevenLabs`
+today) is the whole seam for a transcription provider whose response already
+carries speaker turns (ElevenLabs Scribe's `diarize` parameter): flip that flag
+for a future provider's `kind` and have its `LLMProvider.transcribe` populate
+`RawTranscript.speakerTurns` however its API shapes that data — nothing else
+needs to know the wire format. `DiarizationEngine.transcriptionProviderNative`
+is the matching diarizer choice; `PipelineConfiguration.effectiveDiarization`
+honors it only when the transcription engine is `.whisperAPI` *and* the
+selected provider supports it, otherwise stepping back to `.heuristic` like the
+other diarizer fallbacks — no download and no consent flag either, since it
+fetches nothing. Transcription and diarization otherwise stay fully independent
+axes: choosing `.heuristic`/`.fluidAudio`/`.sherpaOnnx` always runs that exact
+engine regardless of which transcription engine or provider is configured, so
+e.g. ElevenLabs for transcription with FluidAudio for diarization is an
+ordinary, unremarkable combination.
+
 `Providers/ProviderModelsService.swift` separately lists a provider's available
 summary models by querying its own `/models` endpoint (auth style branches on
 `AIProviderKind`), falling back to `AIProvider.fallbackModels` on a 403 or an
@@ -1217,8 +1294,13 @@ non-reentrant progress state and supports cooperative cancellation.
 recording. Both the Lock Screen Live Activity (via `kurn://recording/...` deep links)
 and the Apple Watch (via `PhoneSessionController` over WatchConnectivity) route
 through it. The recorder pushes state to the Watch with `updateApplicationContext`
-(survives disconnects) and throttles audio-level pushes (`sendMessage` off the main
-thread, 0.2s spacing). `Services/LockScreenRecordingController.swift` owns the
+(survives disconnects). There is deliberately no continuous audio-level stream to
+the Watch: the recorder screen used to animate a decorative, already
+`.accessibilityHidden` level meter fed by a 0.2s-throttled `sendMessage` push on
+every audio buffer, which cost real battery/radio on both devices for a purely
+cosmetic element — the title and ticking timer already communicate that
+recording is active, which is what watchOS HIG glanceability calls for on a
+single-screen remote control. `Services/LockScreenRecordingController.swift` owns the
 ActivityKit (`Activity<RecordingActivityAttributes>`) lifecycle — `start`/
 `update`/`end` mirror `AudioRecorderService.State` into the activity's
 `ContentState`; the actual Live Activity UI is rendered separately by the
@@ -1609,6 +1691,20 @@ toolbar would be the wrong control**:
   (see "Secure local storage for recordings"), so there is no toolbar to hide.
 - Accessibility identifiers used by `KurnUITests/ScreenshotUITests.swift`
   (`nav.settings`, `meetingCard`) must survive any further chrome rework.
+- Empty states use `ContentUnavailableView`, not a hand-rolled `VStack` of an
+  icon and two `Text`s — `DocumentsListView` was first; `MeetingsListView` and
+  `ChatSessionListView` were migrated to match. Follow the existing pattern for
+  a new empty state rather than reinventing it.
+- On regular-width layouts (iPad, Mac Catalyst), `ContentView` presents
+  `FolderSidebarView` as a `NavigationSplitView` sidebar column instead of a
+  sheet — see "Organization" above for the binding it shares with
+  `MeetingsListView`.
+- `docs/design-review-liquid-glass.md` is the full HIG/Liquid Glass audit these
+  rules were distilled from (button style decision table, WCAG contrast
+  findings, the `kurnDialog` confirmation convention every native `.alert`
+  should migrate to). All 8 of its remediation tracks (D1–D8) are implemented;
+  its own "Not done" notes are the up-to-date list of what still needs a
+  manual device/simulator pass rather than a code change.
 
 ### Accessibility
 
