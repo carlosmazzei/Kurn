@@ -84,6 +84,11 @@ struct MeetingDetailView: View {
     @State private var tab: Tab = .recordings
 
     @State private var showingRecorder = false
+    /// Drives the full-screen photo viewer from the Recordings tab's photo
+    /// strip — shown there independently of the Transcript tab's inline
+    /// markers, which need transcript segments to anchor to and so stay
+    /// empty until transcription finishes.
+    @State private var presentedPhoto: MeetingPhoto?
     /// Not `private` — `MeetingDetailToolbar.swift` needs it.
     @State var showingEdit = false
     /// Presents the generated article without adding a fifth item to the compact
@@ -160,6 +165,7 @@ struct MeetingDetailView: View {
             }
         }
         .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
+        .sheet(item: $presentedPhoto) { photo in PhotoViewerView(photo: photo) }
         .sheet(isPresented: $showingShareSelection) {
             MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
                 shareItem = ShareItem(urls: urls)
@@ -354,8 +360,38 @@ struct MeetingDetailView: View {
 
     // MARK: - Recordings tab (List, so swipe-to-delete works)
 
+    /// All photos captured across every recording, oldest first — shown as
+    /// soon as a recording is saved, not gated on transcription completing.
+    private var allPhotos: [MeetingPhoto] {
+        sortedRecordings.flatMap(\.photos).sorted { $0.createdAt < $1.createdAt }
+    }
+
+    @ViewBuilder
+    private var photosStrip: some View {
+        if !allPhotos.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabel(NSLocalizedString("detail.photos", comment: "Photos"))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(allPhotos) { photo in
+                            Button {
+                                presentedPhoto = photo
+                            } label: {
+                                PhotoThumbnail(photo: photo)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+            .clearListRow(insets: EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
+        }
+    }
+
     private var recordingsList: some View {
         List {
+            photosStrip
             sectionLabel(NSLocalizedString("detail.recordings", comment: "Recordings"))
                 .clearListRow(insets: EdgeInsets(top: 16, leading: 20, bottom: 4, trailing: 20))
             ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in

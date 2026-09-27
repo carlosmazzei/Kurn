@@ -59,3 +59,29 @@ struct PhotoViewerView: View {
         }
     }
 }
+
+/// A small square thumbnail for `MeetingDetailView`'s photo strip — the
+/// gallery that's visible as soon as a recording is saved, independent of
+/// `TranscriptView`'s inline markers (which need transcript segments to
+/// anchor to and so stay empty until transcription finishes).
+struct PhotoThumbnail: View {
+    let photo: MeetingPhoto
+
+    var body: some View {
+        Group {
+            if let uiImage = UIImage(contentsOfFile: photo.fileURL.path) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Rectangle()
+                    .fill(Theme.textTertiary.opacity(0.15))
+                    .overlay(Image(systemName: "photo").foregroundStyle(Theme.textTertiary))
+            }
+        }
+        .frame(width: 64, height: 64)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityLabel(NSLocalizedString("photo.captured_image", comment: "Photo captured during recording"))
+        .accessibilityAddTraits(.isButton)
+    }
+}

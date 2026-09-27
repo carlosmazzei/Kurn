@@ -403,6 +403,7 @@
 /* 详情 */
 "detail.total_duration" = "总时长：%@";
 "detail.recordings" = "录音";
+"detail.photos" = "照片";
 "detail.record_new" = "录制新片段";
 "detail.transcribe" = "转录";
 "detail.transcript" = "转录内容";

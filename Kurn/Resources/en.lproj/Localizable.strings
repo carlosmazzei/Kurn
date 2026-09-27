@@ -403,6 +403,7 @@
 /* Detail */
 "detail.total_duration" = "Total duration: %@";
 "detail.recordings" = "Recordings";
+"detail.photos" = "Photos";
 "detail.record_new" = "Record New Segment";
 "detail.transcribe" = "Transcribe";
 "detail.transcript" = "Transcript";
