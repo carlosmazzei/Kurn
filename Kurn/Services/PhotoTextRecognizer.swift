@@ -22,7 +22,15 @@ enum PhotoTextRecognizer {
               let cgImage = cgImage(from: data) else { return nil }
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
+        // Language correction nudges each recognized token toward the
+        // closest dictionary-like word — helpful for a photographed page of
+        // prose, actively harmful for the case this feature is really for
+        // (a whiteboard or a screen full of code/identifiers): a camelCase
+        // variable or an acronym isn't a dictionary word to begin with, so
+        // "correcting" it produces a string that is neither the original
+        // text nor a real word (e.g. a `successfully` mangled into
+        // "sucesftry"). Off, so the result is what the glyphs actually say.
+        request.usesLanguageCorrection = false
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         do {
             try handler.perform([request])
