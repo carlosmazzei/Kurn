@@ -212,6 +212,7 @@
 "recorder.highlight" = "标记高亮";
 "recorder.photo" = "照片";
 "recorder.photo_shutter" = "拍照";
+"recorder.photo_flash" = "闪光灯";
 "transcript.jump_to_highlight" = "跳转到标记";
 "transcript.view_photo" = "查看照片";
 "photo.unavailable" = "照片不可用";

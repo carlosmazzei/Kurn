@@ -212,6 +212,7 @@
 "recorder.highlight" = "Destacar";
 "recorder.photo" = "Foto";
 "recorder.photo_shutter" = "Tirar Foto";
+"recorder.photo_flash" = "Flash";
 "transcript.jump_to_highlight" = "Ir para o destaque";
 "transcript.view_photo" = "Ver foto";
 "photo.unavailable" = "Foto indisponível";
