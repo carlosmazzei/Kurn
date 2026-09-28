@@ -479,6 +479,7 @@
 "summary.key_decisions" = "Wichtige Entscheidungen";
 "summary.action_items" = "Aufgaben";
 "summary.footer" = "Erstellt von %1$@ · %2$@";
+"summary.photo_reference" = "Foto um %@ ansehen";
 "summary.footer_with_model" = "Erstellt von %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Vorlage: %@";
 

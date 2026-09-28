@@ -144,6 +144,9 @@ struct SummaryTab: View {
     let onDeleteSummary: (Summary) -> Void
     let onTranslateSummary: (Summary) -> Void
     let onCancelTranslateSummary: () -> Void
+    /// Taps a section's photo reference chip; `nil` when the meeting has no
+    /// photos, hiding the chip row entirely (see `SummaryView.onShowPhoto`).
+    var onShowPhoto: ((TimeInterval) -> Void)?
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -161,7 +164,7 @@ struct SummaryTab: View {
                     summaryProgressPanel
                 }
                 ReadAloudControl(item: .summary(selectedSummary, meeting: meeting))
-                SummaryView(summary: selectedSummary)
+                SummaryView(summary: selectedSummary, onShowPhoto: onShowPhoto)
                 if !isSummarizing {
                     newSummaryButton
                 }

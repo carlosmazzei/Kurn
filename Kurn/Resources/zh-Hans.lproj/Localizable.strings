@@ -479,6 +479,7 @@
 "summary.key_decisions" = "关键决策";
 "summary.action_items" = "行动事项";
 "summary.footer" = "由 %1$@ 生成 · %2$@";
+"summary.photo_reference" = "查看 %@ 的照片";
 "summary.footer_with_model" = "由 %1$@ 生成 · %2$@ · %3$@";
 "summary.template_label" = "模板：%@";
 

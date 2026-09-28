@@ -479,6 +479,7 @@
 "summary.key_decisions" = "Decisões Principais";
 "summary.action_items" = "Itens de Ação";
 "summary.footer" = "Gerado por %1$@ · %2$@";
+"summary.photo_reference" = "Ver foto às %@";
 "summary.footer_with_model" = "Gerado por %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Modelo: %@";
 

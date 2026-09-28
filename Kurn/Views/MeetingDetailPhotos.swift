@@ -44,4 +44,26 @@ extension MeetingDetailView {
             .clearListRow(insets: EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
         }
     }
+
+    /// Resolves a Summary photo-reference chip's meeting-relative timestamp
+    /// (see `SummarySection.photoTimestamps`) to the nearest actual photo and
+    /// presents it — the inverse of the meeting-relative-offset math
+    /// `startOffset(of:)` already does for `jumpToTime`'s transcript
+    /// citations. Nearest rather than exact: the model copies the photo
+    /// line's own "[mm:ss]" stamp verbatim, but that stamp is itself only
+    /// display precision (seconds, rounded), so an exact-equality match
+    /// would be fragile for no benefit.
+    func showPhoto(atMeetingRelativeTime time: TimeInterval) {
+        var best: (photo: MeetingPhoto, distance: TimeInterval)?
+        for recording in sortedRecordings {
+            let offset = meeting.startOffset(of: recording)
+            for photo in recording.photos {
+                let distance = abs((photo.capturedAt + offset) - time)
+                if best == nil || distance < best!.distance {
+                    best = (photo, distance)
+                }
+            }
+        }
+        presentedPhoto = best?.photo
+    }
 }

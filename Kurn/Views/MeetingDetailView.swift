@@ -325,7 +325,8 @@ struct MeetingDetailView: View {
                     onSelectSummary: { selectedSummaryID = $0.id },
                     onDeleteSummary: { pendingDeleteSummary = $0 },
                     onTranslateSummary: { pendingTranslateSummary = $0 },
-                    onCancelTranslateSummary: { cancelTranslateSummary() }
+                    onCancelTranslateSummary: { cancelTranslateSummary() },
+                    onShowPhoto: allPhotos.isEmpty ? nil : { showPhoto(atMeetingRelativeTime: $0) }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
             }
