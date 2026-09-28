@@ -26,14 +26,25 @@ extension MeetingDetailView {
     var photosStrip: some View {
         if !allPhotos.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
+                Divider()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
                 sectionLabel(NSLocalizedString("detail.photos", comment: "Photos"))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    HStack(alignment: .top, spacing: 14) {
                         ForEach(allPhotos) { photo in
                             Button {
                                 presentedPhoto = photo
                             } label: {
-                                PhotoThumbnail(photo: photo)
+                                VStack(spacing: 4) {
+                                    PhotoThumbnail(photo: photo)
+                                    Text(meetingRelativeTime(of: photo).clockDisplay)
+                                        .font(Theme.caption2)
+                                        .foregroundStyle(Theme.textTertiary)
+                                        .monospacedDigit()
+                                }
                             }
                             .buttonStyle(.plain)
                         }
@@ -43,6 +54,19 @@ extension MeetingDetailView {
             }
             .clearListRow(insets: EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
         }
+    }
+
+    /// A photo's timestamp on the meeting's own timeline — its
+    /// recording-relative `capturedAt` plus that recording's `startOffset`
+    /// — so the strip reads the same "time since the meeting began" as every
+    /// other timestamp in the UI (transcript citations, the Summary photo
+    /// reference chips), not the time within whichever segment it happened
+    /// to be taken in.
+    private func meetingRelativeTime(of photo: MeetingPhoto) -> TimeInterval {
+        guard let recording = sortedRecordings.first(where: { $0.photos.contains(where: { $0.id == photo.id }) }) else {
+            return photo.capturedAt
+        }
+        return photo.capturedAt + meeting.startOffset(of: recording)
     }
 
     /// Resolves a Summary photo-reference chip's meeting-relative timestamp

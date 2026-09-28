@@ -364,7 +364,6 @@ struct MeetingDetailView: View {
 
     private var recordingsList: some View {
         List {
-            photosStrip
             sectionLabel(NSLocalizedString("detail.recordings", comment: "Recordings"))
                 .clearListRow(insets: EdgeInsets(top: 16, leading: 20, bottom: 4, trailing: 20))
             ForEach(Array(sortedRecordings.enumerated()), id: \.element.id) { index, recording in
@@ -391,6 +390,7 @@ struct MeetingDetailView: View {
             }
             addSegmentButton
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
+            photosStrip
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)

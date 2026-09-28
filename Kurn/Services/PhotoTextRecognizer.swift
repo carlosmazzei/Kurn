@@ -30,7 +30,22 @@ enum PhotoTextRecognizer {
             return nil
         }
         guard let observations = request.results else { return nil }
-        let lines = observations.compactMap { $0.topCandidates(1).first?.string }
+        // Vision does not guarantee reading order in `results` — it groups by
+        // its own internal detection order, which for a photographed screen
+        // or whiteboard (multiple text blocks at different depths/angles)
+        // routinely interleaves unrelated lines. `boundingBox` is normalized
+        // with a bottom-left origin, so sorting by descending Y (top first),
+        // then ascending X (left first) within a row, reconstructs the
+        // top-to-bottom, left-to-right order a reader would actually use.
+        let sorted = observations.sorted { lhs, rhs in
+            let lhsBox = lhs.boundingBox
+            let rhsBox = rhs.boundingBox
+            if abs(lhsBox.midY - rhsBox.midY) > 0.01 {
+                return lhsBox.midY > rhsBox.midY
+            }
+            return lhsBox.midX < rhsBox.midX
+        }
+        let lines = sorted.compactMap { $0.topCandidates(1).first?.string }
         guard !lines.isEmpty else { return nil }
         return lines.joined(separator: "\n")
     }
