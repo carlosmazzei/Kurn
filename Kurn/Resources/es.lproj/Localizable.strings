@@ -218,6 +218,9 @@
 "photo.unavailable" = "Foto no disponible";
 "photo.recognized_text" = "Texto reconocido";
 "photo.captured_image" = "Foto tomada durante la grabación";
+"photo.delete" = "Eliminar Foto";
+"photo.delete.confirm" = "¿Eliminar esta foto?";
+"photo.delete.message" = "Su texto reconocido y cualquier referencia en el resumen también se eliminarán.";
 "recorder.paused" = "EN PAUSA";
 "recorder.permission.title" = "Se Necesita Acceso al Micrófono";
 "recorder.permission.message" = "Kurn necesita acceso al micrófono para grabar reuniones. Actívalo en Ajustes.";

@@ -72,4 +72,17 @@ final class MeetingsViewModel {
             error = failure
         }
     }
+
+    /// Delete a single meeting photo through the same journaled
+    /// trash → commit → purge path — a photo is meeting-derived content like
+    /// any other, so removing it gets the same crash-safety guarantee as
+    /// deleting a whole recording.
+    func deletePhoto(_ photo: MeetingPhoto) {
+        if let failure = RecordingOperationJournal.performDelete(fileNames: [photo.fileName], commit: {
+            modelContext.delete(photo)
+            return modelContext.saveOrError()
+        }) {
+            error = failure
+        }
+    }
 }

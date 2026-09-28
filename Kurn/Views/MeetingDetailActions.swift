@@ -272,4 +272,11 @@ extension MeetingDetailView {
         viewModel.deleteRecording(recording)
         if let failure = viewModel.error { txVM?.error = failure }
     }
+
+    func deletePhoto(_ photo: MeetingPhoto) {
+        if presentedPhoto?.id == photo.id { presentedPhoto = nil }
+        let viewModel = MeetingsViewModel(modelContext: modelContext)
+        viewModel.deletePhoto(photo)
+        if let failure = viewModel.error { txVM?.error = failure }
+    }
 }

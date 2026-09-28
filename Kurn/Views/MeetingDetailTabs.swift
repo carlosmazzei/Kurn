@@ -22,6 +22,7 @@ struct TranscriptTab: View {
     let offsetFor: (Recording) -> TimeInterval
     let onSeek: (Recording, TimeInterval) -> Void
     let onRenameCommit: () -> Void
+    var onDeletePhoto: ((MeetingPhoto) -> Void)?
 
     @State private var selectedSpeaker: String?
     @State private var presentedPhoto: MeetingPhoto?
@@ -99,7 +100,7 @@ struct TranscriptTab: View {
             }
         }
         .sheet(item: $presentedPhoto) { photo in
-            PhotoViewerView(photo: photo)
+            PhotoViewerView(photo: photo, onDelete: onDeletePhoto == nil ? nil : { onDeletePhoto?(photo) })
         }
     }
 }

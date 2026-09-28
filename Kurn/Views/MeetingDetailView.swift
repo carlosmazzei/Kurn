@@ -166,7 +166,9 @@ struct MeetingDetailView: View {
             }
         }
         .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
-        .sheet(item: $presentedPhoto) { photo in PhotoViewerView(photo: photo) }
+        .sheet(item: $presentedPhoto) { photo in
+            PhotoViewerView(photo: photo, onDelete: { deletePhoto(photo) })
+        }
         .sheet(isPresented: $showingShareSelection) {
             MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
                 shareItem = ShareItem(urls: urls)
@@ -443,7 +445,8 @@ struct MeetingDetailView: View {
                     player: player,
                     offsetFor: { startOffset(of: $0) },
                     onSeek: { rec, time in seek(rec, to: time) },
-                    onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } }
+                    onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } },
+                    onDeletePhoto: { deletePhoto($0) }
                 )
             }
         }

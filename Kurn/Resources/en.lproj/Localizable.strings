@@ -218,6 +218,9 @@
 "photo.unavailable" = "Photo unavailable";
 "photo.recognized_text" = "Recognized text";
 "photo.captured_image" = "Photo captured during recording";
+"photo.delete" = "Delete Photo";
+"photo.delete.confirm" = "Delete this photo?";
+"photo.delete.message" = "Its recognized text and any summary references to it are removed too.";
 "recorder.paused" = "PAUSED";
 "recorder.permission.title" = "Microphone Access Needed";
 "recorder.permission.message" = "Kurn needs microphone access to record meetings. Enable it in Settings.";

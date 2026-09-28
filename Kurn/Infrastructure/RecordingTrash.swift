@@ -123,7 +123,14 @@ enum RecordingTrash {
         ) else { return }
         guard !operationFolders.isEmpty else { return }
         guard let existingRecordings = try? context.fetch(FetchDescriptor<Recording>()) else { return }
-        let knownFileNames = Set(existingRecordings.map(\.fileName))
+        let existingPhotos = (try? context.fetch(FetchDescriptor<MeetingPhoto>())) ?? []
+        // A trash folder from a lone `deletePhoto(_:)` operation carries only
+        // a photo file name, never a recording's — checking recordings alone
+        // would read every such folder as "already committed" and purge it
+        // unconditionally, even when the process died before the model
+        // mutation actually ran, permanently losing a photo whose row still
+        // exists and now points at nothing.
+        let knownFileNames = Set(existingRecordings.map(\.fileName)).union(existingPhotos.map(\.fileName))
 
         for folder in operationFolders {
             guard let operationID = UUID(uuidString: folder.lastPathComponent) else { continue }

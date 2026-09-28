@@ -218,6 +218,9 @@
 "photo.unavailable" = "Foto nicht verfügbar";
 "photo.recognized_text" = "Erkannter Text";
 "photo.captured_image" = "Während der Aufnahme aufgenommenes Foto";
+"photo.delete" = "Foto löschen";
+"photo.delete.confirm" = "Dieses Foto löschen?";
+"photo.delete.message" = "Der erkannte Text und alle Verweise darauf in der Zusammenfassung werden ebenfalls entfernt.";
 "recorder.paused" = "PAUSIERT";
 "recorder.permission.title" = "Mikrofonzugriff erforderlich";
 "recorder.permission.message" = "Kurn benötigt Mikrofonzugriff, um Meetings aufzuzeichnen. Aktivieren Sie ihn in den Einstellungen.";

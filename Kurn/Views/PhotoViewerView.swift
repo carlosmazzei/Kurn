@@ -13,8 +13,10 @@ import UIKit
 
 struct PhotoViewerView: View {
     let photo: MeetingPhoto
+    var onDelete: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var showingDeleteConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -52,11 +54,38 @@ struct PhotoViewerView: View {
             .navigationTitle((photo.capturedAt).clockDisplay)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if onDelete != nil {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showingDeleteConfirm = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .accessibilityLabel(NSLocalizedString("photo.delete", comment: "Delete Photo"))
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
                 }
             }
         }
+        .kurnDialog(
+            isPresented: $showingDeleteConfirm,
+            iconSystemName: "trash.fill",
+            iconTint: Theme.accent,
+            title: NSLocalizedString("photo.delete.confirm", comment: "Delete this photo?"),
+            message: NSLocalizedString(
+                "photo.delete.message",
+                comment: "Its recognized text and any summary references to it are removed too."
+            ),
+            primaryTitle: NSLocalizedString("photo.delete", comment: "Delete Photo"),
+            primaryRole: .destructive,
+            primaryAction: {
+                onDelete?()
+            },
+            secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),
+            secondaryAction: {}
+        )
     }
 }
 
