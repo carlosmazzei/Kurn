@@ -134,6 +134,25 @@ struct ModelStoreBackupManagerTests {
         }
     }
 
+    @Test func eraseAllRecoveryCopiesRemovesBackupsAndQuarantineButNeverTheLiveStore() throws {
+        try withTempAppSupport { directory in
+            try writeLiveStoreFiles(in: directory, content: "original")
+            let manager = ModelStoreBackupManager(appSupportDirectory: directory)
+            let created = try manager.createBackupIfLiveStoreExists()
+            let generation = try #require(created)
+            try writeLiveStoreFiles(in: directory, content: "changed-after-backup")
+            try manager.restore(generation: generation)
+            #expect(!quarantinedContents(in: directory).isEmpty)
+
+            let residual = manager.eraseAllRecoveryCopies()
+
+            #expect(residual == 0)
+            #expect(manager.listGenerations().isEmpty)
+            #expect(quarantinedContents(in: directory).isEmpty)
+            #expect(readLiveStoreContent(in: directory) == "original")
+        }
+    }
+
     // MARK: - Helpers
 
     private func rewriteAppVersion(of generation: ModelStoreBackupGeneration, in directory: URL, to version: String) throws {

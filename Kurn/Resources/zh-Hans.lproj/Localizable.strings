@@ -638,7 +638,7 @@
 "settings.clear_cache.result" = "已移除 %d 个文件（%@）。";
 "settings.delete_all" = "删除所有数据";
 "settings.delete_all.confirm" = "删除所有会议和录音？";
-"settings.delete_all.message" = "这将永久删除所有会议、转录内容和音频文件，此操作无法撤销。";
+"settings.delete_all.message" = "这将永久删除所有会议、转录内容、音频文件、照片、聊天和生成的文档，包括恢复副本。标签和文件夹将保留。此操作无法撤销。";
 "settings.delete_all.residual" = "%d 个音频文件无法删除，仍保留在设备上。请重试或释放空间后再试。";
 "settings.diarization_engine" = "说话人分离引擎";
 "settings.diarization_engine_footer" = "神经网络引擎更准确但需要下载；启发式引擎可立即离线使用。";
