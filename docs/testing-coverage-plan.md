@@ -87,8 +87,8 @@ Outros com 0–10 % e alto valor: `Infrastructure/TranscriptionScheduler.swift`
 
 Alvo: `Services` 50,8 % → ~58 %, `Infrastructure` 80,9 % → ~90 %.
 
-- `TranscriptionScheduler` (2,4 %): já tem `register(containerProvider:)`;
-  testar `scheduleIfWorkRemains`, `run(container:)` com container em memória
+- `TranscriptionScheduler` (2,4 %): já tem `register(contextProvider:)`;
+  testar `scheduleIfWorkRemains`, `run(_:)` com um `BackgroundTranscriptionContext` em memória
   (padrão de `KurnSwiftDataTests`), `pause()`, e o caminho "sem trabalho".
 - `TranscriptionServiceInputPreparation` (0 %): funções sobre `URL`/arquivo —
   usar `AudioFixtures` (já existe) para formatos válidos/inválidos.

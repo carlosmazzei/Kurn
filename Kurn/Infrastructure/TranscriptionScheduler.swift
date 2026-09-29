@@ -25,6 +25,18 @@ import BackgroundTasks
 import UIKit
 #endif
 
+/// What a background processing window needs from the running app: the open
+/// store and the app's own transcription view model and settings — the same
+/// instances the scene uses (`AppComposition`), so a run finished here gets the
+/// same post-transcription indexing and wiki work as one finished in the
+/// foreground, and cannot race a foreground run of the same recording.
+@MainActor
+struct BackgroundTranscriptionContext {
+    let container: ModelContainer
+    let transcription: TranscriptionViewModel
+    let settings: AppSettings
+}
+
 enum TranscriptionScheduler {
 
     /// Must match `BGTaskSchedulerPermittedIdentifiers` in Info.plist.
@@ -33,19 +45,19 @@ enum TranscriptionScheduler {
     /// Register the launch handler. Must be called before the app finishes
     /// launching (`KurnApp.init`) — and, per the H2 boot state machine
     /// (docs/resilience-megaplan.md), before the store has even been opened:
-    /// `containerProvider` is only consulted when a task actually fires (from
+    /// `contextProvider` is only consulted when a task actually fires (from
     /// the main actor, alongside the existing protected-data check), not at
     /// registration time, so registration itself never needs a container to
     /// exist yet. A background-only launch while the device is locked
     /// registers this handler and then never attempts to open the store at
     /// all until the scene becomes active.
-    static func register(containerProvider: @escaping @MainActor @Sendable () -> ModelContainer?) {
+    static func register(contextProvider: @escaping @MainActor @Sendable () -> BackgroundTranscriptionContext?) {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskIdentifier, using: nil) { task in
             guard let task = task as? BGProcessingTask else {
                 task.setTaskCompleted(success: false)
                 return
             }
-            handle(task, containerProvider: containerProvider)
+            handle(task, contextProvider: contextProvider)
         }
     }
 
@@ -85,7 +97,7 @@ enum TranscriptionScheduler {
     /// `expirationHandler` are documented as callable from any thread.
     private static func handle(
         _ task: BGProcessingTask,
-        containerProvider: @escaping @MainActor @Sendable () -> ModelContainer?
+        contextProvider: @escaping @MainActor @Sendable () -> BackgroundTranscriptionContext?
     ) {
         AppLog.transcription.atNotice.notice("bgTask: window started")
         task.expirationHandler = {
@@ -112,13 +124,13 @@ enum TranscriptionScheduler {
             // `.recoveryRequired` even with protected data available (e.g. a
             // launch that hasn't reached `beginBoot()` yet, or a store that
             // failed to open) — nothing to resume against either way.
-            guard let container = containerProvider() else {
+            guard let context = contextProvider() else {
                 AppLog.transcription.atNotice.notice("bgTask: store not ready, deferring")
                 resubmit()
                 box.value.setTaskCompleted(success: false)
                 return
             }
-            let remaining = await BackgroundTranscriptionRunner.shared.run(container: container)
+            let remaining = await BackgroundTranscriptionRunner.shared.run(context)
             AppLog.transcription.atNotice.notice("bgTask: window finished, remaining=\(remaining, privacy: .public)")
             box.value.setTaskCompleted(success: remaining == 0)
         }
@@ -178,36 +190,32 @@ enum TranscriptionScheduler {
     }
 }
 
-/// Owns the view model for a background-window resume pass so the expiration
-/// handler can reach it without capturing non-`Sendable` state.
+/// Drives a background-window resume pass on the app's own view model, and
+/// lets the expiration handler reach it without capturing non-`Sendable`
+/// state.
 @MainActor
 private final class BackgroundTranscriptionRunner {
     static let shared = BackgroundTranscriptionRunner()
-    private var viewModel: TranscriptionViewModel?
+    private var transcription: TranscriptionViewModel?
 
     /// Resume every `.pending` recording, wait for the runs to finish (or be
     /// paused by `pause()`), re-arm the scheduler when a backlog remains, and
     /// return how many recordings are still pending.
-    func run(container: ModelContainer) async -> Int {
-        // Fresh instances: the handler can fire in a background launch where
-        // no UI (and no app-level view model) exists. AppSettings reads the
-        // persisted preferences.
-        let settings = AppSettings()
-        let vm = TranscriptionViewModel(modelContext: container.mainContext)
-        viewModel = vm
-        vm.resumePendingTranscriptions(settings: settings)
-        await vm.awaitActiveTranscriptions()
-        viewModel = nil
+    func run(_ context: BackgroundTranscriptionContext) async -> Int {
+        transcription = context.transcription
+        context.transcription.resumePendingTranscriptions(settings: context.settings)
+        await context.transcription.awaitActiveTranscriptions()
+        transcription = nil
 
-        let remaining = TranscriptionScheduler.pendingRecordings(context: container.mainContext).count
+        let remaining = TranscriptionScheduler.pendingRecordings(context: context.container.mainContext).count
         if remaining > 0 {
-            TranscriptionScheduler.scheduleIfWorkRemains(container: container, settings: settings)
+            TranscriptionScheduler.scheduleIfWorkRemains(container: context.container, settings: context.settings)
         }
         return remaining
     }
 
     func pause() {
-        viewModel?.cancelAllTranscriptions()
+        transcription?.cancelAllTranscriptions()
     }
 }
 

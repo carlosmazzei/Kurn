@@ -48,28 +48,18 @@ final class KurnAppDelegate: NSObject, UIApplicationDelegate {
 }
 #endif
 
-/// The app-wide state that only exists once the store has opened — every
-/// coordinator `ContentView` and its descendants reach through the
-/// environment. Built exactly once, the first time boot reaches `.ready`,
-/// whether that happens synchronously in `init()` (the common case) or later,
-/// from the foreground-activation retry.
-@MainActor
-private struct AppEnvironment {
-    let modelContainer: ModelContainer
-    let transcription: TranscriptionViewModel
-    let playbackEnhancement: PlaybackEnhancementViewModel
-    let semanticIndex: SemanticIndexCoordinator
-    let wiki: WikiCoordinator
-}
-
 @main
 struct KurnApp: App {
     #if canImport(UIKit)
     @UIApplicationDelegateAdaptor(KurnAppDelegate.self) private var appDelegate
     #endif
     /// Shared, observable preferences (provider, default mode/language).
-    /// Store-independent, so it exists regardless of boot state.
-    @State private var settings = AppSettings()
+    /// Store-independent, so it exists regardless of boot state. The same
+    /// instance as `composition.settings`.
+    @State private var settings: AppSettings
+    /// Builds and owns the store-dependent coordinators, so the scene and a
+    /// background processing window share one instance of each.
+    @State private var composition: AppComposition
     /// Per-session Face ID / passcode gate guarding the recordings UI. Reset
     /// on every background transition so a borrowed-unlocked device cannot
     /// expose meeting audio just by reopening the app.
@@ -128,6 +118,10 @@ struct KurnApp: App {
         // both `_boot` and `_recoveryViewModel` are explicitly assigned.
         let bootCoordinator = KurnApp.makeBootCoordinator()
         _boot = State(initialValue: bootCoordinator)
+        let settings = AppSettings()
+        let composition = AppComposition(settings: settings)
+        _settings = State(initialValue: settings)
+        _composition = State(initialValue: composition)
 
         #if canImport(BackgroundTasks)
         // Registered before the app finishes launching, and — per the H2 boot
@@ -135,7 +129,16 @@ struct KurnApp: App {
         // handler only reads `bootCoordinator.container` when a task actually
         // fires, never at registration time, so a background-only launch that
         // never gets past `.waitingForProtectedData` still registers cleanly.
-        TranscriptionScheduler.register(containerProvider: { [bootCoordinator] in bootCoordinator.container })
+        // The context comes from `composition`, so a window that fires before
+        // any scene exists still gets the app's own, fully wired view model.
+        TranscriptionScheduler.register(contextProvider: { [bootCoordinator, composition] in
+            guard let container = bootCoordinator.container else { return nil }
+            return BackgroundTranscriptionContext(
+                container: container,
+                transcription: composition.environment(for: container).transcription,
+                settings: composition.settings
+            )
+        })
         #endif
 
         _recoveryViewModel = State(initialValue: ModelStoreRecoveryViewModel(
@@ -160,7 +163,7 @@ struct KurnApp: App {
 
         boot.beginBoot()
         if boot.state == .ready, let container = boot.container {
-            _appEnvironment = State(initialValue: KurnApp.makeAppEnvironment(container: container, settings: settings))
+            _appEnvironment = State(initialValue: composition.environment(for: container))
         } else {
             _appEnvironment = State(initialValue: nil)
         }
@@ -179,7 +182,7 @@ struct KurnApp: App {
                     if appEnvironment == nil {
                         boot.retryIfNeeded()
                         if boot.state == .ready, let container = boot.container {
-                            appEnvironment = KurnApp.makeAppEnvironment(container: container, settings: settings)
+                            appEnvironment = composition.environment(for: container)
                         }
                     }
                     guard let appEnvironment else { return }
@@ -227,11 +230,6 @@ struct KurnApp: App {
     /// store-dependent coordinators from `environment` instead of bare
     /// top-level properties.
     private func handleScenePhaseChange(_ phase: ScenePhase, environment: AppEnvironment) {
-        environment.transcription.appSettings = settings
-        environment.semanticIndex.appSettings = settings
-        environment.wiki.appSettings = settings
-        environment.transcription.semanticIndexCoordinator = environment.semanticIndex
-        environment.transcription.wikiCoordinator = environment.wiki
         // Lock the recordings gate whenever the app leaves the foreground so
         // the next time it comes back the user has to authenticate again.
         // Only `.background` triggers this: `.inactive` also fires for
@@ -271,7 +269,7 @@ struct KurnApp: App {
             // flight in this process are excluded.
             TranscriptionRecovery.sweepStaleTranscriptions(
                 modelContainer: environment.modelContainer,
-                excluding: TranscriptionViewModel.activeTranscriptionIDs
+                excluding: environment.transcription.activeTranscriptionIDs
             )
             environment.transcription.resumePendingTranscriptions(settings: settings)
             // Backfill the on-device semantic index for meetings transcribed
@@ -354,46 +352,5 @@ struct KurnApp: App {
         }
         #endif
         return try ModelContainerBootstrap.makeStore()
-    }
-
-    /// Builds every store-dependent coordinator and runs the launch/foreground
-    /// recovery sweeps — exactly what used to run unconditionally in `init()`
-    /// before this PR, now callable from either the synchronous (common) path
-    /// or the deferred (locked-launch/recovery) path, so both converge on
-    /// identical behavior once a container exists.
-    @MainActor
-    private static func makeAppEnvironment(container: ModelContainer, settings: AppSettings) -> AppEnvironment {
-        let transcription = TranscriptionViewModel(modelContext: container.mainContext)
-        let playbackEnhancement = PlaybackEnhancementViewModel(modelContext: container.mainContext)
-        let semanticIndex = SemanticIndexCoordinator(modelContext: container.mainContext)
-        let wiki = WikiCoordinator(modelContext: container.mainContext)
-
-        // Lets `StartRecordingIntent` (Siri/Shortcuts/Control Center/Action
-        // Button) create a meeting and queue it for `MeetingsListView` to
-        // present, without any View having to hand it a `ModelContext`.
-        RecordingLauncher.shared.configure(modelContext: container.mainContext, settings: settings)
-        // Clean up after a process that died mid-recording (orphaned Live
-        // Activity + an unsaved audio file with no matching `Recording` row).
-        RecordingRecovery.recoverOrphans(modelContainer: container)
-        // Reconcile any delete or replace whose trash-then-purge was
-        // interrupted by a process death. Journaled operations resolve from
-        // their own durable record (replay forward past a committed mutation,
-        // roll back an uncommitted one — see `RecordingOperationJournal`'s
-        // header comment); the sweep remains as the heuristic fallback for
-        // pre-journal trash folders.
-        RecordingOperationJournal.replay(context: container.mainContext)
-        RecordingTrash.sweep(context: container.mainContext)
-        // And after one that died mid-transcription: recordings stuck at
-        // known on-device `.inProgress` work becomes `.pending`; cloud or
-        // unknown work becomes `.failed` to prevent ambiguous paid replay.
-        TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
-
-        return AppEnvironment(
-            modelContainer: container,
-            transcription: transcription,
-            playbackEnhancement: playbackEnhancement,
-            semanticIndex: semanticIndex,
-            wiki: wiki
-        )
     }
 }

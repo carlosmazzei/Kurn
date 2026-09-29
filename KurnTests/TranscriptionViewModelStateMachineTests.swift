@@ -94,7 +94,7 @@ struct TranscriptionViewModelStateMachineTests {
         #expect(!harness.viewModel.isCancelling(recording))
         #expect(harness.viewModel.phase(for: recording) == nil)
         #expect(harness.viewModel.transcriptionError(for: recording) == nil)
-        #expect(!TranscriptionViewModel.activeTranscriptionIDs.contains(recording.id))
+        #expect(!harness.viewModel.activeTranscriptionIDs.contains(recording.id))
         #expect(harness.engines.transcriber.requests.count == 1)
     }
 

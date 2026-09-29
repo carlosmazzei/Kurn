@@ -42,10 +42,11 @@ final class WikiCoordinator {
     private let wikiService = WikiService()
     private let providerCircuitBreaker: ProviderCircuitBreaker
 
-    /// App-wide settings, set by `KurnApp`; the coordinator respects the
-    /// `wikiEnabled` toggle and reads the configured provider/model without
-    /// threading settings through callers.
-    var appSettings: AppSettings?
+    /// App-wide settings, injected at construction; the coordinator respects
+    /// the `wikiEnabled` toggle and reads the configured provider/model without
+    /// threading settings through callers. `nil` (tests) reads as the feature
+    /// being off.
+    let appSettings: AppSettings?
 
     /// Meetings whose article is being generated, so the UI can reflect progress
     /// and repeat requests for the same meeting coalesce instead of racing.
@@ -75,9 +76,11 @@ final class WikiCoordinator {
 
     init(
         modelContext: ModelContext,
+        appSettings: AppSettings? = nil,
         providerCircuitBreaker: ProviderCircuitBreaker = .shared
     ) {
         self.modelContext = modelContext
+        self.appSettings = appSettings
         self.providerCircuitBreaker = providerCircuitBreaker
     }
 

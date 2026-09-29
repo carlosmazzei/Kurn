@@ -320,6 +320,16 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   "Durability & recovery" below).
 - **AppIntents/** — `StartRecordingIntent`/`KurnShortcuts` (Siri, Shortcuts);
   the matching Control Center control lives in `KurnLiveActivityExtension`.
+- **Composition root** — `Kurn/AppComposition.swift` builds every
+  store-dependent coordinator (`TranscriptionViewModel`,
+  `SemanticIndexCoordinator`, `WikiCoordinator`, …) with its dependencies
+  passed at construction, runs the launch recovery sweeps once per container,
+  and owns the instances for the life of the process. The scene
+  (`KurnApp.appEnvironment`) and the `BGProcessingTask` runner
+  (`TranscriptionScheduler`, via `BackgroundTranscriptionContext`) both get
+  them from there — never build a second view model or `AppSettings` for a
+  non-UI entry point, and never inject a dependency by assigning a property
+  after construction.
 - **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
   `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
@@ -1147,7 +1157,9 @@ instead of restarting from scratch:
   on backgrounding whenever pending/in-progress work remains (skipped for
   FluidAudio engines, which can't compile CoreML models in the background).
   The task resumes pending recordings and checkpoints cooperatively before its
-  time window expires.
+  time window expires, on the app's own `TranscriptionViewModel` (from
+  `AppComposition`), so a run finished there gets the same indexing and wiki
+  post-processing as a foreground one.
 - `Infrastructure/TranscriptionRecovery.swift` sweeps recordings stuck at
   `.inProgress` on launch and every foreground activation: recordings with a
   checkpoint reset to `.pending` (resumable), others to `.failed`.
