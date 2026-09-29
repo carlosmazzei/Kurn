@@ -45,6 +45,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Kurn needs the camera to capture photos (e.g. a whiteboard or slide) during a recording.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Kurn uses Face ID to protect your meeting recordings from unauthorized access.</string>
 	<key>NSMicrophoneUsageDescription</key>

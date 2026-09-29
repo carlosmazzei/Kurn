@@ -65,7 +65,7 @@ struct ModelStoreBackupManagerTests {
             // Provenance records the version the store is actually at, not
             // whichever schema was current when the backup code was written.
             #expect(generation?.schemaVersion == "\(KurnModelGraph.currentSchemaVersion)")
-            #expect(generation?.schemaVersion == "\(KurnSchemaV2.versionIdentifier)")
+            #expect(generation?.schemaVersion == "\(KurnSchemaV3.versionIdentifier)")
         }
     }
 

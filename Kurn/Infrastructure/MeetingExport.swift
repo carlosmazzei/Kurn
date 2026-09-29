@@ -193,6 +193,7 @@ enum MeetingExport {
         var out = ""
         let offset = meeting.startOffset(of: recording)
         let highlights = recording.highlights
+        let photos = recording.photos
         for segment in recording.transcript?.segments ?? [] {
             let rawName = nameByLabel[segment.speakerLabel] ?? segment.speakerLabel
             let name = obsidianStyle ? "[[\(rawName)]]" : rawName
@@ -200,6 +201,16 @@ enum MeetingExport {
             let isHighlighted = highlights.contains { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
             let prefix = isHighlighted ? "⭐ " : ""
             out += "\(prefix)**[\(stamp)] \(name):** \(segment.text)\n\n"
+            // The image itself is never exported — same policy as audio
+            // (Markdown only) — but its OCR text, if any, is already just
+            // text and carries the context forward.
+            for photo in photos where photo.capturedAt >= segment.startTime && photo.capturedAt < segment.endTime {
+                out += "📷 [\((photo.capturedAt + offset).clockDisplay)]"
+                if let text = photo.recognizedText, !text.isEmpty {
+                    out += " \(text)"
+                }
+                out += "\n\n"
+            }
         }
         return out
     }

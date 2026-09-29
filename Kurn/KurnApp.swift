@@ -35,6 +35,16 @@ final class KurnAppDelegate: NSObject, UIApplicationDelegate {
     ) {
         WhisperBackgroundUploader.handleEvents(identifier: identifier, completionHandler: completionHandler)
     }
+
+    /// Read at every rotation attempt, so `AppOrientationLock` can pin the
+    /// app to portrait for the duration `RecorderView`/`PhotoCaptureView`
+    /// are on screen without every other screen losing landscape support.
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        AppOrientationLock.shared.mask
+    }
 }
 #endif
 

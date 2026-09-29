@@ -30,7 +30,20 @@ struct AudioRecordingResult {
     let fileName: String
     let duration: TimeInterval
     let highlights: [Highlight]
+    let photos: [CapturedPhotoRecord]
     let captureFailure: AudioSinkFailure?
+}
+
+/// A photo captured mid-recording, buffered in memory (the file itself is
+/// already durably written by `PhotoFileStore` at capture time) until
+/// `stop()` hands it to `RecorderViewModel` for persistence as a
+/// `MeetingPhoto`, mirroring how `Highlight` is buffered here and persisted
+/// to `Recording.highlights` at finalize.
+struct CapturedPhotoRecord {
+    let id: UUID
+    let fileName: String
+    let capturedAt: TimeInterval
+    let createdAt: Date
 }
 
 enum AudioRecorderState: Equatable {
@@ -147,6 +160,9 @@ final class AudioRecorderService: NSObject {
     /// Timestamps marked during the current recording, chronological (only
     /// appended while `state == .recording`, so append order == time order).
     private(set) var highlights: [Highlight] = []
+    /// Photos captured during the current recording, chronological (only
+    /// appended while `state == .recording`, same guard as `highlights`).
+    private(set) var photos: [CapturedPhotoRecord] = []
     @ObservationIgnored var onStateChanged: ((State, TimeInterval) -> Void)?
     /// Fired synchronously right after a highlight is captured — unlike
     /// `onStateChanged`, marking a highlight does not change `state`/`elapsed`,
@@ -267,6 +283,7 @@ final class AudioRecorderService: NSObject {
         self.segmentStart = Date()
         self.elapsed = 0
         self.highlights = []
+        self.photos = []
         self.routeChangeMessage = nil
         self.captureWatchdog.reset(
             writtenFrames: sink.snapshot.writtenOutputFrames,
@@ -373,9 +390,25 @@ final class AudioRecorderService: NSObject {
         onHighlightAdded?(highlight)
     }
 
-    /// Stop and finalize. Returns the file name, total duration, highlights, and
-    /// any latched capture failure, or nil if nothing was recorded. The session
-    /// is deactivated afterwards.
+    /// Register a photo already written to disk (by `PhotoFileStore`) at the
+    /// current instant. No-op unless actively recording, same guard as
+    /// `markHighlight()` — a caller that captures while paused must delete the
+    /// file itself, since there is no "current instant" to attach it to.
+    /// Returns the record so the caller can react (e.g. haptic feedback), or
+    /// `nil` when the photo could not be registered.
+    @discardableResult
+    func registerPhoto(fileName: String) -> CapturedPhotoRecord? {
+        guard state == .recording, let start = segmentStart else { return nil }
+        let timestamp = accumulated + Date().timeIntervalSince(start)
+        let record = CapturedPhotoRecord(id: UUID(), fileName: fileName, capturedAt: timestamp, createdAt: Date())
+        photos.append(record)
+        AppLog.recorder.atNotice.notice("registerPhoto: added at \(timestamp, privacy: .public)s, count=\(self.photos.count, privacy: .public)")
+        return record
+    }
+
+    /// Stop and finalize. Returns the file name, total duration, highlights,
+    /// captured photos, and any latched capture failure, or nil if nothing was
+    /// recorded. The session is deactivated afterwards.
     @discardableResult
     func stop() -> AudioRecordingResult? {
         AppLog.recorder.atNotice.notice("stop: called state=\(String(describing: self.state), privacy: .public) file=\(self.currentFileName ?? "nil", privacy: .public)")
@@ -390,20 +423,23 @@ final class AudioRecorderService: NSObject {
 
         let duration = accumulated
         let capturedHighlights = highlights
+        let capturedPhotos = photos
         let finalCaptureFailure = captureFailure ?? sink.snapshot.firstFailure
         let outcome = finalCaptureFailure == nil ? "ready" : "partial"
-        AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public)")
+        AppLog.recorder.atNotice.notice("stop: outcome=\(outcome, privacy: .public) file=\(fileName, privacy: .public) duration=\(duration, privacy: .public)s highlights=\(capturedHighlights.count, privacy: .public) photos=\(capturedPhotos.count, privacy: .public)")
         resetRuntimeState()
         engine.deactivateSession()
         return AudioRecordingResult(
             fileName: fileName,
             duration: duration,
             highlights: capturedHighlights,
+            photos: capturedPhotos,
             captureFailure: finalCaptureFailure
         )
     }
 
-    /// Abort the current recording and delete its partial file.
+    /// Abort the current recording and delete its partial file and any photos
+    /// captured during it — a cancelled recording leaves nothing behind.
     func cancel() {
         if isStarting {
             startCancellationRequested = true
@@ -413,6 +449,9 @@ final class AudioRecorderService: NSObject {
         stopMetering()
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)
+        for photo in photos {
+            PhotoFileStore.delete(fileName: photo.fileName)
+        }
         resetRuntimeState()
         engine.deactivateSession()
     }

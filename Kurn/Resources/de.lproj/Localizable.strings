@@ -210,7 +210,17 @@
 "recorder.resume" = "Fortsetzen";
 "recorder.stop" = "Stopp";
 "recorder.highlight" = "Markieren";
+"recorder.photo" = "Foto";
+"recorder.photo_shutter" = "Foto aufnehmen";
+"recorder.photo_flash" = "Blitz";
 "transcript.jump_to_highlight" = "Zum Highlight springen";
+"transcript.view_photo" = "Foto ansehen";
+"photo.unavailable" = "Foto nicht verfügbar";
+"photo.recognized_text" = "Erkannter Text";
+"photo.captured_image" = "Während der Aufnahme aufgenommenes Foto";
+"photo.delete" = "Foto löschen";
+"photo.delete.confirm" = "Dieses Foto löschen?";
+"photo.delete.message" = "Der erkannte Text und alle Verweise darauf in der Zusammenfassung werden ebenfalls entfernt.";
 "recorder.paused" = "PAUSIERT";
 "recorder.permission.title" = "Mikrofonzugriff erforderlich";
 "recorder.permission.message" = "Kurn benötigt Mikrofonzugriff, um Meetings aufzuzeichnen. Aktivieren Sie ihn in den Einstellungen.";
@@ -397,6 +407,7 @@
 /* Detail */
 "detail.total_duration" = "Gesamtdauer: %@";
 "detail.recordings" = "Aufnahmen";
+"detail.photos" = "Fotos";
 "detail.record_new" = "Neuen Abschnitt aufnehmen";
 "detail.transcribe" = "Transkribieren";
 "detail.transcript" = "Transkript";
@@ -472,6 +483,7 @@
 "summary.key_decisions" = "Wichtige Entscheidungen";
 "summary.action_items" = "Aufgaben";
 "summary.footer" = "Erstellt von %1$@ · %2$@";
+"summary.photo_reference" = "Foto um %@ ansehen";
 "summary.footer_with_model" = "Erstellt von %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Vorlage: %@";
 

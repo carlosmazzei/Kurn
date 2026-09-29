@@ -84,6 +84,12 @@ struct MeetingDetailView: View {
     @State private var tab: Tab = .recordings
 
     @State private var showingRecorder = false
+    /// Drives the full-screen photo viewer from the Recordings tab's photo
+    /// strip — shown there independently of the Transcript tab's inline
+    /// markers, which need transcript segments to anchor to and so stay
+    /// empty until transcription finishes. Not `private` —
+    /// `MeetingDetailPhotos.swift` needs it.
+    @State var presentedPhoto: MeetingPhoto?
     /// Not `private` — `MeetingDetailToolbar.swift` needs it.
     @State var showingEdit = false
     /// Presents the generated article without adding a fifth item to the compact
@@ -160,6 +166,9 @@ struct MeetingDetailView: View {
             }
         }
         .sheet(item: $shareItem) { item in ActivityView(items: item.urls) }
+        .sheet(item: $presentedPhoto) { photo in
+            PhotoViewerView(photo: photo, onDelete: { deletePhoto(photo) })
+        }
         .sheet(isPresented: $showingShareSelection) {
             MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
                 shareItem = ShareItem(urls: urls)
@@ -318,7 +327,8 @@ struct MeetingDetailView: View {
                     onSelectSummary: { selectedSummaryID = $0.id },
                     onDeleteSummary: { pendingDeleteSummary = $0 },
                     onTranslateSummary: { pendingTranslateSummary = $0 },
-                    onCancelTranslateSummary: { cancelTranslateSummary() }
+                    onCancelTranslateSummary: { cancelTranslateSummary() },
+                    onShowPhoto: allPhotos.isEmpty ? nil : { showPhoto(atMeetingRelativeTime: $0) }
                 )
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 24)
             }
@@ -382,6 +392,7 @@ struct MeetingDetailView: View {
             }
             addSegmentButton
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
+            photosStrip
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -434,7 +445,8 @@ struct MeetingDetailView: View {
                     player: player,
                     offsetFor: { startOffset(of: $0) },
                     onSeek: { rec, time in seek(rec, to: time) },
-                    onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } }
+                    onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } },
+                    onDeletePhoto: { deletePhoto($0) }
                 )
             }
         }
@@ -602,7 +614,8 @@ struct MeetingDetailView: View {
 
     // MARK: - Shared bits
 
-    private func sectionLabel(_ text: String) -> some View {
+    /// Not `private` — `MeetingDetailPhotos.swift` needs it.
+    func sectionLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(Theme.caption2Emphasized)
             .tracking(0.8)

@@ -91,6 +91,7 @@ struct FoundationModelsProvider: LLMProvider {
             let title: String
             let body: String?
             let items: [String]?
+            let photoReferences: [String]?
         }
         let sections: [Section]
     }
@@ -105,7 +106,7 @@ struct FoundationModelsProvider: LLMProvider {
             try await session.respond(to: userPrompt, generating: GeneratedSummary.self, options: options).content
         }
         let asSummaryJSON = SummaryJSON(sections: generated.sections.map {
-            SummaryJSON.Section(title: $0.title, body: $0.body, items: $0.items)
+            SummaryJSON.Section(title: $0.title, body: $0.body, items: $0.items, photoReferences: $0.photoReferences)
         })
         return SummaryResult(sections: asSummaryJSON.summarySections)
     }

@@ -210,7 +210,17 @@
 "recorder.resume" = "Retomar";
 "recorder.stop" = "Parar";
 "recorder.highlight" = "Destacar";
+"recorder.photo" = "Foto";
+"recorder.photo_shutter" = "Tirar Foto";
+"recorder.photo_flash" = "Flash";
 "transcript.jump_to_highlight" = "Ir para o destaque";
+"transcript.view_photo" = "Ver foto";
+"photo.unavailable" = "Foto indisponível";
+"photo.recognized_text" = "Texto reconhecido";
+"photo.captured_image" = "Foto tirada durante a gravação";
+"photo.delete" = "Excluir Foto";
+"photo.delete.confirm" = "Excluir esta foto?";
+"photo.delete.message" = "O texto reconhecido e quaisquer referências no resumo também serão removidos.";
 "recorder.paused" = "PAUSADO";
 "recorder.permission.title" = "Acesso ao Microfone Necessário";
 "recorder.permission.message" = "O Kurn precisa do microfone para gravar reuniões. Ative o acesso nos Ajustes.";
@@ -397,6 +407,7 @@
 /* Detalhe */
 "detail.total_duration" = "Duração total: %@";
 "detail.recordings" = "Gravações";
+"detail.photos" = "Fotos";
 "detail.record_new" = "Gravar Novo Trecho";
 "detail.transcribe" = "Transcrever";
 "detail.transcript" = "Transcrição";
@@ -472,6 +483,7 @@
 "summary.key_decisions" = "Decisões Principais";
 "summary.action_items" = "Itens de Ação";
 "summary.footer" = "Gerado por %1$@ · %2$@";
+"summary.photo_reference" = "Ver foto às %@";
 "summary.footer_with_model" = "Gerado por %1$@ · %2$@ · %3$@";
 "summary.template_label" = "Modelo: %@";
 

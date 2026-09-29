@@ -82,6 +82,12 @@ final class Recording {
     @Relationship(deleteRule: .cascade, inverse: \Transcript.recording)
     var transcript: Transcript?
 
+    /// Photos captured while this recording was active, timestamped on its
+    /// own clock (`MeetingPhoto.capturedAt`). Cascade-deleted with the
+    /// recording, same as its transcript.
+    @Relationship(deleteRule: .cascade, inverse: \MeetingPhoto.recording)
+    var photos: [MeetingPhoto] = []
+
     init(
         id: UUID = UUID(),
         meeting: Meeting? = nil,

@@ -8,6 +8,7 @@
 //  template-driven list of titled sections.
 //
 
+import Foundation
 import Testing
 @testable import KurnCore
 
@@ -84,6 +85,37 @@ struct SummaryJSONParsingTests {
         #expect(throws: AppError.self) {
             try SummaryJSON.parse("{\"sections\": [ this is not valid }")
         }
+    }
+
+    @Test func parsesPhotoReferencesIntoSeconds() throws {
+        let raw = """
+        {"sections": [
+          {"title": "Roadmap", "body": "Discussed the board.", "photoReferences": ["[02:15]", "1:02:03"]},
+          {"title": "No photo", "body": "Nothing visual here."}
+        ]}
+        """
+        let json = try SummaryJSON.parse(raw)
+        let sections = json.summarySections
+        #expect(sections[0].photoTimestamps == [135, 3723])
+        #expect(sections[1].photoTimestamps == [])
+    }
+
+    @Test func dropsUnparseablePhotoReferencesWithoutFailingTheSection() throws {
+        let raw = """
+        {"sections": [
+          {"title": "Roadmap", "body": "x", "photoReferences": ["not-a-time", "01:30"]}
+        ]}
+        """
+        let json = try SummaryJSON.parse(raw)
+        #expect(json.summarySections.first?.photoTimestamps == [90])
+    }
+
+    @Test func summarySectionDecodesWithoutPhotoTimestampsKey() throws {
+        // A summary stored before photoTimestamps existed has no such key in
+        // its persisted JSON; decoding it must not fail or need a migration.
+        let raw = "{\"title\": \"Overview\", \"body\": \"Recap\", \"items\": []}".data(using: .utf8)!
+        let section = try JSONDecoder().decode(SummarySection.self, from: raw)
+        #expect(section.photoTimestamps == [])
     }
 
     @Test func throwsDecodingErrorOnTruncatedJSON() {

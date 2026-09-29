@@ -22,8 +22,10 @@ struct TranscriptTab: View {
     let offsetFor: (Recording) -> TimeInterval
     let onSeek: (Recording, TimeInterval) -> Void
     let onRenameCommit: () -> Void
+    var onDeletePhoto: ((MeetingPhoto) -> Void)?
 
     @State private var selectedSpeaker: String?
+    @State private var presentedPhoto: MeetingPhoto?
 
     /// Labels that actually say something in the transcripts on screen.
     ///
@@ -79,7 +81,9 @@ struct TranscriptTab: View {
                     activeTime: player.loadedFileName == recording.fileName ? player.currentTime : nil,
                     offset: offsetFor(recording),
                     highlights: recording.highlights,
-                    onSeek: { time in onSeek(recording, time) }
+                    photos: recording.photos,
+                    onSeek: { time in onSeek(recording, time) },
+                    onShowPhoto: { presentedPhoto = $0 }
                 )
             }
 
@@ -94,6 +98,9 @@ struct TranscriptTab: View {
                 Text(NSLocalizedString("detail.speakers.note", comment: "Auto-detected note"))
                     .font(.footnote).foregroundStyle(Theme.textTertiary)
             }
+        }
+        .sheet(item: $presentedPhoto) { photo in
+            PhotoViewerView(photo: photo, onDelete: onDeletePhoto == nil ? nil : { onDeletePhoto?(photo) })
         }
     }
 }
@@ -138,6 +145,9 @@ struct SummaryTab: View {
     let onDeleteSummary: (Summary) -> Void
     let onTranslateSummary: (Summary) -> Void
     let onCancelTranslateSummary: () -> Void
+    /// Taps a section's photo reference chip; `nil` when the meeting has no
+    /// photos, hiding the chip row entirely (see `SummaryView.onShowPhoto`).
+    var onShowPhoto: ((TimeInterval) -> Void)?
 
     private var sortedSummaries: [Summary] {
         meeting.summaries.sorted { $0.createdAt > $1.createdAt }
@@ -155,7 +165,7 @@ struct SummaryTab: View {
                     summaryProgressPanel
                 }
                 ReadAloudControl(item: .summary(selectedSummary, meeting: meeting))
-                SummaryView(summary: selectedSummary)
+                SummaryView(summary: selectedSummary, onShowPhoto: onShowPhoto)
                 if !isSummarizing {
                     newSummaryButton
                 }

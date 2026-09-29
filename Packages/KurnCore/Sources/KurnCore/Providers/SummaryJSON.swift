@@ -18,11 +18,17 @@ public struct SummaryJSON: Decodable {
         public let title: String
         public let body: String?
         public let items: [String]?
+        /// The model's own copy of the "[mm:ss]" stamps (verbatim, not
+        /// recomputed) of any "📷 Photo:" transcript lines this section drew
+        /// on. Asking for the same text the model already saw, rather than
+        /// arithmetic it would have to redo, keeps this robust to model error.
+        public let photoReferences: [String]?
 
-        public init(title: String, body: String? = nil, items: [String]? = nil) {
+        public init(title: String, body: String? = nil, items: [String]? = nil, photoReferences: [String]? = nil) {
             self.title = title
             self.body = body
             self.items = items
+            self.photoReferences = photoReferences
         }
     }
     public let sections: [Section]
@@ -45,7 +51,25 @@ public struct SummaryJSON: Decodable {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             guard !title.isEmpty || !body.isEmpty || !items.isEmpty else { return nil }
-            return SummarySection(title: title, body: body, items: items)
+            let photoTimestamps = (section.photoReferences ?? []).compactMap(Self.parseClockDisplay)
+            return SummarySection(title: title, body: body, items: items, photoTimestamps: photoTimestamps)
+        }
+    }
+
+    /// Parses a "[mm:ss]"/"[h:mm:ss]" stamp (brackets optional) back into
+    /// seconds — the inverse of `TimeInterval.clockDisplay`. Returns `nil`
+    /// (dropping that one reference, not the whole section) for anything
+    /// that doesn't parse, since this reads a model's copy-and-pasted text
+    /// rather than a value it computed.
+    private static func parseClockDisplay(_ raw: String) -> TimeInterval? {
+        let trimmed = raw.trimmingCharacters(in: CharacterSet(charactersIn: "[] \t"))
+        let parts = trimmed.split(separator: ":").map(String.init)
+        guard (2...3).contains(parts.count), parts.allSatisfy({ !$0.isEmpty }) else { return nil }
+        let numbers = parts.compactMap { Double($0) }
+        guard numbers.count == parts.count else { return nil }
+        return numbers.reversed().enumerated().reduce(0) { total, pair in
+            let (index, value) = pair
+            return total + value * pow(60, Double(index))
         }
     }
 }

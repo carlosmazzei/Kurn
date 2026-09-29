@@ -56,6 +56,12 @@ struct RecorderView: View {
             // running recording (no-op after a normal stop/cancel).
             vm?.finalizeIfAbandoned()
         }
+        // Locked for the whole screen, not just the photo sheet: this is a
+        // fixed immersive layout with no landscape variant, and rotating
+        // mid-recording only invited the photo sheet's camera preview to
+        // come up sideways. See `AppOrientationLock`'s header.
+        .onAppear { AppOrientationLock.shared.lockToPortrait() }
+        .onDisappear { AppOrientationLock.shared.unlock() }
     }
 }
 
@@ -64,6 +70,7 @@ private struct RecorderContent: View {
     let onFinished: () -> Void
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
+    @State private var showingPhotoCapture = false
     /// Fixed 20 Hz drive for the waveform scroll — the same cadence as the
     /// recorder's metering tick.
     private let waveformClock = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -185,6 +192,11 @@ private struct RecorderContent: View {
             }
         ))
         .interactiveDismissDisabled(vm.state != .idle || vm.isStarting)
+        .fullScreenCover(isPresented: $showingPhotoCapture) {
+            PhotoCaptureView { data in
+                vm.capturePhoto(jpegData: data)
+            }
+        }
     }
 
     // MARK: - Subviews
@@ -344,57 +356,83 @@ private struct RecorderContent: View {
         .accessibilityHidden(true)
     }
 
+    // Two rows rather than one four-wide HStack: pause/stop are the primary,
+    // full-width pills, and squeezing highlight+photo into the same row left
+    // "Pausar"/"Parar" too narrow to lay out on one line at larger Dynamic
+    // Type sizes. Highlight and photo are secondary actions, so a smaller
+    // centered row below reads fine.
     private var controls: some View {
-        HStack(spacing: 14) {
-            // Pause / resume.
-            Button {
-                AppLog.recorderUI.atInfo.info("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
-                vm.togglePause()
-            } label: {
-                pillLabel(
-                    systemImage: vm.state == .paused ? "play.fill" : "pause.fill",
-                    title: vm.state == .paused
-                        ? NSLocalizedString("recorder.resume", comment: "Resume")
-                        : NSLocalizedString("recorder.pause", comment: "Pause")
-                )
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-            .disabled(vm.state == .idle)
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                // Pause / resume.
+                Button {
+                    AppLog.recorderUI.atInfo.info("UI: pause/resume tapped, state=\(String(describing: vm.state), privacy: .public)")
+                    vm.togglePause()
+                } label: {
+                    pillLabel(
+                        systemImage: vm.state == .paused ? "play.fill" : "pause.fill",
+                        title: vm.state == .paused
+                            ? NSLocalizedString("recorder.resume", comment: "Resume")
+                            : NSLocalizedString("recorder.pause", comment: "Pause")
+                    )
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .disabled(vm.state == .idle)
 
-            // Stop & save.
-            Button {
-                AppLog.recorderUI.atInfo.info("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
-                vm.stopAndSave()
-            } label: {
-                pillLabel(
-                    systemImage: "stop.fill",
-                    title: NSLocalizedString("recorder.stop", comment: "Stop")
-                )
+                // Stop & save.
+                Button {
+                    AppLog.recorderUI.atInfo.info("UI: stop tapped, state=\(String(describing: vm.state), privacy: .public)")
+                    vm.stopAndSave()
+                } label: {
+                    pillLabel(
+                        systemImage: "stop.fill",
+                        title: NSLocalizedString("recorder.stop", comment: "Stop")
+                    )
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .tint(Theme.accent)
+                .disabled(vm.state == .idle)
             }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .tint(Theme.accent)
-            .disabled(vm.state == .idle)
 
-            // Highlight. Fixed-size circle rather than a third full-width pill,
-            // since marking is a secondary action relative to pause/stop.
-            Button {
-                AppLog.recorderUI.atInfo.info("UI: highlight tapped, state=\(String(describing: vm.state), privacy: .public)")
-                vm.markHighlight()
-            } label: {
-                Image(systemName: "bookmark.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .frame(width: 58, height: 58)
+            HStack(spacing: 14) {
+                // Highlight. Fixed-size circle rather than a full-width pill,
+                // since marking is a secondary action relative to pause/stop.
+                Button {
+                    AppLog.recorderUI.atInfo.info("UI: highlight tapped, state=\(String(describing: vm.state), privacy: .public)")
+                    vm.markHighlight()
+                } label: {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .frame(width: 52, height: 52)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(Theme.warning)
+                // Stricter than pause/stop: marking during a pause has no
+                // "current instant" to capture (mirrors `markHighlight()`'s guard).
+                .disabled(vm.state != .recording)
+                .sensoryFeedback(.success, trigger: vm.highlightCount)
+                .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
+
+                // Photo. Same fixed-circle treatment and the same "recording
+                // only" guard as highlight — a photo needs an active
+                // recording to attach its timestamp to (see
+                // `AudioRecorderService.registerPhoto`).
+                Button {
+                    AppLog.recorderUI.atInfo.info("UI: photo tapped, state=\(String(describing: vm.state), privacy: .public)")
+                    showingPhotoCapture = true
+                } label: {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .frame(width: 52, height: 52)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .disabled(vm.state != .recording)
+                .accessibilityLabel(NSLocalizedString("recorder.photo", comment: "Photo"))
             }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .tint(Theme.warning)
-            // Stricter than pause/stop: marking during a pause has no
-            // "current instant" to capture (mirrors `markHighlight()`'s guard).
-            .disabled(vm.state != .recording)
-            .sensoryFeedback(.success, trigger: vm.highlightCount)
-            .accessibilityLabel(NSLocalizedString("recorder.highlight", comment: "Highlight"))
         }
         .opacity(vm.state == .idle ? 0.5 : 1)
     }

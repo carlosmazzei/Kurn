@@ -25,6 +25,14 @@ enum SummaryPrompt {
         [mm:ss] timestamp and a short description of what was said, in \
         chronological order.
 
+        Some transcript lines read "[mm:ss] 📷 Photo: <text>" — text recognized \
+        in a photo taken during the meeting (e.g. a whiteboard or slide). \
+        Whenever a section's content draws on one of these, copy that line's \
+        exact "mm:ss" stamp (do not compute or reformat it) into that \
+        section's "photoReferences" array, so the reader can jump back to the \
+        photo. Omit "photoReferences" entirely for a section that draws on no \
+        photo.
+
         \(template.instructions)
         """
 
@@ -48,11 +56,12 @@ enum SummaryPrompt {
         Output valid JSON with this shape:
         {
           "sections": [
-            { "title": "Section heading", "body": "markdown paragraph(s)", "items": ["bullet", "bullet"] }
+            { "title": "Section heading", "body": "markdown paragraph(s)", "items": ["bullet", "bullet"], "photoReferences": ["mm:ss"] }
           ]
         }
         Each section needs a "title". Use "body" for prose and "items" for bullet \
-        lists; either may be omitted when not needed.
+        lists; either may be omitted when not needed. "photoReferences" is \
+        optional — see the photo instruction above.
         "body" is rendered as Markdown and supports: **bold** and *italic*, #### \
         subheadings, bullet and numbered lists (nest by indenting two spaces), task \
         checkboxes ("- [ ]" open, "- [x]" done), "> " blockquotes, pipe tables with \

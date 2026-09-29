@@ -11,6 +11,10 @@ import SwiftUI
 
 struct SummaryView: View {
     let summary: Summary
+    /// Taps a section's photo reference chip. `nil` hides the chip row
+    /// entirely, so a call site that doesn't wire this up (if any is ever
+    /// added) doesn't need to pass anything.
+    var onShowPhoto: ((TimeInterval) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -58,8 +62,40 @@ struct SummaryView: View {
             ForEach(Array(section.items.enumerated()), id: \.offset) { _, item in
                 itemRow(item)
             }
+            photoReferenceChips(section.photoTimestamps)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A row of tappable "see photo" chips — the same shape
+    /// `MeetingChatView.timestampChips` uses for its citations, so a photo a
+    /// section drew on isn't left as invisible provenance in the prose.
+    @ViewBuilder
+    private func photoReferenceChips(_ timestamps: [TimeInterval]) -> some View {
+        if !timestamps.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(timestamps, id: \.self) { time in
+                        Button { onShowPhoto?(time) } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "camera.fill").font(.caption2)
+                                    .accessibilityHidden(true)
+                                Text(time.clockDisplay).font(.system(.caption, design: .default, weight: .medium))
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Theme.fill, in: Capsule())
+                            .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(onShowPhoto == nil)
+                        .accessibilityLabel(String(
+                            format: NSLocalizedString("summary.photo_reference", comment: "View photo at time"),
+                            time.clockDisplay
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
