@@ -295,7 +295,11 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 
 - **Models/** — SwiftData `@Model` classes (`Meeting`, `Recording`, `Transcript`,
   `Speaker`, `Summary`, `Tag`, `Folder`, `SmartFolder`, `SemanticChunk`,
-  `WikiArticle`, `GeneratedDocument`) plus shared value types (`Enums.swift`,
+  `WikiArticle`, `GeneratedDocument`, `ChatSession`, `MeetingPhoto`) plus
+  shared value types grouped by subject — `AIProvider.swift`,
+  `PipelineEngines.swift` (one engine enum per pipeline stage),
+  `ProgressPhases.swift` (the progress vocabulary reported to the UI),
+  `LibraryEnums.swift`, `CaptureEnums.swift`, `Highlight.swift` — plus
   `MeetingFilter`, `MeetingLanguage`, `TranscriptionCheckpoint`, `FolderCatalog`,
   `SummarySection`, `SummaryTemplate`, `UsageStats`, `DocumentSourceResolver`).
 - **Services/** — audio capture, transcription pipeline (`Services/Pipeline/`),
@@ -385,7 +389,7 @@ Organization is layered on top of `Meeting` rather than replacing the aggregate
 root:
 
 - `isFavorite: Bool` and `archivedAt: Date?` (`isArchived`) are plain fields on
-  `Meeting`; `MeetingsLibraryBucket`/`LibrarySelection` (`Models/Enums.swift`)
+  `Meeting`; `MeetingsLibraryBucket`/`LibrarySelection` (`Models/LibraryEnums.swift`)
   bucket meetings into All/Inbox/Favorites/Archive.
 - `Folder` (`Models/Folder.swift`) — one folder per meeting (`Meeting.folder`,
   `.nullify`, so deleting a folder detaches rather than deletes its meetings).
@@ -444,7 +448,7 @@ Three things follow from the fixed format:
   `convert(to:error:withInputFrom:)`, not the frame-count-preserving overload.
   The converted buffer is also what `onAudioBuffer` hands the live-transcription
   preview.
-- **`AudioQuality`** (`Models/Enums.swift`) is now bit rate only — 64/48/32 kbps,
+- **`AudioQuality`** (`Models/CaptureEnums.swift`) is now bit rate only — 64/48/32 kbps,
   defaulting to `.standard` — because the sample rate is no longer a free
   variable. The pairing is what makes the low tier clean: 32 kbps over a 12 kHz
   band is fine, over 24 kHz it artefacts. `approximateBytesPerHour` backs the
@@ -703,7 +707,7 @@ stage is swappable without touching the orchestrator. `PipelineConfiguration`
 always-available, no-download engines so a fresh install works offline.
 `TranscriptionService` holds one instance of every engine and maps the chosen
 enum to it — engines are never spun up per call. The concrete choices per
-stage (enums in `Models/Enums.swift`) are:
+stage (enums in `Models/PipelineEngines.swift`; `TranscriptionEngine` in KurnCore) are:
 
 | Stage              | `AppSettings` property    | Default (no download)                                                                                                                                                            | Alternative (model download)                                                                                                                                                                             |
 | ------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
