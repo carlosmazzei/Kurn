@@ -14,7 +14,9 @@
 //  generation), and both restore and fresh-start *move* the live store into
 //  quarantine before replacing it — the pre-operation bytes are always
 //  still on disk afterward, just relocated. Nothing in this file deletes an
-//  original.
+//  original — with one explicit exception: `eraseAllRecoveryCopies()`, which
+//  only the user's own "Delete All Data" (`LibraryEraser`) calls, because a
+//  backup of the store is a full copy of every transcript it just erased.
 //
 
 import Foundation
@@ -154,6 +156,17 @@ struct ModelStoreBackupManager {
         guard generations.count > keeping else { return }
         for stale in generations.dropFirst(keeping) {
             try? fileManager.removeItem(at: backupsDirectory.appendingPathComponent(stale.id, isDirectory: true))
+        }
+    }
+
+    /// Removes every backup generation and every quarantined store — the
+    /// whole recovery history — leaving the live store untouched. Only for the
+    /// user's explicit "Delete All Data" (`LibraryEraser`). Returns how many
+    /// items could not be removed and are still on disk.
+    @discardableResult
+    func eraseAllRecoveryCopies() -> Int {
+        [backupsDirectory, quarantineDirectory].reduce(0) { residual, directory in
+            residual + LibraryEraser.removeIfPresent(directory, fileManager: fileManager)
         }
     }
 

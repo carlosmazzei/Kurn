@@ -62,22 +62,30 @@ extension SettingsView {
         }
     }
 
+    /// Stops whatever could still write meeting content (a running
+    /// transcription, read-aloud) and hands the erase to `LibraryEraser`,
+    /// which also removes the recovery copies a plain model delete leaves.
     func deleteAllData() {
-        do {
-            try modelContext.delete(model: Meeting.self)
-            try modelContext.save()
-        } catch {
-            AppLog.persistence.atError.error("Failed to delete all data code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-            dataError = .persistenceFailed(error.localizedDescription)
-            return
-        }
-        let residual = AudioFileStore.deleteAllAudio() + PhotoFileStore.deleteAllPhotos()
-        if residual > 0 {
-            AppLog.persistence.atError.error("Delete all left \(residual, privacy: .public) audio file(s) on disk")
-            dataError = .audioError(String(
-                format: NSLocalizedString("settings.delete_all.residual", comment: "Files left after delete all"),
-                residual
-            ))
+        ReadAloudController.shared.stop()
+        transcription?.cancelAllTranscriptions()
+        Task {
+            await transcription?.awaitActiveTranscriptions()
+            let residual: Int
+            do {
+                residual = try LibraryEraser.eraseAll(context: modelContext)
+            } catch {
+                AppLog.persistence.atError.error(
+                    "Failed to delete all data code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
+                )
+                dataError = .persistenceFailed(error.localizedDescription)
+                return
+            }
+            if residual > 0 {
+                dataError = .audioError(String(
+                    format: NSLocalizedString("settings.delete_all.residual", comment: "Files left after delete all"),
+                    residual
+                ))
+            }
         }
     }
 }

@@ -638,7 +638,7 @@
 "settings.clear_cache.result" = "%d Datei(en) entfernt (%@).";
 "settings.delete_all" = "Alle Daten löschen";
 "settings.delete_all.confirm" = "Alle Meetings und Aufnahmen löschen?";
-"settings.delete_all.message" = "Dadurch werden alle Meetings, Transkripte und Audiodateien dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.";
+"settings.delete_all.message" = "Dadurch werden alle Meetings, Transkripte, Audiodateien, Fotos, Chats und generierten Dokumente dauerhaft entfernt, einschließlich der Wiederherstellungskopien. Tags und Ordner bleiben erhalten. Dies kann nicht rückgängig gemacht werden.";
 "settings.delete_all.residual" = "%d Audiodatei(en) konnten nicht entfernt werden und verbleiben auf dem Gerät. Versuchen Sie es erneut oder schaffen Sie Speicherplatz.";
 "settings.diarization_engine" = "Diarisierungs-Engine";
 "settings.diarization_engine_footer" = "Neuronale Engines sind genauer, benötigen aber einen Download; Heuristisch funktioniert sofort offline.";

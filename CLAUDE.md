@@ -700,7 +700,7 @@ stage (enums in `Models/Enums.swift`) are:
 | Preprocessing      | `preprocessingEngine`     | `.standardDSP` (`AudioPreprocessor`)                                                                                                                                             | `.none` (passthrough — not FluidAudio, just skips cleanup)                                                                                                                                               |
 | VAD                | `vadEngine`               | `.energyThreshold` (`Pipeline/EnergyVAD.swift`)                                                                                                                                  | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD)                                                                                                                                               |
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber)                                                                                                                              | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`)                    |
-| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering), `.sherpaOnnx`, or `.transcriptionProviderNative` (speaker turns from the `.whisperAPI` provider's own response, e.g. ElevenLabs Scribe) are the no-download alternatives |
+| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) or `.transcriptionProviderNative` (speaker turns from the `.whisperAPI` provider's own response, e.g. ElevenLabs Scribe) are the no-download alternatives; `.sherpaOnnx` downloads its own model pair (`SherpaOnnxModelDownloader`, gated by `sherpaOnnxModelsConsented`) |
 | Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud, any provider whose `AIProvider.supportsTranscription` is true — OpenAI's `whisper-1`/`gpt-4o-transcribe`/`gpt-4o-mini-transcribe`, Groq, ElevenLabs Scribe, or a custom OpenAI-compatible endpoint) |
 | Correction         | `correctionEnabled`       | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work)                                                                                       | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below)                                                          |
 
@@ -1041,9 +1041,10 @@ doesn't link the package.
 Three things are deliberately *not* parallel to the FluidAudio stack:
 
 - **Its own downloader.** GGML weights come straight from HuggingFace
-  (`Services/WhisperCppModelDownloader.swift`, a `URLSessionDownloadTask` bridged
-  to async/await), because whisper.cpp ships no downloader of its own. This is
-  the app's only direct model download. The files land in
+  (`Services/WhisperCppModelDownloader.swift`), because whisper.cpp ships no
+  downloader of its own. It and `SherpaOnnxModelDownloader` are the app's two
+  direct model downloads, both delegating fetch → verify → atomic install to
+  the shared `ModelFileDownloader`. The files land in
   `Application Support/WhisperCpp/Models/<variant>/`, excluded from iCloud
   backup, and `ModelStore.ModelGroup.whisperCpp.root` points there rather than at
   FluidAudio's cache — the snapshot-diff folder discovery is skipped for this
@@ -1362,6 +1363,18 @@ store, or the network:
   `intent` → `trashed` → `committed` states; unreadable records are quarantined
   under `Journal/Unreadable` (never dropped), and `advance(_:to:)` returns `Bool`
   so a failed rewrite surfaces as a reliability event.
+- **"Delete All Data" erases the recovery copies too.** Every durability
+  mechanism above keeps meeting content somewhere on purpose — store backups
+  and quarantined stores are whole copies of every transcript, the recordings'
+  trash/quarantine/journal hold audio — so the user's explicit erase goes
+  through `LibraryEraser` (`Infrastructure/`), never an ad hoc model delete in a
+  view. It deletes every content model (including library-wide `ChatSession`s
+  and `GeneratedDocument`s, which no meeting cascade reaches), saves, and only
+  then removes audio, photos and every recovery location
+  (`ModelStoreBackupManager.eraseAllRecoveryCopies()` is that type's one
+  deletion of anything but a redundant backup). Tags, folders, smart folders,
+  reliability events and diagnostic reports are kept — none carries meeting
+  content. A new store of meeting-derived content must be added there.
 - **Malformed or future data is not accepted silently.** `JSONStorage` wraps
   authoritative JSON in a versioned envelope; `JSONDecodeOutcome` distinguishes
   `.corrupted(originalData:)` from `.unsupportedVersion(_, originalData:)` and
@@ -1464,10 +1477,13 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   cut of V2 did exactly that, so "V1" already contained `chatSessions`, no
   real 1.0.0 store matched it, and the migration failed on upgrade while
   `LegacyStoreAdoptionTests` stayed green (its fixture was written with the
-  same live classes). The next model change therefore means: edit the live
-  class, add `KurnSchemaV3` listing the live classes, demote `KurnSchemaV2` to
-  frozen copies in a `KurnSchemaV2Models.swift`, add the stage, and bump
-  `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
+  same live classes). `KurnSchemaV3` (1.2.0, adding `MeetingPhoto`) followed
+  that recipe and is the current version, with V2 frozen in
+  `KurnSchemaV2Models.swift`. The next model change therefore means: edit the
+  live class, add `KurnSchemaV4` listing the live classes, demote
+  `KurnSchemaV3` to frozen copies in a `KurnSchemaV3Models.swift`, add the
+  stage, and bump `KurnModelGraph.currentSchemaVersion` (which backup metadata
+  records). When
   `wikiEnabled` is on, the library-wide path additionally grounds on the
   condensed per-meeting articles — see "Derived artifacts" below for why that
   answers synthesis and counting questions retrieval alone cannot.
