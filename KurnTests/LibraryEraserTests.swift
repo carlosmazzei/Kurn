@@ -38,7 +38,7 @@ struct LibraryEraserTests {
         #expect(try context.fetchCount(FetchDescriptor<ChatSession>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<GeneratedDocument>()) == 0)
 
-        #expect(try context.fetchCount(FetchDescriptor<Tag>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Kurn.Tag>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<Folder>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<SmartFolder>()) == 1)
     }
@@ -53,7 +53,7 @@ struct LibraryEraserTests {
         try LibraryEraser.eraseModels(in: context)
 
         #expect(try context.fetchCount(FetchDescriptor<Meeting>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Tag>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Kurn.Tag>()) == 1)
     }
 
     // MARK: - Recovery copies
@@ -106,7 +106,7 @@ struct LibraryEraserTests {
 
     private func seedLibrary(in context: ModelContext) {
         let folder = Folder(name: "Clients")
-        let tag = Tag(name: "Weekly")
+        let tag = Kurn.Tag(name: "Weekly")
         context.insert(folder)
         context.insert(tag)
         context.insert(SmartFolder(name: "Recent"))
