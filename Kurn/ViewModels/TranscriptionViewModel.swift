@@ -116,18 +116,13 @@ final class TranscriptionViewModel {
     /// cancel it. Not `private` —
     /// `TranscriptionViewModel+SummaryTranslation.swift` needs it.
     var translationTask: Task<Void, Never>?
-    /// Recordings in flight across ALL instances — `KurnApp`'s shared
-    /// instance (the one every `MeetingDetailView` reads via `@Environment`)
-    /// and the app-level `TranscriptionScheduler` resume coordinator's own
-    /// separate instance are two processes that could otherwise both start
-    /// the same recording; a recording must never transcribe twice
-    /// concurrently.
-    private static var globalActiveIDs: Set<UUID> = []
-
-    /// Recordings some view model in this process is actually working on.
-    /// The foreground recovery sweep uses this to distinguish a live run
-    /// (leave alone) from a stale persisted `.inProgress` (reset to resumable).
-    static var activeTranscriptionIDs: Set<UUID> { globalActiveIDs }
+    /// Recordings this instance is actually working on. The foreground
+    /// recovery sweep uses this to distinguish a live run (leave alone) from a
+    /// stale persisted `.inProgress` (reset to resumable). There is one
+    /// instance per process — `KurnApp`'s `AppComposition` hands the same one
+    /// to the scene and to the `BGProcessingTask` runner — so this per-instance
+    /// set is also what keeps a recording from transcribing twice at once.
+    var activeTranscriptionIDs: Set<UUID> { transcribingIDs }
 
     /// Not `private` — `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift` needs it.
     let modelContext: ModelContext
@@ -139,23 +134,30 @@ final class TranscriptionViewModel {
     let summaryService: SummaryService
     /// Not `private` — `TranscriptionViewModel+AITitle.swift` needs it.
     let aiTitleCoordinator: AITitleCoordinator
-    /// App-wide settings, set by `KurnApp` so title generation can use the
-    /// configured LLM provider without passing settings through every call site.
-    var appSettings: AppSettings?
-    /// App-wide semantic-index coordinator, set by `KurnApp`. A finished
-    /// transcription updates the meeting's on-device index through it.
-    var semanticIndexCoordinator: SemanticIndexCoordinator?
-    /// App-wide wiki coordinator, set by `KurnApp`. A finished transcription
-    /// refreshes the meeting's condensed wiki article through it (opt-in).
-    var wikiCoordinator: WikiCoordinator?
+    /// App-wide settings, injected at construction by `AppComposition` so
+    /// usage stats and title generation never run against a missing value.
+    /// `nil` only in tests that exercise the pipeline without preferences.
+    let appSettings: AppSettings?
+    /// App-wide semantic-index coordinator. A finished transcription updates
+    /// the meeting's on-device index through it. `nil` only in tests.
+    let semanticIndexCoordinator: SemanticIndexCoordinator?
+    /// App-wide wiki coordinator. A finished transcription refreshes the
+    /// meeting's condensed wiki article through it (opt-in). `nil` only in tests.
+    let wikiCoordinator: WikiCoordinator?
 
     init(
         modelContext: ModelContext,
+        appSettings: AppSettings? = nil,
+        semanticIndexCoordinator: SemanticIndexCoordinator? = nil,
+        wikiCoordinator: WikiCoordinator? = nil,
         aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator(),
         transcriptionService: TranscriptionService = TranscriptionService(),
         summaryService: SummaryService = SummaryService()
     ) {
         self.modelContext = modelContext
+        self.appSettings = appSettings
+        self.semanticIndexCoordinator = semanticIndexCoordinator
+        self.wikiCoordinator = wikiCoordinator
         self.aiTitleCoordinator = aiTitleCoordinator
         self.transcriptionService = transcriptionService
         self.summaryService = summaryService
@@ -230,7 +232,7 @@ final class TranscriptionViewModel {
         guard recording.isReadyForConsumption else { return }
         let recordingID = recording.id
         guard transcriptionTasks[recordingID] == nil,
-              !Self.globalActiveIDs.contains(recordingID) else {
+              !transcribingIDs.contains(recordingID) else {
             AppLog.transcription.atInfo.info("VM: start ignored, already in flight id=\(recordingID, privacy: .public)")
             return
         }
@@ -284,8 +286,7 @@ final class TranscriptionViewModel {
         config: PipelineConfiguration
     ) async {
         guard recording.isReadyForConsumption,
-              !transcribingIDs.contains(recording.id),
-              !Self.globalActiveIDs.contains(recording.id) else { return }
+              !transcribingIDs.contains(recording.id) else { return }
 
         let recordingID = recording.id
         // H9 PR 22, item 5: one id correlates every `ReliabilityEvent` this
@@ -299,12 +300,10 @@ final class TranscriptionViewModel {
 
         cancelPostTranscriptionWork(for: recording.meeting?.id)
         transcribingIDs.insert(recordingID)
-        Self.globalActiveIDs.insert(recordingID)
         activeRecordings[recordingID] = recording
         phases[recordingID] = .preparing
         defer {
             transcribingIDs.remove(recordingID)
-            Self.globalActiveIDs.remove(recordingID)
             activeRecordings[recordingID] = nil
             phases[recordingID] = nil
             cancellingIDs.remove(recordingID)

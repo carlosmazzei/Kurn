@@ -20,9 +20,10 @@ final class SemanticIndexCoordinator {
     private let modelContext: ModelContext
     private let indexService = SemanticIndexService()
 
-    /// App-wide settings, set by `KurnApp`; the index respects the
-    /// `semanticSearchEnabled` toggle without threading settings through callers.
-    var appSettings: AppSettings?
+    /// App-wide settings, injected at construction; the index respects the
+    /// `semanticSearchEnabled` toggle without threading settings through
+    /// callers. `nil` (tests) reads as the feature being off.
+    let appSettings: AppSettings?
 
     /// Meetings currently being indexed, so the UI can show progress and repeat
     /// requests for the same meeting coalesce instead of racing.
@@ -30,8 +31,9 @@ final class SemanticIndexCoordinator {
     /// True while a backfill sweep is running, so it never overlaps itself.
     private(set) var isBackfilling = false
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext, appSettings: AppSettings? = nil) {
         self.modelContext = modelContext
+        self.appSettings = appSettings
     }
 
     // MARK: - Single meeting
