@@ -7,9 +7,6 @@
 //  size of the f16 originals at nearly the same accuracy, which matters a great
 //  deal when the user is downloading them over cellular onto a phone.
 //
-//  Lives in its own file rather than in `Enums.swift`, which is already past
-//  SwiftLint's file-length warning threshold.
-//
 
 import Foundation
 
