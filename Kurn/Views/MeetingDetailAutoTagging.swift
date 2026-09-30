@@ -47,35 +47,11 @@ extension MeetingDetailView {
     /// Applies a confirmed suggestion to the meeting, creating new tags when
     /// needed and skipping duplicates.
     func applyAutoTagSuggestion(_ suggestion: AutoTaggingService.Suggestion) {
-        let descriptor = FetchDescriptor<Kurn.Tag>(sortBy: [SortDescriptor(\.name)])
-        let allTags = (try? modelContext.fetch(descriptor)) ?? []
-        let existingByID = Dictionary(uniqueKeysWithValues: allTags.map { ($0.id, $0) })
-        for tagID in suggestion.tagIDs {
-            if let tag = existingByID[tagID],
-               !meeting.tags.contains(where: { $0.id == tagID }) {
-                meeting.tags.append(tag)
-            }
-        }
-        for name in suggestion.newTagNames {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            if let existing = allTags.first(where: {
-                $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
-            }) {
-                if !meeting.tags.contains(where: { $0.id == existing.id }) {
-                    meeting.tags.append(existing)
-                }
-            } else {
-                let newTag = Kurn.Tag(name: trimmed)
-                modelContext.insert(newTag)
-                meeting.tags.append(newTag)
-            }
-        }
         do {
-            try modelContext.save()
+            try MeetingLibrary(context: modelContext)
+                .applyTags(ids: suggestion.tagIDs, newNames: suggestion.newTagNames, to: meeting)
         } catch {
-            AppLog.persistence.atError.error("Failed to save auto-tagged meeting: \(error, privacy: .public)")
-            autoTagError = .persistenceFailed(error.localizedDescription)
+            autoTagError = error
         }
         autoTagSuggestion = nil
     }

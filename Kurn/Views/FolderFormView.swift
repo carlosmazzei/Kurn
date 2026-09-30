@@ -161,21 +161,21 @@ struct FolderFormView: View {
         guard !trimmed.isEmpty else { return }
         switch mode {
         case .create(let parent):
-            let folder = Folder(
-                name: trimmed,
-                iconName: iconName,
-                colorHex: colorHex,
-                parent: parent
-            )
-            modelContext.insert(folder)
+            do {
+                try MeetingLibrary(context: modelContext)
+                    .createFolder(name: trimmed, iconName: iconName, colorHex: colorHex, parent: parent)
+            } catch {
+                saveError = error
+                return
+            }
         case .edit(let folder):
             folder.name = trimmed
             folder.iconName = iconName
             folder.colorHex = colorHex
-        }
-        if let failure = modelContext.saveOrError() {
-            saveError = failure
-            return
+            if let failure = modelContext.saveOrError() {
+                saveError = failure
+                return
+            }
         }
         dismiss()
     }

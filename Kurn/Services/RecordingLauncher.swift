@@ -15,7 +15,7 @@
 //  `StartRecordingIntent.perform()` (`Kurn/AppIntents/StartRecordingIntent.swift`)
 //  cannot call into this type directly: that file is compiled into both the
 //  Kurn and KurnLiveActivityExtension targets, and this type's dependency
-//  chain (`MeetingsViewModel`, `Meeting`, `AppSettings`, SwiftData) is not
+//  chain (`MeetingLibrary`, `Meeting`, `AppSettings`, SwiftData) is not
 //  meant to exist in the widget extension. Instead the intent posts a plain
 //  `Notification`, which this singleton observes once it is actually running
 //  inside the app process — exactly where `openAppWhenRun` guarantees the
@@ -23,6 +23,7 @@
 //
 
 import Foundation
+import KurnCore
 import Observation
 import SwiftData
 
@@ -77,7 +78,7 @@ final class RecordingLauncher {
     /// already holds. Returns `false` only when the app genuinely couldn't
     /// act on the request — `configure()` hasn't run yet, a cold-launch race
     /// `StartRecordingIntent` needs to report truthfully rather than assume
-    /// (H8 PR 20, item 8).
+    /// (H8 PR 20, item 8) — or the new meeting could not be saved.
     @discardableResult
     func requestAutoStart() -> Bool {
         guard !RecordingCommandRouter.shared.hasActiveSession else { return true }
@@ -85,9 +86,14 @@ final class RecordingLauncher {
             AppLog.recorderUI.atError.error("RecordingLauncher: auto-start requested before configure() ran")
             return false
         }
-        let viewModel = MeetingsViewModel(modelContext: modelContext)
-        pendingAutoStartMeeting = viewModel.createMeeting(title: "", language: settings.defaultLanguage)
-        return true
+        do {
+            pendingAutoStartMeeting = try MeetingLibrary(context: modelContext)
+                .createMeeting(title: "", language: settings.defaultLanguage)
+            return true
+        } catch {
+            AppLog.recorderUI.atError.error("RecordingLauncher: could not save the new meeting code=\(error.logCode, privacy: .public)")
+            return false
+        }
     }
 
     /// Consumes the pending meeting so it is only presented once.

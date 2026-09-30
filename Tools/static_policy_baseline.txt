@@ -28,3 +28,11 @@ fatal-error|Kurn/Services/Pipeline/STFT.swift|preconditionFailure("vDSP.Discrete
 custom-url-session|Kurn/Providers/ProviderHTTPTransport.swift|let controlledSession = URLSession(
 custom-url-session|Kurn/Services/ModelFileDownloader.swift|let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
 custom-url-session|Kurn/Services/WhisperBackgroundUploader.swift|let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+
+# upward-dependency: the BGProcessingTask runner drives the app's own
+# TranscriptionViewModel (so a background run gets the same indexing and wiki
+# post-processing as a foreground one). Grandfathered until the transcription
+# orchestration moves out of the view model into Application/ (architecture
+# plan, PR 6), after which the scheduler depends on that instead.
+upward-dependency|Kurn/Infrastructure/TranscriptionScheduler.swift|let transcription: TranscriptionViewModel
+upward-dependency|Kurn/Infrastructure/TranscriptionScheduler.swift|private var transcription: TranscriptionViewModel?

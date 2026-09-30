@@ -60,13 +60,16 @@ extension MeetingsListView {
         .accessibilityIdentifier("meetings.record")
     }
 
-    /// Create the meeting the recorder will record into, then present it. Errors
-    /// surface through `saveError` rather than being dropped.
+    /// Create the meeting the recorder will record into, then present it. A
+    /// failed save surfaces through `saveError` and opens no recorder, since
+    /// there would be no committed meeting to record into.
     func startRecording() {
-        let viewModel = MeetingsViewModel(modelContext: modelContext)
-        let meeting = viewModel.createMeeting(title: "", language: settings.defaultLanguage)
-        saveError = viewModel.error
-        recordMeeting = meeting
+        do {
+            recordMeeting = try MeetingLibrary(context: modelContext)
+                .createMeeting(title: "", language: settings.defaultLanguage)
+        } catch {
+            saveError = error
+        }
     }
 
     // MARK: - Bottom bar

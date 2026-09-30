@@ -142,24 +142,19 @@ struct TagPickerView: View {
     }
 
     private func createTag() {
-        let name = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        if let existing = allTags.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
-            if !meeting.tags.contains(where: { $0.id == existing.id }) {
-                meeting.tags.append(existing)
-                saveError = modelContext.saveOrError()
-            }
-        } else {
-            let tag = Tag(name: name)
-            modelContext.insert(tag)
-            meeting.tags.append(tag)
-            saveError = modelContext.saveOrError()
+        do {
+            try MeetingLibrary(context: modelContext).attachTag(named: newTagName, to: meeting)
+        } catch {
+            saveError = error
         }
         newTagName = ""
     }
 
     private func deleteTag(_ tag: Tag) {
-        modelContext.delete(tag)
-        saveError = modelContext.saveOrError()
+        do {
+            try MeetingLibrary(context: modelContext).deleteTag(tag)
+        } catch {
+            saveError = error
+        }
     }
 }

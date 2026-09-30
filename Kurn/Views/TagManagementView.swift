@@ -139,30 +139,28 @@ struct TagManagementView: View {
     }
 
     private func createTag() {
-        let name = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        guard !tags.contains(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) else {
-            newTagName = ""
-            return
+        do {
+            try MeetingLibrary(context: modelContext).createTag(named: newTagName)
+        } catch {
+            saveError = error
         }
-        let tag = Tag(name: name)
-        modelContext.insert(tag)
-        saveError = modelContext.saveOrError()
         newTagName = ""
     }
 
     private func deleteTag(_ tag: Tag) {
-        modelContext.delete(tag)
-        saveError = modelContext.saveOrError()
+        do {
+            try MeetingLibrary(context: modelContext).deleteTag(tag)
+        } catch {
+            saveError = error
+        }
     }
 
     private func merge(source: Tag, into target: Tag) {
-        for meeting in source.meetings
-        where !meeting.tags.contains(where: { $0.id == target.id }) {
-            meeting.tags.append(target)
+        do {
+            try MeetingLibrary(context: modelContext).mergeTag(source, into: target)
+        } catch {
+            saveError = error
         }
-        modelContext.delete(source)
-        saveError = modelContext.saveOrError()
         mergeSource = nil
     }
 }

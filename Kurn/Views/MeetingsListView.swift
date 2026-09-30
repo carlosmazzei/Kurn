@@ -391,9 +391,11 @@ struct MeetingsListView: View {
             primaryRole: .destructive,
             primaryAction: {
                 guard let meeting = pendingDelete else { return }
-                let viewModel = MeetingsViewModel(modelContext: modelContext)
-                viewModel.delete(meeting)
-                saveError = viewModel.error
+                do {
+                    try MeetingLibrary(context: modelContext).deleteMeeting(meeting)
+                } catch {
+                    saveError = error
+                }
                 pendingDelete = nil
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel"),

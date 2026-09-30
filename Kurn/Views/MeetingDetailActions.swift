@@ -258,9 +258,13 @@ extension MeetingDetailView {
     }
 
     func deleteSummary(_ summary: Summary) {
-        modelContext.delete(summary)
-        if let failure = modelContext.saveOrError() { txVM?.error = failure }
-        if selectedSummaryID == summary.id {
+        let wasSelected = selectedSummaryID == summary.id
+        do {
+            try MeetingLibrary(context: modelContext).deleteSummary(summary)
+        } catch {
+            txVM?.error = error
+        }
+        if wasSelected {
             selectedSummaryID = meeting.latestSummary?.id
         }
     }
@@ -268,15 +272,19 @@ extension MeetingDetailView {
     func deleteRecording(_ recording: Recording) {
         if player.loadedFileName == recording.fileName { player.stop() }
         enhancement.cancel(recording)
-        let viewModel = MeetingsViewModel(modelContext: modelContext)
-        viewModel.deleteRecording(recording)
-        if let failure = viewModel.error { txVM?.error = failure }
+        do {
+            try MeetingLibrary(context: modelContext).deleteRecording(recording)
+        } catch {
+            txVM?.error = error
+        }
     }
 
     func deletePhoto(_ photo: MeetingPhoto) {
         if presentedPhoto?.id == photo.id { presentedPhoto = nil }
-        let viewModel = MeetingsViewModel(modelContext: modelContext)
-        viewModel.deletePhoto(photo)
-        if let failure = viewModel.error { txVM?.error = failure }
+        do {
+            try MeetingLibrary(context: modelContext).deletePhoto(photo)
+        } catch {
+            txVM?.error = error
+        }
     }
 }

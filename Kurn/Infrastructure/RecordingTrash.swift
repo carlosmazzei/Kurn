@@ -4,7 +4,7 @@
 //
 //  SwiftData and the filesystem are two stores with no shared transaction, so
 //  "delete the audio file, then delete the model row" (the previous behavior
-//  of `MeetingsViewModel.delete`/`deleteRecording`) has a window where the
+//  of `MeetingLibrary.deleteMeeting`/`deleteRecording`) has a window where the
 //  audio is already gone but the row survives — a save failure or a process
 //  death between the two leaves a visible meeting/recording pointing at
 //  missing audio, with no way back.
