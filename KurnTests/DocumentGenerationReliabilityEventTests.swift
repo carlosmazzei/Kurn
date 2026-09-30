@@ -20,19 +20,23 @@ struct DocumentGenerationReliabilityEventTests {
         capture.install()
         defer { capture.uninstall() }
 
+        let runID = OperationID()
         let service = DocumentGenerationService()
         await #expect(throws: AppError.self) {
             _ = try await service.generate(
                 sources: [],
                 prompt: "Summarize the decisions",
                 provider: .openAI,
-                model: "gpt-test"
+                model: "gpt-test",
+                runID: runID
             )
         }
 
         // The handler is process-global and suites run in parallel, so only
-        // this operation's events are this test's to count.
-        let captured = capture.recorded.filter { $0.operation == "document_generation" }
+        // this run's events are this test's to count. Filtering by operation
+        // name alone picked up `DocumentGenerationServiceTests`' concurrent
+        // "empty_prompt" event.
+        let captured = capture.recorded.filter { $0.operationID == runID }
         #expect(captured.count == 1)
         #expect(captured.first?.outcome == .failed)
         #expect(captured.first?.stage == "validation")
