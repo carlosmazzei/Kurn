@@ -325,12 +325,6 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 - **Views/** — SwiftUI screens, plus the UIKit glue that hosts them
   (`SecurityCoverWindow`).
 
-Dependencies point down: Models/Providers/Services/Infrastructure/Application/
-AppIntents never name a type declared in ViewModels/ or Views/, and ViewModels/
-never name one declared in Views/. `Tools/check_static_policy.py` enforces this
-(`upward-dependency`), together with no store mutations (`view-store-mutation`)
-and no `KeychainManager` (`view-keychain`) in Views. The one grandfathered
-exception is `TranscriptionScheduler` driving `TranscriptionViewModel`.
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
   the durable provider circuit used only by automatic cloud enrichment, the
   large-transfer policy shared by cloud audio and model downloads, and the
@@ -354,6 +348,13 @@ exception is `TranscriptionScheduler` driving `TranscriptionViewModel`.
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
   backing both the fastlane screenshot run and `AccessibilityAuditUITests`. It
   never seeds a real recording or transcript.
+
+Dependencies point down: Models/Providers/Services/Infrastructure/Application/
+AppIntents never name a type declared in ViewModels/ or Views/, and ViewModels/
+never name one declared in Views/. `Tools/check_static_policy.py` enforces this
+(`upward-dependency`), together with no store mutations (`view-store-mutation`)
+and no `KeychainManager` (`view-keychain`) in Views. The one grandfathered
+exception is `TranscriptionScheduler` driving `TranscriptionViewModel`.
 
 ### Change discipline
 
@@ -1441,8 +1442,9 @@ store, or the network:
   reimplementing them.
 
 `Tools/check_static_policy.py` enforces the log-redaction and unchecked-save
-rules statically, alongside the layer rules described under "Architecture" (baseline in `Tools/static_policy_baseline.txt`; a stale
-baseline entry fails the check), and `DebugSupport/` holds the debug-only fault
+rules statically, alongside the layer rules described under "Architecture"
+(baseline in `Tools/static_policy_baseline.txt`; a stale baseline entry fails
+the check), and `DebugSupport/` holds the debug-only fault
 injection hooks the recovery tests use.
 
 ### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/MeetingChatService.swift`)
