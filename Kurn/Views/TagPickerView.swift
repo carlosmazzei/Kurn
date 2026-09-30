@@ -142,7 +142,7 @@ struct TagPickerView: View {
     }
 
     private func createTag() {
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).attachTag(named: newTagName, to: meeting)
         } catch {
             saveError = error
@@ -151,7 +151,7 @@ struct TagPickerView: View {
     }
 
     private func deleteTag(_ tag: Tag) {
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteTag(tag)
         } catch {
             saveError = error

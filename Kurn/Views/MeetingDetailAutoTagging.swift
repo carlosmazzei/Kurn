@@ -47,7 +47,7 @@ extension MeetingDetailView {
     /// Applies a confirmed suggestion to the meeting, creating new tags when
     /// needed and skipping duplicates.
     func applyAutoTagSuggestion(_ suggestion: AutoTaggingService.Suggestion) {
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext)
                 .applyTags(ids: suggestion.tagIDs, newNames: suggestion.newTagNames, to: meeting)
         } catch {

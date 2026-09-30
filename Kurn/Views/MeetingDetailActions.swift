@@ -259,7 +259,7 @@ extension MeetingDetailView {
 
     func deleteSummary(_ summary: Summary) {
         let wasSelected = selectedSummaryID == summary.id
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteSummary(summary)
         } catch {
             txVM?.error = error
@@ -272,7 +272,7 @@ extension MeetingDetailView {
     func deleteRecording(_ recording: Recording) {
         if player.loadedFileName == recording.fileName { player.stop() }
         enhancement.cancel(recording)
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteRecording(recording)
         } catch {
             txVM?.error = error
@@ -281,7 +281,7 @@ extension MeetingDetailView {
 
     func deletePhoto(_ photo: MeetingPhoto) {
         if presentedPhoto?.id == photo.id { presentedPhoto = nil }
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).deletePhoto(photo)
         } catch {
             txVM?.error = error

@@ -12,6 +12,7 @@
 //  declared non-private over there.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 
@@ -64,7 +65,7 @@ extension MeetingsListView {
     /// failed save surfaces through `saveError` and opens no recorder, since
     /// there would be no committed meeting to record into.
     func startRecording() {
-        do {
+        do throws(AppError) {
             recordMeeting = try MeetingLibrary(context: modelContext)
                 .createMeeting(title: "", language: settings.defaultLanguage)
         } catch {

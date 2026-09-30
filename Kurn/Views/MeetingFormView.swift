@@ -127,7 +127,7 @@ struct MeetingFormView: View {
                 return
             }
         } else {
-            do {
+            do throws(AppError) {
                 try MeetingLibrary(context: modelContext)
                     .createMeeting(title: title, notes: notes, language: language)
             } catch {

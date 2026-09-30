@@ -80,7 +80,7 @@ struct DocumentsListView: View {
             primaryRole: .destructive,
             primaryAction: {
                 if let document = pendingDelete {
-                    do {
+                    do throws(AppError) {
                         try MeetingLibrary(context: modelContext).deleteDocument(document)
                     } catch {
                         saveError = error
