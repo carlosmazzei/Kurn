@@ -86,7 +86,7 @@ final class RecordingLauncher {
             AppLog.recorderUI.atError.error("RecordingLauncher: auto-start requested before configure() ran")
             return false
         }
-        do {
+        do throws(AppError) {
             pendingAutoStartMeeting = try MeetingLibrary(context: modelContext)
                 .createMeeting(title: "", language: settings.defaultLanguage)
             return true

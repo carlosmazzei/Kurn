@@ -228,7 +228,7 @@ struct FilterBarView: View {
     private func saveSmartFolder() {
         let name = smartFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).createSmartFolder(name: name, filter: filter)
             showingSaveSheet = false
             dismiss()

@@ -391,7 +391,7 @@ struct MeetingsListView: View {
             primaryRole: .destructive,
             primaryAction: {
                 guard let meeting = pendingDelete else { return }
-                do {
+                do throws(AppError) {
                     try MeetingLibrary(context: modelContext).deleteMeeting(meeting)
                 } catch {
                     saveError = error

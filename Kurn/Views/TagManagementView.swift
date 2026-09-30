@@ -139,7 +139,7 @@ struct TagManagementView: View {
     }
 
     private func createTag() {
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).createTag(named: newTagName)
         } catch {
             saveError = error
@@ -148,7 +148,7 @@ struct TagManagementView: View {
     }
 
     private func deleteTag(_ tag: Tag) {
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteTag(tag)
         } catch {
             saveError = error
@@ -156,7 +156,7 @@ struct TagManagementView: View {
     }
 
     private func merge(source: Tag, into target: Tag) {
-        do {
+        do throws(AppError) {
             try MeetingLibrary(context: modelContext).mergeTag(source, into: target)
         } catch {
             saveError = error

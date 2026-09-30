@@ -161,7 +161,7 @@ struct FolderFormView: View {
         guard !trimmed.isEmpty else { return }
         switch mode {
         case .create(let parent):
-            do {
+            do throws(AppError) {
                 try MeetingLibrary(context: modelContext)
                     .createFolder(name: trimmed, iconName: iconName, colorHex: colorHex, parent: parent)
             } catch {
