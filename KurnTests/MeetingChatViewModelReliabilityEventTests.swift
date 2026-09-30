@@ -7,13 +7,13 @@
 //  distinct from `MeetingChatService`'s own per-stage events — the same
 //  two-tier shape `DocumentGenerationViewModel`/`DocumentGenerationService`
 //  use. Unlike `MeetingChatReliabilityEventTests` (which calls the service
-//  directly and can pass its own `runID`), `send` generates its `runID`
-//  internally and `task` is private, so this filters loosely by
-//  operation/stage and polls `isResponding` instead — the same constraint
-//  already documented for `TranscriptionViewModelSummaryStateTests`'
-//  `waitUntilLLMCalled()`. Marked `.serialized` because that loose filter
-//  would otherwise also pick up another parallel test's own
-//  "meeting_chat"/"view_model" events.
+//  directly), `task` is private, so this polls `isResponding` for completion
+//  — the same constraint already documented for
+//  `TranscriptionViewModelSummaryStateTests`' `waitUntilLLMCalled()`. It
+//  passes its own `runID` to `send` and filters by it: filtering by
+//  operation/stage alone picked up `MeetingChatViewModelSessionTests`'
+//  concurrent "view_model" events, which `.serialized` cannot prevent since
+//  it only orders tests within one suite.
 //
 
 import Foundation
@@ -22,7 +22,6 @@ import Testing
 @testable import Kurn
 
 @MainActor
-@Suite(.serialized)
 struct MeetingChatViewModelReliabilityEventTests {
 
     private func waitUntilDone(_ viewModel: MeetingChatViewModel) async {
@@ -46,17 +45,19 @@ struct MeetingChatViewModelReliabilityEventTests {
         capture.install()
         defer { capture.uninstall() }
 
+        let runID = OperationID()
         let viewModel = MeetingChatViewModel()
         viewModel.send(
             question: "What was decided?",
             transcriptText: nil,
             candidates: [],
             provider: .appleOnDevice,
-            model: ""
+            model: "",
+            runID: runID
         )
         await waitUntilDone(viewModel)
 
-        let events = capture.recorded.filter { $0.operation == "meeting_chat" && $0.stage == "view_model" }
+        let events = capture.recorded.filter { $0.operationID == runID && $0.stage == "view_model" }
         #expect(events.count == 1)
         guard reason != nil else { return }
         #expect(events.first?.outcome == .failed)
