@@ -127,10 +127,11 @@ struct MeetingFormView: View {
                 return
             }
         } else {
-            let viewModel = MeetingsViewModel(modelContext: modelContext)
-            viewModel.createMeeting(title: title, notes: notes, language: language)
-            if let failure = viewModel.error {
-                saveError = failure
+            do {
+                try MeetingLibrary(context: modelContext)
+                    .createMeeting(title: title, notes: notes, language: language)
+            } catch {
+                saveError = error
                 return
             }
         }

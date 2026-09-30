@@ -313,9 +313,24 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   request/replay semantics,
   `ProviderURLPolicy` owns destination validation, `ProviderHTTPTransport` owns
   bounded execution/retry, and `ProviderResponseParsing` owns decoding contracts.
+- **Application/** — `@MainActor` use cases over the store that sit below the
+  UI: `MeetingLibrary` owns every user-initiated library mutation (create and
+  delete meetings, recordings, photos, summaries; tags, folders, smart folders,
+  generated documents), with their rules — trimmed names, case-insensitive tag
+  uniqueness, journaled file cleanup — and throws the save failure as
+  `AppError`. Views call it; they never `insert`/`delete` into a
+  `ModelContext` themselves.
 - **ViewModels/** — `@MainActor @Observable` coordinators owning services and
   persisting results.
-- **Views/** — SwiftUI screens.
+- **Views/** — SwiftUI screens, plus the UIKit glue that hosts them
+  (`SecurityCoverWindow`).
+
+Dependencies point down: Models/Providers/Services/Infrastructure/Application/
+AppIntents never name a type declared in ViewModels/ or Views/, and ViewModels/
+never name one declared in Views/. `Tools/check_static_policy.py` enforces this
+(`upward-dependency`), together with no store mutations (`view-store-mutation`)
+and no `KeychainManager` (`view-keychain`) in Views. The one grandfathered
+exception is `TranscriptionScheduler` driving `TranscriptionViewModel`.
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
   the durable provider circuit used only by automatic cloud enrichment, the
   large-transfer policy shared by cloud audio and model downloads, and the
@@ -550,7 +565,7 @@ So the cover now lives above everything, in its own `UIWindow`:
   shows the neutral privacy cover mid-transition, which is what the
   app-switcher photographs. Only `.locked` takes key window status, because
   only it has controls and a keyboard to feed.
-- `SecurityCoverWindow` (`Infrastructure/SecurityCoverWindow.swift`) owns the
+- `SecurityCoverWindow` (`Views/SecurityCoverWindow.swift`) owns the
   window at `UIWindow.Level.alert + 1` and the `securityCover(…)` modifier
   `KurnApp` attaches. It hides rather than tears down, and learns its
   `UIWindowScene` from a `didMoveToWindow` probe rather than guessing through
@@ -1426,7 +1441,7 @@ store, or the network:
   reimplementing them.
 
 `Tools/check_static_policy.py` enforces the log-redaction and unchecked-save
-rules statically (baseline in `Tools/static_policy_baseline.txt`; a stale
+rules statically, alongside the layer rules described under "Architecture" (baseline in `Tools/static_policy_baseline.txt`; a stale
 baseline entry fails the check), and `DebugSupport/` holds the debug-only fault
 injection hooks the recovery tests use.
 

@@ -228,14 +228,12 @@ struct FilterBarView: View {
     private func saveSmartFolder() {
         let name = smartFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        let smartFolder = SmartFolder(name: name, filter: filter)
-        modelContext.insert(smartFolder)
         do {
-            try modelContext.save()
+            try MeetingLibrary(context: modelContext).createSmartFolder(name: name, filter: filter)
             showingSaveSheet = false
             dismiss()
         } catch {
-            AppLog.persistence.atError.error("Failed to save smart folder: \(error, privacy: .public)")
+            // Already logged (code public, detail private) by `saveOrError()`.
             saveError = .persistenceFailed(
                 NSLocalizedString("smart_folder.save_error", comment: "Could not save smart folder")
             )

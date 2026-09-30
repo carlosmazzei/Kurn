@@ -326,8 +326,11 @@ struct FolderSidebarView: View {
         // If the user is currently drilled into this folder, pop back so the
         // navigation stack does not point at a deleted model.
         path.removeAll { $0.persistentModelID == folder.persistentModelID }
-        modelContext.delete(folder)
-        saveError = modelContext.saveOrError()
+        do {
+            try MeetingLibrary(context: modelContext).deleteFolder(folder)
+        } catch {
+            saveError = error
+        }
     }
 }
 

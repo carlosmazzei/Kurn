@@ -8,12 +8,6 @@
 import SwiftUI
 import UIKit
 
-/// Wraps one or more URLs so they can drive `.sheet(item:)`.
-struct ShareItem: Identifiable {
-    let id = UUID()
-    let urls: [URL]
-}
-
 struct ActivityView: UIViewControllerRepresentable {
     let items: [Any]
 

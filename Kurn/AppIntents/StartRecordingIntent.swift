@@ -15,7 +15,7 @@
 //  `Notification` (Foundation, available identically in both targets) rather
 //  than reaching into `RecordingLauncher` or any other Kurn-target-only type
 //  directly: doing that would drag `RecordingLauncher`'s whole dependency
-//  chain (`MeetingsViewModel`, `Meeting`, `AppSettings`, SwiftData) into the
+//  chain (`MeetingLibrary`, `Meeting`, `AppSettings`, SwiftData) into the
 //  widget extension just to satisfy the compiler. `RecordingLauncher` listens
 //  for the notification once it is actually running in the app process.
 //

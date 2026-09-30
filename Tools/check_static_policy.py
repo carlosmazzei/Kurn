@@ -21,6 +21,23 @@
 # it. These stay manual-audit items, the same way H8 PR 18's concurrency
 # bridge audit was done by hand.
 #
+# Three further rules keep the layer boundaries CLAUDE.md describes from
+# eroding one convenient reference at a time (the architecture inspection
+# found `RecordingLauncher` building a view model, a view model building a
+# View-declared type, and eight Views mutating the store directly):
+#
+# - upward-dependency: code in Models/, Providers/, Services/,
+#   Infrastructure/, Application/ or AppIntents/ must not name a type
+#   declared in ViewModels/ or Views/, and code in ViewModels/ must not name
+#   a type declared in Views/. The set of names is derived from the
+#   declarations themselves on every run, so a new view model or View is
+#   covered without editing this file.
+# - view-store-mutation: a View must not insert into or delete from a
+#   `ModelContext`; library mutations go through `MeetingLibrary`
+#   (Application/), and pipeline output through its coordinator.
+# - view-keychain: a View must not reach `KeychainManager`; key status and
+#   writes go through the observable `CredentialStore`.
+#
 # Every finding must be either fixed or added to the baseline file
 # (grandfathered, keyed by exact line content so it survives unrelated line
 # shifts) or given an inline `// static-policy:allow <check>` comment on the
@@ -72,6 +89,34 @@ class Rule:
     name: str
     pattern: re.Pattern[str]
     description: str
+    # Repo-relative directory prefixes the rule applies to; empty = everywhere.
+    scope: tuple[str, ...] = ()
+
+    def applies_to(self, rel_path: str) -> bool:
+        return not self.scope or rel_path.startswith(self.scope)
+
+
+VIEWS_DIR = "Kurn/Views/"
+VIEW_MODELS_DIR = "Kurn/ViewModels/"
+# Layers that must not depend on view models or Views.
+LOWER_LAYER_DIRS = (
+    "Kurn/Models/",
+    "Kurn/Providers/",
+    "Kurn/Services/",
+    "Kurn/Infrastructure/",
+    "Kurn/Application/",
+    "Kurn/AppIntents/",
+)
+
+# A top-level-or-nested type declaration: attributes and modifiers, then the
+# kind keyword and the name. `private`/`fileprivate` declarations are
+# excluded by the caller, since they cannot be named from another file.
+TYPE_DECLARATION_RE = re.compile(
+    r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*"
+    r"((?:(?:public|internal|private|fileprivate|final|nonisolated)\s+)*)"
+    r"(?:class|struct|enum|actor|protocol)\s+([A-Z]\w*)"
+)
+STRING_LITERAL_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 
 RULES = [
@@ -120,9 +165,73 @@ RULES = [
             "description at `.private` instead."
         ),
     ),
+    Rule(
+        name="view-store-mutation",
+        pattern=re.compile(r"\b\w*[cC]ontext\s*\.\s*(?:insert|delete)\s*\("),
+        description=(
+            "a View inserting into or deleting from a ModelContext. Library "
+            "mutations belong in MeetingLibrary (Kurn/Application/), which "
+            "owns their rules (name deduplication, journaled file cleanup) "
+            "and surfaces save failures as AppError."
+        ),
+        scope=(VIEWS_DIR,),
+    ),
+    Rule(
+        name="view-keychain",
+        pattern=re.compile(r"\bKeychainManager\b"),
+        description=(
+            "a View reaching the Keychain directly. Read key status and "
+            "write keys through `settings.credentials` (CredentialStore), "
+            "which is observable and keeps the provider selections valid."
+        ),
+        scope=(VIEWS_DIR,),
+    ),
 ]
 
+UPWARD_DEPENDENCY = "upward-dependency"
+UPWARD_DEPENDENCY_DESCRIPTION = (
+    "a lower layer naming a type declared in a higher one ({name}, declared "
+    "in {declared_in}). Models/Providers/Services/Infrastructure/Application/"
+    "AppIntents must not depend on ViewModels/ or Views/, and ViewModels/ "
+    "must not depend on Views/. Move the shared type down, or invert the "
+    "dependency (pass a closure or a protocol in from the higher layer)."
+)
+
 RULES_BY_NAME = {rule.name: rule for rule in RULES}
+BASELINE_CHECKS = [rule.name for rule in RULES] + [UPWARD_DEPENDENCY]
+
+
+def declared_types(directory: str) -> dict[str, str]:
+    """Type name -> repo-relative file, for every non-private type
+    declared under `directory`."""
+    names: dict[str, str] = {}
+    root = ROOT / directory
+    if not root.is_dir():
+        return names
+    for path in sorted(root.rglob("*.swift")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = TYPE_DECLARATION_RE.match(line)
+            if not match or "private" in match.group(1):
+                continue
+            names.setdefault(match.group(2), str(path.relative_to(ROOT)))
+    return names
+
+
+def names_pattern(names: dict[str, str]) -> re.Pattern[str] | None:
+    if not names:
+        return None
+    alternatives = "|".join(sorted(map(re.escape, names), key=len, reverse=True))
+    return re.compile(rf"\b({alternatives})\b")
+
+
+def upward_dependency_targets() -> list[tuple[tuple[str, ...], dict[str, str], re.Pattern[str] | None]]:
+    """(scanned directories, forbidden names, pattern) pairs."""
+    view_types = declared_types(VIEWS_DIR)
+    upper_types = {**declared_types(VIEW_MODELS_DIR), **view_types}
+    return [
+        (LOWER_LAYER_DIRS, upper_types, names_pattern(upper_types)),
+        ((VIEW_MODELS_DIR,), view_types, names_pattern(view_types)),
+    ]
 
 
 def iter_source_files() -> list[Path]:
@@ -139,7 +248,7 @@ def iter_source_files() -> list[Path]:
 
 def load_baseline() -> dict[str, set[tuple[str, str]]]:
     """check name -> set of (relative path, stripped line content)."""
-    baseline: dict[str, set[tuple[str, str]]] = {rule.name: set() for rule in RULES}
+    baseline: dict[str, set[tuple[str, str]]] = {name: set() for name in BASELINE_CHECKS}
     if not BASELINE_PATH.is_file():
         return baseline
     for raw_line in BASELINE_PATH.read_text(encoding="utf-8").splitlines():
@@ -158,6 +267,7 @@ def main() -> int:
     baseline = load_baseline()
     violations: list[str] = []
     matched_baseline: set[tuple[str, str, str]] = set()
+    layer_targets = upward_dependency_targets()
 
     for path in iter_source_files():
         rel_path = str(path.relative_to(ROOT))
@@ -185,19 +295,34 @@ def main() -> int:
             # patterns (e.g. ModelContext+Save.swift's own header explaining
             # the anti-pattern it replaces) is not an instance of it.
             code_part = line.split("//", 1)[0]
-            for rule in RULES:
-                if not rule.pattern.search(code_part):
-                    continue
-                if rule.name in allowed_checks:
-                    continue
-                stripped = line.strip()
-                if (rel_path, stripped) in baseline[rule.name]:
-                    matched_baseline.add((rule.name, rel_path, stripped))
-                    continue
+            stripped = line.strip()
+
+            def report(check: str, description: str) -> None:
+                if check in allowed_checks:
+                    return
+                if (rel_path, stripped) in baseline[check]:
+                    matched_baseline.add((check, rel_path, stripped))
+                    return
                 violations.append(
                     f"::error file={rel_path},line={line_number}::"
-                    f"[{rule.name}] {rule.description}"
+                    f"[{check}] {description}"
                 )
+
+            for rule in RULES:
+                if rule.applies_to(rel_path) and rule.pattern.search(code_part):
+                    report(rule.name, rule.description)
+
+            # Names inside string literals (log text, identifiers) are not
+            # dependencies, so they are blanked before this match only.
+            code_without_strings = STRING_LITERAL_RE.sub('""', code_part)
+            for directories, names, pattern in layer_targets:
+                if pattern is None or not rel_path.startswith(directories):
+                    continue
+                match = pattern.search(code_without_strings)
+                if match:
+                    report(UPWARD_DEPENDENCY, UPWARD_DEPENDENCY_DESCRIPTION.format(
+                        name=match.group(1), declared_in=names[match.group(1)]
+                    ))
 
     stale: list[str] = []
     for rule_name, entries in baseline.items():
@@ -210,8 +335,8 @@ def main() -> int:
                     f"does not outlive the code it covered: {content}"
                 )
 
-    for rule in RULES:
-        print(f"static policy baseline [{rule.name}]: {len(baseline[rule.name])} baseline entries")
+    for check in BASELINE_CHECKS:
+        print(f"static policy baseline [{check}]: {len(baseline[check])} baseline entries")
 
     if violations or stale:
         for violation in violations + stale:
