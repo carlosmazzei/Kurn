@@ -1,8 +1,8 @@
 //
-//  TranscriptionViewModelStateMachineTests.swift
+//  TranscriptionCoordinatorStateMachineTests.swift
 //  KurnTests
 //
-//  `TranscriptionViewModel.transcribe`/`startTranscription` driven end to end
+//  `TranscriptionCoordinator.transcribe`/`startTranscription` driven end to end
 //  over a `TranscriptionService` whose every stage is a scripted fake
 //  (`FakePipelineEngines`): the status transitions a recording goes through,
 //  which per-recording state the view model exposes while a run is in flight,
@@ -19,8 +19,8 @@ import Testing
 @testable import Kurn
 
 @MainActor
-@Suite("TranscriptionViewModel state machine")
-struct TranscriptionViewModelStateMachineTests {
+@Suite("TranscriptionCoordinator state machine")
+struct TranscriptionCoordinatorStateMachineTests {
 
     private static let regions = [
         SpeechRegion(start: 0.2, end: 1.2),
@@ -43,7 +43,7 @@ struct TranscriptionViewModelStateMachineTests {
         let container: ModelContainer
         let context: ModelContext
         let engines: FakeEngines
-        let viewModel: TranscriptionViewModel
+        let viewModel: TranscriptionCoordinator
         let meeting: Meeting
         let recording: Recording
         private let fileName: String
@@ -51,8 +51,8 @@ struct TranscriptionViewModelStateMachineTests {
         init() throws {
             container = TestModelContainer.make()
             context = container.mainContext
-            engines = FakeEngines(regions: TranscriptionViewModelStateMachineTests.regions)
-            viewModel = TranscriptionViewModel(
+            engines = FakeEngines(regions: TranscriptionCoordinatorStateMachineTests.regions)
+            viewModel = TranscriptionCoordinator(
                 modelContext: context,
                 transcriptionService: TranscriptionService(engines: engines.catalog)
             )
@@ -226,7 +226,7 @@ struct TranscriptionViewModelStateMachineTests {
         #expect(recording.transcriptionStatus == .pending)
 
         let resumed = FakeEngines(regions: Self.regions)
-        let viewModel = TranscriptionViewModel(
+        let viewModel = TranscriptionCoordinator(
             modelContext: harness.context,
             transcriptionService: TranscriptionService(engines: resumed.catalog)
         )

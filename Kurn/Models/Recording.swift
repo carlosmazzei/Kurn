@@ -30,11 +30,11 @@ final class Recording {
     var transcriptionCheckpointData: Data?
     /// Consecutive automatic (unattended) resume attempts that made no forward
     /// progress on this recording's checkpoint since the last completed chunk
-    /// or explicit user retry. Bounds `TranscriptionViewModel.resumePendingTranscriptions`
+    /// or explicit user retry. Bounds `TranscriptionCoordinator.resumePendingTranscriptions`
     /// so a systemic failure — a chunk that always crashes, a full disk — can't
     /// retry forever, or for a cloud engine keep re-paying, every time the app
     /// launches or foregrounds (H4); an explicit user retry always resets it via
-    /// `TranscriptionViewModel.resetAutomaticResumeBudget`. Defaulted, like
+    /// `TranscriptionCoordinator.resetAutomaticResumeBudget`. Defaulted, like
     /// `fileSize`/`enhancedAudioVersion` below, so SwiftData migrates the store
     /// lightly instead of needing a migration plan.
     var automaticResumeAttempts: Int = 0
@@ -70,7 +70,7 @@ final class Recording {
     /// Speakers are meeting-scoped but a diarization run is per-recording, and
     /// its labels are only unique *within* that run — the diarizer numbers
     /// them independently every time, so a second recording's "Speaker 1" is
-    /// not the first recording's "Speaker 1". `TranscriptionViewModel.syncSpeakers`
+    /// not the first recording's "Speaker 1". `TranscriptionCoordinator.syncSpeakers`
     /// used to be handed only the voiceprints of whichever recording had just
     /// finished, so reconciling any other recording in the meeting fell back
     /// to matching by that ambiguous label string and could silently attach a

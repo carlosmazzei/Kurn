@@ -1,5 +1,5 @@
 //
-//  TranscriptionViewModel+CrossMeetingSpeakerMatch.swift
+//  TranscriptionCoordinator+CrossMeetingSpeakerMatch.swift
 //  Kurn
 //
 //  D6: a person who attends every week used to get an unrelated, freshly
@@ -7,7 +7,7 @@
 //  only ever compared *within* one meeting. This extension is what checks a
 //  brand-new row's voice against every other meeting's named speakers — and,
 //  same rule as the rest of speaker identity, only ever *offers* the match.
-//  Split out of TranscriptionViewModel.swift to keep that file under
+//  Split out of TranscriptionCoordinator.swift to keep that file under
 //  SwiftLint's file-length limit, the same reason MeetingDetailAutoTagging.swift
 //  is a separate file from MeetingDetailView.swift.
 //
@@ -15,7 +15,7 @@
 import Foundation
 import SwiftData
 
-extension TranscriptionViewModel {
+extension TranscriptionCoordinator {
 
     /// A candidate identity for a freshly created `Speaker` row, suggested
     /// from a voiceprint match found in a *different* meeting. Staged on

@@ -1,9 +1,8 @@
 //
-//  TranscriptionViewModel+SummaryTranslation.swift
+//  SummaryViewModel+Translation.swift
 //  Kurn
 //
-//  Summary translation, split out of TranscriptionViewModel.swift for the same
-//  file-length reason as TranscriptionViewModel+Summary.swift. Translating an
+//  Summary translation, split out of SummaryViewModel.swift. Translating an
 //  existing summary creates a brand-new `Summary` linked to the same meeting —
 //  the original is never mutated — mirroring how "Generate Summary" appends
 //  another summary rather than overwriting one.
@@ -13,7 +12,7 @@ import Foundation
 import KurnCore
 import SwiftData
 
-extension TranscriptionViewModel {
+extension SummaryViewModel {
 
     // MARK: - Summary translation
 

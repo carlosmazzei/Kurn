@@ -82,7 +82,7 @@ struct TranscriptionService {
         /// What each stage actually did: requested versus effective engine and
         /// a typed outcome/reason, so a run that fell back is distinguishable
         /// from one that ran as asked (H5). Persisted beside the transcript by
-        /// `TranscriptionViewModel.saveTranscript`.
+        /// `TranscriptionCoordinator.saveTranscript`.
         var report = PipelineReport()
     }
 
@@ -286,7 +286,7 @@ struct TranscriptionService {
         // stops a structurally broken result from reaching the save path on
         // its own. Rejecting it here, before `Output` is ever returned, is
         // what keeps a bad run from being able to replace a still-valid
-        // transcript: `TranscriptionViewModel.saveTranscript` only deletes the
+        // transcript: `TranscriptionCoordinator.saveTranscript` only deletes the
         // existing transcript after this function has already returned
         // successfully, so throwing here leaves it untouched.
         if let failure = TranscriptIntegrityGate.validate(

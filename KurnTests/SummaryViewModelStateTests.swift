@@ -1,8 +1,8 @@
 //
-//  TranscriptionViewModelSummaryStateTests.swift
+//  SummaryViewModelStateTests.swift
 //  KurnTests
 //
-//  `TranscriptionViewModel.startSummary`/`cancelSummary` over a
+//  `SummaryViewModel.startSummary`/`cancelSummary` over a
 //  `SummaryService` whose LLM is a scripted `LLMProvider` (no keychain, no
 //  network): the `isSummarizing`/`isCancellingSummary` flags, what gets
 //  persisted on success, how a provider failure surfaces, that cancellation
@@ -16,8 +16,8 @@ import Testing
 @testable import Kurn
 
 @MainActor
-@Suite("TranscriptionViewModel summary state")
-struct TranscriptionViewModelSummaryStateTests {
+@Suite("SummaryViewModel state")
+struct SummaryViewModelStateTests {
 
     private final class ScriptedLLM: LLMProvider, @unchecked Sendable {
         let provider: AIProvider = .openAI
@@ -50,7 +50,7 @@ struct TranscriptionViewModelSummaryStateTests {
         let container: ModelContainer
         let context: ModelContext
         let llm: ScriptedLLM
-        let viewModel: TranscriptionViewModel
+        let viewModel: SummaryViewModel
         let meeting: Meeting
 
         init(withTranscript: Bool = true) throws {
@@ -58,7 +58,7 @@ struct TranscriptionViewModelSummaryStateTests {
             context = container.mainContext
             llm = ScriptedLLM()
             let scripted = llm
-            viewModel = TranscriptionViewModel(
+            viewModel = SummaryViewModel(
                 modelContext: context,
                 summaryService: SummaryService(resolveProvider: { _, _ in scripted })
             )

@@ -174,7 +174,7 @@ final class WikiCoordinator {
             // Only an explicit, user-initiated run surfaces its failure —
             // an automatic background attempt stays silent-but-logged, the
             // same "best-effort, never a user-facing error" contract
-            // `TranscriptionViewModel.generateAITitle` documents for its own
+            // `TranscriptionCoordinator.generateAITitle` documents for its own
             // automatic path.
             if trigger == .explicit {
                 lastError = (error as? AppError) ?? .wikiGenerationFailed(error.localizedDescription)
@@ -350,7 +350,7 @@ final class WikiCoordinator {
     /// save failure gates forward progress: `SummaryMapRunner` awaits this
     /// before starting the next block, and a thrown error stops the run at
     /// the last durably-committed one — the same contract
-    /// `TranscriptionViewModel`'s own `storeSummaryMapCheckpointDurably` has.
+    /// `SummaryViewModel`'s own `storeSummaryMapCheckpointDurably` has.
     ///
     /// Takes the meeting's id rather than the `Meeting` itself: `Meeting`
     /// isn't `Sendable`, and this is called from the `@Sendable` closure

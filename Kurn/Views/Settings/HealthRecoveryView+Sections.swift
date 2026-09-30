@@ -72,7 +72,7 @@ extension HealthRecoveryView {
                             Image(systemName: "arrow.clockwise")
                         }
                         .buttonStyle(.borderless)
-                        .disabled(txVM?.isTranscribing(recording) == true)
+                        .disabled(transcription?.isTranscribing(recording) == true)
                     }
                 }
             } header: {
@@ -108,7 +108,7 @@ extension HealthRecoveryView {
                                 Image(systemName: "arrow.clockwise")
                             }
                             .buttonStyle(.borderless)
-                            .disabled(txVM?.correctionRetryIDs.contains(item.recording.id) == true)
+                            .disabled(transcription?.correctionRetryIDs.contains(item.recording.id) == true)
                         }
                     }
                 }

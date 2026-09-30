@@ -64,9 +64,9 @@ extension MeetingDetailView {
                 )
                 player.play()
             } catch let error as AppError {
-                txVM?.error = error
+                actionError = error
             } catch {
-                txVM?.error = .audioError(error.localizedDescription)
+                actionError = .audioError(error.localizedDescription)
             }
         }
     }
@@ -102,9 +102,9 @@ extension MeetingDetailView {
             do {
                 try await player.reload(enhanced: enhanced)
             } catch let error as AppError {
-                txVM?.error = error
+                actionError = error
             } catch {
-                txVM?.error = .audioError(error.localizedDescription)
+                actionError = .audioError(error.localizedDescription)
             }
         }
     }
@@ -124,9 +124,9 @@ extension MeetingDetailView {
                 player.seek(to: time)
                 player.play()
             } catch let error as AppError {
-                txVM?.error = error
+                actionError = error
             } catch {
-                txVM?.error = .audioError(error.localizedDescription)
+                actionError = .audioError(error.localizedDescription)
             }
         }
     }
@@ -135,10 +135,10 @@ extension MeetingDetailView {
         guard recording.isReadyForConsumption else { return }
         // A deliberate user action gets a fresh automatic-resume budget,
         // regardless of how many unattended attempts already failed (H4).
-        txVM?.resetAutomaticResumeBudget(for: recording)
-        // Routed through the view model's task registry so the run can be
+        transcription?.resetAutomaticResumeBudget(for: recording)
+        // Routed through the coordinator's task registry so the run can be
         // cancelled (by the user or when the background grace window expires).
-        txVM?.startTranscription(
+        transcription?.startTranscription(
             recording,
             language: meeting.language,
             config: settings.pipelineConfiguration
@@ -147,16 +147,16 @@ extension MeetingDetailView {
 
     func retryCaptureRecovery(_ recording: Recording) {
         if let error = RecordingRecovery.retryRecovery(for: recording, context: modelContext) {
-            txVM?.error = error
+            actionError = error
         }
     }
 
     func cancelTranscription(_ recording: Recording) {
-        txVM?.cancelTranscription(recording)
+        transcription?.cancelTranscription(recording)
     }
 
     func stopTranscription(_ recording: Recording) {
-        txVM?.stopTranscription(recording)
+        transcription?.stopTranscription(recording)
     }
 
     func retranscribe(_ recording: Recording) {
@@ -165,9 +165,9 @@ extension MeetingDetailView {
     }
 
     func retranscribeAll() {
-        guard let txVM else { return }
+        guard let transcription else { return }
         Task {
-            await txVM.retranscribeAll(
+            await transcription.retranscribeAll(
                 meeting,
                 language: meeting.language,
                 config: settings.pipelineConfiguration
@@ -177,7 +177,7 @@ extension MeetingDetailView {
 
     /// Whether the overflow menu should offer a wiki action at all — needs a
     /// transcript to condense and a usable provider, same gate
-    /// `TranscriptionViewModel.shouldGenerateWiki` uses for the automatic
+    /// `TranscriptionCoordinator.shouldGenerateWiki` uses for the automatic
     /// post-transcription pass. Deliberately not also gated on
     /// `settings.wikiEnabled`: a meeting missing its wiki because generation
     /// was off (or blocked) when it transcribed should still be one tap away
@@ -207,7 +207,7 @@ extension MeetingDetailView {
     }
 
     var isGeneratingTitle: Bool {
-        txVM?.isGeneratingTitle(for: meeting) ?? false
+        transcription?.isGeneratingTitle(for: meeting) ?? false
     }
 
     /// Build (or rebuild) this meeting's AI title from its own overflow
@@ -216,7 +216,7 @@ extension MeetingDetailView {
     /// meeting predates the feature) shouldn't need a trip anywhere else to
     /// get one.
     func regenerateTitle() {
-        txVM?.regenerateTitle(for: meeting, settings: settings)
+        transcription?.regenerateTitle(for: meeting, settings: settings)
     }
 
     func generateSummary() {
@@ -224,11 +224,11 @@ extension MeetingDetailView {
     }
 
     func runSummary(with template: SummaryTemplate) {
-        guard let txVM else { return }
+        guard let summaries else { return }
         settings.lastSummaryTemplateID = template.id
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
-        txVM.startSummary(
+        summaries.startSummary(
             for: meeting,
             provider: provider,
             model: model,
@@ -237,14 +237,14 @@ extension MeetingDetailView {
     }
 
     func cancelSummary() {
-        txVM?.cancelSummary()
+        summaries?.cancelSummary()
     }
 
     func runTranslateSummary(_ summary: Summary, to language: MeetingLanguage) {
-        guard let txVM else { return }
+        guard let summaries else { return }
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
-        txVM.startTranslateSummary(
+        summaries.startTranslateSummary(
             source: summary,
             meeting: meeting,
             targetLanguage: language,
@@ -254,7 +254,7 @@ extension MeetingDetailView {
     }
 
     func cancelTranslateSummary() {
-        txVM?.cancelTranslateSummary()
+        summaries?.cancelTranslateSummary()
     }
 
     func deleteSummary(_ summary: Summary) {
@@ -262,7 +262,7 @@ extension MeetingDetailView {
         do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteSummary(summary)
         } catch {
-            txVM?.error = error
+            actionError = error
         }
         if wasSelected {
             selectedSummaryID = meeting.latestSummary?.id
@@ -275,7 +275,7 @@ extension MeetingDetailView {
         do throws(AppError) {
             try MeetingLibrary(context: modelContext).deleteRecording(recording)
         } catch {
-            txVM?.error = error
+            actionError = error
         }
     }
 
@@ -284,7 +284,7 @@ extension MeetingDetailView {
         do throws(AppError) {
             try MeetingLibrary(context: modelContext).deletePhoto(photo)
         } catch {
-            txVM?.error = error
+            actionError = error
         }
     }
 }

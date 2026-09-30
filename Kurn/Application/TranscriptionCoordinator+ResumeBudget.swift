@@ -1,21 +1,21 @@
 //
-//  TranscriptionViewModel+ResumeBudget.swift
+//  TranscriptionCoordinator+ResumeBudget.swift
 //  Kurn
 //
 //  H4 (PR 9): a checkpoint save must gate forward progress, and automatic
 //  (unattended) resume attempts must be bounded so a systemic failure — a
 //  chunk that always crashes, a full disk, a permanently-broken checkpoint —
 //  can't retry forever, or for a cloud engine keep re-paying, every time the
-//  app launches or foregrounds. Split out of TranscriptionViewModel.swift to
+//  app launches or foregrounds. Split out of TranscriptionCoordinator.swift to
 //  keep that file under SwiftLint's file-length limit, the same reason
-//  TranscriptionViewModel+CrossMeetingSpeakerMatch.swift is a separate file.
+//  TranscriptionCoordinator+CrossMeetingSpeakerMatch.swift is a separate file.
 //
 
 import Foundation
 import KurnCore
 import SwiftData
 
-extension TranscriptionViewModel {
+extension TranscriptionCoordinator {
 
     /// Persist chunk progress reported by the pipeline so an interruption at
     /// any point resumes from the last completed chunk. Throws (rather than

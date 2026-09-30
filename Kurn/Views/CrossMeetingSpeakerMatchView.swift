@@ -5,7 +5,7 @@
 //  Sheet offering a voiceprint match found in a different meeting, for a
 //  speaker just created in this one. Confirming copies the name; dismissing
 //  leaves the new row exactly as it was — unnamed, still renameable by hand.
-//  Never applies the match itself; see `TranscriptionViewModel.applyCrossMeetingMatch`.
+//  Never applies the match itself; see `TranscriptionCoordinator.applyCrossMeetingMatch`.
 //
 
 import SwiftUI
@@ -13,7 +13,7 @@ import SwiftUI
 struct CrossMeetingSpeakerMatchView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let match: TranscriptionViewModel.CrossMeetingSpeakerMatch
+    let match: TranscriptionCoordinator.CrossMeetingSpeakerMatch
     let onConfirm: () -> Void
 
     var body: some View {

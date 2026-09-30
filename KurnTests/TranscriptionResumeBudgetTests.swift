@@ -19,19 +19,19 @@ import Testing
 struct TranscriptionResumeBudgetTests {
 
     @Test func pureBoundAllowsAttemptsUnderTheMaxAndRefusesAtIt() {
-        for attempts in 0..<TranscriptionViewModel.maxAutomaticResumeAttemptsWithoutProgress {
-            #expect(TranscriptionViewModel.canAttemptAutomaticResume(afterPriorAttempts: attempts))
+        for attempts in 0..<TranscriptionCoordinator.maxAutomaticResumeAttemptsWithoutProgress {
+            #expect(TranscriptionCoordinator.canAttemptAutomaticResume(afterPriorAttempts: attempts))
         }
-        #expect(!TranscriptionViewModel.canAttemptAutomaticResume(
-            afterPriorAttempts: TranscriptionViewModel.maxAutomaticResumeAttemptsWithoutProgress
+        #expect(!TranscriptionCoordinator.canAttemptAutomaticResume(
+            afterPriorAttempts: TranscriptionCoordinator.maxAutomaticResumeAttemptsWithoutProgress
         ))
-        #expect(!TranscriptionViewModel.canAttemptAutomaticResume(afterPriorAttempts: 1_000))
+        #expect(!TranscriptionCoordinator.canAttemptAutomaticResume(afterPriorAttempts: 1_000))
     }
 
     @Test func resetAutomaticResumeBudgetZeroesTheCounter() {
         let recording = Recording(fileName: "a.m4a", duration: 10)
         recording.automaticResumeAttempts = 7
-        let vm = TranscriptionViewModel(modelContext: TestModelContainer.make().mainContext)
+        let vm = TranscriptionCoordinator(modelContext: TestModelContainer.make().mainContext)
 
         vm.resetAutomaticResumeBudget(for: recording)
 
@@ -41,7 +41,7 @@ struct TranscriptionResumeBudgetTests {
     @Test func exhaustedBudgetMarksFailedWithoutRestartingAndKeepsTheCheckpoint() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
-        let vm = TranscriptionViewModel(modelContext: context)
+        let vm = TranscriptionCoordinator(modelContext: context)
         let meeting = Meeting(title: "M")
         context.insert(meeting)
         let recording = Recording(
@@ -50,7 +50,7 @@ struct TranscriptionResumeBudgetTests {
             duration: 10,
             transcriptionStatus: .pending
         )
-        recording.automaticResumeAttempts = TranscriptionViewModel.maxAutomaticResumeAttemptsWithoutProgress
+        recording.automaticResumeAttempts = TranscriptionCoordinator.maxAutomaticResumeAttemptsWithoutProgress
         recording.transcriptionCheckpoint = .fixture(
             engine: .whisperCpp, language: .english, compacted: false,
             totalChunks: 4, completedChunks: 2, detectedLanguage: "en", spans: []
@@ -64,14 +64,14 @@ struct TranscriptionResumeBudgetTests {
         // assertion is synchronous and deterministic — no background
         // pipeline task is spawned for this recording.
         #expect(recording.transcriptionStatus == .failed)
-        #expect(recording.automaticResumeAttempts == TranscriptionViewModel.maxAutomaticResumeAttemptsWithoutProgress)
+        #expect(recording.automaticResumeAttempts == TranscriptionCoordinator.maxAutomaticResumeAttemptsWithoutProgress)
         #expect(recording.transcriptionCheckpoint?.completedChunks == 2)
     }
 
     @Test func underBudgetIncrementsTheCounterBeforeAttemptingToResume() throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
-        let vm = TranscriptionViewModel(modelContext: context)
+        let vm = TranscriptionCoordinator(modelContext: context)
         let meeting = Meeting(title: "M")
         context.insert(meeting)
         // Not `.ready`, so `startTranscription` is a synchronous no-op below

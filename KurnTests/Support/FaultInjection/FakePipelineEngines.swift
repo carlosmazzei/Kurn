@@ -3,7 +3,7 @@
 //  KurnTests
 //
 //  Scripted stand-ins for every `PipelineEngineCatalog` stage, shared by the
-//  `TranscriptionService` pipeline suite and the `TranscriptionViewModel`
+//  `TranscriptionService` pipeline suite and the `TranscriptionCoordinator`
 //  state-machine suite. None of them touch audio, the network or a model.
 //
 

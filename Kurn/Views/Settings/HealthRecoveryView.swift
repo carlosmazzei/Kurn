@@ -9,7 +9,7 @@
 //  so a user doesn't have to know which of six different screens to check.
 //  Every action here calls the exact same recovery function its per-item
 //  counterpart already does (`RecordingRecovery.retryRecovery`,
-//  `RecordingQuarantine.recover`/`.delete`, `TranscriptionViewModel
+//  `RecordingQuarantine.recover`/`.delete`, `TranscriptionCoordinator
 //  .retryCorrection`/`.startTranscription`, `ModelDownloadController
 //  .deleteModel`) rather than reimplementing recovery logic — this screen
 //  only aggregates and dispatches.
@@ -24,10 +24,10 @@ struct HealthRecoveryView: View {
     // this file under SwiftLint's type-length warning) reads/calls these.
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
-    @Environment(TranscriptionViewModel.self) private var sharedTxVM
+    @Environment(TranscriptionCoordinator.self) private var sharedTranscription
     @Environment(ModelDownloadController.self) var downloads
 
-    var txVM: TranscriptionViewModel? { sharedTxVM }
+    var transcription: TranscriptionCoordinator? { sharedTranscription }
 
     typealias DegradedItem = HealthRecoveryAggregation.DegradedItem
 
@@ -145,14 +145,14 @@ struct HealthRecoveryView: View {
     }
 
     func retryTranscription(_ recording: Recording) {
-        guard let txVM, let meeting = recording.meeting else { return }
-        txVM.resetAutomaticResumeBudget(for: recording)
-        txVM.startTranscription(recording, language: meeting.language, config: settings.pipelineConfiguration)
+        guard let transcription, let meeting = recording.meeting else { return }
+        transcription.resetAutomaticResumeBudget(for: recording)
+        transcription.startTranscription(recording, language: meeting.language, config: settings.pipelineConfiguration)
     }
 
     func retryCorrection(_ recording: Recording) {
-        guard let txVM, let meeting = recording.meeting else { return }
-        txVM.retryCorrection(recording, language: meeting.language, config: settings.pipelineConfiguration)
+        guard let transcription, let meeting = recording.meeting else { return }
+        transcription.retryCorrection(recording, language: meeting.language, config: settings.pipelineConfiguration)
     }
 
     func recoverQuarantined(_ item: QuarantinedRecording) {

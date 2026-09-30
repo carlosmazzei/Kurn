@@ -6,7 +6,7 @@
 //  Loading the model compiles CoreML/ANE artifacts that can take tens of seconds
 //  on first use, so it must happen exactly once and be reused everywhere:
 //  across recordings, across meeting views (each builds its own
-//  `TranscriptionViewModel` → `TranscriptionService`), and across the two
+//  `TranscriptionCoordinator` → `TranscriptionService`), and across the two
 //  consumers that both run Parakeet — the transcriber and the auto-language
 //  detector — which would otherwise each load a separate copy.
 //

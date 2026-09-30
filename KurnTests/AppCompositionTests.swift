@@ -29,6 +29,8 @@ struct AppCompositionTests {
         #expect(environment.transcription.wikiCoordinator === environment.wiki)
         #expect(environment.semanticIndex.appSettings === settings)
         #expect(environment.wiki.appSettings === settings)
+        #expect(environment.summaries.appSettings === settings)
+        #expect(environment.summaries.modelContext === container.mainContext)
     }
 
     @Test func eachCallBuildsIndependentCoordinators() throws {

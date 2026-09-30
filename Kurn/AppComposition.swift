@@ -10,7 +10,7 @@
 //  them through `KurnApp.appEnvironment`; a `BGProcessingTask` window
 //  (`TranscriptionScheduler`) can fire in a background launch where no scene
 //  has observed anything yet. The background runner used to build its own
-//  `AppSettings` and `TranscriptionViewModel`, whose semantic-index and wiki
+//  `AppSettings` and transcription view model, whose semantic-index and wiki
 //  coordinators were never set — so a transcription finished in the background
 //  was silently left unindexed and without its wiki article — and the two
 //  view models could only keep a recording from transcribing twice through a
@@ -26,7 +26,8 @@ import SwiftData
 @MainActor
 struct AppEnvironment {
     let modelContainer: ModelContainer
-    let transcription: TranscriptionViewModel
+    let transcription: TranscriptionCoordinator
+    let summaries: SummaryViewModel
     let playbackEnhancement: PlaybackEnhancementViewModel
     let semanticIndex: SemanticIndexCoordinator
     let wiki: WikiCoordinator
@@ -63,7 +64,7 @@ final class AppComposition {
         let context = container.mainContext
         let semanticIndex = SemanticIndexCoordinator(modelContext: context, appSettings: settings)
         let wiki = WikiCoordinator(modelContext: context, appSettings: settings)
-        let transcription = TranscriptionViewModel(
+        let transcription = TranscriptionCoordinator(
             modelContext: context,
             appSettings: settings,
             semanticIndexCoordinator: semanticIndex,
@@ -72,6 +73,7 @@ final class AppComposition {
         return AppEnvironment(
             modelContainer: container,
             transcription: transcription,
+            summaries: SummaryViewModel(modelContext: context, appSettings: settings),
             playbackEnhancement: PlaybackEnhancementViewModel(modelContext: context),
             semanticIndex: semanticIndex,
             wiki: wiki

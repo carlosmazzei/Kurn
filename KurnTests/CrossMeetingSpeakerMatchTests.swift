@@ -33,7 +33,7 @@ struct CrossMeetingSpeakerMatchTests {
 
     private struct Fixture {
         var context: ModelContext
-        var viewModel: TranscriptionViewModel
+        var viewModel: TranscriptionCoordinator
         var meetingA: Meeting
         var recordingA: Recording
         var meetingB: Meeting
@@ -56,7 +56,7 @@ struct CrossMeetingSpeakerMatchTests {
 
         return Fixture(
             context: context,
-            viewModel: TranscriptionViewModel(modelContext: context),
+            viewModel: TranscriptionCoordinator(modelContext: context),
             meetingA: meetingA,
             recordingA: recordingA,
             meetingB: meetingB,

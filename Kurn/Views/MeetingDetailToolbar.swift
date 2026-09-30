@@ -15,7 +15,7 @@ extension MeetingDetailView {
         ToolbarItem(placement: .topBarTrailing) {
             Button {
                 meeting.isFavorite.toggle()
-                if let failure = modelContext.saveOrError() { txVM?.error = failure }
+                if let failure = modelContext.saveOrError() { actionError = failure }
             } label: {
                 Image(systemName: meeting.isFavorite ? "star.fill" : "star")
                     .foregroundStyle(meeting.isFavorite ? Theme.warning : Theme.textSecondary)
@@ -72,7 +72,7 @@ extension MeetingDetailView {
                 }
                 Button {
                     meeting.archivedAt = meeting.isArchived ? nil : Date()
-                    if let failure = modelContext.saveOrError() { txVM?.error = failure }
+                    if let failure = modelContext.saveOrError() { actionError = failure }
                 } label: {
                     Label(
                         meeting.isArchived

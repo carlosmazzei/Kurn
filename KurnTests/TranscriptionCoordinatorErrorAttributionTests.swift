@@ -1,8 +1,8 @@
 //
-//  TranscriptionViewModelErrorAttributionTests.swift
+//  TranscriptionCoordinatorErrorAttributionTests.swift
 //  KurnTests
 //
-//  H9 PR 21: `TranscriptionViewModel` is one app-wide shared instance
+//  H9 PR 21: `TranscriptionCoordinator` is one app-wide shared instance
 //  (`KurnApp`, injected via `.environment`, read by every `MeetingDetailView`
 //  through `@Environment`) — before this PR, a transcription failure for any
 //  recording set the same single `error: AppError?` property, so two
@@ -24,7 +24,7 @@ import Testing
 #if DEBUG
 
 @MainActor
-struct TranscriptionViewModelErrorAttributionTests {
+struct TranscriptionCoordinatorErrorAttributionTests {
 
     private func makeRecording(meeting: Meeting, context: ModelContext) -> Recording {
         let recording = Recording(meeting: meeting, fileName: "\(UUID().uuidString).m4a", duration: 10)
@@ -41,7 +41,7 @@ struct TranscriptionViewModelErrorAttributionTests {
         let recordingB = makeRecording(meeting: meeting, context: context)
         try context.save()
 
-        let viewModel = TranscriptionViewModel(modelContext: context)
+        let viewModel = TranscriptionCoordinator(modelContext: context)
         viewModel.setTranscriptionErrorForTesting(.transcriptionFailed("engine A crashed"), for: recordingA)
         viewModel.setTranscriptionErrorForTesting(.audioError("engine B: unreadable file"), for: recordingB)
 
@@ -60,7 +60,7 @@ struct TranscriptionViewModelErrorAttributionTests {
         let recordingB = makeRecording(meeting: meeting, context: context)
         try context.save()
 
-        let viewModel = TranscriptionViewModel(modelContext: context)
+        let viewModel = TranscriptionCoordinator(modelContext: context)
         viewModel.setTranscriptionErrorForTesting(.transcriptionFailed("A"), for: recordingA)
         viewModel.setTranscriptionErrorForTesting(.transcriptionFailed("B"), for: recordingB)
 
@@ -78,7 +78,7 @@ struct TranscriptionViewModelErrorAttributionTests {
         let recording = makeRecording(meeting: meeting, context: context)
         try context.save()
 
-        let viewModel = TranscriptionViewModel(modelContext: context)
+        let viewModel = TranscriptionCoordinator(modelContext: context)
 
         #expect(viewModel.transcriptionError(for: recording) == nil)
     }

@@ -4,7 +4,7 @@
 //
 //  Owns on-demand generation of the enhanced listening copies.
 //
-//  Per-recording state is keyed by `UUID`, following `TranscriptionViewModel` —
+//  Per-recording state is keyed by `UUID`, following `TranscriptionCoordinator` —
 //  two recordings can be rendering at once and neither may see the other's
 //  progress or error. The renderer reports a weighted fraction across its neural
 //  and DSP passes so a long recording never looks stuck in one opaque stage.
