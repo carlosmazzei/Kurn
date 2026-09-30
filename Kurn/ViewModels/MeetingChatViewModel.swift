@@ -136,7 +136,8 @@ final class MeetingChatViewModel {
         summariesByMeeting: [UUID: String] = [:],
         articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
         provider: AIProvider,
-        model: String
+        model: String,
+        runID: OperationID = OperationID()
     ) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding else { return }
@@ -155,8 +156,8 @@ final class MeetingChatViewModel {
         // service's own per-stage events (validation, provider, answer) and
         // this view model's own outcome event below — the same
         // caller-generates-the-id convention `DocumentGenerationViewModel`
-        // uses for `DocumentGenerationService`.
-        let runID = OperationID()
+        // uses for `DocumentGenerationService`. A parameter (defaulted) so a
+        // test can pick its own events out of the process-global log.
         let startedAt = Date()
 
         let (stream, continuation) = AsyncStream<ChatStreamEvent>.makeStream()
