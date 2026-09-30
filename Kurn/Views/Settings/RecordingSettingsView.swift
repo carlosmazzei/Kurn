@@ -29,7 +29,7 @@ struct RecordingSettingsView: View {
         .navigationTitle(NSLocalizedString("settings.recording", comment: "Recording"))
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
         .navigationDestination(isPresented: $showingNetworkSettings) {
-            TranscriptionSettingsView(keyRevision: 0)
+            TranscriptionSettingsView()
         }
     }
 

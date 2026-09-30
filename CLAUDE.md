@@ -1621,14 +1621,26 @@ Settings is a **hub, not one long form**. `SettingsView` is a short list of
 each pushing a focused screen in `Views/Settings/` (`ProvidersSettingsView`,
 `SummarySettingsView`, `SemanticSearchSettingsView`, `RecordingSettingsView`,
 `TranscriptionSettingsView`, `TagsSettingsView`, `WikiSettingsView`,
-`StorageSettingsView`, `DiagnosticsSettingsView`, `AboutSettingsView`). Three
-things deliberately stay
-on the root because they can't belong to any one screen: the destructive
-"Delete all data" reset, the `keyRevision` counter passed down so provider rows
-re-read Keychain status, and `ensureSelectedProviderIsConfigured()` /
-`ensureWhisperSelectionIsAllowed()` (`SettingsSections.swift`), which must run
-whichever screen the user drilled into — a key removed anywhere must never leave
-the summary or transcription provider pointing at one without a key.
+`StorageSettingsView`, `DiagnosticsSettingsView`, `AboutSettingsView`). Only
+the destructive "Delete all data" reset stays on the root.
+
+**Key status is observable through `AppSettings.credentials`**
+(`Infrastructure/CredentialStore.swift`). The Keychain is not observable, so
+the screens used to pass a `keyRevision` counter down by hand and read
+`SecItemCopyMatching` on every render — and the transcription settings opened
+from Recording or from a meeting got a constant `0` and never refreshed. Every
+UI key read and write now goes through the store: `hasKey(for:)`,
+`isUsable(_:)` and `isUsableForSpeech(_:)` cache definitive answers (never a
+failed, e.g. locked, read) until the next `saveKey`/`invalidate`, which bumps
+an observable `revision`. Views never call `KeychainManager` directly;
+non-UI code (`ProviderFactory`, services off the main actor) still does,
+through `AIProvider.isUsable`, because it needs the value at call time. Each
+write also runs `AppSettings.ensureProviderSelectionsAreUsable()`
+(`AppSettings+ProviderSelection.swift`, alongside `configuredProviders` and
+its summary/transcription subsets): a key removed anywhere must never leave
+the summary or transcription provider pointing at one without a key. The
+Settings root re-runs it on appear for what no write announces, such as the
+on-device model becoming unavailable.
 
 `ModelDownloadController` (`ViewModels/`, `@MainActor @Observable`) owns the
 FluidAudio download machinery — which `ModelSet` is in flight, the per-feature

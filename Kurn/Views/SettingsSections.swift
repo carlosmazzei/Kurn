@@ -2,9 +2,9 @@
 //  SettingsSections.swift
 //  Kurn
 //
-//  Helpers shared by the Settings hub and its section screens: which providers
-//  actually have a key, the invariants that keep the selected summary and
-//  transcription providers valid, and the destructive reset.
+//  Helpers for the Settings hub: the destructive reset. Which providers have a
+//  key, and the invariants that keep the selected providers valid, live in
+//  `AppSettings+ProviderSelection.swift`.
 //
 //  The section bodies these used to sit next to now live one per screen in
 //  `Views/Settings/`.
@@ -13,54 +13,7 @@
 import SwiftData
 import SwiftUI
 
-extension AppSettings {
-
-    /// Providers usable right now for summaries: a key in the Keychain for a
-    /// cloud vendor, or a runnable `SystemLanguageModel` for the on-device
-    /// provider (which has no key at all). Screens that show these read their
-    /// `keyRevision` counter first, so the list re-derives after a key is added
-    /// or removed.
-    var configuredProviders: [AIProvider] {
-        providers.filter(\.isUsable)
-    }
-
-    /// Configured providers that can run cloud (Whisper) transcription — the
-    /// candidate list for the transcription-provider picker.
-    var configuredTranscriptionProviders: [AIProvider] {
-        configuredProviders.filter(\.supportsTranscription)
-    }
-
-    /// Configured providers that can generate summaries/chat replies — the
-    /// candidate list for the summary-provider picker. Narrower than
-    /// `configuredProviders`: a transcription-only provider (ElevenLabs) is
-    /// usable but must never be offered as a summary provider.
-    var configuredSummaryProviders: [AIProvider] {
-        configuredProviders.filter(\.supportsSummarization)
-    }
-}
-
 extension SettingsView {
-
-    func ensureSelectedProviderIsConfigured() {
-        let providers = settings.configuredSummaryProviders
-        guard !providers.isEmpty else { return }
-        if !providers.contains(where: { $0.id == settings.aiProviderID }) {
-            settings.aiProviderID = providers[0].id
-        }
-    }
-
-    func ensureWhisperSelectionIsAllowed() {
-        guard settings.transcriptionEngine == .whisperAPI else { return }
-        // Revert to on-device only when no transcription-capable provider has a
-        // key; otherwise keep Whisper and repoint at a valid provider if the
-        // selected one lost its key or was removed.
-        let providers = settings.configuredTranscriptionProviders
-        if providers.isEmpty {
-            settings.transcriptionEngine = .appleSpeech
-        } else if !providers.contains(where: { $0.id == settings.transcriptionProviderID }) {
-            settings.transcriptionProviderID = providers[0].id
-        }
-    }
 
     /// Stops whatever could still write meeting content (a running
     /// transcription, read-aloud) and hands the erase to `LibraryEraser`,

@@ -9,8 +9,8 @@
 //
 //  It is now a short list of destinations grouped by subject, each pushing a
 //  focused screen in `Views/Settings/`. What stays here is what has to: the
-//  destructive reset, the shared key-revision counter, and the two invariants
-//  that must run whatever the user drills into.
+//  destructive reset. Key status and the provider-selection invariants live in
+//  `AppSettings.credentials` / `AppSettings+ProviderSelection.swift`.
 //
 
 import SwiftData
@@ -31,11 +31,6 @@ struct SettingsView: View {
     /// controller would track a download this one knows nothing about.
     @Environment(ModelDownloadController.self) private var downloads
 
-    /// Bumped after editing an API key so provider-dependent rows re-read
-    /// Keychain status. Passed down rather than re-derived so one counter drives
-    /// every screen.
-    @State var keyRevision = 0
-
     @State var showingDeleteConfirm = false
     /// Set when "Delete all data" fails to erase the store, so the failure
     /// surfaces instead of the wipe silently doing nothing.
@@ -49,14 +44,14 @@ struct SettingsView: View {
                     systemImage: "brain",
                     identifier: "settings.link.providers"
                 ) {
-                    ProvidersSettingsView(keyRevision: $keyRevision)
+                    ProvidersSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.summary", comment: "Summary"),
                     systemImage: "sparkles",
                     identifier: "settings.link.summary"
                 ) {
-                    SummarySettingsView(keyRevision: keyRevision)
+                    SummarySettingsView()
                 }
                 link(
                     NSLocalizedString("settings.semantic_search_title", comment: "Search and chat"),
@@ -70,14 +65,14 @@ struct SettingsView: View {
                     systemImage: "book",
                     identifier: "settings.link.wiki"
                 ) {
-                    WikiSettingsView(keyRevision: keyRevision)
+                    WikiSettingsView()
                 }
                 link(
                     NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"),
                     systemImage: "speaker.wave.2",
                     identifier: "settings.link.readAloud"
                 ) {
-                    ReadAloudSettingsView(keyRevision: keyRevision)
+                    ReadAloudSettingsView()
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.intelligence", comment: "Intelligence group"))
@@ -96,7 +91,7 @@ struct SettingsView: View {
                     systemImage: "waveform",
                     identifier: "settings.link.transcription"
                 ) {
-                    TranscriptionSettingsView(keyRevision: keyRevision)
+                    TranscriptionSettingsView()
                 }
             } header: {
                 Text(NSLocalizedString("settings.group.capture", comment: "Capture group"))
@@ -170,17 +165,10 @@ struct SettingsView: View {
                 Button(NSLocalizedString("common.done", comment: "Done")) { dismiss() }
             }
         }
-        // These two run here rather than on the Providers screen: a key can be
-        // removed from any drill-down, and the selected summary/transcription
-        // provider must never be left pointing at one without a key.
-        .onAppear {
-            ensureSelectedProviderIsConfigured()
-            ensureWhisperSelectionIsAllowed()
-        }
-        .onChange(of: keyRevision) { _, _ in
-            ensureSelectedProviderIsConfigured()
-            ensureWhisperSelectionIsAllowed()
-        }
+        // Key writes re-apply this themselves (`AppSettings.credentials`);
+        // running it on appear also catches what no write announces, such as
+        // the on-device model becoming unavailable.
+        .onAppear { settings.ensureProviderSelectionsAreUsable() }
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
             iconSystemName: "exclamationmark.triangle.fill",

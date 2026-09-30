@@ -13,18 +13,13 @@ import AVFoundation
 import SwiftUI
 
 struct ReadAloudSettingsView: View {
-    /// Bumped by the providers screen when a key is added/removed, so the list
-    /// of speaking providers re-reads the Keychain.
-    var keyRevision: Int = 0
-
     @Environment(AppSettings.self) private var settings
 
     /// A fixed owner for the sample, so leaving the screen stops only it.
     private static let previewOwner = UUID()
 
     private var speakingProviders: [AIProvider] {
-        _ = keyRevision
-        return settings.providers.filter(\.isUsableForSpeech)
+        settings.providers.filter { settings.credentials.isUsableForSpeech($0) }
     }
 
     private var provider: AIProvider { settings.speechProvider }
