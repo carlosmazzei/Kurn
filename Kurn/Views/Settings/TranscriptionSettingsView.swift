@@ -16,24 +16,18 @@ struct TranscriptionSettingsView: View {
     @Environment(ModelDownloadController.self) private var downloads
     @State private var cloudConsent = CloudTranscriptionConsentController()
 
-    /// Bumped by the root when an API key changes, so the Whisper provider rows
-    /// re-read Keychain state.
-    let keyRevision: Int
-
+    /// Re-derives after any key change, wherever this screen was opened from:
+    /// the list reads through the observable `settings.credentials`.
     private var transcriptionProviders: [AIProvider] {
-        _ = keyRevision
-        return settings.configuredTranscriptionProviders
+        settings.configuredTranscriptionProviders
     }
 
     private var hasAnyTranscriptionProvider: Bool { !transcriptionProviders.isEmpty }
 
-    /// Recomputed whenever `keyRevision` bumps (the root counter shared with
-    /// `WikiSettingsView`, incremented on any provider key add/remove) — the
-    /// correction stage reuses the summary provider, so its toggle must react
+    /// The correction stage reuses the summary provider, so its toggle reacts
     /// to the same key changes.
     private var hasSummaryProviderKey: Bool {
-        _ = keyRevision
-        return settings.aiProvider.isUsable
+        settings.credentials.isUsable(settings.aiProvider)
     }
 
     /// The reason the correction toggle is disabled, when it is. Names the
@@ -136,8 +130,7 @@ struct TranscriptionSettingsView: View {
                 }
                 TranscriptionModelPicker(
                     settings: settings,
-                    provider: settings.transcriptionProvider,
-                    revision: keyRevision
+                    provider: settings.transcriptionProvider
                 )
                 Text(NSLocalizedString(
                     "settings.whisper_provider_key_footer",

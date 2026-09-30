@@ -192,7 +192,7 @@ struct MeetingDetailView: View {
         .errorAlert(transcriptionErrorBinding, onOpenNetworkSettings: { showingNetworkSettings = true })
         .sheet(isPresented: $showingNetworkSettings) {
             NavigationStack {
-                TranscriptionSettingsView(keyRevision: 0)
+                TranscriptionSettingsView()
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(NSLocalizedString("common.done", comment: "Done")) {

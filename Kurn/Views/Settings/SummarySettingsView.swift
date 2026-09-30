@@ -12,15 +12,12 @@ import SwiftUI
 struct SummarySettingsView: View {
     @Environment(AppSettings.self) private var settings
 
-    /// Key-revision counter from the root, so the configured-provider list
-    /// reflects Keychain changes made on the Providers screen.
-    let keyRevision: Int
-
     @State private var showingAddTemplate = false
 
+    /// Re-derives after any key change: `configuredSummaryProviders` reads
+    /// through `settings.credentials`, which is observable.
     private var configuredProviders: [AIProvider] {
-        _ = keyRevision
-        return settings.configuredSummaryProviders
+        settings.configuredSummaryProviders
     }
 
     var body: some View {
@@ -47,7 +44,7 @@ struct SummarySettingsView: View {
                             value: NSLocalizedString("settings.on_device_model_name", comment: "Apple Intelligence")
                         )
                     } else {
-                        SummaryModelPicker(settings: settings, provider: settings.aiProvider, revision: keyRevision)
+                        SummaryModelPicker(settings: settings, provider: settings.aiProvider)
                     }
                 }
             }

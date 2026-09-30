@@ -14,10 +14,6 @@
 import SwiftUI
 
 struct WikiSettingsView: View {
-    /// Bumped by the providers screen when a key is added/removed, so this
-    /// screen re-reads whether the summary provider is usable.
-    var keyRevision: Int = 0
-
     @Environment(AppSettings.self) private var settings
     @Environment(WikiCoordinator.self) private var wiki
 
@@ -36,7 +32,7 @@ struct WikiSettingsView: View {
     }
 
     var body: some View {
-        let hasKey = settings.aiProvider.isUsable
+        let hasKey = settings.credentials.isUsable(settings.aiProvider)
         // `wiki.bulkOperation` is read straight from the coordinator (an
         // `@Observable`), so progress renders live instead of a plain spinner
         // this view has to poll for.

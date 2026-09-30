@@ -76,6 +76,10 @@ final class AppSettings {
     private let defaults: UserDefaults
     private let cloudStore: CloudKeyValueStore
 
+    /// The provider API keys, observable for the UI. Every key write goes
+    /// through it, and each one re-applies `ensureProviderSelectionsAreUsable`.
+    let credentials: CredentialStore
+
     var providers: [AIProvider] {
         didSet { persistProviders() }
     }
@@ -552,6 +556,9 @@ final class AppSettings {
     func updateProvider(_ provider: AIProvider) {
         guard let index = providers.firstIndex(where: { $0.id == provider.id }) else { return }
         providers[index] = provider
+        // An edited kind can change what the provider supports, so the
+        // selections are re-checked like after a key change.
+        credentials.invalidate()
     }
 
     func removeProvider(_ provider: AIProvider) {
@@ -559,7 +566,6 @@ final class AppSettings {
         providers.removeAll { $0.id == provider.id }
         summaryModels[provider.id] = nil
         transcriptionModels[provider.id] = nil
-        KeychainManager.shared.delete(provider.keychainAccount)
         if aiProviderID == provider.id {
             aiProviderID = providers.first?.id ?? AIProvider.openAI.id
         }
@@ -567,14 +573,17 @@ final class AppSettings {
             transcriptionProviderID = providers.first(where: { $0.supportsTranscription })?.id
                 ?? AIProvider.openAI.id
         }
+        credentials.saveKey("", for: provider)
     }
 
     init(
         cloudStore: CloudKeyValueStore = CloudSettingsSync.shared,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        credentials: CredentialStore = CredentialStore()
     ) {
         self.cloudStore = cloudStore
         self.defaults = defaults
+        self.credentials = credentials
         // An empty stored list is treated as absent: it can only come from a
         // corrupt write, and shipping the app with no providers at all is worse
         // than re-seeding the built-ins.
@@ -703,6 +712,9 @@ final class AppSettings {
                 guard let self, self.templatesSyncEnabled else { return }
                 self.reconcileTemplatesWithCloud()
             }
+        }
+        credentials.onChange = { [weak self] in
+            self?.ensureProviderSelectionsAreUsable()
         }
     }
 

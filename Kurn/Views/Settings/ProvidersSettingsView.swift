@@ -13,11 +13,6 @@ import SwiftUI
 struct ProvidersSettingsView: View {
     @Environment(AppSettings.self) private var settings
 
-    /// Bumped whenever a key is added, changed or removed, so the rows re-read
-    /// Keychain status. Owned by the Settings root, which also re-validates the
-    /// selected providers when it changes.
-    @Binding var keyRevision: Int
-
     @State private var showingAddProvider = false
     @State private var keychainError: AppError?
 
@@ -30,7 +25,6 @@ struct ProvidersSettingsView: View {
                             provider: provider,
                             onSave: { updated in
                                 settings.updateProvider(updated)
-                                keyRevision += 1
                                 // Any edit here (key, base URL, kind) could be
                                 // exactly what fixes a configuration failure
                                 // that tripped the provider circuit breaker,
@@ -40,14 +34,10 @@ struct ProvidersSettingsView: View {
                                 // retry that title generation never sends.
                                 Task { await ProviderCircuitBreaker.shared.reset(providerID: updated.id) }
                             },
-                            onDelete: {
-                                settings.removeProvider(provider)
-                                keyRevision += 1
-                            },
-                            onChange: { keyRevision += 1 }
+                            onDelete: { settings.removeProvider(provider) }
                         )
                     } label: {
-                        ProviderRow(provider: provider, revision: keyRevision)
+                        ProviderRow(provider: provider)
                     }
                     .accessibilityIdentifier("settings.providers.row.\(provider.id)")
                 }
@@ -71,13 +61,11 @@ struct ProvidersSettingsView: View {
                     // leaving the row looking unconfigured with no explanation
                     // (H7 PR 14).
                     settings.addProvider(provider)
-                    if !key.isEmpty {
-                        let outcome = KeychainManager.shared.set(key, for: provider.keychainAccount)
-                        if case .failed(let reason) = outcome {
-                            keychainError = .keychainAccessFailed(reason.rawValue)
-                        }
+                    if key.isEmpty {
+                        settings.credentials.invalidate()
+                    } else if case .failed(let reason) = settings.credentials.saveKey(key, for: provider) {
+                        keychainError = .keychainAccessFailed(reason.rawValue)
                     }
-                    keyRevision += 1
                     showingAddProvider = false
                 }
             }

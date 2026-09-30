@@ -15,8 +15,8 @@ struct ProviderEditor: View {
     let provider: AIProvider
     let onSave: (AIProvider) -> Void
     let onDelete: () -> Void
-    let onChange: () -> Void
 
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var kind = AIProviderKind.openAICompatible
@@ -124,7 +124,7 @@ struct ProviderEditor: View {
             name = provider.displayName
             kind = provider.kind
             baseURLString = provider.baseURLString
-            switch KeychainManager.shared.get(provider.keychainAccount) {
+            switch settings.credentials.readKey(for: provider) {
             case .found(let value):
                 key = value
                 originalKey = value
@@ -170,9 +170,7 @@ struct ProviderEditor: View {
     private func commitAndSave() {
         let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedKey != originalKey {
-            let outcome: KeychainWriteOutcome = trimmedKey.isEmpty
-                ? KeychainManager.shared.delete(provider.keychainAccount)
-                : KeychainManager.shared.set(trimmedKey, for: provider.keychainAccount)
+            let outcome = settings.credentials.saveKey(trimmedKey, for: provider)
             guard case .success = outcome else {
                 if case .failed(let reason) = outcome {
                     saveError = .keychainAccessFailed(reason.rawValue)
@@ -180,7 +178,6 @@ struct ProviderEditor: View {
                 return
             }
             originalKey = trimmedKey
-            onChange()
         }
         var updated = provider
         updated.displayName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -253,12 +250,11 @@ struct AddProviderView: View {
 struct SummaryModelPicker: View {
     let settings: AppSettings
     let provider: AIProvider
-    let revision: Int
 
     var body: some View {
         ProviderModelPicker(
             provider: provider,
-            revision: revision,
+            credentials: settings.credentials,
             selection: Binding(
                 get: { settings.summaryModel(for: provider) },
                 set: { settings.setSummaryModel($0, for: provider) }
@@ -274,12 +270,11 @@ struct SummaryModelPicker: View {
 struct TranscriptionModelPicker: View {
     let settings: AppSettings
     let provider: AIProvider
-    let revision: Int
 
     var body: some View {
         ProviderModelPicker(
             provider: provider,
-            revision: revision,
+            credentials: settings.credentials,
             selection: Binding(
                 get: { settings.transcriptionModel(for: provider) },
                 set: { settings.setTranscriptionModel($0, for: provider) }
@@ -316,7 +311,7 @@ struct TranscriptionModelPicker: View {
 /// (e.g. to Whisper-family models for transcription).
 private struct ProviderModelPicker: View {
     let provider: AIProvider
-    let revision: Int
+    let credentials: CredentialStore
     let selection: Binding<String>
     var filter: (@MainActor ([String]) -> [String])?
 
@@ -342,7 +337,7 @@ private struct ProviderModelPicker: View {
             }
         }
         .disabled(pickerModels.isEmpty)
-        .task(id: "\(provider.id)-\(revision)") {
+        .task(id: "\(provider.id)-\(credentials.revision)") {
             await loadModels()
         }
 
@@ -363,12 +358,12 @@ private struct ProviderModelPicker: View {
         } label: {
             Label(NSLocalizedString("settings.refresh_models", comment: "Refresh models"), systemImage: "arrow.clockwise")
         }
-        .disabled(isLoading || !KeychainManager.shared.hasValue(for: provider.keychainAccount))
+        .disabled(isLoading || !credentials.hasKey(for: provider))
     }
 
     @MainActor
     private func loadModels() async {
-        guard KeychainManager.shared.hasValue(for: provider.keychainAccount) else {
+        guard credentials.hasKey(for: provider) else {
             models = []
             errorText = NSLocalizedString("settings.models_need_key", comment: "Configure key to load models")
             return
@@ -569,7 +564,8 @@ private extension View {
 /// `SystemLanguageModel` availability instead — see `OnDeviceStatusLabel`.
 struct ProviderRow: View {
     let provider: AIProvider
-    let revision: Int
+
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
         HStack(spacing: 12) {
@@ -581,9 +577,9 @@ struct ProviderRow: View {
                     .foregroundStyle(Theme.textSecondary)
                 if provider.kind == .appleOnDevice {
                     OnDeviceStatusLabel(reason: OnDeviceModelAvailability.unavailableReason)
-                        .id(revision)
+                        .id(settings.credentials.revision)
                 } else {
-                    let configured = KeychainManager.shared.hasValue(for: provider.keychainAccount)
+                    let configured = settings.credentials.hasKey(for: provider)
                     HStack(spacing: 5) {
                         Circle()
                             .fill(configured ? Theme.success : Theme.textTertiary)
@@ -594,7 +590,7 @@ struct ProviderRow: View {
                             .font(Theme.caption)
                             .foregroundStyle(Theme.textSecondary)
                     }
-                    .id(revision)
+                    .id(settings.credentials.revision)
                 }
             }
         }
