@@ -50,7 +50,7 @@ struct TranscriptionCheckpoint: Codable, Sendable {
     // MARK: - Legacy field access
 
     // These delegate to `fingerprint` so the handful of call sites that only
-    // ever *read* these for logging (`TranscriptionViewModel`,
+    // ever *read* these for logging (`TranscriptionCoordinator`,
     // `TranscriptionRecovery`) didn't need to change shape along with this type.
     var engineRaw: String { fingerprint.engineRaw }
     var languageRaw: String { fingerprint.languageRaw }

@@ -26,7 +26,10 @@ struct MeetingDetailView: View {
     /// Shared, app-wide transcription coordinator (injected from `KurnApp`). Using
     /// the same instance the foreground resume pass uses means a run it restarted
     /// shows here as in-progress with live progress, instead of a stale badge.
-    @Environment(TranscriptionViewModel.self) private var sharedTxVM
+    @Environment(TranscriptionCoordinator.self) private var sharedTranscription
+    /// Shared summary generation/translation state, so a summary still
+    /// running shows its progress when this screen is reopened.
+    @Environment(SummaryViewModel.self) private var sharedSummaries
     /// Shared by all detail screens so a long enhancement remains observable
     /// across back-navigation instead of being orphaned with the old view.
     @Environment(PlaybackEnhancementViewModel.self) var enhancement
@@ -58,10 +61,17 @@ struct MeetingDetailView: View {
     }
 
     @State var player = AudioPlayerService()
-    /// Optional passthrough so the existing `txVM?…` call sites stay unchanged.
-    var txVM: TranscriptionViewModel? { sharedTxVM }
+    /// Optional passthroughs, so a preview or test host without the
+    /// environment objects renders instead of trapping.
+    var transcription: TranscriptionCoordinator? { sharedTranscription }
+    var summaries: SummaryViewModel? { sharedSummaries }
+    /// This screen's own action failures (playback, delete, rename). Kept
+    /// here rather than written into a shared coordinator's `error`, which
+    /// would surface on whichever screen happens to observe it next. Not
+    /// `private` — the `MeetingDetail*` extensions set it.
+    @State var actionError: AppError?
     /// The first transcription failure among this meeting's own recordings
-    /// (H9 PR 21) — `txVM` is one app-wide shared instance, so this screen
+    /// (H9 PR 21) — `transcription` is one app-wide shared instance, so this screen
     /// must only ever surface an error that actually belongs to a recording
     /// it's showing, never a different meeting's background transcription
     /// failure. Dismissing clears just that recording's slot: if another of
@@ -70,13 +80,13 @@ struct MeetingDetailView: View {
     private var transcriptionErrorBinding: Binding<AppError?> {
         Binding(
             get: {
-                guard let txVM else { return nil }
-                return queriedRecordings.lazy.compactMap { txVM.transcriptionError(for: $0) }.first
+                guard let transcription else { return nil }
+                return queriedRecordings.lazy.compactMap { transcription.transcriptionError(for: $0) }.first
             },
             set: { newValue in
-                guard newValue == nil, let txVM else { return }
-                if let recording = queriedRecordings.first(where: { txVM.transcriptionError(for: $0) != nil }) {
-                    txVM.clearTranscriptionError(for: recording)
+                guard newValue == nil, let transcription else { return }
+                if let recording = queriedRecordings.first(where: { transcription.transcriptionError(for: $0) != nil }) {
+                    transcription.clearTranscriptionError(for: recording)
                 }
             }
         )
@@ -204,7 +214,9 @@ struct MeetingDetailView: View {
         }
         .errorAlert($autoTagError)
         .errorAlert(Binding(get: { wiki.lastError }, set: { wiki.lastError = $0 }))
-        .errorAlert(Binding(get: { txVM?.error }, set: { txVM?.error = $0 }))
+        .errorAlert($actionError)
+        .errorAlert(Binding(get: { summaries?.error }, set: { summaries?.error = $0 }))
+        .errorAlert(Binding(get: { transcription?.error }, set: { transcription?.error = $0 }))
         .sheet(item: $autoTagSuggestion) { suggestion in
             AutoTagConfirmView(
                 meeting: meeting,
@@ -315,11 +327,11 @@ struct MeetingDetailView: View {
                 SummaryTab(
                     meeting: meeting,
                     settings: settings,
-                    isSummarizing: txVM?.isSummarizing == true,
-                    isCancellingSummary: txVM?.isCancellingSummary == true,
-                    isTranslatingSummary: txVM?.isTranslatingSummary == true,
-                    translationTargetLanguage: txVM?.translationTargetLanguage,
-                    summaryProgress: txVM?.summaryProgress,
+                    isSummarizing: summaries?.isSummarizing == true,
+                    isCancellingSummary: summaries?.isCancellingSummary == true,
+                    isTranslatingSummary: summaries?.isTranslatingSummary == true,
+                    translationTargetLanguage: summaries?.translationTargetLanguage,
+                    summaryProgress: summaries?.summaryProgress,
                     selectedSummaryID: selectedSummaryID,
                     hasAnyTranscript: hasAnyTranscript,
                     onGenerate: { generateSummary() },
@@ -373,7 +385,7 @@ struct MeetingDetailView: View {
                     recording: recording,
                     index: index,
                     player: player,
-                    txVM: txVM,
+                    transcription: transcription,
                     enhancement: enhancement,
                     pendingRetranscribe: $pendingRetranscribe,
                     onTogglePlay: { togglePlay(recording) },
@@ -431,7 +443,7 @@ struct MeetingDetailView: View {
                 if recording.transcript?.isSegmentsDataCorrupted == true {
                     transcriptCorruptedBanner
                 }
-                if let warning = txVM?.diarizationWarnings[recording.id] {
+                if let warning = transcription?.diarizationWarnings[recording.id] {
                     diarizationWarningBanner(warning)
                 }
                 pipelineWarningsBanner(for: recording)
@@ -445,7 +457,7 @@ struct MeetingDetailView: View {
                     player: player,
                     offsetFor: { startOffset(of: $0) },
                     onSeek: { rec, time in seek(rec, to: time) },
-                    onRenameCommit: { if let failure = modelContext.saveOrError() { txVM?.error = failure } },
+                    onRenameCommit: { if let failure = modelContext.saveOrError() { actionError = failure } },
                     onDeletePhoto: { deletePhoto($0) }
                 )
             }
@@ -545,7 +557,7 @@ struct MeetingDetailView: View {
     /// from what was actually persisted, so it still shows after navigating
     /// away and back, or for a transcript from an earlier session. Correction
     /// is the one stage cheap enough to retry in isolation (see
-    /// `TranscriptionViewModel.retryCorrection`); every other warning falls
+    /// `TranscriptionCoordinator.retryCorrection`); every other warning falls
     /// back to the existing full re-transcribe confirmation.
     @ViewBuilder
     private func pipelineWarningsBanner(for recording: Recording) -> some View {
@@ -565,9 +577,9 @@ struct MeetingDetailView: View {
                 .foregroundStyle(Theme.warning)
                 HStack(spacing: 8) {
                     if report.warnings.contains(where: { $0.stage == .correction }) {
-                        let isRetrying = txVM?.correctionRetryIDs.contains(recording.id) == true
+                        let isRetrying = transcription?.correctionRetryIDs.contains(recording.id) == true
                         Button {
-                            txVM?.retryCorrection(recording, language: meeting.language, config: settings.pipelineConfiguration)
+                            transcription?.retryCorrection(recording, language: meeting.language, config: settings.pipelineConfiguration)
                         } label: {
                             if isRetrying {
                                 ProgressView().controlSize(.small)
@@ -640,7 +652,7 @@ private struct RecordingSegmentRow: View {
     let recording: Recording
     let index: Int
     let player: AudioPlayerService
-    let txVM: TranscriptionViewModel?
+    let transcription: TranscriptionCoordinator?
     let enhancement: PlaybackEnhancementViewModel
     @Binding var pendingRetranscribe: Recording?
     let onTogglePlay: () -> Void
@@ -652,10 +664,10 @@ private struct RecordingSegmentRow: View {
 
     var body: some View {
         let isLoaded = player.loadedFileName == recording.fileName
-        let isTranscribing = txVM?.isTranscribing(recording) == true
-        let isCancelling = txVM?.isCancelling(recording) == true
-        let phase = txVM?.phase(for: recording)
-        let postTranscriptionPhase = txVM?.postTranscriptionPhase(for: recording)
+        let isTranscribing = transcription?.isTranscribing(recording) == true
+        let isCancelling = transcription?.isCancelling(recording) == true
+        let phase = transcription?.phase(for: recording)
+        let postTranscriptionPhase = transcription?.postTranscriptionPhase(for: recording)
         let enhancementProgress = enhancement.progress(for: recording)
         let isEnhancing = enhancementProgress != nil
         return VStack(alignment: .leading, spacing: 10) {

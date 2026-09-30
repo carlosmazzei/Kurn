@@ -129,7 +129,7 @@ struct ModelTests {
     // be detached before the old transcript is deleted, otherwise establishing
     // the new transcript's inverse traps with "relationship already has a value
     // but it's not the target". This mirrors the replace path in
-    // `TranscriptionViewModel.transcribe`.
+    // `TranscriptionCoordinator.transcribe`.
     @Test func replacingTranscriptDetachesTheOldOne() throws {
         let context = makeContext()
         let meeting = Meeting(title: "Standup")

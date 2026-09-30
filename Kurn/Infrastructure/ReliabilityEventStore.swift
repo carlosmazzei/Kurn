@@ -28,7 +28,7 @@ enum ReliabilityEventStore {
     static let fileName = "events.jsonl"
 
     /// `ReliabilityLog.handler` is a plain synchronous `@Sendable` closure,
-    /// callable from any isolation — `TranscriptionViewModel` calls it from
+    /// callable from any isolation — `TranscriptionCoordinator` calls it from
     /// the main actor, `DocumentGenerationService` from off it — so two
     /// events recorded around the same moment from different operations
     /// could otherwise interleave their writes to the same file or race a

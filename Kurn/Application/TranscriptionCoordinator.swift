@@ -1,21 +1,31 @@
 //
-//  TranscriptionViewModel.swift
+//  TranscriptionCoordinator.swift
 //  Kurn
 //
-//  Coordinates transcription and summary generation for a meeting and writes the
-//  results back into SwiftData. Heavy work runs in the value-type services off
-//  the main actor; all model mutation happens here on the main actor.
+//  Owns every transcription run for the process: starting, pausing, stopping
+//  and resuming it, persisting what the pipeline produced, reconciling the
+//  meeting's speakers, and the best-effort enrichment that follows (AI title,
+//  semantic index, wiki). Heavy work runs in the value-type services off the
+//  main actor; all model mutation happens here on the main actor.
+//
+//  It used to be `TranscriptionViewModel`, which also generated and translated
+//  summaries, and the `BGProcessingTask` runner depended on it — a lower layer
+//  reaching up into a view model to transcribe. Transcription has no screen of
+//  its own to serve: the scene and the background window drive the same runs,
+//  so it lives in Application/ and `TranscriptionScheduler` depends on it
+//  directly. Summary generation, which only the meeting screen starts, stayed
+//  behind as `SummaryViewModel`. Its state is still `@Observable` because the
+//  meeting screen renders per-recording progress straight from it.
 //
 
 import Foundation
 import KurnCore
 import Observation
 import SwiftData
-import SwiftUI // for Color.speakerHex palette helper
 
 @MainActor
 @Observable
-final class TranscriptionViewModel {
+final class TranscriptionCoordinator {
     /// An ordered update emitted by the transcription pipeline's `@Sendable`
     /// callbacks and applied on the main actor in emission order (see
     /// `transcribe(_:language:config:)`). Checkpoints are deliberately not
@@ -36,32 +46,12 @@ final class TranscriptionViewModel {
     /// Kept separate from `phases` so the recording can honestly show `.done`
     /// instead of holding the transcription bar at "Finalizing".
     private(set) var postTranscriptionPhases: [UUID: PostTranscriptionPhase] = [:]
-    /// Not `private(set)` — `TranscriptionViewModel+Summary.swift` needs to
-    /// set these from its own file.
-    var isSummarizing = false
-    /// True after the user asks to cancel a summary while the provider request
-    /// is still unwinding.
-    var isCancellingSummary = false
-    /// Staged-summary progress as (stage, total) when a long transcript is
-    /// being summarized in parts; nil for single-pass summaries.
-    var summaryProgress: (stage: Int, total: Int)?
-    /// True while an existing summary is being translated into another
-    /// language. Independent of `isSummarizing`/`summaryTask`: translating a
-    /// summary neither blocks nor is blocked by generating a new one, and it
-    /// is always single-pass so it needs no staged progress. Not `private` —
-    /// `TranscriptionViewModel+SummaryTranslation.swift` needs it.
-    var isTranslatingSummary = false
-    /// The source summary and target language of the in-flight translation,
-    /// so the Summary tab can show *which* chip is translating rather than a
-    /// generic spinner. Set together with `isTranslatingSummary`.
-    var translatingSummaryID: UUID?
-    var translationTargetLanguage: MeetingLanguage?
     /// Failures not tied to any one recording — a generic `persist()` save
     /// (which commits whatever is pending across the whole context, not one
-    /// recording's own changes) or AI title generation for a meeting.
+    /// recording's own changes) or an explicit AI title regeneration.
     var error: AppError?
     /// Transcription failures, keyed by recording (H9 PR 21) — split out of
-    /// the single `error` above because `TranscriptionViewModel` is one
+    /// the single `error` above because `TranscriptionCoordinator` is one
     /// app-wide shared instance (`KurnApp`, injected via `.environment`, read
     /// by every `MeetingDetailView` through `@Environment`), so two different
     /// recordings transcribing concurrently used to be able to clobber or
@@ -78,11 +68,11 @@ final class TranscriptionViewModel {
     private(set) var diarizationWarnings: [UUID: String] = [:]
     /// A voiceprint match for a new `Speaker` row, found in a different
     /// meeting — staged, never silently applied. See
-    /// `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`.
+    /// `TranscriptionCoordinator+CrossMeetingSpeakerMatch.swift`.
     var pendingCrossMeetingMatches: [CrossMeetingSpeakerMatch] = []
     /// Recordings whose correction stage is currently being retried in
     /// isolation (H5 PR 13). Not `private(set)` —
-    /// `TranscriptionViewModel+CorrectionRetry.swift` needs to mutate it.
+    /// `TranscriptionCoordinator+CorrectionRetry.swift` needs to mutate it.
     var correctionRetryIDs: Set<UUID> = []
 
     /// Task handles for transcriptions started via `startTranscription`, so
@@ -107,15 +97,8 @@ final class TranscriptionViewModel {
     private(set) var cancellingIDs: Set<UUID> = []
     /// Recordings this instance is transcribing, so `@Sendable` pipeline
     /// callbacks can reach the model by ID after hopping to the main actor.
-    /// Not `private` — `TranscriptionViewModel+ResumeBudget.swift` needs it.
+    /// Not `private` — `TranscriptionCoordinator+ResumeBudget.swift` needs it.
     var activeRecordings: [UUID: Recording] = [:]
-    /// Active summary task, owned here so the detail screen can cancel it.
-    /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
-    var summaryTask: Task<Void, Never>?
-    /// Active summary-translation task, owned here so the detail screen can
-    /// cancel it. Not `private` —
-    /// `TranscriptionViewModel+SummaryTranslation.swift` needs it.
-    var translationTask: Task<Void, Never>?
     /// Recordings this instance is actually working on. The foreground
     /// recovery sweep uses this to distinguish a live run (leave alone) from a
     /// stale persisted `.inProgress` (reset to resumable). There is one
@@ -124,15 +107,14 @@ final class TranscriptionViewModel {
     /// set is also what keeps a recording from transcribing twice at once.
     var activeTranscriptionIDs: Set<UUID> { transcribingIDs }
 
-    /// Not `private` — `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift` needs it.
+    /// Not `private` — `TranscriptionCoordinator+CrossMeetingSpeakerMatch.swift`
+    /// and `TranscriptionCoordinator+Speakers.swift` need it.
     let modelContext: ModelContext
-    /// Not `private` — `TranscriptionViewModel+CorrectionRetry.swift` needs
+    /// Not `private` — `TranscriptionCoordinator+CorrectionRetry.swift` needs
     /// it to retry just the correction stage without repeating the rest of
     /// the pipeline.
     let transcriptionService: TranscriptionService
-    /// Not `private` — `TranscriptionViewModel+Summary.swift` needs it.
-    let summaryService: SummaryService
-    /// Not `private` — `TranscriptionViewModel+AITitle.swift` needs it.
+    /// Not `private` — `TranscriptionCoordinator+AITitle.swift` needs it.
     let aiTitleCoordinator: AITitleCoordinator
     /// App-wide settings, injected at construction by `AppComposition` so
     /// usage stats and title generation never run against a missing value.
@@ -151,8 +133,7 @@ final class TranscriptionViewModel {
         semanticIndexCoordinator: SemanticIndexCoordinator? = nil,
         wikiCoordinator: WikiCoordinator? = nil,
         aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator(),
-        transcriptionService: TranscriptionService = TranscriptionService(),
-        summaryService: SummaryService = SummaryService()
+        transcriptionService: TranscriptionService = TranscriptionService()
     ) {
         self.modelContext = modelContext
         self.appSettings = appSettings
@@ -160,7 +141,6 @@ final class TranscriptionViewModel {
         self.wikiCoordinator = wikiCoordinator
         self.aiTitleCoordinator = aiTitleCoordinator
         self.transcriptionService = transcriptionService
-        self.summaryService = summaryService
     }
 
     /// Persist pending model changes, surfacing failures instead of dropping
@@ -188,7 +168,7 @@ final class TranscriptionViewModel {
     #if DEBUG
     /// Test-only: `transcribe()`'s real failure paths need the full pipeline
     /// running, so `KurnTests` sets `errorsByRecording` directly instead
-    /// (see `TranscriptionViewModelErrorAttributionTests`) rather than
+    /// (see `TranscriptionCoordinatorErrorAttributionTests`) rather than
     /// widening the real API with a public setter.
     func setTranscriptionErrorForTesting(_ error: AppError, for recording: Recording) {
         errorsByRecording[recording.id] = error
@@ -679,214 +659,5 @@ final class TranscriptionViewModel {
                 await task.value
             }
         }
-    }
-
-    /// Reconcile the meeting's `Speaker` rows with the labels present across all
-    /// its recordings' current transcripts, keeping each row attached to the
-    /// person it belongs to rather than to the label it happened to have.
-    ///
-    /// The label is not an identity. The diarizer hands out `"Speaker N"` in
-    /// order of first appearance, freshly on every run — **independently per
-    /// recording** — so a re-transcription routinely renames the same voice,
-    /// and two different recordings' own "Speaker 1" are two different people
-    /// unless a voice says otherwise. This method used to key rows on the
-    /// label string in the only two ways available, both wrong: deleting a row
-    /// whose label stopped appearing threw away the name the user typed, and
-    /// keeping a row under its old label would hand that name to whoever the
-    /// diarizer now calls Speaker 2 — or, across recordings, to a completely
-    /// different person who happened to get the same number.
-    ///
-    /// So the reconciliation is by voice when there is one, and it runs **one
-    /// recording at a time**, in `recordedAt` order: each recording's own
-    /// labels are matched, via `SpeakerIdentityMatcher`, only against
-    /// whichever stored rows an *earlier* recording in this same pass hasn't
-    /// already claimed. `Recording.speakerVoiceprints` is what makes that
-    /// possible — every recording keeps its own diarization run's voiceprints,
-    /// not just the one that just finished — so a second recording's
-    /// "Speaker 1" is judged on its own voice instead of being merged, by
-    /// label string alone, into whatever "Speaker 1" the first recording
-    /// already produced.
-    ///
-    /// Where no voiceprint exists (the heuristic engine, or a transcript from
-    /// before this existed) identity genuinely cannot be recovered, and guessing
-    /// would be the error the matching exists to prevent. There the rule is only
-    /// the conservative half: a row the user has named is never deleted, and a
-    /// label already claimed within this pass is never handed to a second,
-    /// different recording's same-numbered speaker.
-    ///
-    /// Internal rather than private so the behaviour that used to lose a typed
-    /// name — or attach it to the wrong person — can be pinned by a test
-    /// against a real `ModelContainer`.
-    func syncSpeakers(for meeting: Meeting?) {
-        guard let meeting else { return }
-
-        // Snapshot the rows before anything moves: the matching is keyed on
-        // what each row was called going in, and rows are relabelled below.
-        let rows = meeting.speakers.map { (speaker: $0, original: $0.label) }
-
-        var assignment: [String: Speaker] = [:]
-        var claimedLabels: Set<String> = []
-        var placed: Set<ObjectIdentifier> = []
-        func isPlaced(_ speaker: Speaker) -> Bool { placed.contains(ObjectIdentifier(speaker)) }
-
-        // A label already claimed within this pass gets a fresh one instead of
-        // colliding — the only way two different recordings' independently
-        // numbered "Speaker 1"s can both survive as distinct rows.
-        func canonicalLabel(preferring raw: String) -> String {
-            guard claimedLabels.contains(raw) else { return raw }
-            var index = 1
-            while claimedLabels.contains("Speaker \(index)") { index += 1 }
-            return "Speaker \(index)"
-        }
-
-        func place(_ speaker: Speaker, rawLabel: String, canonical: String, voiceprints: [String: [Float]]) {
-            assignment[canonical] = speaker
-            claimedLabels.insert(canonical)
-            placed.insert(ObjectIdentifier(speaker))
-            // Refresh with this recording's own embedding: a speaker heard
-            // again is described better by the newer one than by whichever
-            // was stored first.
-            if let vector = voiceprints[rawLabel] {
-                speaker.voiceprintData = VectorData.encode(vector)
-            }
-        }
-
-        var byVoiceCount = 0
-        var unclaimed: [(label: String, voiceprint: [Float]?)] = []
-
-        for recording in meeting.recordings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
-            guard let segments = recording.transcript?.segments, !segments.isEmpty else { continue }
-
-            // This recording's own labels, in first-appearance order — not
-            // merged with any other recording's, since the diarizer numbers
-            // them independently per run.
-            var recordingLabels: [String] = []
-            for segment in segments where !recordingLabels.contains(segment.speakerLabel) {
-                recordingLabels.append(segment.speakerLabel)
-            }
-            let recordingVoiceprints = recording.speakerVoiceprints
-
-            // Which row is which person, by voice — over *every* row with a
-            // voiceprint, placed or not. A row an earlier recording in this
-            // pass already placed can still be recognized by a later
-            // recording's own run: that's what lets the same voice be
-            // reunified across recordings regardless of which number each
-            // one's diarizer gave it. Run over every label this recording
-            // produced, not only the ones that appear or disappear: the
-            // common case is the label set staying the same while the
-            // assignment permutes, and matching only the leftovers would
-            // miss exactly that.
-            let matches = SpeakerIdentityMatcher.match(
-                existing: rows.compactMap { row -> SpeakerIdentityMatcher.Candidate? in
-                    guard let voiceprint = row.speaker.voiceprint else { return nil }
-                    return SpeakerIdentityMatcher.Candidate(label: row.original, voiceprint: voiceprint)
-                },
-                incoming: recordingLabels.compactMap { label -> SpeakerIdentityMatcher.Candidate? in
-                    guard let voiceprint = recordingVoiceprints[label] else { return nil }
-                    return SpeakerIdentityMatcher.Candidate(label: label, voiceprint: voiceprint)
-                }
-            )
-            byVoiceCount += matches.count
-
-            // This recording's own raw labels that found a person this pass —
-            // by voice below, or by the label fallback after it — so the
-            // "nobody claimed this" step at the end only sees genuine leftovers.
-            var consumed: Set<String> = []
-
-            // 1. Voice wins. It is the only evidence here that identifies a
-            // person. A fresh match places the row under a (collision-free)
-            // canonical label; a match onto a row already placed this pass is
-            // just a reconfirmation — same person, refresh the voiceprint,
-            // don't relabel or duplicate.
-            for row in rows {
-                guard let raw = matches[row.original] else { continue }
-                consumed.insert(raw)
-                if isPlaced(row.speaker) {
-                    if let vector = recordingVoiceprints[raw] {
-                        row.speaker.voiceprintData = VectorData.encode(vector)
-                    }
-                    continue
-                }
-                let canonical = canonicalLabel(preferring: raw)
-                place(row.speaker, rawLabel: raw, canonical: canonical, voiceprints: recordingVoiceprints)
-                if canonical != row.original {
-                    AppLog.transcription.atNotice.notice("VM: syncSpeakers \(row.original, privacy: .public) -> \(canonical, privacy: .public) by voice")
-                }
-            }
-            // 2. Then the label, for rows no voiceprint could speak for — the
-            // old behaviour, and still right when nothing has been renumbered.
-            // Scoped to *this* recording's own, still-unconsumed labels, so a
-            // later recording can never steal a row an earlier one already
-            // claimed just because the diarizer handed out the same number
-            // again.
-            for row in rows where !isPlaced(row.speaker) {
-                guard recordingLabels.contains(row.original),
-                      !consumed.contains(row.original),
-                      !claimedLabels.contains(row.original) else { continue }
-                place(row.speaker, rawLabel: row.original, canonical: row.original, voiceprints: recordingVoiceprints)
-                consumed.insert(row.original)
-            }
-
-            // Whatever this recording produced that no row claimed becomes a
-            // new row below — never merged, by raw label string, into another
-            // recording's leftover of the same name.
-            for label in recordingLabels where !consumed.contains(label) {
-                unclaimed.append((label, recordingVoiceprints[label]))
-            }
-        }
-
-        for (label, speaker) in assignment {
-            speaker.label = label
-        }
-
-        // 3. Rows with nowhere to go. An unnamed one holds nothing but a label
-        // that no longer means anything; a named one holds what the user typed,
-        // and losing that silently is the failure this method exists to prevent.
-        var keptNamed = 0
-        var removed = 0
-        for row in rows where !isPlaced(row.speaker) {
-            guard row.speaker.name.isEmpty else {
-                keptNamed += 1
-                continue
-            }
-            modelContext.delete(row.speaker)
-            removed += 1
-        }
-
-        // 4. Rows for labels nobody claimed. The color index counts the rows
-        // that will actually remain — deletes above aren't applied until save,
-        // so `meeting.speakers` can't be counted for this. A brand-new row is
-        // also checked against every *other* meeting's named speakers here
-        // (D6, see TranscriptionViewModel+CrossMeetingSpeakerMatch.swift);
-        // `crossMeetingCandidates` is fetched once, not per entry.
-        let crossMeetingCandidates = unclaimed.contains { $0.voiceprint != nil }
-            ? crossMeetingSpeakerCandidates(excluding: meeting)
-            : []
-        var index = assignment.count
-        var addedLabels: [String] = []
-        for entry in unclaimed {
-            let canonical = canonicalLabel(preferring: entry.label)
-            // Setting `meeting` establishes the relationship; SwiftData maintains
-            // the inverse `meeting.speakers`.
-            let speaker = Speaker(
-                meeting: meeting,
-                label: canonical,
-                color: Color.speakerHex(for: index),
-                voiceprintData: entry.voiceprint.map(VectorData.encode)
-            )
-            modelContext.insert(speaker)
-            claimedLabels.insert(canonical)
-            addedLabels.append(canonical)
-            index += 1
-            stageCrossMeetingMatchIfPossible(for: speaker, voiceprint: entry.voiceprint, among: crossMeetingCandidates)
-        }
-
-        // Final state the UI (filter chips + speaker list) will render, plus the
-        // delta, so a "UI shows 1 speaker" report can be traced to the exact stage:
-        // if `final` here is >1 the data layer is correct and any UI mismatch is a
-        // view-refresh problem; if it's 1, the collapse happened upstream (see the
-        // diarizer's `turnSpeakers`/`speakers` log lines).
-        let finalLabels = claimedLabels.sorted()
-        AppLog.transcription.atNotice.notice("VM: syncSpeakers final=\(finalLabels.count, privacy: .public) [\(finalLabels.joined(separator: ", "), privacy: .public)] added=\(addedLabels.count, privacy: .public) removed=\(removed, privacy: .public) byVoice=\(byVoiceCount, privacy: .public) keptNamed=\(keptNamed, privacy: .public)")
     }
 }

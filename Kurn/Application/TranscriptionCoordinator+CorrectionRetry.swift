@@ -1,5 +1,5 @@
 //
-//  TranscriptionViewModel+CorrectionRetry.swift
+//  TranscriptionCoordinator+CorrectionRetry.swift
 //  Kurn
 //
 //  Retries only the correction stage over an already-saved transcript (H5 PR
@@ -7,14 +7,14 @@
 //  language, so a `.degraded`/`.failed` correction entry can be redone
 //  without repeating audio preprocessing, ASR, or diarization. Every other
 //  stage's warning falls back to a full re-transcribe — the architecture has
-//  no seam to re-run just one of them. Split out of `TranscriptionViewModel.swift`
+//  no seam to re-run just one of them. Split out of `TranscriptionCoordinator.swift`
 //  for the same file-length reason as its other `+`-extension siblings.
 //
 
 import Foundation
 import KurnCore
 
-extension TranscriptionViewModel {
+extension TranscriptionCoordinator {
     /// Re-runs `TranscriptionService.correctIfRequested` over `recording`'s
     /// current transcript segments and, on success, replaces just the
     /// correction entry of its `PipelineReport` — the rest of the report is

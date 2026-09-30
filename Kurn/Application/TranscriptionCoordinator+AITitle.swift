@@ -1,17 +1,17 @@
 //
-//  TranscriptionViewModel+AITitle.swift
+//  TranscriptionCoordinator+AITitle.swift
 //  Kurn
 //
-//  AI title generation, split out of TranscriptionViewModel.swift to keep that
+//  AI title generation, split out of TranscriptionCoordinator.swift to keep that
 //  file under SwiftLint's file-length limit, the same reason
-//  TranscriptionViewModel+Summary.swift and
-//  TranscriptionViewModel+ResumeBudget.swift are separate files.
+//  TranscriptionCoordinator+Speakers.swift and
+//  TranscriptionCoordinator+ResumeBudget.swift are separate files.
 //
 
 import Foundation
 import KurnCore
 
-extension TranscriptionViewModel {
+extension TranscriptionCoordinator {
 
     // MARK: - AI title
 

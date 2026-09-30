@@ -1,24 +1,76 @@
 //
-//  TranscriptionViewModel+Summary.swift
+//  SummaryViewModel.swift
 //  Kurn
 //
-//  Summary generation, split out of TranscriptionViewModel.swift to keep that
-//  file under SwiftLint's file-length limit, the same reason
-//  TranscriptionViewModel+ResumeBudget.swift and
-//  TranscriptionViewModel+CrossMeetingSpeakerMatch.swift are separate files.
+//  Generating and translating a meeting's summaries — the Summary tab's work.
+//  Split out of the old `SummaryViewModel`, which also owned every
+//  transcription run; that half is now `TranscriptionCoordinator`
+//  (Application/), because the background processing window drives it too,
+//  while only the meeting screen ever starts a summary.
 //
 //  H4: a staged (map-reduce) summary run's map-stage checkpoint
 //  (`Meeting.summaryMapCheckpoint`) is read as a resume seed before the run
 //  starts and durably saved after every completed block, gating forward
-//  progress the same way `TranscriptionViewModel+ResumeBudget.swift` does for
-//  transcription chunks — see `storeSummaryMapCheckpointDurably` below.
+//  progress the same way `TranscriptionCoordinator+ResumeBudget.swift` does
+//  for transcription chunks — see `storeSummaryMapCheckpointDurably` below.
 //
 
 import Foundation
 import KurnCore
+import Observation
 import SwiftData
 
-extension TranscriptionViewModel {
+@MainActor
+@Observable
+final class SummaryViewModel {
+    var isSummarizing = false
+    /// True after the user asks to cancel a summary while the provider request
+    /// is still unwinding.
+    var isCancellingSummary = false
+    /// Staged-summary progress as (stage, total) when a long transcript is
+    /// being summarized in parts; nil for single-pass summaries.
+    var summaryProgress: (stage: Int, total: Int)?
+    /// True while an existing summary is being translated into another
+    /// language. Independent of `isSummarizing`/`summaryTask`: translating a
+    /// summary neither blocks nor is blocked by generating a new one, and it
+    /// is always single-pass so it needs no staged progress.
+    var isTranslatingSummary = false
+    /// The source summary and target language of the in-flight translation,
+    /// so the Summary tab can show *which* chip is translating rather than a
+    /// generic spinner. Set together with `isTranslatingSummary`.
+    var translatingSummaryID: UUID?
+    var translationTargetLanguage: MeetingLanguage?
+    /// The last summary or translation failure, for the meeting screen's
+    /// `.errorAlert`.
+    var error: AppError?
+
+    /// Active summary task, owned here so the detail screen can cancel it.
+    var summaryTask: Task<Void, Never>?
+    /// Active translation task. Not `private` —
+    /// `SummaryViewModel+Translation.swift` needs it.
+    var translationTask: Task<Void, Never>?
+
+    /// Not `private` — `SummaryViewModel+Translation.swift` needs these.
+    let modelContext: ModelContext
+    let summaryService: SummaryService
+    /// Records which template was used (`UsageStats`). `nil` only in tests.
+    let appSettings: AppSettings?
+
+    init(
+        modelContext: ModelContext,
+        appSettings: AppSettings? = nil,
+        summaryService: SummaryService = SummaryService()
+    ) {
+        self.modelContext = modelContext
+        self.appSettings = appSettings
+        self.summaryService = summaryService
+    }
+
+    /// Persist pending model changes, surfacing a failure through `error`
+    /// instead of dropping it.
+    func persist() {
+        if let failure = modelContext.saveOrError() { error = failure }
+    }
 
     // MARK: - Summary
 

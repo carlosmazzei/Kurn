@@ -6,7 +6,7 @@
 //  cleanup, language detection, and voice-activity detection — plus the typed
 //  stage reports they produce (H5 PR 11). Extracted from
 //  `TranscriptionService.transcribe` for the same reason
-//  `TranscriptionViewModel+Summary.swift` was: recording an outcome per stage
+//  `SummaryViewModel.swift` was: recording an outcome per stage
 //  pushed one already-long function past SwiftLint's body-length limit.
 //
 //  Every branch that steps down here — cleanup failing and using the original

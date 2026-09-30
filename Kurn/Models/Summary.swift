@@ -17,7 +17,7 @@ final class Summary {
     /// multi-summary feature shipped is linked through this property.
     var owningMeeting: Meeting?
     /// JSON-encoded `[SummarySection]` — the template-driven summary body.
-    /// Not `private`: `TranscriptionViewModel.generateSummary` writes it
+    /// Not `private`: `SummaryViewModel.generateSummary` writes it
     /// directly with an already-encoded, pre-checked payload rather than
     /// encoding `sections` a second time through the setter below. Matches
     /// `Transcript.segmentsData`'s access level for the same reason.
@@ -43,7 +43,7 @@ final class Summary {
         self.owningMeeting = meeting
         // `?? Data()` only ever applies to the `= []` default here; a real
         // payload that fails to encode goes through
-        // `TranscriptionViewModel.generateSummary`'s explicit pre-check
+        // `SummaryViewModel.generateSummary`'s explicit pre-check
         // instead, which fails the save. See `JSONStorage.encodeAuthoritative`.
         self.sectionsData = JSONStorage.encodeAuthoritative(sections) ?? Data()
         self.templateName = templateName

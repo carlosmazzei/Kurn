@@ -126,7 +126,7 @@ final class MeetingChatViewModel {
     /// The reply streams in: `MeetingChatService` reports `ChatStreamEvent`s
     /// from off the main actor, so they are bridged through an `AsyncStream`
     /// into a single `@MainActor` consumer task that applies them in order —
-    /// the same pattern `TranscriptionViewModel` uses for transcription
+    /// the same pattern `TranscriptionCoordinator` uses for transcription
     /// phases. The assistant `Turn` is created lazily, on the first text
     /// delta, so an error before any text arrives leaves no stray turn behind.
     func send(
@@ -190,7 +190,7 @@ final class MeetingChatViewModel {
 
         // Close the channel and wait for the consumer to apply every pending
         // event before touching completion/error state, the same
-        // `drainEvents` idiom `TranscriptionViewModel` uses for its own
+        // `drainEvents` idiom `TranscriptionCoordinator` uses for its own
         // off-main phase callbacks.
         func drainEvents() async {
             continuation.finish()

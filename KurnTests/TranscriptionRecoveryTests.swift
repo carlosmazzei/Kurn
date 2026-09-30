@@ -133,12 +133,12 @@ struct TranscriptionRecoveryTests {
     }
 
     @Test func onlyExplicitCancellationCanResumeAutomatically() {
-        #expect(TranscriptionViewModel.isResumableCancellation(
+        #expect(TranscriptionCoordinator.isResumableCancellation(
             .networkError(URLError(.cancelled))
         ))
-        #expect(!TranscriptionViewModel.isResumableCancellation(
+        #expect(!TranscriptionCoordinator.isResumableCancellation(
             .networkError(URLError(.timedOut))
         ))
-        #expect(!TranscriptionViewModel.isResumableCancellation(.ambiguousProviderResult))
+        #expect(!TranscriptionCoordinator.isResumableCancellation(.ambiguousProviderResult))
     }
 }

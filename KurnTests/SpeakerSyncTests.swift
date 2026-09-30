@@ -31,7 +31,7 @@ struct SpeakerSyncTests {
 
     private struct Fixture {
         var context: ModelContext
-        var viewModel: TranscriptionViewModel
+        var viewModel: TranscriptionCoordinator
         var meeting: Meeting
         var recording: Recording
         /// A second recording in the same meeting, for the cross-recording
@@ -52,7 +52,7 @@ struct SpeakerSyncTests {
         context.insert(recordingB)
         return Fixture(
             context: context,
-            viewModel: TranscriptionViewModel(modelContext: context),
+            viewModel: TranscriptionCoordinator(modelContext: context),
             meeting: meeting,
             recording: recording,
             recordingB: recordingB

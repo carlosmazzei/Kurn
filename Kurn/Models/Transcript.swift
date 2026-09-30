@@ -42,7 +42,7 @@ final class Transcript {
         self.recording = recording
         // `?? Data()` only ever applies to the `= []` default here, which
         // trivially encodes; a real payload that fails to encode goes
-        // through `TranscriptionViewModel.saveTranscript`'s explicit
+        // through `TranscriptionCoordinator.saveTranscript`'s explicit
         // pre-check instead, which fails the save rather than reaching this
         // fallback. See `JSONStorage.encodeAuthoritative`.
         self.segmentsData = JSONStorage.encodeAuthoritative(segments) ?? Data()

@@ -131,7 +131,7 @@ Linux; the README
 badge reads the `main` total). Coverage is informational only (`codecov.yml`)
 and excludes SwiftPM checkouts and test sources; do not add a coverage
 threshold or make the upload fatal. `codecov.yml` declares one component per
-layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `ViewModels`,
+layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `Application`, `ViewModels`,
 `Views`, KurnCore) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
 `Kurn/AppIntents` and `Kurn/DebugSupport` until a job executes them;
 `Tools/coverage_report.py` renders the per-layer table into the job summary.
@@ -314,17 +314,25 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   `ProviderURLPolicy` owns destination validation, `ProviderHTTPTransport` owns
   bounded execution/retry, and `ProviderResponseParsing` owns decoding contracts.
 - **Application/** — `@MainActor` use cases over the store that sit below the
-  UI: `MeetingLibrary` owns every user-initiated library mutation (create and
-  delete meetings, recordings, photos, summaries; tags, folders, smart folders,
-  generated documents), with their rules — trimmed names, case-insensitive tag
-  uniqueness, journaled file cleanup — and throws the save failure as
-  `AppError`. Views call it; they never `insert`/`delete` into a
-  `ModelContext` themselves.
-- **ViewModels/** — `@MainActor @Observable` coordinators owning services and
-  persisting results.
+  UI, driven by the scene and by non-UI entry points alike:
+  - `MeetingLibrary` owns every user-initiated library mutation (create and
+    delete meetings, recordings, photos, summaries; tags, folders, smart
+    folders, generated documents), with their rules — trimmed names,
+    case-insensitive tag uniqueness, journaled file cleanup — and throws the
+    save failure as `AppError`. Views call it; they never `insert`/`delete`
+    into a `ModelContext` themselves.
+  - `TranscriptionCoordinator` owns every transcription run: start, pause,
+    stop, resume budget, persisting the transcript, speaker reconciliation
+    (`+Speakers`), correction retry, and the post-transcription enrichment
+    it hands to `AITitleCoordinator`, `SemanticIndexCoordinator` and
+    `WikiCoordinator`. It is `@Observable` because the meeting screen renders
+    per-recording progress from it, but it serves the `BGProcessingTask`
+    runner as much as the UI, which is why it is not a view model.
+- **ViewModels/** — `@MainActor @Observable` state for one kind of screen:
+  `SummaryViewModel` (generate/translate summaries), `RecorderViewModel`,
+  `MeetingChatViewModel`, `DocumentGenerationViewModel`, …
 - **Views/** — SwiftUI screens, plus the UIKit glue that hosts them
   (`SecurityCoverWindow`).
-
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
   the durable provider circuit used only by automatic cloud enrichment, the
   large-transfer policy shared by cloud audio and model downloads, and the
@@ -334,7 +342,7 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 - **AppIntents/** — `StartRecordingIntent`/`KurnShortcuts` (Siri, Shortcuts);
   the matching Control Center control lives in `KurnLiveActivityExtension`.
 - **Composition root** — `Kurn/AppComposition.swift` builds every
-  store-dependent coordinator (`TranscriptionViewModel`,
+  store-dependent coordinator (`TranscriptionCoordinator`, `SummaryViewModel`,
   `SemanticIndexCoordinator`, `WikiCoordinator`, …) with its dependencies
   passed at construction, runs the launch recovery sweeps once per container,
   and owns the instances for the life of the process. The scene
@@ -353,8 +361,9 @@ Dependencies point down: Models/Providers/Services/Infrastructure/Application/
 AppIntents never name a type declared in ViewModels/ or Views/, and ViewModels/
 never name one declared in Views/. `Tools/check_static_policy.py` enforces this
 (`upward-dependency`), together with no store mutations (`view-store-mutation`)
-and no `KeychainManager` (`view-keychain`) in Views. The one grandfathered
-exception is `TranscriptionScheduler` driving `TranscriptionViewModel`.
+and no `KeychainManager` (`view-keychain`) in Views. There are no
+grandfathered exceptions; keep it that way by moving a shared type down or
+inverting the dependency, not by adding a baseline entry.
 
 ### Change discipline
 
@@ -969,7 +978,7 @@ speaker, computed *after* smoothing and any collapse rescue so it describes the
 speaker as finally reported. `Speaker.voiceprintData` persists it through
 `VectorData`, in the store, never in a sidecar file.
 
-`TranscriptionViewModel.syncSpeakers` then reconciles as a total assignment
+`TranscriptionCoordinator.syncSpeakers` then reconciles as a total assignment
 rather than a diff, **one recording at a time, in `recordedAt` order**: labels
 are produced per *recording* (the diarizer numbers them independently on every
 run) while `Speaker` is per *meeting*, so a recording's own labels are matched,
@@ -1177,7 +1186,7 @@ instead of restarting from scratch:
   on backgrounding whenever pending/in-progress work remains (skipped for
   FluidAudio engines, which can't compile CoreML models in the background).
   The task resumes pending recordings and checkpoints cooperatively before its
-  time window expires, on the app's own `TranscriptionViewModel` (from
+  time window expires, on the app's own `TranscriptionCoordinator` (from
   `AppComposition`), so a run finished there gets the same indexing and wiki
   post-processing as a foreground one.
 - `Infrastructure/TranscriptionRecovery.swift` sweeps recordings stuck at
@@ -1317,7 +1326,7 @@ map-reduce pass (condense each block, then summarize the combined notes) and
 raises the output budget/timeout (8192 tokens, 300s) so long transcripts don't
 truncate mid-JSON or time out; a truncated response surfaces as
 `AppError.summaryTruncated` instead of a confusing decode error. Summary generation is
-owned by `TranscriptionViewModel.startSummary`, which keeps the Summary tab in a
+owned by `SummaryViewModel.startSummary`, which keeps the Summary tab in a
 non-reentrant progress state and supports cooperative cancellation.
 
 ### Cross-device control (Watch + Live Activity)
@@ -1458,7 +1467,7 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
 - **Indexing.** After a transcript is persisted, `TranscriptChunker` splits it
   into short passages (absolute meeting timestamps + dominant speaker),
   `SemanticIndexService` embeds them off-main, and `SemanticIndexCoordinator`
-  (`@MainActor`, app-wide, created in `KurnApp`) persists them as `SemanticChunk`
+  (`Application/`, `@MainActor`, app-wide, built by `AppComposition`) persists them as `SemanticChunk`
   rows. Indexing is automatic after transcription completion and a low-priority
   launch/foreground **backfill** re-indexes meetings transcribed before the
   feature existed (or by an older embedder, tracked via `modelIdentifier`). Gated
@@ -1555,7 +1564,7 @@ decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
 - **Staleness is tracked, and a rebuild replaces.** `sourceContentHash` /
   `generatorModelIdentifier` are the wiki analogue of `SemanticChunk`'s
   `modelIdentifier` check; when the transcript or the generating model changes
-  the article is rebuilt, never appended to. `WikiCoordinator` (`ViewModels/`)
+  the article is rebuilt, never appended to. `WikiCoordinator` (`Application/`)
   owns the main-actor/SwiftData half; the LLM call runs off-main in the service.
 - Gated by `AppSettings.wikiEnabled`, **off by default** — it makes a paid cloud
   LLM call per transcription.

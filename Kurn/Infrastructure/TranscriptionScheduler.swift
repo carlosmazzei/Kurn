@@ -26,14 +26,14 @@ import UIKit
 #endif
 
 /// What a background processing window needs from the running app: the open
-/// store and the app's own transcription view model and settings — the same
+/// store and the app's own transcription coordinator and settings — the same
 /// instances the scene uses (`AppComposition`), so a run finished here gets the
 /// same post-transcription indexing and wiki work as one finished in the
 /// foreground, and cannot race a foreground run of the same recording.
 @MainActor
 struct BackgroundTranscriptionContext {
     let container: ModelContainer
-    let transcription: TranscriptionViewModel
+    let transcription: TranscriptionCoordinator
     let settings: AppSettings
 }
 
@@ -190,13 +190,13 @@ enum TranscriptionScheduler {
     }
 }
 
-/// Drives a background-window resume pass on the app's own view model, and
+/// Drives a background-window resume pass on the app's own coordinator, and
 /// lets the expiration handler reach it without capturing non-`Sendable`
 /// state.
 @MainActor
 private final class BackgroundTranscriptionRunner {
     static let shared = BackgroundTranscriptionRunner()
-    private var transcription: TranscriptionViewModel?
+    private var transcription: TranscriptionCoordinator?
 
     /// Resume every `.pending` recording, wait for the runs to finish (or be
     /// paused by `pause()`), re-arm the scheduler when a backlog remains, and

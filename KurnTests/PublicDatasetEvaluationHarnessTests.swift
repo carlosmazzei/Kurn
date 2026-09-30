@@ -3,7 +3,7 @@
 //  KurnTests
 //
 //  Runs the app's actual pipeline — `TranscriptionService`, exactly as
-//  `TranscriptionViewModel` drives it, not a stand-in — over public benchmark
+//  `TranscriptionCoordinator` drives it, not a stand-in — over public benchmark
 //  audio, once per configuration in `PipelineEvaluationMatrix`. This is what
 //  answers "does audio cleanup help", "which diarizer is better", "which ASR
 //  engine wins" with a measured number instead of an inference from the

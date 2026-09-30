@@ -22,8 +22,8 @@ struct SettingsView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     /// Optional: Settings also renders in the security cover window, which
-    /// does not inject the transcription view model.
-    @Environment(TranscriptionViewModel.self) var transcription: TranscriptionViewModel?
+    /// does not inject the transcription coordinator.
+    @Environment(TranscriptionCoordinator.self) var transcription: TranscriptionCoordinator?
 
     /// The FluidAudio download state shared by the Transcription, Recording and
     /// Storage screens. Owned by `KurnApp` rather than here: the diarization

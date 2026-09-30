@@ -199,6 +199,7 @@ struct KurnApp: App {
                 .environment(accessGate)
                 .environment(downloads)
                 .environment(appEnvironment.transcription)
+                .environment(appEnvironment.summaries)
                 .environment(appEnvironment.playbackEnhancement)
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)

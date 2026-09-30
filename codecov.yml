@@ -59,6 +59,9 @@ component_management:
     - component_id: services
       name: Services
       paths: [Kurn/Services/**]
+    - component_id: application
+      name: Application
+      paths: [Kurn/Application/**]
     - component_id: viewmodels
       name: ViewModels
       paths: [Kurn/ViewModels/**]

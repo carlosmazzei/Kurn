@@ -9,7 +9,7 @@
 //  use. Unlike `MeetingChatReliabilityEventTests` (which calls the service
 //  directly), `task` is private, so this polls `isResponding` for completion
 //  — the same constraint already documented for
-//  `TranscriptionViewModelSummaryStateTests`' `waitUntilLLMCalled()`. It
+//  `SummaryViewModelStateTests`' `waitUntilLLMCalled()`. It
 //  passes its own `runID` to `send` and filters by it: filtering by
 //  operation/stage alone picked up `MeetingChatViewModelSessionTests`'
 //  concurrent "view_model" events, which `.serialized` cannot prevent since
