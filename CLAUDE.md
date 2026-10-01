@@ -77,7 +77,7 @@ substitution on `project.pbxproj` (not `increment_version_number`/`xcodeproj`,
 which reorder unrelated parts of this file because it uses Xcode 16
 file-system-synchronized groups), then commits, tags `vX.Y.Z`, and pushes —
 run locally by a maintainer. Pushing that tag starts the pipeline in
-`.github/workflows/swift.yml` once all five CI jobs pass: `release` publishes the
+`.github/workflows/swift.yml` once all six CI jobs pass: `release` publishes the
 GitHub Release; `beta` signs via readonly `fastlane match`, uploads to TestFlight,
 and waits for Apple processing; and `store-assets` calls the reusable
 `.github/workflows/screenshots.yml` to capture iPhone/iPad/Watch screenshots and
@@ -116,26 +116,51 @@ Builds and tests require macOS + Xcode, so they can't run in Linux/CI agents or
 any environment without the Apple toolchain. When you cannot build or test
 locally, **do not claim a change compiles or passes — verify it through the
 GitHub Actions `iOS CI` workflow** (`.github/workflows/swift.yml`). It is five
-independently-reporting jobs: `lint-and-validate` (SwiftLint, localization and
+independently-reporting test/check jobs plus the `coverage-gate` that follows them: `lint-and-validate` (SwiftLint, localization and
 store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
 `unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
 `ui-accessibility-tests` (`KurnUITests` minus the screenshot suite) and
 `kurncore-linux` (`swift test` for `Packages/KurnCore`). The `release` job
-needs all five. The weekly/on-demand `reliability-hardening.yml` adds a Thread
+needs all six. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
 test run and a UI-test flake measurement. The three test jobs also upload
 lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`, via
 `.github/actions/upload-xcode-coverage`, which converts the `.xcresult`
 coverage archive with `Tools/xccov_to_lcov.py`, and `llvm-cov export` on
 Linux; the README
-badge reads the `main` total). Coverage is informational only (`codecov.yml`)
-and excludes SwiftPM checkouts and test sources; do not add a coverage
-threshold or make the upload fatal. `codecov.yml` declares one component per
+badge reads the `main` total). Codecov itself stays informational
+(`codecov.yml`) and excludes SwiftPM checkouts and test sources; do not make
+the Codecov upload fatal — the gate below is ours, so a Codecov outage never
+blocks a merge. `codecov.yml` declares one component per
 layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `Application`, `ViewModels`,
 `Views`, KurnCore) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
 `Kurn/AppIntents` and `Kurn/DebugSupport` until a job executes them;
 `Tools/coverage_report.py` renders the per-layer table into the job summary.
 The phased plan for raising coverage is `docs/testing-coverage-plan.md`.
+
+**Coverage gate (target: 80%).** `coverage-gate` unions the three lcov
+reports with `Tools/coverage_gate.py` and fails a PR on either of two checks,
+both restricted to the files `Tools/coverage_scope.json` puts in scope — app
+logic (`Kurn/` minus `Views/`, `ContentView.swift`, `DebugSupport/`,
+`AppIntents/`) and KurnCore's sources:
+
+- **Patch:** the executable in-scope lines a PR adds must be ≥ 80% covered.
+  Untested new logic is the failure this exists to catch; write the test in
+  the same PR rather than moving the code somewhere unmeasured.
+- **Floor:** the in-scope total and each layer may not drop more than 0.5pp
+  below `Tools/coverage_floor.json`. The floor is a ratchet: a PR that raises
+  coverage runs `python3 Tools/coverage_gate.py --write-floor <lcovs>` (the
+  three reports are artifacts of the run) and commits the result. Never lower
+  a floor or add an exclusion to make a PR pass.
+
+An exclusion is legitimate only for code no test target can run: a SwiftUI
+view body, or an **adapter** — a file that only wraps an API needing
+hardware, a downloaded model, Metal/ANE or an entitlement, with every decision
+it used to make already moved into a tested type. Each `exclude` entry states
+that reason; new logic inside an excluded adapter is a review bug. Pure
+presentation logic does not belong in `Views/` (where it would be excluded);
+put it beside the type it presents. `Tools/tests/` covers the gate itself and
+runs in `static-policy`.
 
 To verify a change through CI:
 

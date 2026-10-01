@@ -363,7 +363,8 @@ xcodebuild \
 ```
 
 CI is configured in `.github/workflows/swift.yml` (`iOS CI`) and runs on every
-push to `main` and every pull request targeting it, as five independent jobs:
+push to `main` and every pull request targeting it, as five independent jobs
+followed by a `coverage-gate`:
 `lint-and-validate` (SwiftLint, localization and store-metadata checks),
 `static-policy` (`python3 Tools/check_static_policy.py` — bans unchecked
 `save()`, `fatalError`, ad-hoc `URLSession`s and raw error text in public
@@ -380,10 +381,14 @@ profile data on Linux) and upload
 them to [Codecov](https://codecov.io/gh/carlosmazzei/Kurn) under the
 `unittests`, `uitests` and `kurncore` flags, which is what the badge at the
 top of this file reports. Third-party SwiftPM checkouts and test sources are
-excluded so the number describes first-party production code. Coverage is
-informational only (`codecov.yml` marks every status `informational: true`):
-it is visible on every PR but never blocks a merge, since no coverage
-threshold with a real baseline has been established. `codecov.yml` also
+excluded so the number describes first-party production code. Codecov's own
+statuses stay informational (`codecov.yml` marks every status
+`informational: true`); the blocking check is the in-repo `coverage-gate` job
+(`Tools/coverage_gate.py`), which requires a PR's new in-scope lines to be at
+least 80% covered and holds the in-scope total and each layer at the ratchet
+recorded in `Tools/coverage_floor.json`. The scope — app logic and KurnCore,
+without SwiftUI view bodies and a short, justified list of exclusions — is
+`Tools/coverage_scope.json`; the target for it is 80%. `codecov.yml` also
 declares one Codecov *component* per architectural layer (Infrastructure,
 Providers, Models, Services, ViewModels, Views, KurnCore) so the PR comment
 shows where coverage moved, and `Tools/coverage_report.py` writes the same
@@ -418,7 +423,7 @@ Fastlane-driven process (see `fastlane/Fastfile`):
    targets, commits, tags the commit `vX.Y.Z`, and pushes both to `main`.
 2. Pushing the `vX.Y.Z` tag triggers the `release` job in
    `.github/workflows/swift.yml` (gated on tag pushes), which runs once the
-   same five CI jobs that gate every push/PR pass, then publishes a
+   same six CI jobs that gate every push/PR pass, then publishes a
    GitHub Release with auto-generated notes.
 
 Pushing the tag also starts the protected App Store pipeline. After the CI

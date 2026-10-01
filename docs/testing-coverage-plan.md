@@ -1,202 +1,144 @@
-# Kurn — Plano para melhorar a cobertura de testes
+# Kurn: plano para 80% de cobertura mínima
 
-Base: lcov reais do CI em `main` (04/09/2026, após o merge do #186).
-`unittests` + `uitests` combinados: **46,9 %** das 26 545 linhas executáveis de
-primeira parte (unit sozinho: 39,7 %). `kurncore` (Linux): 46,2 %.
+## Meta e regras
 
-## 1. Onde a cobertura está (e onde não está)
+- **Meta: 80% de cobertura de linhas sobre o código em escopo**, exigida no CI
+  pelo job `coverage-gate` (`Tools/coverage_gate.py`).
+- **Escopo** (`Tools/coverage_scope.json`): a lógica do app (`Kurn/`, sem
+  `Views/`, `ContentView.swift`, `DebugSupport/` e `AppIntents/`) mais os
+  fontes do KurnCore. Os corpos de view SwiftUI ficam fora, porque são
+  exercitados pelos fluxos de `KurnUITests`, e não por esta métrica. Pela mesma
+  regra, também fica fora todo **adapter**: arquivo que só embrulha uma API
+  que exige hardware, modelo baixado, Metal/ANE ou entitlement. Um adapter
+  só entra em `exclude` quando toda a decisão que ele tomava já está num tipo
+  testado, e cada entrada traz a sua justificativa.
+- **Gate de patch:** as linhas executáveis em escopo que um PR adiciona
+  precisam estar ≥ 80% cobertas, desde já.
+- **Piso (catraca):** o total em escopo e cada camada não podem cair mais de
+  0,5pp abaixo de `Tools/coverage_floor.json`. O PR que sobe a cobertura roda
+  `coverage_gate.py --write-floor` e commita o piso novo. O piso nunca desce.
+- O Codecov continua informativo (badge, comentário, componentes). O gate é
+  nosso, então uma queda do Codecov não bloqueia merge.
+- Sem testes que dependam de rede, modelo baixado ou microfone. Seams vêm antes
+  dos testes, e nunca se usa `#if DEBUG` dentro da lógica (mesma regra do plano anterior).
 
-| Camada | Linhas | Combinado | Só unit | Não cobertas |
-|---|---:|---:|---:|---:|
-| `Kurn/Views` | 8 449 | 23,4 % | 7,2 % | **6 469** |
-| `Kurn/Services` | 9 188 | 50,8 % | 49,9 % | **4 516** |
-| `Kurn/ViewModels` | 2 400 | 32,2 % | 29,1 % | **1 626** |
-| `Kurn/Infrastructure` | 3 306 | 80,9 % | 80,5 % | 631 |
-| `KurnWatch` | 240 | 0 % | 0 % | 240 |
-| `KurnLiveActivityExtension` | 228 | 0 % | 0 % | 228 |
-| `Kurn/Models` | 852 | 82,6 % | 82,5 % | 148 |
-| `Kurn/Providers` | 1 184 | 88,5 % | 88,5 % | 136 |
-| `Kurn/AppIntents` | 60 | 0 % | 0 % | 60 |
-| `Kurn/DebugSupport` | 362 | 97,5 % | 0 % | 9 |
+## Ponto de partida
 
-Leitura: o trilho de resiliência (Infrastructure/Providers/Models) está bem
-coberto. O gap está em três lugares — **Views** (54 % de todas as linhas não
-cobertas), **Services de áudio/pipeline** que dependem de hardware ou de
-modelos, e **ViewModels grandes** com muitas dependências concretas.
+Última medição registrada aqui (04/09/2026, antes das fases 2 e 3 do plano anterior):
 
-### Top 15 arquivos por linhas não cobertas
+| Camada | Linhas | Combinado (unit+UI) |
+|---|---:|---:|
+| `Kurn/Services` | 9 188 | 50,8% |
+| `Kurn/ViewModels` | 2 400 | 32,2% |
+| `Kurn/Infrastructure` | 3 306 | 80,9% |
+| `Kurn/Models` | 852 | 82,6% |
+| `Kurn/Providers` | 1 184 | 88,5% |
+| `Packages/KurnCore` | — | 46,2% |
+| `Kurn/Views` (fora do escopo) | 8 449 | 23,4% |
 
-| Arquivo | Linhas | Cob. | Não cob. | Por quê |
-|---|---:|---:|---:|---|
-| `Services/TranscriptionService.swift` | 616 | 7,5 % | 570 | Orquestra 16 engines concretos criados no `init`; só testado via harness (skip em CI) |
-| `Services/AudioRecorderService.swift` | 630 | 20,3 % | 502 | `AVAudioEngine`/sessão de áudio real; só a parte de storage/stall é testada |
-| `ViewModels/TranscriptionViewModel.swift` | 633 | 36,3 % | 403 | Só o caminho de atribuição de erro tem teste |
-| `Views/SettingsProviderViews.swift` | 457 | 15,1 % | 388 | UI test não navega para Providers |
-| `Views/MeetingDetailView.swift` | 736 | 51,6 % | 356 | Só o audit de acessibilidade passa por aqui |
-| `Services/Pipeline/WhisperCppTranscriber.swift` | 322 | 0,3 % | 321 | Requer modelo ggml baixado |
-| `Views/Settings/StorageSettingsView.swift` | 309 | 2,6 % | 301 | Não navegada |
-| `Views/Settings/TranscriptionSettingsView.swift` | 292 | 0 % | 292 | Não navegada |
-| `Views/MeetingChatView.swift` | 269 | 0 % | 269 | Não navegada |
-| `Views/FolderSidebarView.swift` | 265 | 0 % | 265 | iPad-only |
-| `ViewModels/ModelDownloadController.swift` | 277 | 8,3 % | 254 | Máquina de estados de confirmação/download sem teste |
-| `Views/MeetingShareSelectionView.swift` | 253 | 0 % | 253 | Não navegada |
-| `Views/TagManagementView.swift` | 231 | 0 % | 231 | Não navegada |
-| `Views/DocumentCreateView.swift` | 230 | 0 % | 230 | Não navegada |
-| `ViewModels/RecorderViewModel.swift` | 392 | 44,6 % | 217 | Caminhos de erro/interrupção sem teste |
+Depois disso, entraram o `PipelineEngineCatalog`, o `AudioCaptureEngine`, os
+testes de máquina de estados dos ViewModels, o `PlaybackTransport`, a extração
+de lógica das Views e os fluxos de UI. Além disso, a camada `Application/` foi
+criada. A tabela atual, já no escopo novo, sai do primeiro run do
+`coverage-gate` (job summary) e fica registrada em `Tools/coverage_floor.json`.
 
-Outros com 0–10 % e alto valor: `Infrastructure/TranscriptionScheduler.swift`
-(123 linhas, 2,4 % — é infra pura, o único buraco relevante da camada),
-`Services/LiveTranscriptionService.swift` (5,8 %),
-`Services/Pipeline/TranscriptionServiceInputPreparation.swift` (0 %),
-`ViewModels/TranscriptionViewModel+Summary.swift` (0 %),
-`Services/AudioPlayerService.swift` (12 %), `Services/FluidAudioDiarizer.swift`
-(5,3 %, modelo), `Services/OnDeviceTranscriber.swift` (12,6 %, Apple Speech).
+Até a Fase 0, o relatório do KurnCore nunca chegava ao Codecov: o export
+avisava, saía com 0 e deixava o job verde.
 
-## 2. Princípios
+## Fases (cada uma pode ter vários PRs, e cada PR sobe o piso)
 
-1. **Medir o que importa, não perseguir o número.** Meta por camada, não meta
-   global: um `README` com 70 % obtido cobrindo `Views` com snapshots vale
-   menos do que 80 % em `Services`.
-2. **Sem testes que dependem de rede, modelo baixado ou microfone em CI.** O
-   projeto já tem a resposta certa (`EvaluationHarnessTests` só roda com
-   `KURN_EVAL_DATA`); código que exige modelo fica atrás de um protocolo e o
-   protocolo é testado com fake.
-3. **Seams antes de testes.** Nos três arquivos maiores, o motivo da baixa
-   cobertura é estrutural (dependências concretas no `init`). Primeiro
-   injetar, depois testar — nunca `#if DEBUG` dentro da lógica.
-4. **Cobertura do trilho H1–H10 não pode cair.** Adicionar ao `codecov.yml`
-   um flag/`target` informativo por diretório (`Infrastructure/`,
-   `Providers/`) para que uma queda apareça no comentário do PR.
-5. Não alterar testes para "passar"; testes flaky por estado global (como os
-   dois corrigidos no #186) são bugs de isolamento e entram no plano.
+### Fase 0: medir e ligar o gate ✅ (este PR)
 
-## 3. Fases (cada fase = 1 PR revisável; estimativa em sessões Devin)
+- Export do KurnCore consertado. Agora ele falha alto e publica o lcov como artifact.
+- `Tools/lcov.py` (leitura e escopo compartilhados), `Tools/coverage_gate.py`,
+  `Tools/coverage_scope.json`, `Tools/coverage_floor.json`, com testes em
+  `Tools/tests/` rodando no `static-policy`.
+- Job `coverage-gate` (precisa de `unit-tests`, `ui-accessibility-tests` e
+  `kurncore-linux`). O `release`, o `beta` e o `store-assets` dependem dele.
+- Passo manual do mantenedor: marcar `coverage-gate` como check obrigatório
+  na branch protection de `main`.
+- Em seguida, registrar o piso inicial com os valores medidos.
 
-### Fase 0 — Tornar a cobertura acionável (½ sessão)
+### Fase 1: KurnCore ≥ 85% (1 PR)
 
-- `codecov.yml`: `flags` por camada (`services`, `viewmodels`, `views`,
-  `infrastructure`) além dos três atuais; `comment.layout` com `flags`;
-  `ignore` para `KurnWatch/`, `KurnLiveActivityExtension/` **até** existir um
-  job que os exercite (hoje distorcem o total para baixo sem chance de subir).
-- `Tools/coverage_report.py`: lê o(s) lcov do artifact e imprime a tabela da
-  seção 1 (por camada + top-N arquivos). Roda no job summary de `unit-tests`
-  para que cada PR mostre para onde a cobertura foi.
-- Ganho direto: 0 pontos; torna as fases seguintes mensuráveis.
+É o ganho mais barato: Foundation pura, `swift test` no Linux e iteração local
+sem esperar o macOS. O alvo é o que o relatório `kurncore` apontar como
+descoberto (`SpokenText`, `PCMWaveFile`, `ReliabilityEvent`, os tipos de
+valor do pipeline e os seams de filesystem/relógio).
 
-### Fase 1 — Vitórias baratas em Infrastructure/Services puros (1 sessão)
+### Fase 2: extrair a lógica dos adapters e excluir os cascos (2–3 PRs)
 
-Alvo: `Services` 50,8 % → ~58 %, `Infrastructure` 80,9 % → ~90 %.
+Para cada arquivo preso a framework, primeiro mover as decisões para um tipo
+puro testado em `KurnTests` e só depois listar o casco em `exclude`:
 
-- `TranscriptionScheduler` (2,4 %): já tem `register(contextProvider:)`;
-  testar `scheduleIfWorkRemains`, `run(_:)` com um `BackgroundTranscriptionContext` em memória
-  (padrão de `KurnSwiftDataTests`), `pause()`, e o caminho "sem trabalho".
-- `TranscriptionServiceInputPreparation` (0 %): funções sobre `URL`/arquivo —
-  usar `AudioFixtures` (já existe) para formatos válidos/inválidos.
-- `VADAudioCompactor` (32,7 %): ramos de "nenhum trecho de voz", "tudo voz",
-  segmentos adjacentes fundidos; `RecordingCompactor` (20,3 %): falha de
-  verificação, falha no swap atômico, cancelamento — usar
-  `FakeFileSystem`/`FakeAudioSinkWriting` já em `Support/FaultInjection`.
-- `RecordingSink` (44,5 %): ramos de erro do writer, disco cheio, interrupção
-  — `RecordingSinkFaultTests` já tem a estrutura; ampliar matriz.
-- `DocumentGenerationService` (31 %): caminho feliz com `LLMProvider` fake e
-  respostas malformadas (parsing), reaproveitando `MockURLProtocol`.
-- `LiveTranscriptionService` (5,8 %): separar a parte de buffer/janela (pura)
-  da parte `SFSpeechRecognizer` e testar a primeira.
+- `Services/Pipeline/WhisperCppTranscriber.swift`: agregação de peças
+  SentencePiece em palavras, montagem de params, `t0/t1` → spans.
+- `Services/OnDeviceTranscriber.swift`: validação de timings contra o range do
+  resultado e run → `TimedWordSpanBuilder`.
+- `FluidAudioDiarizer`, `FluidAudioTranscriber`, `FluidAudioVAD`,
+  `FluidAudioModelStore`, `FluidAudioMultilingualStreamingManager`,
+  `SherpaOnnxDiarizer`: `processTimeout` e montagem de config. O
+  pós-processamento já está em `SpeakerTurnSmoothing`, `SpeakerClusterRefiner`
+  e `SpeakerVoiceprints`.
+- `LockScreenRecordingController` (State → `ContentState`),
+  `PhoneSessionController` (codec do contexto e das mensagens),
+  `RecordingAccessGate` (política de relock), `Speech/SystemSpeechEngine` e
+  `Speech/CloudSpeechEngine` (fila e prefetch),
+  `CrashReporting/DiagnosticsSubscriber`.
+- Implementação real de `AudioCaptureEngine` e `CaptureAudioSession`: a
+  decisão já está em `CaptureInputSelection`.
+- Tipos de apresentação puros que hoje moram em `Views/`
+  (`MarkdownPresentation`, …) descem para junto do tipo que apresentam, para
+  voltar a contar.
 
-### Fase 2 — Seams nos três grandes (1–2 sessões)
+### Fase 3: Services ≥ 80% (3–4 PRs, o maior bloco)
 
-Alvo: `TranscriptionService` 7,5 % → ≥ 60 %; `AudioRecorderService`
-20 % → ≥ 55 %; `ViewModels` 32 % → ≥ 55 %.
+Usa os seams e fakes que já existem: `PipelineEngineCatalog`, `AudioCaptureEngine`,
+`KurnTests/Support/FaultInjection` (`FakeFileSystem`, `FakeAudioSinkWriting`),
+`AudioFixtures` e `MockURLProtocol`.
 
-- **`TranscriptionService`** (feito — `Kurn/Services/Pipeline/PipelineEngineCatalog.swift`,
-  `KurnTests/TranscriptionServicePipelineTests.swift`): mover a criação dos 16 engines para um
-  `PipelineEngineCatalog` (struct com closures/protocolos por estágio,
-  `Sendable`) recebido no `init` com default = engines reais. O
-  `transcribe(...)` passa a ser testável de ponta a ponta com fakes por
-  estágio: checkpoint retomado/descartado, `onPhase` em ordem, chunk loop,
-  `onDiarizationWarning`, cancelamento entre chunks, falha em um estágio
-  preservando o `PipelineStageReport`. Também destrava o refactor de tamanho
-  já apontado na revisão (600+ linhas).
-- **`AudioRecorderService`** (feito — `Kurn/Services/AudioCaptureEngine.swift`,
-  `KurnTests/AudioRecorderServiceCaptureTests.swift`): separar o núcleo de
-  estado (start/pause/resume/markHighlight/stop/cancel, storage, stall) de um
-  `AudioCaptureEngine` protocol que embrulha `AVAudioEngine`/`AVAudioSession`.
-  O fake dispara interrupções, mudança de rota, mudança de configuração/reset
-  de media services, formato não negociado e erros do sink — os cenários que
-  antes só o TSan lane exercitava indiretamente.
-- **`TranscriptionViewModel` / `+Summary` / `RecorderViewModel` /
-  `ModelDownloadController`**: já recebem dependências no `init`; escrever
-  testes de máquina de estados com fakes (`@MainActor` tests, sem UI):
-  transições de confirmação (batch ASR / diarization / VAD / whisper.cpp:
-  confirmar, cancelar, rede cara vs Wi-Fi via `LargeTransferPolicy`),
-  `deleteModel`, `refreshInstalledModels`; no `RecorderViewModel`, cada
-  `PauseReason`, stop com resultado nulo, launcher externo vs UI.
-- **`AudioPlayerService`**: extrair a lógica de rate/seek/skip/clamp para um
-  tipo puro; o `AVAudioPlayer` fica por trás de um protocolo.
+- `TranscriptionService` com `+Gating`, `+Diarization` e
+  `TranscriptionServiceInputPreparation`: cada fallback de
+  `effectiveDiarization`/`effectiveCorrection`, remap da compactação com
+  `speakerTurns`, escolha de chunk boundary, preprocess falhando → original.
+- `AudioRecorderService` e `RecordingSink`: matriz de interrupção, rota,
+  reconfiguração e falha de escrita pelo fake engine.
+- DSP com fixtures reais (o render offline roda no simulador):
+  `SpeakerDiarizer`, `EnergyVAD`, `DiarizationPreprocessor`, `AudioPreprocessor`,
+  `AudioChunker`, `RecordingCompactor`, `OfflineAudioRenderer` e `Enhancement/*`
+  (sem modelo → caminho DSP).
+- LLM com fake `LLMProvider`/`SpeechSynthesisProvider`: `SummaryService`,
+  `WikiService`, `DocumentGenerationService`, `AutoTaggingService`,
+  `MeetingChatService`, `Speech/ReadAloudController`.
+- `LiveTranscriptionService`: gate de in-flight e engine por idioma.
 
-### Fase 3 — Views com valor (1 sessão)
+### Fase 4: Application + ViewModels ≥ 80% (2 PRs)
 
-Alvo: `Views` 23 % → ~40 % sem snapshots frágeis.
+Testes `@MainActor` de máquina de estados sobre `TestModelContainer.make()`:
 
-- Extrair lógica de apresentação embutida nas Views para tipos puros
-  testáveis em `KurnTests` (padrão que `MeetingExport`/`MeetingFilter` já
-  seguem): formatação de `HealthRecoveryView+Sections` (agregação dos
-  estados de recovery), `FilterBarView` (composição de filtros),
-  `MarkdownText` (parser), `SegmentPlaybackScrubber` (mapeamento
-  tempo↔posição), `MeetingShareSelectionView` (seleção → `MeetingExport`).
-- Estender `KurnUITests` com **fluxos**, não só audit: Settings → Providers
-  (Foundation Models default, chave ausente), Settings → Transcription
-  (troca de engine sem download), Settings → Storage/Health & Recovery,
-  Tags e Folders CRUD, Share sheet até a seleção de formato Obsidian, Chat
-  (com provider indisponível → estado vazio). Cada fluxo com
-  `accessibilityIdentifier`s estáveis; medir o flake rate no lane
-  `reliability-hardening` antes de promover para o job obrigatório.
-- Não fazer: snapshot testing pixel-a-pixel (Liquid Glass/iOS 26 muda por
-  release; custo de manutenção alto, sinal baixo).
-- Entregue: `HealthRecoveryAggregation`, `PlaybackScrubberLayout`,
-  `MarkdownPresentation`, `MeetingShareSelection`/`MeetingShareFormat` e
-  `MeetingFilter.toggleTag/toggleStatus` (KurnCore), com suítes em
-  `KurnTests`; fluxos em `KurnUITests/Flows/` (`SettingsFlowUITests`,
-  `LibraryFlowUITests`, `ShareAndChatFlowUITests`). Medição no lane
-  `ui-flake-rate`: 5/5 tentativas verdes em `main`; os fluxos foram
-  promovidos ao job obrigatório `ui-accessibility-tests` (remoção das linhas
-  `-skip-testing` em `swift.yml`). Suíte que passar a oscilar volta para trás
-  de um skip até ser corrigida e re-medida.
+- `TranscriptionCoordinator` (+`Speakers`: matching total, ordem por
+  `recordedAt`, próximo label livre), `WikiCoordinator`,
+  `SemanticIndexCoordinator` (backfill), `AITitleCoordinator`,
+  `MeetingLibrary`, `AppComposition`.
+- `RecorderViewModel`, `SummaryViewModel`, `MeetingChatViewModel`,
+  `DocumentGenerationViewModel`, `ModelDownloadController`,
+  `RecordingCompactionViewModel`.
 
-### Fase 4 — Targets hoje em 0 % (1 sessão, opcional)
+### Fase 5: Infrastructure, Providers e Models ≥ 85%, e fechar em 80%
 
-- `KurnWatch` / `KurnLiveActivityExtension` / `AppIntents`: o código de UI
-  não roda no simulador iOS. Estratégia: mover a lógica compartilhável
-  (`WatchConnectivityManager` message codec, estado da Live Activity,
-  `StartRecordingIntent` → `RecordingLauncher`) para `KurnCore` ou para
-  tipos puros no target `Kurn`, cobertos em `KurnTests`/Linux. Um job
-  `watch-tests` (`KurnWatchUITests` no simulador watchOS) só se o flake rate
-  for aceitável — hoje é o mesmo follow-up já registrado na revisão.
-- Depois disso, remover o `ignore` da Fase 0.
+- `TranscriptionScheduler`, `RecordingRecovery`, `ModelDownloadConsent` e o
+  boot/salvage restante (em `KurnSwiftDataTests` quando precisar de isolamento
+  de processo).
+- Quando o total em escopo passar de 80%, o piso registrado fica ≥ 80%. A
+  partir daí a meta vira o mínimo, e a catraca só sobe.
 
-## 4. Metas propostas (informativas, como o `codecov.yml` já é)
+## Riscos
 
-| | Hoje | Após F1 | Após F2 | Após F3 |
-|---|---:|---:|---:|---:|
-| Total (unit+ui) | 46,9 % | ~52 % | ~62 % | ~68 % |
-| `Services` | 50,8 % | ~58 % | ~72 % | ~72 % |
-| `ViewModels` | 32,2 % | 32 % | ~58 % | ~60 % |
-| `Infrastructure` | 80,9 % | ~90 % | ~90 % | ~90 % |
-| `Views` | 23,4 % | 23 % | 25 % | ~40 % |
-
-Números derivados das linhas não cobertas por arquivo acima; são metas de
-planejamento, não SLO (mesma regra do H10: nada de gate numérico sem
-baseline).
-
-## 5. Riscos e decisões
-
-- Fase 2 toca `TranscriptionService` e `AudioRecorderService`, os dois
-  arquivos mais sensíveis do app; cada seam vai em PR próprio com o lane TSan
-  rodado antes do merge.
-- UI tests novos aumentam o tempo do job `ui-accessibility-tests`
-  (hoje ~15 min). Se passar de ~25 min, separar em job próprio.
-- Cobertura de `uitests` (15,7 %) e `unittests` (40 %) é somada pelo Codecov
-  no total; manter os flags separados como já está para não mascarar.
-- Decisão necessária: ordem F1→F2→F3 (recomendada: destrava refactor de
-  tamanho e cobre o pipeline crítico primeiro) ou F3 primeiro se a prioridade
-  for regressão visual das telas novas (Health & Recovery, Providers).
+- Mexer em `TranscriptionService` e `AudioRecorderService` exige rodar o lane
+  TSan (`reliability-hardening.yml`) antes do merge, num PR para cada seam.
+- A cobertura dos UI tests entra na união. Se um fluxo for desligado (skip por
+  flake), o total pode cair um pouco: a tolerância de 0,5pp absorve ruído, mas
+  não uma suíte inteira. Nesse caso, o PR que desliga a suíte explica a queda e
+  regrava o piso, e essa é a única exceção à regra de nunca baixar o piso.
+- Excluir arquivos é a forma mais fácil de "subir" o número. Por isso cada
+  exclusão traz a justificativa e é revisada como código.
