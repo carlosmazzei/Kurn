@@ -26,78 +26,10 @@ import Foundation
 import Observation
 import os
 
-struct AudioRecordingResult {
-    let fileName: String
-    let duration: TimeInterval
-    let highlights: [Highlight]
-    let photos: [CapturedPhotoRecord]
-    let captureFailure: AudioSinkFailure?
-}
-
-/// A photo captured mid-recording, buffered in memory (the file itself is
-/// already durably written by `PhotoFileStore` at capture time) until
-/// `stop()` hands it to `RecorderViewModel` for persistence as a
-/// `MeetingPhoto`, mirroring how `Highlight` is buffered here and persisted
-/// to `Recording.highlights` at finalize.
-struct CapturedPhotoRecord {
-    let id: UUID
-    let fileName: String
-    let capturedAt: TimeInterval
-    let createdAt: Date
-}
-
-enum AudioRecorderState: Equatable {
-    case idle
-    case recording
-    case paused
-}
-
-/// Why `pause()` was invoked. Attached to the diagnostic log line so
-/// Console / exported logs show WHY a recording paused — especially for
-/// the automatic triggers that fire without any user interaction.
-enum AudioRecorderPauseReason: String {
-    case userToggle = "user toggled pause (in-app button or Live Activity pill)"
-    case watchCommand = "Watch app pause command"
-    case audioInterruption = "audio session interruption began"
-    case engineRecoveryFailed = "engine recovery failed (tap rebuild after format change)"
-    case engineRestartFailed = "engine recovery failed (engine.start() after rebuild)"
-    case routeChanged = "input route became unavailable (oldDeviceUnavailable)"
-    case sinkFailure = "audio conversion or file write failed"
-    case captureStalled = "no output frames reached the recording file"
-}
-
 @MainActor
 @Observable
 final class AudioRecorderService: NSObject {
     typealias State = AudioRecorderState
-
-    /// Sample rate every recording is stored at, regardless of what the
-    /// microphone route negotiates (typically 48kHz built-in, 16kHz Bluetooth
-    /// HFP). Speech occupies roughly 80Hz–8kHz, so 24kHz mono — a 12kHz band —
-    /// is transparent for voice even at the 2x playback `AudioPlayerService`
-    /// offers, while every machine consumer of the audio resamples to 16kHz
-    /// anyway (`AudioPreprocessor`, `DiarizationPreprocessor`, `VADAudioLoader`,
-    /// `WhisperCppTranscriber`, and the ASR frameworks internally). Storing the
-    /// mic's native rate therefore spent bits on a band nothing reads.
-    /// `nonisolated` because this type is `@MainActor`, which its statics would
-    /// otherwise inherit — and the engine setup (`beginEngine`) and
-    /// `RecordingCompactor` both read these from outside the main actor.
-    nonisolated static let storageSampleRate: Double = 24_000
-    /// Recordings are always mono: diarization and ASR both downmix, and the
-    /// second channel of a stereo external mic doubles the file for nothing.
-    nonisolated static let storageChannelCount: AVAudioChannelCount = 1
-
-    /// The format buffers are converted to before being encoded. Non-nil for
-    /// every sample rate/channel pair we pass, but `AVAudioFormat`'s initializer
-    /// is failable, so callers treat `nil` as a setup failure.
-    nonisolated static var storageProcessingFormat: AVAudioFormat? {
-        AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: storageSampleRate,
-            channels: storageChannelCount,
-            interleaved: false
-        )
-    }
 
     private(set) var state: State = .idle
     /// Preferred built-in mic pickup pattern. Set before `start`. Defaults to

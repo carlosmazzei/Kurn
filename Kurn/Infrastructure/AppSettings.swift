@@ -71,10 +71,10 @@ final class AppSettings {
     /// iCloud key-value storage key for the synced custom-template payload.
     /// Not in `Keys` (that enum is `UserDefaults` keys) — this one lives in
     /// `CloudKeyValueStore` instead.
-    private static let cloudTemplatesKey = "cloud.summaryTemplates"
+    static let cloudTemplatesKey = "cloud.summaryTemplates"
 
     private let defaults: UserDefaults
-    private let cloudStore: CloudKeyValueStore
+    let cloudStore: CloudKeyValueStore
 
     /// The provider API keys, observable for the UI. Every key write goes
     /// through it, and each one re-applies `ensureProviderSelectionsAreUsable`.
@@ -522,32 +522,6 @@ final class AppSettings {
         didSet { defaults.set(lastSummaryTemplateID, forKey: Keys.lastSummaryTemplate) }
     }
 
-    func template(for id: String) -> SummaryTemplate? {
-        summaryTemplates.first(where: { $0.id == id })
-    }
-
-    func addTemplate(_ template: SummaryTemplate) {
-        summaryTemplates.append(template)
-        pushTemplatesToCloudIfSyncing()
-    }
-
-    func updateTemplate(_ template: SummaryTemplate) {
-        guard let index = summaryTemplates.firstIndex(where: { $0.id == template.id }) else { return }
-        var updated = template
-        updated.updatedAt = Date()
-        summaryTemplates[index] = updated
-        pushTemplatesToCloudIfSyncing()
-    }
-
-    func removeTemplate(_ template: SummaryTemplate) {
-        guard !template.isBuiltIn else { return }
-        summaryTemplates.removeAll { $0.id == template.id }
-        if lastSummaryTemplateID == template.id {
-            lastSummaryTemplateID = summaryTemplates.first?.id ?? SummaryTemplate.general.id
-        }
-        pushTemplatesToCloudIfSyncing()
-    }
-
     func addProvider(_ provider: AIProvider) {
         providers.append(provider)
         aiProviderID = provider.id
@@ -718,35 +692,6 @@ final class AppSettings {
         }
     }
 
-    /// Merges this device's custom templates with whatever is currently in
-    /// iCloud (`TemplateSyncMerger`), applies the result locally if it
-    /// changed, and pushes the merged set back so both sides converge.
-    private func reconcileTemplatesWithCloud() {
-        let localCustom = summaryTemplates.filter { !$0.isBuiltIn }
-        let remoteCustom: [SummaryTemplate]
-        if let data = cloudStore.data(forKey: Self.cloudTemplatesKey),
-           let decoded = try? JSONDecoder().decode([SummaryTemplate].self, from: data) {
-            remoteCustom = decoded
-        } else {
-            remoteCustom = []
-        }
-        let merged = TemplateSyncMerger.merge(local: localCustom, remote: remoteCustom)
-        if merged != localCustom {
-            let builtIns = summaryTemplates.filter(\.isBuiltIn)
-            summaryTemplates = builtIns + merged
-        }
-        if let data = try? JSONEncoder().encode(merged) {
-            cloudStore.setData(data, forKey: Self.cloudTemplatesKey)
-        }
-    }
-
-    private func pushTemplatesToCloudIfSyncing() {
-        guard templatesSyncEnabled else { return }
-        let custom = summaryTemplates.filter { !$0.isBuiltIn }
-        guard let data = try? JSONEncoder().encode(custom) else { return }
-        cloudStore.setData(data, forKey: Self.cloudTemplatesKey)
-    }
-
     private func persistProviders() {
         if let data = try? JSONEncoder().encode(providers) {
             defaults.set(data, forKey: Keys.providers)
@@ -757,41 +702,5 @@ final class AppSettings {
         if let data = try? JSONEncoder().encode(summaryTemplates) {
             defaults.set(data, forKey: Keys.summaryTemplates)
         }
-    }
-
-    /// Keep stored templates (user edits to built-ins persist) and append any
-    /// built-in preset that isn't present yet, so new presets appear on upgrade.
-    private static func mergedTemplates(_ stored: [SummaryTemplate]) -> [SummaryTemplate] {
-        var templates = stored
-        for builtIn in SummaryTemplate.defaultTemplates
-        where !templates.contains(where: { $0.id == builtIn.id }) {
-            templates.append(builtIn)
-        }
-        return templates
-    }
-
-    /// Derive the initial `TranscriptionEngine` from the legacy `defaultMode` +
-    /// on-device-multilingual consent so upgrading users keep their behavior.
-    nonisolated static func migratedTranscriptionEngine(
-        mode: TranscriptionMode,
-        language: MeetingLanguage,
-        multilingualConsented: Bool
-    ) -> TranscriptionEngine {
-        switch mode {
-        case .whisperAPI:
-            return .whisperAPI
-        case .onDevice:
-            // The old "Auto + multilingual model consented" path routed to
-            // FluidAudio Parakeet; everything else used Apple Speech.
-            return (language == .autoDetect && multilingualConsented) ? .fluidAudioParakeet : .appleSpeech
-        }
-    }
-
-    private static func mergedProviders(_ stored: [AIProvider]) -> [AIProvider] {
-        var providers = AIProvider.defaultProviders
-        for provider in stored where !provider.isBuiltIn && !providers.contains(where: { $0.id == provider.id }) {
-            providers.append(provider)
-        }
-        return providers
     }
 }
