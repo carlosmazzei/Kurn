@@ -199,11 +199,12 @@ struct ProviderHTTPTests {
         }
     }
 
-    @Test func anthropicDoesNotSupportTranscription() async {
-        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
-        await #expect(throws: AppError.self) {
-            _ = try await provider.transcribe(audioData: Data(), fileName: "a.m4a", language: .english)
-        }
+    /// Anthropic has no speech route. It used to inherit a `transcribe` that
+    /// threw; it now has none, so a transcription call on it does not compile.
+    @Test func anthropicDoesNotSupportTranscription() {
+        let provider: Any = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+        #expect(provider is any LLMProvider)
+        #expect(!(provider is any TranscriptionProvider))
     }
 
     // MARK: - Google
