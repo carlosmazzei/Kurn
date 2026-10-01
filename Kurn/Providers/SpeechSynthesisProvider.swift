@@ -2,11 +2,11 @@
 //  SpeechSynthesisProvider.swift
 //  Kurn
 //
-//  Cloud text-to-speech, kept apart from `LLMProvider` on purpose: that
-//  protocol is about producing *text* (transcripts, summaries, chat), and a
-//  speech vendor shares nothing with it but the key and the base URL. A
-//  separate seam also keeps ElevenLabs — transcription-only as an
-//  `LLMProvider` — from gaining a `summarize` it cannot serve.
+//  Cloud text-to-speech, kept apart from `LLMProvider` and
+//  `TranscriptionProvider` on purpose: those produce *text* (summaries, chat,
+//  transcripts), and a speech vendor shares nothing with them but the key and
+//  the base URL. A vendor conforms to each capability it actually serves —
+//  ElevenLabs speaks and transcribes, but has no text-generation route.
 //
 //  The on-device voice (`AVSpeechSynthesizer`) is not a conformer: it plays
 //  directly rather than returning audio, so `ReadAloudController` drives it

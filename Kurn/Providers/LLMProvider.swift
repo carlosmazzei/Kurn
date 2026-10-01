@@ -2,10 +2,19 @@
 //  LLMProvider.swift
 //  Kurn
 //
-//  Abstraction over the cloud vendors. Transcription is only meaningful for
-//  vendors that expose a speech endpoint (OpenAI Whisper); summary generation is
-//  supported by both. Implementations talk to their HTTP APIs via URLSession and
-//  must be safe to call from any task (`Sendable`).
+//  The two capabilities a vendor can offer, as two protocols:
+//  `LLMProvider` generates text (summaries, chat, documents) and
+//  `TranscriptionProvider` turns audio into a transcript. A vendor conforms to
+//  what it actually serves — OpenAI-compatible endpoints to both, ElevenLabs
+//  only to transcription, Anthropic, Gemini and the on-device model only to
+//  text generation.
+//
+//  They used to be one protocol whose missing half every vendor stubbed with a
+//  throw (ElevenLabs' `summarize`/`chat`, everyone else's inherited
+//  `transcribe`), so passing the wrong vendor to a call site compiled and
+//  failed at runtime. Now it does not compile. Implementations talk to their
+//  HTTP APIs via URLSession and must be safe to call from any task
+//  (`Sendable`).
 //
 
 import Foundation
@@ -59,14 +68,21 @@ struct TokenUsage: Sendable, Equatable, Codable {
     var totalTokens: Int { promptTokens + completionTokens }
 }
 
-protocol LLMProvider: Sendable {
+/// A vendor's speech-to-text route, used by cloud (`.whisperAPI`)
+/// transcription through `ProviderFactory.whisperProvider`.
+protocol TranscriptionProvider: Sendable {
     /// Vendor this provider represents.
     var provider: AIProvider { get }
 
     /// Transcribe a single audio blob (one chunk). `language` is a hint; the
     /// returned `RawTranscript.language` reflects what the service detected.
-    /// Vendors without speech support throw `AppError.transcriptionFailed`.
     func transcribe(audioData: Data, fileName: String, language: MeetingLanguage) async throws -> RawTranscript
+}
+
+/// A vendor's text-generation route: summaries, chat and documents.
+protocol LLMProvider: Sendable {
+    /// Vendor this provider represents.
+    var provider: AIProvider { get }
 
     /// Produce a structured meeting summary from a fully built prompt.
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult
@@ -108,13 +124,6 @@ protocol LLMProvider: Sendable {
 }
 
 extension LLMProvider {
-    /// Default for vendors with no speech endpoint wired here.
-    func transcribe(audioData: Data, fileName: String, language: MeetingLanguage) async throws -> RawTranscript {
-        throw AppError.transcriptionFailed(
-            NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
-        )
-    }
-
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
     }

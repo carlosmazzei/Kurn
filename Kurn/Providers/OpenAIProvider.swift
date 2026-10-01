@@ -10,7 +10,7 @@
 import Foundation
 import KurnCore
 
-struct OpenAIProvider: LLMProvider {
+struct OpenAIProvider: LLMProvider, TranscriptionProvider {
     let provider: AIProvider
 
     private let apiKey: String

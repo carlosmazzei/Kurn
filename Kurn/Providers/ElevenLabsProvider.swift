@@ -2,23 +2,21 @@
 //  ElevenLabsProvider.swift
 //  Kurn
 //
-//  ElevenLabs: transcription-only vendor (Scribe speech-to-text). Conforms to
-//  `LLMProvider` like every other cloud vendor so it plugs into the same
-//  `ProviderFactory`/Settings/consent machinery as OpenAI, Groq, Anthropic and
-//  Google — `AIProviderKind.elevenLabs`/`AIProvider.supportsTranscription`
-//  is what makes it selectable in the transcription-provider picker, and
+//  ElevenLabs: transcription-only vendor (Scribe speech-to-text), so it
+//  conforms to `TranscriptionProvider` and not to `LLMProvider` — there is no
+//  text-generation route to stub. It plugs into the same
+//  `ProviderFactory`/Settings/consent machinery as OpenAI and Groq:
+//  `AIProviderKind.elevenLabs`/`AIProvider.supportsTranscription` is what makes
+//  it selectable in the transcription-provider picker, and
 //  `AIProvider.supportsSummarization == false` is what keeps it out of the
-//  summary-provider picker. `summarize`/`chat` throw
-//  `AppError.summarizationUnsupported` rather than being implemented —
-//  `streamChat` needs no override, since `LLMProvider`'s own extension falls
-//  back to `chat`, which already throws the right error. Its text-to-speech
-//  route is a separate seam, `ElevenLabsSpeechProvider` (read aloud).
+//  summary-provider picker. Its text-to-speech route is a separate seam,
+//  `ElevenLabsSpeechProvider` (read aloud).
 //
 
 import Foundation
 import KurnCore
 
-struct ElevenLabsProvider: LLMProvider {
+struct ElevenLabsProvider: TranscriptionProvider {
     let provider: AIProvider
 
     private let apiKey: String
@@ -168,20 +166,6 @@ struct ElevenLabsProvider: LLMProvider {
         body.append(Data("\r\n".utf8))
         body.append(Data("--\(boundary)--\r\n".utf8))
         return body
-    }
-
-    // MARK: - Summarization (unsupported)
-
-    func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
-        throw AppError.summarizationUnsupported(provider: provider.displayName)
-    }
-
-    func chat(
-        systemPrompt: String,
-        messages: [ChatMessage],
-        options: TextGenerationOptions
-    ) async throws -> String {
-        throw AppError.summarizationUnsupported(provider: provider.displayName)
     }
 }
 

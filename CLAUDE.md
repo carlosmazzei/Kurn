@@ -307,8 +307,10 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   summaries, wiki and document generation, folder analytics, auto-tagging. These
   are mostly `struct`/`actor` types operating on plain values so they stay
   decoupled from SwiftData and safe off the main actor.
-- **Providers/** — LLM clients behind the `LLMProvider` protocol: Apple's
-  on-device `FoundationModelsProvider` plus the cloud vendors. Shared
+- **Providers/** — vendor clients behind one protocol per capability:
+  `LLMProvider` (text generation — Apple's on-device `FoundationModelsProvider`
+  plus the cloud vendors), `TranscriptionProvider` (cloud speech-to-text) and
+  `SpeechSynthesisProvider` (read aloud). Shared
   networking is split by responsibility: `ProviderHTTPPolicy` owns budgets and
   request/replay semantics,
   `ProviderURLPolicy` owns destination validation, `ProviderHTTPTransport` owns
@@ -1217,8 +1219,14 @@ never falls behind the microphone.
 
 ### Providers (`Providers/`)
 
-`LLMProvider` (`Sendable`) abstracts every LLM backend, cloud or local.
-`ProviderFactory` is the single place that resolves a provider from `AppSettings`
+`LLMProvider` (`Sendable`) abstracts text generation — `summarize`, `chat`,
+`streamChat` — for every backend, cloud or local. Cloud speech-to-text is the
+separate `TranscriptionProvider` (`transcribe`), so each vendor conforms to
+what it actually serves: OpenAI-compatible endpoints to both, ElevenLabs only
+to `TranscriptionProvider`, Anthropic, Gemini and on-device only to
+`LLMProvider`. They used to be one protocol with each vendor's missing half
+stubbed as a throw; routing a vendor to a capability it lacks is now a compile
+error, not a runtime one. `ProviderFactory` is the single place that resolves a provider from `AppSettings`
 + Keychain and throws `AppError.noAPIKey` when a cloud key is missing or
 `AppError.onDeviceModelUnavailable` when the on-device model can't run. Vendor
 API shapes are modeled by `AIProviderKind` (`openAICompatible`, `anthropic`,
@@ -1260,7 +1268,7 @@ provider + model (Groq defaults to `whisper-large-v3`, ElevenLabs to
 case.** `AIProvider.supportsNativeDiarization` (true only for `.elevenLabs`
 today) is the whole seam for a transcription provider whose response already
 carries speaker turns (ElevenLabs Scribe's `diarize` parameter): flip that flag
-for a future provider's `kind` and have its `LLMProvider.transcribe` populate
+for a future provider's `kind` and have its `TranscriptionProvider.transcribe` populate
 `RawTranscript.speakerTurns` however its API shapes that data — nothing else
 needs to know the wire format. `DiarizationEngine.transcriptionProviderNative`
 is the matching diarizer choice; `PipelineConfiguration.effectiveDiarization`
@@ -1605,10 +1613,10 @@ control whose text failed — an alert could land behind the wiki sheet).
   `AUDIO` modality; Anthropic has none. Groq is special-cased by id like
   `defaultTranscriptionModel`: Orpheus models, WAV only, 200 characters per
   request. Voices and models are suggestions — Settings also accepts free text.
-- **`SpeechSynthesisProvider` is a separate protocol from `LLMProvider`**
-  (`Providers/SpeechSynthesisProvider.swift`, conformers in
-  `CloudSpeechProviders.swift`), so ElevenLabs stays transcription-only as an
-  `LLMProvider`. Request builders are `static` for tests; speech requests are
+- **`SpeechSynthesisProvider` is a separate protocol from `LLMProvider` and
+  `TranscriptionProvider`** (`Providers/SpeechSynthesisProvider.swift`,
+  conformers in `CloudSpeechProviders.swift`), one per capability, so a
+  speaking vendor gains no text-generation route it cannot serve. Request builders are `static` for tests; speech requests are
   marked idempotent (a replay only costs money) and a 2xx body that is not audio
   is rejected before `AVAudioPlayer` sees it. Gemini's bare PCM is wrapped by
   KurnCore's `PCMWaveFile`.

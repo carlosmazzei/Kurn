@@ -25,10 +25,6 @@ struct AnthropicProvider: LLMProvider {
         self.session = session
     }
 
-    // Transcription is unsupported: `AIProvider.supportsTranscription` is false
-    // for Anthropic, so the picker never offers it, and the `LLMProvider`
-    // extension's default `transcribe` covers the unreachable path.
-
     // MARK: - Summary (Messages API)
 
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {

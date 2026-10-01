@@ -2,7 +2,8 @@
 //  ProviderFactory.swift
 //  Kurn
 //
-//  Builds the correct `LLMProvider` from settings + keychain. Centralizes the
+//  Builds the correct `LLMProvider` (text generation) or
+//  `TranscriptionProvider` (speech) from settings + keychain. Centralizes the
 //  "do we have a key?" check so call sites get a clear `AppError.noAPIKey`.
 //
 
@@ -64,7 +65,7 @@ enum ProviderFactory {
         for provider: AIProvider,
         model: String,
         transferPolicy: LargeTransferPolicy = .wifiOnly
-    ) throws -> any LLMProvider {
+    ) throws -> any TranscriptionProvider {
         guard LLMHTTP.isValidBaseURL(provider.baseURLString) else {
             throw AppError.invalidProviderURL
         }
@@ -85,15 +86,20 @@ enum ProviderFactory {
                 transcriptionModel: resolvedModel,
                 largeTransferPolicy: transferPolicy
             )
-        case .openAICompatible, .anthropic, .googleGemini, .appleOnDevice:
-            // Reachable only defensively for anthropic/googleGemini/appleOnDevice —
-            // `configuredTranscriptionProviders` already excludes them via
-            // `supportsTranscription`.
+        case .openAICompatible:
             return OpenAIProvider(
                 provider: provider,
                 apiKey: key,
                 transcriptionModel: resolvedModel,
                 largeTransferPolicy: transferPolicy
+            )
+        case .anthropic, .googleGemini, .appleOnDevice:
+            // Reachable only defensively — `configuredTranscriptionProviders`
+            // already excludes these via `supportsTranscription`. They have no
+            // speech route, so this fails instead of sending the audio to a
+            // Whisper-shaped endpoint the vendor does not have.
+            throw AppError.transcriptionFailed(
+                NSLocalizedString("error.provider_no_transcribe", comment: "Provider has no transcription")
             )
         }
     }
