@@ -2,6 +2,15 @@
   "_comment": "Ratchet for Tools/coverage_gate.py: the in-scope total and each layer may not drop more than `tolerance` points below these values. Raise them with `coverage_gate.py --write-floor` in the PR that raises coverage; never lower them to make a PR pass. `null` means not measured yet (bootstrap: the gate reports, and passes).",
   "target": 80.0,
   "tolerance": 0.5,
-  "total": null,
-  "layers": {}
+  "total": 69.0,
+  "layers": {
+    "Kurn": 88.6,
+    "Kurn/Application": 63.1,
+    "Kurn/Infrastructure": 80.3,
+    "Kurn/Models": 86.5,
+    "Kurn/Providers": 86.7,
+    "Kurn/Services": 62.8,
+    "Kurn/ViewModels": 67.5,
+    "Packages/KurnCore": 54.0
+  }
 }

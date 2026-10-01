@@ -22,25 +22,27 @@
 - Sem testes que dependam de rede, modelo baixado ou microfone. Seams vêm antes
   dos testes, e nunca se usa `#if DEBUG` dentro da lógica (mesma regra do plano anterior).
 
-## Ponto de partida
+## Ponto de partida (medido em 01/10/2026, PR #240)
 
-Última medição registrada aqui (04/09/2026, antes das fases 2 e 3 do plano anterior):
+O primeiro run do `coverage-gate` (união unit + UI + KurnCore, só o escopo):
+**69,0% de 22 025 linhas em 241 arquivos.** Esses valores viraram o piso inicial
+em `Tools/coverage_floor.json`.
 
-| Camada | Linhas | Combinado (unit+UI) |
-|---|---:|---:|
-| `Kurn/Services` | 9 188 | 50,8% |
-| `Kurn/ViewModels` | 2 400 | 32,2% |
-| `Kurn/Infrastructure` | 3 306 | 80,9% |
-| `Kurn/Models` | 852 | 82,6% |
-| `Kurn/Providers` | 1 184 | 88,5% |
-| `Packages/KurnCore` | — | 46,2% |
-| `Kurn/Views` (fora do escopo) | 8 449 | 23,4% |
+| Camada | Linhas | Cobertura | Meta |
+|---|---:|---:|---:|
+| `Packages/KurnCore` | 1 673 | 54,0% | ≥ 85% (Fase 1) |
+| `Kurn/Services` | 10 319 | 62,8% | ≥ 80% (Fase 3) |
+| `Kurn/Application` | 1 286 | 63,1% | ≥ 80% (Fase 4) |
+| `Kurn/ViewModels` | 1 803 | 67,5% | ≥ 80% (Fase 4) |
+| `Kurn/Infrastructure` | 3 741 | 80,3% | ≥ 85% (Fase 5) |
+| `Kurn/Models` | 1 023 | 86,5% | manter |
+| `Kurn/Providers` | 1 881 | 86,7% | manter |
+| `Kurn` (raiz: `AppComposition`, `KurnApp`) | 299 | 88,6% | manter |
 
-Depois disso, entraram o `PipelineEngineCatalog`, o `AudioCaptureEngine`, os
-testes de máquina de estados dos ViewModels, o `PlaybackTransport`, a extração
-de lógica das Views e os fluxos de UI. Além disso, a camada `Application/` foi
-criada. A tabela atual, já no escopo novo, sai do primeiro run do
-`coverage-gate` (job summary) e fica registrada em `Tools/coverage_floor.json`.
+Faltam cerca de 2 400 linhas cobertas para chegar a 80%. `Services` sozinho
+responde por ~3 800 das 6 800 linhas descobertas, por isso a Fase 3 é a maior.
+A medição anterior registrada aqui (04/09, 46,9%) usava outro denominador,
+com as Views dentro, e não é comparável.
 
 Até a Fase 0, o relatório do KurnCore nunca chegava ao Codecov: o export
 avisava, saía com 0 e deixava o job verde.
@@ -57,7 +59,7 @@ avisava, saía com 0 e deixava o job verde.
   `kurncore-linux`). O `release`, o `beta` e o `store-assets` dependem dele.
 - Passo manual do mantenedor: marcar `coverage-gate` como check obrigatório
   na branch protection de `main`.
-- Em seguida, registrar o piso inicial com os valores medidos.
+- Piso inicial registrado com os valores medidos acima.
 
 ### Fase 1: KurnCore ≥ 85% (1 PR)
 
