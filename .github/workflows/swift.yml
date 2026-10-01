@@ -256,14 +256,20 @@ jobs:
         run: |
           bin_path=$(swift build --show-bin-path)
           profdata="$bin_path/codecov/default.profdata"
-          test_binary="$bin_path/KurnCorePackageTests.xctest"
+          # The test product's name depends on the build system: the legacy
+          # one links `KurnCorePackageTests.xctest`, swift-build links
+          # `KurnCoreTests.so`. Both embed KurnCore's coverage mapping.
+          test_binary=""
+          for candidate in "$bin_path/KurnCorePackageTests.xctest" "$bin_path/KurnCoreTests.so"; do
+            if [ -f "$candidate" ]; then test_binary="$candidate"; break; fi
+          done
           resource_dir=$(swift -print-target-info | python3 -c 'import json,sys; print(json.load(sys.stdin)["paths"]["runtimeResourcePath"])')
           llvm_cov=""
           for candidate in "$resource_dir/../../bin/llvm-cov" "$(dirname "$(readlink -f "$(command -v swift)")")/llvm-cov" "$(command -v llvm-cov || true)"; do
             if [ -n "$candidate" ] && [ -x "$candidate" ]; then llvm_cov="$candidate"; break; fi
           done
           echo "profdata=$profdata binary=$test_binary llvm-cov=$llvm_cov"
-          if [ ! -f "$profdata" ] || [ ! -e "$test_binary" ] || [ -z "$llvm_cov" ]; then
+          if [ ! -f "$profdata" ] || [ -z "$test_binary" ] || [ -z "$llvm_cov" ]; then
             echo "::error::KurnCore coverage export could not find its inputs"
             ls -la "$bin_path" "$bin_path/codecov" || true
             exit 1
