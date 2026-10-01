@@ -89,7 +89,7 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     /// future provider of the same shape inherits this for free.
     ///
     /// This is the whole seam for adding a new native-diarization provider:
-    /// flip this to `true` for its `kind`, and have its `LLMProvider.transcribe`
+    /// flip this to `true` for its `kind`, and have its `TranscriptionProvider.transcribe`
     /// populate `RawTranscript.speakerTurns` however its API shapes that data
     /// (per-word speaker ids, per-segment labels, whatever it returns) — no
     /// other file needs to know the wire format. Everything downstream

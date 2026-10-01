@@ -215,23 +215,15 @@ struct ElevenLabsProviderTests {
         #expect(bodyText.contains("true"))
     }
 
-    // MARK: - Unsupported capabilities
+    // MARK: - Capabilities
 
-    @Test func summarizeThrowsSummarizationUnsupported() async throws {
-        let provider = ElevenLabsProvider(apiKey: "test-key")
-        await #expect(throws: AppError.self) {
-            try await provider.summarize(systemPrompt: "system", userPrompt: "user")
-        }
-    }
-
-    @Test func chatThrowsSummarizationUnsupported() async throws {
-        let provider = ElevenLabsProvider(apiKey: "test-key")
-        await #expect(throws: AppError.self) {
-            try await provider.chat(
-                systemPrompt: "system",
-                messages: [ChatMessage(role: .user, content: "hi")],
-                options: .chat
-            )
-        }
+    /// ElevenLabs used to conform to the combined provider protocol and stub
+    /// `summarize`/`chat` with a throw. It now conforms only to what it serves,
+    /// so routing it to summary generation is a compile error rather than a
+    /// runtime one — this pins that it stays that way.
+    @Test func conformsToTranscriptionOnly() {
+        let provider: Any = ElevenLabsProvider(apiKey: "test-key")
+        #expect(provider is any TranscriptionProvider)
+        #expect(!(provider is any LLMProvider))
     }
 }

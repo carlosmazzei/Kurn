@@ -72,10 +72,6 @@ struct FoundationModelsProvider: LLMProvider {
         self.provider = provider
     }
 
-    // transcribe: not overridden. FoundationModels has no speech endpoint, so
-    // the `LLMProvider` extension's default throws `AppError.transcriptionFailed`,
-    // same as AnthropicProvider/GoogleProvider.
-
     // MARK: - Summary (guided generation)
 
     /// Mirrors `SummaryJSON`'s shape so a generated result can reuse
