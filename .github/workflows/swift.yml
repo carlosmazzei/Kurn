@@ -105,6 +105,9 @@ jobs:
       - name: Run static policy checks
         run: python3 Tools/check_static_policy.py
 
+      - name: Test the coverage tools
+        run: python3 -m unittest discover -s Tools/tests -t .
+
   # Simulator-integration signal: KurnTests (Swift Testing unit/integration
   # suite) plus KurnSwiftDataTests (split into its own test target for
   # process isolation — see the scheme's own comment). Reports separately
@@ -240,53 +243,57 @@ jobs:
         working-directory: Packages/KurnCore
         run: swift test --enable-code-coverage
 
-      # SwiftPM's coverage output lands as raw LLVM profile data, not a
-      # report; `llvm-cov export` needs the exact test binary the profile
-      # was recorded against, which SwiftPM doesn't print a path for and
-      # whose name depends on the package's own naming — found by search
-      # rather than assumed. `continue-on-error` (not `|| true` inside the
-      # step, so a real failure here is still visible in the job's UI as a
-      # yellow/skipped step) because this is the one piece of this workflow
-      # with no macOS/Xcode toolchain available anywhere in this project's
-      # authoring environment to verify against a real SwiftPM coverage
-      # build.
+      # SwiftPM's coverage output is raw LLVM profile data, not a report.
+      # `--show-bin-path` names the build directory instead of searching for
+      # it, and `llvm-cov` is looked up through the toolchain's own resource
+      # path, since the resolved `swift` on PATH may be a version-manager
+      # proxy with no `llvm-cov` beside it. This step used to warn and exit 0
+      # when an input was missing, which left Codecov with no KurnCore report
+      # on every run without anyone noticing; it now fails, because
+      # coverage-gate needs the report.
       - name: Export coverage report
-        if: always()
-        continue-on-error: true
         working-directory: Packages/KurnCore
         run: |
-          profdata=$(find .build -name "default.profdata" -print -quit)
-          binary=$(find .build -name "*PackageTests.xctest" -o -name "*PackageTests" | grep -v '\.build/checkouts' | head -n1)
-          if [ -z "$profdata" ] || [ -z "$binary" ]; then
-            echo "::warning::could not locate coverage profile/binary; skipping Linux coverage export"
-            exit 0
-          fi
-          test_binary="$binary"
-          if [ -d "$binary" ]; then
-            test_binary=$(find "$binary" -type f -perm -u+x | head -n1)
-          fi
-          # The Linux runner has no `llvm-cov` on PATH; use the one bundled with
-          # the Swift toolchain that produced the profile.
-          llvm_cov="$(dirname "$(readlink -f "$(command -v swift)")")/llvm-cov"
-          if [ ! -x "$llvm_cov" ]; then
-            llvm_cov=$(command -v llvm-cov || true)
-          fi
-          if [ -z "$llvm_cov" ]; then
-            echo "::warning::llvm-cov not found; skipping Linux coverage export"
-            exit 0
+          bin_path=$(swift build --show-bin-path)
+          profdata="$bin_path/codecov/default.profdata"
+          test_binary="$bin_path/KurnCorePackageTests.xctest"
+          resource_dir=$(swift -print-target-info | python3 -c 'import json,sys; print(json.load(sys.stdin)["paths"]["runtimeResourcePath"])')
+          llvm_cov=""
+          for candidate in "$resource_dir/../../bin/llvm-cov" "$(dirname "$(readlink -f "$(command -v swift)")")/llvm-cov" "$(command -v llvm-cov || true)"; do
+            if [ -n "$candidate" ] && [ -x "$candidate" ]; then llvm_cov="$candidate"; break; fi
+          done
+          echo "profdata=$profdata binary=$test_binary llvm-cov=$llvm_cov"
+          if [ ! -f "$profdata" ] || [ ! -e "$test_binary" ] || [ -z "$llvm_cov" ]; then
+            echo "::error::KurnCore coverage export could not find its inputs"
+            ls -la "$bin_path" "$bin_path/codecov" || true
+            exit 1
           fi
           "$llvm_cov" export -format=lcov "$test_binary" -instr-profile "$profdata" \
             -ignore-filename-regex='(/\.build/|/Tests/)' \
             > "$RUNNER_TEMP/kurncore-coverage.lcov"
-          echo "exported $(grep -c '^SF:' "$RUNNER_TEMP/kurncore-coverage.lcov") source files"
+          files=$(grep -c '^SF:' "$RUNNER_TEMP/kurncore-coverage.lcov" || true)
+          echo "exported $files source files"
+          if [ "${files:-0}" -eq 0 ]; then
+            echo "::error::KurnCore coverage export produced no source files"
+            exit 1
+          fi
+
+      - name: Summarize coverage
+        run: |
           {
             echo "### Coverage (kurncore)"
             python3 Tools/coverage_report.py --root "$GITHUB_WORKSPACE" "$RUNNER_TEMP/kurncore-coverage.lcov" \
               || echo "_coverage summary failed; see the lcov artifact_"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Keep the coverage report as an artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-kurncore.lcov
+          path: ${{ runner.temp }}/kurncore-coverage.lcov
+          retention-days: 7
+
       - name: Upload coverage to Codecov
-        if: always()
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -295,8 +302,47 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
+  # The coverage gate (docs/testing-coverage-plan.md, CLAUDE.md "Coverage
+  # gate"). Unions the three lcov reports and fails when the in-scope code
+  # (Tools/coverage_scope.json) drops below the ratchet in
+  # Tools/coverage_floor.json, or when a pull request adds executable
+  # in-scope lines that are less than 80% covered. Lives here rather than in
+  # Codecov's status checks so a Codecov outage can never block a merge.
+  # Runs only when every test job passed: a failing test already blocks the
+  # change, and a partial report would read as a coverage drop.
+  coverage-gate:
+    needs: [unit-tests, ui-accessibility-tests, kurncore-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The pull_request checkout is GitHub's merge commit; its first
+          # parent is the base branch the tests were run against.
+          fetch-depth: 2
+
+      - name: Download coverage reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*.lcov
+          path: ${{ runner.temp }}/coverage
+          merge-multiple: true
+
+      - name: Check coverage
+        env:
+          PATCH_ARGS: ${{ github.event_name == 'pull_request' && '--patch-base HEAD^1' || '' }}
+        run: |
+          ls -la "$RUNNER_TEMP/coverage"
+          set -o pipefail
+          python3 Tools/coverage_gate.py --root "$GITHUB_WORKSPACE" $PATCH_ARGS \
+            "$RUNNER_TEMP/coverage/coverage-unit-tests.lcov" \
+            "$RUNNER_TEMP/coverage/coverage-ui-tests.lcov" \
+            "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   release:
-    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
+    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux, coverage-gate]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     # The only job in this workflow that writes to the repository (creates a
@@ -323,7 +369,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   beta:
-    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
+    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux, coverage-gate]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-26
     # Gates the actual TestFlight upload behind the `release` GitHub
@@ -372,7 +418,7 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
 
   store-assets:
-    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux]
+    needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux, coverage-gate]
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/screenshots.yml
     with:

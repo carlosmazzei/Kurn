@@ -1,0 +1,25 @@
+{
+  "_comment": "What the coverage gate (Tools/coverage_gate.py) measures. A file counts when its repository-relative path starts with an `include` root and matches no `exclude` pattern. Every exclusion carries its reason; an adapter may only be listed once all of its decisions live in a tested type (see CLAUDE.md, 'Coverage gate').",
+  "include": [
+    "Kurn/",
+    "Packages/KurnCore/Sources/"
+  ],
+  "exclude": [
+    {
+      "pattern": "Kurn/Views/**",
+      "reason": "SwiftUI view bodies; exercised by KurnUITests flows, not measured by the gate. Presentation logic is extracted to a pure type below Views/ so it counts."
+    },
+    {
+      "pattern": "Kurn/ContentView.swift",
+      "reason": "Root SwiftUI view (split view / sheet host); same rule as Kurn/Views."
+    },
+    {
+      "pattern": "Kurn/DebugSupport/**",
+      "reason": "DEBUG-only seed data and fault-injection hooks; test glue, compiled out of Release."
+    },
+    {
+      "pattern": "Kurn/AppIntents/**",
+      "reason": "App Intents run only from Siri/Shortcuts; no test target executes them yet (docs/testing-coverage-plan.md, Fase 4)."
+    }
+  ]
+}

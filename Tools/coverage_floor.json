@@ -1,0 +1,7 @@
+{
+  "_comment": "Ratchet for Tools/coverage_gate.py: the in-scope total and each layer may not drop more than `tolerance` points below these values. Raise them with `coverage_gate.py --write-floor` in the PR that raises coverage; never lower them to make a PR pass. `null` means not measured yet (bootstrap: the gate reports, and passes).",
+  "target": 80.0,
+  "tolerance": 0.5,
+  "total": null,
+  "layers": {}
+}

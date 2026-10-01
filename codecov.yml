@@ -1,12 +1,11 @@
 # Codecov configuration.
 #
-# Every status check here is `informational: true` — matching the same "no
-# invented numeric reliability SLO" rule this repo already applies to its
-# own pipeline-evaluation and reliability-hardening reports (see
-# docs/roadmap.md's H10 "Reliability scorecard" section). Codecov's
-# project/patch coverage checks never block a merge; they exist to make
-# coverage visible on the PR, not to gate it on a threshold nobody has
-# established a baseline for yet.
+# Every status check here is `informational: true`: Codecov is for
+# visibility (the PR comment, components, the badge). The blocking check is
+# the in-repo `coverage-gate` job in .github/workflows/swift.yml
+# (Tools/coverage_gate.py, scope in Tools/coverage_scope.json, ratchet in
+# Tools/coverage_floor.json), so a Codecov outage can never block a merge.
+# Codecov's total still includes Views, which the gate does not measure.
 coverage:
   status:
     project:
