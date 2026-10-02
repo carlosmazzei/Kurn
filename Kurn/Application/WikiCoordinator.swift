@@ -39,7 +39,8 @@ final class WikiCoordinator {
     }
 
     private let modelContext: ModelContext
-    private let wikiService = WikiService()
+    private let wikiService: WikiService
+    private let isProviderUsable: (AIProvider) -> Bool
     private let providerCircuitBreaker: ProviderCircuitBreaker
 
     /// App-wide settings, injected at construction; the coordinator respects
@@ -74,14 +75,21 @@ final class WikiCoordinator {
     /// prompt/format changes.
     private static let promptVersion = "wiki-v1"
 
+    /// `wikiService` and `isProviderUsable` are the LLM call and the
+    /// Keychain/on-device check; tests replace both so a run needs neither a
+    /// key nor a network.
     init(
         modelContext: ModelContext,
         appSettings: AppSettings? = nil,
-        providerCircuitBreaker: ProviderCircuitBreaker = .shared
+        providerCircuitBreaker: ProviderCircuitBreaker = .shared,
+        wikiService: WikiService = WikiService(),
+        isProviderUsable: @escaping (AIProvider) -> Bool = { $0.isUsable }
     ) {
         self.modelContext = modelContext
         self.appSettings = appSettings
         self.providerCircuitBreaker = providerCircuitBreaker
+        self.wikiService = wikiService
+        self.isProviderUsable = isProviderUsable
     }
 
     // MARK: - Single meeting
@@ -289,7 +297,7 @@ final class WikiCoordinator {
     /// key for a cloud vendor, or a runnable model for the on-device provider).
     private var hasProviderKey: Bool {
         guard let settings = appSettings else { return false }
-        return settings.aiProvider.isUsable
+        return isProviderUsable(settings.aiProvider)
     }
 
     private static func generatorIdentifier(provider: AIProvider, model: String) -> String {
