@@ -4,8 +4,9 @@
 //
 //  The two read-aloud engines driven without a network or a listener:
 //  `CloudSpeechEngine` against a scripted provider (which chunk is fetched,
-//  failures surfaced as `AppError`, stale fetches dropped after
-//  a stop) and `SystemSpeechEngine`'s voice choice and empty-queue handling.
+//  failures surfaced as `AppError`, stale fetches dropped after a stop —
+//  never a real `AVAudioPlayer`, which hangs the CI simulator) and
+//  `SystemSpeechEngine`'s voice choice and empty-queue handling.
 //
 
 import AVFoundation
@@ -57,12 +58,12 @@ struct CloudSpeechEngineTests {
 
     private struct Offline: Error {}
 
-    /// Only the request is asserted, and the reply is not audio: building an
-    /// `AVAudioPlayer` from real audio touches the audio session, which the CI
-    /// simulator does not answer in bounded time — a player still being built
-    /// after the test returned is not something a test should leave behind.
+    /// The provider fails, so the engine never builds an `AVAudioPlayer`:
+    /// on the CI simulator that call touches the audio session, blocked for
+    /// minutes, and took the test process down with it. Playback itself is
+    /// left to the device matrix.
     @Test func startingFetchesTheRequestedChunkFirst() async {
-        let provider = ScriptedSpeechProvider(payload: Data("not audio".utf8))
+        let provider = ScriptedSpeechProvider(failure: Offline())
         let engine = CloudSpeechEngine(provider: provider, languageCode: "pt", rate: 1)
         var failure: AppError?
         engine.onFailed = { failure = $0 }
@@ -104,24 +105,9 @@ struct CloudSpeechEngineTests {
         #expect(failure?.logCode == AppError.speechSynthesisFailed("").logCode)
     }
 
-    @Test func undecodableAudioIsAFailureNotAChunk() async {
-        let engine = CloudSpeechEngine(
-            provider: ScriptedSpeechProvider(payload: Data("not audio".utf8)),
-            languageCode: nil,
-            rate: 1
-        )
-        var failure: AppError?
-        var started: [Int] = []
-        engine.onFailed = { failure = $0 }
-        engine.onChunkStarted = { started.append($0) }
-        engine.start(["texto"], at: 0)
-        #expect(await waitUntil { failure != nil })
-        #expect(failure?.logCode == AppError.speechSynthesisFailed("").logCode)
-        #expect(started.isEmpty)
-    }
-
     @Test func aFetchThatLandsAfterStopIsDropped() async throws {
-        let provider = ScriptedSpeechProvider(delayNanoseconds: 200_000_000)
+        // Fails even if the stop loses the race, so no player is ever built.
+        let provider = ScriptedSpeechProvider(failure: Offline(), delayNanoseconds: 200_000_000)
         let engine = CloudSpeechEngine(provider: provider, languageCode: nil, rate: 1)
         var started: [Int] = []
         var failure: AppError?
