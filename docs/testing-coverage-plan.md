@@ -30,7 +30,7 @@ em `Tools/coverage_floor.json`.
 
 | Camada | Linhas | Cobertura | Meta |
 |---|---:|---:|---:|
-| `Packages/KurnCore` | 1 673 | 54,0% | ≥ 85% (Fase 1) |
+| `Packages/KurnCore` | 1 673 | 54,0% → 96,9% | ≥ 85% ✅ (Fase 1) |
 | `Kurn/Services` | 10 319 | 62,8% | ≥ 80% (Fase 3) |
 | `Kurn/Application` | 1 286 | 63,1% | ≥ 80% (Fase 4) |
 | `Kurn/ViewModels` | 1 803 | 67,5% | ≥ 80% (Fase 4) |
@@ -61,12 +61,17 @@ avisava, saía com 0 e deixava o job verde.
   na branch protection de `main`.
 - Piso inicial registrado com os valores medidos acima.
 
-### Fase 1: KurnCore ≥ 85% (1 PR)
+### Fase 1: KurnCore ≥ 85% ✅ (PR #241)
 
-É o ganho mais barato: Foundation pura, `swift test` no Linux e iteração local
-sem esperar o macOS. O alvo é o que o relatório `kurncore` apontar como
-descoberto (`SpokenText`, `PCMWaveFile`, `ReliabilityEvent`, os tipos de
-valor do pipeline e os seams de filesystem/relógio).
+KurnCore subiu de 54,0% para **96,9%**, e o total em escopo foi de 69,0% para
+72,8%. Quatro suítes que só testam tipos do KurnCore (`TranscriptFusion`,
+`SpeakerTurnSmoothing`, `TranscriptQualityFilter`, `TimedWordSpanBuilder`)
+moravam em `KurnTests` e passaram a rodar no Linux, junto do código que testam.
+Seis suítes novas cobrem o que nada testava: o catálogo inteiro de `AppError`,
+a tabela de `MeetingLanguage`, os vocabulários de transcrição, `SummarySection`,
+o cabeçalho RIFF de `PCMWaveFile` com `PlaybackTuning` e o `SystemClock`.
+Regra que fica: um teste que só usa tipos do KurnCore mora em
+`Packages/KurnCore/Tests`, e não em `KurnTests`.
 
 ### Fase 2: extrair a lógica dos adapters e excluir os cascos (2–3 PRs)
 
