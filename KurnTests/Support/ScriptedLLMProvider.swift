@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KurnCore
 @testable import Kurn
 
 final class ScriptedLLMProvider: LLMProvider, @unchecked Sendable {
