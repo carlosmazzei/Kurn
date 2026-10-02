@@ -62,8 +62,8 @@ struct WhisperTranscriberRoundTripTests {
         let checkpoints = Recorded<Int>()
         let fractions = Recorded<Double>()
         let resolved = Recorded<String>()
-        let transcriber = WhisperTranscriber(resolveProvider: { provider_, model, _ in
-            resolved.append("\(provider_.id)/\(model)")
+        let transcriber = WhisperTranscriber(resolveProvider: { vendor, model, _ in
+            resolved.append("\(vendor.id)/\(model)")
             return provider
         })
 
