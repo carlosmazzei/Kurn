@@ -141,26 +141,26 @@ actor FluidAudioDiarizer: Diarizing {
                 AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 onDownloadFailure?(error.localizedDescription)
                 return DiarizationOutcome(
-                    turns: [Self.fallbackTurn(for: url)],
+                    turns: [AudioFileDuration.wholeClipTurn(for: url)],
                     degradation: .modelPreparationFailed
                 )
             }
         }
         onProgress?(0)
-        let duration = Self.audioDuration(of: url)
+        let duration = AudioFileDuration.seconds(of: url)
         let timeout = Self.processTimeout(forAudioDuration: duration)
         AppLog.transcription.atNotice.notice("FluidAudioDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s timeout=\(String(format: "%.1f", timeout), privacy: .public)s")
         do {
             let outcome = try await withTimeout(seconds: timeout, timeoutError: Self.timeoutError) {
                 try await self.processAndMapTurns(url: url, onProgress: onProgress)
             }
-            return DiarizationFinalization.nonEmpty(outcome, fallback: Self.fallbackTurn(for: url))
+            return DiarizationFinalization.nonEmpty(outcome, fallback: AudioFileDuration.wholeClipTurn(for: url))
         } catch {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
             // which would mislead the user into re-consenting for no reason.
             AppLog.transcription.atError.error("FluidAudioDiarizer: processing failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-            return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .engineFailed)
+            return DiarizationOutcome(turns: [AudioFileDuration.wholeClipTurn(for: url)], degradation: .engineFailed)
         }
     }
 
@@ -264,30 +264,8 @@ actor FluidAudioDiarizer: Diarizing {
         AppLog.transcription.atError.error("FluidAudioDiarizer: \(message, privacy: .public)")
         onDownloadFailure?(message)
         onProgress?(1)
-        return DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .engineUnavailable)
+        return DiarizationOutcome(turns: [AudioFileDuration.wholeClipTurn(for: url)], degradation: .engineUnavailable)
     }
 }
 
 #endif
-
-// MARK: - Shared helpers
-//
-// Outside the `#if canImport(FluidAudio)` split: both build configurations need
-// the same fallback turn, and keeping one copy stops the two branches drifting
-// apart. The processing budget lives in `DiarizationFinalization.swift`.
-
-extension FluidAudioDiarizer {
-    /// A single speaker turn spanning the whole clip, used whenever diarization
-    /// can't produce real turns — covering the full duration (instead of a
-    /// zero-length range) keeps downstream speaker-label lookups meaningful.
-    fileprivate static func fallbackTurn(for url: URL) -> SpeakerTurn {
-        SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, audioDuration(of: url)))
-    }
-
-    fileprivate static func audioDuration(of url: URL) -> TimeInterval {
-        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 else {
-            return 0
-        }
-        return Double(file.length) / file.processingFormat.sampleRate
-    }
-}

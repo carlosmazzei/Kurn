@@ -42,37 +42,25 @@ final class PhoneSessionController: NSObject {
         isAvailable: Bool,
         highlightCount: Int
     ) {
-        guard WCSession.isSupported() else { return }
-        let session = WCSession.default
-        guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
-        let context: [String: Any] = [
-            WatchSessionKey.state: stateString(state),
-            WatchSessionKey.meetingTitle: meetingTitle,
-            WatchSessionKey.referenceDate: referenceDate,
-            WatchSessionKey.accumulatedElapsed: accumulatedElapsed,
-            WatchSessionKey.isAvailable: isAvailable,
-            WatchSessionKey.highlightCount: highlightCount
-        ]
-        try? session.updateApplicationContext(context)
+        push(RecordingSurfacePayloads.watchContext(
+            state: state,
+            meetingTitle: meetingTitle,
+            accumulatedElapsed: accumulatedElapsed,
+            referenceDate: referenceDate,
+            isAvailable: isAvailable,
+            highlightCount: highlightCount
+        ))
     }
 
     func notifyEnded() {
-        pushState(
-            state: .idle,
-            meetingTitle: "",
-            accumulatedElapsed: 0,
-            referenceDate: Date(),
-            isAvailable: false,
-            highlightCount: 0
-        )
+        push(RecordingSurfacePayloads.endedWatchContext())
     }
 
-    private func stateString(_ state: AudioRecorderService.State) -> String {
-        switch state {
-        case .idle: return WatchSessionState.idle
-        case .recording: return WatchSessionState.recording
-        case .paused: return WatchSessionState.paused
-        }
+    private func push(_ context: [String: Any]) {
+        guard WCSession.isSupported() else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
+        try? session.updateApplicationContext(context)
     }
 }
 
@@ -111,32 +99,18 @@ extension PhoneSessionController: WCSessionDelegate {
         didReceiveMessage message: [String: Any],
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
-        guard let raw = message[WatchSessionKey.command] as? String, let command = WatchCommand(rawValue: raw) else {
+        guard let decoded = RecordingSurfacePayloads.decodeCommand(message) else {
             AppLog.recorderUI.atError.error("PhoneSessionController: received unrecognized Watch command")
-            replyHandler([
-                WatchSessionKey.ok: false,
-                WatchSessionKey.error: WatchSessionReplyError.unknownCommand,
-                WatchSessionKey.ackPhase: WatchAckPhase.received.rawValue
-            ])
+            replyHandler(RecordingSurfacePayloads.unknownCommandReply())
             return
         }
-        // A commandID-less message can only come from an older paired Watch
-        // app build; fall back to a fresh ID (never a replay match) so
-        // dedup simply doesn't engage rather than failing closed.
-        let commandID = (message[WatchSessionKey.commandID] as? String) ?? UUID().uuidString
-        AppLog.recorderUI.atNotice.notice("PhoneSessionController: received Watch command \(raw, privacy: .public)")
+        AppLog.recorderUI.atNotice.notice("PhoneSessionController: received Watch command \(decoded.command.rawValue, privacy: .public)")
         let reply = WatchCommandReplyHandler(reply: replyHandler)
         Task {
             let (handled, phase) = await MainActor.run {
-                RecordingCommandRouter.shared.handleWatchCommand(command, commandID: commandID)
+                RecordingCommandRouter.shared.handleWatchCommand(decoded.command, commandID: decoded.commandID)
             }
-            reply.call(handled
-                ? [WatchSessionKey.ok: true, WatchSessionKey.ackPhase: phase.rawValue]
-                : [
-                    WatchSessionKey.ok: false,
-                    WatchSessionKey.error: WatchSessionReplyError.noActiveRecording,
-                    WatchSessionKey.ackPhase: phase.rawValue
-                ])
+            reply.call(RecordingSurfacePayloads.commandReply(handled: handled, phase: phase))
         }
     }
 }

@@ -39,7 +39,7 @@ actor FluidAudioVAD: VoiceActivityDetecting {
     func detectSpeech(url: URL) async -> [SpeechRegion] {
         guard !Task.isCancelled else {
             AppLog.transcription.atNotice.notice("FluidAudioVAD: cancelled before starting")
-            return [Self.fallbackRegion(for: url)]
+            return [AudioFileDuration.wholeClipRegion(for: url)]
         }
         do {
             let started = Date()
@@ -53,10 +53,10 @@ actor FluidAudioVAD: VoiceActivityDetecting {
             // The non-throwing protocol still requires a value. The pipeline's
             // cancellation barrier immediately after VAD will discard it.
             AppLog.transcription.atNotice.notice("FluidAudioVAD: cancelled")
-            return [Self.fallbackRegion(for: url)]
+            return [AudioFileDuration.wholeClipRegion(for: url)]
         } catch {
             AppLog.transcription.atError.error("FluidAudioVAD: failed, using whole-clip fallback code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-            return [Self.fallbackRegion(for: url)]
+            return [AudioFileDuration.wholeClipRegion(for: url)]
         }
     }
 
@@ -64,16 +64,16 @@ actor FluidAudioVAD: VoiceActivityDetecting {
     private func segment(url: URL) async throws -> [SpeechRegion] {
         let manager = try await loadedManager()
         let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: Double(VadManager.sampleRate))
-        guard !samples.isEmpty else { return [Self.fallbackRegion(for: url)] }
+        guard !samples.isEmpty else { return [AudioFileDuration.wholeClipRegion(for: url)] }
 
         let segments = try await manager.segmentSpeech(samples)
-        let regions = segments
-            .map { SpeechRegion(start: $0.startTime, end: $0.endTime) }
-            .filter { $0.end > $0.start }
-        AppLog.transcription.atInfo.info("FluidAudioVAD: regions=\(regions.count, privacy: .public)")
-        // No detected speech → treat the whole clip as one region rather than
-        // returning nothing, so downstream consumers stay well-defined.
-        return regions.isEmpty ? [Self.fallbackRegion(for: url)] : regions
+        AppLog.transcription.atInfo.info("FluidAudioVAD: segments=\(segments.count, privacy: .public)")
+        // No detected speech → the whole clip as one region rather than
+        // nothing, so downstream consumers stay well-defined.
+        return SpeechRegionNormalization.regions(
+            segments.map { SpeechRegion(start: $0.startTime, end: $0.endTime) },
+            clipDuration: AudioFileDuration.seconds(of: url)
+        )
     }
 
     private func loadedManager() async throws -> VadManager {
@@ -83,16 +83,6 @@ actor FluidAudioVAD: VoiceActivityDetecting {
         AppLog.transcription.atNotice.notice("FluidAudioVAD: Silero VAD model loaded")
         return created
     }
-
-    private static func fallbackRegion(for url: URL) -> SpeechRegion {
-        let duration: TimeInterval
-        if let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 {
-            duration = Double(file.length) / file.processingFormat.sampleRate
-        } else {
-            duration = 0
-        }
-        return SpeechRegion(start: 0, end: max(0, duration))
-    }
 }
 
 #else
@@ -101,13 +91,7 @@ actor FluidAudioVAD: VoiceActivityDetecting {
 /// region (no trimming, single speaker) so the pipeline keeps working.
 actor FluidAudioVAD: VoiceActivityDetecting {
     func detectSpeech(url: URL) async -> [SpeechRegion] {
-        let duration: TimeInterval
-        if let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 {
-            duration = Double(file.length) / file.processingFormat.sampleRate
-        } else {
-            duration = 0
-        }
-        return [SpeechRegion(start: 0, end: max(0, duration))]
+        [AudioFileDuration.wholeClipRegion(for: url)]
     }
 }
 

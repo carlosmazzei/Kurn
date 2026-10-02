@@ -28,6 +28,30 @@
     {
       "pattern": "Kurn/Services/FluidAudioDiarizer.swift",
       "reason": "Adapter: drives FluidAudio's OfflineDiarizerManager, which needs downloaded CoreML models. Labeling and progress live in KurnCore's DiarizerSegmentLabeling/ChunkProgressSampler, the rescue, smoothing, voiceprints and time budget in DiarizationFinalization (all tested)."
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioTranscriber.swift",
+      "reason": "Adapter: drives FluidAudio's AsrManager, which needs downloaded CoreML models. The progress threshold, fraction clamp and transcript assembly live in KurnCore's BatchTranscriptAssembly (tested)."
+    },
+    {
+      "pattern": "Kurn/Services/Pipeline/FluidAudioVAD.swift",
+      "reason": "Adapter: drives FluidAudio's Silero VadManager, which needs a downloaded CoreML model. Region normalization lives in KurnCore's SpeechRegionNormalization, the whole-clip fallback in AudioFileDuration (both tested)."
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioModelStore.swift",
+      "reason": "Adapter: loads FluidAudio's Parakeet models (download + CoreML/ANE compile). Load-once, coalescing and retry-after-failure live in KurnCore's CoalescedLoader (tested)."
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioMultilingualStreamingManager.swift",
+      "reason": "Adapter: forwards the StreamingAsrManager protocol to FluidAudio's Nemotron streaming manager, which needs a downloaded model; it buffers and forwards, with no decision of its own."
+    },
+    {
+      "pattern": "Kurn/Services/LockScreenRecordingController.swift",
+      "reason": "Adapter: ActivityKit requests and updates a Live Activity only in a signed app on a device or simulator with activities enabled, which no test target can drive. The content state lives in RecordingSurfacePayloads (tested); what remains is the start/end ordering guard around Activity.request."
+    },
+    {
+      "pattern": "Kurn/Services/PhoneSessionController.swift",
+      "reason": "Adapter: WCSession needs a paired Watch. The application context, command decoding and replies live in RecordingSurfacePayloads, command handling in RecordingCommandRouter (both tested)."
     }
   ]
 }

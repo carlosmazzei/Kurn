@@ -160,11 +160,6 @@ final class LockScreenRecordingController {
         elapsed: TimeInterval,
         highlightCount: Int
     ) -> RecordingActivityAttributes.ContentState {
-        RecordingActivityAttributes.ContentState(
-            isPaused: state != .recording,
-            elapsed: elapsed,
-            referenceDate: Date(),
-            highlightCount: highlightCount
-        )
+        RecordingSurfacePayloads.activityState(for: state, elapsed: elapsed, highlightCount: highlightCount)
     }
 }
