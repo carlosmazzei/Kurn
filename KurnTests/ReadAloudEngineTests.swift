@@ -47,12 +47,13 @@ private final class ScriptedSpeechProvider: SpeechSynthesisProvider, @unchecked 
     }
 }
 
-/// Polls until `condition` holds. The deadline is generous on purpose: the
-/// main actor is shared with every other suite running in parallel, and on
-/// a loaded CI simulator a hop that normally takes milliseconds has taken
-/// well over five seconds. A passing test returns as soon as it holds.
+/// Polls until `condition` holds. The deadline is a hang guard, not a
+/// performance bound: the engine's fetch runs on the shared cooperative pool,
+/// and while the whole test target is starting up on a CI simulator that
+/// pool has been saturated for more than thirty seconds. A passing test
+/// returns as soon as the condition holds.
 @MainActor
-private func waitUntil(timeout: TimeInterval = 30, _ condition: () -> Bool) async -> Bool {
+private func waitUntil(timeout: TimeInterval = 180, _ condition: () -> Bool) async -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while !condition() {
         if Date() > deadline { return false }
