@@ -7,8 +7,8 @@ SwiftUI views, debug glue or the adapter shells it lists):
 
 * **Floor (ratchet).** The in-scope total and every layer must stay within
   `tolerance` points of `Tools/coverage_floor.json`. A PR that raises
-  coverage records the new values with `--write-floor`; the floor only moves
-  up. A `null` total means "not measured yet": the gate reports and passes.
+  coverage records the new values with `--write-floor`, which never lowers
+  a value; the floor only moves up. A `null` total means "not measured yet": the gate reports and passes.
 * **Patch.** With `--patch-base`, the executable lines the diff adds to
   in-scope files must be covered at `--patch-min` (default 80%). Added lines
   the tracefiles do not mark executable (comments, declarations, blank lines)
@@ -178,8 +178,13 @@ def check_patch(hits: dict, scope: lcov.Scope, diff: dict, minimum: float, out) 
 
 
 def write_floor(path: str, floor: dict, measured: dict) -> None:
-    floor["total"] = floor_down(measured["total"])
-    floor["layers"] = {layer: floor_down(value) for layer, value in sorted(measured["layers"].items())}
+    """Records the measured values, rounded down, without ever lowering one."""
+    def ratchet(current, value):
+        return floor_down(value) if current is None else max(current, floor_down(value))
+
+    floor["total"] = ratchet(floor.get("total"), measured["total"])
+    layers = floor.get("layers", {})
+    floor["layers"] = {layer: ratchet(layers.get(layer), value) for layer, value in sorted(measured["layers"].items())}
     with open(path, "w") as handle:
         json.dump(floor, handle, indent=2)
         handle.write("\n")
