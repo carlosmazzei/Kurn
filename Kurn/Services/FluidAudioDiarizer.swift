@@ -8,41 +8,17 @@
 //  falls back to a single speaker turn on any failure, including a missing
 //  model download.
 //
+//  This file only drives FluidAudio and reads its types into plain values.
+//  Every decision about the result lives in tested code: labeling and
+//  progress in KurnCore's `DiarizerSegmentLabeling`/`ChunkProgressSampler`,
+//  the collapse rescue, smoothing, voiceprints and the time budget in
+//  `DiarizationFinalization`. It is excluded from the coverage gate on that
+//  basis (`Tools/coverage_scope.json`); new logic belongs in those types.
+//
 
 import AVFoundation
 import Foundation
 import KurnCore
-
-/// What the neural diarizer produces beyond the turns themselves.
-///
-/// The voiceprints are the reason this type exists. The model computes a speaker
-/// embedding per window and the diarizer used to drop every one of them on the
-/// way out, which left `"Speaker 2"` — a label reassigned in order of first
-/// appearance on every run — as the only identity a `Speaker` row could be keyed
-/// on. Carrying the centroid out is what lets a name the user typed follow the
-/// voice instead of the number.
-///
-/// Empty for the heuristic engine, which has no embeddings to give.
-struct DiarizationOutcome: Sendable {
-    var turns: [SpeakerTurn]
-    /// Speaker label → L2-normalized mean embedding.
-    var voiceprints: [String: [Float]]
-    /// Why these turns are not what the requested engine was supposed to
-    /// produce, or `nil` when they are. Carried out of the engine because a
-    /// single whole-clip turn is indistinguishable from a genuine
-    /// one-speaker meeting once it reaches fusion (H5 PR 11).
-    var degradation: PipelineStageReason?
-
-    init(
-        turns: [SpeakerTurn],
-        voiceprints: [String: [Float]] = [:],
-        degradation: PipelineStageReason? = nil
-    ) {
-        self.turns = turns
-        self.voiceprints = voiceprints
-        self.degradation = degradation
-    }
-}
 
 #if canImport(FluidAudio)
 import FluidAudio
@@ -156,7 +132,7 @@ actor FluidAudioDiarizer: Diarizing {
             let preparationStarted = Date()
             AppLog.transcription.atNotice.notice("FluidAudioDiarizer: preparing models file=\(url.lastPathComponent, privacy: .public) timeout=\(self.prepareTimeout, privacy: .public)s")
             do {
-                try await Self.withTimeout(seconds: prepareTimeout) {
+                try await withTimeout(seconds: prepareTimeout, timeoutError: Self.timeoutError) {
                     try await self.prepareModels()
                 }
                 modelsReady = true
@@ -175,12 +151,10 @@ actor FluidAudioDiarizer: Diarizing {
         let timeout = Self.processTimeout(forAudioDuration: duration)
         AppLog.transcription.atNotice.notice("FluidAudioDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s timeout=\(String(format: "%.1f", timeout), privacy: .public)s")
         do {
-            let outcome = try await Self.withTimeout(seconds: timeout) {
+            let outcome = try await withTimeout(seconds: timeout, timeoutError: Self.timeoutError) {
                 try await self.processAndMapTurns(url: url, onProgress: onProgress)
             }
-            return outcome.turns.isEmpty
-                ? DiarizationOutcome(turns: [Self.fallbackTurn(for: url)], degradation: .noInput)
-                : outcome
+            return DiarizationFinalization.nonEmpty(outcome, fallback: Self.fallbackTurn(for: url))
         } catch {
             // Not a download/consent problem (models are already prepared) —
             // log it, but don't route it through the download-failure banner,
@@ -208,64 +182,37 @@ actor FluidAudioDiarizer: Diarizing {
         let started = Date()
         let fileName = url.lastPathComponent
         let result = try await manager.process(url) { processed, total in
-            let safeTotal = max(1, total)
-            let safeProcessed = min(max(0, processed), safeTotal)
-            let percent = safeProcessed * 100 / safeTotal
-            let previousPercent = max(0, safeProcessed - 1) * 100 / safeTotal
-            if percent > previousPercent {
-                onProgress?(Double(safeProcessed) / Double(safeTotal))
-            }
-            let crossedDecile = percent / 10 > previousPercent / 10
-            guard safeProcessed == 1 || safeProcessed == safeTotal || crossedDecile else { return }
-
+            let step = ChunkProgressSampler.step(
+                processed: processed,
+                total: total,
+                elapsed: Date().timeIntervalSince(started)
+            )
+            if let fraction = step.fraction { onProgress?(fraction) }
+            guard step.shouldLog else { return }
             let elapsed = Date().timeIntervalSince(started)
-            let remaining = safeProcessed > 0
-                ? elapsed * Double(safeTotal - safeProcessed) / Double(safeProcessed)
-                : 0
-            if safeProcessed == safeTotal {
-                AppLog.transcription.atInfo.info("FluidAudioDiarizer: audio pass 100% file=\(fileName, privacy: .public) chunks=\(safeProcessed, privacy: .public)/\(safeTotal, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s; finalizing embeddings and clustering")
+            if step.isFinished {
+                AppLog.transcription.atInfo.info("FluidAudioDiarizer: audio pass 100% file=\(fileName, privacy: .public) chunks=\(total, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s; finalizing embeddings and clustering")
             } else {
-                AppLog.transcription.atInfo.info("FluidAudioDiarizer: audio pass \(percent, privacy: .public)% file=\(fileName, privacy: .public) chunks=\(safeProcessed, privacy: .public)/\(safeTotal, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", remaining), privacy: .public)s")
+                AppLog.transcription.atInfo.info("FluidAudioDiarizer: audio pass \(step.percent, privacy: .public)% file=\(fileName, privacy: .public) chunks=\(processed, privacy: .public)/\(total, privacy: .public) elapsed=\(String(format: "%.1f", elapsed), privacy: .public)s eta≈\(String(format: "%.1f", step.estimatedRemaining), privacy: .public)s")
             }
         }
-        let uniqueIDs = Set(result.segments.map { $0.speakerId }).count
-        AppLog.transcription.atInfo.info("FluidAudioDiarizer: segments=\(result.segments.count, privacy: .public) uniqueSpeakerIds=\(uniqueIDs, privacy: .public)")
-
-        var turns = Self.turns(from: result.segments)
-        let windows = Self.embeddingWindows(from: result.chunkEmbeddings)
-        if uniqueIDs <= 1, let windows {
-            turns = Self.rescueCollapsedSpeakers(turns: turns, windows: windows)
+        let segments = result.segments.map {
+            DiarizerSegment(
+                speakerID: $0.speakerId,
+                start: TimeInterval($0.startTimeSeconds),
+                end: TimeInterval($0.endTimeSeconds)
+            )
         }
-        let smoothed = SpeakerTurnSmoothing.smooth(turns)
-        AppLog.transcription.atInfo.info("FluidAudioDiarizer: smoothed turns \(turns.count, privacy: .public) -> \(smoothed.count, privacy: .public), speakers=\(Set(smoothed.map { $0.speakerLabel }).count, privacy: .public)")
+        let distinct = DiarizerSegmentLabeling.distinctSpeakerCount(in: segments)
+        AppLog.transcription.atInfo.info("FluidAudioDiarizer: segments=\(segments.count, privacy: .public) uniqueSpeakerIds=\(distinct, privacy: .public)")
 
-        // After smoothing and any rescue, so a voiceprint describes the speaker
-        // as finally reported rather than as first clustered.
-        let voiceprints = windows.map {
-            SpeakerVoiceprints.centroids(turns: smoothed, windows: $0)
-        } ?? [:]
-        if !voiceprints.isEmpty {
-            AppLog.transcription.atInfo.info("FluidAudioDiarizer: voiceprints for \(voiceprints.count, privacy: .public) speaker(s)")
-        }
+        let outcome = DiarizationFinalization.outcome(
+            turns: DiarizerSegmentLabeling.turns(from: segments),
+            distinctSpeakers: distinct,
+            windows: Self.embeddingWindows(from: result.chunkEmbeddings)
+        )
         onProgress?(1)
-        return DiarizationOutcome(turns: smoothed, voiceprints: voiceprints)
-    }
-
-    /// Re-cluster the per-window speaker embeddings that VBx collapsed and
-    /// re-attribute the diarizer's own segment boundaries to the result. Keeps
-    /// `turns` unchanged when the embeddings genuinely hold a single voice.
-    private static func rescueCollapsedSpeakers(
-        turns: [SpeakerTurn],
-        windows: [SpeakerEmbeddingWindow]
-    ) -> [SpeakerTurn] {
-        guard let labels = SpeakerClusterRefiner.clusterLabels(for: windows) else {
-            AppLog.transcription.atInfo.info("FluidAudioDiarizer: single cluster confirmed by re-clustering \(windows.count, privacy: .public) windows")
-            return turns
-        }
-        let rescued = SpeakerClusterRefiner.reassign(turns: turns, windows: windows, labels: labels)
-        let speakers = Set(rescued.map { $0.speakerLabel }).count
-        AppLog.transcription.atNotice.notice("FluidAudioDiarizer: recovered \(speakers, privacy: .public) speakers from \(windows.count, privacy: .public) embedding windows after VBx collapse")
-        return rescued
+        return outcome
     }
 
     private static func embeddingWindows(from chunks: [ChunkEmbedding]?) -> [SpeakerEmbeddingWindow]? {
@@ -279,44 +226,10 @@ actor FluidAudioDiarizer: Diarizing {
         }
     }
 
-    /// Map FluidAudio's `speakerId` strings to the same "Speaker N" (1-indexed,
-    /// first-appearance order) labels the heuristic engine produces.
-    private static func turns(from segments: [TimedSpeakerSegment]) -> [SpeakerTurn] {
-        let ordered = segments.sorted { $0.startTimeSeconds < $1.startTimeSeconds }
-        var labelByID: [String: String] = [:]
-        var turns: [SpeakerTurn] = []
-        for segment in ordered {
-            let label = labelByID[segment.speakerId] ?? {
-                let next = "Speaker \(labelByID.count + 1)"
-                labelByID[segment.speakerId] = next
-                return next
-            }()
-            turns.append(
-                SpeakerTurn(
-                    speakerLabel: label,
-                    start: TimeInterval(segment.startTimeSeconds),
-                    end: TimeInterval(segment.endTimeSeconds)
-                )
-            )
-        }
-        return turns
-    }
-
-    private static func withTimeout<T: Sendable>(
-        seconds: TimeInterval,
-        operation: @escaping @Sendable () async throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                try await Task.sleep(for: .seconds(seconds))
-                throw AppError.modelDownloadFailed(
-                    NSLocalizedString("error.model_download_timeout", comment: "Model download/processing timed out")
-                )
-            }
-            defer { group.cancelAll() }
-            return try await group.next()!
-        }
+    private static let timeoutError: @Sendable () -> Error = {
+        AppError.modelDownloadFailed(
+            NSLocalizedString("error.model_download_timeout", comment: "Model download/processing timed out")
+        )
     }
 }
 
@@ -360,8 +273,8 @@ actor FluidAudioDiarizer: Diarizing {
 // MARK: - Shared helpers
 //
 // Outside the `#if canImport(FluidAudio)` split: both build configurations need
-// the same fallback turn and the same processing budget, and keeping one copy
-// stops the two branches drifting apart.
+// the same fallback turn, and keeping one copy stops the two branches drifting
+// apart. The processing budget lives in `DiarizationFinalization.swift`.
 
 extension FluidAudioDiarizer {
     /// A single speaker turn spanning the whole clip, used whenever diarization
@@ -376,18 +289,5 @@ extension FluidAudioDiarizer {
             return 0
         }
         return Double(file.length) / file.processingFormat.sampleRate
-    }
-
-    /// Processing budget scaled to the recording.
-    ///
-    /// This used to be a flat 120s, which a one-hour meeting can exceed on an
-    /// older device even when everything is working — and the timeout path
-    /// falls back to a single whole-clip turn, so the symptom was every long
-    /// recording silently coming back as one speaker. Diarization runs well
-    /// under real time on the ANE, so half of the recording's duration is a
-    /// generous budget; the floor keeps short clips from tripping on model
-    /// warm-up and the ceiling still bounds a genuinely stuck run.
-    static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
-        min(1800, max(180, duration * 0.5))
     }
 }

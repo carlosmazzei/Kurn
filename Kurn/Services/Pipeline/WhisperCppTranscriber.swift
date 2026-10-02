@@ -13,6 +13,14 @@
 //  chunks cap that at ~19 MB, and bring resumable checkpoints and per-chunk
 //  cancellation along for free.
 //
+//  This file only drives whisper.cpp: it reads raw segment text, bounds and
+//  tokens out of the C context. What those values mean — words from
+//  SentencePiece pieces, confidence from token probabilities, progress across
+//  chunks, the thread budget — is decided in KurnCore's tested
+//  `WhisperSegmentAssembly`/`ChunkedProgress`. It is excluded from the coverage
+//  gate on that basis (`Tools/coverage_scope.json`), since running it needs a
+//  downloaded model; new logic belongs in those types.
+//
 
 import AVFoundation
 import Foundation
@@ -113,8 +121,8 @@ actor WhisperCppTranscriber: Transcribing {
         // Map whisper's within-chunk progress into this chunk's slice of the
         // overall bar, so a single long chunk still advances visibly.
         let chunkProgress: @Sendable (Double) -> Void = { fraction in
-            let overall = (Double(index) + min(1, max(0, fraction))) / Double(max(1, total))
-            onProgress(overall, min(total, index + 1), total)
+            let overall = ChunkedProgress.overall(chunkIndex: index, fraction: fraction, total: total)
+            onProgress(overall.fraction, overall.completedChunks, total)
         }
 
         let result = try await context.transcribe(
@@ -236,7 +244,9 @@ private final class WhisperContext: @unchecked Sendable {
         var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
         // Leave one core for the rest of the app; whisper saturates whatever it
         // is given and the UI still has to render a progress bar.
-        params.n_threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 1))
+        params.n_threads = Int32(
+            WhisperSegmentAssembly.inferenceThreadCount(activeProcessors: ProcessInfo.processInfo.activeProcessorCount)
+        )
         params.translate = false
         params.no_timestamps = false
         params.print_special = false
@@ -323,87 +333,34 @@ private final class WhisperContext: @unchecked Sendable {
         var scored: [TranscriptQualityFilter.ScoredSpan] = []
         for index in 0..<whisper_full_n_segments(context) {
             guard let raw = whisper_full_get_segment_text(context, index) else { continue }
-            let text = String(cString: raw).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-            // whisper reports segment bounds in centiseconds.
-            let start = Double(whisper_full_get_segment_t0(context, index)) / 100
-            let end = Double(whisper_full_get_segment_t1(context, index)) / 100
-            scored.append(
-                TranscriptQualityFilter.ScoredSpan(
-                    span: TranscribedSpan(
-                        text: text,
-                        start: start,
-                        end: max(start, end),
-                        confidence: nil
-                    ),
-                    quality: quality(ofSegment: index),
-                    words: words(inSegment: index)
-                )
+            let segment = WhisperSegmentAssembly.scoredSpan(
+                text: String(cString: raw),
+                startCentiseconds: whisper_full_get_segment_t0(context, index),
+                endCentiseconds: whisper_full_get_segment_t1(context, index),
+                tokens: tokens(inSegment: index),
+                noSpeechProbability: whisper_full_get_segment_no_speech_prob(context, index)
             )
+            if let segment { scored.append(segment) }
         }
         return TranscriptQualityFilter.keeping(scored, engine: "whisperCpp")
     }
 
-    /// The decoder's confidence in one segment.
-    ///
-    /// There is no local equivalent of the cloud's `compression_ratio`, so that
-    /// field stays `nil` and the filter's own repetition test is what catches a
-    /// loop here.
-    private func quality(ofSegment index: Int32) -> SpanQuality {
-        let noSpeech = Double(whisper_full_get_segment_no_speech_prob(context, index))
-
-        // Whisper's `avg_logprob` is the mean over *text* tokens. Everything from
-        // `whisper_token_eot` upwards is a control or timestamp token — near
-        // certain by construction, and counting them would flatter the average
-        // towards zero on every segment equally.
-        var total = 0.0
-        var count = 0
-        forEachTextToken(inSegment: index) { token, _ in
-            let probability = Double(whisper_full_get_token_p(context, index, token))
-            guard probability.isFinite else { return }
-            total += log(max(probability, 1e-10))
-            count += 1
-        }
-
-        return SpanQuality(
-            averageLogProb: count > 0 ? total / Double(count) : nil,
-            noSpeechProb: noSpeech.isFinite ? noSpeech : nil,
-            compressionRatio: nil
-        )
-    }
-
-    /// Word timings for one segment, aggregated from the model's sub-word tokens.
-    ///
-    /// Whisper emits SentencePiece pieces, not words: "orçamento" can arrive as
-    /// "or", "ça", "mento". A piece that begins with a space opens a new word and
-    /// every piece after it extends that word, which is the same rule the
-    /// tokenizer used to produce them. Sub-word timings are what
-    /// `TranscriptFusion` needs to place a speaker handover *inside* a sentence
-    /// rather than estimating where it fell.
-    private func words(inSegment index: Int32) -> [TimedWord] {
-        var words: [TimedWord] = []
+    /// The text tokens of one segment, as the C context reports them.
+    private func tokens(inSegment index: Int32) -> [WhisperDecodedToken] {
+        var tokens: [WhisperDecodedToken] = []
         forEachTextToken(inSegment: index) { token, _ in
             guard let raw = whisper_full_get_token_text(context, index, token) else { return }
-            let piece = String(cString: raw)
-            let text = piece.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return }
-
-            // Token bounds are centiseconds from the start of this chunk, the
-            // same origin the segment bounds use, so the chunk runner's offset
-            // correction applies to both without further work.
             let data = whisper_full_get_token_data(context, index, token)
-            let start = Double(data.t0) / 100
-            let end = Double(data.t1) / 100
-            guard start.isFinite, end.isFinite else { return }
-
-            if piece.first?.isWhitespace == true || words.isEmpty {
-                words.append(TimedWord(text: text, start: start, end: max(start, end)))
-            } else {
-                words[words.count - 1].text += text
-                words[words.count - 1].end = max(words[words.count - 1].end, end)
-            }
+            tokens.append(
+                WhisperDecodedToken(
+                    piece: String(cString: raw),
+                    startCentiseconds: data.t0,
+                    endCentiseconds: data.t1,
+                    probability: whisper_full_get_token_p(context, index, token)
+                )
+            )
         }
-        return words
+        return tokens
     }
 
     /// Visit the tokens of a segment that carry text, skipping control and

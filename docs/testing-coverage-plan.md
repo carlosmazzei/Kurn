@@ -78,7 +78,14 @@ Regra que fica: um teste que só usa tipos do KurnCore mora em
 ### Fase 2: extrair a lógica dos adapters e excluir os cascos (2–3 PRs)
 
 Para cada arquivo preso a framework, primeiro mover as decisões para um tipo
-puro testado em `KurnTests` e só depois listar o casco em `exclude`:
+puro testado (no KurnCore quando não depende de nada da Apple, para rodar no
+Linux) e só depois listar o casco em `exclude`:
+
+**Feito (parte 1):** `WhisperCppTranscriber` → KurnCore `WhisperSegmentAssembly`
+e `ChunkedProgress`; `FluidAudioDiarizer` → KurnCore `DiarizerSegmentLabeling`,
+`ChunkProgressSampler` e `withTimeout`, mais `DiarizationFinalization` no app
+(resgate do colapso, suavização, voiceprints, orçamento de tempo). Os dois cascos
+estão em `exclude`.
 
 - `Services/Pipeline/WhisperCppTranscriber.swift`: agregação de peças
   SentencePiece em palavras, montagem de params, `t0/t1` → spans.

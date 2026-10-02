@@ -20,6 +20,14 @@
     {
       "pattern": "Kurn/AppIntents/**",
       "reason": "App Intents run only from Siri/Shortcuts; no test target executes them yet (docs/testing-coverage-plan.md, Fase 4)."
+    },
+    {
+      "pattern": "Kurn/Services/Pipeline/WhisperCppTranscriber.swift",
+      "reason": "Adapter: drives whisper.cpp, which needs a downloaded GGML model. Segment assembly, confidence, progress and thread budget live in KurnCore's WhisperSegmentAssembly/ChunkedProgress (tested)."
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioDiarizer.swift",
+      "reason": "Adapter: drives FluidAudio's OfflineDiarizerManager, which needs downloaded CoreML models. Labeling and progress live in KurnCore's DiarizerSegmentLabeling/ChunkProgressSampler, the rescue, smoothing, voiceprints and time budget in DiarizationFinalization (all tested)."
     }
   ]
 }
