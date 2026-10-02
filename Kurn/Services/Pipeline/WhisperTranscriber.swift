@@ -17,7 +17,19 @@ import KurnCore
 
 actor WhisperTranscriber: Transcribing {
 
+    /// Resolves the cloud speech-to-text client for a run. Production resolves
+    /// through `ProviderFactory` (key, base URL, transfer policy); tests inject
+    /// a scripted provider.
+    typealias ProviderResolver = @Sendable (AIProvider, String, LargeTransferPolicy) throws -> any TranscriptionProvider
+
     private let chunker = AudioChunker()
+    private let resolveProvider: ProviderResolver
+
+    init(resolveProvider: @escaping ProviderResolver = {
+        try ProviderFactory.whisperProvider(for: $0, model: $1, transferPolicy: $2)
+    }) {
+        self.resolveProvider = resolveProvider
+    }
 
     func transcribe(
         url: URL,
@@ -45,11 +57,7 @@ actor WhisperTranscriber: Transcribing {
         onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) async throws -> Void)? = nil,
         onProgress: @escaping @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
-        let provider = try ProviderFactory.whisperProvider(
-            for: transcriptionProvider,
-            model: model,
-            transferPolicy: transferPolicy
-        )
+        let provider = try resolveProvider(transcriptionProvider, model, transferPolicy)
         let vendor = transcriptionProvider.displayName
         let chunks = try await chunker.chunk(url: url, cutPoints: cutPoints)
         let total = chunks.count

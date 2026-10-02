@@ -349,6 +349,18 @@ jobs:
             "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # Where the uncovered in-scope lines are, file by file, in the log as
+      # well as the summary: the lcov artifacts expire, and the log is what a
+      # contributor (or an agent without artifact access) can read back.
+      - name: Rank files by uncovered lines
+        if: always()
+        run: |
+          python3 Tools/coverage_report.py --root "$GITHUB_WORKSPACE" --top 60 \
+            "$RUNNER_TEMP/coverage/coverage-unit-tests.lcov" \
+            "$RUNNER_TEMP/coverage/coverage-ui-tests.lcov" \
+            "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   release:
     needs: [lint-and-validate, static-policy, unit-tests, ui-accessibility-tests, kurncore-linux, coverage-gate]
     if: startsWith(github.ref, 'refs/tags/v')

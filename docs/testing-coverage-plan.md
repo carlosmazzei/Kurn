@@ -132,6 +132,17 @@ diretos (provedor roteirizado, prefetch, falhas, fetch descartado depois de
 
 ### Fase 3: Services ≥ 80% (3–4 PRs, o maior bloco)
 
+**Feito (parte 1, PR #245):** Services subiu de 72,5% para 79,0%, e o total em
+escopo chegou a **80,3%**. O piso do total foi fixado em 80,0. Os serviços que
+chamam LLM (`SummaryService`, `DocumentGenerationService`, `AutoTaggingService`,
+`WikiService`, `MeetingChatService`) e o `WhisperTranscriber` passaram a receber
+o provedor por injeção, e são testados com `ScriptedLLMProvider`
+(`KurnTests/Support`). Também ganharam testes `PhotoFileStore` e
+`PipelineEngineCatalog.live`. O `coverage-gate` agora lista no log os arquivos
+com mais linhas descobertas. Lição registrada em `ReadAloudEngineTests`:
+`AVSpeechSynthesizer` e `AVAudioPlayer` travam o simulador do CI e derrubam o
+processo de testes inteiro, então nenhum teste pode construí-los.
+
 Usa os seams e fakes que já existem: `PipelineEngineCatalog`, `AudioCaptureEngine`,
 `KurnTests/Support/FaultInjection` (`FakeFileSystem`, `FakeAudioSinkWriting`),
 `AudioFixtures` e `MockURLProtocol`.

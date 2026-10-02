@@ -11,6 +11,13 @@ import Foundation
 import KurnCore
 
 struct AutoTaggingService: Sendable {
+    private let resolveProvider: SummaryService.ProviderResolver
+
+    /// Production resolves through `ProviderFactory`, exactly like
+    /// `SummaryService`; tests inject a scripted provider.
+    init(resolveProvider: @escaping SummaryService.ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+        self.resolveProvider = resolveProvider
+    }
 
     /// Lightweight, sendable description of a tag for the prompt.
     struct TagInput: Sendable {
@@ -40,7 +47,7 @@ struct AutoTaggingService: Sendable {
             return Suggestion(tagIDs: [], newTagNames: [])
         }
 
-        let llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+        let llm = try resolveProvider(provider, model)
         let prompt = buildPrompt(
             title: meetingTitle,
             transcript: trimmed,

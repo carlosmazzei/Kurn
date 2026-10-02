@@ -17,7 +17,11 @@
 import Foundation
 
 struct WikiService {
-    private let summaryService = SummaryService()
+    private let summaryService: SummaryService
+
+    init(summaryService: SummaryService = SummaryService()) {
+        self.summaryService = summaryService
+    }
 
     /// Build the condensed wiki markdown for a meeting's transcript. Uses the
     /// summary map-stage notes template for both stages, so the output is
