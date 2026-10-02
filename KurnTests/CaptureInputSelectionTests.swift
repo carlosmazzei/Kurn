@@ -8,6 +8,7 @@
 //  into its streaming program for the whole meeting.
 //
 
+import AVFoundation
 import Testing
 @testable import Kurn
 
@@ -72,5 +73,66 @@ struct CaptureInputSelectionTests {
             preferredInputUID: "gone"
         )
         #expect(selection == .builtIn(uid: builtIn.uid))
+    }
+}
+
+struct CapturePolarPatternTests {
+    @Test func wholeRoomPrefersOmnidirectional() {
+        #expect(CaptureInputSelection.preferredPolarPatterns(for: .wholeRoom) == [.omnidirectional, .subcardioid])
+    }
+
+    @Test func focusSpeakerPrefersCardioid() {
+        #expect(CaptureInputSelection.preferredPolarPatterns(for: .focusSpeaker) == [.cardioid, .subcardioid])
+    }
+}
+
+struct SessionActivationRetryTests {
+    private struct Transient: Error {}
+
+    @Test func succeedsFirstTimeWithoutRetrying() async throws {
+        var calls = 0
+        var retries: [Int] = []
+        try await SessionActivationRetry.run(delayNanoseconds: 0) {
+            calls += 1
+        } onRetry: { attempt, _ in
+            retries.append(attempt)
+        }
+        #expect(calls == 1)
+        #expect(retries.isEmpty)
+    }
+
+    @Test func ridesOutATransientFailure() async throws {
+        var calls = 0
+        var retries: [Int] = []
+        try await SessionActivationRetry.run(delayNanoseconds: 0) {
+            calls += 1
+            if calls < 3 { throw Transient() }
+        } onRetry: { attempt, _ in
+            retries.append(attempt)
+        }
+        #expect(calls == 3)
+        #expect(retries == [1, 2])
+    }
+
+    @Test func throwsTheLastErrorOnceAttemptsRunOut() async {
+        var calls = 0
+        await #expect(throws: Transient.self) {
+            try await SessionActivationRetry.run(attempts: 2, delayNanoseconds: 0) {
+                calls += 1
+                throw Transient()
+            }
+        }
+        #expect(calls == 2)
+    }
+
+    @Test func atLeastOneAttemptIsMade() async {
+        var calls = 0
+        await #expect(throws: Transient.self) {
+            try await SessionActivationRetry.run(attempts: 0, delayNanoseconds: 0) {
+                calls += 1
+                throw Transient()
+            }
+        }
+        #expect(calls == 1)
     }
 }

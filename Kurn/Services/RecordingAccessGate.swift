@@ -22,26 +22,6 @@ protocol LocalAuthenticator: Sendable {
     func evaluate(reason: String) async throws
 }
 
-/// Default `LAContext`-backed implementation. A fresh `LAContext` is created
-/// per evaluation so cached biometry state from a prior session never carries
-/// over into the next.
-struct SystemLocalAuthenticator: LocalAuthenticator {
-    func evaluate(reason: String) async throws {
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(
-            .deviceOwnerAuthentication,
-            error: &error
-        ) else {
-            throw error ?? LAError(.authenticationFailed)
-        }
-        try await context.evaluatePolicy(
-            .deviceOwnerAuthentication,
-            localizedReason: reason
-        )
-    }
-}
-
 @MainActor
 @Observable
 final class RecordingAccessGate {
@@ -105,16 +85,18 @@ final class RecordingAccessGate {
             lastError = nil
         } catch {
             isUnlocked = false
-            if let laError = error as? LAError {
-                switch laError.code {
-                case .passcodeNotSet, .biometryNotAvailable:
-                    lastError = .authenticationNotAvailable
-                default:
-                    lastError = .authenticationFailed(error.localizedDescription)
-                }
-            } else {
-                lastError = .authenticationFailed(error.localizedDescription)
-            }
+            lastError = Self.appError(for: error)
         }
+    }
+
+    /// A device that can never authenticate (no passcode, no biometry) is a
+    /// settings problem, not a failed attempt: the lock view offers Settings
+    /// instead of a retry.
+    nonisolated static func appError(for error: Error) -> AppError {
+        if let laError = error as? LAError,
+           laError.code == .passcodeNotSet || laError.code == .biometryNotAvailable {
+            return .authenticationNotAvailable
+        }
+        return .authenticationFailed(error.localizedDescription)
     }
 }

@@ -52,6 +52,26 @@
     {
       "pattern": "Kurn/Services/PhoneSessionController.swift",
       "reason": "Adapter: WCSession needs a paired Watch. The application context, command decoding and replies live in RecordingSurfacePayloads, command handling in RecordingCommandRouter (both tested)."
+    },
+    {
+      "pattern": "Kurn/Services/OnDeviceTranscriber.swift",
+      "reason": "Adapter: drives SpeechAnalyzer/SpeechTranscriber, which need a downloaded Speech locale asset. Result bounds, word validation, the timeline check, progress and the no-speech decision live in KurnCore's AppleSpeechResultAssembly (tested)."
+    },
+    {
+      "pattern": "Kurn/Services/SystemLocalAuthenticator.swift",
+      "reason": "Adapter: LAContext presents Face ID/Touch ID/passcode, which needs an enrolled device credential. RecordingAccessGate's coalescing, relock and error mapping are tested through a stub authenticator."
+    },
+    {
+      "pattern": "Kurn/Services/CaptureAudioSession.swift",
+      "reason": "Adapter: configures the shared AVAudioSession, whose inputs and ports need real audio hardware. Input choice, category, polar-pattern order and activation retry live in CaptureInputSelection/SessionActivationRetry (tested)."
+    },
+    {
+      "pattern": "Kurn/Services/AVFoundationCaptureEngine.swift",
+      "reason": "Adapter: AVAudioEngine input tap and session notifications need a microphone. Notification decoding and the output file's format and fallback live in AudioCaptureEvent/CaptureOutputFile (tested); the recorder runs against FakeAudioCaptureEngine."
+    },
+    {
+      "pattern": "Kurn/Infrastructure/CrashReporting/DiagnosticsSubscriber.swift",
+      "reason": "Adapter: MetricKit delivers MXDiagnosticPayloads, which a test cannot construct. Consent, the crash/hang split, formatting and saving live in DiagnosticPayloadIntake (tested)."
     }
   ]
 }

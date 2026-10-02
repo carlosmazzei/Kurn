@@ -97,6 +97,19 @@ contexto do Watch, decodificação de comando e respostas). Esses cinco cascos e
 `exclude`. O `SherpaOnnxDiarizer` continua em escopo: a implementação real não é
 compilada, e o stub é testado.
 
+**Feito (parte 3):** `OnDeviceTranscriber` → KurnCore `AppleSpeechResultAssembly`
+(os testes de timeline de palavras foram junto, para rodar no Linux);
+`DiagnosticsSubscriber` → `DiagnosticPayloadIntake` (consentimento, crash/hang,
+formatação, gravação); `RecordingAccessGate` ganhou `appError(for:)` testado, e o
+`LAContext` foi para `SystemLocalAuthenticator`; `CaptureAudioSession` →
+`CaptureInputSelection.preferredPolarPatterns` e `SessionActivationRetry`; o
+`AVFoundationCaptureEngine` saiu de `AudioCaptureEngine.swift`, deixando lá
+`AudioCaptureEvent.interruption/routeChange` e `CaptureOutputFile`, todos
+testados. Esses cinco cascos estão em `exclude`. `SystemSpeechEngine` e
+`CloudSpeechEngine` continuam em escopo: rodam no simulador e ganharam testes
+diretos (provedor roteirizado, prefetch, falhas, fetch descartado depois de
+`stop`). Com isso, a Fase 2 está fechada.
+
 - `Services/Pipeline/WhisperCppTranscriber.swift`: agregação de peças
   SentencePiece em palavras, montagem de params, `t0/t1` → spans.
 - `Services/OnDeviceTranscriber.swift`: validação de timings contra o range do

@@ -19,69 +19,6 @@ import Testing
 
 struct WordTimestampTests {
 
-    // MARK: - Apple Speech result assembly
-
-    @Test func wordsBecomeOneSpanEach() {
-        let spans = OnDeviceTranscriber.spans(
-            words: [
-                TimedWord(text: "vamos", start: 10, end: 10.4),
-                TimedWord(text: "começar", start: 10.4, end: 11.0)
-            ],
-            text: "vamos começar",
-            resultStart: 10,
-            resultEnd: 11,
-            duration: 60
-        )
-        #expect(spans.map(\.text) == ["vamos", "começar"])
-        #expect(spans.first?.start == 10)
-        #expect(spans.last?.end == 11)
-    }
-
-    @Test func noWordsFallsBackToTheResultSpan() {
-        let spans = OnDeviceTranscriber.spans(
-            words: [],
-            text: "vamos começar",
-            resultStart: 10,
-            resultEnd: 11,
-            duration: 60
-        )
-        #expect(spans.count == 1)
-        #expect(spans.first?.text == "vamos começar")
-        #expect(spans.first?.start == 10)
-        #expect(spans.first?.end == 11)
-    }
-
-    /// The failure this guard exists for: timings on a different timeline than
-    /// the result would read as a correct transcript with every word at the
-    /// start of the recording, and speaker attribution would collapse onto
-    /// whoever spoke first. Better to lose the granularity than the timeline.
-    @Test func wordsOffTheResultTimelineAreRefused() {
-        let spans = OnDeviceTranscriber.spans(
-            words: [
-                TimedWord(text: "vamos", start: 0, end: 0.4),
-                TimedWord(text: "começar", start: 0.4, end: 1.0)
-            ],
-            text: "vamos começar",
-            resultStart: 600,
-            resultEnd: 601,
-            duration: 3600
-        )
-        #expect(spans.count == 1)
-        #expect(spans.first?.start == 600)
-    }
-
-    @Test func wordsRunningPastTheResultAreRefused() {
-        let spans = OnDeviceTranscriber.spans(
-            words: [TimedWord(text: "vamos", start: 10, end: 45)],
-            text: "vamos",
-            resultStart: 10,
-            resultEnd: 11,
-            duration: 60
-        )
-        #expect(spans.count == 1)
-        #expect(spans.first?.end == 11)
-    }
-
     // MARK: - Expansion through the quality filter
 
     /// Words are emitted only for segments that survive. A hallucinated segment's
