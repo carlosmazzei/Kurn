@@ -80,15 +80,15 @@ actor SherpaOnnxDiarizer: Diarizing {
         ensureWrapper(speakerCount: speakerCount)
         guard let wrapper else {
             AppLog.transcription.atError.error("SherpaOnnxDiarizer: models unavailable, falling back to one turn")
-            return [Self.fallbackTurn(for: url)]
+            return [AudioFileDuration.wholeClipTurn(for: url)]
         }
 
-        let duration = Self.audioDuration(of: url)
+        let duration = AudioFileDuration.seconds(of: url)
         let budget = Self.processTimeout(forAudioDuration: duration)
         AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: processing file=\(url.lastPathComponent, privacy: .public) audio=\(String(format: "%.1f", duration), privacy: .public)s budget=\(String(format: "%.1f", budget), privacy: .public)s")
         guard !Task.isCancelled else {
             AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: cancelled before starting")
-            return [Self.fallbackTurn(for: url)]
+            return [AudioFileDuration.wholeClipTurn(for: url)]
         }
         do {
             // H8 PR 18: this used to race `processSynchronously` against a
@@ -112,13 +112,13 @@ actor SherpaOnnxDiarizer: Diarizing {
             if elapsed > budget {
                 AppLog.transcription.atNotice.notice("SherpaOnnxDiarizer: exceeded its \(String(format: "%.1f", budget), privacy: .public)s budget (took \(String(format: "%.1f", elapsed), privacy: .public)s) — sherpa-onnx exposes no abort hook, so processing ran to completion rather than being interrupted")
             }
-            guard !turns.isEmpty else { return [Self.fallbackTurn(for: url)] }
+            guard !turns.isEmpty else { return [AudioFileDuration.wholeClipTurn(for: url)] }
             let smoothed = SpeakerTurnSmoothing.smooth(turns)
             AppLog.transcription.atInfo.info("SherpaOnnxDiarizer: turns \(turns.count, privacy: .public) -> smoothed \(smoothed.count, privacy: .public), speakers=\(Set(smoothed.map { $0.speakerLabel }).count, privacy: .public)")
             return smoothed
         } catch {
             AppLog.transcription.atError.error("SherpaOnnxDiarizer: processing failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-            return [Self.fallbackTurn(for: url)]
+            return [AudioFileDuration.wholeClipTurn(for: url)]
         }
     }
 
@@ -190,7 +190,7 @@ actor SherpaOnnxDiarizer: Diarizing {
     func diarize(url: URL, speakerCount: Int) async -> [SpeakerTurn] {
         let message = NSLocalizedString("settings.sherpa_onnx.package_missing", comment: "sherpa-onnx package missing")
         AppLog.transcription.atError.error("SherpaOnnxDiarizer: \(message, privacy: .public)")
-        return [Self.fallbackTurn(for: url)]
+        return [AudioFileDuration.wholeClipTurn(for: url)]
     }
 }
 
@@ -199,22 +199,9 @@ actor SherpaOnnxDiarizer: Diarizing {
 // MARK: - Shared helpers
 //
 // Outside the compilation-condition split: both build configurations need
-// the same fallback turn and the same processing budget.
+// the same processing budget. The fallback turn is `AudioFileDuration`'s.
 
 extension SherpaOnnxDiarizer {
-    /// A single speaker turn spanning the whole clip, used whenever
-    /// diarization can't produce real turns.
-    fileprivate static func fallbackTurn(for url: URL) -> SpeakerTurn {
-        SpeakerTurn(speakerLabel: "Speaker 1", start: 0, end: max(0, audioDuration(of: url)))
-    }
-
-    fileprivate static func audioDuration(of url: URL) -> TimeInterval {
-        guard let file = try? AVAudioFile(forReading: url), file.processingFormat.sampleRate > 0 else {
-            return 0
-        }
-        return Double(file.length) / file.processingFormat.sampleRate
-    }
-
     /// Processing budget scaled to the recording — reported, not enforced
     /// (H8 PR 18): sherpa-onnx exposes no way to abort an in-flight call, so
     /// exceeding this only logs, it never cancels. Deliberately more

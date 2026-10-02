@@ -87,6 +87,16 @@ e `ChunkedProgress`; `FluidAudioDiarizer` → KurnCore `DiarizerSegmentLabeling`
 (resgate do colapso, suavização, voiceprints, orçamento de tempo). Os dois cascos
 estão em `exclude`.
 
+**Feito (parte 2):** `FluidAudioTranscriber` → KurnCore `BatchTranscriptAssembly`;
+`FluidAudioVAD` → KurnCore `SpeechRegionNormalization`; `FluidAudioModelStore`
+→ KurnCore `CoalescedLoader`; o fallback de clipe inteiro que VAD e
+diarizadores copiavam virou `AudioFileDuration`; `LockScreenRecordingController`
+e `PhoneSessionController` → `RecordingSurfacePayloads` (estado da Live Activity,
+contexto do Watch, decodificação de comando e respostas). Esses cinco cascos e o
+`FluidAudioMultilingualStreamingManager` (só repassa chamadas) estão em
+`exclude`. O `SherpaOnnxDiarizer` continua em escopo: a implementação real não é
+compilada, e o stub é testado.
+
 - `Services/Pipeline/WhisperCppTranscriber.swift`: agregação de peças
   SentencePiece em palavras, montagem de params, `t0/t1` → spans.
 - `Services/OnDeviceTranscriber.swift`: validação de timings contra o range do

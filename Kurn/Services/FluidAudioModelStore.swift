@@ -41,39 +41,31 @@ actor FluidAudioModelStore {
         dualDecodeArbitration: true
     )
 
-    private var manager: AsrManager?
-    /// In-flight load, so concurrent callers await one load instead of racing to
-    /// start several (e.g. language detection and transcription firing together).
-    private var loadTask: Task<AsrManager, Error>?
+    /// Loads once, coalesces concurrent callers (e.g. language detection and
+    /// transcription firing together) onto one load, and never caches a failure.
+    private let loader = CoalescedLoader<AsrManager>()
 
     private init() {}
 
-    /// The shared manager, loaded on first call. Concurrent callers coalesce onto
-    /// the same in-flight load. Failures aren't cached — the next call retries.
+    /// The shared manager, loaded on first call. Failures aren't cached — the
+    /// next call retries.
     func manager() async throws -> AsrManager {
         try await ResourceGuard.requireModelDownloadHeadroom()
-        if let manager { return manager }
-        if let loadTask { return try await loadTask.value }
-
-        let task = Task<AsrManager, Error> {
-            try await ResourceGuard.requireModelDownloadHeadroom()
-            // H8 PR 17: acquired once for the whole coalesced load, not per
-            // caller — concurrent callers already await this one `Task`
-            // rather than each starting their own.
-            return try await withResourceReservation(.modelLoading) {
-                let models = try await AsrModels.downloadAndLoad(version: .v3)
-                return AsrManager(config: Self.transcriptionConfig, models: models)
-            }
-        }
-        loadTask = task
+        if let manager = await loader.current { return manager }
         do {
-            let created = try await task.value
-            manager = created
-            loadTask = nil
-            AppLog.transcription.atNotice.notice("fluidAudio: multilingual ASR models loaded (shared)")
-            return created
+            let manager = try await loader.value {
+                try await ResourceGuard.requireModelDownloadHeadroom()
+                // H8 PR 17: acquired once for the whole coalesced load, not per
+                // caller — concurrent callers already await this one load
+                // rather than each starting their own.
+                return try await withResourceReservation(.modelLoading) {
+                    let models = try await AsrModels.downloadAndLoad(version: .v3)
+                    return AsrManager(config: Self.transcriptionConfig, models: models)
+                }
+            }
+            AppLog.transcription.atNotice.notice("fluidAudio: multilingual ASR models ready (shared)")
+            return manager
         } catch {
-            loadTask = nil
             AppLog.transcription.atError.error("fluidAudio: model load failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
             try ResourceGuard.rethrowIfResourceFailure(error)
             throw AppError.modelDownloadFailed(error.localizedDescription)

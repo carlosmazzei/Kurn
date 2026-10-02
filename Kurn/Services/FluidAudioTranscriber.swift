@@ -44,12 +44,12 @@ actor FluidAudioTranscriber: Transcribing {
         // long enough that the engine will actually run — and finish — a progress
         // session; otherwise we'd leave a dangling session on the shared manager.
         var progressTask: Task<Void, Never>?
-        if duration > 15.5 {
+        if BatchTranscriptAssembly.reportsProgress(forDuration: duration) {
             let stream = await manager.transcriptionProgressStream
             progressTask = Task {
                 do {
                     for try await fraction in stream {
-                        onProgress(min(1, max(0, fraction)))
+                        onProgress(BatchTranscriptAssembly.clampedFraction(fraction))
                     }
                 } catch {
                     // A failed session is surfaced by `transcribe` below; the
@@ -82,25 +82,16 @@ actor FluidAudioTranscriber: Transcribing {
             throw AppError.transcriptionFailed(error.localizedDescription)
         }
 
-        let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
-            return RawTranscript(spans: [], language: "")
-        }
-
         // FluidAudio 0.15.5 exposes token timings. Aggregate its SentencePiece
         // tokens into words so diarization can assign each word to the speaker
         // active at that point. Older/cached results without timings retain the
-        // full-clip fallback.
+        // full-clip fallback (`BatchTranscriptAssembly`).
         let words = result.tokenTimings.map(buildWordTimings(from:)) ?? []
-        let timedWords = words.map {
-            TimedWord(text: $0.word, start: $0.startTime, end: $0.endTime)
-        }
-        let spans = TimedWordSpanBuilder.spans(
-            from: timedWords,
-            fallbackText: text,
+        return BatchTranscriptAssembly.transcript(
+            text: result.text,
+            words: words.map { TimedWord(text: $0.word, start: $0.startTime, end: $0.endTime) },
             duration: duration
         )
-        return RawTranscript(spans: spans, language: "")
     }
 }
 
