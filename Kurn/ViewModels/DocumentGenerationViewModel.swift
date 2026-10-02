@@ -12,14 +12,15 @@ import SwiftData
 @Observable
 final class DocumentGenerationViewModel {
     private let modelContext: ModelContext
-    private let service = DocumentGenerationService()
+    private let service: DocumentGenerationService
 
     private(set) var isGenerating = false
     private(set) var progress: (current: Int, total: Int)?
     var error: AppError?
 
-    init(modelContext: ModelContext) {
+    init(modelContext: ModelContext, service: DocumentGenerationService = DocumentGenerationService()) {
         self.modelContext = modelContext
+        self.service = service
     }
 
     func generate(

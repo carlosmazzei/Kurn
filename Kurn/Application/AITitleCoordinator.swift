@@ -12,6 +12,7 @@ import Observation
 final class AITitleCoordinator {
     private let summaryService: SummaryService
     private let providerCircuitBreaker: ProviderCircuitBreaker
+    private let isProviderUsable: (AIProvider) -> Bool
 
     /// Meetings whose title is being (re)generated, mirroring
     /// `WikiCoordinator.generatingMeetingIDs` — lets a view show progress and
@@ -24,12 +25,16 @@ final class AITitleCoordinator {
     /// `WikiCoordinator.lastError` has.
     var lastError: AppError?
 
+    /// `isProviderUsable` is the Keychain/on-device check; tests replace it
+    /// together with the summary service's provider resolver.
     init(
         summaryService: SummaryService = SummaryService(),
-        providerCircuitBreaker: ProviderCircuitBreaker = .shared
+        providerCircuitBreaker: ProviderCircuitBreaker = .shared,
+        isProviderUsable: @escaping (AIProvider) -> Bool = { $0.isUsable }
     ) {
         self.summaryService = summaryService
         self.providerCircuitBreaker = providerCircuitBreaker
+        self.isProviderUsable = isProviderUsable
     }
 
     /// Generate (or, with `force`, regenerate) `meeting`'s AI title.
@@ -49,7 +54,7 @@ final class AITitleCoordinator {
               force || meeting.aiTitle == nil,
               meeting.hasAnyTranscript else { return nil }
         let provider = settings.aiProvider
-        guard provider.isUsable else { return nil }
+        guard isProviderUsable(provider) else { return nil }
         guard await providerCircuitBreaker.allows(
             providerID: provider.id,
             trigger: trigger
