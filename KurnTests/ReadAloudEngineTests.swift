@@ -5,8 +5,13 @@
 //  The two read-aloud engines driven without a network or a listener:
 //  `CloudSpeechEngine` against a scripted provider (which chunk is fetched,
 //  failures surfaced as `AppError`, stale fetches dropped after a stop —
-//  never a real `AVAudioPlayer`, which hangs the CI simulator) and
-//  `SystemSpeechEngine`'s voice choice and empty-queue handling.
+//  never a real `AVAudioPlayer`, which hangs the CI simulator).
+//
+//  `SystemSpeechEngine` has no suite here on purpose: constructing an
+//  `AVSpeechSynthesizer` or listing the installed voices calls into the
+//  speech daemon, which on the CI simulator deadlocks and aborts the whole
+//  test process ("Initialize: RPC timeout. Apparently deadlocked"). Its pure
+//  helpers are covered in `SpeechSynthesisTests`.
 //
 
 import AVFoundation
@@ -123,33 +128,5 @@ struct CloudSpeechEngineTests {
         try await Task.sleep(nanoseconds: 400_000_000)
         #expect(started.isEmpty)
         #expect(failure == nil)
-    }
-}
-
-@MainActor
-struct SystemSpeechEngineQueueTests {
-
-    @Test func startingPastTheEndFinishesImmediately() {
-        let engine = SystemSpeechEngine(voiceIdentifier: "", languageCode: nil, rate: 1)
-        var finished = false
-        engine.onFinished = { finished = true }
-        engine.start([], at: 0)
-        #expect(finished)
-        engine.stop()
-    }
-
-    @Test func anUnknownVoiceFallsBackToTheLanguage() {
-        let voice = SystemSpeechEngine.voice(identifier: "no.such.voice", languageCode: "en")
-        if let voice {
-            #expect(voice.language.lowercased().hasPrefix("en"))
-        }
-        #expect(SystemSpeechEngine.voice(identifier: "", languageCode: nil) == nil)
-    }
-
-    @Test func anInstalledVoiceIsKept() {
-        // A simulator without any installed voice has nothing to pick.
-        guard let installed = AVSpeechSynthesisVoice.speechVoices().first else { return }
-        let voice = SystemSpeechEngine.voice(identifier: installed.identifier, languageCode: "xx")
-        #expect(voice?.identifier == installed.identifier)
     }
 }
