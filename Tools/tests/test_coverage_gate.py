@@ -103,6 +103,7 @@ class ScopeTests(unittest.TestCase):
             floor = json.load(handle)
         self.assertEqual(floor["target"], 80.0)
         self.assertIn("layers", floor)
+        self.assertGreaterEqual(floor["tolerance"], 1.0, "below the measured run-to-run noise the gate flakes")
 
 
 class FloorTests(unittest.TestCase):
@@ -130,6 +131,16 @@ class FloorTests(unittest.TestCase):
         self.assertEqual(floor["total"], 58.3)
         self.assertEqual(floor["layers"], {"Kurn/Models": 100.0, "Kurn/Services": 50.0})
         self.assertEqual(ws.run(report)[0], 0)
+
+    def test_write_floor_never_lowers_a_recorded_value(self):
+        ws = Workspace(self, {"target": 80.0, "tolerance": 1.0, "total": 90.0,
+                              "layers": {"Kurn/Services": 70.0, "Kurn/Models": 10.0}})
+        report = self.records(ws, 5)
+        self.assertEqual(ws.run(report, extra=("--write-floor",))[0], 0)
+        with open(ws.floor) as handle:
+            floor = json.load(handle)
+        self.assertEqual(floor["total"], 90.0)
+        self.assertEqual(floor["layers"], {"Kurn/Models": 100.0, "Kurn/Services": 70.0})
 
     def test_drop_below_floor_fails(self):
         ws = Workspace(self, {"target": 80.0, "tolerance": 0.5, "total": 70.0,

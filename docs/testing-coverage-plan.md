@@ -15,8 +15,10 @@
 - **Gate de patch:** as linhas executáveis em escopo que um PR adiciona
   precisam estar ≥ 80% cobertas, desde já.
 - **Piso (catraca):** o total em escopo e cada camada não podem cair mais de
-  0,5pp abaixo de `Tools/coverage_floor.json`. O PR que sobe a cobertura roda
-  `coverage_gate.py --write-floor` e commita o piso novo. O piso nunca desce.
+  1pp abaixo de `Tools/coverage_floor.json`. O PR que sobe a cobertura roda
+  `coverage_gate.py --write-floor` (que nunca baixa um valor) e commita o piso
+  novo, subindo só as camadas que a mudança mexeu, pelo menor de dois runs —
+  os runs do simulador variam até 0,9pp no mesmo código. O piso nunca desce.
 - O Codecov continua informativo (badge, comentário, componentes). O gate é
   nosso, então uma queda do Codecov não bloqueia merge.
 - Sem testes que dependam de rede, modelo baixado ou microfone. Seams vêm antes
@@ -144,7 +146,8 @@ Testes `@MainActor` de máquina de estados sobre `TestModelContainer.make()`:
 - Mexer em `TranscriptionService` e `AudioRecorderService` exige rodar o lane
   TSan (`reliability-hardening.yml`) antes do merge, num PR para cada seam.
 - A cobertura dos UI tests entra na união. Se um fluxo for desligado (skip por
-  flake), o total pode cair um pouco: a tolerância de 0,5pp absorve ruído, mas
+  flake), o total pode cair um pouco: a tolerância de 1pp absorve ruído (medido: até 0,9pp entre dois runs
+  do mesmo código em `Services`/`Providers`), mas
   não uma suíte inteira. Nesse caso, o PR que desliga a suíte explica a queda e
   regrava o piso, e essa é a única exceção à regra de nunca baixar o piso.
 - Excluir arquivos é a forma mais fácil de "subir" o número. Por isso cada

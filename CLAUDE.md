@@ -147,11 +147,14 @@ logic (`Kurn/` minus `Views/`, `ContentView.swift`, `DebugSupport/`,
 - **Patch:** the executable in-scope lines a PR adds must be ≥ 80% covered.
   Untested new logic is the failure this exists to catch; write the test in
   the same PR rather than moving the code somewhere unmeasured.
-- **Floor:** the in-scope total and each layer may not drop more than 0.5pp
+- **Floor:** the in-scope total and each layer may not drop more than 1pp
   below `Tools/coverage_floor.json`. The floor is a ratchet: a PR that raises
   coverage runs `python3 Tools/coverage_gate.py --write-floor <lcovs>` (the
-  three reports are artifacts of the run) and commits the result. Never lower
-  a floor or add an exclusion to make a PR pass.
+  three reports are artifacts of the run; it never lowers a value) and commits
+  the result. The simulator runs are not deterministic — `Services` and
+  `Providers` measured 0.8–0.9pp apart on identical code — so raise only the
+  layers the change moved, from the lower of two runs, never a whole table
+  from one. Never lower a floor or add an exclusion to make a PR pass.
 
 An exclusion is legitimate only for code no test target can run: a SwiftUI
 view body, or an **adapter** — a file that only wraps an API needing
