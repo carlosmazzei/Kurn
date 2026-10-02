@@ -2,14 +2,14 @@
   "_comment": "Ratchet for Tools/coverage_gate.py: the in-scope total and each layer may not drop more than `tolerance` points below these values. The macOS test runs are not deterministic (layers measured up to 0.9pp apart on identical code), so raise only the layers a change actually moved, from the lower of two runs; `coverage_gate.py --write-floor` never lowers a value. Never lower a floor to make a PR pass. `null` means not measured yet (bootstrap: the gate reports, and passes).",
   "target": 80.0,
   "tolerance": 1.0,
-  "total": 76.7,
+  "total": 80.0,
   "layers": {
     "Kurn": 88.6,
     "Kurn/Application": 63.1,
     "Kurn/Infrastructure": 80.6,
     "Kurn/Models": 86.5,
     "Kurn/Providers": 86.7,
-    "Kurn/Services": 71.6,
+    "Kurn/Services": 78.1,
     "Kurn/ViewModels": 67.5,
     "Packages/KurnCore": 97.4
   }
