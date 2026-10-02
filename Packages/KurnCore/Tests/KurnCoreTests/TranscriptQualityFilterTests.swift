@@ -1,6 +1,6 @@
 //
 //  TranscriptQualityFilterTests.swift
-//  KurnTests
+//  KurnCoreTests
 //
 //  The rules that decide whether Whisper actually heard a segment.
 //
@@ -11,9 +11,8 @@
 //
 
 import Foundation
-import KurnCore
 import Testing
-@testable import Kurn
+@testable import KurnCore
 
 struct TranscriptQualityFilterTests {
 
