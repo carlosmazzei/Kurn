@@ -19,6 +19,7 @@ struct DocumentGenerationViewModelTests {
 
     private struct ProviderDown: Error {}
 
+    @MainActor
     private struct Harness {
         let context: ModelContext
         let llm: ScriptedLLMProvider
