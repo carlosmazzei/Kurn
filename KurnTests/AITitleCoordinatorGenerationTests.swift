@@ -75,6 +75,21 @@ struct AITitleCoordinatorGenerationTests {
         #expect(unusable.llm.summarizeCalls.isEmpty)
     }
 
+    @Test func theDefaultUsabilityCheckIsTheProvidersOwn() async {
+        let context = ModelContext(TestModelContainer.make())
+        let llm = ScriptedLLMProvider(summarize: { _, _ in
+            SummaryResult(sections: [SummarySection(title: "Roadmap", body: "")])
+        })
+        let settings = MeetingFixtures.isolatedSettings()
+        let coordinator = AITitleCoordinator(
+            summaryService: SummaryService(resolveProvider: { _, _ in llm }),
+            providerCircuitBreaker: MeetingFixtures.freshCircuit()
+        )
+        let meeting = MeetingFixtures.transcribed("Untitled", in: context)
+        let title = await coordinator.generateTitle(for: meeting, settings: settings)
+        #expect((title != nil) == settings.aiProvider.isUsable)
+    }
+
     @Test func anExplicitFailureSurfacesInLastError() async {
         let harness = Harness(reply: { _ in throw ProviderDown() })
         let meeting = MeetingFixtures.transcribed("Untitled", in: harness.context)

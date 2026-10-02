@@ -127,6 +127,22 @@ struct WikiCoordinatorGenerationTests {
         #expect(harness.coordinator.articleCount() == WikiCoordinator.backfillBatchLimit)
     }
 
+    @Test func theDefaultUsabilityCheckIsTheProvidersOwn() async {
+        let context = ModelContext(TestModelContainer.make())
+        let llm = ScriptedLLMProvider()
+        let settings = MeetingFixtures.isolatedSettings()
+        settings.wikiEnabled = true
+        let coordinator = WikiCoordinator(
+            modelContext: context,
+            appSettings: settings,
+            providerCircuitBreaker: MeetingFixtures.freshCircuit(),
+            wikiService: WikiService(summaryService: SummaryService(resolveProvider: { _, _ in llm }))
+        )
+        MeetingFixtures.transcribed("Planning", in: context)
+        await coordinator.rebuildWiki()
+        #expect(coordinator.articleCount() == (settings.aiProvider.isUsable ? 1 : 0))
+    }
+
     @Test func backfillDoesNothingWhenDisabledOrUnusable() async {
         let disabled = Harness(enabled: false)
         MeetingFixtures.transcribed("A", in: disabled.context)
