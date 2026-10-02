@@ -22,48 +22,6 @@ import Foundation
 import KurnCore
 import os
 
-/// Pure decision of which input a recording uses, kept apart from
-/// `AVAudioSession` so it is testable without real hardware.
-enum CaptureInputSelection: Equatable, Sendable {
-    /// The iPhone's own microphone, identified by its port UID.
-    case builtIn(uid: String)
-    /// An explicitly chosen external input (Bluetooth, wired, USB).
-    case external(uid: String)
-    /// Leave the route to the system (an accessory is connected and nothing
-    /// asked for a specific input).
-    case systemDefault
-
-    struct Input: Equatable, Sendable {
-        let uid: String
-        let isBuiltIn: Bool
-    }
-
-    /// Priority: an explicit `preferredInputUID` (from the per-recording
-    /// microphone picker) always wins. Otherwise the built-in mic is selected
-    /// when `forceBuiltIn` is set (Settings → always use the iPhone mic) or no
-    /// external input exists; with an accessory connected and no preference,
-    /// the system's own route choice is left alone.
-    static func resolve(
-        inputs: [Input],
-        forceBuiltIn: Bool,
-        preferredInputUID: String?
-    ) -> CaptureInputSelection {
-        if let uid = preferredInputUID, let match = inputs.first(where: { $0.uid == uid }) {
-            return match.isBuiltIn ? .builtIn(uid: match.uid) : .external(uid: match.uid)
-        }
-        guard let builtIn = inputs.first(where: \.isBuiltIn) else { return .systemDefault }
-        let hasExternal = inputs.contains { !$0.isBuiltIn }
-        return forceBuiltIn || !hasExternal ? .builtIn(uid: builtIn.uid) : .systemDefault
-    }
-
-    /// Whether the session needs an output route (and Bluetooth HFP) for this
-    /// input. Only the built-in mic can capture without one.
-    var needsPlayAndRecord: Bool {
-        if case .builtIn = self { return false }
-        return true
-    }
-}
-
 enum CaptureAudioSession {
     static func configure(
         pickup: MicPickup,
@@ -101,22 +59,13 @@ enum CaptureAudioSession {
         }
     }
 
-    /// Activate the session with a short retry/backoff. Requesting
-    /// `.playAndRecord` while a Bluetooth headset is connected forces the
-    /// accessory to switch profile (A2DP/idle → HFP), an asynchronous radio
-    /// handshake that can make `setActive(true)` throw transiently while it's
-    /// in flight. A brief retry rides out that window instead of failing the
-    /// whole recording start on the first attempt.
-    private static func activate(_ session: AVAudioSession, attempts: Int = 3) async throws {
-        for attempt in 1...attempts {
-            do {
-                try session.setActive(true)
-                return
-            } catch {
-                if attempt == attempts { throw error }
-                AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-                try? await Task.sleep(nanoseconds: 200_000_000)
-            }
+    /// Activate the session, retrying through a Bluetooth profile switch
+    /// (`SessionActivationRetry`).
+    private static func activate(_ session: AVAudioSession) async throws {
+        try await SessionActivationRetry.run {
+            try session.setActive(true)
+        } onRetry: { attempt, error in
+            AppLog.recorder.atInfo.info("activateSession: attempt \(attempt, privacy: .public) failed, retrying code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 
@@ -150,11 +99,7 @@ enum CaptureAudioSession {
 
         // Try patterns in priority order for the chosen pickup mode; apply the
         // first one the hardware actually supports.
-        let preferredPatterns: [AVAudioSession.PolarPattern] = pickup == .wholeRoom
-            ? [.omnidirectional, .subcardioid]
-            : [.cardioid, .subcardioid]
-
-        for pattern in preferredPatterns {
+        for pattern in CaptureInputSelection.preferredPolarPatterns(for: pickup) {
             guard let source = sources.first(where: {
                 $0.supportedPolarPatterns?.contains(pattern) == true
             }) else { continue }

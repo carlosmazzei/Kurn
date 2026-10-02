@@ -11,6 +11,9 @@
 //  transmitted anywhere automatically regardless of consent — reports only
 //  leave the device via an explicit "Share" action in DiagnosticReportsListView.
 //
+//  Only reads MetricKit's payloads; what is kept and how it is saved is
+//  `DiagnosticPayloadIntake`'s decision.
+//
 
 #if canImport(MetricKit)
 import Foundation
@@ -21,55 +24,32 @@ final class DiagnosticsSubscriber: NSObject, MXMetricManagerSubscriber, @uncheck
 
     private override init() {}
 
-    private var isConsented: Bool {
-        UserDefaults.standard.bool(forKey: AppSettingsKeys.diagnosticReportsConsented)
-    }
-
     func didReceive(_ payloads: [MXDiagnosticPayload]) {
-        guard isConsented else {
+        let consented = DiagnosticPayloadIntake.isConsented()
+        guard consented else {
             AppLog.persistence.atNotice.notice(
                 "diagnostics: discarding \(payloads.count, privacy: .public) payload(s), not consented"
             )
             return
         }
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
-        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
-        for payload in payloads {
-            let receivedAt = payload.timeStampEnd
-            let hasCrash = !(payload.crashDiagnostics?.isEmpty ?? true)
-            let hasHang = !(payload.hangDiagnostics?.isEmpty ?? true)
-            guard hasCrash || hasHang else { continue }
-            let json = payload.jsonRepresentation()
-            if hasCrash {
-                save(kind: .crash, receivedAt: receivedAt, appVersion: appVersion, osVersion: osVersion, json: json)
-            }
-            if hasHang {
-                save(kind: .hang, receivedAt: receivedAt, appVersion: appVersion, osVersion: osVersion, json: json)
-            }
-        }
+        let reports = DiagnosticPayloadIntake.reports(
+            for: payloads.map { payload in
+                DiagnosticPayloadIntake.Payload(
+                    receivedAt: payload.timeStampEnd,
+                    hasCrash: !(payload.crashDiagnostics?.isEmpty ?? true),
+                    hasHang: !(payload.hangDiagnostics?.isEmpty ?? true),
+                    json: payload.jsonRepresentation()
+                )
+            },
+            consented: consented,
+            appVersion: DiagnosticPayloadIntake.appVersion(),
+            osVersion: ProcessInfo.processInfo.operatingSystemVersionString
+        )
+        DiagnosticPayloadIntake.persist(reports)
     }
 
     /// No-op: this app surfaces diagnostic (crash/hang) reports only, not the
     /// periodic performance-metric payloads (CPU/battery/disk aggregates).
     func didReceive(_ payloads: [MXMetricPayload]) {}
-
-    private func save(
-        kind: DiagnosticReportFormatter.Kind,
-        receivedAt: Date,
-        appVersion: String,
-        osVersion: String,
-        json: Data
-    ) {
-        let text = DiagnosticReportFormatter.format(
-            kind: kind, receivedAt: receivedAt, appVersion: appVersion, osVersion: osVersion, jsonRepresentation: json
-        )
-        do {
-            try DiagnosticReportStore.save(text, kind: kind, receivedAt: receivedAt)
-        } catch {
-            AppLog.persistence.atError.error(
-                "diagnostics: failed to save \(kind.rawValue, privacy: .public) report code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
-            )
-        }
-    }
 }
 #endif

@@ -55,187 +55,72 @@ protocol AudioCaptureEngine: AnyObject, Sendable {
     func stop()
 }
 
-/// Production engine: one `AVAudioEngine` plus the shared `AVAudioSession`.
-final class AVFoundationCaptureEngine: AudioCaptureEngine, @unchecked Sendable {
-    private let engine = AVAudioEngine()
-    private let lock = NSLock()
-    private var eventHandler: (@Sendable (AudioCaptureEvent) -> Void)?
-    private var observers: [NSObjectProtocol] = []
-
-    var onEvent: (@Sendable (AudioCaptureEvent) -> Void)? {
-        get { lock.withLock { eventHandler } }
-        set { lock.withLock { eventHandler = newValue } }
-    }
-
-    init() {
-        registerNotifications()
-    }
-
-    deinit {
-        for observer in observers {
-            NotificationCenter.default.removeObserver(observer)
+extension AudioCaptureEvent {
+    /// The event an `AVAudioSession.interruptionNotification` carries, or
+    /// `nil` for a notification without a recognisable type. An `ended`
+    /// without options never asks to resume.
+    static func interruption(userInfo: [AnyHashable: Any]?) -> AudioCaptureEvent? {
+        guard let raw = userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return nil }
+        switch type {
+        case .began:
+            return .interruptionBegan
+        case .ended:
+            let options = (userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt)
+                .map(AVAudioSession.InterruptionOptions.init(rawValue:)) ?? []
+            return .interruptionEnded(shouldResume: options.contains(.shouldResume))
+        @unknown default:
+            return nil
         }
     }
 
-    var isRunning: Bool { engine.isRunning }
-
-    var inputFormat: AVAudioFormat? {
-        let format = engine.inputNode.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { return nil }
-        return format
+    /// The event an `AVAudioSession.routeChangeNotification` carries: only a
+    /// lost input (headphones pulled, Bluetooth mic off) matters to a live
+    /// capture; every other reason is `nil`.
+    static func routeChange(userInfo: [AnyHashable: Any]?) -> AudioCaptureEvent? {
+        guard let raw = userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable else { return nil }
+        return .inputRouteLost
     }
+}
 
-    func configureSession(pickup: MicPickup, forceBuiltIn: Bool, preferredInputUID: String?) async throws {
-        try await CaptureAudioSession.configure(
-            pickup: pickup,
-            forceBuiltIn: forceBuiltIn,
-            preferredInputUID: preferredInputUID
-        )
-    }
-
-    func reactivateSession() {
-        // `setActive` is a synchronous, blocking AVFoundation call; hopping
-        // through the nonisolated `AudioSessionActivation` helper keeps that
-        // block off whichever thread called `reactivateSession()` (the
-        // recorder is `@MainActor`) instead of stalling it.
-        Task { try? await AudioSessionActivation.setActive(true) }
-    }
-
-    func deactivateSession() {
-        Task { await AudioRecorderEngineSupport.deactivateSession() }
-    }
-
-    func openOutputFile(at url: URL, bitRate: Int) throws -> any AudioFileWriting {
-        let settings: [String: Any] = [
+/// The encoded file a recording is written to: mono AAC at the storage rate.
+enum CaptureOutputFile {
+    static func settings(bitRate: Int?) -> [String: Any] {
+        var settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: AudioRecorderService.storageSampleRate,
             AVNumberOfChannelsKey: Int(AudioRecorderService.storageChannelCount),
-            AVEncoderBitRateKey: bitRate,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
-        // Kept from when the encoder saw the mic's native rate: some routes
-        // (e.g. Bluetooth HFP hearing aids negotiating a narrowband link) had a
-        // sample rate whose AAC encoder rejected an explicit bit rate this high,
-        // throwing out of AVAudioFile's init. The fixed 24kHz mono format
-        // should never trip that, but failing a whole recording over an encoder
-        // property is not worth the saved lines.
+        if let bitRate { settings[AVEncoderBitRateKey] = bitRate }
+        return settings
+    }
+
+    /// Kept from when the encoder saw the mic's native rate: some routes
+    /// (e.g. Bluetooth HFP hearing aids negotiating a narrowband link) had a
+    /// sample rate whose AAC encoder rejected an explicit bit rate this high,
+    /// throwing out of AVAudioFile's init. The fixed 24kHz mono format
+    /// should never trip that, but failing a whole recording over an encoder
+    /// property is not worth the saved lines — so a rejected bit rate is
+    /// retried once with the encoder's own choice.
+    static func open(
+        at url: URL,
+        bitRate: Int,
+        make: (URL, [String: Any]) throws -> any AudioFileWriting = { try AVAudioFile(forWriting: $0, settings: $1) }
+    ) throws -> any AudioFileWriting {
         do {
-            return try AVAudioFile(forWriting: url, settings: settings)
+            return try make(url, settings(bitRate: bitRate))
         } catch {
             AppLog.recorder.atError.error(
                 "beginEngine: AVAudioFile open failed with bitRate=\(bitRate, privacy: .public); retrying without explicit bit rate code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
-            var fallbackSettings = settings
-            fallbackSettings.removeValue(forKey: AVEncoderBitRateKey)
             do {
-                return try AVAudioFile(forWriting: url, settings: fallbackSettings)
+                return try make(url, settings(bitRate: nil))
             } catch {
                 AppLog.recorder.atError.error("beginEngine: AVAudioFile open failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
                 throw error
             }
         }
-    }
-
-    func installTap(format: AVAudioFormat, sink: any AudioSinkWriting) {
-        AudioRecorderEngineSupport.installTap(on: engine.inputNode, format: format, sink: sink)
-    }
-
-    func removeTap() {
-        engine.inputNode.removeTap(onBus: 0)
-    }
-
-    /// Keep the recorder on the standard input unit. VoiceProcessingIO can
-    /// block engine startup on some routes/devices, freezing the screen.
-    func disableVoiceProcessing() {
-        try? engine.inputNode.setVoiceProcessingEnabled(false)
-    }
-
-    func prepare() {
-        engine.prepare()
-    }
-
-    func start() throws {
-        try engine.start()
-    }
-
-    func stop() {
-        engine.stop()
-    }
-
-    // MARK: - Notifications
-
-    private func registerNotifications() {
-        let center = NotificationCenter.default
-        observers.append(center.addObserver(
-            forName: AVAudioSession.interruptionNotification, object: nil, queue: nil
-        ) { [weak self] note in
-            self?.handleInterruption(note)
-        })
-        observers.append(center.addObserver(
-            forName: AVAudioSession.routeChangeNotification, object: nil, queue: nil
-        ) { [weak self] note in
-            self?.handleRouteChange(note)
-        })
-        // The engine can be stopped out from under a live recording with NO
-        // interruption notification: a configuration change (route/sample-rate
-        // shuffle, seen around locking and unlocking the device) or a
-        // media-services reset. Without these observers the recorder keeps
-        // counting elapsed time while no buffers reach the file — silent
-        // audio loss with only a frozen level meter as a symptom.
-        observers.append(center.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
-        ) { [weak self] _ in
-            AppLog.recorder.atInfo.info("handleEngineConfigurationChange: notification received")
-            self?.emit(.configurationChanged)
-        })
-        observers.append(center.addObserver(
-            forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil
-        ) { [weak self] _ in
-            AppLog.recorder.atInfo.info("handleMediaServicesReset: notification received")
-            self?.emit(.mediaServicesReset)
-        })
-    }
-
-    private func emit(_ event: AudioCaptureEvent) {
-        onEvent?(event)
-    }
-
-    private func handleInterruption(_ note: Notification) {
-        guard let info = note.userInfo,
-              let raw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
-
-        switch type {
-        case .began:
-            let interruptionReason = (info[AVAudioSessionInterruptionReasonKey] as? UInt)
-                .flatMap { AVAudioSession.InterruptionReason(rawValue: $0) }
-            AppLog.recorder.atNotice.notice("handleInterruption: began reason=\(AudioRecorderEngineSupport.interruptionReasonDescription(interruptionReason), privacy: .public)")
-            emit(.interruptionBegan)
-        case .ended:
-            let shouldResume: Bool
-            if let optRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt {
-                shouldResume = AVAudioSession.InterruptionOptions(rawValue: optRaw).contains(.shouldResume)
-            } else {
-                shouldResume = false
-            }
-            AppLog.recorder.atNotice.notice("handleInterruption: ended shouldResume=\(shouldResume, privacy: .public)")
-            emit(.interruptionEnded(shouldResume: shouldResume))
-        @unknown default:
-            break
-        }
-    }
-
-    private func handleRouteChange(_ note: Notification) {
-        guard let info = note.userInfo,
-              let raw = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
-              let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
-
-        let previousInputs = (info[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription)?
-            .inputs.map { $0.portName }.joined(separator: ",") ?? "unknown"
-        AppLog.recorder.atNotice.notice("handleRouteChange: reason=\(String(describing: reason), privacy: .public) previousInputs=\(previousInputs, privacy: .public)")
-
-        // An "old device unavailable" reason means e.g. headphones were pulled.
-        guard reason == .oldDeviceUnavailable else { return }
-        emit(.inputRouteLost)
     }
 }

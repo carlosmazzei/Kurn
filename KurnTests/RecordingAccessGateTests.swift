@@ -9,6 +9,8 @@
 //
 
 import Foundation
+import KurnCore
+import LocalAuthentication
 import Testing
 @testable import Kurn
 
@@ -89,6 +91,22 @@ struct RecordingAccessGateTests {
 
         await task.value
         #expect(gate.isAuthenticating == false)
+    }
+
+    // MARK: - Error mapping
+
+    @Test func deviceWithoutCredentialsIsASettingsProblem() {
+        for code in [LAError.Code.passcodeNotSet, .biometryNotAvailable] {
+            let mapped = RecordingAccessGate.appError(for: LAError(code))
+            #expect(mapped.logCode == AppError.authenticationNotAvailable.logCode)
+        }
+    }
+
+    @Test func otherFailuresAreRetryableAttempts() {
+        let cancelled = RecordingAccessGate.appError(for: LAError(.userCancel))
+        #expect(cancelled.logCode == AppError.authenticationFailed("").logCode)
+        let other = RecordingAccessGate.appError(for: URLError(.timedOut))
+        #expect(other.logCode == AppError.authenticationFailed("").logCode)
     }
 }
 
