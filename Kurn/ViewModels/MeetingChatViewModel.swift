@@ -88,7 +88,7 @@ final class MeetingChatViewModel {
     private(set) var currentPhaseDetail: String?
     var error: AppError?
 
-    private let chatService = MeetingChatService()
+    private let chatService: MeetingChatService
     // H8 PR 20: `deinit` is nonisolated even on a `@MainActor` class (Swift
     // gives it no way to hop actors before the object is gone), so cancelling
     // `task` there needs unchecked access — confirmed by CI, which rejected
@@ -115,6 +115,12 @@ final class MeetingChatViewModel {
     /// backstop regardless of which dismissal path was taken.
     deinit {
         task?.cancel()
+    }
+
+    /// `chatService` defaults to the live retrieval + provider stack; tests
+    /// pass one over a stub embedder and a scripted provider.
+    init(chatService: MeetingChatService = MeetingChatService()) {
+        self.chatService = chatService
     }
 
     /// Send `question`. When `transcriptText` is non-nil the scope is a single
