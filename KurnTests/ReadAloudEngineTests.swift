@@ -57,16 +57,19 @@ struct CloudSpeechEngineTests {
 
     private struct Offline: Error {}
 
-    /// Only the request is asserted: building the `AVAudioPlayer` touches the
-    /// audio session, which the CI simulator does not answer in bounded time,
-    /// so playback and the prefetch it triggers are left to the device matrix.
+    /// Only the request is asserted, and the reply is not audio: building an
+    /// `AVAudioPlayer` from real audio touches the audio session, which the CI
+    /// simulator does not answer in bounded time — a player still being built
+    /// after the test returned is not something a test should leave behind.
     @Test func startingFetchesTheRequestedChunkFirst() async {
-        let provider = ScriptedSpeechProvider()
+        let provider = ScriptedSpeechProvider(payload: Data("not audio".utf8))
         let engine = CloudSpeechEngine(provider: provider, languageCode: "pt", rate: 1)
+        var failure: AppError?
+        engine.onFailed = { failure = $0 }
         engine.pause()
         engine.start(["primeiro", "segundo"], at: 0)
-        #expect(await waitUntil { !provider.requests.isEmpty })
-        #expect(provider.requests.first == "primeiro")
+        #expect(await waitUntil { failure != nil })
+        #expect(provider.requests == ["primeiro"])
         engine.resume()
         engine.stop()
     }
