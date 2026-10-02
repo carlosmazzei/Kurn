@@ -24,9 +24,16 @@ struct MeetingChatService {
     // separate file) reuses the same retrieval helpers, and `private` is
     // file-scoped.
     let searchService: SemanticSearchService
+    private let providerResolver: SummaryService.ProviderResolver
 
-    init(searchService: SemanticSearchService = SemanticSearchService()) {
+    /// `resolveProvider` resolves through `ProviderFactory` in production,
+    /// exactly like `SummaryService`; tests inject a scripted provider.
+    init(
+        searchService: SemanticSearchService = SemanticSearchService(),
+        resolveProvider: @escaping SummaryService.ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }
+    ) {
         self.searchService = searchService
+        self.providerResolver = resolveProvider
     }
 
     /// Progress/streaming callback fired as an answer is retrieved and
@@ -130,7 +137,7 @@ struct MeetingChatService {
     ) async throws -> Answer {
         let startedAt = Date()
         let trimmed = try Self.requireQuestion(question, runID: runID)
-        let llm = try Self.resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
+        let llm = try resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
         let transcript = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let answer: Answer
@@ -174,7 +181,7 @@ struct MeetingChatService {
     ) async throws -> Answer {
         let startedAt = Date()
         let trimmed = try Self.requireQuestion(question, runID: runID)
-        let llm = try Self.resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
+        let llm = try resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
         let answer = try await libraryCombinedAnswer(
             question: trimmed, history: history, candidates: candidates,
             summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm, onEvent: onEvent, runID: runID
@@ -189,19 +196,19 @@ struct MeetingChatService {
     /// Resolve the LLM provider, reporting a `"provider"`-stage failure (bad
     /// key, invalid URL, on-device model unavailable) the same way
     /// `DocumentGenerationService` reports its own provider-resolution step.
-    private static func resolveProvider(
+    private func resolveProvider(
         provider: AIProvider,
         model: String,
         runID: OperationID,
         startedAt: Date
     ) throws -> LLMProvider {
         do {
-            return try ProviderFactory.summaryProvider(for: provider, model: model)
+            return try providerResolver(provider, model)
         } catch {
             ReliabilityLog.record(ReliabilityEvent(
                 operationID: runID, operation: "meeting_chat", stage: "provider",
                 outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                code: errorCode(error)
+                code: Self.errorCode(error)
             ))
             throw error
         }

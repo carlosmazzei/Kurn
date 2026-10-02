@@ -23,6 +23,14 @@ struct GeneratedDocumentResult: Sendable {
 }
 
 struct DocumentGenerationService {
+    private let resolveProvider: SummaryService.ProviderResolver
+
+    /// Production resolves through `ProviderFactory`, exactly like
+    /// `SummaryService`; tests inject a scripted provider.
+    init(resolveProvider: @escaping SummaryService.ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+        self.resolveProvider = resolveProvider
+    }
+
     func generate(
         sources: [DocumentTranscriptSource],
         prompt: String,
@@ -59,7 +67,7 @@ struct DocumentGenerationService {
 
         let llm: LLMProvider
         do {
-            llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+            llm = try resolveProvider(provider, model)
         } catch {
             ReliabilityLog.record(ReliabilityEvent(
                 operationID: runID, operation: "document_generation", stage: "provider",
