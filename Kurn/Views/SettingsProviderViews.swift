@@ -28,6 +28,7 @@ struct ProviderEditor: View {
     @State private var originalKey = ""
     @State private var showingDeleteConfirm = false
     @State private var saveError: AppError?
+    private let authorizer = SensitiveActionAuthorizer()
 
     private var canEditDetails: Bool { !provider.isBuiltIn }
     private var canSave: Bool {
@@ -114,7 +115,15 @@ struct ProviderEditor: View {
             if provider.kind != .appleOnDevice {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common.save", comment: "Save")) {
-                        commitAndSave()
+                        // A key or base URL decides where meeting content is
+                        // sent, so saving one re-authenticates first.
+                        Task {
+                            await authorizer.perform(
+                                requireAuth: settings.requireAuthForRecordings,
+                                onDenied: { saveError = $0 },
+                                commitAndSave
+                            )
+                        }
                     }
                     .disabled(!canSave)
                 }
@@ -191,7 +200,10 @@ struct ProviderEditor: View {
 struct AddProviderView: View {
     let onAdd: (AIProvider, String) -> Void
 
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
+    @State private var authError: AppError?
+    private let authorizer = SensitiveActionAuthorizer()
     @State private var name = ""
     @State private var kind = AIProviderKind.openAICompatible
     @State private var baseURLString = AIProviderKind.openAICompatible.defaultBaseURLString
@@ -236,7 +248,16 @@ struct AddProviderView: View {
                         kind: kind,
                         baseURLString: baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
-                    onAdd(provider, key.trimmingCharacters(in: .whitespacesAndNewlines))
+                    let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // A new provider is a new destination for meeting content.
+                    Task {
+                        await authorizer.perform(
+                            requireAuth: settings.requireAuthForRecordings,
+                            onDenied: { authError = $0 }
+                        ) {
+                            onAdd(provider, trimmedKey)
+                        }
+                    }
                 }
                 .disabled(!canSave)
             }
@@ -244,6 +265,7 @@ struct AddProviderView: View {
         .onChange(of: kind) { _, newValue in
             baseURLString = newValue.defaultBaseURLString
         }
+        .errorAlert($authError)
     }
 }
 

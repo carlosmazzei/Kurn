@@ -618,9 +618,21 @@ So the cover now lives above everything, in its own `UIWindow`:
 - `SecurityCoverView` (`Views/SecurityCoverView.swift`) renders
   `PrivacyCoverView` or `LockedRecordingsView` and hosts the Settings escape
   hatch — required because a device with no passcode configured can never
-  authenticate, and nothing below the cover window is reachable. It re-injects
-  `AppSettings`, `ModelDownloadController` and the model container, since a
-  separate window's hosting controller inherits no environment.
+  authenticate, and nothing below the cover window is reachable. The hatch is
+  offered **only** in that case (`RecordingAccessGate.offersSettingsEscapeHatch`)
+  and is a minimal screen holding the require-authentication toggle alone,
+  never the full `SettingsView`: anything reachable from the lock screen is
+  reachable without authenticating, so it must not read meeting content,
+  change where content is sent, or destroy it.
+
+Being past the lock once is not enough for changes that weaken it or redirect
+content. `SensitiveActionAuthorizer` (`Services/`) re-authenticates — when
+`requireAuthForRecordings` is on — before turning the lock off, saving or
+adding a provider (its key or base URL decides where transcripts go), "Delete
+all data", and the store-recovery shell's salvage/restore/fresh start, which
+run before the cover exists. A device with no passcode is authorized (there is
+no protection to preserve); a dismissed prompt is a no-op, not an error. New
+actions of the same kind should go through it rather than a bare tap.
 
 Two consequences worth keeping: sheet placement in `MeetingsListView` is no
 longer a security decision (nothing is torn down, so presentations go wherever
@@ -1718,9 +1730,12 @@ all start a download, and so can the diarization prompt on a meeting's
 transcript — two controllers would each track a download the other knew nothing
 about. Screens that can trigger one attach `.modelDownloadAlerts(_:settings:)`.
 
-**Three settings are off by default, for two different reasons.** `wikiEnabled`
+**Four settings are off by default, for two different reasons.** `wikiEnabled`
 and `correctionEnabled` make paid cloud LLM calls on *every* transcription, so
-neither can be a default. `templatesSyncEnabled` costs nothing per
+neither can be a default; `aiTitleCloudEnabled` likewise gates the automatic
+post-transcription title when the summary provider is a cloud vendor, since it
+sends the whole transcript (on-device titles and an explicit regenerate are
+never gated — `AITitleCoordinator.allowsGeneration`). `templatesSyncEnabled` costs nothing per
 transcription and involves no LLM at all, but it is the first setting that
 sends anything off the device — which is reason enough here.
 

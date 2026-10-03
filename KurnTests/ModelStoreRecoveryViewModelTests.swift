@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import LocalAuthentication
 import Testing
 @testable import Kurn
 
@@ -40,14 +41,21 @@ struct ModelStoreRecoveryViewModelTests {
         }
 
         @MainActor
-        func viewModel() -> ModelStoreRecoveryViewModel {
-            ModelStoreRecoveryViewModel(appSupportDirectory: url) { [weak self] in
+        func viewModel(
+            authenticator: ScriptedLocalAuthenticator = ScriptedLocalAuthenticator(),
+            requiresAuthentication: Bool = true
+        ) -> ModelStoreRecoveryViewModel {
+            ModelStoreRecoveryViewModel(
+                appSupportDirectory: url,
+                authorizer: SensitiveActionAuthorizer(authenticator: authenticator),
+                requiresAuthentication: { requiresAuthentication }
+            ) { [weak self] in
                 self?.reopenCount += 1
             }
         }
     }
 
-    @Test func restoringABackupBringsItsFilesBackAndAsksToReopen() throws {
+    @Test func restoringABackupBringsItsFilesBackAndAsksToReopen() async throws {
         let directory = try Directory()
         try directory.writeLiveStore("backed up")
         _ = try ModelStoreBackupManager(appSupportDirectory: directory.url).createBackupIfLiveStoreExists()
@@ -55,7 +63,7 @@ struct ModelStoreRecoveryViewModelTests {
         let viewModel = directory.viewModel()
         let generation = try #require(viewModel.backupGenerations.first)
 
-        viewModel.restore(generation)
+        await viewModel.restore(generation)
 
         #expect(directory.liveContent == "backed up")
         #expect(directory.reopenCount == 1)
@@ -63,12 +71,12 @@ struct ModelStoreRecoveryViewModelTests {
         #expect(!viewModel.isPerformingAction)
     }
 
-    @Test func restoringAMissingGenerationReportsAnErrorAndDoesNotReopen() throws {
+    @Test func restoringAMissingGenerationReportsAnErrorAndDoesNotReopen() async throws {
         let directory = try Directory()
         let viewModel = directory.viewModel()
         #expect(viewModel.backupGenerations.isEmpty)
 
-        viewModel.restore(ModelStoreBackupGeneration(
+        await viewModel.restore(ModelStoreBackupGeneration(
             id: "missing", createdAt: Date(), schemaVersion: "3", appVersion: "1.0", appBuild: "1"
         ))
 
@@ -76,39 +84,86 @@ struct ModelStoreRecoveryViewModelTests {
         #expect(directory.reopenCount == 0)
     }
 
-    @Test func aFreshStartQuarantinesTheLiveStore() throws {
+    @Test func aFreshStartQuarantinesTheLiveStore() async throws {
         let directory = try Directory()
         try directory.writeLiveStore("broken")
         let viewModel = directory.viewModel()
 
-        viewModel.confirmedFreshStart()
+        await viewModel.confirmedFreshStart()
 
         #expect(directory.liveContent == nil)
         #expect(directory.reopenCount == 1)
     }
 
-    @Test func salvageWithoutALiveStoreIsUnavailable() throws {
+    @Test func salvageWithoutALiveStoreIsUnavailable() async throws {
         let directory = try Directory()
         let viewModel = directory.viewModel()
 
-        viewModel.attemptSalvage()
+        await viewModel.attemptSalvage()
 
         #expect(viewModel.salvageResult == .unavailable)
         #expect(viewModel.shareItem == nil)
     }
 
-    @Test func salvageOfAFileThatIsNotSQLiteFails() throws {
+    @Test func salvageOfAFileThatIsNotSQLiteFails() async throws {
         let directory = try Directory()
         try directory.writeLiveStore("not a database")
         let viewModel = directory.viewModel()
 
-        viewModel.attemptSalvage()
+        await viewModel.attemptSalvage()
 
         guard case .failed = viewModel.salvageResult else {
             Issue.record("expected a junk store to fail salvage")
             return
         }
         #expect(viewModel.shareItem == nil)
+    }
+
+    // MARK: - Re-authentication
+
+    /// The recovery shell runs before the app's security cover exists, so the
+    /// actions that read or replace the library must authenticate themselves.
+    @Test func aRefusedPromptLeavesTheStoreUntouched() async throws {
+        let directory = try Directory()
+        try directory.writeLiveStore("broken")
+        let authenticator = ScriptedLocalAuthenticator(failure: LAError(.authenticationFailed))
+        let viewModel = directory.viewModel(authenticator: authenticator)
+
+        await viewModel.confirmedFreshStart()
+        await viewModel.attemptSalvage()
+
+        #expect(directory.liveContent == "broken")
+        #expect(directory.reopenCount == 0)
+        #expect(viewModel.salvageResult == nil)
+        #expect(viewModel.shareItem == nil)
+        #expect(viewModel.errorMessage != nil)
+        #expect(authenticator.callCount == 2)
+    }
+
+    @Test func aDismissedPromptDoesNothingAndReportsNothing() async throws {
+        let directory = try Directory()
+        try directory.writeLiveStore("backed up")
+        _ = try ModelStoreBackupManager(appSupportDirectory: directory.url).createBackupIfLiveStoreExists()
+        try directory.writeLiveStore("broken")
+        let viewModel = directory.viewModel(authenticator: ScriptedLocalAuthenticator(failure: LAError(.userCancel)))
+        let generation = try #require(viewModel.backupGenerations.first)
+
+        await viewModel.restore(generation)
+
+        #expect(directory.liveContent == "broken")
+        #expect(directory.reopenCount == 0)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test func withTheLockOffNoPromptIsShown() async throws {
+        let directory = try Directory()
+        let authenticator = ScriptedLocalAuthenticator(failure: LAError(.authenticationFailed))
+        let viewModel = directory.viewModel(authenticator: authenticator, requiresAuthentication: false)
+
+        await viewModel.attemptSalvage()
+
+        #expect(viewModel.salvageResult == .unavailable)
+        #expect(authenticator.callCount == 0)
     }
 
     @Test func diagnosticsListTheReasonAndGenerationsOnly() throws {

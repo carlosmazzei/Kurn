@@ -143,6 +143,7 @@ struct KurnApp: App {
 
         _recoveryViewModel = State(initialValue: ModelStoreRecoveryViewModel(
             appSupportDirectory: bootCoordinator.appSupportDirectory,
+            requiresAuthentication: { [settings] in settings.requireAuthForRecordings },
             onStoreReplaced: { [bootCoordinator] in bootCoordinator.retryIfNeeded() }
         ))
 
@@ -208,14 +209,11 @@ struct KurnApp: App {
                 // They used to be an in-hierarchy `ZStack` branch and a view
                 // swap inside `MeetingsListView` respectively, neither of which
                 // could cover a presented sheet — and the swap destroyed
-                // whatever it replaced. Neither is needed before `.ready`:
-                // there is no meeting content to protect yet.
-                .securityCover(
-                    gate: accessGate,
-                    settings: settings,
-                    downloads: downloads,
-                    modelContainer: appEnvironment.modelContainer
-                )
+                // whatever it replaced. Neither is needed before `.ready`: no
+                // meeting is on screen yet, and the recovery shell's actions
+                // that do read meetings (salvage, restore) re-authenticate on
+                // their own (`ModelStoreRecoveryViewModel`).
+                .securityCover(gate: accessGate, settings: settings)
                 .modelContainer(appEnvironment.modelContainer)
         } else if case .recoveryRequired(let failure) = boot.state {
             ModelStoreRecoveryView(failure: failure, retry: { boot.retryIfNeeded() }, viewModel: recoveryViewModel)

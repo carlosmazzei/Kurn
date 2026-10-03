@@ -960,3 +960,8 @@
 "settings.read_aloud.preview" = "Prévia";
 "settings.read_aloud.preview_footer" = "A leitura em voz alta está disponível em resumos, artigos da wiki das reuniões e documentos gerados.";
 "settings.read_aloud.sample" = "É assim que seus resumos, artigos da wiki e documentos vão soar quando lidos em voz alta.";
+
+/* Security-sensitive change re-authentication and automatic cloud titles */
+"auth.sensitive_change_reason" = "Confirme sua identidade para alterar esta configuração de segurança.";
+"settings.ai_title_cloud" = "Títulos Automáticos com Provedores na Nuvem";
+"settings.ai_title_cloud_footer" = "Quando ativado, cada transcrição concluída é enviada ao seu provedor de resumos na nuvem para sugerir um título. Títulos gerados no dispositivo e os que você regenera manualmente não são afetados.";

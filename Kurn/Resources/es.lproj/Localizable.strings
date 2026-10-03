@@ -960,3 +960,8 @@
 "settings.read_aloud.preview" = "Vista previa";
 "settings.read_aloud.preview_footer" = "La lectura en voz alta está disponible en resúmenes, artículos de la wiki de reuniones y documentos generados.";
 "settings.read_aloud.sample" = "Así sonarán tus resúmenes, artículos de la wiki y documentos cuando se lean en voz alta.";
+
+/* Security-sensitive change re-authentication and automatic cloud titles */
+"auth.sensitive_change_reason" = "Confirma tu identidad para cambiar este ajuste de seguridad.";
+"settings.ai_title_cloud" = "Títulos Automáticos con Proveedores en la Nube";
+"settings.ai_title_cloud_footer" = "Si está activado, cada transcripción terminada se envía a tu proveedor de resúmenes en la nube para sugerir un título. Los títulos generados en el dispositivo y los que regeneras tú mismo no se ven afectados.";

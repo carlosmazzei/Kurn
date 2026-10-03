@@ -74,6 +74,15 @@ struct SummarySettingsView: View {
 
             Section {
                 Toggle(
+                    NSLocalizedString("settings.ai_title_cloud", comment: "Automatic titles with cloud providers"),
+                    isOn: $settings.aiTitleCloudEnabled
+                )
+            } footer: {
+                Text(NSLocalizedString("settings.ai_title_cloud_footer", comment: "Explains automatic titles send the transcript to the cloud provider"))
+            }
+
+            Section {
+                Toggle(
                     NSLocalizedString("settings.templates_sync", comment: "Sync Templates via iCloud"),
                     isOn: $settings.templatesSyncEnabled
                 )

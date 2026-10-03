@@ -55,6 +55,14 @@ final class AITitleCoordinator {
               meeting.hasAnyTranscript else { return nil }
         let provider = settings.aiProvider
         guard isProviderUsable(provider) else { return nil }
+        guard Self.allowsGeneration(
+            trigger: trigger,
+            provider: provider,
+            cloudEnabled: settings.aiTitleCloudEnabled
+        ) else {
+            AppLog.transcription.atInfo.info("AI title: automatic cloud title not enabled")
+            return nil
+        }
         guard await providerCircuitBreaker.allows(
             providerID: provider.id,
             trigger: trigger
@@ -119,5 +127,18 @@ final class AITitleCoordinator {
             }
             return nil
         }
+    }
+
+    /// An automatic title sends the whole transcript to the summary provider
+    /// on every transcription, so a cloud provider needs its own opt-in
+    /// (`AppSettings.aiTitleCloudEnabled`); choosing it for summaries the user
+    /// asks for is not that. On-device generation never leaves the device, and
+    /// an explicit regenerate is the user asking.
+    nonisolated static func allowsGeneration(
+        trigger: ProviderAutomationTrigger,
+        provider: AIProvider,
+        cloudEnabled: Bool
+    ) -> Bool {
+        trigger == .explicit || provider.kind == .appleOnDevice || cloudEnabled
     }
 }

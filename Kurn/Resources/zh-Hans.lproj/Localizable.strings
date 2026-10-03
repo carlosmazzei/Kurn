@@ -960,3 +960,8 @@
 "settings.read_aloud.preview" = "试听";
 "settings.read_aloud.preview_footer" = "朗读功能适用于摘要、会议维基文章和生成的文档。";
 "settings.read_aloud.sample" = "这就是你的摘要、维基文章和文档被朗读时的声音。";
+
+/* Security-sensitive change re-authentication and automatic cloud titles */
+"auth.sensitive_change_reason" = "请验证您的身份以更改此安全设置。";
+"settings.ai_title_cloud" = "使用云端服务商自动生成标题";
+"settings.ai_title_cloud_footer" = "开启后，每次转写完成都会发送到您的云端摘要服务商以建议标题。设备端生成的标题以及您手动重新生成的标题不受影响。";

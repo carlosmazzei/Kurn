@@ -85,7 +85,7 @@ struct ModelStoreRecoveryView: View {
             message: NSLocalizedString("store_recovery.start_fresh_confirm_message", comment: "Old data moved aside, not deleted"),
             primaryTitle: NSLocalizedString("store_recovery.start_fresh_button", comment: "Start Fresh"),
             primaryRole: .destructive,
-            primaryAction: { viewModel.confirmedFreshStart() },
+            primaryAction: { Task { await viewModel.confirmedFreshStart() } },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
         .kurnDialog(
@@ -97,7 +97,7 @@ struct ModelStoreRecoveryView: View {
             primaryTitle: NSLocalizedString("store_recovery.restore_button", comment: "Restore"),
             primaryRole: .destructive,
             primaryAction: {
-                if let generation = confirmingRestoreOf { viewModel.restore(generation) }
+                if let generation = confirmingRestoreOf { Task { await viewModel.restore(generation) } }
                 confirmingRestoreOf = nil
             },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
@@ -180,7 +180,7 @@ struct ModelStoreRecoveryView: View {
             secondaryButton(
                 title: NSLocalizedString("store_recovery.salvage_button", comment: "Attempt Data Recovery"),
                 identifier: "storeRecovery.salvageButton",
-                action: { viewModel.attemptSalvage() }
+                action: { Task { await viewModel.attemptSalvage() } }
             )
             if let salvageResult = viewModel.salvageResult {
                 Text(salvageMessage(for: salvageResult))
