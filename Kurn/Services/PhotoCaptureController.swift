@@ -34,6 +34,10 @@ final class PhotoCaptureController: NSObject {
     /// Set once configuration finishes, back on the main actor — the pinch
     /// and tap gesture handlers read/lock it for zoom and focus/exposure.
     private var device: AVCaptureDevice?
+    /// Tracks how the phone is physically held. The app UI is portrait-only, so
+    /// the interface never rotates and the capture connection would otherwise
+    /// always write portrait pixels, even with the phone lying on its side.
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var isConfigured = false
     private var captureCompletion: ((Data?) -> Void)?
     var flashMode: PhotoFlashMode = .auto
@@ -77,6 +81,9 @@ final class PhotoCaptureController: NSObject {
             return addedDevice
         }.value
         device = configuredDevice
+        if let configuredDevice {
+            rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: configuredDevice, previewLayer: nil)
+        }
     }
 
     func stop() {
@@ -133,6 +140,11 @@ final class PhotoCaptureController: NSObject {
         let settings = AVCapturePhotoSettings()
         if output.supportedFlashModes.contains(flashMode.avFlashMode) {
             settings.flashMode = flashMode.avFlashMode
+        }
+        if let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture,
+           let connection = output.connection(with: .video),
+           connection.isVideoRotationAngleSupported(angle) {
+            connection.videoRotationAngle = angle
         }
         output.capturePhoto(with: settings, delegate: self)
     }
