@@ -59,7 +59,7 @@ enum PhotoFileStore {
         let name = fileName(recordingID: recordingID)
         let url = directory.appendingPathComponent(name)
         do {
-            try data.write(to: url, options: .atomic)
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
         } catch {
             throw AppError.protectedStorageUnavailable(error.localizedDescription)
         }

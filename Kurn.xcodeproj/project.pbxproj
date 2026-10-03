@@ -18,6 +18,7 @@
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA1000000000000000000162 /* Kurn/Infrastructure/RecordingActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */; };
 		AA1000000000000000000172 /* Kurn/AppIntents/StartRecordingIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000171 /* Kurn/AppIntents/StartRecordingIntent.swift */; };
+		AA1000000000000000000182 /* Kurn/AppIntents/RecordingControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000181 /* Kurn/AppIntents/RecordingControlIntent.swift */; };
 		AA3000000000000000000131 /* KurnWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA30000000000000000000A1 /* KurnWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA3000000000000000000162 /* Kurn/Services/WatchSessionProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3000000000000000000161 /* Kurn/Services/WatchSessionProtocol.swift */; };
 /* End PBXBuildFile section */
@@ -101,6 +102,7 @@
 		AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KurnLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/Infrastructure/RecordingActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
 		AA1000000000000000000171 /* Kurn/AppIntents/StartRecordingIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/AppIntents/StartRecordingIntent.swift; sourceTree = SOURCE_ROOT; };
+		AA1000000000000000000181 /* Kurn/AppIntents/RecordingControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/AppIntents/RecordingControlIntent.swift; sourceTree = SOURCE_ROOT; };
 		AA20000000000000000000A1 /* KurnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KurnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA30000000000000000000A1 /* KurnWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KurnWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA3000000000000000000161 /* Kurn/Services/WatchSessionProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kurn/Services/WatchSessionProtocol.swift; sourceTree = SOURCE_ROOT; };
@@ -209,6 +211,7 @@
 				2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */,
 				AA1000000000000000000161 /* Kurn/Infrastructure/RecordingActivityAttributes.swift */,
 				AA1000000000000000000171 /* Kurn/AppIntents/StartRecordingIntent.swift */,
+				AA1000000000000000000181 /* Kurn/AppIntents/RecordingControlIntent.swift */,
 				AA3000000000000000000161 /* Kurn/Services/WatchSessionProtocol.swift */,
 			);
 			name = "Recovered References";
@@ -570,6 +573,7 @@
 			files = (
 				AA1000000000000000000162 /* Kurn/Infrastructure/RecordingActivityAttributes.swift in Sources */,
 				AA1000000000000000000172 /* Kurn/AppIntents/StartRecordingIntent.swift in Sources */,
+				AA1000000000000000000182 /* Kurn/AppIntents/RecordingControlIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

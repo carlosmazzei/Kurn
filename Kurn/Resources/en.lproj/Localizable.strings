@@ -965,3 +965,7 @@
 "auth.sensitive_change_reason" = "Confirm it's you to change this security setting.";
 "settings.ai_title_cloud" = "Automatic Titles with Cloud Providers";
 "settings.ai_title_cloud_footer" = "When on, each finished transcription is sent to your cloud summary provider to suggest a title. On-device titles and titles you regenerate yourself are not affected.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Control Recording";
+"intent.recordingControl.action" = "Action";

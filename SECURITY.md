@@ -37,7 +37,7 @@ A useful report typically contains:
 
 - A clear description of the vulnerability and its impact.
 - The affected component (e.g. `KeychainManager`, `AudioRecorderService`,
-  Live Activity deep link handler, a specific `LLMProvider` implementation).
+  Live Activity controls (`RecordingControlIntent`), a specific `LLMProvider` implementation).
 - Steps to reproduce, including device/OS/Xcode version when relevant.
 - A proof of concept if you have one.
 - Any suggested mitigation, if you have ideas.

@@ -12,3 +12,7 @@
 "control.startRecording.title" = "Avvia registrazione";
 "control.startRecording.displayName" = "Avvia registrazione";
 "control.startRecording.description" = "Avvia una nuova registrazione in Kurn. Aggiungendolo alla schermata di blocco, può essere attivato con un solo tocco anche a dispositivo bloccato.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Controlla Registrazione";
+"intent.recordingControl.action" = "Azione";

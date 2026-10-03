@@ -10,6 +10,7 @@
 //
 
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -174,21 +175,21 @@ private func commandButtons(
         commandLink(
             systemImage: context.state.isPaused ? "play.fill" : "pause.fill",
             label: context.state.isPaused ? "live_activity.resume" : "live_activity.pause",
-            url: "kurn://recording/toggle",
+            intent: RecordingControlIntent(.togglePause),
             style: .prominent,
             height: height
         )
         commandLink(
             systemImage: "stop.fill",
             label: "live_activity.stop",
-            url: "kurn://recording/stop",
+            intent: RecordingControlIntent(.stop),
             style: .destructive,
             height: height
         )
         // Icon-only, fixed width rather than a third full-width text pill,
         // which would crowd "Pause"/"Stop" labels in longer languages.
         if !context.state.isPaused {
-            Link(destination: URL(string: "kurn://recording/highlight")!) {
+            Button(intent: RecordingControlIntent(.highlight)) {
                 Image(systemName: "bookmark.fill")
                     .font(.system(size: height < 40 ? 13 : 15, weight: .bold))
                     .foregroundStyle(.white)
@@ -196,6 +197,7 @@ private func commandButtons(
                     .background(Color.white.opacity(0.12), in: Circle())
                     .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 0.5))
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(Text("live_activity.highlight"))
         }
     }
@@ -230,11 +232,11 @@ private func statusText(_ context: ActivityViewContext<RecordingActivityAttribut
 private func commandLink(
     systemImage: String,
     label: LocalizedStringKey,
-    url: String,
+    intent: RecordingControlIntent,
     style: RecordingCommandStyle,
     height: CGFloat
 ) -> some View {
-    Link(destination: URL(string: url)!) {
+    Button(intent: intent) {
         HStack(spacing: 7) {
             Image(systemName: systemImage)
                 .font(.system(size: height < 40 ? 11 : 13, weight: .bold))
@@ -250,6 +252,7 @@ private func commandLink(
         .background(style.background, in: Capsule())
         .overlay(Capsule().stroke(.white.opacity(style.borderOpacity), lineWidth: 0.5))
     }
+    .buttonStyle(.plain)
 }
 
 private enum RecordingCommandStyle {

@@ -39,9 +39,6 @@ struct ContentView: View {
                 }
             }
         }
-        .onOpenURL { url in
-            RecordingCommandRouter.shared.handle(url)
-        }
     }
 }
 

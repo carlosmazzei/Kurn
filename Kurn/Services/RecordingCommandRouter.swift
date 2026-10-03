@@ -2,7 +2,7 @@
 //  RecordingCommandRouter.swift
 //  Kurn
 //
-//  Routes Live Activity deep links and Watch commands back to the active
+//  Routes Live Activity button intents and Watch commands back to the active
 //  in-app recorder. The recorder owns the real state changes; Live Activity
 //  buttons and the Watch app only request an action from the currently
 //  running recorder session.
@@ -66,21 +66,18 @@ final class RecordingCommandRouter {
         recentCommands.removeAll()
     }
 
-    func handle(_ url: URL) {
-        guard url.scheme == "kurn", url.host == "recording" else { return }
-
-        switch url.path {
-        case "/toggle":
-            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity toggle received")
+    /// Apply a Live Activity button (`RecordingControlIntent`). These used to
+    /// arrive as `kurn://recording/...` deep links, which any app could open;
+    /// an App Intent only reaches here from the Live Activity itself.
+    func handle(_ action: RecordingControlAction) {
+        AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity \(action.rawValue, privacy: .public) received")
+        switch action {
+        case .togglePause:
             onTogglePause?()
-        case "/stop":
-            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity stop received")
+        case .stop:
             _ = onStop?()
-        case "/highlight":
-            AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity highlight received")
+        case .highlight:
             onHighlight?()
-        default:
-            break
         }
     }
 

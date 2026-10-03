@@ -49,7 +49,13 @@ enum ModelStoreSalvage {
         defer { try? fileManager.removeItem(at: workDirectory) }
 
         do {
-            try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+            // The copy is every transcript in the library; it gets the same
+            // protection class as the store it was copied from.
+            try fileManager.createDirectory(
+                at: workDirectory,
+                withIntermediateDirectories: true,
+                attributes: [.protectionKey: RecordingProtection.protectionType]
+            )
             for source in liveFiles {
                 try fileManager.copyItem(at: source, to: workDirectory.appendingPathComponent(source.lastPathComponent))
             }

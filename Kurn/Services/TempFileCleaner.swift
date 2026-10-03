@@ -22,6 +22,9 @@ enum TempFileCleaner {
         "kurn_chunk_",
         "kurn_compact_",
         "kurn_enh_",
+        // Markdown exports handed to the share sheet (`MeetingExport`): a
+        // folder per export, holding meeting content.
+        MeetingExport.exportDirectoryPrefix,
         // A completed-but-not-yet-installed model download, staged here by
         // `Downloader` before `ModelFileDownloader` verifies and atomically
         // installs it (H7 PR 15) — swept the same way every other pipeline

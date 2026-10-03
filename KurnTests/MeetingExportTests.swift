@@ -298,6 +298,16 @@ struct MeetingExportTests {
         #expect(try String(contentsOf: url, encoding: .utf8) == "hello world")
     }
 
+    /// An export is meeting content, so its folder carries the prefix the
+    /// temp-file sweep removes once the share sheet is long done with it.
+    @Test func exportFoldersAreSweptByTheTempFileCleaner() throws {
+        let url = try MeetingExport.temporaryFile(markdown: "notes", suggestedName: "Notes")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        #expect(url.deletingLastPathComponent().lastPathComponent.hasPrefix(MeetingExport.exportDirectoryPrefix))
+        #expect(TempFileCleaner.prefixes.contains(MeetingExport.exportDirectoryPrefix))
+    }
+
     // MARK: - Obsidian-style export
 
     @Test func markdownOmitsFrontmatterByDefault() {

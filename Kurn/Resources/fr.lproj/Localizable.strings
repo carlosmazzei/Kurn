@@ -965,3 +965,7 @@
 "auth.sensitive_change_reason" = "Confirmez votre identité pour modifier ce réglage de sécurité.";
 "settings.ai_title_cloud" = "Titres automatiques avec les fournisseurs cloud";
 "settings.ai_title_cloud_footer" = "Lorsque cette option est activée, chaque transcription terminée est envoyée à votre fournisseur de résumés cloud pour suggérer un titre. Les titres générés sur l’appareil et ceux que vous régénérez vous-même ne sont pas concernés.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Contrôler l’enregistrement";
+"intent.recordingControl.action" = "Action";

@@ -63,6 +63,12 @@ enum SherpaOnnxModelDownloader {
     /// ~5.7 MiB upstream; loose lower bound so a truncated transfer is
     /// re-fetched rather than handed to sherpa-onnx as a corrupt model.
     private static let segmentationMinimumPlausibleBytes: Int64 = 3 * 1_000_000
+    /// SHA-256 of `model.onnx` in k2-fsa's `speaker-segmentation-models`
+    /// release archive (`sherpa-onnx-pyannote-segmentation-3-0.tar.bz2`,
+    /// 5,992,913 bytes) — the file the pinned Hugging Face revision above
+    /// mirrors. Checked against the received bytes, so a swapped file fails
+    /// the download instead of reaching onnxruntime's parser.
+    static let segmentationSHA256 = "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
 
     /// CAM++ speaker embedding model from the 3D-Speaker project (Apache-2.0),
     /// converted to ONNX by k2-fsa.
@@ -76,6 +82,10 @@ enum SherpaOnnxModelDownloader {
     )!
     /// ~28 MB upstream.
     private static let embeddingMinimumPlausibleBytes: Int64 = 15 * 1_000_000
+    /// SHA-256 of the release asset above (28,281,164 bytes). A GitHub
+    /// release asset can be replaced in place and GitHub sends no content
+    /// digest with it, so this pin is the only integrity check it gets.
+    static let embeddingSHA256 = "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
 
     /// Whether both model files are on disk and large enough to be complete.
     static var isInstalled: Bool {
@@ -106,7 +116,8 @@ enum SherpaOnnxModelDownloader {
             destination: segmentationModelURL,
             minimumPlausibleBytes: segmentationMinimumPlausibleBytes,
             policy: policy,
-            logLabel: "sherpaOnnxDownload"
+            logLabel: "sherpaOnnxDownload",
+            pinnedSHA256: segmentationSHA256
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: fraction * 0.5, phase: .downloading))
         }
@@ -115,7 +126,8 @@ enum SherpaOnnxModelDownloader {
             destination: embeddingModelURL,
             minimumPlausibleBytes: embeddingMinimumPlausibleBytes,
             policy: policy,
-            logLabel: "sherpaOnnxDownload"
+            logLabel: "sherpaOnnxDownload",
+            pinnedSHA256: embeddingSHA256
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: 0.5 + fraction * 0.5, phase: .downloading))
         }

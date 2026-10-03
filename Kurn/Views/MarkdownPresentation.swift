@@ -33,7 +33,20 @@ enum MarkdownPresentation {
 
     /// Inline Markdown parsed for display, or `nil` when the text is not
     /// valid Markdown and should be shown verbatim.
+    ///
+    /// Links are rendered as their text but are not tappable. Everything
+    /// shown through here — summaries, wiki articles, documents, chat
+    /// replies — is written by an LLM from a transcript, and the transcript
+    /// is whatever was said in the room: a speaker (or a document read aloud)
+    /// can steer the model into emitting a link whose URL carries meeting
+    /// content to a server, or opens another app's URL scheme. Nothing the
+    /// app shows legitimately depends on a tappable link in that text.
     static func inlineAttributedString(_ text: String) -> AttributedString? {
-        try? AttributedString(markdown: text)
+        guard var attributed = try? AttributedString(markdown: text) else { return nil }
+        let linkRanges = attributed.runs.filter { $0.link != nil }.map(\.range)
+        for range in linkRanges {
+            attributed[range].link = nil
+        }
+        return attributed
     }
 }

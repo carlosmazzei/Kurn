@@ -1386,7 +1386,9 @@ non-reentrant progress state and supports cooperative cancellation.
 
 `RecordingCommandRouter` (main-actor singleton) is the single dispatcher: the live
 `RecorderViewModel` registers `onPause/onResume/onStop/onTogglePause` closures while
-recording. Both the Lock Screen Live Activity (via `kurn://recording/...` deep links)
+recording. Both the Lock Screen Live Activity (via `RecordingControlIntent`, a
+`LiveActivityIntent` hidden from Shortcuts — the app declares no URL scheme, since
+any app could open one and stop a meeting being recorded)
 and the Apple Watch (via `PhoneSessionController` over WatchConnectivity) route
 through it. The recorder pushes state to the Watch with `updateApplicationContext`
 (survives disconnects). There is deliberately no continuous audio-level stream to
@@ -1973,6 +1975,17 @@ enforced by lint and by a CI audit test, not just convention:
   `chore`, `refactor`, `test`, `perf`, `style`, `build`, `ci` — e.g.
   `fix(chat): dismiss the keyboard on tap outside the composer`. Existing history
   is mixed (older commits predate this rule); new commits should follow it.
+- **Meeting content leaving the app's sandbox:** copy to the clipboard only
+  through `MeetingPasteboard` (local-only, expiring), never
+  `UIPasteboard.general.string`; LLM-written Markdown is rendered with links
+  disabled (`MarkdownPresentation.inlineAttributedString`), since a transcript
+  can steer the model into a link that exfiltrates it; and a downloaded model
+  gets a `pinnedSHA256` in its catalog entry whenever the publisher's own
+  artifact lets one be taken.
+- **CI supply chain:** every `uses:` in `.github/` is pinned to a full commit
+  SHA with the version in a trailing comment (Dependabot keeps both current),
+  checkouts set `persist-credentials: false`, and workflow inputs reach `run:`
+  scripts through `env:`, never `${{ }}` interpolation.
 - **Do not commit directly to `main`:** create a feature branch for every change,
   push it, and open a pull request. Only merge through the GitHub PR workflow so
   CI runs before the change lands on `main`. The only exceptions are fastlane

@@ -208,7 +208,7 @@ struct ModelStoreBackupManager {
     private func write(_ metadata: ModelStoreBackupMetadata, to folder: URL) throws {
         let url = folder.appendingPathComponent("metadata.json")
         let data = try JSONEncoder().encode(metadata)
-        try data.write(to: url, options: .atomic)
+        try data.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
         RecordingProtection.apply(to: url)
     }
 

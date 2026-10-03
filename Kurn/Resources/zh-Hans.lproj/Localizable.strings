@@ -965,3 +965,7 @@
 "auth.sensitive_change_reason" = "请验证您的身份以更改此安全设置。";
 "settings.ai_title_cloud" = "使用云端服务商自动生成标题";
 "settings.ai_title_cloud_footer" = "开启后，每次转写完成都会发送到您的云端摘要服务商以建议标题。设备端生成的标题以及您手动重新生成的标题不受影响。";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "控制录音";
+"intent.recordingControl.action" = "操作";

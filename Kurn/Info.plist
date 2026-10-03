@@ -22,17 +22,6 @@
 		<string>de</string>
 		<string>zh-Hans</string>
 	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>ai.kurn.app.recording</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>kurn</string>
-			</array>
-		</dict>
-	</array>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>

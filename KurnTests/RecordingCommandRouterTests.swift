@@ -114,4 +114,32 @@ struct RecordingCommandRouterTests {
 
         #expect(highlightCount == 2)
     }
+
+    // MARK: - Live Activity buttons
+
+    @Test func liveActivityActionsReachTheMatchingHandler() {
+        let router = RecordingCommandRouter.shared
+        defer { router.unregister() }
+        var calls: [String] = []
+        router.register(
+            onTogglePause: { calls.append("toggle") }, onPause: {}, onResume: {},
+            onStop: { calls.append("stop"); return true },
+            onHighlight: { calls.append("highlight") }
+        )
+
+        for action in RecordingControlAction.allCases {
+            router.handle(action)
+        }
+
+        #expect(calls == ["toggle", "stop", "highlight"])
+    }
+
+    @Test func liveActivityActionsWithoutASessionAreIgnored() {
+        let router = RecordingCommandRouter.shared
+        router.unregister()
+        for action in RecordingControlAction.allCases {
+            router.handle(action)
+        }
+        #expect(!router.hasActiveSession)
+    }
 }
