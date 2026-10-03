@@ -40,7 +40,7 @@ final class WikiCoordinator {
 
     private let modelContext: ModelContext
     private let wikiService: WikiService
-    private let isProviderUsable: (AIProvider) -> Bool
+    private let isProviderUsable: ProviderFactory.UsabilityCheck
     private let providerCircuitBreaker: ProviderCircuitBreaker
 
     /// App-wide settings, injected at construction; the coordinator respects
@@ -83,7 +83,7 @@ final class WikiCoordinator {
         appSettings: AppSettings? = nil,
         providerCircuitBreaker: ProviderCircuitBreaker = .shared,
         wikiService: WikiService = WikiService(),
-        isProviderUsable: @escaping (AIProvider) -> Bool = { $0.isUsable }
+        isProviderUsable: @escaping ProviderFactory.UsabilityCheck = ProviderFactory.liveUsability
     ) {
         self.modelContext = modelContext
         self.appSettings = appSettings

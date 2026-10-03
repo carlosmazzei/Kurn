@@ -12,7 +12,7 @@ import Observation
 final class AITitleCoordinator {
     private let summaryService: SummaryService
     private let providerCircuitBreaker: ProviderCircuitBreaker
-    private let isProviderUsable: (AIProvider) -> Bool
+    private let isProviderUsable: ProviderFactory.UsabilityCheck
 
     /// Meetings whose title is being (re)generated, mirroring
     /// `WikiCoordinator.generatingMeetingIDs` — lets a view show progress and
@@ -30,7 +30,7 @@ final class AITitleCoordinator {
     init(
         summaryService: SummaryService = SummaryService(),
         providerCircuitBreaker: ProviderCircuitBreaker = .shared,
-        isProviderUsable: @escaping (AIProvider) -> Bool = { $0.isUsable }
+        isProviderUsable: @escaping ProviderFactory.UsabilityCheck = ProviderFactory.liveUsability
     ) {
         self.summaryService = summaryService
         self.providerCircuitBreaker = providerCircuitBreaker

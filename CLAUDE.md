@@ -160,7 +160,12 @@ An exclusion is legitimate only for code no test target can run: a SwiftUI
 view body, or an **adapter** — a file that only wraps an API needing
 hardware, a downloaded model, Metal/ANE or an entitlement, with every decision
 it used to make already moved into a tested type. Each `exclude` entry states
-that reason; new logic inside an excluded adapter is a review bug. Pure
+that reason; new logic inside an excluded adapter is a review bug. An adapter
+entry also records `maxLines`, its size when excluded, and `Scope.audit`
+(`Tools/lcov.py`, run by `Tools/tests/` in `static-policy`) fails when an
+adapter outgrows it or a pattern no longer matches any file: since excluded
+code is unmeasured, its size is the signal, and raising a budget is a change
+a reviewer sees. Pure
 presentation logic does not belong in `Views/` (where it would be excluded);
 put it beside the type it presents. `Tools/tests/` covers the gate itself and
 runs in `static-policy`.

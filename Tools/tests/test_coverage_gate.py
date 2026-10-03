@@ -106,6 +106,52 @@ class ScopeTests(unittest.TestCase):
         self.assertGreaterEqual(floor["tolerance"], 1.0, "below the measured run-to-run noise the gate flakes")
 
 
+class ScopeAuditTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.root = self.dir.name
+        for rel, lines in [("Kurn/Views/V.swift", 1), ("Kurn/Services/Adapter.swift", 3)]:
+            path = os.path.join(self.root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as handle:
+                handle.write("line\n" * lines)
+
+    def audit(self, *entries: dict) -> list[str]:
+        return lcov.Scope(["Kurn/"], list(entries)).audit(self.root)
+
+    def test_live_exclusions_within_budget_pass(self):
+        self.assertEqual(self.audit(
+            {"pattern": "Kurn/Views/**", "reason": "views"},
+            {"pattern": "Kurn/Services/Adapter.swift", "reason": "Adapter: hardware", "maxLines": 3},
+        ), [])
+
+    def test_a_pattern_matching_nothing_is_stale(self):
+        problems = self.audit(
+            {"pattern": "Kurn/Gone/**", "reason": "views"},
+            {"pattern": "Kurn/Services/Removed.swift", "reason": "Adapter: gone", "maxLines": 10},
+        )
+        self.assertEqual(len(problems), 2)
+        self.assertTrue(all("matches no" in problem for problem in problems))
+
+    def test_an_adapter_needs_a_budget(self):
+        problems = self.audit({"pattern": "Kurn/Services/Adapter.swift", "reason": "Adapter: hardware"})
+        self.assertEqual(len(problems), 1)
+        self.assertIn("no maxLines", problems[0])
+
+    def test_an_adapter_that_grew_past_its_budget_fails(self):
+        problems = self.audit({"pattern": "Kurn/Services/Adapter.swift", "reason": "Adapter: hardware", "maxLines": 2})
+        self.assertEqual(len(problems), 1)
+        self.assertIn("grew to 3 lines (budget 2)", problems[0])
+
+    def test_non_adapter_exclusions_need_no_budget(self):
+        self.assertEqual(self.audit({"pattern": "Kurn/Views/V.swift", "reason": "root view"}), [])
+
+    def test_repository_exclusions_are_live_and_adapters_within_budget(self):
+        root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+        self.assertEqual(lcov.Scope.load().audit(root), [])
+
+
 class FloorTests(unittest.TestCase):
     def records(self, ws: Workspace, services_hit: int) -> str:
         services = {line: (1 if line <= services_hit else 0) for line in range(1, 11)}

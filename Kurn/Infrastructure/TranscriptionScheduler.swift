@@ -140,17 +140,23 @@ enum TranscriptionScheduler {
 final class BackgroundTranscriptionRunner {
     static let shared = BackgroundTranscriptionRunner()
     private var transcription: TranscriptionCoordinator?
+    /// Re-arms the scheduler while a backlog remains — the `BGTaskScheduler`
+    /// submission in production, injected at construction like every other
+    /// dependency so the pass is tested without one.
+    private let reschedule: (BackgroundTranscriptionContext) -> Void
+
+    init(
+        reschedule: @escaping (BackgroundTranscriptionContext) -> Void = {
+            TranscriptionScheduler.scheduleIfWorkRemains(container: $0.container, settings: $0.settings)
+        }
+    ) {
+        self.reschedule = reschedule
+    }
 
     /// Resume every `.pending` recording, wait for the runs to finish (or be
     /// paused by `pause()`), re-arm the scheduler when a backlog remains, and
-    /// return how many recordings are still pending. `reschedule` is the
-    /// `BGTaskScheduler` submission; tests observe it instead.
-    func run(
-        _ context: BackgroundTranscriptionContext,
-        reschedule: (BackgroundTranscriptionContext) -> Void = {
-            TranscriptionScheduler.scheduleIfWorkRemains(container: $0.container, settings: $0.settings)
-        }
-    ) async -> Int {
+    /// return how many recordings are still pending.
+    func run(_ context: BackgroundTranscriptionContext) async -> Int {
         transcription = context.transcription
         context.transcription.resumePendingTranscriptions(settings: context.settings)
         await context.transcription.awaitActiveTranscriptions()

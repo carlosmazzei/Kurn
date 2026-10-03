@@ -20,6 +20,15 @@ enum ProviderFactory {
     /// Keychain and builds the vendor's client.
     static let liveLLM: LLMResolver = { try summaryProvider(for: $0, model: $1) }
 
+    /// Whether a provider can be used right now (a stored key, or the
+    /// on-device model available). Coordinators that skip work for an
+    /// unusable provider take one, so a test can decide without a Keychain;
+    /// production passes `liveUsability`.
+    typealias UsabilityCheck = @Sendable (AIProvider) -> Bool
+
+    /// The production check: `AIProvider.isUsable`.
+    static let liveUsability: UsabilityCheck = { $0.isUsable }
+
     /// Build the summary provider chosen in Settings. Throws `.noAPIKey` when a
     /// cloud provider has no stored key, or `.onDeviceModelUnavailable` when the
     /// on-device provider is selected but `SystemLanguageModel` can't run —

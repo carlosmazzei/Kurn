@@ -8,6 +8,7 @@ decides which files the gate measures.
 """
 
 import fnmatch
+import glob
 import json
 import os
 from collections import defaultdict
@@ -104,6 +105,39 @@ class Scope:
             elif fnmatch.fnmatchcase(rel, pattern):
                 return entry
         return None
+
+    def audit(self, root: str) -> list[str]:
+        """Problems with the exclusion list itself, relative to `root`: a
+        pattern that matches nothing (stale), and an adapter (a reason
+        starting "Adapter:") that has no `maxLines` budget or has grown past
+        it. Excluded code is unmeasured, so its size is the only signal that
+        logic is creeping into it."""
+        problems = []
+        for entry in self.exclude:
+            pattern = entry["pattern"]
+            if pattern.endswith("/**"):
+                if not os.path.isdir(os.path.join(root, pattern[:-3])):
+                    problems.append(f"{pattern}: matches no directory")
+                continue
+            matches = sorted(glob.glob(os.path.join(root, pattern)))
+            if not matches:
+                problems.append(f"{pattern}: matches no file")
+                continue
+            if not entry.get("reason", "").startswith("Adapter:"):
+                continue
+            budget = entry.get("maxLines")
+            if not isinstance(budget, int):
+                problems.append(f"{pattern}: adapter has no maxLines budget")
+                continue
+            for path in matches:
+                with open(path) as handle:
+                    lines = sum(1 for _ in handle)
+                if lines > budget:
+                    problems.append(
+                        f"{pattern}: adapter grew to {lines} lines (budget {budget}); "
+                        "move the new logic into a tested type, or raise maxLines with a reason"
+                    )
+        return problems
 
     def contains(self, rel: str) -> bool:
         if not any(rel.startswith(root) for root in self.include):
