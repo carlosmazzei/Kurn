@@ -965,3 +965,7 @@
 "auth.sensitive_change_reason" = "Confirme sua identidade para alterar esta configuração de segurança.";
 "settings.ai_title_cloud" = "Títulos Automáticos com Provedores na Nuvem";
 "settings.ai_title_cloud_footer" = "Quando ativado, cada transcrição concluída é enviada ao seu provedor de resumos na nuvem para sugerir um título. Títulos gerados no dispositivo e os que você regenera manualmente não são afetados.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Controlar Gravação";
+"intent.recordingControl.action" = "Ação";

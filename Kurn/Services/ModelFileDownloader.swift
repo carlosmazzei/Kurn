@@ -25,7 +25,14 @@
 //  verification, or the install step itself) always leaves the previous
 //  valid model exactly as it was, never absent and never silently corrupt.
 //
-//  What this deliberately does NOT do, and why: pin an exact SHA-256 or an
+//  Since then, a catalog entry may pass `pinnedSHA256`: a digest taken from
+//  the publisher's own release artifact and checked against the received
+//  bytes regardless of what the origin's headers say. The sherpa-onnx models
+//  carry one. The whisper.cpp weights do not yet — upstream publishes no
+//  SHA-256 for the quantized variants, and the reasoning below still holds
+//  for any value that was not confirmed against the real file.
+//
+//  What this originally did NOT do, and why: pin an exact SHA-256 or an
 //  immutable source revision (commit SHA / release asset digest) as a
 //  hardcoded manifest. Doing that responsibly requires fetching the real,
 //  current values from the hosting services (HuggingFace, GitHub) to pin
@@ -61,6 +68,7 @@ protocol ModelDownloading: Sendable {
         minimumPlausibleBytes: Int64,
         policy: LargeTransferPolicy,
         logLabel: String,
+        pinnedSHA256: String?,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws
 }
@@ -110,13 +118,18 @@ actor ModelFileDownloader: ModelDownloading {
     /// (never wrapped, so a caller's `catch is CancellationError` still
     /// works), and everything else becomes `.modelDownloadFailed`.
     /// `logLabel` prefixes the log lines so each downloader's stream stays
-    /// greppable.
+    /// greppable. `pinnedSHA256`, when the catalog has one, is the digest
+    /// the file must have, checked against the bytes received — unlike the
+    /// origin's own `X-Linked-ETag`, it cannot be changed by whoever controls
+    /// the origin, which is what makes it protection against a swapped file
+    /// rather than only against a corrupted transfer.
     func fetch(
         url: URL,
         destination: URL,
         minimumPlausibleBytes: Int64,
         policy: LargeTransferPolicy,
         logLabel: String,
+        pinnedSHA256: String? = nil,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard Self.installedSize(of: destination) < minimumPlausibleBytes else { return }
@@ -153,8 +166,12 @@ actor ModelFileDownloader: ModelDownloading {
         }
 
         do {
-            try Self.verify(outcome, minimumPlausibleBytes: minimumPlausibleBytes)
-            try Self.install(outcome.fileURL, at: destination, expectedHashHex: Self.linkedHashHex(from: outcome.response))
+            try Self.verify(outcome, minimumPlausibleBytes: minimumPlausibleBytes, pinnedSHA256: pinnedSHA256)
+            try Self.install(
+                outcome.fileURL,
+                at: destination,
+                expectedHashHex: pinnedSHA256 ?? Self.linkedHashHex(from: outcome.response)
+            )
             AppLog.transcription.atNotice.notice(
                 "\(logLabel, privacy: .public): installed \(destination.lastPathComponent, privacy: .public)"
             )
@@ -224,7 +241,11 @@ actor ModelFileDownloader: ModelDownloading {
     /// the origin volunteered one — the file's SHA-256 against it. See the
     /// file header for why this app cannot pin an out-of-band manifest
     /// value here instead.
-    private static func verify(_ outcome: Downloader.Outcome, minimumPlausibleBytes: Int64) throws {
+    private static func verify(
+        _ outcome: Downloader.Outcome,
+        minimumPlausibleBytes: Int64,
+        pinnedSHA256: String?
+    ) throws {
         let actualSize = installedSize(of: outcome.fileURL)
         let expectedLength = outcome.response.expectedContentLength
         if expectedLength > 0 {
@@ -238,8 +259,10 @@ actor ModelFileDownloader: ModelDownloading {
                 throw AppError.modelDownloadFailed("downloaded file is smaller than expected")
             }
         }
-        if let expectedHex = linkedHashHex(from: outcome.response) {
-            let actualHex = try PipelineDigest.sha256Hex(ofFileAt: outcome.fileURL)
+        let expectedHexes = [pinnedSHA256, linkedHashHex(from: outcome.response)].compactMap { $0 }
+        guard !expectedHexes.isEmpty else { return }
+        let actualHex = try PipelineDigest.sha256Hex(ofFileAt: outcome.fileURL)
+        for expectedHex in expectedHexes {
             guard actualHex.caseInsensitiveCompare(expectedHex) == .orderedSame else {
                 throw AppError.modelDownloadFailed("downloaded file did not match its published checksum")
             }

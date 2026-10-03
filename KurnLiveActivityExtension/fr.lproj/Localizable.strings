@@ -12,3 +12,7 @@
 "control.startRecording.title" = "Démarrer l'enregistrement";
 "control.startRecording.displayName" = "Démarrer l'enregistrement";
 "control.startRecording.description" = "Démarre un nouvel enregistrement Kurn. En l'ajoutant à l'écran verrouillé, il peut être déclenché d'un geste alors que l'appareil est verrouillé.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Contrôler l’enregistrement";
+"intent.recordingControl.action" = "Action";

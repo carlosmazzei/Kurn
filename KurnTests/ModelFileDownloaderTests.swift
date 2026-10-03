@@ -198,6 +198,70 @@ struct ModelFileDownloaderTests {
         #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
+    // MARK: - Pinned digests
+
+    @Test("installs a file whose SHA-256 matches the pinned digest")
+    func installsWhenPinMatches() async throws {
+        let downloader = makeDownloader()
+        let destination = tempDestination()
+        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+
+        let body = Data(repeating: 0x33, count: 2_048)
+        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
+
+        try await downloader.fetch(
+            url: URL(string: "https://example.com/model.bin")!,
+            destination: destination,
+            minimumPlausibleBytes: 500,
+            policy: .wifiOnly,
+            logLabel: "test",
+            pinnedSHA256: sha256Hex(of: body)
+        ) { _ in }
+
+        #expect(try Data(contentsOf: destination) == body)
+    }
+
+    /// The case the pin exists for: an origin that serves a different file
+    /// *and* a matching digest header for it. The header agrees with the
+    /// bytes, so only the pinned value can tell the file was swapped.
+    @Test("rejects a swapped file even when the origin's digest header agrees with it")
+    func rejectsSwappedFileDespiteMatchingHeader() async throws {
+        let downloader = makeDownloader()
+        let destination = tempDestination()
+        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+
+        let expected = Data(repeating: 0x33, count: 2_048)
+        let swapped = Data(repeating: 0x66, count: 2_048)
+        StubDownloadProtocol.enqueue(.init(body: swapped, headers: [
+            "Content-Length": "\(swapped.count)",
+            "X-Linked-ETag": sha256Hex(of: swapped)
+        ]))
+
+        await #expect(throws: AppError.self) {
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                minimumPlausibleBytes: 500,
+                policy: .wifiOnly,
+                logLabel: "test",
+                pinnedSHA256: sha256Hex(of: expected)
+            ) { _ in }
+        }
+
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    @Test("the sherpa-onnx catalog pins well-formed SHA-256 digests")
+    func sherpaCatalogPinsAreWellFormed() {
+        for pin in [SherpaOnnxModelDownloader.segmentationSHA256, SherpaOnnxModelDownloader.embeddingSHA256] {
+            // Evaluated outside `#expect`: the macro would treat the
+            // rethrowing `allSatisfy` as a throwing call.
+            let isHex = pin.allSatisfy { $0.isHexDigit }
+            #expect(pin.count == 64)
+            #expect(isHex)
+        }
+    }
+
     @Test("a plain ETag is never treated as a hash to verify")
     func plainETagIsIgnored() async throws {
         let downloader = makeDownloader()

@@ -223,6 +223,9 @@ enum MeetingExport {
     /// twice in quick succession, or two meetings that both fall back to
     /// "meeting.md" — never collide on the same path while one share sheet
     /// is still open and the other's `.atomic` write or later cleanup runs.
+    /// Prefix of every export folder in the temp directory; see `TempFileCleaner`.
+    static let exportDirectoryPrefix = "kurn_export_"
+
     @MainActor
     static func temporaryFile(for meeting: Meeting, summary: Summary?) throws -> URL {
         try temporaryFile(markdown: markdown(for: meeting, summary: summary), suggestedName: meeting.title)
@@ -232,6 +235,12 @@ enum MeetingExport {
     /// `suggestedName` (sanitized), and return its URL. See
     /// `temporaryFile(for:summary:)` for why each call gets its own
     /// UUID-named subdirectory.
+    ///
+    /// The file is written protected (`.completeFileProtectionUnlessOpen`)
+    /// rather than stamped after the fact, and the folder carries
+    /// `exportDirectoryPrefix` so `TempFileCleaner` removes it once it is an
+    /// hour old: an export is meeting content, and the share sheet only needs
+    /// it for as long as it is open.
     static func temporaryFile(markdown text: String, suggestedName: String) throws -> URL {
         let safeName = suggestedName
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
@@ -239,10 +248,10 @@ enum MeetingExport {
             .joined(separator: "-")
         let name = (safeName.isEmpty ? "meeting" : safeName) + ".md"
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent(exportDirectoryPrefix + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent(name)
-        try text.data(using: .utf8)?.write(to: url, options: .atomic)
+        try text.data(using: .utf8)?.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
         RecordingProtection.apply(to: url)
         return url
     }

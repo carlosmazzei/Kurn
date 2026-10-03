@@ -81,7 +81,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -89,7 +91,7 @@ jobs:
       - uses: ./.github/actions/prepare-simulator
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
@@ -108,7 +110,7 @@ jobs:
       # Datasets change rarely; keyed on the manifest and fetchers so an edit
       # to either (e.g. a new reference file) invalidates it.
       - name: Cache public datasets
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.DATASET_DIR }}
           key: kurn-eval-public-${{ hashFiles('Tools/evaluation/public_datasets/**') }}
@@ -122,10 +124,18 @@ jobs:
           # and the listing 403s. `contents: read` is enough to read a public
           # repository's contents.
           GITHUB_TOKEN: ${{ github.token }}
+          # Passed through the environment, never interpolated into the
+          # script: a workflow input expanded inside `run:` is shell code.
+          CORPORA: ${{ github.event.inputs.corpora }}
         run: |
+          only_args=()
+          if [ -n "$CORPORA" ]; then
+            read -r -a corpora <<< "$CORPORA"
+            only_args=(--only "${corpora[@]}")
+          fi
           python3 Tools/evaluation/public_datasets/fetch_all.py \
             --out "$DATASET_DIR" \
-            ${{ github.event.inputs.corpora != '' && format('--only {0}', github.event.inputs.corpora) || '' }}
+            "${only_args[@]}"
 
       - name: Build and test
         env:
@@ -227,7 +237,7 @@ jobs:
 
       - name: Upload report artifact
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pipeline-eval-report
           path: |

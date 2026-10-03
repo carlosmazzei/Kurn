@@ -52,7 +52,7 @@ enum DiagnosticReportStore {
         let directory = try directory()
         let name = "\(kind.rawValue)-\(dateFormatter.string(from: receivedAt))-\(UUID().uuidString.prefix(8)).txt"
         let url = directory.appendingPathComponent(name)
-        try text.data(using: .utf8)?.write(to: url, options: .atomic)
+        try text.data(using: .utf8)?.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
         RecordingProtection.apply(to: url)
         prune()
         return url

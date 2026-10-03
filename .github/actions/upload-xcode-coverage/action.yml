@@ -73,7 +73,7 @@ runs:
 
     - name: Keep the coverage report as an artifact
       if: steps.export.outputs.exported == 'true'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ inputs.output-file }}
         path: ${{ runner.temp }}/${{ inputs.output-file }}
@@ -81,7 +81,7 @@ runs:
 
     - name: Upload coverage to Codecov
       if: steps.export.outputs.exported == 'true'
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ inputs.codecov-token }}
         files: ${{ runner.temp }}/${{ inputs.output-file }}

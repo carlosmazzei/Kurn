@@ -189,7 +189,7 @@ struct MeetingShareSelectionView: View {
 
     private func copyButton(id: UUID, text: @escaping () -> String) -> some View {
         Button {
-            UIPasteboard.general.string = text()
+            MeetingPasteboard.copy(text())
             flashCopied(id)
         } label: {
             Image(systemName: copiedRowID == id ? "checkmark" : "doc.on.doc")
@@ -210,7 +210,7 @@ struct MeetingShareSelectionView: View {
     private func copyAll() {
         let combined = selection.combinedMarkdown()
         guard !combined.isEmpty else { return }
-        UIPasteboard.general.string = combined
+        MeetingPasteboard.copy(combined)
         copiedAll = true
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.5))

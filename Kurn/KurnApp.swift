@@ -147,6 +147,9 @@ struct KurnApp: App {
             onStoreReplaced: { [bootCoordinator] in bootCoordinator.retryIfNeeded() }
         ))
 
+        // The Live Activity's buttons (`RecordingControlIntent`) run in this
+        // process and reach the recorder through this hook.
+        RecordingControlRouting.handler = { RecordingCommandRouter.shared.handle($0) }
         PhoneSessionController.shared.activate()
         #if canImport(UIKit)
         ResourcePressureMonitor.shared.start()

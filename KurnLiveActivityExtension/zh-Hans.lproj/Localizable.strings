@@ -12,3 +12,7 @@
 "control.startRecording.title" = "开始录音";
 "control.startRecording.displayName" = "开始录音";
 "control.startRecording.description" = "开始一段新的 Kurn 录音。将其添加到锁定屏幕后，即使设备处于锁定状态，也可以通过单击触发。";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "控制录音";
+"intent.recordingControl.action" = "操作";

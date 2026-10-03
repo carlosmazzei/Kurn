@@ -965,3 +965,7 @@
 "auth.sensitive_change_reason" = "Conferma la tua identità per modificare questa impostazione di sicurezza.";
 "settings.ai_title_cloud" = "Titoli Automatici con Provider Cloud";
 "settings.ai_title_cloud_footer" = "Se attivo, ogni trascrizione completata viene inviata al tuo provider cloud dei riepiloghi per suggerire un titolo. I titoli generati sul dispositivo e quelli che rigeneri tu non sono interessati.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Controlla Registrazione";
+"intent.recordingControl.action" = "Azione";

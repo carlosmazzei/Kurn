@@ -66,7 +66,11 @@ enum WhisperCppModelDownloader {
             destination: fileURL(for: model),
             minimumPlausibleBytes: model.minimumPlausibleBytes,
             policy: policy,
-            logLabel: "whisperCppDownload"
+            logLabel: "whisperCppDownload",
+            // No pin yet: upstream publishes no SHA-256 for these quantized
+            // files (see `ModelFileDownloader`'s header). Hugging Face's own
+            // `X-Linked-ETag` digest is still checked.
+            pinnedSHA256: nil
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: fraction, phase: .downloading))
         }

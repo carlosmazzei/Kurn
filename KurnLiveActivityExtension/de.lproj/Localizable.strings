@@ -12,3 +12,7 @@
 "control.startRecording.title" = "Aufnahme starten";
 "control.startRecording.displayName" = "Aufnahme starten";
 "control.startRecording.description" = "Startet eine neue Kurn-Aufnahme. Wird sie zum Sperrbildschirm hinzugefügt, kann sie dort mit einem einzigen Tipp ausgelöst werden, während das Gerät gesperrt ist.";
+
+/* Live Activity button intent (hidden from Shortcuts) */
+"intent.recordingControl.title" = "Aufnahme steuern";
+"intent.recordingControl.action" = "Aktion";

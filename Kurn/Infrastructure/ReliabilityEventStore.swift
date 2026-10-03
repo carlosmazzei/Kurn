@@ -96,7 +96,7 @@ enum ReliabilityEventStore {
                 try handle.seekToEnd()
                 try handle.write(contentsOf: line)
             } else {
-                try line.write(to: url, options: .atomic)
+                try line.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
                 RecordingProtection.apply(to: url)
             }
             pruneIfNeeded()
@@ -138,7 +138,7 @@ enum ReliabilityEventStore {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
         guard lines.count > maxEvents + pruneMargin else { return }
         let kept = lines.suffix(maxEvents).joined(separator: "\n") + "\n"
-        try? kept.data(using: .utf8)?.write(to: url, options: .atomic)
+        try? kept.data(using: .utf8)?.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
         RecordingProtection.apply(to: url)
     }
 }

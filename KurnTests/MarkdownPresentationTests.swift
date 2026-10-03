@@ -40,4 +40,15 @@ struct MarkdownPresentationTests {
         let attributed = try #require(MarkdownPresentation.inlineAttributedString("just words"))
         #expect(String(attributed.characters) == "just words")
     }
+
+    /// LLM output is shaped by whatever was said in the meeting, so a link in
+    /// it is never made tappable: its text is kept, its destination dropped.
+    @Test func linksInGeneratedTextAreNotTappable() throws {
+        let markdown = "See [the notes](https://attacker.example/?q=secret) and <kurn://recording/stop>."
+        let attributed = try #require(MarkdownPresentation.inlineAttributedString(markdown))
+        let hasLink = attributed.runs.contains { $0.link != nil }
+        #expect(!hasLink)
+        #expect(String(attributed.characters).contains("the notes"))
+        #expect(!String(attributed.characters).contains("attacker.example"))
+    }
 }
