@@ -46,7 +46,8 @@ struct MarkdownPresentationTests {
     @Test func linksInGeneratedTextAreNotTappable() throws {
         let markdown = "See [the notes](https://attacker.example/?q=secret) and <kurn://recording/stop>."
         let attributed = try #require(MarkdownPresentation.inlineAttributedString(markdown))
-        #expect(attributed.runs.allSatisfy { $0.link == nil })
+        let hasLink = attributed.runs.contains { $0.link != nil }
+        #expect(!hasLink)
         #expect(String(attributed.characters).contains("the notes"))
         #expect(!String(attributed.characters).contains("attacker.example"))
     }

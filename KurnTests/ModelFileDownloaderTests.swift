@@ -254,8 +254,11 @@ struct ModelFileDownloaderTests {
     @Test("the sherpa-onnx catalog pins well-formed SHA-256 digests")
     func sherpaCatalogPinsAreWellFormed() {
         for pin in [SherpaOnnxModelDownloader.segmentationSHA256, SherpaOnnxModelDownloader.embeddingSHA256] {
+            // Evaluated outside `#expect`: the macro would treat the
+            // rethrowing `allSatisfy` as a throwing call.
+            let isHex = pin.allSatisfy { $0.isHexDigit }
             #expect(pin.count == 64)
-            #expect(pin.allSatisfy(\.isHexDigit))
+            #expect(isHex)
         }
     }
 
