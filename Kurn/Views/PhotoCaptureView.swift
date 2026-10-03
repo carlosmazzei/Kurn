@@ -207,7 +207,9 @@ struct PhotoCaptureView: View {
     }
 
     private func controlIcon(_ systemName: String) -> some View {
+        // Decorative: the Button or Menu wrapping it carries the label.
         Image(systemName: systemName)
+            .accessibilityHidden(true)
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 40, height: 40)
