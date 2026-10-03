@@ -132,8 +132,9 @@ struct TranscriptionSchedulerPlanTests {
             settings: Self.backgroundCapableSettings()
         )
         var rescheduled = 0
+        let runner = BackgroundTranscriptionRunner { _ in rescheduled += 1 }
 
-        let remaining = await BackgroundTranscriptionRunner().run(context) { _ in rescheduled += 1 }
+        let remaining = await runner.run(context)
 
         #expect(remaining == 0)
         #expect(rescheduled == 0)
@@ -151,11 +152,11 @@ struct TranscriptionSchedulerPlanTests {
             transcription: TranscriptionCoordinator(modelContext: worked.mainContext),
             settings: Self.backgroundCapableSettings()
         )
-        let runner = BackgroundTranscriptionRunner()
         var rescheduled = 0
+        let runner = BackgroundTranscriptionRunner { _ in rescheduled += 1 }
 
         runner.pause()
-        let remaining = await runner.run(context) { _ in rescheduled += 1 }
+        let remaining = await runner.run(context)
 
         #expect(remaining == 1)
         #expect(rescheduled == 1)

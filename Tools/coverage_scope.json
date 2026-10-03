@@ -1,5 +1,5 @@
 {
-  "_comment": "What the coverage gate (Tools/coverage_gate.py) measures. A file counts when its repository-relative path starts with an `include` root and matches no `exclude` pattern. Every exclusion carries its reason; an adapter may only be listed once all of its decisions live in a tested type (see CLAUDE.md, 'Coverage gate').",
+  "_comment": "What the coverage gate (Tools/coverage_gate.py) measures. A file counts when its repository-relative path starts with an `include` root and matches no `exclude` pattern. Every exclusion carries its reason; an adapter may only be listed once all of its decisions live in a tested type (see CLAUDE.md, 'Coverage gate'). An adapter entry also records `maxLines`, the file's size when it was excluded: Tools/lcov.py's Scope.audit fails the static-policy job when an adapter grows past it, so new code landing in an unmeasured file is a visible, reviewed budget change rather than a silent one. A pattern that no longer matches any file fails the same check.",
   "include": [
     "Kurn/",
     "Packages/KurnCore/Sources/"
@@ -23,71 +23,88 @@
     },
     {
       "pattern": "Kurn/Services/Pipeline/WhisperCppTranscriber.swift",
-      "reason": "Adapter: drives whisper.cpp, which needs a downloaded GGML model. Segment assembly, confidence, progress and thread budget live in KurnCore's WhisperSegmentAssembly/ChunkedProgress (tested)."
+      "reason": "Adapter: drives whisper.cpp, which needs a downloaded GGML model. Segment assembly, confidence, progress and thread budget live in KurnCore's WhisperSegmentAssembly/ChunkedProgress (tested).",
+      "maxLines": 449
     },
     {
       "pattern": "Kurn/Services/FluidAudioDiarizer.swift",
-      "reason": "Adapter: drives FluidAudio's OfflineDiarizerManager, which needs downloaded CoreML models. Labeling and progress live in KurnCore's DiarizerSegmentLabeling/ChunkProgressSampler, the rescue, smoothing, voiceprints and time budget in DiarizationFinalization (all tested)."
+      "reason": "Adapter: drives FluidAudio's OfflineDiarizerManager, which needs downloaded CoreML models. Labeling and progress live in KurnCore's DiarizerSegmentLabeling/ChunkProgressSampler, the rescue, smoothing, voiceprints and time budget in DiarizationFinalization (all tested).",
+      "maxLines": 271
     },
     {
       "pattern": "Kurn/Services/FluidAudioTranscriber.swift",
-      "reason": "Adapter: drives FluidAudio's AsrManager, which needs downloaded CoreML models. The progress threshold, fraction clamp and transcript assembly live in KurnCore's BatchTranscriptAssembly (tested)."
+      "reason": "Adapter: drives FluidAudio's AsrManager, which needs downloaded CoreML models. The progress threshold, fraction clamp and transcript assembly live in KurnCore's BatchTranscriptAssembly (tested).",
+      "maxLines": 114
     },
     {
       "pattern": "Kurn/Services/Pipeline/FluidAudioVAD.swift",
-      "reason": "Adapter: drives FluidAudio's Silero VadManager, which needs a downloaded CoreML model. Region normalization lives in KurnCore's SpeechRegionNormalization, the whole-clip fallback in AudioFileDuration (both tested)."
+      "reason": "Adapter: drives FluidAudio's Silero VadManager, which needs a downloaded CoreML model. Region normalization lives in KurnCore's SpeechRegionNormalization, the whole-clip fallback in AudioFileDuration (both tested).",
+      "maxLines": 98
     },
     {
       "pattern": "Kurn/Services/FluidAudioModelStore.swift",
-      "reason": "Adapter: loads FluidAudio's Parakeet models (download + CoreML/ANE compile). Load-once, coalescing and retry-after-failure live in KurnCore's CoalescedLoader (tested)."
+      "reason": "Adapter: loads FluidAudio's Parakeet models (download + CoreML/ANE compile). Load-once, coalescing and retry-after-failure live in KurnCore's CoalescedLoader (tested).",
+      "maxLines": 83
     },
     {
       "pattern": "Kurn/Services/FluidAudioMultilingualStreamingManager.swift",
-      "reason": "Adapter: forwards the StreamingAsrManager protocol to FluidAudio's Nemotron streaming manager, which needs a downloaded model; it buffers and forwards, with no decision of its own."
+      "reason": "Adapter: forwards the StreamingAsrManager protocol to FluidAudio's Nemotron streaming manager, which needs a downloaded model; it buffers and forwards, with no decision of its own.",
+      "maxLines": 102
     },
     {
       "pattern": "Kurn/Services/LockScreenRecordingController.swift",
-      "reason": "Adapter: ActivityKit requests and updates a Live Activity only in a signed app on a device or simulator with activities enabled, which no test target can drive. The content state lives in RecordingSurfacePayloads (tested); what remains is the start/end ordering guard around Activity.request."
+      "reason": "Adapter: ActivityKit requests and updates a Live Activity only in a signed app on a device or simulator with activities enabled, which no test target can drive. The content state lives in RecordingSurfacePayloads (tested); what remains is the start/end ordering guard around Activity.request.",
+      "maxLines": 165
     },
     {
       "pattern": "Kurn/Services/PhoneSessionController.swift",
-      "reason": "Adapter: WCSession needs a paired Watch. The application context, command decoding and replies live in RecordingSurfacePayloads, command handling in RecordingCommandRouter (both tested)."
+      "reason": "Adapter: WCSession needs a paired Watch. The application context, command decoding and replies live in RecordingSurfacePayloads, command handling in RecordingCommandRouter (both tested).",
+      "maxLines": 116
     },
     {
       "pattern": "Kurn/Services/OnDeviceTranscriber.swift",
-      "reason": "Adapter: drives SpeechAnalyzer/SpeechTranscriber, which need a downloaded Speech locale asset. Result bounds, word validation, the timeline check, progress and the no-speech decision live in KurnCore's AppleSpeechResultAssembly (tested)."
+      "reason": "Adapter: drives SpeechAnalyzer/SpeechTranscriber, which need a downloaded Speech locale asset. Result bounds, word validation, the timeline check, progress and the no-speech decision live in KurnCore's AppleSpeechResultAssembly (tested).",
+      "maxLines": 153
     },
     {
       "pattern": "Kurn/Services/SystemLocalAuthenticator.swift",
-      "reason": "Adapter: LAContext presents Face ID/Touch ID/passcode, which needs an enrolled device credential. RecordingAccessGate's coalescing, relock and error mapping are tested through a stub authenticator."
+      "reason": "Adapter: LAContext presents Face ID/Touch ID/passcode, which needs an enrolled device credential. RecordingAccessGate's coalescing, relock and error mapping are tested through a stub authenticator.",
+      "maxLines": 32
     },
     {
       "pattern": "Kurn/Services/CaptureAudioSession.swift",
-      "reason": "Adapter: configures the shared AVAudioSession, whose inputs and ports need real audio hardware. Input choice, category, polar-pattern order and activation retry live in CaptureInputSelection/SessionActivationRetry (tested)."
+      "reason": "Adapter: configures the shared AVAudioSession, whose inputs and ports need real audio hardware. Input choice, category, polar-pattern order and activation retry live in CaptureInputSelection/SessionActivationRetry (tested).",
+      "maxLines": 113
     },
     {
       "pattern": "Kurn/Services/AVFoundationCaptureEngine.swift",
-      "reason": "Adapter: AVAudioEngine input tap and session notifications need a microphone. Notification decoding and the output file's format and fallback live in AudioCaptureEvent/CaptureOutputFile (tested); the recorder runs against FakeAudioCaptureEngine."
+      "reason": "Adapter: AVAudioEngine input tap and session notifications need a microphone. Notification decoding and the output file's format and fallback live in AudioCaptureEvent/CaptureOutputFile (tested); the recorder runs against FakeAudioCaptureEngine.",
+      "maxLines": 155
     },
     {
       "pattern": "Kurn/Infrastructure/CrashReporting/DiagnosticsSubscriber.swift",
-      "reason": "Adapter: MetricKit delivers MXDiagnosticPayloads, which a test cannot construct. Consent, the crash/hang split, formatting and saving live in DiagnosticPayloadIntake (tested)."
+      "reason": "Adapter: MetricKit delivers MXDiagnosticPayloads, which a test cannot construct. Consent, the crash/hang split, formatting and saving live in DiagnosticPayloadIntake (tested).",
+      "maxLines": 55
     },
     {
       "pattern": "Kurn/Infrastructure/ModelDownloadConsent+FluidAudio.swift",
-      "reason": "Adapter: fetches and loads FluidAudio's CoreML bundles, which needs a real download and the Neural Engine. Which set downloads, the network policy, progress scaling (ModelDownloadStatus.scaled) and failure mapping (ModelDownloadConsent.downloadFailure) live in ModelDownloadConsent.swift (tested)."
+      "reason": "Adapter: fetches and loads FluidAudio's CoreML bundles, which needs a real download and the Neural Engine. Which set downloads, the network policy, progress scaling (ModelDownloadStatus.scaled) and failure mapping (ModelDownloadConsent.downloadFailure) live in ModelDownloadConsent.swift (tested).",
+      "maxLines": 97
     },
     {
       "pattern": "Kurn/Infrastructure/TranscriptionScheduler+BGTask.swift",
-      "reason": "Adapter: registers, submits and completes BGProcessingTasks, which BGTaskScheduler only accepts in a real app launch. What to submit (submissionPlan), whether an opened window may run (windowStart) and the resume pass (BackgroundTranscriptionRunner) live in TranscriptionScheduler.swift (tested)."
+      "reason": "Adapter: registers, submits and completes BGProcessingTasks, which BGTaskScheduler only accepts in a real app launch. What to submit (submissionPlan), whether an opened window may run (windowStart) and the resume pass (BackgroundTranscriptionRunner) live in TranscriptionScheduler.swift (tested).",
+      "maxLines": 118
     },
     {
       "pattern": "Kurn/Services/PhotoCaptureController.swift",
-      "reason": "Adapter: drives AVCaptureSession/AVCapturePhotoOutput, and the simulator has no camera. The flash toggle's cycle and icon and the zoom clamp live in PhotoFlashMode.swift (PhotoFlashMode, PhotoZoom; tested)."
+      "reason": "Adapter: drives AVCaptureSession/AVCapturePhotoOutput, and the simulator has no camera. The flash toggle's cycle and icon and the zoom clamp live in PhotoFlashMode.swift (PhotoFlashMode, PhotoZoom; tested).",
+      "maxLines": 153
     },
     {
       "pattern": "Kurn/Services/SherpaOnnx/SherpaOnnxCWrapper.swift",
-      "reason": "Adapter: thin Swift wrapper over sherpa-onnx's C diarization API, which needs the downloaded ONNX model pair. Labeling lives in KurnCore's DiarizerSegmentLabeling, the fallback and time budget in SherpaOnnxDiarizer (tested)."
+      "reason": "Adapter: thin Swift wrapper over sherpa-onnx's C diarization API, which needs the downloaded ONNX model pair. Labeling lives in KurnCore's DiarizerSegmentLabeling, the fallback and time budget in SherpaOnnxDiarizer (tested).",
+      "maxLines": 111
     }
   ]
 }
