@@ -98,8 +98,8 @@
     },
     {
       "pattern": "Kurn/Services/PhotoCaptureController.swift",
-      "reason": "Adapter: drives AVCaptureSession/AVCapturePhotoOutput, and the simulator has no camera. The flash toggle's cycle and icon and the zoom clamp live in PhotoFlashMode.swift (PhotoFlashMode, PhotoZoom; tested).",
-      "maxLines": 153
+      "reason": "Adapter: drives AVCaptureSession/AVCapturePhotoOutput, and the simulator has no camera. The flash and timer choices, which lens buttons to offer, the zoom clamp, the exposure mapping and the control rotation live in PhotoFlashMode.swift (PhotoFlashMode, PhotoTimer, PhotoZoom, PhotoExposure, PhotoControlRotation; tested). Budget raised from 153 for lens switching, camera flip and exposure bias, each a thin AVCaptureDevice call.",
+      "maxLines": 270
     },
     {
       "pattern": "Kurn/Services/SherpaOnnx/SherpaOnnxCWrapper.swift",

@@ -213,6 +213,15 @@
 "recorder.photo" = "Photo";
 "recorder.photo_shutter" = "Take Photo";
 "recorder.photo_flash" = "Flash";
+"recorder.photo_auto" = "Auto";
+"recorder.photo_on" = "On";
+"recorder.photo_off" = "Off";
+"recorder.photo_timer" = "Timer";
+"recorder.photo_timer_seconds" = "%d s";
+"recorder.photo_flip" = "Flip Camera";
+"recorder.photo_last" = "Last photo taken";
+"recorder.photo_exposure" = "Exposure";
+"recorder.photo_zoom_format" = "Zoom %@×";
 "transcript.jump_to_highlight" = "Jump to highlight";
 "transcript.view_photo" = "View photo";
 "photo.unavailable" = "Photo unavailable";

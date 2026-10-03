@@ -12,6 +12,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Testing
+import UIKit
 import UniformTypeIdentifiers
 @testable import Kurn
 
@@ -43,6 +44,75 @@ struct PhotoCaptureDecisionsTests {
         #expect(PhotoZoom.clamp(2.5, deviceMax: 10) == 2.5)
         #expect(PhotoZoom.clamp(40, deviceMax: 10) == 6)
         #expect(PhotoZoom.clamp(5, deviceMax: 4) == 4)
+    }
+
+    @Test func zoomCeilingIsSixTimesTheMainLensNotTheUltraWide() {
+        #expect(PhotoZoom.maxFactor(deviceMax: 120, base: 2) == 12)
+        #expect(PhotoZoom.clamp(30, deviceMax: 120, base: 2) == 12)
+        #expect(PhotoZoom.clamp(0.5, deviceMax: 120, base: 2) == 1)
+    }
+
+    @Test func aTripleCameraOffersUltraWideMainCroppedTwoTimesAndTelephotoButtons() {
+        // iPhone Pro: ultra-wide at 1, main at 2, telephoto at 6 (3x), with a
+        // 2x crop of the main sensor in between.
+        let stops = PhotoZoom.lensStops(switchOverFactors: [2, 6], hasUltraWide: true, deviceMax: 120)
+        #expect(stops.map(\.deviceFactor) == [1, 2, 4, 6])
+        #expect(stops.map(\.displayFactor) == [0.5, 1, 2, 3])
+    }
+
+    @Test func aDualWideCameraAddsACroppedTwoTimesButton() {
+        let stops = PhotoZoom.lensStops(switchOverFactors: [2], hasUltraWide: true, deviceMax: 120)
+        #expect(stops.map(\.displayFactor) == [0.5, 1, 2])
+        #expect(stops.map(\.deviceFactor) == [1, 2, 4])
+    }
+
+    @Test func aSingleCameraOffersOneTimesAndACroppedTwoTimes() {
+        let stops = PhotoZoom.lensStops(switchOverFactors: [], hasUltraWide: false, deviceMax: 10)
+        #expect(stops.map(\.deviceFactor) == [1, 2])
+        #expect(PhotoZoom.lensStops(switchOverFactors: [], hasUltraWide: false, deviceMax: 1.5).count == 1)
+    }
+
+    @Test func theSelectedButtonIsTheLastLensAtOrBelowTheZoom() {
+        let stops = PhotoZoom.lensStops(switchOverFactors: [2, 6], hasUltraWide: true, deviceMax: 120)
+        #expect(PhotoZoom.activeStop(in: stops, zoomFactor: 1)?.deviceFactor == 1)
+        #expect(PhotoZoom.activeStop(in: stops, zoomFactor: 3.4)?.deviceFactor == 2)
+        #expect(PhotoZoom.activeStop(in: stops, zoomFactor: 6)?.deviceFactor == 6)
+    }
+
+    @Test func lensLabelsDropAnUnneededDecimal() {
+        #expect(PhotoZoom.label(displayFactor: 1) == "1")
+        #expect(PhotoZoom.label(displayFactor: 3.0000001) == "3")
+    }
+
+    // MARK: - Timer
+
+    @Test func theTimerOffersOffThreeAndTenSeconds() {
+        #expect(PhotoTimer.allCases.map(\.seconds) == [0, 3, 10])
+    }
+
+    // MARK: - Exposure
+
+    @Test func draggingTheSunUpBrightensAndDownDarkens() {
+        #expect(PhotoExposure.level(afterDrag: -25, from: 0) == 0.5)
+        #expect(PhotoExposure.level(afterDrag: 25, from: 0) == -0.5)
+        #expect(PhotoExposure.level(afterDrag: -500, from: 0.2) == 1)
+        #expect(PhotoExposure.level(afterDrag: 500, from: 0.2) == -1)
+    }
+
+    @Test func exposureBiasStaysWithinTheDeviceAndTwoStops() {
+        #expect(PhotoExposure.bias(level: 1, deviceMin: -8, deviceMax: 8) == 2)
+        #expect(PhotoExposure.bias(level: -1, deviceMin: -1, deviceMax: 8) == -1)
+        #expect(PhotoExposure.bias(level: 0, deviceMin: -8, deviceMax: 8) == 0)
+    }
+
+    // MARK: - Control rotation
+
+    @Test func controlsCounterRotateWithThePhone() {
+        #expect(PhotoControlRotation.degrees(for: .portrait) == 0)
+        #expect(PhotoControlRotation.degrees(for: .landscapeLeft) == 90)
+        #expect(PhotoControlRotation.degrees(for: .landscapeRight) == -90)
+        #expect(PhotoControlRotation.degrees(for: .faceUp) == nil)
+        #expect(PhotoControlRotation.degrees(for: .portraitUpsideDown) == nil)
     }
 
     // MARK: - OCR reading order

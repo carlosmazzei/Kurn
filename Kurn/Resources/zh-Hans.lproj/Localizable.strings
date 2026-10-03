@@ -213,6 +213,15 @@
 "recorder.photo" = "照片";
 "recorder.photo_shutter" = "拍照";
 "recorder.photo_flash" = "闪光灯";
+"recorder.photo_auto" = "自动";
+"recorder.photo_on" = "开";
+"recorder.photo_off" = "关";
+"recorder.photo_timer" = "定时器";
+"recorder.photo_timer_seconds" = "%d 秒";
+"recorder.photo_flip" = "切换摄像头";
+"recorder.photo_last" = "最近拍摄的照片";
+"recorder.photo_exposure" = "曝光";
+"recorder.photo_zoom_format" = "变焦 %@×";
 "transcript.jump_to_highlight" = "跳转到标记";
 "transcript.view_photo" = "查看照片";
 "photo.unavailable" = "照片不可用";
