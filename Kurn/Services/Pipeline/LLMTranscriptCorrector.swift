@@ -30,9 +30,9 @@ struct NoOpTranscriptCorrector: TranscriptCorrecting {
 struct LLMTranscriptCorrector: TranscriptCorrecting {
     /// How the correction provider is built; tests pass a scripted one so the
     /// batch loop runs with no Keychain or network.
-    private let resolveProvider: SummaryService.ProviderResolver
+    private let resolveProvider: ProviderFactory.LLMResolver
 
-    init(resolveProvider: @escaping SummaryService.ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+    init(resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM) {
         self.resolveProvider = resolveProvider
     }
 

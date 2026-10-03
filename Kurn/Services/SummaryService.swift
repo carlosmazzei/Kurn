@@ -14,14 +14,10 @@ import Foundation
 import KurnCore
 
 struct SummaryService {
-    /// Resolves the LLM that backs a run. Production resolves through
-    /// `ProviderFactory` (keychain key, base-URL validation, on-device
-    /// availability); tests inject a scripted provider.
-    typealias ProviderResolver = @Sendable (AIProvider, String) throws -> LLMProvider
+    /// Resolves the LLM that backs a run; see `ProviderFactory.LLMResolver`.
+    private let resolveProvider: ProviderFactory.LLMResolver
 
-    private let resolveProvider: ProviderResolver
-
-    init(resolveProvider: @escaping ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+    init(resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM) {
         self.resolveProvider = resolveProvider
     }
 

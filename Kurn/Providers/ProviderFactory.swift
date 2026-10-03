@@ -11,6 +11,15 @@ import Foundation
 import KurnCore
 
 enum ProviderFactory {
+    /// How a service turns the chosen provider and model into a text-generation
+    /// client. Every LLM-backed service takes one, so a test can hand it a
+    /// scripted provider; production passes `liveLLM`.
+    typealias LLMResolver = @Sendable (AIProvider, String) throws -> LLMProvider
+
+    /// The production resolver: `summaryProvider(for:model:)`, which reads the
+    /// Keychain and builds the vendor's client.
+    static let liveLLM: LLMResolver = { try summaryProvider(for: $0, model: $1) }
+
     /// Build the summary provider chosen in Settings. Throws `.noAPIKey` when a
     /// cloud provider has no stored key, or `.onDeviceModelUnavailable` when the
     /// on-device provider is selected but `SystemLanguageModel` can't run —
