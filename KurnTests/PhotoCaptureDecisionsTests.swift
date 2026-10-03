@@ -32,6 +32,23 @@ struct PhotoCaptureDecisionsTests {
         #expect(Set(PhotoFlashMode.allCases.map(\.systemImage)).count == PhotoFlashMode.allCases.count)
     }
 
+    @Test func everyFlashModeAndTimerOptionHasADistinctReadableName() {
+        let flashNames = PhotoFlashMode.allCases.map(\.displayName)
+        #expect(flashNames.allSatisfy { !$0.isEmpty })
+        #expect(Set(flashNames).count == PhotoFlashMode.allCases.count)
+
+        let timerNames = PhotoTimer.allCases.map(\.displayName)
+        #expect(timerNames.allSatisfy { !$0.isEmpty })
+        #expect(Set(timerNames).count == PhotoTimer.allCases.count)
+        #expect(PhotoTimer.three.displayName.contains("3"))
+        #expect(PhotoTimer.ten.displayName.contains("10"))
+    }
+
+    @Test func aRunningTimerIsDrawnDifferentlyFromAnIdleOne() {
+        #expect(PhotoTimer.off.systemImage != PhotoTimer.three.systemImage)
+        #expect(PhotoTimer.three.systemImage == PhotoTimer.ten.systemImage)
+    }
+
     // MARK: - Zoom
 
     @Test func zoomIsCappedAtSixOrTheDevicesOwnCeiling() {
@@ -77,6 +94,12 @@ struct PhotoCaptureDecisionsTests {
         #expect(PhotoZoom.activeStop(in: stops, zoomFactor: 1)?.deviceFactor == 1)
         #expect(PhotoZoom.activeStop(in: stops, zoomFactor: 3.4)?.deviceFactor == 2)
         #expect(PhotoZoom.activeStop(in: stops, zoomFactor: 6)?.deviceFactor == 6)
+    }
+
+    @Test func aLensStopLabelsItselfFromItsDisplayFactor() {
+        let stop = PhotoLensStop(deviceFactor: 4, displayFactor: 2)
+        #expect(stop.label == PhotoZoom.label(displayFactor: 2))
+        #expect(stop.label == "2")
     }
 
     @Test func lensLabelsDropAnUnneededDecimal() {
