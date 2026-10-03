@@ -23,11 +23,11 @@ struct GeneratedDocumentResult: Sendable {
 }
 
 struct DocumentGenerationService {
-    private let resolveProvider: SummaryService.ProviderResolver
+    private let resolveProvider: ProviderFactory.LLMResolver
 
     /// Production resolves through `ProviderFactory`, exactly like
     /// `SummaryService`; tests inject a scripted provider.
-    init(resolveProvider: @escaping SummaryService.ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+    init(resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM) {
         self.resolveProvider = resolveProvider
     }
 
