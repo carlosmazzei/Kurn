@@ -611,10 +611,14 @@ final class AppSettings {
         correctionEnabled = defaults.bool(forKey: Keys.correctionEnabled, default: false)
         aiTitleCloudEnabled = defaults.bool(forKey: Keys.aiTitleCloudEnabled, default: false)
         // Screenshot automation (fastlane `snapshot`) always forces this off so
-        // the recordings lock screen never blocks an unattended UI test run.
+        // the recordings lock screen never blocks an unattended UI test run;
+        // so does the injected store-open failure, whose recovery actions
+        // re-authenticate (`ModelStoreRecoveryViewModel`) and would otherwise
+        // stop at a prompt no UI test can answer.
         #if DEBUG
-        let screenshotRun = ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots")
-        requireAuthForRecordings = screenshotRun
+        let unattendedUITestRun = ProcessInfo.processInfo.arguments.contains("UI-Testing-Screenshots")
+            || ProcessInfo.processInfo.environment["UI_TESTING_STORE_OPEN_FAILURE_REASON"] != nil
+        requireAuthForRecordings = unattendedUITestRun
             ? false
             : defaults.bool(forKey: Keys.requireAuthForRecordings, default: true)
         #else
