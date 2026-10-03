@@ -17,28 +17,7 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-/// Flash mode cycled by the shutter screen's flash toggle. Named to match
-/// `AVCaptureDevice.FlashMode`, which this maps directly onto — kept as its
-/// own type so the view layer doesn't need to import AVFoundation.
-enum PhotoFlashMode: CaseIterable {
-    case auto, on, off
-
-    var systemImage: String {
-        switch self {
-        case .auto: return "bolt.badge.a.fill"
-        case .on: return "bolt.fill"
-        case .off: return "bolt.slash.fill"
-        }
-    }
-
-    var next: PhotoFlashMode {
-        switch self {
-        case .auto: return .on
-        case .on: return .off
-        case .off: return .auto
-        }
-    }
-
+extension PhotoFlashMode {
     fileprivate var avFlashMode: AVCaptureDevice.FlashMode {
         switch self {
         case .auto: return .auto
@@ -65,12 +44,9 @@ final class PhotoCaptureController: NSObject {
         device?.videoZoomFactor ?? 1
     }
 
-    /// Capped at 6x (or the device's own ceiling if lower): this is a quick
-    /// context capture, not a photography app, and digital zoom past a
-    /// handful of times over softens text (the main reason to zoom here —
-    /// reading a distant whiteboard) rather than helping it.
+    /// See `PhotoZoom.maxFactor(deviceMax:)`.
     var maxZoomFactor: CGFloat {
-        min(device?.activeFormat.videoMaxZoomFactor ?? 1, 6)
+        PhotoZoom.maxFactor(deviceMax: device?.activeFormat.videoMaxZoomFactor ?? 1)
     }
 
     /// Configure and start the session off-main, then resume on the main
@@ -115,7 +91,7 @@ final class PhotoCaptureController: NSObject {
     /// `1...maxZoomFactor`.
     func setZoom(factor: CGFloat) {
         guard let device else { return }
-        let clamped = max(1, min(factor, maxZoomFactor))
+        let clamped = PhotoZoom.clamp(factor, deviceMax: device.activeFormat.videoMaxZoomFactor)
         do {
             try device.lockForConfiguration()
             device.videoZoomFactor = clamped

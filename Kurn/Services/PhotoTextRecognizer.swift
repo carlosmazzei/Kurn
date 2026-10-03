@@ -38,24 +38,28 @@ enum PhotoTextRecognizer {
             return nil
         }
         guard let observations = request.results else { return nil }
-        // Vision does not guarantee reading order in `results` — it groups by
-        // its own internal detection order, which for a photographed screen
-        // or whiteboard (multiple text blocks at different depths/angles)
-        // routinely interleaves unrelated lines. `boundingBox` is normalized
-        // with a bottom-left origin, so sorting by descending Y (top first),
-        // then ascending X (left first) within a row, reconstructs the
-        // top-to-bottom, left-to-right order a reader would actually use.
-        let sorted = observations.sorted { lhs, rhs in
-            let lhsBox = lhs.boundingBox
-            let rhsBox = rhs.boundingBox
-            if abs(lhsBox.midY - rhsBox.midY) > 0.01 {
-                return lhsBox.midY > rhsBox.midY
+        return readingOrder(observations.compactMap { observation in
+            observation.topCandidates(1).first.map { (box: observation.boundingBox, text: $0.string) }
+        })
+    }
+
+    /// Vision does not guarantee reading order in `results` — it groups by
+    /// its own internal detection order, which for a photographed screen
+    /// or whiteboard (multiple text blocks at different depths/angles)
+    /// routinely interleaves unrelated lines. `boundingBox` is normalized
+    /// with a bottom-left origin, so sorting by descending Y (top first),
+    /// then ascending X (left first) within a row, reconstructs the
+    /// top-to-bottom, left-to-right order a reader would actually use.
+    /// Returns `nil` when there is no text at all.
+    static func readingOrder(_ lines: [(box: CGRect, text: String)]) -> String? {
+        let sorted = lines.sorted { lhs, rhs in
+            if abs(lhs.box.midY - rhs.box.midY) > 0.01 {
+                return lhs.box.midY > rhs.box.midY
             }
-            return lhsBox.midX < rhsBox.midX
+            return lhs.box.midX < rhs.box.midX
         }
-        let lines = sorted.compactMap { $0.topCandidates(1).first?.string }
-        guard !lines.isEmpty else { return nil }
-        return lines.joined(separator: "\n")
+        guard !sorted.isEmpty else { return nil }
+        return sorted.map(\.text).joined(separator: "\n")
     }
 
     private static func cgImage(from data: Data) -> CGImage? {

@@ -28,6 +28,14 @@ struct NoOpTranscriptCorrector: TranscriptCorrecting {
 }
 
 struct LLMTranscriptCorrector: TranscriptCorrecting {
+    /// How the correction provider is built; tests pass a scripted one so the
+    /// batch loop runs with no Keychain or network.
+    private let resolveProvider: SummaryService.ProviderResolver
+
+    init(resolveProvider: @escaping SummaryService.ProviderResolver = { try ProviderFactory.summaryProvider(for: $0, model: $1) }) {
+        self.resolveProvider = resolveProvider
+    }
+
     static let maxSegmentsPerBatch = 40
     static let maxBatchChars = 6_000
     /// Below this, a Whisper-reported confidence is treated as worth
@@ -145,7 +153,7 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
 
         let llm: LLMProvider
         do {
-            llm = try ProviderFactory.summaryProvider(for: provider, model: model)
+            llm = try resolveProvider(provider, model)
         } catch {
             AppLog.transcription.atNotice.notice("correct: no usable provider (code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)); skipping correction")
             return TranscriptCorrectionResult(
