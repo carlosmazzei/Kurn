@@ -72,6 +72,14 @@
     {
       "pattern": "Kurn/Infrastructure/CrashReporting/DiagnosticsSubscriber.swift",
       "reason": "Adapter: MetricKit delivers MXDiagnosticPayloads, which a test cannot construct. Consent, the crash/hang split, formatting and saving live in DiagnosticPayloadIntake (tested)."
+    },
+    {
+      "pattern": "Kurn/Infrastructure/ModelDownloadConsent+FluidAudio.swift",
+      "reason": "Adapter: fetches and loads FluidAudio's CoreML bundles, which needs a real download and the Neural Engine. Which set downloads, the network policy, progress scaling (ModelDownloadStatus.scaled) and failure mapping (ModelDownloadConsent.downloadFailure) live in ModelDownloadConsent.swift (tested)."
+    },
+    {
+      "pattern": "Kurn/Infrastructure/TranscriptionScheduler+BGTask.swift",
+      "reason": "Adapter: registers, submits and completes BGProcessingTasks, which BGTaskScheduler only accepts in a real app launch. What to submit (submissionPlan), whether an opened window may run (windowStart) and the resume pass (BackgroundTranscriptionRunner) live in TranscriptionScheduler.swift (tested)."
     }
   ]
 }

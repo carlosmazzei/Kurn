@@ -33,8 +33,13 @@ enum LibraryEraser {
     /// Erases every meeting-derived model and then every meeting-derived file.
     /// Returns the number of files that could not be removed; throws only when
     /// the model erase failed, in which case no file was touched.
+    /// `removeFiles` is the on-disk half; tests replace it so they never sweep
+    /// the recordings directory other suites are using.
     @discardableResult
-    static func eraseAll(context: ModelContext) throws -> Int {
+    static func eraseAll(
+        context: ModelContext,
+        removeFiles: () -> Int = { eraseFiles(appSupportDirectory: ModelStoreBootCoordinator.systemAppSupportDirectory()) }
+    ) throws -> Int {
         let runID = OperationID()
         let startedAt = Date()
         ReliabilityLog.record(ReliabilityEvent(operationID: runID, operation: "library_erase", outcome: .started))
@@ -48,7 +53,7 @@ enum LibraryEraser {
             ))
             throw error
         }
-        let residual = eraseFiles(appSupportDirectory: ModelStoreBootCoordinator.systemAppSupportDirectory())
+        let residual = removeFiles()
         ReliabilityLog.record(ReliabilityEvent(
             operationID: runID, operation: "library_erase", stage: "files",
             outcome: residual == 0 ? .succeeded : .failed,

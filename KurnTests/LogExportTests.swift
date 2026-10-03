@@ -41,4 +41,19 @@ struct LogExportTests {
         let text = LogExport.formatText(entries: [], generatedAt: Date())
         #expect(text.contains("Entries: 0"))
     }
+
+    /// The live path: this process's own unified-log entries, read back and
+    /// written to a shareable file. Which entries come back depends on the
+    /// simulator's log store, so only the export's own shape is asserted.
+    @Test func temporaryFileWritesTheFormattedExport() throws {
+        AppLog.persistence.atError.error("LogExportTests: export probe")
+        AppLog.persistence.atNotice.notice("LogExportTests: export probe")
+
+        let url = try LogExport.temporaryFile(hoursBack: 1)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.hasPrefix("# Kurn log export"))
+        #expect(text.contains("Entries: "))
+    }
 }

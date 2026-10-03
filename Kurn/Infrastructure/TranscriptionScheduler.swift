@@ -14,16 +14,17 @@
 //  communicate with a helper application"), which would either fail the run or
 //  silently degrade diarization quality.
 //
+//  This file holds every decision — what counts as interrupted work, whether
+//  and how to submit, whether an opened window may run, and the resume pass
+//  itself — so it is tested without `BGTaskScheduler`. The calls into
+//  `BGTaskScheduler` live in `TranscriptionScheduler+BGTask.swift`.
+//
 
 import Foundation
 import KurnCore
 import SwiftData
 
 #if canImport(BackgroundTasks)
-import BackgroundTasks
-#if canImport(UIKit)
-import UIKit
-#endif
 
 /// What a background processing window needs from the running app: the open
 /// store and the app's own transcription coordinator and settings — the same
@@ -42,114 +43,59 @@ enum TranscriptionScheduler {
     /// Must match `BGTaskSchedulerPermittedIdentifiers` in Info.plist.
     static let taskIdentifier = "ai.kurn.transcription.processing"
 
-    /// Register the launch handler. Must be called before the app finishes
-    /// launching (`KurnApp.init`) — and, per the H2 boot state machine
-    /// (docs/resilience-megaplan.md), before the store has even been opened:
-    /// `contextProvider` is only consulted when a task actually fires (from
-    /// the main actor, alongside the existing protected-data check), not at
-    /// registration time, so registration itself never needs a container to
-    /// exist yet. A background-only launch while the device is locked
-    /// registers this handler and then never attempts to open the store at
-    /// all until the scene becomes active.
-    static func register(contextProvider: @escaping @MainActor @Sendable () -> BackgroundTranscriptionContext?) {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskIdentifier, using: nil) { task in
-            guard let task = task as? BGProcessingTask else {
-                task.setTaskCompleted(success: false)
-                return
-            }
-            handle(task, contextProvider: contextProvider)
-        }
+    /// What `scheduleIfWorkRemains` submits: one processing request, needing
+    /// the network only when a Whisper upload is part of the backlog.
+    struct SubmissionPlan: Equatable {
+        var pendingCount: Int
+        var requiresNetworkConnectivity: Bool
     }
 
-    /// Submit a processing request when interrupted transcriptions are waiting
-    /// and the configured pipeline can actually run in the background. Called
-    /// on every background transition; resubmitting replaces the earlier
-    /// request, so it's safe to call repeatedly.
+    /// Whether to submit a processing request, and with what requirements.
+    /// `nil` when the pipeline cannot run in the background or nothing is
+    /// waiting. Includes `.inProgress`: at the moment the app backgrounds, an
+    /// active run hasn't been paused yet — it parks as `.pending` when its
+    /// grace window expires a few seconds later.
     @MainActor
-    static func scheduleIfWorkRemains(container: ModelContainer, settings: AppSettings) {
+    static func submissionPlan(context: ModelContext, settings: AppSettings) -> SubmissionPlan? {
         guard !pipelineUsesCoreML(settings.pipelineConfiguration) else {
             AppLog.transcription.atDebug.debug("bgTask: FluidAudio pipeline, not scheduling")
-            return
+            return nil
         }
-        // Include `.inProgress`: at the moment the app backgrounds, an active
-        // run hasn't been paused yet — it parks as `.pending` when its grace
-        // window expires a few seconds later.
-        let pending = interruptedRecordings(context: container.mainContext)
-        guard !pending.isEmpty else { return }
-
-        let request = BGProcessingTaskRequest(identifier: taskIdentifier)
+        let pending = interruptedRecordings(context: context)
+        guard !pending.isEmpty else { return nil }
         // Whisper resumes need the network; a purely on-device backlog doesn't,
         // and requiring connectivity there would only delay scheduling.
-        request.requiresNetworkConnectivity = pending.contains { $0.transcriptionMode == .whisperAPI }
-        request.requiresExternalPower = false
-        do {
-            try BGTaskScheduler.shared.submit(request)
-            AppLog.transcription.atNotice.notice("bgTask: scheduled for \(pending.count, privacy: .public) pending recording(s)")
-        } catch {
-            AppLog.transcription.atError.error("bgTask: submit failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
-        }
+        return SubmissionPlan(
+            pendingCount: pending.count,
+            requiresNetworkConnectivity: pending.contains { $0.transcriptionMode == .whisperAPI }
+        )
     }
 
-    // MARK: - Task handling
-
-    /// `BGTask` isn't `Sendable`, so the completion call crosses into the
-    /// main-actor work task inside an unchecked box; `setTaskCompleted` and
-    /// `expirationHandler` are documented as callable from any thread.
-    private static func handle(
-        _ task: BGProcessingTask,
-        contextProvider: @escaping @MainActor @Sendable () -> BackgroundTranscriptionContext?
-    ) {
-        AppLog.transcription.atNotice.notice("bgTask: window started")
-        task.expirationHandler = {
-            // Cooperative shutdown: each run checkpoints and parks as
-            // `.pending`, then `awaitActiveTranscriptions` returns in `run`.
-            AppLog.transcription.atNotice.notice("bgTask: window expiring, pausing runs")
-            Task { @MainActor in BackgroundTranscriptionRunner.shared.pause() }
-        }
-        let box = UncheckedSendableBox(task)
-        Task { @MainActor in
-            // Processing windows usually open while the device is locked
-            // (idle, charging) — but the store and the recordings are Data
-            // Protected and unreadable then, which would turn every resume
-            // into a spurious failure. Try again in a later window instead.
-            #if canImport(UIKit)
-            guard UIApplication.shared.isProtectedDataAvailable else {
-                AppLog.transcription.atNotice.notice("bgTask: protected data unavailable (locked), deferring")
-                resubmit()
-                box.value.setTaskCompleted(success: false)
-                return
-            }
-            #endif
-            // Boot may still be `.waitingForProtectedData`/`.opening`/
-            // `.recoveryRequired` even with protected data available (e.g. a
-            // launch that hasn't reached `beginBoot()` yet, or a store that
-            // failed to open) — nothing to resume against either way.
-            guard let context = contextProvider() else {
-                AppLog.transcription.atNotice.notice("bgTask: store not ready, deferring")
-                resubmit()
-                box.value.setTaskCompleted(success: false)
-                return
-            }
-            let remaining = await BackgroundTranscriptionRunner.shared.run(context)
-            AppLog.transcription.atNotice.notice("bgTask: window finished, remaining=\(remaining, privacy: .public)")
-            box.value.setTaskCompleted(success: remaining == 0)
-        }
-    }
-
-    /// Re-arm a processing request without touching the (possibly unreadable)
-    /// store. Network connectivity is required pessimistically — the common
-    /// backlog is Whisper chunks, and an on-device backlog just waits for the
-    /// next foreground pass instead.
-    @MainActor
-    private static func resubmit() {
-        let request = BGProcessingTaskRequest(identifier: taskIdentifier)
-        request.requiresNetworkConnectivity = true
-        request.requiresExternalPower = false
-        try? BGTaskScheduler.shared.submit(request)
+    /// What an opened processing window does first.
+    enum WindowStart {
+        /// The device is locked: the store and recordings are Data Protected
+        /// and unreadable, which would turn every resume into a spurious
+        /// failure. Try again in a later window.
+        case deferWhileLocked
+        /// Boot may still be `.waitingForProtectedData`/`.opening`/
+        /// `.recoveryRequired` even with protected data available — nothing
+        /// to resume against either way.
+        case deferUntilStoreReady
+        case run(BackgroundTranscriptionContext)
     }
 
     @MainActor
-    fileprivate static func pendingRecordings(context: ModelContext) -> [Recording] {
+    static func windowStart(
+        protectedDataAvailable: Bool,
+        context: () -> BackgroundTranscriptionContext?
+    ) -> WindowStart {
+        guard protectedDataAvailable else { return .deferWhileLocked }
+        guard let context = context() else { return .deferUntilStoreReady }
+        return .run(context)
+    }
+
+    @MainActor
+    static func pendingRecordings(context: ModelContext) -> [Recording] {
         let pendingRaw = TranscriptionStatus.pending.rawValue
         let readyRaw = RecordingCaptureState.ready.rawValue
         let descriptor = FetchDescriptor<Recording>(
@@ -160,9 +106,6 @@ enum TranscriptionScheduler {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    // `interruptedRecordings` and `pipelineUsesCoreML` are internal rather than
-    // private only so the scheduling decision can be unit tested without
-    // `BGTaskScheduler`; nothing outside this type is meant to call them.
     @MainActor
     static func interruptedRecordings(context: ModelContext) -> [Recording] {
         let pendingRaw = TranscriptionStatus.pending.rawValue
@@ -194,14 +137,20 @@ enum TranscriptionScheduler {
 /// lets the expiration handler reach it without capturing non-`Sendable`
 /// state.
 @MainActor
-private final class BackgroundTranscriptionRunner {
+final class BackgroundTranscriptionRunner {
     static let shared = BackgroundTranscriptionRunner()
     private var transcription: TranscriptionCoordinator?
 
     /// Resume every `.pending` recording, wait for the runs to finish (or be
     /// paused by `pause()`), re-arm the scheduler when a backlog remains, and
-    /// return how many recordings are still pending.
-    func run(_ context: BackgroundTranscriptionContext) async -> Int {
+    /// return how many recordings are still pending. `reschedule` is the
+    /// `BGTaskScheduler` submission; tests observe it instead.
+    func run(
+        _ context: BackgroundTranscriptionContext,
+        reschedule: (BackgroundTranscriptionContext) -> Void = {
+            TranscriptionScheduler.scheduleIfWorkRemains(container: $0.container, settings: $0.settings)
+        }
+    ) async -> Int {
         transcription = context.transcription
         context.transcription.resumePendingTranscriptions(settings: context.settings)
         await context.transcription.awaitActiveTranscriptions()
@@ -209,7 +158,7 @@ private final class BackgroundTranscriptionRunner {
 
         let remaining = TranscriptionScheduler.pendingRecordings(context: context.container.mainContext).count
         if remaining > 0 {
-            TranscriptionScheduler.scheduleIfWorkRemains(container: context.container, settings: context.settings)
+            reschedule(context)
         }
         return remaining
     }
@@ -217,12 +166,5 @@ private final class BackgroundTranscriptionRunner {
     func pause() {
         transcription?.cancelAllTranscriptions()
     }
-}
-
-/// Crosses a non-`Sendable` value between isolation domains when the
-/// underlying API is documented thread-safe.
-private final class UncheckedSendableBox<Value>: @unchecked Sendable {
-    let value: Value
-    init(_ value: Value) { self.value = value }
 }
 #endif
