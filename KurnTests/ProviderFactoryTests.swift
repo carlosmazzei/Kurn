@@ -219,10 +219,12 @@ struct ProviderFactoryTests {
             #expect(speech.provider == .openAI)
         }
         try withKey(.elevenLabs, value: "test-key") {
-            #expect(try ProviderFactory.speechProvider(for: .elevenLabs, model: "", voice: "") is ElevenLabsSpeechProvider)
+            let speech = try ProviderFactory.speechProvider(for: .elevenLabs, model: "", voice: "")
+            #expect(speech is ElevenLabsSpeechProvider)
         }
         try withKey(.google, value: "test-key") {
-            #expect(try ProviderFactory.speechProvider(for: .google, model: "custom", voice: "Kore") is GeminiSpeechProvider)
+            let speech = try ProviderFactory.speechProvider(for: .google, model: "custom", voice: "Kore")
+            #expect(speech is GeminiSpeechProvider)
         }
     }
 
