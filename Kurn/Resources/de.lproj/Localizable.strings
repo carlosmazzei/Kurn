@@ -213,6 +213,15 @@
 "recorder.photo" = "Foto";
 "recorder.photo_shutter" = "Foto aufnehmen";
 "recorder.photo_flash" = "Blitz";
+"recorder.photo_auto" = "Automatisch";
+"recorder.photo_on" = "An";
+"recorder.photo_off" = "Aus";
+"recorder.photo_timer" = "Selbstauslöser";
+"recorder.photo_timer_seconds" = "%d Sek.";
+"recorder.photo_flip" = "Kamera wechseln";
+"recorder.photo_last" = "Zuletzt aufgenommenes Foto";
+"recorder.photo_exposure" = "Belichtung";
+"recorder.photo_zoom_format" = "Zoom %@×";
 "transcript.jump_to_highlight" = "Zum Highlight springen";
 "transcript.view_photo" = "Foto ansehen";
 "photo.unavailable" = "Foto nicht verfügbar";
