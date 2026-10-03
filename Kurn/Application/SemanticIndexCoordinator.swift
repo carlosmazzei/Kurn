@@ -18,7 +18,7 @@ import SwiftData
 @Observable
 final class SemanticIndexCoordinator {
     private let modelContext: ModelContext
-    private let indexService = SemanticIndexService()
+    private let indexService: SemanticIndexService
 
     /// App-wide settings, injected at construction; the index respects the
     /// `semanticSearchEnabled` toggle without threading settings through
@@ -31,9 +31,16 @@ final class SemanticIndexCoordinator {
     /// True while a backfill sweep is running, so it never overlaps itself.
     private(set) var isBackfilling = false
 
-    init(modelContext: ModelContext, appSettings: AppSettings? = nil) {
+    /// `indexService` wraps the on-device embedder; tests pass one over a
+    /// deterministic embedder so no `NLContextualEmbedding` asset is needed.
+    init(
+        modelContext: ModelContext,
+        appSettings: AppSettings? = nil,
+        indexService: SemanticIndexService = SemanticIndexService()
+    ) {
         self.modelContext = modelContext
         self.appSettings = appSettings
+        self.indexService = indexService
     }
 
     // MARK: - Single meeting

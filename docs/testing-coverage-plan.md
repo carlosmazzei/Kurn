@@ -174,6 +174,15 @@ Testes `@MainActor` de máquina de estados sobre `TestModelContainer.make()`:
   `DocumentGenerationViewModel`, `ModelDownloadController`,
   `RecordingCompactionViewModel`.
 
+**Concluída (#246, #247).** Application foi de 63,1% para 88,8% e ViewModels
+de 67,5% para 86,7%; o total em escopo ficou em 83,7%. Os seams novos são
+todos parâmetros de construtor com o default de produção:
+`isProviderUsable` em `WikiCoordinator`/`AITitleCoordinator`, `service` em
+`DocumentGenerationViewModel`, `indexService` em `SemanticIndexCoordinator` e
+`chatService` em `MeetingChatViewModel`. Os pisos foram para 87,9 / 85,8 /
+82,8. Ficam abertos `RecorderViewModel` (73,7%) e o núcleo de
+`TranscriptionCoordinator` (75,6%), já acima do piso da camada.
+
 ### Fase 5: Infrastructure, Providers e Models ≥ 85%, e fechar em 80%
 
 - `TranscriptionScheduler`, `RecordingRecovery`, `ModelDownloadConsent` e o
