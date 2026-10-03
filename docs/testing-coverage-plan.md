@@ -202,6 +202,14 @@ vocabulário de progresso achou um bug real: a faixa de diarização terminava
 em 0,96, acima do 0,95 de `finalizing`, e a barra voltava. Pisos: 86,3 /
 88,4 / 91,8, total 84,2. Fica aberto `Services` (79,1%).
 
+**Services acima de 80% (#249).** Services foi de 79,1% para 81,5% e o total em
+escopo para 86,2%: o loop de `LLMTranscriptCorrector` passou a ser testado por
+um resolver injetado, o flash e o zoom da câmera foram para `PhotoFlashMode`
+(`PhotoCaptureController` virou adapter excluído), a ordem de leitura do OCR
+virou `PhotoTextRecognizer.readingOrder`, e o wrapper C do sherpa-onnx foi
+excluído como adapter. Pisos: Services 80,6, total 85,3. Toda camada em escopo
+está agora acima da meta de 80%.
+
 ## Riscos
 
 - Mexer em `TranscriptionService` e `AudioRecorderService` exige rodar o lane
