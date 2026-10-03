@@ -158,16 +158,9 @@ actor SherpaOnnxDiarizer: Diarizing {
     /// engine in this app uses, so downstream code never has to special-case
     /// a third engine's label format.
     private static func turns(from segments: [SherpaOnnxDiarizationSegmentWrapper]) -> [SpeakerTurn] {
-        let ordered = segments.sorted { $0.start < $1.start }
-        var labelByID: [Int: String] = [:]
-        return ordered.map { segment in
-            let label = labelByID[segment.speaker] ?? {
-                let next = "Speaker \(labelByID.count + 1)"
-                labelByID[segment.speaker] = next
-                return next
-            }()
-            return SpeakerTurn(speakerLabel: label, start: TimeInterval(segment.start), end: TimeInterval(segment.end))
-        }
+        DiarizerSegmentLabeling.turns(from: segments.map {
+            DiarizerSegment(speakerID: String($0.speaker), start: TimeInterval($0.start), end: TimeInterval($0.end))
+        })
     }
 }
 

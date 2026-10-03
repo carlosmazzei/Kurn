@@ -80,6 +80,14 @@
     {
       "pattern": "Kurn/Infrastructure/TranscriptionScheduler+BGTask.swift",
       "reason": "Adapter: registers, submits and completes BGProcessingTasks, which BGTaskScheduler only accepts in a real app launch. What to submit (submissionPlan), whether an opened window may run (windowStart) and the resume pass (BackgroundTranscriptionRunner) live in TranscriptionScheduler.swift (tested)."
+    },
+    {
+      "pattern": "Kurn/Services/PhotoCaptureController.swift",
+      "reason": "Adapter: drives AVCaptureSession/AVCapturePhotoOutput, and the simulator has no camera. The flash toggle's cycle and icon and the zoom clamp live in PhotoFlashMode.swift (PhotoFlashMode, PhotoZoom; tested)."
+    },
+    {
+      "pattern": "Kurn/Services/SherpaOnnx/SherpaOnnxCWrapper.swift",
+      "reason": "Adapter: thin Swift wrapper over sherpa-onnx's C diarization API, which needs the downloaded ONNX model pair. Labeling lives in KurnCore's DiarizerSegmentLabeling, the fallback and time budget in SherpaOnnxDiarizer (tested)."
     }
   ]
 }
