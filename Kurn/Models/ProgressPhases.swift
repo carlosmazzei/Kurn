@@ -90,7 +90,7 @@ enum TranscriptionPhase: Sendable, Equatable {
         case .detectingLanguage: return 0.22
         case .detectingSpeech: return 0.28
         case .transcribing(let progress, _): return 0.30 + 0.55 * min(1, max(0, progress ?? 0))
-        case .diarizing(let progress): return 0.86 + 0.10 * min(1, max(0, progress ?? 0))
+        case .diarizing(let progress): return 0.86 + 0.09 * min(1, max(0, progress ?? 0))
         case .finalizing: return 0.95
         case .correcting(let progress): return 0.95 + 0.05 * min(1, max(0, progress ?? 0))
         }

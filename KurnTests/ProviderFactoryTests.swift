@@ -201,4 +201,38 @@ struct ProviderFactoryTests {
             Issue.record("expected AppError, got \(error)")
         }
     }
+
+    // MARK: - Speech
+
+    @Test func speechProviderThrowsNoAPIKeyWhenKeychainIsEmpty() {
+        withClearedKey(.openAI) {
+            #expect(throws: AppError.self) {
+                _ = try ProviderFactory.speechProvider(for: .openAI, model: "", voice: "")
+            }
+        }
+    }
+
+    @Test func speechProviderBuildsEachVendorsSpeechClient() throws {
+        try withKey(.openAI, value: "test-key") {
+            let speech = try ProviderFactory.speechProvider(for: .openAI, model: "", voice: "")
+            #expect(speech is OpenAISpeechProvider)
+            #expect(speech.provider == .openAI)
+        }
+        try withKey(.elevenLabs, value: "test-key") {
+            let speech = try ProviderFactory.speechProvider(for: .elevenLabs, model: "", voice: "")
+            #expect(speech is ElevenLabsSpeechProvider)
+        }
+        try withKey(.google, value: "test-key") {
+            let speech = try ProviderFactory.speechProvider(for: .google, model: "custom", voice: "Kore")
+            #expect(speech is GeminiSpeechProvider)
+        }
+    }
+
+    @Test func speechProviderRefusesAVendorWithoutASpeechRoute() {
+        withKey(.anthropic, value: "test-key") {
+            #expect(throws: AppError.self) {
+                _ = try ProviderFactory.speechProvider(for: .anthropic, model: "", voice: "")
+            }
+        }
+    }
 }

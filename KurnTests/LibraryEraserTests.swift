@@ -56,6 +56,23 @@ struct LibraryEraserTests {
         #expect(try context.fetchCount(FetchDescriptor<Kurn.Tag>()) == 1)
     }
 
+    @Test func eraseAllErasesModelsBeforeFilesAndReportsResidue() throws {
+        let context = ModelContext(TestModelContainer.make())
+        seedLibrary(in: context)
+        try context.save()
+        var meetingsLeftWhenFilesRan: Int?
+
+        let residual = try LibraryEraser.eraseAll(context: context) {
+            meetingsLeftWhenFilesRan = try? context.fetchCount(FetchDescriptor<Meeting>())
+            return 2
+        }
+
+        #expect(residual == 2)
+        #expect(meetingsLeftWhenFilesRan == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Kurn.Tag>()) == 1)
+        #expect(try LibraryEraser.eraseAll(context: context) { 0 } == 0)
+    }
+
     // MARK: - Recovery copies
 
     @Test func eraseRecoveryCopiesRemovesEveryRecoveryLocation() throws {

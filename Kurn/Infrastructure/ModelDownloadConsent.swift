@@ -11,10 +11,6 @@
 import Foundation
 import KurnCore
 
-#if canImport(FluidAudio)
-import FluidAudio
-#endif
-
 enum ModelSet: Sendable, Equatable {
     case liveTranscriptionASR
     case onDeviceASR
@@ -55,6 +51,24 @@ enum ModelDownloadPhase: Sendable, Equatable {
 struct ModelDownloadStatus: Sendable, Equatable {
     var fractionCompleted: Double
     var phase: ModelDownloadPhase
+
+    /// One step of a download that owns only `lowerBound...upperBound` of the
+    /// overall bar (live transcription warms two models, each half of it).
+    /// The reported fraction is clamped first, so a library overshooting 1
+    /// or reporting a negative value can never move the bar backwards or
+    /// past its slice.
+    static func scaled(
+        _ fraction: Double,
+        from lowerBound: Double,
+        to upperBound: Double,
+        phase: ModelDownloadPhase
+    ) -> ModelDownloadStatus {
+        let clamped = min(1, max(0, fraction))
+        return ModelDownloadStatus(
+            fractionCompleted: lowerBound + clamped * (upperBound - lowerBound),
+            phase: phase
+        )
+    }
 }
 
 struct ModelDownloadConsent {
@@ -106,25 +120,7 @@ struct ModelDownloadConsent {
             return
         }
         #if canImport(FluidAudio)
-        do {
-            // H8 PR 17: reserved for the whole download+load, released in
-            // the same flow whichever way it exits — see `ResourceScheduler`.
-            try await withResourceReservation(.modelLoading) {
-                try await loadFluidAudioModels(set, onProgress: onProgress)
-            }
-        } catch let appError as AppError {
-            throw appError
-        } catch {
-            if let restriction = LargeTransferPolicy.restrictionError(
-                for: error,
-                policy: policy,
-                snapshot: network.snapshot
-            ) {
-                throw restriction
-            }
-            try ResourceGuard.rethrowIfResourceFailure(error)
-            throw AppError.modelDownloadFailed(error.localizedDescription)
-        }
+        try await downloadFluidAudioModels(set, policy: policy, network: network, onProgress: onProgress)
         #else
         throw AppError.modelDownloadRequired(
             NSLocalizedString("settings.fluid_audio.package_missing", comment: "FluidAudio package missing")
@@ -132,77 +128,21 @@ struct ModelDownloadConsent {
         #endif
     }
 
-    #if canImport(FluidAudio)
-    private static func loadFluidAudioModels(
-        _ set: ModelSet,
-        onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
-    ) async throws {
-        onProgress(ModelDownloadStatus(fractionCompleted: 0, phase: .preparing))
-        switch set {
-        case .liveTranscriptionASR:
-            // The live preview picks a streaming model per meeting language at
-            // record time (English-only EOU vs. multilingual), so warm both
-            // now — the recording path must never block on a missing model.
-            let englishEngine = StreamingEouAsrManager(chunkSize: .ms160)
-            try await englishEngine.loadModels(progressHandler: scaledProgress(
-                from: 0,
-                to: 0.5,
-                onProgress: onProgress
-            ))
-            let multilingualEngine = FluidAudioMultilingualStreamingManager()
-            try await multilingualEngine.loadModels(progressHandler: scaledProgress(
-                from: 0.5,
-                to: 1,
-                onProgress: onProgress
-            ))
-        case .onDeviceASR:
-            // Multilingual on-device batch ASR (Parakeet TDT v3) used for the
-            // post-recording transcript when the meeting language is "Auto".
-            _ = try await AsrModels.downloadAndLoad(
-                version: .v3,
-                progressHandler: progressHandler(onProgress)
-            )
-        case .diarization:
-            _ = try await OfflineDiarizerModels.load(
-                progressHandler: progressHandler(onProgress)
-            )
-        case .vad:
-            // Silero VAD CoreML model; `VadManager`'s initializer downloads
-            // and loads it on first use.
-            _ = try await VadManager(progressHandler: progressHandler(onProgress))
-        case .whisperCppASR, .sherpaOnnxDiarization:
-            // Unreachable — `download` returned for both before reaching here.
-            break
+    /// What a failed FluidAudio download surfaces as: an `AppError` unchanged;
+    /// a URL failure the transfer policy explains as `.networkPolicyRestricted`
+    /// rather than "offline"; a resource failure (disk full) as itself; and
+    /// anything else as `.modelDownloadFailed`. Pure so it is tested without a
+    /// real download.
+    static func downloadFailure(
+        for error: Error,
+        policy: LargeTransferPolicy,
+        snapshot: NetworkPathSnapshot
+    ) -> AppError {
+        if let appError = error as? AppError { return appError }
+        if let restriction = LargeTransferPolicy.restrictionError(for: error, policy: policy, snapshot: snapshot) {
+            return restriction
         }
-        onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
-        try await ResourceGuard.requireModelDownloadHeadroom()
+        if let resource = ResourceGuard.appErrorIfResourceFailure(error) { return resource }
+        return .modelDownloadFailed(error.localizedDescription)
     }
-
-    private static func progressHandler(
-        _ onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
-    ) -> ProgressHandler {
-        scaledProgress(from: 0, to: 1, onProgress: onProgress)
-    }
-
-    private static func scaledProgress(
-        from lowerBound: Double,
-        to upperBound: Double,
-        onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void
-    ) -> ProgressHandler {
-        { progress in
-            let fraction = min(1, max(0, progress.fractionCompleted))
-            let scaled = lowerBound + fraction * (upperBound - lowerBound)
-            let phase: ModelDownloadPhase
-            switch progress.phase {
-            case .listing:
-                phase = .preparing
-            case .downloading:
-                phase = .downloading
-            case .compiling:
-                phase = .compiling
-            }
-            onProgress(ModelDownloadStatus(fractionCompleted: scaled, phase: phase))
-        }
-    }
-    #endif
 }

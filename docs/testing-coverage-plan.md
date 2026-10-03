@@ -191,6 +191,17 @@ todos parâmetros de construtor com o default de produção:
 - Quando o total em escopo passar de 80%, o piso registrado fica ≥ 80%. A
   partir daí a meta vira o mínimo, e a catraca só sobe.
 
+**Infrastructure, Providers e Models concluídos (#248).** Infrastructure foi de
+81,1% para 87,2%, Providers de 87,7% para 89,3% e Models de 88,0% para 92,7%;
+o total em escopo ficou em 85,1%. `ModelDownloadConsent` e
+`TranscriptionScheduler` foram divididos: as decisões (escala de progresso,
+mapeamento de falha, plano de submissão, início de janela, o runner)
+ficaram no arquivo testado, e as chamadas a FluidAudio e `BGTaskScheduler`
+foram para `+FluidAudio`/`+BGTask`, excluídos como adapters. O teste novo do
+vocabulário de progresso achou um bug real: a faixa de diarização terminava
+em 0,96, acima do 0,95 de `finalizing`, e a barra voltava. Pisos: 86,3 /
+88,4 / 91,8, total 84,2. Fica aberto `Services` (79,1%).
+
 ## Riscos
 
 - Mexer em `TranscriptionService` e `AudioRecorderService` exige rodar o lane
