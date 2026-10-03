@@ -960,3 +960,8 @@
 "settings.read_aloud.preview" = "Vorschau";
 "settings.read_aloud.preview_footer" = "Vorlesen ist für Zusammenfassungen, Artikel im Meeting-Wiki und erstellte Dokumente verfügbar.";
 "settings.read_aloud.sample" = "So klingen deine Zusammenfassungen, Wiki-Artikel und Dokumente, wenn sie vorgelesen werden.";
+
+/* Security-sensitive change re-authentication and automatic cloud titles */
+"auth.sensitive_change_reason" = "Bestätigen Sie Ihre Identität, um diese Sicherheitseinstellung zu ändern.";
+"settings.ai_title_cloud" = "Automatische Titel mit Cloud-Anbietern";
+"settings.ai_title_cloud_footer" = "Wenn aktiviert, wird jede fertige Transkription an Ihren Cloud-Zusammenfassungsanbieter gesendet, um einen Titel vorzuschlagen. Auf dem Gerät erzeugte Titel und Titel, die Sie selbst neu generieren, sind nicht betroffen.";

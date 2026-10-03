@@ -10,11 +10,10 @@ import SwiftUI
 
 /// The lock screen, rendered by `SecurityCoverView` in the cover window that
 /// sits above the whole app. Offers a retry button when the user cancels the
-/// prompt or biometrics fail. When the device has no passcode/biometrics
-/// configured, a Settings button lets the user reach the in-app settings to
-/// disable the auth requirement instead of leaving them stranded — the cover
-/// presents that sheet itself, since nothing below the cover window is
-/// reachable. Triggering authentication is the cover's job, not this view's.
+/// prompt or biometrics fail. Only when the device has no passcode configured
+/// does a Settings button let the user turn the auth requirement off instead
+/// of leaving them stranded — the cover presents that (deliberately minimal)
+/// sheet itself, since nothing below the cover window is reachable. Triggering authentication is the cover's job, not this view's.
 struct LockedRecordingsView: View {
     let gate: RecordingAccessGate
     @Binding var showingSettings: Bool
@@ -52,14 +51,18 @@ struct LockedRecordingsView: View {
             .buttonStyle(.glassProminent)
             .tint(Theme.accent)
             .padding(.top, 4)
-            Button {
-                showingSettings = true
-            } label: {
-                Text(NSLocalizedString("recordings.open_settings", comment: "Open Settings"))
-                    .font(Theme.subheadlineEmphasized)
-                    .foregroundStyle(Theme.accent)
+            // Only when the device cannot authenticate at all; see
+            // `RecordingAccessGate.offersSettingsEscapeHatch`.
+            if gate.offersSettingsEscapeHatch {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Text(NSLocalizedString("recordings.open_settings", comment: "Open Settings"))
+                        .font(Theme.subheadlineEmphasized)
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 36)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

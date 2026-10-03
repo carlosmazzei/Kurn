@@ -960,3 +960,8 @@
 "settings.read_aloud.preview" = "Anteprima";
 "settings.read_aloud.preview_footer" = "La lettura ad alta voce è disponibile per riepiloghi, articoli della wiki delle riunioni e documenti generati.";
 "settings.read_aloud.sample" = "Ecco come suoneranno i tuoi riepiloghi, articoli della wiki e documenti quando letti ad alta voce.";
+
+/* Security-sensitive change re-authentication and automatic cloud titles */
+"auth.sensitive_change_reason" = "Conferma la tua identità per modificare questa impostazione di sicurezza.";
+"settings.ai_title_cloud" = "Titoli Automatici con Provider Cloud";
+"settings.ai_title_cloud_footer" = "Se attivo, ogni trascrizione completata viene inviata al tuo provider cloud dei riepiloghi per suggerire un titolo. I titoli generati sul dispositivo e quelli che rigeneri tu non sono interessati.";

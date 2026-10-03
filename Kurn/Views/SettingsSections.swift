@@ -10,10 +10,22 @@
 //  `Views/Settings/`.
 //
 
+import KurnCore
 import SwiftData
 import SwiftUI
 
 extension SettingsView {
+
+    /// Erasing the library is irreversible, so it re-authenticates first —
+    /// being inside an unlocked session is not proof of who is holding the
+    /// device.
+    func authorizeAndDeleteAllData() async {
+        await SensitiveActionAuthorizer().perform(
+            requireAuth: settings.requireAuthForRecordings,
+            onDenied: { dataError = $0 },
+            deleteAllData
+        )
+    }
 
     /// Stops whatever could still write meeting content (a running
     /// transcription, read-aloud) and hands the erase to `LibraryEraser`,

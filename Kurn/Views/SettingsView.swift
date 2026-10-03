@@ -177,7 +177,7 @@ struct SettingsView: View {
             message: NSLocalizedString("settings.delete_all.message", comment: ""),
             primaryTitle: NSLocalizedString("settings.delete_all", comment: "Delete All Data"),
             primaryRole: .destructive,
-            primaryAction: deleteAllData,
+            primaryAction: { Task { await authorizeAndDeleteAllData() } },
             secondaryTitle: NSLocalizedString("common.cancel", comment: "Cancel")
         )
         .errorAlert($dataError)

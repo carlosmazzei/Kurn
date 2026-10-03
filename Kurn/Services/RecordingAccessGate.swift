@@ -37,6 +37,15 @@ final class RecordingAccessGate {
     /// changes should not lock (and cancel this task) while this is true.
     var isAuthenticating: Bool { inFlight != nil }
 
+    /// Whether the lock screen may offer its way into Settings. Only when the
+    /// device cannot authenticate anyone at all (no passcode): otherwise that
+    /// route would let whoever holds the device switch the lock off without
+    /// ever proving who they are.
+    var offersSettingsEscapeHatch: Bool {
+        if case .authenticationNotAvailable = lastError { return true }
+        return false
+    }
+
     @ObservationIgnored private let authenticator: LocalAuthenticator
     @ObservationIgnored private var inFlight: Task<Void, Never>?
 

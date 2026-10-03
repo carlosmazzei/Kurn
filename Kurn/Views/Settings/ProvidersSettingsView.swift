@@ -69,6 +69,7 @@ struct ProvidersSettingsView: View {
                     showingAddProvider = false
                 }
             }
+            .environment(settings)
         }
     }
 }

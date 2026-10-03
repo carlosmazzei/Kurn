@@ -10,6 +10,7 @@
 //  (`SettingsRowLabel`) instead of a footer paragraph per control.
 //
 
+import KurnCore
 import SwiftUI
 
 struct RecordingSettingsView: View {
@@ -18,6 +19,10 @@ struct RecordingSettingsView: View {
     /// Pushed from a live-preview model download the large-transfer policy
     /// refused; the switches live on the Transcription screen.
     @State private var showingNetworkSettings = false
+    /// Set when turning the recordings lock off was refused by the
+    /// re-authentication prompt.
+    @State private var authError: AppError?
+    private let authorizer = SensitiveActionAuthorizer()
 
     var body: some View {
         Form {
@@ -28,6 +33,7 @@ struct RecordingSettingsView: View {
         }
         .navigationTitle(NSLocalizedString("settings.recording", comment: "Recording"))
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
+        .errorAlert($authError)
         .navigationDestination(isPresented: $showingNetworkSettings) {
             TranscriptionSettingsView()
         }
@@ -140,7 +146,7 @@ struct RecordingSettingsView: View {
             Toggle(
                 isOn: Binding(
                     get: { settings.requireAuthForRecordings },
-                    set: { settings.requireAuthForRecordings = $0 }
+                    set: { setRequireAuth($0) }
                 )
             ) {
                 SettingsRowLabel(
@@ -163,6 +169,20 @@ struct RecordingSettingsView: View {
             Text(NSLocalizedString("settings.recording_section_privacy", comment: "Privacy"))
         } footer: {
             Text(NSLocalizedString("settings.recording_section_privacy_footer", comment: "Explains audio is always encrypted regardless of these toggles"))
+        }
+    }
+
+    /// Switching the lock off re-authenticates first (`SensitiveActionAuthorizer`):
+    /// an unlocked session alone must not be enough to remove the protection.
+    /// The toggle keeps reading the stored value, so it snaps back on refusal.
+    private func setRequireAuth(_ newValue: Bool) {
+        let current = settings.requireAuthForRecordings
+        Task { @MainActor in
+            switch await authorizer.authorizeRequireAuthChange(to: newValue, currentlyRequired: current) {
+            case .authorized: settings.requireAuthForRecordings = newValue
+            case .cancelled: break
+            case .denied(let error): authError = error
+            }
         }
     }
 }

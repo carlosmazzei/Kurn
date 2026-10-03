@@ -22,7 +22,6 @@
 //
 
 import KurnCore
-import SwiftData
 import SwiftUI
 import UIKit
 
@@ -53,8 +52,6 @@ final class SecurityCoverWindow {
         let state: SecurityCoverState
         let gate: RecordingAccessGate
         let settings: AppSettings
-        let downloads: ModelDownloadController
-        let modelContainer: ModelContainer
     }
 
     private var window: UIWindow?
@@ -82,17 +79,9 @@ final class SecurityCoverWindow {
     func update(
         state: SecurityCoverState,
         gate: RecordingAccessGate,
-        settings: AppSettings,
-        downloads: ModelDownloadController,
-        modelContainer: ModelContainer
+        settings: AppSettings
     ) {
-        request = Request(
-            state: state,
-            gate: gate,
-            settings: settings,
-            downloads: downloads,
-            modelContainer: modelContainer
-        )
+        request = Request(state: state, gate: gate, settings: settings)
         apply()
     }
 
@@ -107,9 +96,7 @@ final class SecurityCoverWindow {
         let content = SecurityCoverView(
             state: request.state,
             gate: request.gate,
-            settings: request.settings,
-            downloads: request.downloads,
-            modelContainer: request.modelContainer
+            settings: request.settings
         )
 
         if let host {
@@ -164,8 +151,6 @@ private struct WindowSceneReader: UIViewRepresentable {
 private struct SecurityCoverModifier: ViewModifier {
     let gate: RecordingAccessGate
     let settings: AppSettings
-    let downloads: ModelDownloadController
-    let modelContainer: ModelContainer
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var cover = SecurityCoverWindow()
@@ -188,9 +173,7 @@ private struct SecurityCoverModifier: ViewModifier {
                 cover.update(
                     state: newState,
                     gate: gate,
-                    settings: settings,
-                    downloads: downloads,
-                    modelContainer: modelContainer
+                    settings: settings
                 )
             }
     }
@@ -201,17 +184,8 @@ extension View {
     /// as the scene phase and the recordings gate require.
     func securityCover(
         gate: RecordingAccessGate,
-        settings: AppSettings,
-        downloads: ModelDownloadController,
-        modelContainer: ModelContainer
+        settings: AppSettings
     ) -> some View {
-        modifier(
-            SecurityCoverModifier(
-                gate: gate,
-                settings: settings,
-                downloads: downloads,
-                modelContainer: modelContainer
-            )
-        )
+        modifier(SecurityCoverModifier(gate: gate, settings: settings))
     }
 }

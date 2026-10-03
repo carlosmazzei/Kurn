@@ -10,8 +10,14 @@
 //  never a `ModelContext`, since the whole point is working when the store
 //  itself can't be opened.
 //
+//  Restore, salvage and fresh start re-authenticate first when the recordings
+//  lock is on. This shell runs before the store is open, so the app's security
+//  cover is not in place yet — and salvage in particular exports every meeting
+//  it can still read. Diagnostics carry no content and stay unauthenticated.
+//
 
 import Foundation
+import KurnCore
 import SwiftUI
 
 @MainActor
@@ -25,13 +31,23 @@ final class ModelStoreRecoveryViewModel {
 
     private let appSupportDirectory: URL
     private let backupManager: ModelStoreBackupManager
+    private let authorizer: SensitiveActionAuthorizer
+    /// `AppSettings.requireAuthForRecordings`, read at action time.
+    private let requiresAuthentication: @MainActor () -> Bool
     /// Called after a restore or fresh start moves the live store aside (or
     /// replaces it) — the caller retries opening.
     private let onStoreReplaced: () -> Void
 
-    init(appSupportDirectory: URL, onStoreReplaced: @escaping () -> Void) {
+    init(
+        appSupportDirectory: URL,
+        authorizer: SensitiveActionAuthorizer = SensitiveActionAuthorizer(),
+        requiresAuthentication: @escaping @MainActor () -> Bool,
+        onStoreReplaced: @escaping () -> Void
+    ) {
         self.appSupportDirectory = appSupportDirectory
         self.backupManager = ModelStoreBackupManager(appSupportDirectory: appSupportDirectory)
+        self.authorizer = authorizer
+        self.requiresAuthentication = requiresAuthentication
         self.onStoreReplaced = onStoreReplaced
         refreshGenerations()
     }
@@ -43,7 +59,8 @@ final class ModelStoreRecoveryViewModel {
     /// Quarantines the current live store (never deletes it) and copies
     /// `generation`'s files back into place, then asks the caller to retry
     /// opening.
-    func restore(_ generation: ModelStoreBackupGeneration) {
+    func restore(_ generation: ModelStoreBackupGeneration) async {
+        guard await authorizeContentAccess() else { return }
         performAction {
             try backupManager.restore(generation: generation)
             onStoreReplaced()
@@ -54,7 +71,8 @@ final class ModelStoreRecoveryViewModel {
     /// live location empty, so the next open attempt creates a brand-new
     /// store there. Never automatic — only called from an explicit,
     /// double-confirmed user action in the view.
-    func confirmedFreshStart() {
+    func confirmedFreshStart() async {
+        guard await authorizeContentAccess() else { return }
         performAction {
             try backupManager.quarantineLiveStore()
             onStoreReplaced()
@@ -64,7 +82,8 @@ final class ModelStoreRecoveryViewModel {
     /// Best-effort recovery of readable data without touching the live
     /// store — see `ModelStoreSalvage` for why this can succeed even when
     /// the live open just failed, and why it sometimes won't.
-    func attemptSalvage() {
+    func attemptSalvage() async {
+        guard await authorizeContentAccess() else { return }
         performAction {
             let (result, markdown) = ModelStoreSalvage.attempt(appSupportDirectory: appSupportDirectory)
             salvageResult = result
@@ -104,6 +123,18 @@ final class ModelStoreRecoveryViewModel {
             }
         }
         return out
+    }
+
+    private func authorizeContentAccess() async -> Bool {
+        switch await authorizer.authorize(requireAuth: requiresAuthentication()) {
+        case .authorized:
+            return true
+        case .cancelled:
+            return false
+        case .denied(let error):
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     private func performAction(_ action: () throws -> Void) {

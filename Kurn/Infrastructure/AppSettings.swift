@@ -64,6 +64,7 @@ final class AppSettings {
         static let semanticSearchEnabled = "settings.semanticSearchEnabled"
         static let wikiEnabled = "settings.wikiEnabled"
         static let correctionEnabled = "settings.correctionEnabled"
+        static let aiTitleCloudEnabled = "settings.aiTitleCloudEnabled"
         static let templatesSyncEnabled = "settings.templatesSyncEnabled"
         static let readAloud = "settings.readAloud"
     }
@@ -182,6 +183,16 @@ final class AppSettings {
     /// explicit opt-in. See `LLMTranscriptCorrector`.
     var correctionEnabled: Bool {
         didSet { defaults.set(correctionEnabled, forKey: Keys.correctionEnabled) }
+    }
+
+    /// Whether a meeting's title is generated automatically after
+    /// transcription when the summary provider is a cloud vendor. Off by
+    /// default: it sends the whole transcript off the device on every
+    /// transcription, which choosing a provider for on-demand summaries does
+    /// not imply. The on-device provider is never gated, and an explicit
+    /// "regenerate title" always runs. See `AITitleCoordinator`.
+    var aiTitleCloudEnabled: Bool {
+        didSet { defaults.set(aiTitleCloudEnabled, forKey: Keys.aiTitleCloudEnabled) }
     }
 
     /// Whether custom summary templates sync via iCloud key-value storage, so
@@ -598,6 +609,7 @@ final class AppSettings {
         // Off by default: transcription correction makes paid cloud LLM calls,
         // so it is an explicit opt-in, same as wiki generation.
         correctionEnabled = defaults.bool(forKey: Keys.correctionEnabled, default: false)
+        aiTitleCloudEnabled = defaults.bool(forKey: Keys.aiTitleCloudEnabled, default: false)
         // Screenshot automation (fastlane `snapshot`) always forces this off so
         // the recordings lock screen never blocks an unattended UI test run.
         #if DEBUG
