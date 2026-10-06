@@ -35,31 +35,33 @@ final class AccessibilityAuditUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
     }
 
-    func testMeetingDetailRecordings() throws {
-        openFirstMeeting()
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
-    }
-
-    func testMeetingDetailTranscript() throws {
-        openFirstMeeting()
-        app.buttons["tab.transcript"].tap()
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
-    }
-
-    func testMeetingDetailSummary() throws {
-        openFirstMeeting()
-        app.buttons["tab.summary"].tap()
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
-    }
-
-    /// Seeded data has no semantic index, so this only reaches the chat's
+    /// The four Meeting Detail tabs share one launch: every test here
+    /// relaunches the app, and that launch (not the audit) was most of each
+    /// test's ~20-70 s on CI, so auditing the tabs as four tests paid for the
+    /// same launch and navigation four times. Each tab is its own activity,
+    /// and `continueAfterFailure` is on for this test only, so a failing tab
+    /// is still named in the report and the remaining tabs are still audited.
+    ///
+    /// Seeded data has no semantic index, so the Chat tab only reaches its
     /// empty/disabled state and composer — not the conversation UI (thinking
     /// row, streaming reply, retry, citations), which needs a real answer
     /// from a configured provider and so stays a manual/on-device check.
-    func testMeetingDetailChat() throws {
+    func testMeetingDetailTabs() throws {
         openFirstMeeting()
-        app.buttons["tab.chat"].tap()
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+        continueAfterFailure = true
+
+        for tab in ["recordings", "transcript", "summary", "chat"] {
+            XCTContext.runActivity(named: "Audit the \(tab) tab") { _ in
+                let button = app.buttons["tab.\(tab)"]
+                XCTAssertTrue(button.waitForExistence(timeout: 10), "Tab \(tab) missing")
+                button.tap()
+                do {
+                    try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait])
+                } catch {
+                    XCTFail("Accessibility audit of the \(tab) tab failed: \(error)")
+                }
+            }
+        }
     }
 
     func testSettings() throws {

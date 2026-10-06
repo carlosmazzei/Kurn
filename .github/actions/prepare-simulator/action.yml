@@ -5,6 +5,24 @@ description: >
   unit-tests/ui-accessibility-tests, the reliability-hardening lane,
   pipeline-eval), so it lives here once instead of six copies.
 
+  With `boot-device`, it also starts booting that simulator in the background
+  and returns at once, so the boot overlaps the build instead of following
+  it: xcodebuild used to boot the device only after compiling, which cost
+  ~3.5 minutes before the first test in every job. The `udid` output names
+  the device that was booted; pass it to xcodebuild as `id=<udid>` so the
+  run uses that same device rather than another one with the same name.
+
+inputs:
+  boot-device:
+    description: Simulator device name to start booting now (e.g. "iPhone 17"). Empty skips the boot.
+    required: false
+    default: ''
+
+outputs:
+  udid:
+    description: UDID of the device booting in the background, or empty when none was started.
+    value: ${{ steps.boot.outputs.udid }}
+
 runs:
   using: composite
   steps:
@@ -20,3 +38,39 @@ runs:
         if ! xcrun simctl list runtimes available | grep -q "watchOS"; then
           xcodebuild -downloadPlatform watchOS
         fi
+
+    # Best effort: any failure leaves `udid` empty and xcodebuild boots the
+    # device by name as it did before.
+    - name: Start booting the simulator
+      id: boot
+      if: inputs.boot-device != ''
+      shell: bash
+      env:
+        DEVICE_NAME: ${{ inputs.boot-device }}
+      run: |
+        set +e
+        # The newest iOS runtime's device with that name, which is the one a
+        # `name=` destination resolves to as well.
+        udid=$(xcrun simctl list devices available -j | python3 -c '
+        import json, os, re, sys
+        name = os.environ["DEVICE_NAME"]
+        best = None
+        for runtime, devices in json.load(sys.stdin)["devices"].items():
+            if ".iOS-" not in runtime:
+                continue
+            version = tuple(int(part) for part in re.findall(r"\d+", runtime.split(".iOS-")[1]))
+            for device in devices:
+                if device.get("name") == name and (best is None or version > best[0]):
+                    best = (version, device["udid"])
+        print(best[1] if best else "")
+        ')
+        if [ -z "$udid" ]; then
+          echo "::warning::no available simulator named $DEVICE_NAME; xcodebuild will pick one"
+          exit 0
+        fi
+        # `bootstatus -b` boots and waits through first-boot setup; it runs
+        # detached so this step returns while the build compiles.
+        nohup xcrun simctl bootstatus "$udid" -b > "$RUNNER_TEMP/simulator-boot.log" 2>&1 &
+        echo "udid=$udid" >> "$GITHUB_OUTPUT"
+        echo "booting $DEVICE_NAME ($udid) in the background"
+        exit 0

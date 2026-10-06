@@ -135,18 +135,26 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - uses: ./.github/actions/prepare-simulator
+      # Boots the simulator in the background so it is ready when the build
+      # finishes, instead of xcodebuild booting it only after compiling.
+      - id: simulator
+        uses: ./.github/actions/prepare-simulator
+        with:
+          boot-device: iPhone 17
 
-      # Shared (same key) with ui-accessibility-tests below, since both
+      # Shared (same key) with the ui-tests shards below, since they all
       # resolve the same packages from the same scheme.
       - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
+        env:
+          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
         run: |
+          destination="${SIMULATOR_UDID:+platform=iOS Simulator,id=$SIMULATOR_UDID}"
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
-            -destination "$IOS_DESTINATION" \
+            -destination "${destination:-$IOS_DESTINATION}" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
@@ -168,19 +176,40 @@ jobs:
           output-file: coverage-unit-tests.lcov
           codecov-token: ${{ secrets.CODECOV_TOKEN }}
 
-  # UI/accessibility signal: KurnUITests, i.e. AccessibilityAuditUITests
-  # (ScreenshotUITests stays excluded here exactly as it is in the scheme —
-  # it needs fastlane's snapshot setup and runs via `fastlane screenshots`
-  # instead). Split from unit-tests above for the same reason: a simulator
-  # launch/UI flake and a data-integrity regression should never share one
-  # red check.
+  # UI/accessibility signal: KurnUITests — AccessibilityAuditUITests,
+  # ModelStoreRecoveryUITests and the flow suites (ScreenshotUITests stays
+  # excluded here exactly as it is in the scheme — it needs fastlane's
+  # snapshot setup and runs via `fastlane screenshots` instead). Split from
+  # unit-tests above for the same reason: a simulator launch/UI flake and a
+  # data-integrity regression should never share one red check.
   #
   # The flow suites under KurnUITests/Flows run here since their flake rate
   # measured 0/5 in reliability-hardening.yml's `ui-flake-rate` lane (per
   # docs/testing-coverage-plan.md, Fase 3). A suite that starts flaking goes
   # back behind a -skip-testing line until it is fixed and re-measured.
-  ui-accessibility-tests:
+  #
+  # UI tests run serially on one simulator and each relaunches the app, so
+  # the suite is sharded across two runners (about half the wall time each)
+  # rather than parallelized on clones of one simulator, which a 3-core
+  # runner would make flakier. The `flows` shard names the two long flow
+  # suites; `main` runs everything else in KurnUITests, so a new test class
+  # lands in a shard without anyone having to list it.
+  ui-tests:
     runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: main
+            selection: >-
+              -only-testing:KurnUITests
+              -skip-testing:KurnUITests/ScreenshotUITests
+              -skip-testing:KurnUITests/LibraryFlowUITests
+              -skip-testing:KurnUITests/SettingsFlowUITests
+          - shard: flows
+            selection: >-
+              -only-testing:KurnUITests/LibraryFlowUITests
+              -only-testing:KurnUITests/SettingsFlowUITests
 
     env:
       XCODE_PROJECT: Kurn.xcodeproj
@@ -196,21 +225,29 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - uses: ./.github/actions/prepare-simulator
+      - id: simulator
+        uses: ./.github/actions/prepare-simulator
+        with:
+          boot-device: iPhone 17
 
       - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
+        env:
+          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
+          TEST_SELECTION: ${{ matrix.selection }}
         run: |
+          destination="${SIMULATOR_UDID:+platform=iOS Simulator,id=$SIMULATOR_UDID}"
+          # Word splitting is intended: the selection is a list of flags.
+          # shellcheck disable=SC2086
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
-            -destination "$IOS_DESTINATION" \
+            -destination "${destination:-$IOS_DESTINATION}" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
-            -only-testing:KurnUITests \
-            -skip-testing:KurnUITests/ScreenshotUITests \
+            $TEST_SELECTION \
             clean test
 
       # Failed UI/accessibility-audit tests attach their own screenshots to
@@ -221,15 +258,31 @@ jobs:
         if: failure()
         uses: ./.github/actions/collect-failure-diagnostics
         with:
-          artifact-name: ui-accessibility-tests-failure-diagnostics
+          artifact-name: ui-tests-${{ matrix.shard }}-failure-diagnostics
 
       - name: Export and upload coverage
         if: always()
         uses: ./.github/actions/upload-xcode-coverage
         with:
           flag: uitests
-          output-file: coverage-ui-tests.lcov
+          output-file: coverage-ui-tests-${{ matrix.shard }}.lcov
           codecov-token: ${{ secrets.CODECOV_TOKEN }}
+
+  # One stable check for the sharded UI suite, so branch protection, the
+  # release jobs and coverage-gate keep depending on a single
+  # `ui-accessibility-tests` result however many shards there are.
+  ui-accessibility-tests:
+    needs: ui-tests
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require every UI test shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.ui-tests.result }}
+        run: |
+          echo "ui-tests shards: $SHARDS_RESULT"
+          [ "$SHARDS_RESULT" = "success" ]
 
   # Fast, Xcode-free signal for the KurnCore package (see docs/roadmap.md,
   # "The change that isn't a feature: SPM extraction"): runs in seconds on
@@ -356,7 +409,8 @@ jobs:
           set -o pipefail
           python3 Tools/coverage_gate.py --root "$GITHUB_WORKSPACE" $PATCH_ARGS \
             "$RUNNER_TEMP/coverage/coverage-unit-tests.lcov" \
-            "$RUNNER_TEMP/coverage/coverage-ui-tests.lcov" \
+            "$RUNNER_TEMP/coverage/coverage-ui-tests-main.lcov" \
+            "$RUNNER_TEMP/coverage/coverage-ui-tests-flows.lcov" \
             "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -368,7 +422,8 @@ jobs:
         run: |
           python3 Tools/coverage_report.py --root "$GITHUB_WORKSPACE" --top 60 \
             "$RUNNER_TEMP/coverage/coverage-unit-tests.lcov" \
-            "$RUNNER_TEMP/coverage/coverage-ui-tests.lcov" \
+            "$RUNNER_TEMP/coverage/coverage-ui-tests-main.lcov" \
+            "$RUNNER_TEMP/coverage/coverage-ui-tests-flows.lcov" \
             "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
