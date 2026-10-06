@@ -135,26 +135,18 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      # Boots the simulator in the background so it is ready when the build
-      # finishes, instead of xcodebuild booting it only after compiling.
-      - id: simulator
-        uses: ./.github/actions/prepare-simulator
-        with:
-          boot-device: iPhone 17
+      - uses: ./.github/actions/prepare-simulator
 
       # Shared (same key) with the ui-tests shards below, since they all
       # resolve the same packages from the same scheme.
       - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
-        env:
-          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
         run: |
-          destination="${SIMULATOR_UDID:+platform=iOS Simulator,id=$SIMULATOR_UDID}"
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
-            -destination "${destination:-$IOS_DESTINATION}" \
+            -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
@@ -195,6 +187,7 @@ jobs:
   # suites; `main` runs everything else in KurnUITests, so a new test class
   # lands in a shard without anyone having to list it.
   ui-tests:
+    name: ui-tests (${{ matrix.shard }})
     runs-on: macos-26
     strategy:
       fail-fast: false
@@ -225,25 +218,20 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - id: simulator
-        uses: ./.github/actions/prepare-simulator
-        with:
-          boot-device: iPhone 17
+      - uses: ./.github/actions/prepare-simulator
 
       - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test
         env:
-          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
           TEST_SELECTION: ${{ matrix.selection }}
         run: |
-          destination="${SIMULATOR_UDID:+platform=iOS Simulator,id=$SIMULATOR_UDID}"
           # Word splitting is intended: the selection is a list of flags.
           # shellcheck disable=SC2086
           xcodebuild \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
-            -destination "${destination:-$IOS_DESTINATION}" \
+            -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
