@@ -370,7 +370,7 @@ followed by a `coverage-gate`:
 `save()`, `fatalError`, ad-hoc `URLSession`s and raw error text in public
 logs, against an allow-list baseline that fails when it goes stale),
 `unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
-`ui-accessibility-tests` (`KurnUITests`) and `kurncore-linux` (`swift test`
+`ui-accessibility-tests` (`KurnUITests`, sharded across two runners) and `kurncore-linux` (`swift test`
 for `Packages/KurnCore` on Ubuntu).
 
 ### Coverage

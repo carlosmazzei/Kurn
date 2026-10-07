@@ -178,8 +178,9 @@ jobs:
 
   # Item 5's "selected UI tests repeated to measure flake rate." Five
   # independent attempts at the same suite `ui-accessibility-tests` in
-  # `iOS CI` runs on every PR (AccessibilityAuditUITests +
-  # ModelStoreRecoveryUITests, ScreenshotUITests still excluded). Each
+  # `iOS CI` runs on every PR, sharded there (AccessibilityAuditUITests,
+  # ModelStoreRecoveryUITests and the flow suites, ScreenshotUITests still
+  # excluded); here each attempt runs the whole suite on one runner. Each
   # attempt uploads its own pass/fail marker; the summary job below counts
   # them into an actual rate rather than reporting only the matrix's overall
   # green/red.

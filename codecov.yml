@@ -15,8 +15,8 @@ coverage:
       default:
         informational: true
 
-# Three flags, one per CI job that uploads coverage (unit-tests,
-# ui-accessibility-tests in .github/workflows/swift.yml; kurncore-linux for
+# Three flags, one per CI job that uploads coverage (unit-tests, and the
+# ui-tests shards behind ui-accessibility-tests, in .github/workflows/swift.yml; kurncore-linux for
 # the KurnCore Swift package) — kept separate rather than merged into one
 # number, since a UI-test run and a unit-test run cover very different code
 # and conflating them would make neither figure meaningful.
