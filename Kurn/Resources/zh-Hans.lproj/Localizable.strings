@@ -750,10 +750,19 @@
 "share.copy_all" = "全部复制";
 "share.share_action" = "分享";
 "share.format.picker" = "格式";
-"share.format.standard" = "标准";
+"share.format.standard" = "Markdown";
 "share.format.obsidian" = "Obsidian";
 "share.format.standard.detail" = "纯 Markdown，不含额外元数据。";
 "share.format.obsidian.detail" = "添加 YAML frontmatter 和说话人的 [[wikilinks]]。";
+"share.format.pdf" = "PDF";
+"share.format.pdf.detail" = "带格式化摘要的分页文档，可直接打印或发送。";
+"share.format.docx" = "Word (.docx)";
+"share.format.docx.detail" = "可在 Word、Pages 或 Google 文档中编辑，带真正的标题和列表。";
+"share.format.html" = "网页 (HTML)";
+"share.format.html.detail" = "独立网页，可在任何浏览器中打开，粘贴时保留格式。";
+"share.format.plain_text" = "纯文本";
+"share.format.plain_text.detail" = "不含格式标记的文本，适用于邮件、工单或聊天。";
+"share.exporting" = "正在准备文件";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "已完成任务";

@@ -3,54 +3,50 @@
 //  Kurn
 //
 //  Selection state and export planning behind `MeetingShareSelectionView`:
-//  which summaries/transcripts are picked, in which format, and what Markdown
-//  (and file names) that selection turns into. The view owns only the
-//  side effects — pasteboard, temporary files, dismissal.
+//  which summaries/transcripts are picked, in which format, and what
+//  documents (and file names) that selection turns into. The view owns only
+//  the side effects — pasteboard, temporary files, dismissal.
 //
 
 import Foundation
 import KurnCore
 
-/// Output format for every export in the share sheet: standard plain
-/// Markdown, or "Obsidian" (YAML frontmatter + `[[wikilinks]]` for speakers)
-/// — see `MeetingExport.markdown(for:summary:obsidianStyle:)`.
-enum MeetingShareFormat: String, CaseIterable {
-    case standard, obsidian
+/// One file the share sheet will produce: a document, the format to render
+/// it in, and the name to suggest for it. Kept outside the main-actor
+/// `MeetingShareSelection` so rendering and writing can run in the background.
+struct MeetingExportItem: Equatable, Sendable {
+    let suggestedName: String
+    let document: ExportDocument
+    let format: MeetingExportFormat
 
-    var title: String {
-        switch self {
-        case .standard: NSLocalizedString("share.format.standard", comment: "Standard")
-        case .obsidian: NSLocalizedString("share.format.obsidian", comment: "Obsidian")
-        }
+    /// Markdown in the selected flavour, whatever the file format.
+    var markdown: String {
+        MarkdownExportRenderer.render(document, obsidianStyle: format.isObsidianStyle)
     }
 
-    /// What the choice actually changes in the exported file. Without it
-    /// "Obsidian" is just a word next to "Standard" — nothing else on the
-    /// screen reacts to the picker, so this line is the only feedback that
-    /// the control did anything.
-    var explanation: String {
-        switch self {
-        case .standard: NSLocalizedString("share.format.standard.detail", comment: "Standard format detail")
-        case .obsidian: NSLocalizedString("share.format.obsidian.detail", comment: "Obsidian format detail")
-        }
-    }
+    var clipboardText: String { format.clipboardText(for: document) }
 
-    var isObsidianStyle: Bool { self == .obsidian }
+    /// Renders the file and writes it to a protected temporary location.
+    /// Nonisolated so the share sheet can do it off the main actor.
+    func writeTemporaryFile(pageSize: ExportPageSize) throws -> URL {
+        try MeetingExport.temporaryFile(
+            data: format.data(for: document, pageSize: pageSize),
+            suggestedName: suggestedName,
+            fileExtension: format.fileExtension
+        )
+    }
 }
 
 @MainActor
 struct MeetingShareSelection {
-    struct ExportItem: Equatable {
-        let suggestedName: String
-        let markdown: String
-    }
+    typealias ExportItem = MeetingExportItem
 
     static let combinedSeparator = "\n\n---\n\n"
 
     let meeting: Meeting
     var selectedSummaryIDs: Set<UUID>
     var selectedRecordingIDs: Set<UUID>
-    var format: MeetingShareFormat = .standard
+    var format: MeetingExportFormat = .standard
 
     /// Defaults to every transcribed recording plus the summary currently
     /// shown on screen, matching the export this replaces.
@@ -121,12 +117,13 @@ struct MeetingShareSelection {
         String(format: NSLocalizedString("detail.recording_n", comment: ""), index + 1)
     }
 
-    func markdown(for summary: Summary) -> String {
-        MeetingExport.summaryMarkdown(for: meeting, summary: summary, obsidianStyle: format.isObsidianStyle)
+    /// What a row's Copy button puts on the clipboard in the current format.
+    func clipboardText(for summary: Summary) -> String {
+        format.clipboardText(for: MeetingExport.summaryDocument(for: meeting, summary: summary))
     }
 
-    func markdown(for recording: Recording) -> String {
-        MeetingExport.transcriptMarkdown(for: meeting, recording: recording, obsidianStyle: format.isObsidianStyle)
+    func clipboardText(for recording: Recording) -> String {
+        format.clipboardText(for: MeetingExport.transcriptDocument(for: meeting, recording: recording))
     }
 
     /// One export per selected item — summaries first (newest first), then
@@ -136,18 +133,20 @@ struct MeetingShareSelection {
         var items: [ExportItem] = []
         for summary in sortedSummaries where selectedSummaryIDs.contains(summary.id) {
             let name = "\(meeting.title)-summary-\(summary.templateName ?? "\(items.count + 1)")"
-            items.append(ExportItem(suggestedName: name, markdown: markdown(for: summary)))
+            let document = MeetingExport.summaryDocument(for: meeting, summary: summary)
+            items.append(ExportItem(suggestedName: name, document: document, format: format))
         }
         for entry in transcribedRecordings where selectedRecordingIDs.contains(entry.recording.id) {
             let name = "\(meeting.title)-transcript-\(entry.index + 1)"
-            items.append(ExportItem(suggestedName: name, markdown: markdown(for: entry.recording)))
+            let document = MeetingExport.transcriptDocument(for: meeting, recording: entry.recording)
+            items.append(ExportItem(suggestedName: name, document: document, format: format))
         }
         return items
     }
 
     /// Every selected export joined into a single clipboard payload; empty
     /// when nothing is selected.
-    func combinedMarkdown() -> String {
-        exportItems().map(\.markdown).joined(separator: Self.combinedSeparator)
+    func combinedClipboardText() -> String {
+        exportItems().map(\.clipboardText).joined(separator: Self.combinedSeparator)
     }
 }

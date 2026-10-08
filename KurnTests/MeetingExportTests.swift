@@ -308,6 +308,59 @@ struct MeetingExportTests {
         #expect(TempFileCleaner.prefixes.contains(MeetingExport.exportDirectoryPrefix))
     }
 
+    /// The Markdown export is rendered from `ExportDocument` now; this pins
+    /// the exact bytes it produced before, so a vault that diffs or syncs
+    /// these notes sees no change.
+    @Test func markdownKeepsItsExactLayout() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning", notes: "Bring laptops")
+        context.insert(meeting)
+        let summary = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "Recap", body: "We **aligned**.", items: ["Ship it", "Test it"])],
+            provider: .openAI
+        )
+        context.insert(summary)
+        let recording = Recording(meeting: meeting, fileName: "a.m4a", duration: 10, highlights: [Highlight(timestamp: 6)])
+        context.insert(recording)
+        let transcript = Transcript(recording: recording, segments: [
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: "Hello"),
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 5, endTime: 10, text: "World")
+        ])
+        context.insert(transcript)
+        recording.transcript = transcript
+
+        var expected = "# Sprint Planning\n\n_\(meeting.createdAt.meetingDisplay)_\n\n"
+        if meeting.totalDuration > 0 {
+            expected += "**Duration:** \(meeting.totalDuration.clockDisplay)\n\n"
+        }
+        expected += "## Notes\n\nBring laptops\n\n"
+        expected += "## Summary\n\n### Recap\n\nWe **aligned**.\n\n- Ship it\n- Test it\n\n"
+        expected += "## Highlights\n\n- 0:06\n\n"
+        expected += "## Transcript\n\n**[0:00] Speaker 1:** Hello\n\n⭐ **[0:05] Speaker 1:** World\n\n"
+        #expect(MeetingExport.markdown(for: meeting, summary: summary) == expected)
+    }
+
+    @Test func documentKeepsSummaryMarkdownForRichFormatsToRender() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Sprint Planning")
+        context.insert(meeting)
+        let summary = Summary(
+            meeting: meeting,
+            sections: [SummarySection(title: "Recap", body: "We **aligned**.")],
+            provider: .openAI
+        )
+        context.insert(summary)
+
+        let document = MeetingExport.summaryDocument(for: meeting, summary: summary)
+        #expect(document.blocks == [
+            .heading(level: 2, text: "Summary"),
+            .heading(level: 3, text: "Recap"),
+            .markdown("We **aligned**.")
+        ])
+        #expect(document.richBlocks.contains(.paragraph(runs: [InlineRun("We "), InlineRun("aligned", style: .bold), InlineRun(".")])))
+    }
+
     // MARK: - Obsidian-style export
 
     @Test func markdownOmitsFrontmatterByDefault() {

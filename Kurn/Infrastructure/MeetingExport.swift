@@ -2,11 +2,14 @@
 //  MeetingExport.swift
 //  Kurn
 //
-//  Renders a meeting to a structured Markdown document and writes it to a temp
-//  file for sharing via ShareLink.
+//  Turns a meeting (or one of its summaries or transcripts) into a
+//  format-neutral `ExportDocument`, renders it as Markdown, and writes
+//  exports to protected temporary files for the share sheet. The other
+//  formats render the same document; see `MeetingExportFormat`.
 //
 
 import Foundation
+import KurnCore
 
 enum MeetingExport {
     /// Build the full Markdown representation of a meeting.
@@ -18,39 +21,7 @@ enum MeetingExport {
     ///     `[[wikilinks]]` instead of plain text.
     @MainActor
     static func markdown(for meeting: Meeting, summary: Summary?, obsidianStyle: Bool = false) -> String {
-        var out = header(for: meeting, obsidianStyle: obsidianStyle)
-
-        if !meeting.notes.isEmpty {
-            out += "## Notes\n\n\(meeting.notes)\n\n"
-        }
-
-        if let summary {
-            out += renderSummary(summary)
-        }
-
-        out += renderHighlights(for: meeting)
-
-        let recordings = meeting.recordings
-            .filter(\.isReadyForConsumption)
-            .sorted { $0.recordedAt < $1.recordedAt }
-        let transcribed = recordings.filter { $0.transcript != nil }
-        if !transcribed.isEmpty {
-            out += "## Transcript\n\n"
-            let nameByLabel = speakerNames(for: meeting)
-            for (index, recording) in transcribed.enumerated() {
-                if transcribed.count > 1 {
-                    out += "### Segment \(index + 1)\n\n"
-                }
-                out += renderTranscript(
-                    for: meeting,
-                    recording: recording,
-                    nameByLabel: nameByLabel,
-                    obsidianStyle: obsidianStyle
-                )
-            }
-        }
-
-        return out
+        MarkdownExportRenderer.render(document(for: meeting, summary: summary), obsidianStyle: obsidianStyle)
     }
 
     /// Markdown for a single recording's transcript, standalone (own title/date
@@ -58,54 +29,83 @@ enum MeetingExport {
     /// independently of the rest of the meeting.
     @MainActor
     static func transcriptMarkdown(for meeting: Meeting, recording: Recording, obsidianStyle: Bool = false) -> String {
-        var out = header(for: meeting, obsidianStyle: obsidianStyle)
-        out += "## Transcript\n\n"
-        out += renderTranscript(
-            for: meeting,
-            recording: recording,
-            nameByLabel: speakerNames(for: meeting),
-            obsidianStyle: obsidianStyle
-        )
-        return out
+        MarkdownExportRenderer.render(transcriptDocument(for: meeting, recording: recording), obsidianStyle: obsidianStyle)
     }
 
     /// Markdown for a single summary, standalone (own title/date header, no
     /// other summaries or transcripts).
     @MainActor
     static func summaryMarkdown(for meeting: Meeting, summary: Summary, obsidianStyle: Bool = false) -> String {
-        header(for: meeting, obsidianStyle: obsidianStyle) + renderSummary(summary)
+        MarkdownExportRenderer.render(summaryDocument(for: meeting, summary: summary), obsidianStyle: obsidianStyle)
+    }
+
+    // MARK: - Documents
+
+    /// The whole meeting as a format-neutral document: notes, the given
+    /// summary, highlights, then every transcribed recording in order.
+    @MainActor
+    static func document(for meeting: Meeting, summary: Summary?) -> ExportDocument {
+        var document = header(for: meeting)
+
+        if !meeting.notes.isEmpty {
+            document.blocks.append(.heading(level: 2, text: "Notes"))
+            document.blocks.append(.plainText(meeting.notes))
+        }
+
+        if let summary {
+            document.blocks += summaryBlocks(summary)
+        }
+
+        document.blocks += highlightBlocks(for: meeting)
+
+        let transcribed = meeting.recordings
+            .filter(\.isReadyForConsumption)
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .filter { $0.transcript != nil }
+        if !transcribed.isEmpty {
+            document.blocks.append(.heading(level: 2, text: "Transcript"))
+            let nameByLabel = speakerNames(for: meeting)
+            for (index, recording) in transcribed.enumerated() {
+                if transcribed.count > 1 {
+                    document.blocks.append(.heading(level: 3, text: "Segment \(index + 1)"))
+                }
+                document.blocks += transcriptBlocks(for: meeting, recording: recording, nameByLabel: nameByLabel)
+            }
+        }
+
+        return document
+    }
+
+    /// One recording's transcript, standalone.
+    @MainActor
+    static func transcriptDocument(for meeting: Meeting, recording: Recording) -> ExportDocument {
+        var document = header(for: meeting)
+        document.blocks.append(.heading(level: 2, text: "Transcript"))
+        document.blocks += transcriptBlocks(for: meeting, recording: recording, nameByLabel: speakerNames(for: meeting))
+        return document
+    }
+
+    /// One summary, standalone.
+    @MainActor
+    static func summaryDocument(for meeting: Meeting, summary: Summary) -> ExportDocument {
+        var document = header(for: meeting)
+        document.blocks = summaryBlocks(summary)
+        return document
     }
 
     @MainActor
-    private static func header(for meeting: Meeting, obsidianStyle: Bool) -> String {
-        var out = obsidianStyle ? frontmatter(for: meeting) : ""
-        out += "# \(meeting.title)\n\n"
-        out += "_\(meeting.createdAt.meetingDisplay)_\n\n"
-        if meeting.totalDuration > 0 {
-            out += "**Duration:** \(meeting.totalDuration.clockDisplay)\n\n"
-        }
-        return out
-    }
-
-    /// YAML frontmatter block Obsidian recognizes as note properties: title,
-    /// date, tags, folder, and favorite. Keys whose value is absent/false are
-    /// omitted entirely rather than emitted empty, so an untagged, unfiled,
-    /// non-favorite meeting doesn't carry noise in its frontmatter.
-    @MainActor
-    private static func frontmatter(for meeting: Meeting) -> String {
-        var lines = ["title: \(yamlString(meeting.title))"]
-        lines.append("date: \(isoDateFormatter.string(from: meeting.createdAt))")
-        if !meeting.tags.isEmpty {
-            let tags = meeting.tags.map { yamlString($0.name) }.joined(separator: ", ")
-            lines.append("tags: [\(tags)]")
-        }
-        if let folder = meeting.folder {
-            lines.append("folder: \(yamlString(folderPath(folder)))")
-        }
-        if meeting.isFavorite {
-            lines.append("favorite: true")
-        }
-        return "---\n" + lines.joined(separator: "\n") + "\n---\n\n"
+    private static func header(for meeting: Meeting) -> ExportDocument {
+        ExportDocument(
+            title: meeting.title,
+            dateLine: meeting.createdAt.meetingDisplay,
+            duration: meeting.totalDuration > 0 ? meeting.totalDuration.clockDisplay : nil,
+            properties: ExportDocument.Properties(
+                date: meeting.createdAt,
+                tags: meeting.tags.map(\.name),
+                folderPath: meeting.folder.map(folderPath),
+                isFavorite: meeting.isFavorite
+            )
+        )
     }
 
     /// `Parent/Child` path for a (possibly nested) folder.
@@ -119,47 +119,27 @@ enum MeetingExport {
         return components.reversed().joined(separator: "/")
     }
 
-    /// Renders a value as a double-quoted YAML scalar, escaping the
-    /// characters that would otherwise break the frontmatter block: an
-    /// embedded quote, or a newline (frontmatter values are single-line).
-    private static func yamlString(_ value: String) -> String {
-        let escaped = value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: " ")
-        return "\"\(escaped)\""
-    }
-
-    private static let isoDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
-
-    private static func renderSummary(_ summary: Summary) -> String {
-        var out = "## Summary\n\n"
+    private static func summaryBlocks(_ summary: Summary) -> [ExportDocument.Block] {
+        var blocks: [ExportDocument.Block] = [.heading(level: 2, text: "Summary")]
         for section in summary.sections {
             if !section.title.isEmpty {
-                out += "### \(section.title)\n\n"
+                blocks.append(.heading(level: 3, text: section.title))
             }
             if !section.body.isEmpty {
-                out += "\(section.body)\n\n"
+                blocks.append(.markdown(section.body))
             }
             if !section.items.isEmpty {
-                out += section.items.map { "- \($0)" }.joined(separator: "\n")
-                out += "\n\n"
+                blocks.append(.bulletItems(section.items))
             }
         }
-        return out
+        return blocks
     }
 
-    /// Bullet list of every recording-relative highlight, converted to
-    /// meeting-relative `[mm:ss]` stamps and sorted chronologically. Static
-    /// document, no tap-to-seek — purely a navigational list.
+    /// Every recording-relative highlight, converted to meeting-relative
+    /// stamps and sorted chronologically. Static document, no tap-to-seek —
+    /// purely a navigational list.
     @MainActor
-    private static func renderHighlights(for meeting: Meeting) -> String {
+    private static func highlightBlocks(for meeting: Meeting) -> [ExportDocument.Block] {
         let stamps = meeting.recordings
             .filter(\.isReadyForConsumption)
             .sorted { $0.recordedAt < $1.recordedAt }
@@ -167,11 +147,11 @@ enum MeetingExport {
                 recording.highlights.map { meeting.startOffset(of: recording) + $0.timestamp }
             }
             .sorted()
-        guard !stamps.isEmpty else { return "" }
-        var out = "## Highlights\n\n"
-        out += stamps.map { "- \($0.clockDisplay)" }.joined(separator: "\n")
-        out += "\n\n"
-        return out
+        guard !stamps.isEmpty else { return [] }
+        return [
+            .heading(level: 2, text: "Highlights"),
+            .bulletItems(stamps.map(\.clockDisplay))
+        ]
     }
 
     /// Map speaker labels to display names for nicer export.
@@ -184,36 +164,37 @@ enum MeetingExport {
     }
 
     @MainActor
-    private static func renderTranscript(
+    private static func transcriptBlocks(
         for meeting: Meeting,
         recording: Recording,
-        nameByLabel: [String: String],
-        obsidianStyle: Bool = false
-    ) -> String {
-        var out = ""
+        nameByLabel: [String: String]
+    ) -> [ExportDocument.Block] {
+        var blocks: [ExportDocument.Block] = []
         let offset = meeting.startOffset(of: recording)
         let highlights = recording.highlights
         let photos = recording.photos
         for segment in recording.transcript?.segments ?? [] {
-            let rawName = nameByLabel[segment.speakerLabel] ?? segment.speakerLabel
-            let name = obsidianStyle ? "[[\(rawName)]]" : rawName
-            let stamp = (segment.startTime + offset).clockDisplay
             let isHighlighted = highlights.contains { $0.timestamp >= segment.startTime && $0.timestamp < segment.endTime }
-            let prefix = isHighlighted ? "⭐ " : ""
-            out += "\(prefix)**[\(stamp)] \(name):** \(segment.text)\n\n"
-            // The image itself is never exported — same policy as audio
-            // (Markdown only) — but its OCR text, if any, is already just
-            // text and carries the context forward.
+            blocks.append(.utterance(ExportDocument.Utterance(
+                timestamp: (segment.startTime + offset).clockDisplay,
+                speaker: nameByLabel[segment.speakerLabel] ?? segment.speakerLabel,
+                text: segment.text,
+                isHighlighted: isHighlighted
+            )))
+            // The image itself is never exported — same policy as audio — but
+            // its OCR text, if any, is already just text and carries the
+            // context forward.
             for photo in photos where photo.capturedAt >= segment.startTime && photo.capturedAt < segment.endTime {
-                out += "📷 [\((photo.capturedAt + offset).clockDisplay)]"
-                if let text = photo.recognizedText, !text.isEmpty {
-                    out += " \(text)"
-                }
-                out += "\n\n"
+                blocks.append(.photo(
+                    timestamp: (photo.capturedAt + offset).clockDisplay,
+                    recognizedText: photo.recognizedText
+                ))
             }
         }
-        return out
+        return blocks
     }
+
+    // MARK: - Files
 
     /// Write the Markdown to a temporary `.md` file and return its URL.
     ///
@@ -232,8 +213,14 @@ enum MeetingExport {
     }
 
     /// Write arbitrary Markdown to a temporary `.md` file, named after
-    /// `suggestedName` (sanitized), and return its URL. See
-    /// `temporaryFile(for:summary:)` for why each call gets its own
+    /// `suggestedName` (sanitized), and return its URL.
+    static func temporaryFile(markdown text: String, suggestedName: String) throws -> URL {
+        try temporaryFile(data: Data(text.utf8), suggestedName: suggestedName, fileExtension: "md")
+    }
+
+    /// Write an export of any format to a temporary file named after
+    /// `suggestedName` (sanitized) with `fileExtension`, and return its URL.
+    /// See `temporaryFile(for:summary:)` for why each call gets its own
     /// UUID-named subdirectory.
     ///
     /// The file is written protected (`.completeFileProtectionUnlessOpen`)
@@ -241,18 +228,23 @@ enum MeetingExport {
     /// `exportDirectoryPrefix` so `TempFileCleaner` removes it once it is an
     /// hour old: an export is meeting content, and the share sheet only needs
     /// it for as long as it is open.
-    static func temporaryFile(markdown text: String, suggestedName: String) throws -> URL {
+    static func temporaryFile(data: Data, suggestedName: String, fileExtension: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(exportDirectoryPrefix + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(fileName(for: suggestedName, fileExtension: fileExtension))
+        try data.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+        RecordingProtection.apply(to: url)
+        return url
+    }
+
+    /// `suggestedName` reduced to alphanumeric words joined by dashes, with
+    /// `meeting` standing in when nothing survives.
+    static func fileName(for suggestedName: String, fileExtension: String) -> String {
         let safeName = suggestedName
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .joined(separator: "-")
-        let name = (safeName.isEmpty ? "meeting" : safeName) + ".md"
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(exportDirectoryPrefix + UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent(name)
-        try text.data(using: .utf8)?.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
-        RecordingProtection.apply(to: url)
-        return url
+        return (safeName.isEmpty ? "meeting" : safeName) + "." + fileExtension
     }
 }

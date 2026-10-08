@@ -3,9 +3,10 @@
 //  Kurn
 //
 //  Lets the user choose which of a meeting's transcripts and summaries to
-//  share or copy. Each selected item is exported as its own Markdown file;
-//  sharing hands the resulting URLs back to the caller to drive the iOS
-//  share sheet with multiple attachments at once.
+//  share or copy, and in which format (Markdown, Obsidian, PDF, Word, HTML or
+//  plain text). Each selected item is exported as its own file; sharing hands
+//  the resulting URLs back to the caller to drive the iOS share sheet with
+//  multiple attachments at once.
 //
 
 import SwiftUI
@@ -22,6 +23,7 @@ struct MeetingShareSelectionView: View {
     @State private var copiedRowID: UUID?
     @State private var copiedAll = false
     @State private var shareError: AppError?
+    @State private var isExporting = false
 
     init(meeting: Meeting, preselectedSummary: Summary?, onShare: @escaping ([URL]) -> Void) {
         self.meeting = meeting
@@ -97,7 +99,7 @@ struct MeetingShareSelectionView: View {
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
                 Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $selection.format) {
-                    ForEach(MeetingShareFormat.allCases, id: \.self) { option in
+                    ForEach(MeetingExportFormat.allCases, id: \.self) { option in
                         Text(option.title).tag(option)
                     }
                 }
@@ -115,11 +117,20 @@ struct MeetingShareSelectionView: View {
             Button {
                 performShare()
             } label: {
-                Text(selection.shareButtonTitle).frame(maxWidth: .infinity)
+                // A long meeting's PDF takes a moment to typeset; the spinner
+                // keeps the button from reading as unresponsive meanwhile.
+                ZStack {
+                    Text(selection.shareButtonTitle).opacity(isExporting ? 0 : 1)
+                    if isExporting {
+                        ProgressView()
+                            .accessibilityLabel(NSLocalizedString("share.exporting", comment: "Preparing files"))
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
             .tint(Theme.accent)
-            .disabled(!hasSelection)
+            .disabled(!hasSelection || isExporting)
             .accessibilityIdentifier("share.share_button")
         }
         .padding(.horizontal, 16)
@@ -136,7 +147,7 @@ struct MeetingShareSelectionView: View {
                 selection.toggle(summary)
             }
             copyButton(id: summary.id) {
-                selection.markdown(for: summary)
+                selection.clipboardText(for: summary)
             }
         }
     }
@@ -151,7 +162,7 @@ struct MeetingShareSelectionView: View {
                 selection.toggle(recording)
             }
             copyButton(id: recording.id) {
-                selection.markdown(for: recording)
+                selection.clipboardText(for: recording)
             }
         }
     }
@@ -208,7 +219,7 @@ struct MeetingShareSelectionView: View {
     }
 
     private func copyAll() {
-        let combined = selection.combinedMarkdown()
+        let combined = selection.combinedClipboardText()
         guard !combined.isEmpty else { return }
         MeetingPasteboard.copy(combined)
         copiedAll = true
@@ -218,15 +229,25 @@ struct MeetingShareSelectionView: View {
         }
     }
 
+    /// Builds the documents here, on the main actor where the meeting lives,
+    /// then renders and writes the files in the background.
     private func performShare() {
-        do {
-            let urls = try selection.exportItems().map {
-                try MeetingExport.temporaryFile(markdown: $0.markdown, suggestedName: $0.suggestedName)
+        let items = selection.exportItems()
+        guard !items.isEmpty, !isExporting else { return }
+        let pageSize = ExportPageSize.preferred(forRegion: Locale.current.region?.identifier)
+        isExporting = true
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try items.map { try $0.writeTemporaryFile(pageSize: pageSize) } }
+            }.value
+            isExporting = false
+            switch result {
+            case .success(let urls):
+                dismiss()
+                onShare(urls)
+            case .failure(let error):
+                shareError = .audioError(error.localizedDescription)
             }
-            dismiss()
-            onShare(urls)
-        } catch {
-            shareError = .audioError(error.localizedDescription)
         }
     }
 }

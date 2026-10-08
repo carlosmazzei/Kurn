@@ -498,7 +498,7 @@ band that nothing reads back: every machine consumer resamples to 16 kHz
 `SpeakerDiarizer`, `WhisperCppTranscriber`, and Apple Speech / FluidAudio
 internally), and the only full-fidelity consumer is `AudioPlayerService`, for
 which 24 kHz mono is transparent. Audio is never exported — `MeetingExport`
-produces Markdown only.
+produces documents only (see "Export formats").
 
 Three things follow from the fixed format:
 
@@ -1382,6 +1382,37 @@ truncate mid-JSON or time out; a truncated response surfaces as
 `AppError.summaryTruncated` instead of a confusing decode error. Summary generation is
 owned by `SummaryViewModel.startSummary`, which keeps the Summary tab in a
 non-reentrant progress state and supports cooperative cancellation.
+
+### Export formats
+
+The share sheet (`MeetingShareSelectionView`) exports each selected summary or
+transcript as its own file in one `MeetingExportFormat`: Markdown, Obsidian,
+PDF, Word (.docx), HTML or plain text. **There is one document and many
+renderers**: `MeetingExport` turns SwiftData into a format-neutral
+`ExportDocument` (KurnCore, `Export/`), and every format renders that value —
+so a section added to the export shows up everywhere, not just in whichever
+renderer remembered it.
+
+- `ExportDocument.blocks` is semantic and keeps LLM Markdown as written, which
+  is what lets `MarkdownExportRenderer` emit it verbatim (its output is pinned
+  byte for byte by `MeetingExportTests.markdownKeepsItsExactLayout`).
+  `richBlocks` expands it through `MarkdownBlockParser` and `InlineMarkdown`
+  into styled runs, and the other renderers consume only that — none parses
+  Markdown itself. Transcript text and user notes are never parsed as
+  Markdown. Links keep only their text, for the same reason
+  `MarkdownPresentation` disables them on screen.
+- Word is written directly as Office Open XML into a stored (uncompressed)
+  ZIP by `ZipArchiveWriter` — no dependency, deterministic output. Lists are
+  indented paragraphs with a glyph rather than `numbering.xml`.
+- `PDFExportRenderer` (app target) typesets with Core Text into a Core
+  Graphics PDF context — not UIKit's renderers or TextKit — because neither is
+  main-actor-bound, so the share sheet renders off the main actor
+  (`MeetingExportItem.writeTemporaryFile`). Core Text draws no strikethrough
+  or backgrounds; those are carried by colour and font instead.
+- Section headings ("Summary", "Transcript", …) stay English in every format,
+  as the Markdown export always has been.
+- Copy puts the format's own text on the clipboard for Markdown, Obsidian and
+  plain text, and Markdown for the file formats.
 
 ### Cross-device control (Watch + Live Activity)
 
