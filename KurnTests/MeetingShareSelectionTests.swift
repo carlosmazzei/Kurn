@@ -88,7 +88,7 @@ struct MeetingShareSelectionTests {
         let selection = MeetingShareSelection(meeting: meeting, preselectedSummary: nil)
         #expect(!selection.hasSelection)
         #expect(selection.shareButtonTitle == NSLocalizedString("share.share_action", comment: ""))
-        #expect(selection.combinedMarkdown().isEmpty)
+        #expect(selection.combinedClipboardText().isEmpty)
         #expect(selection.exportItems().isEmpty)
     }
 
@@ -181,12 +181,12 @@ struct MeetingShareSelectionTests {
         _ = summary
     }
 
-    @Test func combinedMarkdownJoinsExportsWithTheSeparator() {
+    @Test func combinedClipboardTextJoinsExportsWithTheSeparator() {
         addRecording(at: 0)
         let summary = addSummary(template: "General", at: 0)
         let selection = MeetingShareSelection(meeting: meeting, preselectedSummary: summary)
 
-        let combined = selection.combinedMarkdown()
+        let combined = selection.combinedClipboardText()
         let parts = combined.components(separatedBy: MeetingShareSelection.combinedSeparator)
         #expect(parts.count == 2)
         #expect(parts[0].contains("Recap General"))
@@ -205,9 +205,63 @@ struct MeetingShareSelectionTests {
     }
 
     @Test func formatMetadataIsLocalizedPerCase() {
-        #expect(MeetingShareFormat.allCases == [.standard, .obsidian])
-        #expect(MeetingShareFormat.standard.title == NSLocalizedString("share.format.standard", comment: ""))
-        #expect(MeetingShareFormat.obsidian.explanation == NSLocalizedString("share.format.obsidian.detail", comment: ""))
-        #expect(!MeetingShareFormat.standard.isObsidianStyle)
+        #expect(MeetingExportFormat.allCases == [.standard, .obsidian, .pdf, .docx, .html, .plainText])
+        #expect(MeetingExportFormat.standard.title == NSLocalizedString("share.format.standard", comment: ""))
+        #expect(MeetingExportFormat.obsidian.explanation == NSLocalizedString("share.format.obsidian.detail", comment: ""))
+        #expect(MeetingExportFormat.docx.title == NSLocalizedString("share.format.docx", comment: ""))
+        #expect(MeetingExportFormat.plainText.explanation == NSLocalizedString("share.format.plain_text.detail", comment: ""))
+        #expect(!MeetingExportFormat.standard.isObsidianStyle)
+        // Every case has its own explanation, so the picker always visibly reacts.
+        #expect(Set(MeetingExportFormat.allCases.map(\.explanation)).count == MeetingExportFormat.allCases.count)
+    }
+
+    // MARK: - Formats
+
+    @Test func exportItemsCarryTheSelectedFormat() {
+        addRecording(at: 0)
+        let summary = addSummary(template: "General", at: 0)
+        var selection = MeetingShareSelection(meeting: meeting, preselectedSummary: summary)
+        selection.format = .docx
+
+        let items = selection.exportItems()
+        #expect(items.count == 2)
+        #expect(items.allSatisfy { $0.format == .docx })
+        #expect(items[0].document.title == "Sprint Planning")
+    }
+
+    @Test func plainTextClipboardHasNoMarkdownSyntax() {
+        addRecording(at: 0)
+        let summary = addSummary(template: "General", at: 0)
+        var selection = MeetingShareSelection(meeting: meeting, preselectedSummary: summary)
+        selection.format = .plainText
+
+        let text = selection.clipboardText(for: summary)
+        #expect(text.contains("Recap General"))
+        #expect(!text.contains("## "))
+        #expect(!text.contains("**"))
+    }
+
+    @Test func fileFormatsCopyMarkdown() {
+        let summary = addSummary(template: "General", at: 0)
+        var selection = MeetingShareSelection(meeting: meeting, preselectedSummary: summary)
+        selection.format = .pdf
+        #expect(selection.clipboardText(for: summary).contains("## Summary"))
+    }
+
+    @Test func writingAnItemProducesAFileWithTheFormatsExtension() throws {
+        addRecording(at: 0)
+        let summary = addSummary(template: "General", at: 0)
+        for format in MeetingExportFormat.allCases {
+            var selection = MeetingShareSelection(meeting: meeting, preselectedSummary: summary)
+            selection.format = format
+            for item in selection.exportItems() {
+                let url = try item.writeTemporaryFile(pageSize: .a4)
+                defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+                #expect(url.pathExtension == format.fileExtension)
+                let data = try Data(contentsOf: url)
+                #expect(!data.isEmpty)
+                #expect(url.deletingLastPathComponent().lastPathComponent.hasPrefix(MeetingExport.exportDirectoryPrefix))
+            }
+        }
     }
 }

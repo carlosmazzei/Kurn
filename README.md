@@ -475,17 +475,28 @@ the other package manifests in the repo up to date.
 
 ## Export
 
-Meetings can be shared as structured Markdown in two formats — **Standard**,
-and **Obsidian** (YAML frontmatter plus `[[wikilinks]]` for speakers, ready to
-drop into a vault). The export includes:
+Each summary and transcript of a meeting can be shared (or copied) in six
+formats, picked in the share sheet:
 
-- Meeting title, date, notes, and total duration.
-- Summary content, key decisions, and action items when available.
-- Speaker-attributed transcript lines with timestamps.
+- **Markdown** and **Obsidian** (YAML frontmatter plus `[[wikilinks]]` for
+  speakers, ready to drop into a vault).
+- **PDF** — paginated (A4 or Letter by region), with page numbers.
+- **Word (.docx)** — real Title/Heading/Quote/Code styles, so Word's
+  navigation pane and restyling work; opens in Word, Pages and Google Docs.
+- **HTML** — one self-contained page with no scripts or external resources.
+- **Plain text** — no formatting marks, for email, tickets or chat.
+
+The LLM-written summary Markdown is *rendered* in the rich formats — headings,
+lists and task boxes, bold/italic, code, quotes and tables — never dumped as
+raw syntax. Links keep only their text, as on screen. Every format renders the
+same format-neutral `ExportDocument`, so they differ only in presentation.
 
 Export generation is implemented in:
 
-`Kurn/Infrastructure/MeetingExport.swift`
+- `Kurn/Infrastructure/MeetingExport.swift` (meeting → `ExportDocument`, temp files)
+- `Kurn/Infrastructure/MeetingExportFormat.swift` and `PDFExportRenderer.swift`
+- `Packages/KurnCore/Sources/KurnCore/Export/` (document model, inline Markdown,
+  Markdown/plain-text/HTML/Word renderers, stored-ZIP writer)
 
 ## Architecture
 

@@ -750,10 +750,19 @@
 "share.copy_all" = "Copia tutto";
 "share.share_action" = "Condividi";
 "share.format.picker" = "Formato";
-"share.format.standard" = "Standard";
+"share.format.standard" = "Markdown";
 "share.format.obsidian" = "Obsidian";
 "share.format.standard.detail" = "Markdown semplice, senza metadati aggiuntivi.";
 "share.format.obsidian.detail" = "Aggiunge frontmatter YAML e [[wikilink]] per gli interlocutori.";
+"share.format.pdf" = "PDF";
+"share.format.pdf.detail" = "Documento impaginato con riepiloghi formattati, pronto da stampare o inviare.";
+"share.format.docx" = "Word (.docx)";
+"share.format.docx.detail" = "Documento modificabile in Word, Pages o Google Docs, con titoli ed elenchi veri.";
+"share.format.html" = "Pagina web (HTML)";
+"share.format.html.detail" = "Pagina autonoma che si apre in qualsiasi browser e si incolla con la sua formattazione.";
+"share.format.plain_text" = "Testo semplice";
+"share.format.plain_text.detail" = "Testo senza segni di formattazione, per email, ticket o chat.";
+"share.exporting" = "Preparazione dei file";
 
 /* Markdown task checkboxes */
 "markdown.task.checked" = "Attività completata";
