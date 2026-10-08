@@ -3,7 +3,8 @@ description: >
   On a failed Xcode test job, best-effort collects the booted simulator's
   unified log and any DiagnosticReports, then uploads them alongside the
   .xcresult bundle (H10 PR 24, item 4: retain enough evidence to diagnose one
-  run without needing to reproduce it locally). Log collection is guarded
+  run without needing to reproduce it locally), and prints the crashed test
+  host's backtraces into the job log (`Tools/summarize_crash_reports.py`). Log collection is guarded
   end-to-end (`set +e`, `|| true`, a final `exit 0`) so a wrong `simctl` flag
   or a missing booted device degrades to "no simulator log collected," never
   a second, confusing failure layered on top of the real one. Call this step
@@ -29,6 +30,16 @@ runs:
         fi
         cp -R ~/Library/Logs/DiagnosticReports "$RUNNER_TEMP/failure-diagnostics/" 2>/dev/null || true
         exit 0
+
+    # The artifact below expires and is not readable from everywhere a failure
+    # gets diagnosed; the crashed host's threads in the log are what name the
+    # test that was running when it aborted (e.g. the simulator audio stack's
+    # "AURemoteIO: RPC timeout. Apparently deadlocked").
+    - name: Print crash report backtraces
+      shell: bash
+      run: |
+        python3 "$GITHUB_WORKSPACE/Tools/summarize_crash_reports.py" \
+          "$RUNNER_TEMP/failure-diagnostics/DiagnosticReports" || true
 
     - name: Upload failure diagnostics
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
