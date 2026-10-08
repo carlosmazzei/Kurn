@@ -563,7 +563,12 @@ shared offline manual-rendering loop behind `AudioPreprocessor`,
 **must** go through an `AVAudioEngine` player-node render — `AVAudioFile.read`
 and `AVAudioConverter` both fail on them with a generic "erro 0" on device.
 `VADAudioLoader.monoSamples` keeps its own copy of the loop because it is
-synchronous; keep the two in sync.
+synchronous; keep the two in sync. Both get their engine from
+`OfflineAudioRenderer.makeOfflineEngine`, which switches to `.offline` manual
+rendering **before** any node is wired: touching `mainMixerNode` on a device-mode
+engine creates an `AURemoteIO` output unit registered with the audio server, and
+one per parallel render is what aborted the test host with `AURemoteIO: RPC
+timeout. Apparently deadlocked`.
 
 ### Secure local storage for recordings
 

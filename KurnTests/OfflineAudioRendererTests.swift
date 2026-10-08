@@ -47,3 +47,32 @@ struct OfflineAudioRendererTests {
         #expect(everyRenderCoversTheClip, "every render covers the 1 s clip: \(frames)")
     }
 }
+
+struct OfflineAudioEngineFactoryTests {
+
+    @Test func theEngineIsOfflineBeforeAnyNodeIsWired() throws {
+        let format = try #require(OfflineAudioRenderer.monoFormat(sampleRate: 16_000))
+
+        let engine = try OfflineAudioRenderer.makeOfflineEngine(outputFormat: format, maximumFrameCount: 2048)
+
+        #expect(engine.isInManualRenderingMode)
+        #expect(engine.manualRenderingMode == .offline)
+        #expect(engine.manualRenderingMaximumFrameCount == 2048)
+        #expect(engine.manualRenderingFormat.sampleRate == 16_000)
+        #expect(engine.manualRenderingFormat.channelCount == 1)
+    }
+
+    @Test func wiringAfterwardsKeepsTheEngineOffline() throws {
+        let format = try #require(OfflineAudioRenderer.monoFormat(sampleRate: 16_000))
+        let engine = try OfflineAudioRenderer.makeOfflineEngine(outputFormat: format, maximumFrameCount: 4096)
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+
+        engine.connect(player, to: engine.mainMixerNode, format: format)
+        try engine.start()
+        defer { engine.stop() }
+
+        #expect(engine.isInManualRenderingMode)
+        #expect(engine.manualRenderingMode == .offline)
+    }
+}

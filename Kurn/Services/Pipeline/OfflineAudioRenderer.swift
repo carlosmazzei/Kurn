@@ -90,12 +90,11 @@ struct OfflineAudioRenderer {
             throw failure
         }
 
-        let engine = AVAudioEngine()
+        let engine = try Self.makeOfflineEngine(outputFormat: outputFormat, maximumFrameCount: maxFrames)
         let player = AVAudioPlayerNode()
         engine.attach(player)
         buildChain(engine, player, inputFormat)
 
-        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
         try engine.start()
         afterStart?(engine)
         Self.scheduleForOfflineRender(inputFile, on: player)
@@ -171,6 +170,32 @@ struct OfflineAudioRenderer {
         }
         AppLog.transcription.atDebug.debug("\(self.logLabel, privacy: .public): render progress 100%")
         return engine.manualRenderingSampleTime
+    }
+
+    /// An engine already switched to `.offline` manual rendering, before any
+    /// node is attached or connected.
+    ///
+    /// The order is the point. `mainMixerNode` is created lazily and wired to
+    /// `outputNode` on first access, and in the default (device) mode that
+    /// output is an `AURemoteIO` — a real I/O unit registered with the audio
+    /// server over RPC — even though an offline render never plays a sample.
+    /// Building the chain first and switching modes afterwards, as this code
+    /// used to, created one such unit per render. With several renders in
+    /// parallel (the unit tests run the preprocessors, the enhancement renderer
+    /// and the compactors concurrently) the simulator's audio server stopped
+    /// answering and the host process aborted with
+    /// `AURemoteIO: RPC timeout. Apparently deadlocked. Aborting now.`. On a
+    /// device it also means a background transcription touched the audio
+    /// hardware while a recording might be running. Switching first means the
+    /// output node is created as the offline unit and the audio server is
+    /// never involved.
+    static func makeOfflineEngine(
+        outputFormat: AVAudioFormat,
+        maximumFrameCount: AVAudioFrameCount
+    ) throws -> AVAudioEngine {
+        let engine = AVAudioEngine()
+        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maximumFrameCount)
+        return engine
     }
 
     /// Mono Float32 output format at `sampleRate`, the shape every machine
