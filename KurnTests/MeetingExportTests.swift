@@ -317,7 +317,11 @@ struct MeetingExportTests {
         context.insert(meeting)
         let summary = Summary(
             meeting: meeting,
-            sections: [SummarySection(title: "Recap", body: "We **aligned**.", items: ["Ship it", "Test it"])],
+            sections: [SummarySection(
+                title: "Recap",
+                body: "We **aligned** on the scope of the release and agreed to ship it next week.",
+                items: ["Ship it", "Test it"]
+            )],
             provider: .openAI
         )
         context.insert(summary)
@@ -330,15 +334,89 @@ struct MeetingExportTests {
         context.insert(transcript)
         recording.transcript = transcript
 
-        var expected = "# Sprint Planning\n\n_\(meeting.createdAt.meetingDisplay)_\n\n"
+        var expected = "# Sprint Planning\n\n_\(ExportLanguage.dateLine(for: meeting.createdAt, labels: .english))_\n\n"
         if meeting.totalDuration > 0 {
             expected += "**Duration:** \(meeting.totalDuration.clockDisplay)\n\n"
         }
         expected += "## Notes\n\nBring laptops\n\n"
-        expected += "## Summary\n\n### Recap\n\nWe **aligned**.\n\n- Ship it\n- Test it\n\n"
+        expected += "## Summary\n\n### Recap\n\nWe **aligned** on the scope of the release and agreed to ship it next week.\n\n"
+        expected += "- Ship it\n- Test it\n\n"
         expected += "## Highlights\n\n- 0:06\n\n"
         expected += "## Transcript\n\n**[0:00] Speaker 1:** Hello\n\n⭐ **[0:05] Speaker 1:** World\n\n"
         #expect(MeetingExport.markdown(for: meeting, summary: summary) == expected)
+    }
+
+    // MARK: - Document language
+
+    /// A Portuguese summary gets Portuguese headings, whatever language the
+    /// app itself runs in.
+    @Test func headingsFollowTheSummarysLanguage() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Planejamento", notes: "Levar os notebooks")
+        context.insert(meeting)
+        let summary = Summary(
+            meeting: meeting,
+            sections: [SummarySection(
+                title: "Decisões",
+                body: "A equipe decidiu lançar a nova versão na próxima semana, depois de revisar os testes com o cliente."
+            )],
+            provider: .openAI
+        )
+        context.insert(summary)
+        addTranscribedRecording(to: meeting, in: context, at: 0, text: "Bom dia a todos, vamos começar.")
+        addTranscribedRecording(to: meeting, in: context, at: 60, text: "Obrigado pela presença.")
+
+        let document = MeetingExport.document(for: meeting, summary: summary)
+        #expect(document.labels == .forLanguage("pt"))
+        let markdown = MarkdownExportRenderer.render(document)
+        for heading in ["## Notas", "## Resumo", "## Transcrição", "### Segmento 1", "### Segmento 2"] {
+            #expect(markdown.contains(heading), "missing \(heading)")
+        }
+        #expect(!markdown.contains("## Summary"))
+        #expect(MeetingExport.summaryMarkdown(for: meeting, summary: summary).contains("## Resumo"))
+    }
+
+    /// A transcript exported on its own is judged by its own text.
+    @Test func transcriptHeadingFollowsTheTranscriptsLanguage() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Reunión")
+        context.insert(meeting)
+        let recording = addTranscribedRecording(
+            to: meeting, in: context, at: 0,
+            text: "Buenos días a todos. Hoy vamos a revisar el presupuesto del próximo trimestre y las contrataciones."
+        )
+        let document = MeetingExport.transcriptDocument(for: meeting, recording: recording)
+        #expect(document.labels.languageCode == "es")
+        #expect(MarkdownExportRenderer.render(document).contains("## Transcripción"))
+    }
+
+    /// Too little text to judge falls back to the meeting's own language.
+    @Test func shortContentFallsBackToTheMeetingLanguage() {
+        let context = makeContext()
+        let meeting = Meeting(title: "Kurz", language: .german)
+        context.insert(meeting)
+        let recording = addTranscribedRecording(to: meeting, in: context, at: 0, text: "Hallo")
+        #expect(MeetingExport.transcriptDocument(for: meeting, recording: recording).labels.transcript == "Transkript")
+
+        let unknown = Meeting(title: "Short")
+        context.insert(unknown)
+        let other = addTranscribedRecording(to: unknown, in: context, at: 0, text: "Hi")
+        #expect(MeetingExport.transcriptDocument(for: unknown, recording: other).labels == .english)
+    }
+
+    @discardableResult
+    private func addTranscribedRecording(to meeting: Meeting, in context: ModelContext, at offset: TimeInterval, text: String) -> Recording {
+        let recording = Recording(
+            meeting: meeting, fileName: "r\(Int(offset)).m4a", duration: 10,
+            recordedAt: Date(timeIntervalSince1970: 1_000 + offset)
+        )
+        context.insert(recording)
+        let transcript = Transcript(recording: recording, segments: [
+            TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 5, text: text)
+        ])
+        context.insert(transcript)
+        recording.transcript = transcript
+        return recording
     }
 
     @Test func documentKeepsSummaryMarkdownForRichFormatsToRender() {

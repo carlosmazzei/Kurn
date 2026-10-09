@@ -16,7 +16,7 @@ public enum HTMLExportRenderer {
         var body = "<header>\n<h1>\(escape(document.title))</h1>\n"
         var meta = escape(document.dateLine)
         if let duration = document.duration {
-            meta += " · \(escape(ExportDocument.durationLabel)): \(escape(duration))"
+            meta += " · \(escape(document.labels.duration)): \(escape(duration))"
         }
         body += "<p class=\"meta\">\(meta)</p>\n"
         if !document.properties.tags.isEmpty {
@@ -28,7 +28,7 @@ public enum HTMLExportRenderer {
 
         return """
         <!DOCTYPE html>
-        <html>
+        <html lang="\(escape(document.labels.languageCode))">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">

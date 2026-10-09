@@ -488,7 +488,10 @@ formats, picked in the share sheet:
 
 The LLM-written summary Markdown is *rendered* in the rich formats — headings,
 lists and task boxes, bold/italic, code, quotes and tables — never dumped as
-raw syntax. Links keep only their text, as on screen. Every format renders the
+raw syntax. Links keep only their text, as on screen. Section headings,
+labels and the date are written in the language of the summary (or of the
+transcript when exporting it alone), so a Portuguese summary reads "Resumo",
+"Transcrição", whatever language the app runs in. Every format renders the
 same format-neutral `ExportDocument`, so they differ only in presentation.
 
 Export generation is implemented in:

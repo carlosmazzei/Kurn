@@ -45,29 +45,33 @@ enum MeetingExport {
     /// summary, highlights, then every transcribed recording in order.
     @MainActor
     static func document(for meeting: Meeting, summary: Summary?) -> ExportDocument {
-        var document = header(for: meeting)
-
-        if !meeting.notes.isEmpty {
-            document.blocks.append(.heading(level: 2, text: "Notes"))
-            document.blocks.append(.plainText(meeting.notes))
-        }
-
-        if let summary {
-            document.blocks += summaryBlocks(summary)
-        }
-
-        document.blocks += highlightBlocks(for: meeting)
-
         let transcribed = meeting.recordings
             .filter(\.isReadyForConsumption)
             .sorted { $0.recordedAt < $1.recordedAt }
             .filter { $0.transcript != nil }
+        // The summary decides the language when there is one: it is what the
+        // reader reads first, and it may have been translated on request.
+        let sample = [summary.map(summaryText) ?? "", transcriptText(transcribed), meeting.notes].joined(separator: "\n")
+        var document = header(for: meeting, languageSample: sample)
+        let labels = document.labels
+
+        if !meeting.notes.isEmpty {
+            document.blocks.append(.heading(level: 2, text: labels.notes))
+            document.blocks.append(.plainText(meeting.notes))
+        }
+
+        if let summary {
+            document.blocks += summaryBlocks(summary, labels: labels)
+        }
+
+        document.blocks += highlightBlocks(for: meeting, labels: labels)
+
         if !transcribed.isEmpty {
-            document.blocks.append(.heading(level: 2, text: "Transcript"))
+            document.blocks.append(.heading(level: 2, text: labels.transcript))
             let nameByLabel = speakerNames(for: meeting)
             for (index, recording) in transcribed.enumerated() {
                 if transcribed.count > 1 {
-                    document.blocks.append(.heading(level: 3, text: "Segment \(index + 1)"))
+                    document.blocks.append(.heading(level: 3, text: labels.segment(index + 1)))
                 }
                 document.blocks += transcriptBlocks(for: meeting, recording: recording, nameByLabel: nameByLabel)
             }
@@ -79,8 +83,8 @@ enum MeetingExport {
     /// One recording's transcript, standalone.
     @MainActor
     static func transcriptDocument(for meeting: Meeting, recording: Recording) -> ExportDocument {
-        var document = header(for: meeting)
-        document.blocks.append(.heading(level: 2, text: "Transcript"))
+        var document = header(for: meeting, languageSample: transcriptText([recording]))
+        document.blocks.append(.heading(level: 2, text: document.labels.transcript))
         document.blocks += transcriptBlocks(for: meeting, recording: recording, nameByLabel: speakerNames(for: meeting))
         return document
     }
@@ -88,24 +92,49 @@ enum MeetingExport {
     /// One summary, standalone.
     @MainActor
     static func summaryDocument(for meeting: Meeting, summary: Summary) -> ExportDocument {
-        var document = header(for: meeting)
-        document.blocks = summaryBlocks(summary)
+        var document = header(for: meeting, languageSample: summaryText(summary))
+        document.blocks = summaryBlocks(summary, labels: document.labels)
         return document
     }
 
+    /// Title, date and properties, with the labels of the language
+    /// `languageSample` is written in (see `ExportLanguage`).
     @MainActor
-    private static func header(for meeting: Meeting) -> ExportDocument {
-        ExportDocument(
+    private static func header(for meeting: Meeting, languageSample: String) -> ExportDocument {
+        let labels = ExportLanguage.labels(for: languageSample, fallback: meeting.language)
+        return ExportDocument(
             title: meeting.title,
-            dateLine: meeting.createdAt.meetingDisplay,
+            dateLine: ExportLanguage.dateLine(for: meeting.createdAt, labels: labels),
             duration: meeting.totalDuration > 0 ? meeting.totalDuration.clockDisplay : nil,
             properties: ExportDocument.Properties(
                 date: meeting.createdAt,
                 tags: meeting.tags.map(\.name),
                 folderPath: meeting.folder.map(folderPath),
                 isFavorite: meeting.isFavorite
-            )
+            ),
+            labels: labels
         )
+    }
+
+    /// A summary's text as one string, for language detection.
+    private static func summaryText(_ summary: Summary) -> String {
+        summary.sections
+            .flatMap { [$0.title, $0.body] + $0.items }
+            .joined(separator: "\n")
+    }
+
+    /// The opening of the recordings' transcripts, for language detection —
+    /// stopping once there is enough, so a long meeting costs no more.
+    @MainActor
+    private static func transcriptText(_ recordings: [Recording]) -> String {
+        var text = ""
+        for recording in recordings {
+            for segment in recording.transcript?.segments ?? [] {
+                text += segment.text + "\n"
+                if text.count >= ExportLanguage.sampleLimit { return text }
+            }
+        }
+        return text
     }
 
     /// `Parent/Child` path for a (possibly nested) folder.
@@ -119,8 +148,8 @@ enum MeetingExport {
         return components.reversed().joined(separator: "/")
     }
 
-    private static func summaryBlocks(_ summary: Summary) -> [ExportDocument.Block] {
-        var blocks: [ExportDocument.Block] = [.heading(level: 2, text: "Summary")]
+    private static func summaryBlocks(_ summary: Summary, labels: ExportLabels) -> [ExportDocument.Block] {
+        var blocks: [ExportDocument.Block] = [.heading(level: 2, text: labels.summary)]
         for section in summary.sections {
             if !section.title.isEmpty {
                 blocks.append(.heading(level: 3, text: section.title))
@@ -139,7 +168,7 @@ enum MeetingExport {
     /// stamps and sorted chronologically. Static document, no tap-to-seek —
     /// purely a navigational list.
     @MainActor
-    private static func highlightBlocks(for meeting: Meeting) -> [ExportDocument.Block] {
+    private static func highlightBlocks(for meeting: Meeting, labels: ExportLabels) -> [ExportDocument.Block] {
         let stamps = meeting.recordings
             .filter(\.isReadyForConsumption)
             .sorted { $0.recordedAt < $1.recordedAt }
@@ -149,7 +178,7 @@ enum MeetingExport {
             .sorted()
         guard !stamps.isEmpty else { return [] }
         return [
-            .heading(level: 2, text: "Highlights"),
+            .heading(level: 2, text: labels.highlights),
             .bulletItems(stamps.map(\.clockDisplay))
         ]
     }

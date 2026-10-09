@@ -18,7 +18,7 @@ public enum MarkdownExportRenderer {
         out += "# \(document.title)\n\n"
         out += "_\(document.dateLine)_\n\n"
         if let duration = document.duration {
-            out += "**\(ExportDocument.durationLabel):** \(duration)\n\n"
+            out += "**\(document.labels.duration):** \(duration)\n\n"
         }
         for block in document.blocks {
             out += render(block, obsidianStyle: obsidianStyle)

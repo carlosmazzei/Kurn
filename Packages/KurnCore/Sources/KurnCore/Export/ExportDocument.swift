@@ -76,6 +76,10 @@ public struct ExportDocument: Equatable, Sendable {
     /// Formatted total duration, `nil` when there is no audio.
     public var duration: String?
     public var properties: Properties
+    /// The words the export adds around the content, in the content's own
+    /// language. The builder also uses them for the section headings it puts
+    /// in `blocks`; renderers read the duration label and language from here.
+    public var labels: ExportLabels
     public var blocks: [Block]
 
     public init(
@@ -83,19 +87,16 @@ public struct ExportDocument: Equatable, Sendable {
         dateLine: String,
         duration: String? = nil,
         properties: Properties,
+        labels: ExportLabels = .english,
         blocks: [Block] = []
     ) {
         self.title = title
         self.dateLine = dateLine
         self.duration = duration
         self.properties = properties
+        self.labels = labels
         self.blocks = blocks
     }
-
-    /// Label of the duration line. English like the section headings: the
-    /// export's structure has always been English, whatever language the
-    /// meeting itself was held in.
-    public static let durationLabel = "Duration"
 }
 
 // MARK: - Rich layer
