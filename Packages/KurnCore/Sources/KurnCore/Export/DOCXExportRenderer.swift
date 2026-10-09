@@ -24,7 +24,7 @@ public enum DOCXExportRenderer {
         try zip.add(path: "docProps/core.xml", text: coreProperties(for: document))
         try zip.add(path: "docProps/app.xml", text: appProperties)
         try zip.add(path: "word/_rels/document.xml.rels", text: documentRelationships)
-        try zip.add(path: "word/styles.xml", text: styles)
+        try zip.add(path: "word/styles.xml", text: styles(languageCode: document.labels.languageCode))
         try zip.add(path: "word/document.xml", text: documentXML(for: document, pageSize: pageSize))
         return zip.finalized()
     }
@@ -35,7 +35,7 @@ public enum DOCXExportRenderer {
         var body = paragraph(style: "Title", runs: [InlineRun(document.title)])
         var meta = document.dateLine
         if let duration = document.duration {
-            meta += " · \(ExportDocument.durationLabel): \(duration)"
+            meta += " · \(document.labels.duration): \(duration)"
         }
         body += paragraph(style: "Subtitle", runs: [InlineRun(meta)])
         if !document.properties.tags.isEmpty {
@@ -225,11 +225,15 @@ public enum DOCXExportRenderer {
         return out
     }
 
-    static var styles: String {
+    /// `languageCode` becomes the document's default proofing language, so
+    /// Word spell-checks a Portuguese export as Portuguese.
+    static func styles(languageCode: String) -> String {
+        let language = escape(languageCode)
         var out = xmlDeclaration + "<w:styles xmlns:w=\"\(wordNamespace)\">"
         out += "<w:docDefaults><w:rPrDefault><w:rPr>"
         out += "<w:rFonts w:ascii=\"Calibri\" w:hAnsi=\"Calibri\" w:eastAsia=\"Calibri\" w:cs=\"Calibri\"/>"
-        out += "<w:sz w:val=\"22\"/><w:szCs w:val=\"22\"/></w:rPr></w:rPrDefault>"
+        out += "<w:sz w:val=\"22\"/><w:szCs w:val=\"22\"/>"
+        out += "<w:lang w:val=\"\(language)\" w:eastAsia=\"\(language)\" w:bidi=\"\(language)\"/></w:rPr></w:rPrDefault>"
         out += "<w:pPrDefault><w:pPr><w:spacing w:after=\"120\" w:line=\"276\" w:lineRule=\"auto\"/></w:pPr></w:pPrDefault>"
         out += "</w:docDefaults>"
         out += "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/><w:qFormat/></w:style>"

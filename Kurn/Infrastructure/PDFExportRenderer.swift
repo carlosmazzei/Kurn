@@ -80,7 +80,7 @@ enum PDFExportRenderer {
         append([InlineRun(document.title)], to: out, font: Style.font(size: 24, bold: true), paragraph: Style.paragraph(after: 4))
         var meta = document.dateLine
         if let duration = document.duration {
-            meta += " · \(ExportDocument.durationLabel): \(duration)"
+            meta += " · \(document.labels.duration): \(duration)"
         }
         if !document.properties.tags.isEmpty {
             meta += "\n" + document.properties.tags.map { "#\($0)" }.joined(separator: "  ")

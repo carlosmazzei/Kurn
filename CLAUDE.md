@@ -1409,8 +1409,14 @@ renderer remembered it.
   main-actor-bound, so the share sheet renders off the main actor
   (`MeetingExportItem.writeTemporaryFile`). Core Text draws no strikethrough
   or backgrounds; those are carried by colour and font instead.
-- Section headings ("Summary", "Transcript", …) stay English in every format,
-  as the Markdown export always has been.
+- The words the export adds — section headings, the duration label, the
+  date — follow the language of the exported content, not the app's UI:
+  `ExportLanguage` (app, `NLLanguageRecognizer`) reads the summary, else the
+  transcript, else the notes, and falls back to `Meeting.language` below
+  `minimumSampleLength`/`minimumConfidence`, then English. `ExportLabels`
+  (KurnCore) is a table rather than `Localizable.strings` because a meeting
+  can be in a language the app is not localized into; HTML's `lang` and
+  Word's proofing `w:lang` carry the same code.
 - Copy puts the format's own text on the clipboard for Markdown, Obsidian and
   plain text, and Markdown for the file formats.
 

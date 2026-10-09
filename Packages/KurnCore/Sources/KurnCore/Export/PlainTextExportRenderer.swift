@@ -14,7 +14,7 @@ public enum PlainTextExportRenderer {
         var out = underlined(document.title, with: "=")
         out += "\(document.dateLine)\n"
         if let duration = document.duration {
-            out += "\(ExportDocument.durationLabel): \(duration)\n"
+            out += "\(document.labels.duration): \(duration)\n"
         }
         out += "\n"
         var previousWasListItem = false
