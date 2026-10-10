@@ -436,6 +436,7 @@
 "detail.summary.progress.subtitle" = "Elaborazione della trascrizione in sezioni. Puoi lasciare aperta questa schermata o annullare l'operazione.";
 "detail.summary.progress.single.subtitle" = "Richiesta al modello selezionato di scrivere il riassunto. Potrebbe richiedere qualche istante.";
 "detail.summary.progress.streaming" = "Il modello sta scrivendo: circa %d parole finora.";
+"detail.summary.draft.title" = "Bozza: formattata al termine";
 "detail.summary.delete_confirm.title" = "Eliminare questo riassunto?";
 "detail.summary.delete_confirm.message" = "Non è possibile annullare l'operazione.";
 "detail.share" = "Condividi";

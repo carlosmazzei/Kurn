@@ -190,30 +190,31 @@ struct SummaryServiceGenerationTests {
         #expect(llm.summarizeCalls.count == 1)
     }
 
-    // MARK: - Streamed progress
+    // MARK: - Streamed draft
 
-    @Test func streamedFragmentsReportARunningWordCount() async throws {
+    @Test func streamedFragmentsBuildAReadableDraft() async throws {
         let llm = ScriptedLLMProvider(summaryDeltas: [#"{"sections":[{"title":"Deci"#, #"sions","body":"we ship"}]}"#])
-        let words = Recorded<Int>()
+        let drafts = Recorded<SummaryDraftSnapshot>()
         _ = try await service(llm).generate(
             transcriptText: "[00:01] Ana: vamos", meetingTitle: "t", provider: .openAI, model: "m", template: .general,
-            onTextProgress: { words.append($0) }
+            onDraft: { drafts.append($0) }
         )
-        // Reset to 0 as the request starts; then sections, title, "Deci";
-        // then "sions" continues that word, so only body, we, ship are new.
-        #expect(words.values == [0, 3, 6])
+        #expect(drafts.values.map(\.text) == ["", "Deci", "Decisions\nwe ship\n"])
+        #expect(drafts.values.map(\.words) == [0, 1, 3])
+        #expect(drafts.values.map(\.sequence) == [1, 2, 3])
     }
 
-    @Test func eachStagedRequestRestartsTheWordCount() async throws {
-        let llm = ScriptedLLMProvider(provider: .appleOnDevice, summaryDeltas: ["two words"])
-        let words = Recorded<Int>()
+    @Test func eachStagedRequestStartsAnEmptyDraftWithARisingSequence() async throws {
+        let llm = ScriptedLLMProvider(provider: .appleOnDevice, summaryDeltas: [#"{"sections":[{"title":"T"}]}"#])
+        let drafts = Recorded<SummaryDraftSnapshot>()
         _ = try await service(llm).generate(
             transcriptText: longTranscript(), meetingTitle: "Longa", provider: .appleOnDevice, model: "on-device",
-            template: .general, onTextProgress: { words.append($0) }
+            template: .general, onDraft: { drafts.append($0) }
         )
         let requests = llm.summarizeCalls.count
         #expect(requests > 2)
-        #expect(words.values == Array(repeating: [0, 2], count: requests).flatMap { $0 })
+        #expect(drafts.values.map(\.text) == Array(repeating: ["", "T\n"], count: requests).flatMap { $0 })
+        #expect(drafts.values.map(\.sequence) == Array(1...(requests * 2)))
     }
 
     @Test func contentDigestIsStableAndContentSensitive() {

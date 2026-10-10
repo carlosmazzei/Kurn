@@ -31,9 +31,20 @@ final class SummaryViewModel {
     /// being summarized in parts; nil for single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
     /// Approximate words the model has written so far in the request in
-    /// flight (`SummaryService`'s `onTextProgress`); nil until text starts
-    /// arriving, and back to nil-or-zero as each staged request begins.
+    /// flight; nil until text starts arriving, and back to nil as each
+    /// staged request begins.
     var summaryWordsReceived: Int?
+    /// The readable, unformatted draft of the request in flight
+    /// (`SummaryDraftPreview`), shown live while the model writes and
+    /// replaced by the parsed summary when it finishes. Empty before the
+    /// first fragment, and again as each staged request begins.
+    var summaryDraft = ""
+    /// When the request now in flight started, for the "thinking" timer
+    /// shown until its first fragment arrives.
+    var summaryRequestStartedAt: Date?
+    /// Last applied `SummaryDraftSnapshot.sequence`; snapshots hop to the
+    /// main actor independently, so an older one may land after a newer one.
+    private var lastDraftSequence = 0
     /// True while an existing summary is being translated into another
     /// language. Independent of `isSummarizing`/`summaryTask`: translating a
     /// summary neither blocks nor is blocked by generating a new one, and it
@@ -88,7 +99,8 @@ final class SummaryViewModel {
         isSummarizing = true
         isCancellingSummary = false
         summaryProgress = nil
-        summaryWordsReceived = nil
+        resetSummaryDraft()
+        summaryRequestStartedAt = Date()
         summaryTask = Task { [weak self, meeting] in
             await self?.generateSummary(
                 for: meeting,
@@ -136,7 +148,7 @@ final class SummaryViewModel {
             isSummarizing = false
             isCancellingSummary = false
             summaryProgress = nil
-            summaryWordsReceived = nil
+            resetSummaryDraft()
             summaryTask = nil
         }
 
@@ -166,8 +178,8 @@ final class SummaryViewModel {
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.summaryProgress = (stage, total) }
                 },
-                onTextProgress: { [weak self] words in
-                    Task { @MainActor in self?.recordSummaryWords(words) }
+                onDraft: { [weak self] snapshot in
+                    Task { @MainActor in self?.recordSummaryDraft(snapshot) }
                 },
                 onMapStageCompleted: { [weak self] checkpoint in
                     try await self?.storeSummaryMapCheckpointDurably(checkpoint, forMeetingID: meetingID)
@@ -207,12 +219,25 @@ final class SummaryViewModel {
         }
     }
 
-    /// Fold in a word-count update from the stream. A hop that lands after
-    /// the run finished (the `defer` above already cleared state) is
-    /// dropped, so a late update can't resurrect a stale count.
-    func recordSummaryWords(_ words: Int) {
-        guard isSummarizing else { return }
-        summaryWordsReceived = words > 0 ? words : nil
+    /// Apply a draft update from the stream. Dropped when it lands after
+    /// the run finished (the `defer` above already cleared state) or after a
+    /// newer update, so a late hop can't resurrect stale text. An empty
+    /// draft opens a new request and restarts the "thinking" timer.
+    func recordSummaryDraft(_ snapshot: SummaryDraftSnapshot) {
+        guard isSummarizing, snapshot.sequence > lastDraftSequence else { return }
+        lastDraftSequence = snapshot.sequence
+        if snapshot.text.isEmpty, !summaryDraft.isEmpty || summaryRequestStartedAt == nil {
+            summaryRequestStartedAt = Date()
+        }
+        summaryDraft = snapshot.text
+        summaryWordsReceived = snapshot.words > 0 ? snapshot.words : nil
+    }
+
+    private func resetSummaryDraft() {
+        summaryDraft = ""
+        summaryWordsReceived = nil
+        summaryRequestStartedAt = nil
+        lastDraftSequence = 0
     }
 
     /// Persist a staged summary run's map-stage progress so an interruption
