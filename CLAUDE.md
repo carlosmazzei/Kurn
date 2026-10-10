@@ -1415,10 +1415,20 @@ the stream's final finish/stop reason, exactly as the buffered parse did.
 `streamSSE(retriesBeforeFirstPayload:)` retries a 429/5xx or an unopened
 connection by `sendValidated`'s rules (Retry-After honoured, ambiguous
 timeouts not replayed) but never after the first payload; chat does not opt
-in. The streamed text is progress only, never displayed: KurnCore's
-`StreamedWordCount` turns it into the approximate word count the Summary tab
-shows (`SummaryViewModel.summaryWordsReceived`). The on-device model and test
-doubles fall back to the extension default, which is just `summarize`. Summary generation is
+in. While it streams, the Summary tab shows a live, unformatted draft the way
+the chat shows its reply: a "thinking for Ns" row (`ThinkingRow`, shared with
+the chat in `Views/StreamingIndicators.swift`) until the first fragment, then
+the text growing in a bounded window with a trailing cursor, replaced by the
+formatted summary when generation finishes. The raw stream is JSON, so it is
+never shown as is: KurnCore's `SummaryDraftPreview` walks it incrementally and
+emits only section titles, bodies and items (keys, nested objects, photo
+references and any prose around the JSON are dropped), plus a word count
+(`StreamedWordCount`). `SummaryService` reports it as numbered
+`SummaryDraftSnapshot`s — empty at the start of every map block and the
+reduce — and `SummaryViewModel.recordSummaryDraft` ignores one that lands
+after a newer snapshot or after the run ended. The on-device model and test
+doubles fall back to the extension default, which is just `summarize`, so
+they show only the thinking row. Summary generation is
 owned by `SummaryViewModel.startSummary`, which keeps the Summary tab in a
 non-reentrant progress state and supports cooperative cancellation.
 

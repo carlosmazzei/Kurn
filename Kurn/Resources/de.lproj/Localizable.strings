@@ -436,6 +436,7 @@
 "detail.summary.progress.subtitle" = "Das Transkript wird abschnittsweise verarbeitet. Sie können diesen Bildschirm geöffnet lassen oder den Vorgang abbrechen.";
 "detail.summary.progress.single.subtitle" = "Das ausgewählte Modell wird gebeten, die Zusammenfassung zu schreiben. Dies kann einen Moment dauern.";
 "detail.summary.progress.streaming" = "Das Modell schreibt – bisher etwa %d Wörter.";
+"detail.summary.draft.title" = "Entwurf – wird am Ende formatiert";
 "detail.summary.delete_confirm.title" = "Diese Zusammenfassung löschen?";
 "detail.summary.delete_confirm.message" = "Dies kann nicht rückgängig gemacht werden.";
 "detail.share" = "Teilen";

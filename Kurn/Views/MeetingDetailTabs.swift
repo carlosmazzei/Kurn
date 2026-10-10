@@ -138,6 +138,11 @@ struct SummaryTab: View {
     /// Approximate words the model has streamed so far in the current
     /// request; nil until text starts arriving.
     var summaryWordsReceived: Int?
+    /// The unformatted draft streaming in for the request in flight; empty
+    /// before its first fragment.
+    var summaryDraft = ""
+    /// When the request in flight started, for the "thinking" timer.
+    var summaryRequestStartedAt: Date?
     /// Currently selected summary's id; falls back to the newest when nil or
     /// no longer present (e.g. it was just deleted).
     let selectedSummaryID: UUID?
@@ -296,6 +301,10 @@ struct SummaryTab: View {
                 IndeterminateSummaryProgressBar()
             }
 
+            if !isCancellingSummary {
+                SummaryDraftView(draft: summaryDraft, startedAt: summaryRequestStartedAt)
+            }
+
             Button(role: .cancel) {
                 onCancel()
             } label: {
@@ -449,6 +458,52 @@ private struct IndeterminateSummaryProgressBar: View {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: false)) {
                 phase = true
+            }
+        }
+    }
+}
+
+/// The live, unformatted draft of a summary being written — the summary's
+/// counterpart of the chat's streaming reply: a "thinking for Ns" row until
+/// the first fragment arrives, then the text growing in a bounded window
+/// that follows the newest line, dimmed and with a trailing cursor so it
+/// reads as provisional. It is replaced by the formatted summary when
+/// generation finishes.
+private struct SummaryDraftView: View {
+    let draft: String
+    let startedAt: Date?
+
+    private static let endID = "summary.draft.end"
+
+    var body: some View {
+        if draft.isEmpty {
+            ThinkingRow(phase: nil, detail: nil, startedAt: startedAt ?? Date())
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(NSLocalizedString("detail.summary.draft.title", comment: "Live unformatted summary draft"))
+                    .font(Theme.caption2Emphasized)
+                    .foregroundStyle(Theme.textTertiary)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        HStack(alignment: .lastTextBaseline, spacing: 4) {
+                            Text(draft)
+                                .font(Theme.footnote)
+                                .italic()
+                                .foregroundStyle(Theme.textSecondary)
+                            StreamingCursor()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Color.clear
+                            .frame(height: 1)
+                            .id(Self.endID)
+                    }
+                    .frame(maxHeight: 200)
+                    .onChange(of: draft) {
+                        proxy.scrollTo(Self.endID, anchor: .bottom)
+                    }
+                }
+                .padding(12)
+                .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
     }

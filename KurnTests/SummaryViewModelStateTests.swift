@@ -112,25 +112,39 @@ struct SummaryViewModelStateTests {
         #expect(harness.llm.calls == 1)
     }
 
-    @Test func streamedWordsAreShownOnlyWhileARunIsInFlight() async throws {
+    @Test func theDraftIsShownOnlyWhileARunIsInFlightAndNeverGoesBackwards() async throws {
         let harness = try Harness()
-        harness.viewModel.recordSummaryWords(5)
-        #expect(harness.viewModel.summaryWordsReceived == nil)
+        let vm = harness.viewModel
+        vm.recordSummaryDraft(SummaryDraftSnapshot(sequence: 1, text: "early", words: 1))
+        #expect(vm.summaryDraft.isEmpty)
 
         harness.llm.holdUntilCancelled()
         harness.start()
+        #expect(vm.summaryRequestStartedAt != nil)
         await harness.waitUntilLLMCalled()
-        // Let the run's own reset-to-0 hop land before scripting updates.
+        // Let the run's own opening (empty) draft land before scripting updates.
         try await Task.sleep(for: .milliseconds(50))
-        harness.viewModel.recordSummaryWords(12)
-        #expect(harness.viewModel.summaryWordsReceived == 12)
-        harness.viewModel.recordSummaryWords(0)
-        #expect(harness.viewModel.summaryWordsReceived == nil)
-        harness.viewModel.recordSummaryWords(3)
 
-        harness.viewModel.cancelSummary()
+        vm.recordSummaryDraft(SummaryDraftSnapshot(sequence: 10, text: "Decisions\nwe", words: 2))
+        #expect(vm.summaryDraft == "Decisions\nwe")
+        #expect(vm.summaryWordsReceived == 2)
+
+        // An older snapshot landing late is ignored.
+        vm.recordSummaryDraft(SummaryDraftSnapshot(sequence: 9, text: "Deci", words: 1))
+        #expect(vm.summaryDraft == "Decisions\nwe")
+
+        // A new staged request opens with an empty draft and restarts the timer.
+        let before = try #require(vm.summaryRequestStartedAt)
+        try await Task.sleep(for: .milliseconds(10))
+        vm.recordSummaryDraft(SummaryDraftSnapshot(sequence: 11, text: "", words: 0))
+        #expect(vm.summaryDraft.isEmpty)
+        #expect(vm.summaryWordsReceived == nil)
+        #expect(try #require(vm.summaryRequestStartedAt) > before)
+
+        vm.cancelSummary()
         await harness.awaitSummary()
-        #expect(harness.viewModel.summaryWordsReceived == nil)
+        #expect(vm.summaryDraft.isEmpty)
+        #expect(vm.summaryRequestStartedAt == nil)
     }
 
     @Test func providerFailureSurfacesTheAppErrorAndPersistsNothing() async throws {

@@ -51,9 +51,9 @@ struct SummaryService {
     ///     matches this run's exactly (see `SummaryMapCheckpoint.matches`).
     ///   - onProgress: staged-path progress as (stage, totalStages); reported
     ///     off the main actor, single-pass summaries never call it.
-    ///   - onTextProgress: approximate words the model has written so far in
-    ///     the request currently in flight, restarting at 0 for each map
-    ///     block and for the reduce; reported off the main actor.
+    ///   - onDraft: the readable draft of the request in flight as it
+    ///     streams (`SummaryDraftPreview`), starting empty for each map block
+    ///     and for the reduce; reported off the main actor.
     ///   - onMapStageCompleted: staged-path durable-progress sink, awaited
     ///     after every completed map block (H4); the caller persists it so an
     ///     interrupted run can resume instead of re-condensing — for a cloud
@@ -66,7 +66,7 @@ struct SummaryService {
         template: SummaryTemplate,
         resume: SummaryMapCheckpoint? = nil,
         onProgress: (@Sendable (Int, Int) -> Void)? = nil,
-        onTextProgress: (@Sendable (Int) -> Void)? = nil,
+        onDraft: (@Sendable (SummaryDraftSnapshot) -> Void)? = nil,
         onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)? = nil
     ) async throws -> SummaryResult {
         let trimmed = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -77,6 +77,7 @@ struct SummaryService {
         }
 
         let llm = try resolveProvider(provider, model)
+        let draft = onDraft.map { DraftRecorder(onDraft: $0) }
         var budget = resolveBudget(provider, model)
 
         if budget.fits(trimmed) {
@@ -92,7 +93,7 @@ struct SummaryService {
                     llm: llm,
                     systemPrompt: SummaryPrompt.system(for: template),
                     userPrompt: userPrompt,
-                    onTextProgress: onTextProgress
+                    draft: draft
                 )
             } catch let error as AppError where error.isContextOverflow {
                 // The budget overestimated the window (outdated table entry,
@@ -115,7 +116,7 @@ struct SummaryService {
             template: template,
             resume: resume,
             onProgress: onProgress,
-            onTextProgress: onTextProgress,
+            draft: draft,
             onMapStageCompleted: onMapStageCompleted
         )
     }
@@ -140,7 +141,7 @@ struct SummaryService {
         template: SummaryTemplate,
         resume: SummaryMapCheckpoint?,
         onProgress: (@Sendable (Int, Int) -> Void)?,
-        onTextProgress: (@Sendable (Int) -> Void)?,
+        draft: DraftRecorder?,
         onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)?
     ) async throws -> SummaryResult {
         let blocks = Self.splitTranscript(transcript, maxChars: budget.mapBlockChars(for: transcript))
@@ -166,7 +167,7 @@ struct SummaryService {
                     llm: llm,
                     systemPrompt: SummaryPrompt.system(for: Self.notesTemplate),
                     userPrompt: userPrompt,
-                    onTextProgress: onTextProgress
+                    draft: draft
                 )
                 AppLog.transcription.atInfo.info("summary: map block \(index + 1, privacy: .public)/\(blocks.count, privacy: .public) done")
                 return Self.markdownText(from: partial.sections)
@@ -193,25 +194,24 @@ struct SummaryService {
             llm: llm,
             systemPrompt: SummaryPrompt.system(for: template),
             userPrompt: reducePrompt,
-            onTextProgress: onTextProgress
+            draft: draft
         )
     }
 
-    /// One streamed summary request, folding its fragments into a running
-    /// word count for `onTextProgress` (reset to 0 as the request starts).
+    /// One streamed summary request, folding its fragments into the draft
+    /// (which starts empty as the request starts).
     private static func streamSummary(
         llm: LLMProvider,
         systemPrompt: String,
         userPrompt: String,
-        onTextProgress: (@Sendable (Int) -> Void)?
+        draft: DraftRecorder?
     ) async throws -> SummaryResult {
-        guard let onTextProgress else {
+        guard let draft else {
             return try await llm.streamSummary(systemPrompt: systemPrompt, userPrompt: userPrompt) { _ in }
         }
-        let counter = LockedWordCount()
-        onTextProgress(0)
+        draft.startRequest()
         return try await llm.streamSummary(systemPrompt: systemPrompt, userPrompt: userPrompt) { delta in
-            onTextProgress(counter.add(delta))
+            draft.add(delta)
         }
     }
 
@@ -411,13 +411,34 @@ struct SummaryService {
     }
 }
 
-/// `StreamedWordCount` behind a lock: stream fragments arrive on a
-/// URLSession delegate queue, outside any actor.
-private final class LockedWordCount: @unchecked Sendable {
+/// One run's `SummaryDraftPreview` behind a lock: stream fragments arrive on
+/// a URLSession delegate queue, outside any actor. The sequence spans the
+/// whole run, so the empty draft opening a map block or the reduce
+/// supersedes everything the previous request reported.
+private final class DraftRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var count = StreamedWordCount()
+    private let onDraft: @Sendable (SummaryDraftSnapshot) -> Void
+    private var preview = SummaryDraftPreview()
+    private var sequence = 0
 
-    func add(_ fragment: String) -> Int {
-        lock.withLock { count.add(fragment) }
+    init(onDraft: @escaping @Sendable (SummaryDraftSnapshot) -> Void) {
+        self.onDraft = onDraft
+    }
+
+    func startRequest() {
+        report { $0 = SummaryDraftPreview() }
+    }
+
+    func add(_ fragment: String) {
+        report { $0.add(fragment) }
+    }
+
+    private func report(_ change: (inout SummaryDraftPreview) -> Void) {
+        let snapshot = lock.withLock { () -> SummaryDraftSnapshot in
+            change(&preview)
+            sequence += 1
+            return SummaryDraftSnapshot(sequence: sequence, text: preview.text, words: preview.words)
+        }
+        onDraft(snapshot)
     }
 }

@@ -436,6 +436,7 @@
 "detail.summary.progress.subtitle" = "Processando a transcrição em partes. Você pode manter esta tela aberta ou cancelar a geração.";
 "detail.summary.progress.single.subtitle" = "Pedindo ao modelo selecionado para escrever o resumo. Isso pode levar alguns instantes.";
 "detail.summary.progress.streaming" = "O modelo está escrevendo — cerca de %d palavras até agora.";
+"detail.summary.draft.title" = "Rascunho — formatado ao concluir";
 "detail.summary.delete_confirm.title" = "Excluir este resumo?";
 "detail.summary.delete_confirm.message" = "Essa ação não pode ser desfeita.";
 "detail.share" = "Compartilhar";
