@@ -64,15 +64,22 @@ struct HTTPPolicy: Equatable, Sendable {
     let totalDeadline: TimeInterval
     let maxResponseBytes: Int
     let maximumServerWait: TimeInterval
+    /// Longest silence tolerated between two pieces of a response, applied as
+    /// the request's `timeoutInterval` (which URLSession enforces as an
+    /// inactivity timeout, not a total one). Equal to `totalDeadline` unless
+    /// set, which keeps every non-streaming caller's behaviour unchanged.
+    let idleTimeout: TimeInterval
 
     init(
         totalDeadline: TimeInterval,
         maxResponseBytes: Int = defaultMaxResponseBytes,
-        maximumServerWait: TimeInterval = 30
+        maximumServerWait: TimeInterval = 30,
+        idleTimeout: TimeInterval? = nil
     ) {
         self.totalDeadline = max(0, totalDeadline)
         self.maxResponseBytes = max(0, maxResponseBytes)
         self.maximumServerWait = min(max(0, maximumServerWait), self.totalDeadline)
+        self.idleTimeout = min(max(0, idleTimeout ?? self.totalDeadline), self.totalDeadline)
     }
 
     static func interactive(totalDeadline: TimeInterval) -> Self {
@@ -82,6 +89,15 @@ struct HTTPPolicy: Equatable, Sendable {
     static func automated(totalDeadline: TimeInterval) -> Self {
         Self(totalDeadline: totalDeadline, maximumServerWait: 300)
     }
+
+    /// A streamed summary: bounded by silence rather than by length, so a
+    /// long generation that keeps producing text is not cut off at the
+    /// fixed deadline a buffered request needs.
+    static let streamingSummary = Self(
+        totalDeadline: LLMHTTP.summaryStreamDeadline,
+        maximumServerWait: 300,
+        idleTimeout: LLMHTTP.summaryTimeout
+    )
 
     func allowsServerWait(_ delay: TimeInterval) -> Bool {
         delay >= 0 && delay <= maximumServerWait
@@ -96,6 +112,11 @@ enum LLMHTTP {
     /// the whole generation finishes. Mirrors the transcribe path's 300s.
     static let summaryTimeout: TimeInterval = 300
     static let transcriptionTimeout: TimeInterval = 300
+    /// Total budget for a streamed summary. Streaming replaces the fixed
+    /// `summaryTimeout` with an inactivity timeout of the same length, so this
+    /// only bounds a generation that keeps trickling text for far longer than
+    /// any real summary takes.
+    static let summaryStreamDeadline: TimeInterval = 900
     /// Output budget for summary generations. The previous 2000-token cap cut
     /// long-meeting summaries off mid-JSON, which then failed to parse; 8192
     /// leaves room for a detailed multi-section summary on every vendor.

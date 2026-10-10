@@ -53,6 +53,50 @@ struct AnthropicProvider: LLMProvider {
         )
     }
 
+    /// Streamed `summarize`: the same Messages request with `"stream": true`.
+    func streamSummary(
+        systemPrompt: String,
+        userPrompt: String,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> SummaryResult {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        let request = try makeRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: [
+                "model": model,
+                "max_tokens": LLMHTTP.summaryMaxOutputTokens,
+                "system": systemPrompt,
+                "messages": [
+                    ["role": "user", "content": userPrompt]
+                ],
+                "stream": true
+            ]
+        )
+
+        let accumulator = StreamingAccumulator()
+        let finish = FinishReasonRecorder()
+        try await LLMHTTP.streamSSE(
+            request,
+            session: session,
+            policy: .streamingSummary,
+            retriesBeforeFirstPayload: true
+        ) { payload in
+            guard let event = try Self.decodeEvent(from: payload) else { return }
+            // `message_delta` carries the stop reason once generation ends.
+            finish.record(event.delta?.stopReason)
+            guard event.type == "content_block_delta", event.delta?.type == "text_delta",
+                  let delta = event.delta?.text, !delta.isEmpty else { return }
+            accumulator.append(delta)
+            onDelta(delta)
+        }
+        return try LLMHTTP.summaryResult(
+            streamedText: accumulator.value,
+            truncated: finish.value == "max_tokens",
+            emptyMessage: "empty Anthropic response"
+        )
+    }
+
     // MARK: - Chat (Messages API, plain text)
 
     func chat(
@@ -204,6 +248,13 @@ private struct StreamEvent: Decodable {
     struct Delta: Decodable {
         let type: String?
         let text: String?
+        /// Present on `message_delta`: why generation stopped.
+        let stopReason: String?
+
+        enum CodingKeys: String, CodingKey {
+            case type, text
+            case stopReason = "stop_reason"
+        }
     }
     struct ErrorInfo: Decodable {
         let message: String

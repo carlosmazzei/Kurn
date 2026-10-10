@@ -435,6 +435,7 @@
 "detail.summary.cancelling.subtitle" = "正在停止当前请求，已生成的摘要将被保留。";
 "detail.summary.progress.subtitle" = "正在分段处理转录内容。您可以让此页面保持打开，或取消本次生成。";
 "detail.summary.progress.single.subtitle" = "正在请求所选模型撰写摘要，这可能需要一点时间。";
+"detail.summary.progress.streaming" = "模型正在撰写，目前约 %d 个词。";
 "detail.summary.delete_confirm.title" = "删除此摘要？";
 "detail.summary.delete_confirm.message" = "此操作无法撤销。";
 "detail.share" = "分享";

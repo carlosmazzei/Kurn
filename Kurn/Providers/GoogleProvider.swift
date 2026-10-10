@@ -27,8 +27,63 @@ struct GoogleProvider: LLMProvider {
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
 
-        // Gemini has no dedicated system role here; fold it into the user turn.
-        let combined = "\(systemPrompt)\n\n\(userPrompt)"
+        let request = try makeRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: Self.summaryBody(systemPrompt: systemPrompt, userPrompt: userPrompt)
+        )
+
+        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+
+        return try LLMHTTP.summaryResult(
+            from: data,
+            as: GeminiResponse.self,
+            emptyMessage: "empty Gemini response",
+            isTruncated: { $0.candidates?.first?.finishReason == "MAX_TOKENS" },
+            extractContent: { Self.text(from: $0) }
+        )
+    }
+
+    /// Streamed `summarize`: the same schema-constrained request against
+    /// `streamGenerateContent`.
+    func streamSummary(
+        systemPrompt: String,
+        userPrompt: String,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> SummaryResult {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        let request = try makeStreamRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: Self.summaryBody(systemPrompt: systemPrompt, userPrompt: userPrompt)
+        )
+
+        let accumulator = StreamingAccumulator()
+        let finish = FinishReasonRecorder()
+        try await LLMHTTP.streamSSE(
+            request,
+            session: session,
+            policy: .streamingSummary,
+            retriesBeforeFirstPayload: true
+        ) { payload in
+            guard let data = payload.data(using: .utf8),
+                  let chunk = try? JSONDecoder().decode(GeminiResponse.self, from: data) else { return }
+            finish.record(chunk.candidates?.first?.finishReason)
+            if let delta = Self.text(from: chunk), !delta.isEmpty {
+                accumulator.append(delta)
+                onDelta(delta)
+            }
+        }
+        return try LLMHTTP.summaryResult(
+            streamedText: accumulator.value,
+            truncated: finish.value == "MAX_TOKENS",
+            emptyMessage: "empty Gemini response"
+        )
+    }
+
+    /// The summary request body shared by the buffered and streamed routes.
+    /// Gemini has no dedicated system role here, so the system prompt is
+    /// folded into the user turn; the response schema pins the JSON contract.
+    private static func summaryBody(systemPrompt: String, userPrompt: String) -> [String: Any] {
         let summarySchema: [String: Any] = [
             "type": "object",
             "properties": [
@@ -50,27 +105,14 @@ struct GoogleProvider: LLMProvider {
             ],
             "required": ["sections"]
         ]
-        let request = try makeRequest(
-            timeout: LLMHTTP.summaryTimeout,
-            body: [
-                "contents": [["role": "user", "parts": [["text": combined]]]],
-                "generationConfig": [
-                    "responseMimeType": "application/json",
-                    "responseJsonSchema": summarySchema,
-                    "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
-                ]
+        return [
+            "contents": [["role": "user", "parts": [["text": "\(systemPrompt)\n\n\(userPrompt)"]]]],
+            "generationConfig": [
+                "responseMimeType": "application/json",
+                "responseJsonSchema": summarySchema,
+                "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
             ]
-        )
-
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
-
-        return try LLMHTTP.summaryResult(
-            from: data,
-            as: GeminiResponse.self,
-            emptyMessage: "empty Gemini response",
-            isTruncated: { $0.candidates?.first?.finishReason == "MAX_TOKENS" },
-            extractContent: { Self.text(from: $0) }
-        )
+        ]
     }
 
     // MARK: - Chat (generateContent, plain text)

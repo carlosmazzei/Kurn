@@ -435,6 +435,7 @@
 "detail.summary.cancelling.subtitle" = "Deteniendo la solicitud actual. Los resúmenes ya generados se conservan.";
 "detail.summary.progress.subtitle" = "Procesando la transcripción por secciones. Puedes dejar esta pantalla abierta o cancelar el proceso.";
 "detail.summary.progress.single.subtitle" = "Pidiendo al modelo seleccionado que escriba el resumen. Esto puede tardar un momento.";
+"detail.summary.progress.streaming" = "El modelo está escribiendo: unas %d palabras hasta ahora.";
 "detail.summary.delete_confirm.title" = "¿Eliminar este resumen?";
 "detail.summary.delete_confirm.message" = "Esta acción no se puede deshacer.";
 "detail.share" = "Compartir";

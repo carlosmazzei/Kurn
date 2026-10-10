@@ -112,6 +112,27 @@ struct SummaryViewModelStateTests {
         #expect(harness.llm.calls == 1)
     }
 
+    @Test func streamedWordsAreShownOnlyWhileARunIsInFlight() async throws {
+        let harness = try Harness()
+        harness.viewModel.recordSummaryWords(5)
+        #expect(harness.viewModel.summaryWordsReceived == nil)
+
+        harness.llm.holdUntilCancelled()
+        harness.start()
+        await harness.waitUntilLLMCalled()
+        // Let the run's own reset-to-0 hop land before scripting updates.
+        try await Task.sleep(for: .milliseconds(50))
+        harness.viewModel.recordSummaryWords(12)
+        #expect(harness.viewModel.summaryWordsReceived == 12)
+        harness.viewModel.recordSummaryWords(0)
+        #expect(harness.viewModel.summaryWordsReceived == nil)
+        harness.viewModel.recordSummaryWords(3)
+
+        harness.viewModel.cancelSummary()
+        await harness.awaitSummary()
+        #expect(harness.viewModel.summaryWordsReceived == nil)
+    }
+
     @Test func providerFailureSurfacesTheAppErrorAndPersistsNothing() async throws {
         let harness = try Harness()
         harness.llm.fail(with: AppError.noAPIKey(provider: "OpenAI"))

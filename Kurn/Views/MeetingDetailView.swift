@@ -332,6 +332,7 @@ struct MeetingDetailView: View {
                     isTranslatingSummary: summaries?.isTranslatingSummary == true,
                     translationTargetLanguage: summaries?.translationTargetLanguage,
                     summaryProgress: summaries?.summaryProgress,
+                    summaryWordsReceived: summaries?.summaryWordsReceived,
                     selectedSummaryID: selectedSummaryID,
                     hasAnyTranscript: hasAnyTranscript,
                     onGenerate: { generateSummary() },

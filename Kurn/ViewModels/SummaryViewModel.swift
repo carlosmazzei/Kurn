@@ -30,6 +30,10 @@ final class SummaryViewModel {
     /// Staged-summary progress as (stage, total) when a long transcript is
     /// being summarized in parts; nil for single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
+    /// Approximate words the model has written so far in the request in
+    /// flight (`SummaryService`'s `onTextProgress`); nil until text starts
+    /// arriving, and back to nil-or-zero as each staged request begins.
+    var summaryWordsReceived: Int?
     /// True while an existing summary is being translated into another
     /// language. Independent of `isSummarizing`/`summaryTask`: translating a
     /// summary neither blocks nor is blocked by generating a new one, and it
@@ -84,6 +88,7 @@ final class SummaryViewModel {
         isSummarizing = true
         isCancellingSummary = false
         summaryProgress = nil
+        summaryWordsReceived = nil
         summaryTask = Task { [weak self, meeting] in
             await self?.generateSummary(
                 for: meeting,
@@ -131,6 +136,7 @@ final class SummaryViewModel {
             isSummarizing = false
             isCancellingSummary = false
             summaryProgress = nil
+            summaryWordsReceived = nil
             summaryTask = nil
         }
 
@@ -159,6 +165,9 @@ final class SummaryViewModel {
                 onProgress: { [weak self] stage, total in
                     // Reported off the main actor; hop back before mutating state.
                     Task { @MainActor in self?.summaryProgress = (stage, total) }
+                },
+                onTextProgress: { [weak self] words in
+                    Task { @MainActor in self?.recordSummaryWords(words) }
                 },
                 onMapStageCompleted: { [weak self] checkpoint in
                     try await self?.storeSummaryMapCheckpointDurably(checkpoint, forMeetingID: meetingID)
@@ -196,6 +205,14 @@ final class SummaryViewModel {
             self.error = .apiError(statusCode: 0, message: error.localizedDescription)
             AppLog.transcription.atError.error("VM: summary failed code=unexpected")
         }
+    }
+
+    /// Fold in a word-count update from the stream. A hop that lands after
+    /// the run finished (the `defer` above already cleared state) is
+    /// dropped, so a late update can't resurrect a stale count.
+    func recordSummaryWords(_ words: Int) {
+        guard isSummarizing else { return }
+        summaryWordsReceived = words > 0 ? words : nil
     }
 
     /// Persist a staged summary run's map-stage progress so an interruption

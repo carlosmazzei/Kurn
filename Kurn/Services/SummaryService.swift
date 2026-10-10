@@ -51,6 +51,9 @@ struct SummaryService {
     ///     matches this run's exactly (see `SummaryMapCheckpoint.matches`).
     ///   - onProgress: staged-path progress as (stage, totalStages); reported
     ///     off the main actor, single-pass summaries never call it.
+    ///   - onTextProgress: approximate words the model has written so far in
+    ///     the request currently in flight, restarting at 0 for each map
+    ///     block and for the reduce; reported off the main actor.
     ///   - onMapStageCompleted: staged-path durable-progress sink, awaited
     ///     after every completed map block (H4); the caller persists it so an
     ///     interrupted run can resume instead of re-condensing — for a cloud
@@ -63,6 +66,7 @@ struct SummaryService {
         template: SummaryTemplate,
         resume: SummaryMapCheckpoint? = nil,
         onProgress: (@Sendable (Int, Int) -> Void)? = nil,
+        onTextProgress: (@Sendable (Int) -> Void)? = nil,
         onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)? = nil
     ) async throws -> SummaryResult {
         let trimmed = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -84,9 +88,11 @@ struct SummaryService {
             \(trimmed)
             """
             do {
-                return try await llm.summarize(
+                return try await Self.streamSummary(
+                    llm: llm,
                     systemPrompt: SummaryPrompt.system(for: template),
-                    userPrompt: userPrompt
+                    userPrompt: userPrompt,
+                    onTextProgress: onTextProgress
                 )
             } catch let error as AppError where error.isContextOverflow {
                 // The budget overestimated the window (outdated table entry,
@@ -109,6 +115,7 @@ struct SummaryService {
             template: template,
             resume: resume,
             onProgress: onProgress,
+            onTextProgress: onTextProgress,
             onMapStageCompleted: onMapStageCompleted
         )
     }
@@ -133,6 +140,7 @@ struct SummaryService {
         template: SummaryTemplate,
         resume: SummaryMapCheckpoint?,
         onProgress: (@Sendable (Int, Int) -> Void)?,
+        onTextProgress: (@Sendable (Int) -> Void)?,
         onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)?
     ) async throws -> SummaryResult {
         let blocks = Self.splitTranscript(transcript, maxChars: budget.mapBlockChars(for: transcript))
@@ -154,9 +162,11 @@ struct SummaryService {
                 Transcript (part \(index + 1) of \(blocks.count)):
                 \(block)
                 """
-                let partial = try await llm.summarize(
+                let partial = try await Self.streamSummary(
+                    llm: llm,
                     systemPrompt: SummaryPrompt.system(for: Self.notesTemplate),
-                    userPrompt: userPrompt
+                    userPrompt: userPrompt,
+                    onTextProgress: onTextProgress
                 )
                 AppLog.transcription.atInfo.info("summary: map block \(index + 1, privacy: .public)/\(blocks.count, privacy: .public) done")
                 return Self.markdownText(from: partial.sections)
@@ -179,10 +189,30 @@ struct SummaryService {
         Notes:
         \(combinedNotes)
         """
-        return try await llm.summarize(
+        return try await Self.streamSummary(
+            llm: llm,
             systemPrompt: SummaryPrompt.system(for: template),
-            userPrompt: reducePrompt
+            userPrompt: reducePrompt,
+            onTextProgress: onTextProgress
         )
+    }
+
+    /// One streamed summary request, folding its fragments into a running
+    /// word count for `onTextProgress` (reset to 0 as the request starts).
+    private static func streamSummary(
+        llm: LLMProvider,
+        systemPrompt: String,
+        userPrompt: String,
+        onTextProgress: (@Sendable (Int) -> Void)?
+    ) async throws -> SummaryResult {
+        guard let onTextProgress else {
+            return try await llm.streamSummary(systemPrompt: systemPrompt, userPrompt: userPrompt) { _ in }
+        }
+        let counter = LockedWordCount()
+        onTextProgress(0)
+        return try await llm.streamSummary(systemPrompt: systemPrompt, userPrompt: userPrompt) { delta in
+            onTextProgress(counter.add(delta))
+        }
     }
 
     /// SHA-256 of a map-reduce run's transcript text, part of
@@ -378,5 +408,16 @@ struct SummaryService {
             }
         }
         return lines.joined(separator: "\n")
+    }
+}
+
+/// `StreamedWordCount` behind a lock: stream fragments arrive on a
+/// URLSession delegate queue, outside any actor.
+private final class LockedWordCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = StreamedWordCount()
+
+    func add(_ fragment: String) -> Int {
+        lock.withLock { count.add(fragment) }
     }
 }

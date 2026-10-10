@@ -135,6 +135,9 @@ struct SummaryTab: View {
     /// (stage, total) when a long transcript is summarized in parts; nil for
     /// single-pass summaries.
     var summaryProgress: (stage: Int, total: Int)?
+    /// Approximate words the model has streamed so far in the current
+    /// request; nil until text starts arriving.
+    var summaryWordsReceived: Int?
     /// Currently selected summary's id; falls back to the newest when nil or
     /// no longer present (e.g. it was just deleted).
     let selectedSummaryID: UUID?
@@ -366,6 +369,12 @@ struct SummaryTab: View {
     private var progressSubtitle: String {
         if isCancellingSummary {
             return NSLocalizedString("detail.summary.cancelling.subtitle", comment: "Cancelling summary subtitle")
+        }
+        if let words = summaryWordsReceived {
+            return String(
+                format: NSLocalizedString("detail.summary.progress.streaming", comment: "Words streamed so far"),
+                words
+            )
         }
         if summaryProgress != nil {
             return NSLocalizedString("detail.summary.progress.subtitle", comment: "Staged summary subtitle")
