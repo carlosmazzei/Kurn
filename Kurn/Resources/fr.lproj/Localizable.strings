@@ -435,6 +435,7 @@
 "detail.summary.cancelling.subtitle" = "Arrêt de la requête en cours. Les résumés déjà générés sont conservés.";
 "detail.summary.progress.subtitle" = "Traitement de la transcription par sections. Vous pouvez garder cet écran ouvert ou annuler l'opération.";
 "detail.summary.progress.single.subtitle" = "Demande au modèle sélectionné de rédiger le résumé. Cela peut prendre un instant.";
+"detail.summary.progress.streaming" = "Le modèle écrit — environ %d mots pour l’instant.";
 "detail.summary.delete_confirm.title" = "Supprimer ce résumé ?";
 "detail.summary.delete_confirm.message" = "Cette action est irréversible.";
 "detail.share" = "Partager";

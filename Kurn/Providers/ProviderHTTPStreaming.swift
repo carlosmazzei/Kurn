@@ -11,11 +11,15 @@
 //  so cancelling the task that called `streamChat` cancels the in-flight
 //  request instead of leaving it running in an orphaned background task.
 //
-//  Streaming has no retry loop (unlike `sendValidated`): a stream either
-//  connects and delivers text, or it fails outright. Retrying a partially
-//  delivered generation would mean re-showing already-rendered text or
-//  silently dropping it, and `Retry-After` has no meaning once a response
-//  has started streaming, so this deliberately does not attempt either.
+//  A stream is never retried once it has delivered a payload: retrying a
+//  partially delivered generation would mean re-showing already-rendered
+//  text or silently dropping it, and `Retry-After` has no meaning once a
+//  response has started streaming. A caller can opt into retrying a failure
+//  that happened *before* the first payload (`retriesBeforeFirstPayload`) —
+//  a 429/5xx or a connection that never opened, judged by the same
+//  `retryableDelay` rules `sendValidated` uses — since nothing has been
+//  shown or charged for yet. Summaries opt in; chat, which streams into
+//  the visible reply, keeps the original fail-fast behaviour.
 //
 
 import Foundation
@@ -32,18 +36,77 @@ extension LLMHTTP {
         session: URLSession,
         policy: HTTPPolicy,
         clock: some MonotonicSleepClock = SystemClock(),
+        retriesBeforeFirstPayload: Bool = false,
         onPayload: @escaping @Sendable (String) throws -> Void
     ) async throws {
         guard let approvedURL = request.url else { throw AppError.invalidProviderURL }
         var boundedRequest = request
-        boundedRequest.timeoutInterval = policy.totalDeadline
-        let delegate = BoundedSSEDataDelegate(
-            approvedURL: approvedURL,
-            maxResponseBytes: policy.maxResponseBytes,
-            deadlineAt: clock.now + policy.totalDeadline,
-            now: { clock.now },
-            onPayload: onPayload
-        )
+        // URLSession applies `timeoutInterval` to silence between packets, so
+        // this is the stream's inactivity bound; the delegate enforces the
+        // total deadline itself.
+        boundedRequest.timeoutInterval = policy.idleTimeout
+        let deadlineAt = clock.now + policy.totalDeadline
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            let delegate = BoundedSSEDataDelegate(
+                approvedURL: approvedURL,
+                maxResponseBytes: policy.maxResponseBytes,
+                deadlineAt: deadlineAt,
+                now: { clock.now },
+                onPayload: onPayload
+            )
+            do {
+                try await streamAttempt(boundedRequest, session: session, delegate: delegate)
+                return
+            } catch {
+                guard retriesBeforeFirstPayload, !delegate.deliveredPayload,
+                      let delay = retryDelayBeforeFirstPayload(
+                        after: error, attempt: attempt, retryAfter: delegate.retryAfter, policy: policy
+                      ),
+                      delay < deadlineAt - clock.now else { throw error }
+                let seconds = String(format: "%.2f", delay)
+                AppLog.transcription.atInfo.info(
+                    "http: stream retrying after \(seconds, privacy: .public)s (attempt \(attempt + 2, privacy: .public)/\(maxAttempts, privacy: .public), code=\(error.publicLogCode, privacy: .public))"
+                )
+                try await clock.sleep(seconds: delay)
+                attempt += 1
+            }
+        }
+    }
+
+    /// How long to wait before retrying a stream that failed before its
+    /// first payload, or `nil` when it must not be retried: a non-transient
+    /// status, an exhausted attempt budget, a server wait longer than the
+    /// policy allows, or a timeout/lost connection — the same "ambiguous"
+    /// cases `sendValidated` refuses to replay, since the server may already
+    /// be generating. Not `private`: unit-tested directly.
+    static func retryDelayBeforeFirstPayload(
+        after error: Error,
+        attempt: Int,
+        retryAfter: TimeInterval?,
+        policy: HTTPPolicy
+    ) -> TimeInterval? {
+        switch error {
+        case AppError.apiError(let status, _) where status > 0:
+            guard let delay = retryableDelay(
+                attempt: attempt, status: status, urlError: nil, retryAfter: retryAfter
+            ) else { return nil }
+            if retryAfter != nil, !policy.allowsServerWait(delay) { return nil }
+            return delay
+        case AppError.networkError(let urlError):
+            guard !ambiguousURLErrorCodes.contains(urlError.code) else { return nil }
+            return retryableDelay(attempt: attempt, status: nil, urlError: urlError, retryAfter: nil)
+        default:
+            return nil
+        }
+    }
+
+    private static func streamAttempt(
+        _ request: URLRequest,
+        session: URLSession,
+        delegate: BoundedSSEDataDelegate
+    ) async throws {
         // Short-lived, custom-delegate session needed to enforce this same
         // origin-locked, deadline-bounded policy on a streaming response —
         // the same shape as ProviderHTTPTransport.swift's
@@ -56,7 +119,7 @@ extension LLMHTTP {
         )
         defer { controlledSession.invalidateAndCancel() }
         do {
-            try await delegate.execute(boundedRequest, session: controlledSession)
+            try await delegate.execute(request, session: controlledSession)
         } catch let error as AppError {
             throw error
         } catch is CancellationError {
@@ -66,7 +129,7 @@ extension LLMHTTP {
         } catch let error as URLError {
             if let restriction = LargeTransferPolicy.restrictionError(
                 for: error,
-                request: boundedRequest,
+                request: request,
                 snapshot: NetworkPathObserver.shared.snapshot
             ) {
                 throw restriction
@@ -92,6 +155,23 @@ final class StreamingAccumulator: @unchecked Sendable {
 
     var value: String { lock.withLock { text } }
     var receivedText: Bool { lock.withLock { !text.isEmpty } }
+}
+
+/// Thread-safe holder for the reason a streamed generation stopped, which
+/// vendors report in a final chunk or event (`finish_reason`,
+/// `stop_reason`, `finishReason`) separate from the text itself. A
+/// streamed summary reads it once the stream ends to tell a generation cut
+/// off by the output-token cap — broken JSON — from a complete one.
+final class FinishReasonRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reason: String?
+
+    func record(_ reason: String?) {
+        guard let reason, !reason.isEmpty else { return }
+        lock.withLock { self.reason = reason }
+    }
+
+    var value: String? { lock.withLock { reason } }
 }
 
 /// Thread-safe accumulator for the token usage a streaming response reports —
@@ -146,6 +226,14 @@ private final class BoundedSSEDataDelegate: NSObject, URLSessionDataDelegate, @u
     private var terminalError: Error?
     private var cancelled = false
     private var completed = false
+    private var _deliveredPayload = false
+    private var _retryAfter: TimeInterval?
+
+    /// Whether any payload reached `onPayload` — once one has, the attempt
+    /// must never be retried.
+    var deliveredPayload: Bool { lock.withLock { _deliveredPayload } }
+    /// The response's `Retry-After`, for retrying a rejected attempt.
+    var retryAfter: TimeInterval? { lock.withLock { _retryAfter } }
 
     init(
         approvedURL: URL,
@@ -206,6 +294,7 @@ private final class BoundedSSEDataDelegate: NSObject, URLSessionDataDelegate, @u
     ) {
         let shouldCancel = lock.withLock {
             httpStatus = (response as? HTTPURLResponse)?.statusCode
+            _retryAfter = LLMHTTP.retryAfterSeconds(from: response)
             if now() >= deadlineAt {
                 terminalError = AppError.networkError(URLError(.timedOut))
                 return true
@@ -241,7 +330,9 @@ private final class BoundedSSEDataDelegate: NSObject, URLSessionDataDelegate, @u
             }
 
             lineBuffer.append(data)
-            return (false, drainCompleteLines())
+            let payloads = drainCompleteLines()
+            if !payloads.isEmpty { _deliveredPayload = true }
+            return (false, payloads)
         }
         guard let outcome else { return }
         for payload in outcome.payloads {

@@ -575,7 +575,8 @@ struct ProviderHTTPTests {
 
     /// A raw SSE body: one `data: <payload>` line per element, terminated with
     /// the `[DONE]` sentinel `BoundedSSEDataDelegate` is expected to skip.
-    private func sseBody(_ payloads: [String]) -> Data {
+    /// Not `private`: the suite's extensions in other files use it too.
+    func sseBody(_ payloads: [String]) -> Data {
         Data((payloads.map { "data: \($0)\n\n" }.joined() + "data: [DONE]\n\n").utf8)
     }
 

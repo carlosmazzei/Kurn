@@ -270,6 +270,52 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         )
     }
 
+    /// Streamed `summarize`: the same JSON-mode request with `"stream": true`.
+    func streamSummary(
+        systemPrompt: String,
+        userPrompt: String,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> SummaryResult {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+
+        let request = try makeRequest(
+            timeout: LLMHTTP.summaryTimeout,
+            body: [
+                "model": chatModel,
+                "max_completion_tokens": LLMHTTP.summaryMaxOutputTokens,
+                "response_format": ["type": "json_object"],
+                "messages": [
+                    ["role": "system", "content": systemPrompt],
+                    ["role": "user", "content": userPrompt]
+                ],
+                "stream": true
+            ]
+        )
+
+        let accumulator = StreamingAccumulator()
+        let finish = FinishReasonRecorder()
+        try await LLMHTTP.streamSSE(
+            request,
+            session: session,
+            policy: .streamingSummary,
+            retriesBeforeFirstPayload: true
+        ) { payload in
+            guard let data = payload.data(using: .utf8),
+                  let chunk = try? JSONDecoder().decode(ChatStreamChunk.self, from: data),
+                  let choice = chunk.choices.first else { return }
+            finish.record(choice.finishReason)
+            if let delta = choice.delta.content, !delta.isEmpty {
+                accumulator.append(delta)
+                onDelta(delta)
+            }
+        }
+        return try LLMHTTP.summaryResult(
+            streamedText: accumulator.value,
+            truncated: finish.value == "length",
+            emptyMessage: "empty chat response"
+        )
+    }
+
     // MARK: - Chat (Chat Completions, plain text)
 
     func chat(
@@ -440,6 +486,14 @@ private struct ChatStreamChunk: Decodable {
     struct Choice: Decodable {
         struct Delta: Decodable { let content: String? }
         let delta: Delta
+        /// Set on the last content chunk; `"length"` means the output-token
+        /// cap cut the generation off.
+        let finishReason: String?
+
+        enum CodingKeys: String, CodingKey {
+            case delta
+            case finishReason = "finish_reason"
+        }
     }
     /// Only present on the final chunk `stream_options.include_usage` asks
     /// for, which carries no choices of its own.

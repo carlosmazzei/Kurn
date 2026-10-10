@@ -87,6 +87,21 @@ protocol LLMProvider: Sendable {
     /// Produce a structured meeting summary from a fully built prompt.
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult
 
+    /// Streaming variant of `summarize`: the same JSON contract and the same
+    /// result, but received incrementally so a long generation is bounded by
+    /// silence rather than by a fixed total timeout, and so the caller can
+    /// show that text is arriving. `onDelta` gets the raw generated text (the
+    /// JSON being written) as it arrives — progress, never content to
+    /// display. A failure before the first fragment is retried like a
+    /// buffered request; once text has arrived the call never retries. A
+    /// conformer without a streaming route uses the extension default, which
+    /// delivers nothing until `summarize` returns.
+    func streamSummary(
+        systemPrompt: String,
+        userPrompt: String,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> SummaryResult
+
     /// Free-form multi-turn chat completion. Unlike `summarize`, this returns
     /// plain text (no JSON-section contract), so it backs the "chat with your
     /// meetings" feature. `systemPrompt` carries the grounding instructions;
@@ -124,6 +139,17 @@ protocol LLMProvider: Sendable {
 }
 
 extension LLMProvider {
+    /// Default streaming summary: the buffered `summarize`, with no deltas.
+    /// Correct for any conformer (the on-device model, test doubles), just
+    /// not incremental.
+    func streamSummary(
+        systemPrompt: String,
+        userPrompt: String,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> SummaryResult {
+        try await summarize(systemPrompt: systemPrompt, userPrompt: userPrompt)
+    }
+
     func chat(systemPrompt: String, messages: [ChatMessage]) async throws -> String {
         try await chat(systemPrompt: systemPrompt, messages: messages, options: .chat)
     }

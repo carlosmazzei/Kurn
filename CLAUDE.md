@@ -1401,7 +1401,24 @@ the context) sends the same work down the staged path with the conservative
 budget, or rethrows when that would not split anything. The same budget and
 fallback drive per-meeting chat, the library synthesis and generated
 documents, each of which takes a `ContextBudget.Resolver` at construction so
-tests can force either path. Summary generation is
+tests can force either path.
+
+**Summary requests stream.** `SummaryService` calls `LLMProvider.streamSummary`
+for the single pass, every map block and the reduce: the same JSON contract
+as `summarize`, received over SSE (OpenAI and Anthropic `"stream": true`,
+Gemini `streamGenerateContent?alt=sse`). That swaps the buffered request's
+fixed 300 s total timeout for `HTTPPolicy.streamingSummary` — 300 s of
+*silence* (`idleTimeout`, applied as the request's `timeoutInterval`, which
+URLSession enforces as inactivity) within a 900 s total — so a long
+generation that keeps writing is no longer cut off. Truncation is read from
+the stream's final finish/stop reason, exactly as the buffered parse did.
+`streamSSE(retriesBeforeFirstPayload:)` retries a 429/5xx or an unopened
+connection by `sendValidated`'s rules (Retry-After honoured, ambiguous
+timeouts not replayed) but never after the first payload; chat does not opt
+in. The streamed text is progress only, never displayed: KurnCore's
+`StreamedWordCount` turns it into the approximate word count the Summary tab
+shows (`SummaryViewModel.summaryWordsReceived`). The on-device model and test
+doubles fall back to the extension default, which is just `summarize`. Summary generation is
 owned by `SummaryViewModel.startSummary`, which keeps the Summary tab in a
 non-reentrant progress state and supports cooperative cancellation.
 

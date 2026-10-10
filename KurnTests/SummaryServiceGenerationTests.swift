@@ -190,6 +190,32 @@ struct SummaryServiceGenerationTests {
         #expect(llm.summarizeCalls.count == 1)
     }
 
+    // MARK: - Streamed progress
+
+    @Test func streamedFragmentsReportARunningWordCount() async throws {
+        let llm = ScriptedLLMProvider(summaryDeltas: [#"{"sections":[{"title":"Deci"#, #"sions","body":"we ship"}]}"#])
+        let words = Recorded<Int>()
+        _ = try await service(llm).generate(
+            transcriptText: "[00:01] Ana: vamos", meetingTitle: "t", provider: .openAI, model: "m", template: .general,
+            onTextProgress: { words.append($0) }
+        )
+        // Reset to 0 as the request starts; then sections, title, "Deci";
+        // then "sions" continues that word, so only body, we, ship are new.
+        #expect(words.values == [0, 3, 6])
+    }
+
+    @Test func eachStagedRequestRestartsTheWordCount() async throws {
+        let llm = ScriptedLLMProvider(provider: .appleOnDevice, summaryDeltas: ["two words"])
+        let words = Recorded<Int>()
+        _ = try await service(llm).generate(
+            transcriptText: longTranscript(), meetingTitle: "Longa", provider: .appleOnDevice, model: "on-device",
+            template: .general, onTextProgress: { words.append($0) }
+        )
+        let requests = llm.summarizeCalls.count
+        #expect(requests > 2)
+        #expect(words.values == Array(repeating: [0, 2], count: requests).flatMap { $0 })
+    }
+
     @Test func contentDigestIsStableAndContentSensitive() {
         #expect(SummaryService.contentDigest("a") == SummaryService.contentDigest("a"))
         #expect(SummaryService.contentDigest("a") != SummaryService.contentDigest("b"))

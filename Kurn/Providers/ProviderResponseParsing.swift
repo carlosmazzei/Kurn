@@ -40,6 +40,27 @@ extension LLMHTTP {
         }
     }
 
+    /// Parse a streamed summary's accumulated text into a `SummaryResult` —
+    /// the streaming sibling of `summaryResult(from:as:…)`, with the same
+    /// truncation, empty-content and parse-failure errors, so a caller
+    /// cannot tell from the outcome which transport produced it.
+    static func summaryResult(
+        streamedText text: String,
+        truncated: Bool,
+        emptyMessage: String
+    ) throws -> SummaryResult {
+        guard !truncated else { throw AppError.summaryTruncated }
+        guard !text.isEmpty else { throw AppError.decodingError(emptyMessage) }
+        do {
+            let json = try SummaryJSON.parse(text)
+            return SummaryResult(sections: json.summarySections)
+        } catch let error as AppError {
+            throw error
+        } catch {
+            throw AppError.decodingError(error.localizedDescription)
+        }
+    }
+
     /// Decode a chat response and extract its plain-text content. The
     /// text sibling of `summaryResult`: no JSON-section parsing, just the
     /// model's reply. Re-throws `AppError`s (e.g. the empty-content failure) so

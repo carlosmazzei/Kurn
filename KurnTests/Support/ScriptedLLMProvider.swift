@@ -30,15 +30,20 @@ final class ScriptedLLMProvider: LLMProvider, @unchecked Sendable {
     private var _chatCalls: [ChatCall] = []
     private let summarizeReply: @Sendable (SummarizeCall, Int) throws -> SummaryResult
     private let chatReply: @Sendable (ChatCall, Int) throws -> String
+    /// Fragments `streamSummary` delivers before its result, as a streaming
+    /// vendor would. Empty = the buffered default (no fragments).
+    private let summaryDeltas: [String]
 
     init(
         provider: AIProvider = .openAI,
+        summaryDeltas: [String] = [],
         summarize: @escaping @Sendable (SummarizeCall, Int) throws -> SummaryResult = { _, _ in
             SummaryResult(sections: [SummarySection(title: "Notes", body: "scripted")])
         },
         chat: @escaping @Sendable (ChatCall, Int) throws -> String = { _, _ in "scripted reply" }
     ) {
         self.provider = provider
+        self.summaryDeltas = summaryDeltas
         self.summarizeReply = summarize
         self.chatReply = chat
     }
@@ -53,6 +58,15 @@ final class ScriptedLLMProvider: LLMProvider, @unchecked Sendable {
             return _summarizeCalls.count - 1
         }
         return try summarizeReply(call, index)
+    }
+
+    func streamSummary(
+        systemPrompt: String,
+        userPrompt: String,
+        onDelta: @escaping @Sendable (String) -> Void
+    ) async throws -> SummaryResult {
+        summaryDeltas.forEach(onDelta)
+        return try await summarize(systemPrompt: systemPrompt, userPrompt: userPrompt)
     }
 
     func chat(systemPrompt: String, messages: [ChatMessage], options: TextGenerationOptions) async throws -> String {
