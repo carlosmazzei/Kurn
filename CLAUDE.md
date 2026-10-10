@@ -1375,11 +1375,33 @@ convention rather than reaching for a singular summary:
 Every provider HTTP call funnels through `LLMHTTP.sendValidated`, which retries
 transient transport errors and `429/500/502/503/504` with exponential
 backoff + jitter (honoring `Retry-After`), instead of failing outright on a
-momentary blip. `SummaryService` splits transcripts beyond ~80k chars into a
-map-reduce pass (condense each block, then summarize the combined notes) and
+momentary blip. `SummaryService` sends the whole transcript in one request
+whenever it fits the model's `ContextBudget`, and only otherwise takes a
+map-reduce pass (condense each block, then summarize the combined notes); it
 raises the output budget/timeout (8192 tokens, 300s) so long transcripts don't
 truncate mid-JSON or time out; a truncated response surfaces as
-`AppError.summaryTruncated` instead of a confusing decode error. Summary generation is
+`AppError.summaryTruncated` instead of a confusing decode error.
+
+**The single-pass budget is per model, in tokens** (`ContextBudget`, KurnCore).
+It used to be a fixed 80k characters for every cloud model — sized for the
+smallest window any vendor had, so a two-hour meeting always went through lossy
+staged notes, and wrong by a factor of four for Chinese, where a character is
+about a token. `ContextBudget.resolve(provider:model:)` takes the window the
+provider's `/models` listing reported (Gemini `inputTokenLimit`, Groq
+`context_window`, OpenRouter `context_length`, remembered by
+`ModelContextWindowStore`), else KurnCore's `ModelContextWindows` table by
+model family, else `ContextBudget.conservative` (the old thresholds); Apple's
+on-device model always gets `ContextBudget.onDevice`. From a window it reserves
+the output budget, prompt overhead and a 20% margin, and caps any single
+request at 100k tokens. `TokenEstimate` counts per script (3.5 characters per
+token for alphabetic text, 1 for CJK/Thai/Hangul), deliberately pessimistic.
+A wrong window is safe by construction: a provider rejecting the input as too
+long (`AppError.isContextOverflow` — 413, or a 400/422 whose message names
+the context) sends the same work down the staged path with the conservative
+budget, or rethrows when that would not split anything. The same budget and
+fallback drive per-meeting chat, the library synthesis and generated
+documents, each of which takes a `ContextBudget.Resolver` at construction so
+tests can force either path. Summary generation is
 owned by `SummaryViewModel.startSummary`, which keeps the Summary tab in a
 non-reentrant progress state and supports cooperative cancellation.
 
@@ -1577,7 +1599,7 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   (implemented for OpenAI/Anthropic/Google; no JSON-mode forcing) alongside
   `summarize`. `MeetingChatService` has two grounding strategies: **per-meeting**
   (`answerAboutMeeting`) sends the **whole transcript** as context — a single
-  meeting almost always fits the single-pass budget (`SummaryService.maxSinglePassChars`),
+  meeting almost always fits the single-pass budget (the model's `ContextBudget`),
   which is far more accurate than retrieving a few passages; only over-budget
   meetings fall back to retrieval. **Library-wide** (`answerAcrossLibrary`) and
   the long-meeting fallback use a retrieval pipeline: LLM query rewrite → hybrid

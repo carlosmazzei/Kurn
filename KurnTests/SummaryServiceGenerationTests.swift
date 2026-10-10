@@ -74,7 +74,7 @@ struct SummaryServiceGenerationTests {
             onMapStageCompleted: { checkpoint in checkpoints.append(checkpoint.completedNotes.count) }
         )
 
-        let blocks = SummaryService.splitTranscript(transcript, maxChars: SummaryService.mapBlockChars(for: .appleOnDevice))
+        let blocks = SummaryService.splitTranscript(transcript, maxChars: ContextBudget.onDevice.mapBlockChars(for: transcript))
         #expect(blocks.count > 1)
         let calls = llm.summarizeCalls
         #expect(calls.count == blocks.count + 1)
@@ -94,7 +94,7 @@ struct SummaryServiceGenerationTests {
     @Test func aMatchingCheckpointSkipsTheBlocksAlreadyCondensed() async throws {
         let llm = ScriptedLLMProvider(provider: .appleOnDevice)
         let transcript = longTranscript()
-        let blocks = SummaryService.splitTranscript(transcript, maxChars: SummaryService.mapBlockChars(for: .appleOnDevice))
+        let blocks = SummaryService.splitTranscript(transcript, maxChars: ContextBudget.onDevice.mapBlockChars(for: transcript))
         let resume = SummaryMapCheckpoint(
             contentDigest: SummaryService.contentDigest(transcript),
             providerID: AIProvider.appleOnDevice.id,
@@ -129,6 +129,65 @@ struct SummaryServiceGenerationTests {
             )
         }
         #expect(llm.summarizeCalls.count == 2)
+    }
+
+    // MARK: - Context budget
+
+    /// ~100k characters: past the conservative budget, inside a 128k window.
+    private var twoHourTranscript: String {
+        String(repeating: "[12:34] Speaker 1: we agreed to ship it\n", count: 2_500)
+    }
+
+    private static var tooLong: AppError { .apiError(statusCode: 400, message: "This model's maximum context length is 128000 tokens.") }
+
+    private func service(_ llm: ScriptedLLMProvider, budget: ContextBudget) -> SummaryService {
+        SummaryService(resolveProvider: { _, _ in llm }, resolveBudget: { _, _ in budget })
+    }
+
+    @Test func aTranscriptInsideTheModelsWindowIsOneRequest() async throws {
+        let llm = ScriptedLLMProvider()
+        _ = try await service(llm, budget: .forContextWindow(128_000, reservedOutputTokens: 8_192)).generate(
+            transcriptText: twoHourTranscript, meetingTitle: "Longa", provider: .openAI, model: "gpt-4o", template: .general
+        )
+        #expect(llm.summarizeCalls.count == 1)
+        #expect(llm.summarizeCalls.first?.systemPrompt == SummaryPrompt.system(for: .general))
+    }
+
+    @Test func aRejectedSinglePassIsStagedWithTheConservativeBudget() async throws {
+        let llm = ScriptedLLMProvider { _, index in
+            if index == 0 { throw Self.tooLong }
+            return SummaryResult(sections: [SummarySection(title: "Part", body: "notes \(index)")])
+        }
+        let transcript = twoHourTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        _ = try await service(llm, budget: .forContextWindow(128_000, reservedOutputTokens: 8_192)).generate(
+            transcriptText: transcript, meetingTitle: "Longa", provider: .openAI, model: "gpt-4o", template: .general
+        )
+        let blocks = SummaryService.splitTranscript(
+            transcript, maxChars: ContextBudget.conservative.mapBlockChars(for: transcript)
+        )
+        #expect(blocks.count > 1)
+        #expect(llm.summarizeCalls.count == 1 + blocks.count + 1)
+        #expect(llm.summarizeCalls[1].systemPrompt == SummaryPrompt.system(for: SummaryService.notesTemplate))
+    }
+
+    @Test func aRejectionStagingCouldNotHelpSurfaces() async {
+        let llm = ScriptedLLMProvider { _, _ in throw Self.tooLong }
+        await #expect(throws: AppError.self) {
+            _ = try await service(llm, budget: .forContextWindow(128_000, reservedOutputTokens: 8_192)).generate(
+                transcriptText: "[00:01] Ana: curto", meetingTitle: "t", provider: .openAI, model: "gpt-4o", template: .general
+            )
+        }
+        #expect(llm.summarizeCalls.count == 1)
+    }
+
+    @Test func otherSinglePassFailuresAreNotStaged() async {
+        let llm = ScriptedLLMProvider { _, _ in throw AppError.apiError(statusCode: 400, message: "invalid model") }
+        await #expect(throws: AppError.self) {
+            _ = try await service(llm, budget: .forContextWindow(128_000, reservedOutputTokens: 8_192)).generate(
+                transcriptText: twoHourTranscript, meetingTitle: "t", provider: .openAI, model: "gpt-4o", template: .general
+            )
+        }
+        #expect(llm.summarizeCalls.count == 1)
     }
 
     @Test func contentDigestIsStableAndContentSensitive() {

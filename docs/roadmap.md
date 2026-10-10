@@ -108,7 +108,7 @@ untouched.
   small enough. `MeetingChatService`'s retrieval-grounded chat
   (`answerAcrossLibrary`, and the `answerAboutMeeting` full-transcript path for
   meetings short enough to fit) and `SummaryService`'s map-reduce both do too,
-  now that `maxSinglePassChars`/`mapBlockChars` and the retrieval pool sizes
+  now that the single-pass/map-block budgets (now `ContextBudget.onDevice`) and the retrieval pool sizes
   are per-provider — the on-device context window is far smaller than any
   cloud vendor's, so a long meeting takes more reduce rounds there than it
   would on a cloud provider, exactly as anticipated below.
@@ -118,7 +118,7 @@ untouched.
   both unreachable on this path — the secondary benefit originally named here.
 
 **Left for a follow-up, per I3:** the on-device char/token thresholds
-(`SummaryService`'s on-device `maxSinglePassChars`/`mapBlockChars`,
+(`ContextBudget.onDevice`, formerly `SummaryService`'s on-device `maxSinglePassChars`/`mapBlockChars`,
 `FoundationModelsProvider`'s output-token ceiling, `MeetingChatService`'s
 on-device pool sizes) are conservative first-cut estimates against Apple's
 documented ~4096-token session window, explicitly commented as such in the

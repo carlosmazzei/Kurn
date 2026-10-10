@@ -61,7 +61,9 @@ struct DocumentGenerationRoundTripTests {
             model: "on-device",
             onProgress: { stage, total in stages.append("\(stage)/\(total)") }
         )
-        let blocks = DocumentGenerationService.renderBlocks(sources, maxChars: SummaryService.mapBlockChars(for: .appleOnDevice))
+        let blocks = DocumentGenerationService.renderBlocks(
+            sources, maxChars: ContextBudget.onDevice.mapBlockChars(for: DocumentGenerationService.render(sources))
+        )
         #expect(blocks.count > 1)
         let calls = llm.chatCalls
         #expect(calls.count == blocks.count + 1)
@@ -69,6 +71,41 @@ struct DocumentGenerationRoundTripTests {
         #expect(calls.last?.messages.first?.content.contains("## Source part 1") == true)
         #expect(stages.values.last == "\(blocks.count + 1)/\(blocks.count + 1)")
         #expect(result.title == "Doc \(blocks.count)")
+    }
+
+    @Test func aRejectedSinglePassIsExtractedWithTheConservativeBudget() async throws {
+        let llm = ScriptedLLMProvider(chat: { _, index in
+            if index == 0 { throw AppError.apiError(statusCode: 400, message: "prompt is too long: 210000 tokens > 200000 maximum") }
+            return "# Doc \(index)"
+        })
+        let service = DocumentGenerationService(
+            resolveProvider: { _, _ in llm },
+            resolveBudget: { _, _ in .forContextWindow(200_000, reservedOutputTokens: 8_192) }
+        )
+        let big = String(repeating: "[00:01] Speaker 1: a long point about the roadmap\n", count: 1_200)
+        let sources = [source("A", transcript: big), source("B", transcript: big)]
+        _ = try await service.generate(sources: sources, prompt: "Compare", provider: .anthropic, model: "claude-x")
+
+        let context = DocumentGenerationService.render(sources)
+        let blocks = DocumentGenerationService.renderBlocks(
+            sources, maxChars: ContextBudget.conservative.mapBlockChars(for: context)
+        )
+        #expect(blocks.count > 1)
+        #expect(llm.chatCalls.count == 1 + blocks.count + 1)
+    }
+
+    @Test func aRejectionStagingCouldNotHelpSurfaces() async {
+        let llm = ScriptedLLMProvider(chat: { _, _ in throw AppError.apiError(statusCode: 413, message: "Request too large") })
+        let service = DocumentGenerationService(
+            resolveProvider: { _, _ in llm },
+            resolveBudget: { _, _ in .forContextWindow(200_000, reservedOutputTokens: 8_192) }
+        )
+        await #expect(throws: AppError.self) {
+            _ = try await service.generate(
+                sources: [source("Sync", transcript: "texto")], prompt: "Resuma", provider: .anthropic, model: "claude-x"
+            )
+        }
+        #expect(llm.chatCalls.count == 1)
     }
 
     @Test func blankReplyIsAnError() async {

@@ -4,9 +4,10 @@
 //
 //  Builds the summary prompt from a meeting's transcripts and delegates to the
 //  configured LLM provider. Pure value-in / value-out so it stays off SwiftData.
-//  Transcripts short enough for one request go through a single pass; very long
-//  meetings (2h+) are summarized in stages: each block is condensed into detailed
-//  notes (map), then the notes are summarized with the user's template (reduce).
+//  A transcript that fits the model's `ContextBudget` goes through a single
+//  pass; one that does not — or that the provider rejects as too long — is
+//  summarized in stages: each block is condensed into detailed notes (map),
+//  then the notes are summarized with the user's template (reduce).
 //
 
 import CryptoKit
@@ -16,9 +17,15 @@ import KurnCore
 struct SummaryService {
     /// Resolves the LLM that backs a run; see `ProviderFactory.LLMResolver`.
     private let resolveProvider: ProviderFactory.LLMResolver
+    /// Decides single pass vs. staged per model; see `ContextBudget.resolve`.
+    private let resolveBudget: ContextBudget.Resolver
 
-    init(resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM) {
+    init(
+        resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM,
+        resolveBudget: @escaping ContextBudget.Resolver = ContextBudget.live
+    ) {
         self.resolveProvider = resolveProvider
+        self.resolveBudget = resolveBudget
     }
 
     struct TranscriptGroup {
@@ -30,40 +37,6 @@ struct SummaryService {
         /// contributes to summary/wiki/chat prompts. Defaulted so existing
         /// call sites that predate photos don't need to change.
         var photos: [MeetingPhoto] = []
-    }
-
-    /// Transcripts at or below this size are summarized in a single request.
-    /// ~80k chars ≈ 20k tokens — inside every cloud vendor's context window
-    /// with room for the system prompt and the summary itself, while keeping
-    /// single-request latency inside the request timeout. A 2h meeting lands
-    /// around 100k chars, so long meetings take the staged path.
-    private static let cloudMaxSinglePassChars = 80_000
-    /// Size of each map-stage block when the transcript exceeds the
-    /// single-pass threshold. Blocks split on line boundaries only, so no
-    /// `[mm:ss] Speaker: text` line is ever cut in half.
-    private static let cloudMapBlockChars = 60_000
-
-    /// Apple's on-device `FoundationModels` session window is far smaller than
-    /// any cloud vendor's (~4096 tokens total, shared across instructions,
-    /// input, and generation, as of iOS 26) — these are conservative first-cut
-    /// estimates leaving headroom for the system prompt and output budget, not
-    /// a measured figure; tune against real on-device runs before trusting
-    /// them as a ceiling.
-    private static let onDeviceMaxSinglePassChars = 6_000
-    /// Slightly smaller than the single-pass figure: a map-stage block is also
-    /// wrapped in "Meeting title: …\nTranscript (part X of Y):\n" framing.
-    private static let onDeviceMapBlockChars = 5_000
-
-    /// Transcripts at or below this size are summarized in a single request —
-    /// see `cloudMaxSinglePassChars`/`onDeviceMaxSinglePassChars`.
-    static func maxSinglePassChars(for provider: AIProvider) -> Int {
-        provider.kind == .appleOnDevice ? onDeviceMaxSinglePassChars : cloudMaxSinglePassChars
-    }
-
-    /// Size of each map-stage block when a transcript exceeds
-    /// `maxSinglePassChars(for:)`.
-    static func mapBlockChars(for provider: AIProvider) -> Int {
-        provider.kind == .appleOnDevice ? onDeviceMapBlockChars : cloudMapBlockChars
     }
 
     /// Generate a structured summary for already-assembled transcript text.
@@ -100,8 +73,9 @@ struct SummaryService {
         }
 
         let llm = try resolveProvider(provider, model)
+        var budget = resolveBudget(provider, model)
 
-        guard trimmed.count > Self.maxSinglePassChars(for: provider) else {
+        if budget.fits(trimmed) {
             try Task.checkCancellation()
             let userPrompt = """
             Meeting title: \(meetingTitle)
@@ -109,15 +83,27 @@ struct SummaryService {
             Transcript:
             \(trimmed)
             """
-            return try await llm.summarize(
-                systemPrompt: SummaryPrompt.system(for: template),
-                userPrompt: userPrompt
-            )
+            do {
+                return try await llm.summarize(
+                    systemPrompt: SummaryPrompt.system(for: template),
+                    userPrompt: userPrompt
+                )
+            } catch let error as AppError where error.isContextOverflow {
+                // The budget overestimated the window (outdated table entry,
+                // custom endpoint, a per-minute token limit). Staging with the
+                // conservative budget only helps when that would actually
+                // split the transcript; otherwise the same request would fail
+                // again.
+                guard !ContextBudget.conservative.fits(trimmed) else { throw error }
+                AppLog.transcription.atNotice.notice("summary: provider rejected single pass as too long, staging chars=\(trimmed.count, privacy: .public)")
+                budget = .conservative
+            }
         }
 
         return try await mapReduce(
             llm: llm,
             model: model,
+            budget: budget,
             transcript: trimmed,
             meetingTitle: meetingTitle,
             template: template,
@@ -137,9 +123,11 @@ struct SummaryService {
     /// skips already-condensed blocks, and `onMapStageCompleted` is awaited
     /// after each new block so a save failure stops the run there instead of
     /// risking the next block's cost on top of unsaved progress.
+    // swiftlint:disable:next function_parameter_count
     private func mapReduce(
         llm: LLMProvider,
         model: String,
+        budget: ContextBudget,
         transcript: String,
         meetingTitle: String,
         template: SummaryTemplate,
@@ -147,7 +135,7 @@ struct SummaryService {
         onProgress: (@Sendable (Int, Int) -> Void)?,
         onMapStageCompleted: (@Sendable (SummaryMapCheckpoint) async throws -> Void)?
     ) async throws -> SummaryResult {
-        let blocks = Self.splitTranscript(transcript, maxChars: Self.mapBlockChars(for: llm.provider))
+        let blocks = Self.splitTranscript(transcript, maxChars: budget.mapBlockChars(for: transcript))
         let totalStages = blocks.count + 1
         let contentDigest = Self.contentDigest(transcript)
         AppLog.transcription.atNotice.notice("summary: staged path blocks=\(blocks.count, privacy: .public) chars=\(transcript.count, privacy: .public)")
