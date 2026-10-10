@@ -25,15 +25,20 @@ struct MeetingChatService {
     // file-scoped.
     let searchService: SemanticSearchService
     private let providerResolver: ProviderFactory.LLMResolver
+    /// Decides whether a whole transcript (or the library synthesis prompt)
+    /// fits one request; see `ContextBudget.resolve`.
+    let budgetResolver: ContextBudget.Resolver
 
     /// `resolveProvider` resolves through `ProviderFactory` in production,
     /// exactly like `SummaryService`; tests inject a scripted provider.
     init(
         searchService: SemanticSearchService = SemanticSearchService(),
-        resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM
+        resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM,
+        resolveBudget: @escaping ContextBudget.Resolver = ContextBudget.live
     ) {
         self.searchService = searchService
         self.providerResolver = resolveProvider
+        self.budgetResolver = resolveBudget
     }
 
     /// Progress/streaming callback fired as an answer is retrieved and
@@ -79,7 +84,7 @@ struct MeetingChatService {
 
     /// On-device sizes are much smaller than the cloud ones above. Unlike the
     /// library-wide answer (which falls back to map-reduce when its prompt
-    /// doesn't fit, per `SummaryService.maxSinglePassChars(for:)`),
+    /// doesn't fit the model's `ContextBudget`),
     /// `retrievedAnswer`'s single-meeting answer has no such fallback — its
     /// prompt must fit the small on-device context window directly. The
     /// rerank prompt lists every pooled passage in full, so the pool itself
@@ -140,15 +145,25 @@ struct MeetingChatService {
         let llm = try resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
         let transcript = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let answer: Answer
-        if !transcript.isEmpty, transcript.count <= SummaryService.maxSinglePassChars(for: provider) {
+        var fullContextAnswer: Answer?
+        if !transcript.isEmpty, budgetResolver(provider, model).fits(transcript) {
             let userPrompt = Self.fullContextPrompt(question: trimmed, transcript: transcript)
-            let result = try await streamAnswer(
-                systemPrompt: Self.fullContextSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)],
-                llm: llm, onEvent: onEvent, runID: runID
-            )
-            answer = Answer(text: result.text, citations: [], usage: result.usage)
+            do {
+                let result = try await streamAnswer(
+                    systemPrompt: Self.fullContextSystemPrompt,
+                    messages: history + [ChatMessage(role: .user, content: userPrompt)],
+                    llm: llm, onEvent: onEvent, runID: runID
+                )
+                fullContextAnswer = Answer(text: result.text, citations: [], usage: result.usage)
+            } catch let error as AppError where error.isContextOverflow {
+                // Rejected before anything streamed: the budget overestimated
+                // this model's window, so answer from retrieval instead.
+                AppLog.generation.atNotice.notice("chat: provider rejected full transcript as too long, using retrieval run=\(runID.value, privacy: .public)")
+            }
+        }
+        let answer: Answer
+        if let fullContextAnswer {
+            answer = fullContextAnswer
         } else {
             answer = try await retrievedAnswer(
                 question: trimmed, history: history, candidates: candidates, llm: llm, onEvent: onEvent, runID: runID
@@ -184,7 +199,8 @@ struct MeetingChatService {
         let llm = try resolveProvider(provider: provider, model: model, runID: runID, startedAt: startedAt)
         let answer = try await libraryCombinedAnswer(
             question: trimmed, history: history, candidates: candidates,
-            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm, onEvent: onEvent, runID: runID
+            summaries: summariesByMeeting, articles: articlesByMeeting, llm: llm,
+            budget: budgetResolver(provider, model), onEvent: onEvent, runID: runID
         )
         ReliabilityLog.record(ReliabilityEvent(
             operationID: runID, operation: "meeting_chat",

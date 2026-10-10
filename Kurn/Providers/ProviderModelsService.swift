@@ -11,6 +11,7 @@ import KurnCore
 struct ProviderModelsService: Sendable {
     private let session: URLSession
     private let apiKey: String?
+    private let contextWindows: ModelContextWindowStore
     private let anthropicVersion = "2023-06-01"
 
     /// - Parameters:
@@ -18,9 +19,16 @@ struct ProviderModelsService: Sendable {
     ///   - apiKey: Optional override for the provider's API key. When `nil`,
     ///     the key is read from the Keychain as usual. This is mainly for tests
     ///     so they can avoid racing on the process-wide Keychain.
-    init(session: URLSession = .shared, apiKey: String? = nil) {
+    ///   - contextWindows: where context windows the listing reports are
+    ///     remembered for `ContextBudget.resolve`.
+    init(
+        session: URLSession = .shared,
+        apiKey: String? = nil,
+        contextWindows: ModelContextWindowStore = .shared
+    ) {
         self.session = session
         self.apiKey = apiKey
+        self.contextWindows = contextWindows
     }
 
     func models(for provider: AIProvider) async throws -> [String] {
@@ -46,7 +54,9 @@ struct ProviderModelsService: Sendable {
                 fetched = try await fetchModels(provider: provider, as: OpenAIModelListResponse.self) { request in
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                 } extract: { decoded in
-                    decoded.data.filter { $0.active != false }.map(\.id)
+                    let active = decoded.data.filter { $0.active != false }
+                    recordWindows(active.map { ($0.id, $0.contextWindow) }, provider: provider)
+                    return active.map(\.id)
                 }
             } catch let AppError.apiError(status, _) where status == 403 && !provider.fallbackModels.isEmpty {
                 // Some vendors' /models endpoints (e.g. Groq's) sometimes reject an
@@ -79,9 +89,11 @@ struct ProviderModelsService: Sendable {
             let models = try await fetchModels(provider: provider, as: GoogleModelListResponse.self) { request in
                 request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
             } extract: { decoded in
-                decoded.models
+                let generative = decoded.models
                     .filter { $0.supportedGenerationMethods.contains("generateContent") }
-                    .map { $0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: "") }
+                    .map { ($0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: ""), $0.inputTokenLimit) }
+                recordWindows(generative, provider: provider)
+                return generative.map { $0.0 }
             }
             AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
             return models
@@ -109,6 +121,15 @@ struct ProviderModelsService: Sendable {
         return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
     }
 
+    /// Remember the context windows a listing reported, as (model id, window).
+    private func recordWindows(_ models: [(String, Int?)], provider: AIProvider) {
+        var windows: [String: Int] = [:]
+        for (id, window) in models {
+            if let window { windows[id] = window }
+        }
+        contextWindows.record(windows, providerID: provider.id)
+    }
+
     private func uniqueSorted(_ values: [String]) -> [String] {
         Array(Set(values.filter { !$0.isEmpty })).sorted()
     }
@@ -118,6 +139,24 @@ private struct OpenAIModelListResponse: Decodable {
     struct Model: Decodable {
         let id: String
         let active: Bool?
+        /// Groq names it `context_window`, OpenRouter `context_length`;
+        /// OpenAI itself reports neither. Decoded leniently: a compatible
+        /// server shaping it differently must not fail the whole listing.
+        let contextWindow: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case id, active
+            case contextWindow = "context_window"
+            case contextLength = "context_length"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            active = try? container.decodeIfPresent(Bool.self, forKey: .active)
+            contextWindow = (try? container.decodeIfPresent(Int.self, forKey: .contextWindow))
+                ?? (try? container.decodeIfPresent(Int.self, forKey: .contextLength))
+        }
     }
 
     let data: [Model]
@@ -136,6 +175,19 @@ private struct GoogleModelListResponse: Decodable {
         let name: String
         let baseModelId: String?
         let supportedGenerationMethods: [String]
+        let inputTokenLimit: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case name, baseModelId, supportedGenerationMethods, inputTokenLimit
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            baseModelId = try container.decodeIfPresent(String.self, forKey: .baseModelId)
+            supportedGenerationMethods = try container.decode([String].self, forKey: .supportedGenerationMethods)
+            inputTokenLimit = try? container.decodeIfPresent(Int.self, forKey: .inputTokenLimit)
+        }
     }
 
     let models: [Model]

@@ -24,11 +24,16 @@ struct GeneratedDocumentResult: Sendable {
 
 struct DocumentGenerationService {
     private let resolveProvider: ProviderFactory.LLMResolver
+    private let resolveBudget: ContextBudget.Resolver
 
     /// Production resolves through `ProviderFactory`, exactly like
     /// `SummaryService`; tests inject a scripted provider.
-    init(resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM) {
+    init(
+        resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM,
+        resolveBudget: @escaping ContextBudget.Resolver = ContextBudget.live
+    ) {
         self.resolveProvider = resolveProvider
+        self.resolveBudget = resolveBudget
     }
 
     func generate(
@@ -77,18 +82,30 @@ struct DocumentGenerationService {
             throw error
         }
 
-        let markdown: String
-        if context.count <= SummaryService.maxSinglePassChars(for: provider) {
+        var budget = resolveBudget(provider, model)
+        var singlePass: String?
+        if budget.fits(context) {
             AppLog.generation.atNotice.notice(
                 "document: strategy run=\(runID.value, privacy: .public) path=single contextChars=\(context.count, privacy: .public)"
             )
-            markdown = try await requestText(
-                llm: llm,
-                systemPrompt: Self.systemPrompt,
-                message: Self.finalPrompt(instruction: instruction, context: context),
-                stage: "single",
-                runID: runID
-            )
+            do {
+                singlePass = try await requestText(
+                    llm: llm,
+                    systemPrompt: Self.systemPrompt,
+                    message: Self.finalPrompt(instruction: instruction, context: context),
+                    stage: "single",
+                    runID: runID
+                )
+            } catch let error as AppError where error.isContextOverflow {
+                // Same recovery as `SummaryService`: stage only when the
+                // conservative budget would actually split the sources.
+                guard !ContextBudget.conservative.fits(context) else { throw error }
+                budget = .conservative
+            }
+        }
+        let markdown: String
+        if let singlePass {
+            markdown = singlePass
         } else {
             AppLog.generation.atNotice.notice(
                 "document: strategy run=\(runID.value, privacy: .public) path=staged contextChars=\(context.count, privacy: .public)"
@@ -97,6 +114,7 @@ struct DocumentGenerationService {
                 sources: sources,
                 instruction: instruction,
                 llm: llm,
+                blockChars: budget.mapBlockChars(for: context),
                 runID: runID,
                 onProgress: onProgress
             )
@@ -130,10 +148,11 @@ struct DocumentGenerationService {
         sources: [DocumentTranscriptSource],
         instruction: String,
         llm: LLMProvider,
+        blockChars: Int,
         runID: OperationID,
         onProgress: (@Sendable (Int, Int) -> Void)?
     ) async throws -> String {
-        let blocks = Self.renderBlocks(sources, maxChars: SummaryService.mapBlockChars(for: llm.provider))
+        let blocks = Self.renderBlocks(sources, maxChars: blockChars)
         let total = blocks.count + 1
         AppLog.generation.atNotice.notice(
             "document: staged run=\(runID.value, privacy: .public) blocks=\(blocks.count, privacy: .public)"

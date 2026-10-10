@@ -34,12 +34,16 @@ struct MeetingChatRoundTripTests {
         )
     }
 
-    private func service(_ llm: ScriptedLLMProvider) -> MeetingChatService {
+    private func service(_ llm: ScriptedLLMProvider, budget: ContextBudget? = nil) -> MeetingChatService {
         MeetingChatService(
             searchService: SemanticSearchService(embedder: ConstantEmbedder()),
-            resolveProvider: { _, _ in llm }
+            resolveProvider: { _, _ in llm },
+            resolveBudget: { provider, model in budget ?? ContextBudget.resolve(provider: provider, model: model) }
         )
     }
+
+    private static var tooLong: AppError { .apiError(statusCode: 400, message: "maximum context length is 128000 tokens") }
+    private static let largeWindow = ContextBudget.forContextWindow(128_000, reservedOutputTokens: 8_192)
 
     // MARK: - Single meeting
 
@@ -111,6 +115,38 @@ struct MeetingChatRoundTripTests {
         #expect(answer.citations.count == 2)
     }
 
+    @Test func aLongMeetingInsideTheModelsWindowIsAnsweredWhole() async throws {
+        let llm = ScriptedLLMProvider(chat: { _, _ in "Monday." })
+        let transcript = String(repeating: "[12:34] Ana: we agreed to ship it on Monday\n", count: 2_500)
+        _ = try await service(llm, budget: Self.largeWindow).answerAboutMeeting(
+            question: "When?", history: [], transcriptText: transcript, candidates: [],
+            provider: .openAI, model: "gpt-4o"
+        )
+        #expect(llm.chatCalls.count == 1)
+        #expect(llm.chatCalls.first?.systemPrompt == MeetingChatService.fullContextSystemPrompt)
+    }
+
+    @Test func aRejectedWholeTranscriptFallsBackToRetrieval() async throws {
+        // Calls in order: the rejected whole transcript, query rewrite, rerank, answer.
+        let llm = ScriptedLLMProvider(chat: { _, index in
+            switch index {
+            case 0: throw Self.tooLong
+            case 1: return "ship date"
+            case 2: return "2, 1"
+            default: return "Monday."
+            }
+        })
+        let answer = try await service(llm, budget: Self.largeWindow).answerAboutMeeting(
+            question: "When do we ship?", history: [], transcriptText: "[00:42] Ana: we ship on Monday",
+            candidates: [candidate(meetingA, "we talked about hiring", at: 10), candidate(meetingA, "we ship on monday", at: 42)],
+            provider: .openAI, model: "gpt-4o"
+        )
+        #expect(answer.text == "Monday.")
+        #expect(!answer.citations.isEmpty)
+        #expect(llm.chatCalls.count == 4)
+        #expect(llm.chatCalls[0].systemPrompt == MeetingChatService.fullContextSystemPrompt)
+    }
+
     // MARK: - Library
 
     @Test func theLibraryAnswerCombinesExcerptsAndArticlesInOnePass() async throws {
@@ -167,6 +203,52 @@ struct MeetingChatRoundTripTests {
         let reduces = llm.chatCalls.filter { $0.systemPrompt == MeetingChatService.combinedSystemPrompt }
         #expect(reduces.count == 1)
         #expect(llm.chatCalls.count >= 5)
+    }
+
+    @Test func aRejectedLibrarySynthesisIsCondensedThenReduced() async throws {
+        let combinedCalls = Recorded<Int>()
+        let llm = ScriptedLLMProvider(chat: { call, index in
+            guard call.systemPrompt == MeetingChatService.combinedSystemPrompt else {
+                return index < 2 ? "1" : "condensed"
+            }
+            combinedCalls.append(index)
+            if combinedCalls.values.count == 1 { throw Self.tooLong }
+            return "Reduced answer."
+        })
+        let longBody = String(repeating: "- a decision with its owner and date\n", count: 1_300)
+        let articles = [
+            meetingA: WikiArticleSnapshot(meetingID: meetingA, title: "Planning", date: Date(timeIntervalSince1970: 100), bodyMarkdown: longBody),
+            meetingB: WikiArticleSnapshot(meetingID: meetingB, title: "Review", date: Date(timeIntervalSince1970: 900), bodyMarkdown: longBody)
+        ]
+        let answer = try await service(llm, budget: Self.largeWindow).answerAcrossLibrary(
+            question: "List every decision",
+            history: [],
+            candidates: [candidate(meetingA, "decision", at: 5), candidate(meetingB, "decision", at: 8)],
+            articlesByMeeting: articles,
+            provider: .openAI,
+            model: "gpt-4o"
+        )
+        #expect(answer.text == "Reduced answer.")
+        // The rejected single pass, then the reduce after the condense calls.
+        #expect(combinedCalls.values.count == 2)
+        #expect(llm.chatCalls.count >= 6)
+    }
+
+    @Test func aRejectedLibrarySynthesisStagingCouldNotHelpSurfaces() async {
+        let llm = ScriptedLLMProvider(chat: { call, index in
+            if call.systemPrompt == MeetingChatService.combinedSystemPrompt { throw Self.tooLong }
+            return index < 2 ? "1" : "condensed"
+        })
+        let articles = [
+            meetingA: WikiArticleSnapshot(meetingID: meetingA, title: "Planning", date: Date(timeIntervalSince1970: 100), bodyMarkdown: "- ship it")
+        ]
+        await #expect(throws: AppError.self) {
+            _ = try await service(llm, budget: Self.largeWindow).answerAcrossLibrary(
+                question: "What did we decide?", history: [],
+                candidates: [candidate(meetingA, "ship it", at: 5)],
+                articlesByMeeting: articles, provider: .openAI, model: "gpt-4o"
+            )
+        }
     }
 
     // MARK: - Failures

@@ -34,6 +34,7 @@ extension MeetingChatService {
         summaries: [UUID: String],
         articles: [UUID: WikiArticleSnapshot],
         llm: LLMProvider,
+        budget: ContextBudget,
         onEvent: @escaping ChatEventHandler = { _ in },
         runID: OperationID
     ) async throws -> Answer {
@@ -69,17 +70,27 @@ extension MeetingChatService {
         )
 
         // Fits in one pass → a single call that can quote and aggregate directly.
-        if userPrompt.count <= SummaryService.maxSinglePassChars(for: llm.provider) {
-            let result = try await streamAnswer(
-                systemPrompt: Self.combinedSystemPrompt,
-                messages: history + [ChatMessage(role: .user, content: userPrompt)],
-                llm: llm, onEvent: onEvent, runID: runID
-            )
-            return Answer(text: result.text, citations: passages, usage: result.usage)
+        var blockBudget = budget
+        if budget.fits(userPrompt) {
+            do {
+                let result = try await streamAnswer(
+                    systemPrompt: Self.combinedSystemPrompt,
+                    messages: history + [ChatMessage(role: .user, content: userPrompt)],
+                    llm: llm, onEvent: onEvent, runID: runID
+                )
+                return Answer(text: result.text, citations: passages, usage: result.usage)
+            } catch let error as AppError where error.isContextOverflow {
+                // Same recovery as `SummaryService`: stage only when the
+                // conservative budget would actually split the articles.
+                guard !ContextBudget.conservative.fits(userPrompt) else { throw error }
+                AppLog.generation.atNotice.notice("chat: provider rejected library synthesis as too long, staging run=\(runID.value, privacy: .public)")
+                blockBudget = .conservative
+            }
         }
 
         // Otherwise map-reduce over whole-article blocks, carrying the excerpts.
-        let blocks = Self.packArticles(rendered, maxChars: SummaryService.mapBlockChars(for: llm.provider))
+        let blockChars = blockBudget.mapBlockChars(for: rendered.joined(separator: "\n\n"))
+        let blocks = Self.packArticles(rendered, maxChars: blockChars)
         let result = try await synthesizeMapReduce(
             question: question, history: history, blocks: blocks, passagesBlock: passagesBlock, llm: llm,
             onEvent: onEvent, runID: runID
