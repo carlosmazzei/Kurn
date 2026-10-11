@@ -2,8 +2,8 @@
 //  ModelStoreOpenFailureClassifierTests.swift
 //  KurnTests
 //
-//  Pins the H2 boot state machine's failure classification
-//  (docs/resilience-megaplan.md, PR 3) against hand-built `NSError`s carrying
+//  Pins the store boot state machine's failure classification
+//  (CLAUDE.md, "Durability & recovery") against hand-built `NSError`s carrying
 //  the exact Foundation/CoreData/POSIX signatures the classifier looks for —
 //  this is the part of the boot machinery that is meaningfully unit-testable
 //  without a real locked device, full disk, or corrupt store.

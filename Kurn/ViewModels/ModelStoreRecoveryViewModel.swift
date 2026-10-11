@@ -2,8 +2,8 @@
 //  ModelStoreRecoveryViewModel.swift
 //  Kurn
 //
-//  Drives `ModelStoreRecoveryView`'s actions (H2 PR 4,
-//  docs/resilience-megaplan.md): list/restore backup generations, attempt
+//  Drives `ModelStoreRecoveryView`'s actions (CLAUDE.md, "Durability &
+//  recovery"): list/restore backup generations, attempt
 //  salvage, export diagnostics, and a confirmed fresh start. Deliberately
 //  store-independent like the view it backs — everything here talks to the
 //  filesystem directly (`ModelStoreBackupManager`, `ModelStoreSalvage`),

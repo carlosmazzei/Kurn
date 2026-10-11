@@ -1,15 +1,17 @@
 # Roadmap
 
-Fourteen candidate capabilities, each judged against what Kurn is rather than
-against what is fashionable: six to adopt, four to evaluate, four deliberately
-out of scope. Then three focused engineering tracks that do not fit that
-taxonomy: diarization, package extraction, and reliability/resilience hardening.
+The single list of **work that is still open**. Everything that has shipped is
+documented where it lives permanently — `CLAUDE.md` for architecture,
+invariants and conventions, the `README.md` for what the app does — and is
+deliberately not repeated here. When an item below ships, move what is worth
+keeping into those two files and delete the item; do not open a separate plan
+document for a new track, add a section here instead.
 
 The verdicts matter less than the reasoning attached to them. A "no" with a
 recorded reason stops the same idea from being re-litigated every few months; a
 "yes" with its coupling point named is most of the design work already done.
 
-## Premise: the filter
+## The filter
 
 Kurn is a local-first meeting recorder. That sentence is load-bearing, and these
 five invariants are what it decomposes into. Every entry below is judged against
@@ -18,7 +20,7 @@ smoothed over.
 
 |        | Invariant                                             | What holds it up today                                                                                                  |
 | ------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **I1** | Nothing leaves the device without an explicit request | Network only on opt-in cloud transcription or a cloud summary provider; a fresh install works offline                   |
+| **I1** | Nothing leaves the device without an explicit request | Network only on opt-in cloud transcription or a cloud LLM provider; a fresh install works offline                       |
 | **I2** | Meeting-derived content lives in the encrypted store  | `ModelStoreProtection` (`.completeUnlessOpen`) covers the SwiftData store; never a loose file, cache, or `UserDefaults` |
 | **I3** | Accuracy is measured, not asserted                    | `KurnTests/Support/Evaluation/` (WER, DER, RTTM) plus the public-dataset matrix                                         |
 | **I4** | The subject is meetings, not dictation                | The value is a 90-minute multi-speaker file, not a six-second insert                                                    |
@@ -30,112 +32,14 @@ why `wikiEnabled` and `correctionEnabled` default off), and a feature that
 merely moves data off-device still needs consent even when no LLM is involved
 (why `templatesSyncEnabled` defaults off).
 
-## Capabilities already in place
+## Product capabilities
 
-Recorded here so none of the entries below is read as replacing something that
-already exists, and so planning does not restart from a blank page.
+### Adopt
 
-- **Diarization** — `FluidAudioDiarizer` with `SpeakerClusterRefiner` rescuing
-  VBx collapse, `SpeakerTurnSmoothing`, and per-`Speaker` voiceprints for
-  identity that survives re-transcription. This is the most developed part of
-  the pipeline and still the one with the most open questions — see the
-  dedicated track below.
-- **Measured accuracy** — WER/DER/RTTM harness, plus the public-dataset
-  evaluation matrix and its recorded history in `pipeline-evaluation.md`.
-- **Encryption at rest and access control** — file protection on recordings and
-  the store, `RecordingAccessGate`, and the cover window above the whole
-  hierarchy.
-- **Resumable transcription** — checkpoints per chunk, background task, launch
-  and foreground recovery sweeps.
-- **Playback enhancement** — GTCRN neural denoise, BS.1770 loudness
-  normalization, offline-rendered derived copies.
-- **Semantic search and chat** — on-device embeddings, hybrid dense + BM25 with
-  RRF, LLM rerank, `[mm:ss]` citations.
-- **Multiple summaries per meeting** — `Meeting.summaries` is one-to-many, each
-  `Summary` recording the template, provider and model it came from, with a
-  switcher, per-summary delete and per-summary export already in the UI.
-  Comparing two templates over one transcript is a shipped feature, not a
-  roadmap item.
-- **Derived artifacts** — per-meeting wiki articles and cross-meeting generated
-  documents.
-- **Transcript correction** — opt-in LLM pass with a change-magnitude guardrail
-  and vocabulary auto-extracted from the meeting itself.
-- **On-device LLM provider** — `FoundationModelsProvider`
-  (`Providers/FoundationModelsProvider.swift`, Apple's `FoundationModels`)
-  resolves through the same `ProviderFactory` as every cloud vendor, with no
-  API key and no network call; new installs default to it. `AutoTaggingService`
-  and the retrieval-grounded chat path already run against it unmodified. See
-  F1 below for what shipped and what's still a first-cut estimate.
-
-## Adopt
-
-Ordered by payoff, not by effort. None of the six creates tension with the five
+Ordered by payoff, not by effort. None of them creates tension with the five
 invariants.
 
-### F1 · Apple Foundation Models as a local provider — Implemented
-
-|                |                                                                        |
-| -------------- | ---------------------------------------------------------------------- |
-| **Couples to** | `Providers/LLMProvider.swift`, `ProviderFactory`, `AIProviderKind`     |
-| **Invariant**  | Closes I1, which the app used to violate in practice                   |
-| **Status**     | Implemented — [PR #139](https://github.com/carlosmazzei/Kurn/pull/139) |
-
-This closed the largest gap between what Kurn promises and what it does.
-`SummaryService`, `MeetingChatService`, `AutoTaggingService`,
-`LLMTranscriptCorrector`, `WikiService` and `DocumentGenerationService` used to
-all resolve through `ProviderFactory` to a cloud vendor with an API key: a user
-who never added a key got transcription and nothing else, and a user who did
-add one shipped the entire transcript of a private meeting to a third party.
-
-A new `AIProviderKind.appleOnDevice` case and `FoundationModelsProvider`
-(`Providers/FoundationModelsProvider.swift`) resolve through the same
-`ProviderFactory`, with no API key and no network call — the deployment target
-is iOS 26.0, so `FoundationModels` needed no `#available` guard, the same
-reason the app uses Liquid Glass chrome directly. New installs default
-`AppSettings.aiProviderID` to it; an existing user's stored selection is
-untouched.
-
-**What shipped:**
-
-- `AIProvider.isUsable` replaces the ad hoc `KeychainManager.hasValue(...)`
-  checks that used to gate title generation, the wiki/correction toggles and
-  `configuredProviders` — all of which would otherwise have treated the
-  on-device provider as permanently unconfigured, since it has no Keychain
-  entry at all. `ProviderFactory` checks `SystemLanguageModel.default.availability`
-  in its place, throwing `AppError.onDeviceModelUnavailable` the same way a
-  missing API key throws `AppError.noAPIKey` today.
-- `AutoTaggingService` runs against it unmodified — its excerpt was already
-  small enough. `MeetingChatService`'s retrieval-grounded chat
-  (`answerAcrossLibrary`, and the `answerAboutMeeting` full-transcript path for
-  meetings short enough to fit) and `SummaryService`'s map-reduce both do too,
-  now that the single-pass/map-block budgets (now `ContextBudget.onDevice`) and the retrieval pool sizes
-  are per-provider — the on-device context window is far smaller than any
-  cloud vendor's, so a long meeting takes more reduce rounds there than it
-  would on a cloud provider, exactly as anticipated below.
-- `summarize` uses guided generation (`@Generable`) rather than
-  `SummaryJSON`'s tolerant JSON parsing for this provider, so
-  `SummaryJSON.parse`'s fence-stripping and `AppError.summaryTruncated` are
-  both unreachable on this path — the secondary benefit originally named here.
-
-**Left for a follow-up, per I3:** the on-device char/token thresholds
-(`ContextBudget.onDevice`, formerly `SummaryService`'s on-device `maxSinglePassChars`/`mapBlockChars`,
-`FoundationModelsProvider`'s output-token ceiling, `MeetingChatService`'s
-on-device pool sizes) are conservative first-cut estimates against Apple's
-documented ~4096-token session window, explicitly commented as such in the
-code — not yet measured against real on-device runs the way the transcription
-pipeline's accuracy is. `LLMTranscriptCorrector`, `WikiService` and
-`DocumentGenerationService` can already select the on-device provider through
-the generic factory path, but that hasn't been exercised or validated the way
-tagging/chat/summary were.
-
-**Availability is a runtime fact, not a compile-time one** remains true after
-shipping: `SystemLanguageModel.default.availability` depends on Apple
-Intelligence hardware and on the feature being enabled, so how often real
-users actually get a usable on-device provider — versus falling through to
-"no provider configured" on a fresh install with Apple Intelligence off — is
-still unmeasured. That number is what F7 (below) should be reassessed against.
-
-### F2 · User-maintained meeting glossary
+#### F2 · User-maintained meeting glossary
 
 |                |                                                                                                   |
 | -------------- | ------------------------------------------------------------------------------------------------- |
@@ -143,12 +47,12 @@ still unmeasured. That number is what F7 (below) should be reassessed against.
 | **Invariant**  | I2 for storage; I3 because the effect is measurable                                               |
 | **Effort**     | Medium                                                                                            |
 
-`MeetingVocabularyExtractor` already exists, but it derives terms from the
-transcript itself with `minOccurrences = 2`, on the premise that the term appears
-spelled correctly *somewhere* in the same recording. That premise fails for
-exactly the words that matter most in a meeting: a participant's name, a product
-name, an internal acronym — mis-heard consistently, in all fourteen occurrences,
-with nothing correct to copy from.
+`MeetingVocabularyExtractor` derives terms from the transcript itself with
+`minOccurrences = 2`, on the premise that the term appears spelled correctly
+*somewhere* in the same recording. That premise fails for exactly the words
+that matter most in a meeting: a participant's name, a product name, an
+internal acronym — mis-heard consistently, in all fourteen occurrences, with
+nothing correct to copy from.
 
 **Two application points, with uneven engine support.**
 
@@ -161,39 +65,17 @@ with nothing correct to copy from.
   ones. This path works for every engine, which is what makes the feature
   coherent despite the gap above.
 
-**The identity connection.** `Speaker` rows already carry user-typed names.
-Those are free glossary entries for the meeting they belong to — and because
-`Speaker.voiceprintData` matches voices across runs, a name learned once can seed
-the hint for later meetings with the same voice.
+**The identity connection.** `Speaker` rows carry user-typed names. Those are
+free glossary entries for the meeting they belong to — and because
+`Speaker.voiceprintData` matches voices across runs and meetings, a name
+learned once can seed the hint for later meetings with the same voice.
 
 This is also the only entry whose effect the project can *prove*: run the
-public-dataset matrix before and after and compare WER. Under I3, that should be
-part of shipping it, not an afterthought.
+public-dataset matrix before and after and compare WER. Under I3, that is part
+of shipping it, not an afterthought — and since KurnCore runs `swift test` on
+Linux, the pure half of it is verifiable without waiting on simulator CI.
 
-### F3 · Frictionless capture: App Intents, Siri, Control Center — Implemented
-
-|                |                                                                              |
-| -------------- | ---------------------------------------------------------------------------- |
-| **Couples to** | `RecordingLauncher` · `RecordingCommandRouter` · `KurnLiveActivityExtension` |
-| **Invariant**  | No tension — system integration, no network                                  |
-| **Status**     | Implemented — [PR #143](https://github.com/carlosmazzei/Kurn/pull/143)       |
-
-`StartRecordingIntent` now opens the app and posts a process-local request;
-`RecordingLauncher` creates and queues the meeting through the existing
-`RecorderView` path; `KurnShortcuts` exposes the action to Siri/Shortcuts; and
-`StartRecordingControl` makes it available from Control Center, Lock Screen and
-the Action Button. The existing Watch/Live Activity pause, resume, stop and
-highlight commands still converge through `RecordingCommandRouter`.
-
-This deliberately starts capture without waiting for `RecordingAccessGate` — a
-lock-screen control that first required Face ID would miss the moment it exists
-to capture — while the cover window still prevents meeting content from being
-exposed. The remaining work is resilience rather than feature wiring: the
-resilience track (`docs/resilience.md`, H8) makes the intent distinguish
-"request accepted" from microphone permission and actual capture, and makes
-duplicate external commands idempotent — both now shipped.
-
-### F4 · Calendar context at record time
+#### F4 · Calendar context at record time
 
 |                |                                                                          |
 | -------------- | ------------------------------------------------------------------------ |
@@ -201,19 +83,19 @@ duplicate external commands idempotent — both now shipped.
 | **Invariant**  | I2 — attendee names are meeting-derived content, so they go in the store |
 | **Effort**     | Low-medium                                                               |
 
-Offer the calendar event happening now as the meeting title, and its attendees as
-pre-created `Speaker` rows. Read-only EventKit access with
+Offer the calendar event happening now as the meeting title, and its attendees
+as pre-created `Speaker` rows. Read-only EventKit access with
 `NSCalendarsUsageDescription`.
 
-This is more than a convenience. `SpeakerIdentityMatcher` already reconciles
-stored rows against fresh diarizer labels by voiceprint, but a name only enters
-the system when a user types one. An attendee list gives the app a *candidate
-set* of names for the voices in the room — and once a voiceprint is bound to a
-name, it can carry forward. That is the direct route to the limitation currently
-recorded in `CLAUDE.md`: nothing crosses meetings today, and "Ana" in one has no
-relation to "Ana" in another.
+This is more than a convenience. Cross-meeting voice matching already suggests
+a name typed in another meeting (`TranscriptionCoordinator+CrossMeetingSpeakerMatch`),
+but a name only enters the system when a user types one *somewhere*. An
+attendee list gives the app a *candidate set* of names for the voices in the
+room, independent of whether a name was ever typed before — the half of
+speaker identity the voiceprint work could not deliver on its own. It wants F2
+in place to pay off fully, since attendee names are also glossary entries.
 
-### F5 · Action items to Reminders
+#### F5 · Action items to Reminders
 
 |                |                                                                       |
 | -------------- | --------------------------------------------------------------------- |
@@ -231,7 +113,7 @@ silently create reminders — which is precisely the pattern `AutoTagConfirmView
 already establishes for suggested tags. Reuse it rather than inventing a second
 review flow.
 
-### F6 · Import audio recorded elsewhere
+#### F6 · Import audio recorded elsewhere
 
 |                |                                                                       |
 | -------------- | --------------------------------------------------------------------- |
@@ -247,7 +129,9 @@ a colleague sent.
 The pipeline already starts from a file: `TranscriptionService.transcribe` works
 from a `Recording`'s `.m4a`. Import is mostly creating the `Meeting` and
 `Recording` and landing the file in `Documents/Recordings/` through
-`RecordingProtection`.
+`RecordingProtection` — and through the same `RecordingCaptureState` /
+`RecordingFileFinalizer` contract a capture uses, since every consumer gates on
+`Recording.isReadyForConsumption`.
 
 **The format trap.** 24 kHz mono AAC is guaranteed for the app's own files, not
 for imports. `RecordingCompactor`, `Recording.effectiveBitRate` and the offline
@@ -256,12 +140,12 @@ render path all assume the app's encoding. Either normalize on ingest —
 tolerance of foreign formats an explicit, tested requirement at each of those
 points. Choosing neither is how a silent corruption bug gets shipped.
 
-## Evaluate
+### Evaluate
 
 Good ideas carrying a condition, a disproportionate cost, or an unresolved
 tension.
 
-### F7 · OAuth for cloud providers
+#### F7 · OAuth for cloud providers
 
 Signing in with an account the user already pays for, instead of a separately
 provisioned API key. It changes nothing about the privacy posture — cloud is
@@ -269,33 +153,33 @@ still cloud — but it changes *who can reach it*: today the barrier is creating
 developer account and entering a credit card.
 
 The cost is real: OAuth with PKCE, token refresh, a local callback.
-**Condition:** F1 has now shipped, so reassess. On a device where the
-on-device provider satisfies "works with no key at all", much of the
-motivation evaporates — what's still unmeasured is how often that's actually
-true across the install base (Apple Intelligence hardware and the feature
-being enabled), which is exactly the number F1's write-up above flags as
-outstanding.
+**Condition:** the on-device provider (`FoundationModelsProvider`) already
+delivers "works with no key at all" wherever Apple Intelligence is available.
+How often that is actually true across the install base is unmeasured (see
+"On-device LLM" under follow-ups) — that number decides whether F7 is worth it.
 
-### F8 · Reading mode
+#### F8 · Reading mode
 
 Filler-word removal and paragraph reflow for readability. This **cannot be a
 pipeline stage**: `TextNormalizer` is explicitly comparison-only, and the stored
 transcript keeps its punctuation and casing by design.
 
 So: a render-time transform over `Transcript.segments`, plus an option in
-`MeetingExport`. Cheap, pure and testable — a good first candidate for
-extraction into the package described below.
+`MeetingExport` (an `ExportDocument` transform, so every format gets it). Cheap,
+pure and testable — a natural KurnCore candidate.
 
-### F9 · On-device translation
+#### F9 · On-device translation of transcripts
 
 Apple's `Translation` framework runs entirely on-device with language packs
 downloaded on demand. Kurn already transcribes many languages; reading an
 English meeting in Portuguese is a real case and the fit with I1 is exact.
+(Summary translation through the selected LLM provider already exists; this is
+about the transcript, and about doing it with no provider at all.)
 
 The pack download is a heavy dependency, so it goes through I5 — reuse the
 `ModelDownloadConsent` pattern rather than fetching independently.
 
-### F10 · Spotlight indexing
+#### F10 · Spotlight indexing
 
 The value is obvious: find a meeting from system search. The problem is specific
 and disqualifying by default. The `CoreSpotlight` index lives outside the app's
@@ -307,469 +191,183 @@ Two defensible versions: index **title and date only**, with no transcript text;
 or make excerpt indexing an explicit opt-in with the trade-off written in plain
 language. **Do not index excerpts by default.**
 
+## Diarization
+
+### D4 · Does sherpa-onnx actually resist the VBx collapse?
+
+`.sherpaOnnx` shipped as an opt-in, segmentation-first diarizer whose only
+justification is surviving the failure `FluidAudioDiarizer` is known for — VBx
+collapsing a far-field meeting into one speaker. On AMI it measures ~17pp
+*behind* `fluidAudio` on DER (`docs/pipeline-evaluation.md`, "sherpa-onnx vs.
+FluidAudio"), but FluidAudio did not collapse on that material, so the run
+could not test the one thing the engine was added for.
+
+**Next measurement:** a dispatch with `diarization_engines: fluidAudio,sherpaOnnx`
+for both raw DERs in one run, read **per file** rather than in aggregate — the
+question is whether any single meeting shows FluidAudio collapsing and
+sherpa-onnx holding. If none does on a corpus that exercises the collapse
+(VoxConverse, single far-field mic), the engine is a candidate for removal.
+Its clustering threshold (`SherpaOnnxDiarizer`) is likewise untuned until that
+data exists.
+
+### Speaker names from outside the app
+
+Cross-meeting voice matching is in place, but it can only suggest a name the
+user already typed somewhere. Candidate names from the calendar are F4.
+
+## Follow-ups on shipped work
+
+Gaps each shipped track recorded about itself. None blocks feature work; each
+is listed so it is not rediscovered.
+
+### On-device LLM (`FoundationModelsProvider`)
+
+- **Measure the on-device budgets.** `ContextBudget.onDevice`,
+  `FoundationModelsProvider`'s output-token ceiling and `MeetingChatService`'s
+  on-device pool sizes are conservative first-cut estimates against Apple's
+  documented ~4096-token session window, commented as such in the code — not
+  measured against real on-device runs the way the transcription pipeline is.
+- **Exercise the untested paths.** `LLMTranscriptCorrector`, `WikiService` and
+  `DocumentGenerationService` can select the on-device provider through the
+  generic factory path, but that has not been exercised or validated the way
+  tagging, chat and summaries were.
+- **Measure availability.** `SystemLanguageModel.default.availability` depends
+  on Apple Intelligence hardware and the user's setting; how often a fresh
+  install actually gets a usable on-device provider is unknown, and is what F7
+  should be decided against.
+
+### KurnCore
+
+- **`KurnCoreAccelerate`.** `SpeakerClusterRefiner`, `SpeakerIdentityMatcher`
+  and `SpeechLevel` stayed in the app because they import `Accelerate`, which
+  does not exist on Linux. If picked up, the plan is a second package target
+  gated by `#if canImport(Accelerate)` in `Package.swift` so a Linux
+  `swift test` never sees it — not a portable rewrite of the `vDSP` calls.
+- **Pure presentation types still in `Views/`.** `MarkdownPresentation` (and
+  any sibling) is excluded from coverage by living there; move it beside the
+  type it presents, as `CLAUDE.md` asks of new code.
+
+### Reliability
+
+The H1–H10 hardening track is closed; its invariants and types are in
+`CLAUDE.md` ("Durability & recovery"). What each track left open:
+
+- **Release gate, recurring.** The physical-device matrix in
+  `docs/release-physical-checklist.md` (Data Protection, interruptions, route
+  changes, background expiry, low storage, thermal/memory, Watch, model
+  compilation) — run per release, not a one-off task.
+- **Model integrity.** Pin `WhisperCppModel`'s download source to an immutable
+  HuggingFace revision instead of `resolve/main` (sherpa-onnx is already
+  pinned); a wrong hardcoded SHA would break every download, so it needs a real
+  commit hash fetched with network access. Models installed before verification
+  existed read `.unverified` until re-downloaded. Download resume data survives
+  backgrounding but not a relaunch, and there is no automatic
+  retry-with-backoff.
+- **Operation state.** A full operation-state enum (queued / running / paused /
+  deferred / retryScheduled / permanentFailure with reason codes and
+  `nextAttemptAt`) was deferred — the bounded `automaticResumeAttempts` counter
+  over `TranscriptionStatus` suffices until a concrete UI need appears (e.g.
+  "retrying in 2 minutes"). `DocumentGenerationService` has no durable map-stage
+  checkpoint, because it spans several meetings and has no single `Meeting` to
+  checkpoint against.
+- **Network.** A dedicated "waiting / rate-limited" UI; FluidAudio's
+  mid-transfer network path changes are unobservable (the library exposes no
+  session to preflight against); background cloud upload stays off while
+  origin-lock cannot be guaranteed there.
+- **Error UX.** Contextual recovery actions reading `AppErrorMetadata.recoveryAction`
+  (the data exists, no UI reads it); a short reference ID shared by an error
+  dialog and the reliability-events list (needs widening `errorAlert`'s shared
+  binding at ~19 call sites); optimistic-UI rollback; `persist()` and AI-title
+  errors are not yet recording-scoped; the non-`AppError` raw-log sweep (~46
+  sites) is unaudited.
+- **Untested by construction today.** End-to-end resume of a staged
+  summary/wiki against a mocked `LLMProvider` (the `SummaryMapRunner` loop is
+  tested in isolation); `TranscriptionService.transcribe` actually throwing
+  `transcriptIntegrityFailed` (the gate is tested in isolation); the
+  ActivityKit start/end race; Watch command timeouts, reconnect reconciliation
+  and intent acceptance (no `WCSession` seam, `KurnWatchUITests` not in CI);
+  Keychain migration on a locked device; `ModelStoreOpenFailureClassifier`'s
+  `NSError` mappings against a real device failure.
+- **Unmeasured constants.** `ResourceScheduler`'s weight table and the
+  memory/thermal cooldowns are first-cut estimates, not measurements.
+- **CI.** The fault-injection seams exist per component (`ClockProviding`,
+  `FakeFileSystem`, `ModelDownloading`, …) but there is no single fault-matrix
+  artifact; the three macOS jobs each run a full clean build (no
+  build-once/test-many).
+
+### Design and accessibility
+
+- **iPad split view needs a hands-on pass.** `ContentView`'s
+  `NavigationSplitView` on regular width is structurally complete but has never
+  been checked on an iPad simulator/device: sidebar balance, collapse/expand in
+  Split View and Slide Over, VoiceOver order sidebar → detail.
+- **Audit coverage.** Bring `RecorderView` (the screen with the most icon-only
+  controls) and `FolderFormView` into `AccessibilityAuditUITests`; no automated
+  check covers large accessibility text sizes; Watch VoiceOver is verified
+  manually because `KurnWatchUITests` does not run in CI; the Chat tab's live
+  conversation UI only renders against a real provider.
+- **Localized screenshots.** `ScreenshotSeedData` is hardcoded English, so App
+  Store screenshots are `en-US` only; translate the seed data, then add
+  `Snapfile` languages.
+
+### Test coverage
+
+Every in-scope layer is above the 80% target and the floor ratchets
+(`Tools/coverage_floor.json`). Still below the target at file level:
+`RecorderViewModel` (~74%) and the core of `TranscriptionCoordinator` (~76%).
+Changes to `TranscriptionService` or `AudioRecorderService` seams should run the
+Thread Sanitizer lane (`reliability-hardening.yml`) before merge.
+
 ## Deliberately out of scope
 
 These are not bad features. They are bad fits, and the reasoning is recorded so
 the question doesn't reopen without new information.
 
 **R1 · CloudKit content sync.** Syncing transcripts across devices is the one
-change here that contradicts the premise outright. The detail that makes it worse
-than it sounds: CloudKit's private database is encrypted in transit and at rest
-but is not end-to-end encrypted the way `.completeUnlessOpen` is — those records
-can be served under legal process. `CloudSettingsSync` is the correct precedent
-and its own header says why: iCloud key-value for non-secret preferences,
-deliberately not the SwiftData container.
+change here that contradicts the premise outright. CloudKit's private database
+is encrypted in transit and at rest but is not end-to-end encrypted the way
+`.completeUnlessOpen` is — those records can be served under legal process.
+`CloudSettingsSync` is the correct precedent: iCloud key-value for non-secret
+preferences, deliberately not the SwiftData container.
 
 **R2 · A system-wide dictation keyboard.** Different product (I4). A meeting
 recorder delivers value in a 90-minute file; a dictation keyboard delivers it in
 a six-second insert. Building one would double the target count and the
 cross-process IPC surface for something nobody installs this app to get.
 
-**R3 · Chasing provider count.** The three `AIProviderKind` shapes already reach
+**R3 · Chasing provider count.** The `AIProviderKind` shapes already reach
 almost any vendor, because `openAICompatible` accepts a custom endpoint. Adding
-seventeen named providers is a settings screen, not a capability. F1 and F7 add
-capability; a longer list does not.
+seventeen named providers is a settings screen, not a capability.
 
 **R4 · Bridging to CLI agents on a desktop.** Routing AI processing through a
-coding agent running on the user's own machine is clever and useless without that
-machine powered on and serving HTTP. Anyone able to operate such a server is
-already served by the custom OpenAI-compatible endpoint the app supports today.
+coding agent running on the user's own machine is useless without that machine
+powered on and serving HTTP. Anyone able to operate such a server is already
+served by the custom OpenAI-compatible endpoint.
 
-## Diarization track
+**R5 · Representing overlapping speech.** `SpeakerTurn` is flat and fusion
+attributes an overlapped span to whoever held most of its duration. Modelling
+concurrent speakers would mean a new turn shape, a fusion policy and UI/export
+answers — and none of it would have content to show, because **no transcription
+engine in this app produces separate text for simultaneous speech**. Revisit
+only if an ASR approach producing independent hypotheses per overlapping
+speaker becomes feasible; that question is upstream of anything here. It also
+means a diarizer's overlap detection is never a reason to adopt it (see D4).
 
-Diarization gets its own section because these six items are interdependent in a
-way the F-list is not: **D2 gates D3, D4 and D5**, and deciding any of those
-without it means arguing rather than measuring. Two are defects rather than
-features, so they carry a different kind of urgency.
-
-|        | Item                                                       | Verdict                                                                                                                                                                 |
-| ------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **D1** | Speaker labels conflated across recordings in one meeting  | Fixed                                                                                                                                                                   |
-| **D2** | Raw diarizer turns are not measurable                      | Implemented                                                                                                                                                             |
-| **D3** | The `Diarizing` seam cannot accept provider-supplied turns | Shipped                                                                                                                                                                 |
-| **D4** | A segmentation-first diarizer as a third engine            | Shipped as an opt-in alternative; measures ~17pp behind `fluidAudio` on AMI, but the collapse case it targets is still untested (needs a per-file, same-run comparison) |
-| **D5** | Overlapping speech is not representable                    | Decided — keep truncating; no engine here has overlap-aware ASR anyway                                                                                                  |
-| **D6** | Voiceprints never cross meetings                           | Implemented (standalone; F4 half still open)                                                                                                                            |
-
-### D1 · Speaker labels conflated across recordings in one meeting — Fixed
-
-**This was a defect, not a missing feature.** `TranscriptionViewModel.syncSpeakers`
-used to build `usedLabels` by walking **every** recording in the meeting and
-collecting the speaker labels found in each transcript, while the `voiceprints`
-argument held only the vectors from the run that had just finished.
-
-The consequence was in the fallback branch: voice matching ran first and could
-only speak for labels in the current run, so every other row fell through to
-label-identity matching — the "Speaker 1" of recording B bound to the existing
-"Speaker 1" row created for recording A. The diarizer hands out labels in order
-of first appearance, independently per recording, so those two were the same
-person only by coincidence. Two different people could end up merged into one
-`Speaker` row, with whatever name the user typed sitting on both — and the
-voiceprint refresh compounded it, since it described whichever recording ran
-last rather than the person the row was named for.
-
-**What shipped:** `Recording.speakerVoiceprintsData` (`Recording.speakerVoiceprints`)
-persists each recording's own diarization run's voiceprints, not just the one
-that just finished. `syncSpeakers` now reconciles **one recording at a time, in
-`recordedAt` order**: each recording's own labels are matched via
-`SpeakerIdentityMatcher` against whichever stored rows an earlier recording in
-the same pass hasn't already claimed, a row already placed can still be
-*reconfirmed* by a later recording's matching voice (never relabelled or
-duplicated), and a label collision between two different recordings' same
-raw number is resolved by handing the second one the next free `"Speaker N"`
-rather than merging into the first's row. `KurnTests/SpeakerSyncTests.swift`
-pins both halves as regression tests: two different voices independently
-numbered the same across recordings stay distinct rows, and one voice heard
-in two recordings under different numbers is still recognized as one person.
-
-**Coupling point:** `TranscriptionViewModel.syncSpeakers`,
-`Kurn/Models/Recording.swift`.
-
-### D2 · Raw diarizer turns are not measurable — Implemented
-
-`TranscriptionService.Output` used to carry `segments`, `language`,
-`speakerLabels` and `speakerVoiceprints` — but not the diarizer's own turns.
-The public-dataset harness therefore built its DER hypothesis from
-`output.segments`, whose boundaries come from the ASR spans that fusion
-attributed.
-
-So the number the project called DER was really *fusion-output* DER: it
-blends diarizer error with ASR boundary placement and fusion policy. That is a
-fine end-to-end metric, and it was the wrong instrument for deciding whether
-one diarizer beats another. The repository already documented that DER "is
-not symmetric, since it is scored on the fused segments whose boundaries come
-from the ASR spans"; this item turns that caveat into something actionable.
-
-**What shipped:** `Output.turns` now carries the diarizer's raw,
-pre-fusion `[SpeakerTurn]`. `PublicDatasetEvaluationHarnessTests` scores a
-second DER (`Row.rawDER`) from those turns against the same reference RTTM,
-reports it alongside the existing fused-segment DER in both the per-item and
-aggregate `[pipeline-eval]` output, and persists it as four extra columns in
-the CSV report; `Tools/evaluation/report_to_markdown.py` renders both as
-separate "DER (fused)" / "DER (raw)" columns. Two numbers that diverge now
-localize the error to a stage — this is what D3/D4/D5 need to be decided by a
-table rather than by argument, per invariant I3.
-
-**Effort:** low. **Coupling point:** `TranscriptionService.Output`,
-`PublicDatasetEvaluationHarnessTests`.
-
-### D3 · The `Diarizing` seam cannot accept provider-supplied turns
-
-The protocol is `func diarize(url: URL) async -> [SpeakerTurn]`. It receives a
-file and nothing else: no access to the ASR result, and no path for turns that
-arrived *with* a transcript rather than being computed from audio.
-
-That shape is why a cloud transcription provider's own speaker attribution can
-never be used. Several speech APIs return speaker-labelled output as part of the
-transcript, and on far-field multi-party audio — the app's whole subject — that
-attribution is often better than a locally computed one, because the service runs
-a larger model than fits comfortably on a phone.
-
-**The tension is real and worth stating.** This is cloud, so it sits against I1.
-But it does not widen the privacy surface: it rides on the opt-in cloud
-transcription consent that already exists, and the audio is already being
-uploaded on that path. What changes is that the turns come back instead of being
-recomputed locally over the same file.
-
-Shape of the change: widen the seam so a transcription result can carry optional
-speaker turns, and add a diarization engine case that consumes them rather than
-opening the audio. Fusion is unaffected — it already takes turns plus spans.
-
-**What shipped** (`feat(transcription): ElevenLabs provider, gpt-4o-transcribe
-support, and generalized native diarization`, #218): `RawTranscript` gained an
-optional `speakerTurns`; `AIProvider.supportsNativeDiarization` is the
-capability flag (true today only for the new `.elevenLabs` kind, whose Scribe
-API returns `diarize`d output) and is the whole seam for a future provider of
-the same shape — flip the flag and populate `speakerTurns` from that
-provider's own response format, nothing else needs to change. The new
-`DiarizationEngine.transcriptionProviderNative` case is honored by
-`PipelineConfiguration.effectiveDiarization` only when the transcription
-engine is `.whisperAPI` and the selected provider supports it, falling back to
-`.heuristic` otherwise (no download, no consent flag — it fetches nothing).
-The two axes stay fully independent: any of the three local diarizers can
-still be paired with any transcription engine or provider, including one
-that could diarize natively. See CLAUDE.md's Providers section for the
-architecture and `docs/pipeline-evaluation.md`'s 2026-09-26 run for measured
-accuracy (ElevenLabs' native turns beat `fluidAudio` on cpWER but not on raw
-DER).
-
-**Effort:** medium, and it presumes adding a provider whose API offers this,
-which is a separate decision from the seam.
-
-### D4 · A segmentation-first diarizer as a third engine
-
-The documented failure of the current neural engine is VBx clustering collapsing
-every mixture weight but one on far-field single-microphone audio, returning the
-whole meeting as one speaker. `SpeakerClusterRefiner` exists specifically to undo
-that after the fact.
-
-Pyannote-style pipelines attack the same case from the other end: local
-segmentation first (a small model that decides who is speaking in a short window,
-overlap included), then clustering over those segments. The collapse mode is
-structurally different, which is the reason to try it rather than a claim that it
-scores better.
-
-`DiarizationEngine` plus the `Diarizing` protocol make a third engine cheap to
-add — the enum, one conforming type, and a consent entry for its model download
-under I5. What makes this worth doing is D2: with raw-turn DER in the evaluation
-matrix, "which diarizer is better on meeting audio" becomes a measurement on AMI
-rather than a preference.
-
-**Effort:** medium. **Sequencing:** after D2 (done). D5 is now decided
-(keep truncating overlap — see below): adopting D4 would have to be justified
-by its VBx-collapse resistance alone, since its overlap detection has nowhere
-to go once fusion runs.
-
-**Status: shipped and runtime-verified; collapse-resistance not yet measured.**
-The candidate is [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
-(Apache-2.0): local segmentation via `pyannote/segmentation-3.0` (MIT) then
-clustering via a 3D-Speaker CAM++ embedding (Apache-2.0) — both permissively
-licensed, so nothing blocked shipping it. `DiarizationEngine.sherpaOnnx`, its
-own `ModelSet`/consent flag/Settings flow, `SherpaOnnxDiarizer` (mirroring
-`FluidAudioDiarizer`'s contract), and the raw-turn-DER evaluation-matrix
-wiring are all in place and merged.
-
-sherpa-onnx exposes a C API with no importable Clang module of its own (its
-SPM product is named `sherpa-onnx`, not a valid Swift module identifier), so
-— unlike FluidAudio and whisper.cpp, both `import`ed directly — it needed a
-bridging header and a `SHERPA_ONNX_ENABLED` compilation condition on the
-`Kurn` target rather than the usual `#if canImport(...)` guard; that wiring
-was completed and verified locally (Xcode) after the initial merge. The
-2026-08-27 pipeline-eval dispatch (`docs/pipeline-evaluation.md`) confirms
-the real engine runs in CI (0.08–0.92s per item, not the disabled stub's
-instant fallback) and reports its first raw-turn DER on AMI (37.41%,
-constant across preprocessing/VAD as expected).
-
-**It loses to `fluidAudio` by ~17pp on AMI, which is evidence against
-adopting it as more than an opt-in alternative.** That run swept
-sherpa-onnx alone, but its English WER came back bit-identical to the
-2026-08-03 `whisperCpp@small` + `fluidAudio` rows — and since fusion is
-word-preserving, identical WER means the ASR path (and therefore the spans
-fusion attributes) behaved identically in both runs, which makes the fused
-DER difference attributable to the diarizer. On that basis `sherpaOnnx`
-scores 63–67% against `fluidAudio`'s 44–50% and `heuristic`'s 72–89%, in
-every one of the four preprocessing × VAD configurations. See "sherpa-onnx
-vs. FluidAudio" under Cross-run findings in `docs/pipeline-evaluation.md`
-for the table and its caveats.
-
-That is not the same as failing D4's actual bar, which is collapse-resistance
-specifically: FluidAudio's 44–50% on these four meetings is not a collapse
-pattern, so the material may simply not exercise the failure this engine was
-added to survive — and an engine cannot demonstrate resistance to a failure
-that did not occur. **Next measurement needed**: a dispatch with
-`diarization_engines: fluidAudio,sherpaOnnx` for both raw DERs in one run,
-read **per file** rather than in aggregate — the question is whether any
-single meeting shows FluidAudio collapsing and sherpa-onnx holding, which an
-average over four meetings cannot show either way.
-
-### D5 · Overlapping speech is not representable — Decided: keep truncating
-
-`SpeakerTurn` is a flat `speakerLabel` / `start` / `end`, and `TranscriptFusion`
-attributes each span to the single speaker holding most of its duration. Nothing
-in the data model can express two people talking at once.
-
-In a meeting that is not an edge case — interruptions, agreement noises and
-crosstalk are routine. Representing it properly would mean `SpeakerTurn`
-allowing concurrent intervals, fusion deciding what an overlapped span even
-renders as, and the transcript UI and Markdown export both needing an answer
-for two simultaneous speakers.
-
-**The decision, and why it's smaller than it looks.** None of that is worth
-building, because a harder constraint sits underneath all of it: **no
-transcription engine in this app — Apple Speech, FluidAudio Parakeet,
-whisper.cpp, or the cloud Whisper API — produces separate text for
-simultaneous speech.** Every one of them returns one word sequence per audio
-span. So "show what both people said" has no content to show regardless of
-what the diarizer reports or how the UI is drawn; the question was never
-really about `SpeakerTurn` or `TranscriptView`, it was gated on overlap-aware
-ASR that doesn't exist here. Kurn keeps attributing an overlapped span to
-whoever held most of its duration, exactly as today, and this stops being an
-open question rather than a documented gap.
-
-**What this means for D4.** A segmentation-first diarizer's overlap detection
-would still be discarded at fusion, same as any other engine's — so if D4 is
-ever adopted, it has to earn that on the VBx-collapse-resistance case (see
-D4 above), not on overlap, which no engine here can turn into text anyway.
-
-**If this is ever revisited**, the blocking question is upstream of anything
-in this app: does an on-device- or cloud-feasible ASR approach exist that
-produces independent hypotheses per overlapping speaker (e.g. re-running
-transcription per diarized track over the overlapped window)? Without an
-answer to that, a data-model/UI redesign here would have nothing real to
-render.
-
-### D6 · Voiceprints never cross meetings — Implemented (standalone, without F4)
-
-`Speaker.voiceprintData` persisted an L2-normalized embedding per speaker, but
-the only consumer was `syncSpeakers(for:)` — scoped to one meeting. A person
-who attends every week got an unrelated, freshly-named row each time.
-
-The roadmap paired this with **F4** (calendar attendees supplying candidate
-names), but F4 isn't built, and the other half — cross-meeting *voiceprint*
-continuity — stands on its own: the only candidate names available today are
-ones already typed on `Speaker` rows in other meetings, which is still a real
-improvement over never checking at all.
-
-**What shipped:** `SpeakerIdentityMatcher.match` assumes each side is
-addressable by a unique label — true within one meeting, false across the
-whole store, where `"Speaker 1"` is the label of countless different people.
-A new `SpeakerIdentityMatcher.closestMatch(to:among:)` sidesteps that: nearest
-single candidate to one voiceprint, over an arbitrary `(value, voiceprint)`
-pool with no uniqueness assumption. `TranscriptionViewModel.syncSpeakers`
-calls it exactly once per sync, at the point a brand-new `Speaker` row is
-created (step 4) — the only place a row is ever created from nothing, so the
-only place "have we heard this voice before, under a name, elsewhere" is
-worth asking — against every *other* meeting's named, voiceprinted rows
-(`crossMeetingSpeakerCandidates`, an unfiltered store-wide fetch filtered in
-Swift, same shape as `SemanticIndexCoordinator`'s sweeps). A hit is staged on
-`pendingCrossMeetingMatches`, never applied directly: `CrossMeetingSpeakerMatchView`
-(a sheet, wired into `MeetingDetailView` scoped to the meeting on screen) lets
-the user confirm or dismiss, mirroring `AutoTagConfirmView`'s "suggest, never
-apply silently" shape. Self-limiting by construction: a given row can only
-reach step 4 — and so only ever get one suggestion — the first time it's
-created; every later re-sync finds it again via intra-meeting voice matching,
-never step 4, so confirming or dismissing is a one-time event, not a repeat
-nag. No new settings toggle — a pure on-device vector comparison over
-already-collected, already-encrypted data, gated by the same explicit-confirm
-step a toggle would add.
-
-**Left open:** the F4 half (attendee names as candidates, independent of
-whether that name has ever been typed before) is still exactly the gap D6's
-original write-up named — see F4 above.
-
-**Coupling point:** `TranscriptionViewModel+CrossMeetingSpeakerMatch.swift`
-(split out of `TranscriptionViewModel.swift` to stay under SwiftLint's
-file-length limit, the same reason `MeetingDetailAutoTagging.swift` exists),
-`SpeakerIdentityMatcher`, `CrossMeetingSpeakerMatchView`.
-
-## The change that isn't a feature: SPM extraction — Implemented
-
-**Status:** Implemented — [PR #142](https://github.com/carlosmazzei/Kurn/pull/142).
-`Packages/KurnCore` now exists, wired into `Kurn.xcodeproj` the same way
-`Packages/WhisperCpp` is, with a `kurncore-linux` CI job running `swift test`
-on Linux in parallel with `build-and-test`, gating every release job the same
-way.
-
-The app is a single Xcode target plus the whisper binary package. Splitting the
-pure logic into local Swift packages fixes a bottleneck this repository already
-documents in detail.
-
-The bottleneck, from "Verifying without a local macOS/Xcode toolchain": builds
-and tests require macOS with Xcode, so they cannot run on a Linux agent or in
-generic CI. The prescribed loop is push the branch, open a PR, read the
-`build-and-test` logs, grep for `error:`, repeat — several rounds, because the
-Swift compiler stops at the first error.
-
-Much of the most heavily tested logic here is already plain Foundation, with no
-UIKit, no SwiftData and no AVFoundation:
-
-| Domain             | Types that are already pure                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------------- |
-| Fusion and quality | `TranscriptFusion`, `TranscriptQualityFilter`, `TranscriptCorrectionGuardrail`, `ChunkBoundary` |
-| Speakers           | `SpeakerClusterRefiner`, `SpeakerIdentityMatcher`, `SpeakerTurnSmoothing`                       |
-| Audio decisions    | `SpeechLevel`, `PlaybackTuning`                                                                 |
-| Text and data      | `MeetingVocabularyExtractor`, `SummaryJSON`, `MeetingFilter`, `MarkdownBlockParser`             |
-| Security           | `SecurityCoverState`                                                                            |
-| Evaluation         | All of `KurnTests/Support/Evaluation/` — WER, DER, RTTM, `TextNormalizer`                       |
-
-Extracted into a `KurnCore` package, these run under `swift test` **on Linux, in
-seconds, without a simulator**. A change to transcript fusion or DER scoring
-becomes verifiable before the push, by CI or by an agent with no Xcode. There is
-no product risk in the move: these types have no platform dependencies today —
-the package only makes that boundary enforceable by the compiler instead of
-maintained by convention.
-
-**What shipped, and where this table was wrong.** All of "Fusion and quality"
-and "Text and data" moved (`MeetingVocabularyExtractor`, `SummaryJSON`,
-`MeetingFilter`, `MarkdownBlockParser`), plus `SecurityCoverState` and
-`Evaluation`'s already-independent files — but two entries in this table
-turned out not to be pure as claimed, discovered only once each was actually
-read line by line rather than trusted from its file's import statement:
-`MeetingFilter` imported SwiftData and its `matches(_:)` read straight off
-the `Meeting` `@Model` class; it's now a pure predicate over a new
-`MeetingFilterAttributes` snapshot, with the SwiftData-facing translation
-left behind as an adapter (`Kurn/Models/MeetingFilter+Meeting.swift`).
-`SecurityCoverState` imported SwiftUI for `ScenePhase`; it now resolves
-against a portable `AppLifecyclePhase` KurnCore defines itself, with a
-one-line `ScenePhase` mapping left at the single app call site. Both kept
-their existing call-site signatures, so nothing outside either file noticed.
-
-Extraction also pulled in dependencies this table didn't list, because a
-type's own file compiling as Foundation-only doesn't mean nothing *it
-depends on* reaches into SwiftData or AVFoundation — `TranscriptSegment`
-(needed by `TranscriptFusion` and `MeetingVocabularyExtractor`),
-`TranscriptionStatus`/`TranscriptionEngine`/`TranscriptionMode`/
-`MeetingLanguage` (needed once `AppError` and `SummaryJSON` moved),
-`SummarySection` plus its `String.unescapingLiteralWhitespace()` helper
-(needed by `SummaryJSON`), and `SpeechRegion`/`TimelineSegment`/`ChunkBoundary`
-split out of files that also carry an AVFoundation-dependent actor.
-`TranscriptionEngine.requiredModelSet(whisperCppModel:)` stayed behind as an
-app-side extension rather than dragging `ModelSet` (which orchestrates real
-FluidAudio/whisper.cpp downloads) into the package — Swift extensions can add
-methods to a type from another module, so the split needed no call-site change.
-
-**Left out, deliberately: the "Speakers" row and `SpeechLevel`.**
-`SpeakerClusterRefiner`, `SpeakerIdentityMatcher` and `SpeechLevel`
-(`SpeechLevelMeter.swift`) all import `Accelerate`, which doesn't exist on
-Linux — moving them would buy none of this change's actual point (a Linux
-`swift test` signal) while adding an Xcode-project change this session had
-no way to verify locally. If picked up later, the plan is a second package
-target (`KurnCoreAccelerate`, gated by `#if canImport(Accelerate)` in
-`Package.swift` so a Linux `swift test` never sees it), not a portable
-rewrite of the `vDSP` calls.
-
-One caution to carry into any coverage work that follows: a test plan gathers
-coverage for every linked target, third-party dependencies included, which makes
-the raw percentage meaningless. Filter to first-party targets before trusting any
-coverage number.
-
-## Reliability and resilience track
-
-The full reliability/resilience track — product invariants, risk register,
-per-track (H1–H10) contracts, and the PR-by-PR execution log — lives in
-[`docs/resilience.md`](resilience.md), a dedicated document rather than a
-section here, since it had grown far larger than every other entry on this
-page combined (it used to be split across this section and
-`docs/resilience-megaplan.md`; the two were merged once the original 25-PR
-sequence closed and there was no remaining reason to describe the same H1–H10
-work in three places).
-
-In short: the track started from a static, repository-wide failure-path audit
-(2026-08-29) covering capture, SwiftData, file mutation, transcription, cloud
-providers, model downloads, background execution, WatchConnectivity, Live
-Activities, diagnostics, UI state, and CI, and turned the findings into ten
-tracks (H1–H10). **H2, H3, H5, H8, and H10 are fully done; H4, H7, and H9 are
-done except one deliberately deferred item each; H1**'s core capture-durability
-work is merged with the physical-device release matrix remaining as a release
-gate; **H6** is core-implemented with a few named follow-ups remaining. See
-`docs/resilience.md` for exactly what shipped, what's still open per track,
-and the underlying invariants and risk register.
-
-## Design review: Liquid Glass / HIG adherence track
-
-A HIG/Liquid Glass adherence review (2026-09-26) of `Kurn/Views/` found the
-navigation-chrome migration described elsewhere in this project's docs is
-real but incomplete elsewhere: three coexisting confirmation-dialog patterns,
-four coexisting "primary button" visual languages, ~35 call sites bypassing
-Dynamic Type, and no iPad-specific navigation (`NavigationSplitView`) despite
-the app being universal. The full findings register and an 8-track (D1–D8)
-remediation plan, ordered by an effort/impact matrix, live in
-[`docs/design-review-liquid-glass.md`](design-review-liquid-glass.md). **All
-8 tracks are now done**, including D6 (iPad `NavigationSplitView` adoption,
-the largest and most structural item — `ContentView` now branches on
-`horizontalSizeClass`). The one item that doc still lists as outstanding is a
-manual iPad simulator/device verification pass, which no Linux CI session can
-perform.
+**R6 · Automatic diagnostic upload or a third-party analytics SDK,** and a
+numeric reliability SLO before an instrumented baseline exists. Diagnostics
+stay on device and leave only through an explicit share.
 
 ## Suggested sequence
 
-Unlike the rest of this document, the numbering here is real — each step makes
-the next cheaper or more verifiable.
+1. **F2 · Meeting glossary.** Its WER effect is measurable, and the pure half
+   is verifiable on Linux.
+2. **F4 · Calendar context.** Feeds F2 real names and supplies the candidate
+   names cross-meeting voice matching lacks.
+3. **F5 · Reminders and F6 · Import.** Independent of each other and of the
+   rest; slot them in as room appears. F6 widens the capture surface, so it
+   lands with the same fault-injection discipline as capture itself.
+4. **D4's per-file measurement**, on its own clock — it is a dispatch, not code.
+5. **Reassess F7–F10.** F7 after the on-device availability number exists.
 
-1. **Extract the pure types into a package — done.** First, because it speeds
-   up verification of everything after it — including the pipeline changes F2
-   introduces. The Accelerate-dependent "Speakers" group is the one deliberate
-   gap; see the section above.
-2. **F3 · Frictionless capture — done.** Shipped in
-   [PR #143](https://github.com/carlosmazzei/Kurn/pull/143); external-command
-   acknowledgement and race hardening continue under H8 rather than reopening
-   the feature itself.
-3. **F1 · Apple Foundation Models — done.** Shipped in
-   [PR #139](https://github.com/carlosmazzei/Kurn/pull/139): provider
-   plumbing, auto-tagging, retrieval chat and per-provider summary thresholds,
-   in that order. Left open: measuring the on-device thresholds against real
-   runs, and exercising correction/wiki/document generation against the new
-   provider.
-4. **F2 · Meeting glossary.** After step 1, so the WER effect can be measured
-   without waiting on simulator CI.
-5. **F4 · Calendar context.** Feeds F2 real names and unlocks cross-meeting
-   speaker identity, so it wants F2 in place to pay off.
-6. **F5 · Reminders and F6 · Import.** Independent of each other and of the
-   rest; slot them in as room appears.
-7. **Reassess F7, F8, F9 and F10.** F7 especially: F1 now delivers "works with
-   no key" wherever the on-device provider is actually available — see F7's
-   own entry above for what's still unmeasured.
-
-The diarization track runs on its own clock, because two of its items are
-defects and because D2 is a prerequisite rather than a feature:
-
-- **D2 first, and early — done.** It was cheap, and every later diarization
-  decision was guesswork without it.
-- **D1 next — done.** It was a correctness defect that silently attached a
-  user's typed name to the wrong person, which is worse than any accuracy
-  number here.
-- **D6 — done standalone, ahead of F4.** The voiceprint half shipped without
-  waiting on calendar context; the two halves of speaker identity still pay
-  off more together, so F4 remains worth doing for the names it would add as
-  candidates.
-- **D5 decided — keep truncating.** No transcription engine in the app
-  produces separate text for simultaneous speech, so an overlap-aware
-  diarizer would have nothing to render regardless of the UI; this was never
-  really a UI question. **D4 is downgraded accordingly**: it would have to be
-  justified purely by VBx-collapse resistance on far-field audio (measurable
-  via D2's raw-turn DER), not by overlap handling. Still just "evaluate", not
-  scheduled.
-- **D3 — done.** The ElevenLabs provider (#218) answered the provider question
-  this depended on: it exposes native diarization, and `AIProvider.supportsNativeDiarization`
-  plus `DiarizationEngine.transcriptionProviderNative` are the shipped seam —
-  see D3's own entry above.
+The follow-ups above are picked up opportunistically, ahead of any feature that
+widens the surface they concern.

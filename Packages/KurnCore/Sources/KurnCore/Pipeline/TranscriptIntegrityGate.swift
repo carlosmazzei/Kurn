@@ -3,8 +3,8 @@
 //  KurnCore
 //
 //  The final check before one transcription run's output is trusted enough to
-//  replace whatever transcript already exists (H5 PR 12,
-//  `docs/resilience-megaplan.md`). Every stage before this one — the ASR
+//  replace whatever transcript already exists (CLAUDE.md, "Durability &
+//  recovery", H-I4). Every stage before this one — the ASR
 //  engine, `TranscriptFusion`, an LLM `TranscriptCorrecting` conformer — is
 //  pure and cannot throw, so nothing upstream stops a structurally broken
 //  result from reaching the save path on its own. This is that stop:

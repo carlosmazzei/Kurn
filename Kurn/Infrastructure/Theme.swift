@@ -81,9 +81,8 @@ enum Theme {
     // MARK: - Button language
     //
     // Which `.buttonStyle` a control gets is a decision, not a per-file
-    // judgment call (docs/design-review-liquid-glass.md, track D4). Four
-    // visual languages coexisted before that review: pick from this table
-    // instead of adding a fifth.
+    // judgment call. Four visual languages once coexisted: pick from this
+    // table instead of adding a fifth.
     //
     // - **Primary action of a screen** (the one thing this screen exists to
     //   let you do — Stop recording, download a model, confirm a share):
@@ -94,10 +93,10 @@ enum Theme {
     // - **Secondary action alongside a primary one** (Cancel next to
     //   Generate, a form's secondary button): `.buttonStyle(.bordered)`.
     // - **Confirmation/destructive decision** (delete, reset, restore):
-    //   `kurnDialog` (`DesignComponents.swift`), not a bespoke button — see
-    //   "Corrections found during implementation" in the design-review doc
-    //   for why this is the deliberate app-wide convention, required as-is
-    //   by `KurnUITests/Flows/LibraryFlowUITests`/`SettingsFlowUITests`.
+    //   `kurnDialog` (`DesignComponents.swift`), not a bespoke button — the
+    //   deliberate app-wide convention (`errorAlert` wraps it), required
+    //   as-is by `KurnUITests/Flows/LibraryFlowUITests`/`SettingsFlowUITests`
+    //   (CLAUDE.md, "Navigation chrome").
     // - **List/menu row, chip, or other incidental tap target** that is not
     //   "the action this screen is for": `.buttonStyle(.plain)` with custom
     //   content remains correct — most of the app's `.plain` buttons are

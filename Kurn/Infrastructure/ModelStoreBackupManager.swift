@@ -2,7 +2,7 @@
 //  ModelStoreBackupManager.swift
 //  Kurn
 //
-//  H2 PR 4 (docs/resilience-megaplan.md): protected, bounded-generation
+//  Protected, bounded-generation
 //  backups of the SwiftData store, taken before every open attempt so a
 //  migration always has a known-good copy behind it, plus restore and a
 //  quarantine mechanism that makes both restore and "confirmed fresh start"

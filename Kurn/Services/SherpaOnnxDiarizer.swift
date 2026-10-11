@@ -12,7 +12,7 @@
 //  same problem from the other end — segment first, cluster after — which
 //  fails differently, not necessarily less. It runs on CPU only via ONNX
 //  Runtime (no ANE acceleration on iOS), a deliberate trade of speed for a
-//  structurally different collapse mode. See `docs/roadmap.md`, item D4.
+//  structurally different collapse mode. See `docs/roadmap.md`, D4.
 //
 //  Mirrors `FluidAudioDiarizer`'s contract: never throws out of
 //  `diarize(url:)` — falls back to a single speaker turn on any failure,
@@ -203,7 +203,7 @@ extension SherpaOnnxDiarizer {
     /// time on the ANE"), which this CPU-only ONNX Runtime engine has no
     /// equivalent guarantee for. This multiplier is a placeholder pending
     /// real device measurement (see the public-dataset evaluation harness,
-    /// `docs/roadmap.md` D4) — tune it once that data exists rather than
+    /// `docs/roadmap.md`, D4) — tune it once that data exists rather than
     /// guessing further.
     static func processTimeout(forAudioDuration duration: TimeInterval) -> TimeInterval {
         min(3600, max(300, duration * 1.5))

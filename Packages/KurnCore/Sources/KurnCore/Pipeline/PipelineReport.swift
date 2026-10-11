@@ -7,7 +7,7 @@
 //  the original file, and a transcript is better than no transcript because
 //  diarization failed — but until this type existed the *fact* of the fallback
 //  only survived in the log: the finished transcript claimed the requested
-//  engine had succeeded (`docs/resilience-megaplan.md`, H5 PR 11).
+//  engine had succeeded (CLAUDE.md, "Durability & recovery", H-I4).
 //
 //  Every field is a closed vocabulary or an engine `rawValue`. There is
 //  deliberately no free-text/`underlyingError` field: this report is persisted

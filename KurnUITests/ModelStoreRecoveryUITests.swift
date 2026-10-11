@@ -5,8 +5,8 @@
 //  Launches the real app with a DEBUG-only synthetic store-open failure
 //  injected (`Kurn/DebugSupport/ModelStoreDebugInjection.swift`) and asserts
 //  the H2 boot state machine's recovery shell renders instead of crashing or
-//  showing real app content — the acceptance bar
-//  docs/resilience-megaplan.md's PR 3 sets ("Locked background launch and
+//  showing real app content — the acceptance bar the
+//  boot state machine was built to ("Locked background launch and
 //  injected open failures do not crash-loop", "Release-configuration launch
 //  tests cover each classified failure"). This is a Debug-configuration
 //  launch, matching how AccessibilityAuditUITests/ScreenshotUITests already

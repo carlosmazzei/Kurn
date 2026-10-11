@@ -50,11 +50,12 @@ generates a summary with a configured AI provider.
 - Pause, resume, cancel, and stop recordings from the app.
 - Control active recordings from the Lock Screen, Dynamic Island, or Apple
   Watch.
-- Mirror recording state and input level to the Watch app.
+- Mirror recording state and the elapsed time to the Watch app.
 - Search meetings and filter them by date range, tags, transcription status,
   summary presence, and duration.
 - Organize meetings into user-defined folders, mark them favorite, or archive
-  them, alongside built-in All / Inbox / Favorites / Archive views.
+  them, alongside built-in All / Inbox / Favorites / Archive views. On iPad the
+  folder list is a persistent sidebar column instead of a sheet.
 - Tag meetings and manage tags globally (rename, recolor, merge, delete), with
   optional LLM-based tag suggestions from the transcript.
 - Save a filter as a Smart Folder that dynamically lists matching meetings.
@@ -176,7 +177,7 @@ Kurn can generate a structured meeting summary from existing transcripts.
 Summaries are template-driven and render Markdown in section titles, body text,
 and bullet items, so provider output can use emphasis, links, inline code,
 headings, and ordered or unordered lists where helpful. Built-in templates
-cover General, Stand-up, and Interview meetings; users can also create,
+cover General, Stand-up, Interview, and Outline; users can also create,
 edit, and delete their own custom templates in Settings.
 
 Long transcripts are summarized in stages. The Summary tab keeps the generation
@@ -394,8 +395,9 @@ Providers, Models, Services, ViewModels, Views, KurnCore) so the PR comment
 shows where coverage moved, and `Tools/coverage_report.py` writes the same
 per-layer table plus the top uncovered files to each test job's summary.
 The watch app, the Live Activity extension and the App Intents are ignored
-until a job actually executes them. The prioritized plan for raising coverage
-is `docs/testing-coverage-plan.md`.
+until a job actually executes them. Every in-scope layer is currently above
+the 80% target (in-scope total ≈ 85%); the remaining file-level gaps are
+tracked in the [roadmap](docs/roadmap.md).
 
 ### Reliability hardening lane
 
@@ -509,7 +511,7 @@ models, async service APIs, and a SwiftData model container.
 ```text
 Kurn/
 ├── KurnApp.swift                 # App entry point and SwiftData container
-├── ContentView.swift            # Root NavigationStack
+├── ContentView.swift            # Root NavigationStack (NavigationSplitView on iPad)
 ├── Models/                      # SwiftData @Model types and shared value types
 ├── Views/                       # SwiftUI screens and reusable views
 ├── ViewModels/                  # Main-actor observable coordinators
@@ -551,18 +553,41 @@ is shared into the `KurnLiveActivityExtension` target rather than duplicated.
 ### Resilience
 
 Kurn is local-first, so a recording is usually the only copy of the audio.
-The completed H1–H10 resilience track (tracked in
-[`docs/resilience.md`](docs/resilience.md)) covers capture failures, store
-boot/recovery, journaled file operations, versioned JSON validation,
-network/model download limits, a single concurrency admission scheduler, and
-redacted on-device reliability diagnostics. See CLAUDE.md's "Durability &
-recovery" section for the concrete types and invariants.
+A completed hardening track built on that fact:
+
+- **Capture never silently loses audio.** A `Recording` row is committed
+  before the file opens, write failures and stalls are surfaced instead of
+  counted past, and only a file that reopens, measures and carries its data
+  protection is marked ready. Interrupted captures are recovered on launch.
+- **The store never silently opens somewhere else.** Launch is a state machine
+  with protected backups (three generations), read-only salvage to Markdown
+  and an explicit, double-confirmed fresh start — not a crash.
+- **Destructive file operations are journaled** (intent → trashed →
+  committed) and replayed or rolled back after a crash; unreadable or
+  unmatched audio is quarantined, never deleted.
+- **Resumed work is exact.** Transcription checkpoints carry a fingerprint of
+  the source and the pipeline, so a resume never splices two configurations'
+  output, and automatic retries are bounded.
+- **Degradation is visible.** Each transcript records which engine every stage
+  ran and whether it degraded; a structurally broken result never replaces an
+  existing transcript.
+- **Models and keys are verified.** Downloads are size/checksum-verified and
+  installed atomically; Keychain reads distinguish "locked" from "missing".
+- **Heavy work shares one admission scheduler** that respects memory and
+  thermal pressure, and Watch/Live Activity/Siri commands are idempotent.
+- **Weekly hardening CI** runs Thread Sanitizer, a Release-configuration test
+  pass and a UI flake measurement; failures no simulator can reproduce are a
+  [physical-device release checklist](docs/release-physical-checklist.md).
+
+See CLAUDE.md's "Durability & recovery" section for the concrete types and
+invariants.
 
 ## Important Implementation Notes
 
 - Cloud transcription uses a Whisper-compatible API (OpenAI, Groq, or
   ElevenLabs today), chosen independently of the summary provider.
-- Summary generation can use OpenAI, Anthropic, Google AI, or Groq, and long
+- Summary generation can use Apple's on-device model, OpenAI, Anthropic,
+  Google AI, or Groq, and long
   transcripts use a staged map-reduce pass with progress and cancellation in
   the Summary tab. ElevenLabs is transcription-only and never appears here.
 - Voice-activity detection, transcription, and language detection are each
@@ -605,6 +630,12 @@ Before shipping:
 - Test microphone, speech recognition, Live Activity, and network permission
   flows.
 - Validate export output with real meeting data.
+
+## Roadmap
+
+What is still open — planned features, items under evaluation, ideas
+deliberately ruled out and the known gaps left by shipped work — is kept in a
+single document, [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Acknowledgements
 

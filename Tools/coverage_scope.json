@@ -19,7 +19,7 @@
     },
     {
       "pattern": "Kurn/AppIntents/**",
-      "reason": "App Intents run only from Siri/Shortcuts; no test target executes them yet (docs/testing-coverage-plan.md, Fase 4)."
+      "reason": "App Intents run only from Siri/Shortcuts; no test target executes them yet."
     },
     {
       "pattern": "Kurn/Services/Pipeline/WhisperCppTranscriber.swift",

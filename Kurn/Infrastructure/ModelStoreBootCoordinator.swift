@@ -3,8 +3,7 @@
 //  Kurn
 //
 //  Replaces the recoverable `fatalError` in `KurnApp`'s old `modelContainer`
-//  initializer with an explicit four-state machine
-//  (docs/resilience-megaplan.md, H2 PR 3): `waitingForProtectedData`,
+//  initializer with an explicit four-state machine: `waitingForProtectedData`,
 //  `opening`, `ready`, `recoveryRequired`. `KurnApp` reads `state` to decide
 //  what to render instead of assuming a container always exists.
 //

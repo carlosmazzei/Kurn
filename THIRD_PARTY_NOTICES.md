@@ -39,8 +39,8 @@ Speech features in Kurn are **Powered by Fluid Inference**.
 
 Optional third diarization engine (segmentation-first, CPU-only via ONNX
 Runtime), added alongside FluidAudio's neural engine for far-field/single-mic
-recordings where FluidAudio's clustering step collapses to one speaker — see
-`docs/roadmap.md`, item D4. Linked as a remote Swift package (mirroring
+recordings where FluidAudio's clustering step collapses to one speaker (whether
+it does is still being measured — see `docs/roadmap.md`, D4). Linked as a remote Swift package (mirroring
 FluidAudio's integration, not whisper.cpp's local binary wrapper), which
 resolves its own transitive `onnxruntime-libs` dependency.
 

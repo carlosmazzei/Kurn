@@ -46,8 +46,8 @@
 //  it verifies the downloaded bytes against whatever integrity signal the
 //  origin volunteers for *this* transfer, over HTTPS, rather than
 //  fabricating a pinned value that was never actually confirmed against
-//  the real file. See "PR 15" in docs/resilience-megaplan.md for the full
-//  reasoning and what a follow-up with real network access should still do.
+//  the real file. Pinning an immutable revision for whisper.cpp is the
+//  open follow-up, tracked in docs/roadmap.md.
 //
 //  Pure `Foundation` (+ `CryptoKit` via `PipelineDigest`), no engine
 //  imports, so it compiles whether or not the binary packages are linked

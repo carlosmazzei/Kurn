@@ -12,7 +12,7 @@ name: Reliability hardening lane
 # reruns anything to make a number look better.
 #
 # "Record baseline counts... without inventing a numeric reliability SLO"
-# (docs/roadmap.md's H10 plan, item 5 and the Reliability scorecard section):
+# (the resilience track's H10 contract, CLAUDE.md "Durability & recovery"):
 # the summary job writes counts to the job summary for a maintainer to read
 # and, if useful, record by hand -- the same "recording a run is a human
 # step" philosophy `pipeline-eval.yml`/`docs/pipeline-evaluation.md` already

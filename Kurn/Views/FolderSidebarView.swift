@@ -5,7 +5,7 @@
 //  Drives the `LibrarySelection` shown by `MeetingsListView` — presented as a
 //  sheet on compact width (from `MeetingsListView`'s toolbar) and as
 //  `ContentView`'s persistent `NavigationSplitView` sidebar column on regular
-//  width (D6, docs/design-review-liquid-glass.md), both against the same
+//  width, both against the same
 //  `Binding<LibrarySelection>`. The root level lists every built-in bucket
 //  (All / Inbox / Favorites / Archive) and the user's root folders; tapping a
 //  folder's row body selects it (and calls `dismiss()`, a no-op when this is

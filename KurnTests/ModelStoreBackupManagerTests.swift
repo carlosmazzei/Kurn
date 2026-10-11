@@ -2,8 +2,8 @@
 //  ModelStoreBackupManagerTests.swift
 //  KurnTests
 //
-//  Exercises the H2 PR 4 backup/restore/quarantine engine
-//  (docs/resilience-megaplan.md) against a real temporary directory —
+//  Exercises the store backup/restore/quarantine engine
+//  (CLAUDE.md, "Durability & recovery") against a real temporary directory —
 //  synthetic "live store" files rather than a real SwiftData store, since
 //  this type only ever copies/moves whole files and never opens them. Proves
 //  the acceptance bar directly: backup only ever copies, pruning only ever

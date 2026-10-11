@@ -102,8 +102,8 @@
          </TestableReference>
          <!-- KurnSwiftDataTests is a separate test target (not just a
               separate suite) so it gets its own, freshly-launched host app
-              process, distinct from KurnTests' — see
-              docs/resilience-megaplan.md's H2 PR 4 handoff for why: a known
+              process, distinct from KurnTests' — for
+              this reason: a known
               SwiftData concurrency crash (FB14089213-class) kept hitting
               CI, and per-target process isolation is the one mechanism
               confirmed to actually separate it from the rest of the ~150

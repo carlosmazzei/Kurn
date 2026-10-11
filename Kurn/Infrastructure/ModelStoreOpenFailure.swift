@@ -2,8 +2,8 @@
 //  ModelStoreOpenFailure.swift
 //  Kurn
 //
-//  Classifies a `ModelContainer` construction failure into one of the four
-//  reasons docs/resilience-megaplan.md's H2 PR 3 names — protected data
+//  Classifies a `ModelContainer` construction failure into one of four
+//  reasons — protected data
 //  unavailable, storage full, an incompatible migration, or everything else —
 //  so the boot coordinator can react differently instead of guessing.
 //
