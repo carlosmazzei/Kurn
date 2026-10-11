@@ -8,8 +8,7 @@
 //  store-independent (no `ModelContext`, no `AppSettings`): the recovery
 //  shell must not depend on the very thing that failed to open.
 //
-//  H2 PR 3 (docs/resilience-megaplan.md) shipped Retry as the only action.
-//  H2 PR 4 adds the rest — restore from a protected backup, best-effort
+//  Beyond Retry, the shell offers restore from a protected backup, best-effort
 //  salvage into a separate read-only container, diagnostics export, and a
 //  confirmed fresh start — all driven by `ModelStoreRecoveryViewModel`.
 //  Restore and fresh start are both double-confirmed and never destructive:

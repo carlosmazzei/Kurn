@@ -22,8 +22,8 @@ import UIKit
 extension TranscriptionScheduler {
 
     /// Register the launch handler. Must be called before the app finishes
-    /// launching (`KurnApp.init`) — and, per the H2 boot state machine
-    /// (docs/resilience-megaplan.md), before the store has even been opened:
+    /// launching (`KurnApp.init`) — and, per the store boot state machine,
+    /// before the store has even been opened:
     /// `contextProvider` is only consulted when a task actually fires (from
     /// the main actor, alongside the existing protected-data check), not at
     /// registration time, so registration itself never needs a container to

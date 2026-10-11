@@ -2,7 +2,7 @@
 //  ModelStoreSalvageTests.swift
 //  KurnSwiftDataTests
 //
-//  Proves H2 PR 4's salvage attempt (docs/resilience-megaplan.md) recovers
+//  Proves the store salvage attempt (CLAUDE.md, "Durability & recovery") recovers
 //  data from a real store copy without ever touching the live files, and
 //  degrades to `.unavailable`/`.failed` rather than crashing when there is
 //  nothing to recover.

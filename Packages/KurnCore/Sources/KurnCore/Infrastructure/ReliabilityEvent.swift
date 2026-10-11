@@ -10,10 +10,9 @@
 //  caller cannot accidentally leak private content through this seam the
 //  way a stray `localizedDescription` interpolation could.
 //
-//  This is the "operation IDs, safe event vocabulary" half of the
-//  reliability track's first step (see docs/roadmap.md, "Baseline and
-//  seams"); persisting these events for an on-device health screen is a
-//  later phase (H9) — this type only standardizes what gets logged today.
+//  This is the "operation IDs, safe event vocabulary" half of reliability
+//  diagnostics; `ReliabilityEventStore` (app target) persists these events
+//  for the Health & Recovery screen (CLAUDE.md, "Durability & recovery").
 //
 //  KurnCore has no `os` dependency (it needs to build on Linux), so, like
 //  `TranscriptQualityFilter.logHandler`, this exposes a handler seam instead

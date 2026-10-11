@@ -59,7 +59,7 @@ struct MeetingsListView: View {
     @State var filter = MeetingFilter()
     /// Owned by `ContentView`, not this view — on iPad-regular width the same
     /// binding also drives `FolderSidebarView`'s persistent `NavigationSplitView`
-    /// sidebar column (D6, docs/design-review-liquid-glass.md), so a folder tap
+    /// sidebar column, so a folder tap
     /// there updates this list without a sheet round-trip. On compact width
     /// `ContentView` still owns the state, just with no sidebar column reading it.
     @Binding var selection: LibrarySelection

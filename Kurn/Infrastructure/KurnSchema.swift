@@ -14,7 +14,7 @@
 //  unversioned `Schema([...])`. Declaring the current graph as version 1.0.0
 //  does not by itself change what is on disk; it gives future model changes a
 //  place to add version 1.1.0/2.0.0 and a `MigrationStage` between them,
-//  which is the point of this PR (`docs/resilience-megaplan.md`'s H2 track).
+//  which is the point of the versioned baseline.
 //  `LegacyStoreAdoptionTests` proves an existing store created the old,
 //  unversioned way still opens through this schema and migration plan without
 //  data loss — see that file for why this is tested with a same-run generated
@@ -81,7 +81,7 @@ enum KurnSchemaV2: VersionedSchema {
 }
 
 /// Version 1.2.0: adds `MeetingPhoto` (a timestamped, in-meeting photo
-/// captured during recording — see `docs/`'s "photo timeline" notes) and its
+/// captured during recording) and its
 /// cascade relationship on `Recording`. Purely additive, same shape as V2's
 /// own addition of `ChatSession`, so a lightweight stage covers it. This is
 /// the *current* version, so it lists the live `@Model` classes; when the

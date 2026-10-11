@@ -2,8 +2,8 @@
 //  ModelStoreBootCoordinatorTests.swift
 //  KurnSwiftDataTests
 //
-//  Drives the H2 boot state machine (docs/resilience-megaplan.md, PR 3 and
-//  PR 4) through injected `makeStore`/`isProtectedDataAvailable` seams — the
+//  Drives the store boot state machine (CLAUDE.md, "Durability & recovery")
+//  through injected `makeStore`/`isProtectedDataAvailable` seams — the
 //  same shape `ModelContainerBootstrapTests` already uses for the
 //  lower-level factory. Proves the acceptance criteria directly: a locked
 //  launch never attempts to open the store, an open failure never crashes

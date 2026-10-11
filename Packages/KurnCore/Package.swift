@@ -5,8 +5,8 @@
 //
 //  Pure-Foundation logic extracted from the Kurn app target so it can be
 //  compiled and tested with `swift test` on Linux, without Xcode or a
-//  simulator. See docs/roadmap.md, "The change that isn't a feature: SPM
-//  extraction".
+//  simulator. See CLAUDE.md, "Overview" and "Verifying without a local
+//  macOS/Xcode toolchain".
 //
 //  Platform floors deliberately stay low (not the app's actual iOS 26 /
 //  watchOS 10 deployment targets): nothing here calls a version-gated API,

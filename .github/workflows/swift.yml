@@ -176,8 +176,7 @@ jobs:
   # data-integrity regression should never share one red check.
   #
   # The flow suites under KurnUITests/Flows run here since their flake rate
-  # measured 0/5 in reliability-hardening.yml's `ui-flake-rate` lane (per
-  # docs/testing-coverage-plan.md, Fase 3). A suite that starts flaking goes
+  # measured 0/5 in reliability-hardening.yml's `ui-flake-rate` lane. A suite that starts flaking goes
   # back behind a -skip-testing line until it is fixed and re-measured.
   #
   # UI tests run serially on one simulator and each relaunches the app, so
@@ -272,8 +271,8 @@ jobs:
           echo "ui-tests shards: $SHARDS_RESULT"
           [ "$SHARDS_RESULT" = "success" ]
 
-  # Fast, Xcode-free signal for the KurnCore package (see docs/roadmap.md,
-  # "The change that isn't a feature: SPM extraction"): runs in seconds on
+  # Fast, Xcode-free signal for the KurnCore package (see CLAUDE.md,
+  # "Overview"): runs in seconds on
   # Linux, well before the macOS jobs' simulator boot finishes, and proves
   # the package's pure logic actually passes its tests rather than just
   # compiling under Xcode. Deliberately no `needs:` on the other jobs so all
@@ -361,8 +360,7 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
-  # The coverage gate (docs/testing-coverage-plan.md, CLAUDE.md "Coverage
-  # gate"). Unions the three lcov reports and fails when the in-scope code
+  # The coverage gate (CLAUDE.md "Coverage gate"). Unions the three lcov reports and fails when the in-scope code
   # (Tools/coverage_scope.json) drops below the ratchet in
   # Tools/coverage_floor.json, or when a pull request adds executable
   # in-scope lines that are less than 80% covered. Lives here rather than in

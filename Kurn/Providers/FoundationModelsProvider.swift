@@ -6,8 +6,8 @@
 //  framework (`SystemLanguageModel` / `LanguageModelSession`). Unlike every other
 //  provider here, this one makes no network request at all: a summary or chat
 //  reply is generated entirely on-device, closing the gap where a user with no
-//  cloud API key got transcription and nothing else. See F1 in
-//  `docs/roadmap.md`.
+//  cloud API key got transcription and nothing else. Its budgets are still
+//  first-cut estimates; measuring them is open in `docs/roadmap.md`.
 //
 
 import Foundation

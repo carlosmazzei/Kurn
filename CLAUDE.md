@@ -37,6 +37,19 @@ is a `.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework
 release asset (see "On-device Whisper (whisper.cpp)" below). The only remote
 package is FluidAudio.
 
+### Where documentation lives
+
+This file is the architecture and conventions reference; `README.md` describes
+what the app does. `docs/` holds only documents with a lasting job:
+`docs/roadmap.md` (the single list of open work — nothing shipped is described
+there), `docs/pipeline-evaluation.md` (the recorded accuracy history),
+`docs/supported-languages.md`, and the two release checklists
+(`docs/app-store-submission-checklist.md`, `docs/release-physical-checklist.md`).
+Do not add a separate plan or review document for a new track: put its open
+items in the roadmap and, as items ship, move what stays true into this file
+or the README and delete them from the roadmap. Code comments cite types or
+`CLAUDE.md` sections, never a plan document that will be deleted.
+
 ## Commands
 
 Builds/tests require macOS with Xcode 26+ (the iOS 26 SDK). CI uses `iPhone 17` as the simulator
@@ -137,7 +150,8 @@ layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `Application`, 
 `Views`, KurnCore) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
 `Kurn/AppIntents` and `Kurn/DebugSupport` until a job executes them;
 `Tools/coverage_report.py` renders the per-layer table into the job summary.
-The phased plan for raising coverage is `docs/testing-coverage-plan.md`.
+Every in-scope layer is above the 80% target; the remaining file-level gaps
+are listed in `docs/roadmap.md`.
 
 **Coverage gate (target: 80%).** `coverage-gate` unions the three lcov
 reports with `Tools/coverage_gate.py` and fails a PR on either of two checks,
@@ -155,7 +169,9 @@ logic (`Kurn/` minus `Views/`, `ContentView.swift`, `DebugSupport/`,
   the result. The simulator runs are not deterministic — `Services` and
   `Providers` measured 0.8–0.9pp apart on identical code — so raise only the
   layers the change moved, from the lower of two runs, never a whole table
-  from one. Never lower a floor or add an exclusion to make a PR pass.
+  from one. Never lower a floor or add an exclusion to make a PR pass. The
+  one exception: a PR that skips a whole flaky UI suite (whose lines are in the
+  union) explains the drop and rewrites the floor in the same change.
 
 An exclusion is legitimate only for code no test target can run: a SwiftUI
 view body, or an **adapter** — a file that only wraps an API needing
@@ -170,6 +186,23 @@ a reviewer sees. Pure
 presentation logic does not belong in `Views/` (where it would be excluded);
 put it beside the type it presents. `Tools/tests/` covers the gate itself and
 runs in `static-policy`.
+
+How coverage was raised to target, and how to keep it there:
+
+- **Seams before tests, as constructor parameters with the production default**
+  (`isProviderUsable`, `service`, `indexService`, `chatService`, an injected
+  `LLMProvider` exercised with `KurnTests/Support/ScriptedLLMProvider`) — never
+  `#if DEBUG` inside logic, and no test that needs the network, a downloaded
+  model or the microphone.
+- **A test that only touches KurnCore types lives in `Packages/KurnCore/Tests`**,
+  not `KurnTests`, so it runs on Linux next to the code it tests.
+- **Never construct `AVSpeechSynthesizer` or `AVAudioPlayer` in a test**: on the
+  CI simulator they hang and take the whole test process down
+  (`ReadAloudEngineTests` records why).
+- Framework-bound files are split the same way every time: the decisions move
+  into a tested type (in KurnCore when Apple-free), and what remains — e.g.
+  `ModelDownloadConsent+FluidAudio`, `TranscriptionScheduler+BGTask` — is an
+  excluded adapter.
 
 To verify a change through CI:
 
@@ -465,7 +498,7 @@ root:
   `Binding<LibrarySelection>` — so `ContentView` presents it two ways off the
   same binding: a sheet on compact width (from `MeetingsListView`'s toolbar,
   unchanged) and, on regular width (iPad, Mac Catalyst), a persistent
-  `NavigationSplitView` sidebar column (D6, `docs/design-review-liquid-glass.md`).
+  `NavigationSplitView` sidebar column.
   `selection` lives on `ContentView` for both paths, so `MeetingsListView`
   holds it as a `@Binding` rather than owning it; `MeetingsListToolbar`'s
   library button is hidden on regular width since the sidebar column already
@@ -1058,9 +1091,20 @@ same-numbered speaker. Preserved rows can then outlive their labels, which is
 why `MeetingDetailTabs` filters the chips and the speaker list to labels
 actually present in the transcript.
 
-One limit still worth knowing: nothing crosses *meetings* — "Ana" in one
-meeting has no relation to "Ana" in another; the stored voiceprint is the
-material a future change would use for that.
+**Across meetings, identity is suggested, never applied.**
+`TranscriptionCoordinator+CrossMeetingSpeakerMatch` asks "have we heard this
+voice before, under a name, elsewhere" exactly once per row: when `syncSpeakers`
+creates a brand-new `Speaker` from nothing, it compares that row's voiceprint
+with every *other* meeting's named, voiceprinted rows through
+`SpeakerIdentityMatcher.closestMatch(to:among:)` — a nearest-candidate search
+with no label-uniqueness assumption, since `"Speaker 1"` names countless people
+store-wide. A hit is staged on `pendingCrossMeetingMatches` and presented by
+`CrossMeetingSpeakerMatchView` for the user to confirm or dismiss, the same
+"suggest, never apply silently" shape as `AutoTagConfirmView`. It is
+self-limiting: later re-syncs find the row through intra-meeting voice
+matching and never reach the creation step again, so a dismissal is final
+rather than a repeated nag. Only names the user already typed somewhere are
+candidates; calendar attendees as candidate names are an open roadmap item.
 
 #### Whisper hallucination filtering
 
@@ -1527,9 +1571,36 @@ microphone permission and actual capture.
 
 ### Durability & recovery (`Infrastructure/`)
 
-The resilience track (H1–H10, fully detailed in `docs/resilience.md`) is built
-on a few invariants; keep them when touching anything that writes audio, the
-store, or the network:
+The H1–H10 resilience track (closed; its remaining gaps are in
+`docs/roadmap.md`) came out of a repository-wide failure-path audit and turned
+six operational invariants into tested contracts:
+
+- **H-I1** Once capture is acknowledged as running, a write failure is detected
+  and surfaced; the app never keeps counting while silently dropping audio.
+- **H-I2** The only copy of user audio is never automatically deleted merely
+  because its metadata is missing, malformed or unreadable.
+- **H-I3** Success is reported only after the authoritative state is durable; a
+  failed save cannot leave the UI claiming an operation completed.
+- **H-I4** A fallback may preserve useful work, but it is recorded and visible;
+  degraded output is never indistinguishable from the requested pipeline
+  succeeding (`PipelineReport`, the transcript's "completed with warnings"
+  banner).
+- **H-I5** A custom network destination is exact: invalid configuration fails
+  closed and never falls through to another vendor or host.
+- **H-I6** Cancellation, transient failure, permanent failure, degradation and
+  resource deferral are distinct states, with bounded automatic retry
+  (`Recording.automaticResumeAttempts`, default 3, reset by a manual retry).
+
+A green CI run proves the tested paths pass, not that disk exhaustion, a locked
+background launch, process death or a malformed provider response behaves
+safely — so **every new durability or state transition lands with a
+deterministic fault-injection test in the same PR** (the fakes live in
+`KurnTests/Support/FaultInjection`, `DebugSupport/` holds the debug hooks), and
+the failures no simulator can reproduce are the release gate in
+`docs/release-physical-checklist.md`. Diagnostics stay on device; no
+recording, transcript, title, key, provider body or URL query ever goes into a
+reliability event, a fixture or an export. Keep these when touching anything
+that writes audio, the store, or the network:
 
 - **The store never silently opens somewhere else.** `ModelStoreBootCoordinator`
   is a boot state machine (`KurnSchema` is the versioned SwiftData schema
@@ -1538,7 +1609,11 @@ store, or the network:
   a temporary directory; `ModelStoreBootViews` hides restore/salvage/fresh-start
   when there is no durable directory to act on. `ModelStoreProtection`,
   `ModelStoreBackupManager` and `ModelStoreSalvage` own protection, protected
-  backup/restore and salvage.
+  backup/restore and salvage. **Never let a `@Model` instance outlive the
+  `ModelContainer` it was fetched from**: SwiftData resets a deallocated
+  container's context and destroys its instances, which is why
+  `ModelStoreSalvage.recoverReadOnly` fetches *and* exports inside the
+  container's lifetime and returns only value types.
 - **Move, then purge.** `RecordingTrash` deletes by atomically moving files into
   a protected trash folder before the model mutation and purging only once the
   save committed; `sweep(context:)` reconciles a crash mid-delete on the next
@@ -1914,12 +1989,33 @@ toolbar would be the wrong control**:
   `FolderSidebarView` as a `NavigationSplitView` sidebar column instead of a
   sheet — see "Organization" above for the binding it shares with
   `MeetingsListView`.
-- `docs/design-review-liquid-glass.md` is the full HIG/Liquid Glass audit these
-  rules were distilled from (button style decision table, WCAG contrast
-  findings, the `kurnDialog` confirmation convention every native `.alert`
-  should migrate to). All 8 of its remediation tracks (D1–D8) are implemented;
-  its own "Not done" notes are the up-to-date list of what still needs a
-  manual device/simulator pass rather than a code change.
+- **Button language** — `Theme.swift`'s "Button language" table is the one
+  decision per situation: `.glassProminent` + `Theme.accent` for a screen's
+  primary action, `.bordered` for a secondary action beside it, `kurnDialog`
+  for a confirmation/destructive decision, and `.plain` for list/menu rows and
+  chips (correct there, not an oversight). `.borderedProminent` is not used.
+- **Modal weight** — `Theme.swift`'s "Modal weight" section: a quick binary
+  decision is a `kurnDialog` (or `.confirmationDialog` for a contextual choice
+  among several options); a decision carrying real content is a `.sheet` with
+  `NavigationStack`, a `.cancellationAction` and `.presentationDetents`
+  (`CrossMeetingSpeakerMatchView` is the reference). Short utility pickers open
+  at `.medium` / `[.medium, .large]`, and every sheet has an explicit
+  Cancel/Done independent of the swipe.
+- **`kurnDialog` is the app's alert component, deliberately.** The shared
+  `errorAlert(_:)` modifier wraps it and the UI flows drive it through
+  `dialog.title`/`dialog.primary`/`dialog.secondary`, which a native `.alert`
+  does not expose — so do not migrate it to native alerts, and add a native
+  `.alert` only where the OS must own the control. Its destructive button is
+  `Theme.accent`, which *is* system red (`#FF3B30`); its primary label is bold
+  `.subheadline` because white
+  on `Theme.accent`/`Theme.info` measures ~3.55:1 / ~3.65:1 — under AA for
+  normal text, above the 3:1 large-text floor that ≥14 pt bold qualifies for.
+- **Fixed font sizes need a reason.** `.font(.system(size:))` appears only on
+  icons constrained by a small fixed well or grid cell, each with an inline
+  comment saying so; everything else uses a `Theme` font or a scalable
+  `.system(.textStyle, weight:)`.
+- The iPad split view has not had a hands-on device pass yet; see
+  `docs/roadmap.md`.
 
 ### Accessibility
 

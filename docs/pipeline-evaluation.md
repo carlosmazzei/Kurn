@@ -395,7 +395,7 @@ CAMOES with `standardDSP` reached **36.13%**, the best CAMOES figure recorded.
 
 **First runtime measurement of the sherpa-onnx diarization engine (D4)** — the
 segmentation-first alternative to FluidAudio's cluster-first VBx pipeline
-(`docs/roadmap.md`, item D4). Also the first recorded run to report
+(`docs/roadmap.md`, D4). Also the first recorded run to report
 `DER (raw)` alongside `DER (fused)`, now that D2's raw-turn metric exists in
 the harness output.
 

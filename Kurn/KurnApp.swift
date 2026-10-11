@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  App entry point. Registers background callbacks and hands the store to
-//  `ModelStoreBootCoordinator`, which walks the H2 boot state machine
-//  (docs/resilience-megaplan.md: `waitingForProtectedData` -> `opening` ->
+//  `ModelStoreBootCoordinator`, which walks the store boot state machine
+//  (`waitingForProtectedData` -> `opening` ->
 //  `ready`/`recoveryRequired`) instead of the old inline `fatalError` on
 //  construction failure. On the common path — protected data available, store
 //  opens cleanly — `beginBoot()` resolves to `.ready` synchronously inside

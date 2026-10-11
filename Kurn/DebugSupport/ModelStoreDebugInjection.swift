@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  DEBUG-only synthetic store-open failures, so `KurnUITests` can exercise
-//  every `ModelStoreOpenFailureReason` the H2 boot state machine classifies
-//  (docs/resilience-megaplan.md) without a real locked device, full disk,
+//  every `ModelStoreOpenFailureReason` the store boot state machine
+//  classifies without a real locked device, full disk,
 //  incompatible schema, or corrupt store file. `KurnApp.makeStore()` throws
 //  one of these when launched with the matching
 //  `UI_TESTING_STORE_OPEN_FAILURE_REASON` launch environment value. Compiled

@@ -2,7 +2,7 @@
 //  LegacyStoreAdoptionTests.swift
 //  KurnTests
 //
-//  H2 (`docs/resilience-megaplan.md`, PR 2 — versioned-schema baseline) calls
+//  The versioned-schema baseline (CLAUDE.md, "Durability & recovery") calls
 //  for committed fixtures proving the oldest supported released store layout
 //  survives adoption into the new versioned schema/migration plan without
 //  data loss. Every Kurn store shipped before `KurnSchema.swift` existed was

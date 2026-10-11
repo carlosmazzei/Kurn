@@ -73,8 +73,8 @@ component_management:
 
 # The watch app, the Live Activity extension and the App Intents are built
 # for the iOS test run but no test executes them, so they sit at 0% and can
-# only drag the total down. Excluded until a job exercises them (see
-# docs/testing-coverage-plan.md, phase 4); DebugSupport is test-only glue.
+# only drag the total down. Excluded until a job exercises them;
+# DebugSupport is test-only glue.
 ignore:
   - KurnWatch/**
   - KurnLiveActivityExtension/**
