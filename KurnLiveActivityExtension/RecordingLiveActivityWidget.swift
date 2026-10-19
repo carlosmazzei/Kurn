@@ -19,6 +19,7 @@ struct KurnLiveActivityExtensionBundle: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivityWidget()
         StartRecordingControl()
+        StartRecordingWidget()
     }
 }
 
@@ -144,7 +145,7 @@ private struct RecordingStatusBadge: View {
 // MARK: - Shared pieces
 
 /// Kurn app glyph: red gradient rounded square with a record-circle.
-private struct KurnLogo: View {
+struct KurnLogo: View {
     var size: CGFloat
     var body: some View {
         RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
@@ -274,7 +275,7 @@ private enum RecordingCommandStyle {
     }
 }
 
-private extension Color {
+extension Color {
     static let kurnActivityBackground = Color(red: 0.055, green: 0.055, blue: 0.071)
     static let kurnAccent = Color(red: 1.0, green: 0.231, blue: 0.188)
     static let kurnPaused = Color(red: 1.0, green: 0.624, blue: 0.039)

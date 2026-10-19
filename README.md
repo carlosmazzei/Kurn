@@ -67,8 +67,10 @@ generates a summary with a configured AI provider.
   mutation has committed, so a failed save or a crash mid-delete never leaves
   a meeting pointing at missing audio.
 - Start a recording hands-free from Siri and Shortcuts (`StartRecordingIntent`),
-  or from a Control Center / Lock Screen / Action Button control
-  (`StartRecordingControl`), without unlocking the app first.
+  from a Control Center / Lock Screen / Action Button control
+  (`StartRecordingControl`), or from a Home Screen, Lock Screen or StandBy
+  widget on iPhone and iPad (`StartRecordingWidget`), without unlocking the
+  app first.
 - Chat with your meetings and search them semantically, on device: transcripts
   are embedded with Apple's `NaturalLanguage` framework and retrieval-grounded
   answers come from the selected AI provider.

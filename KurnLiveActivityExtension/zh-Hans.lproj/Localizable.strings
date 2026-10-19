@@ -12,6 +12,10 @@
 "control.startRecording.title" = "开始录音";
 "control.startRecording.displayName" = "开始录音";
 "control.startRecording.description" = "开始一段新的 Kurn 录音。将其添加到锁定屏幕后，即使设备处于锁定状态，也可以通过单击触发。";
+"widget.startRecording.displayName" = "开始录音";
+"widget.startRecording.description" = "从主屏幕、锁定屏幕或待机显示开始新的 Kurn 录音。小组件从不显示会议内容。";
+"widget.startRecording.title" = "录音";
+"widget.startRecording.subtitle" = "开始新的会议";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "控制录音";
