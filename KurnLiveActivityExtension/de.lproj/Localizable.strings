@@ -12,6 +12,10 @@
 "control.startRecording.title" = "Aufnahme starten";
 "control.startRecording.displayName" = "Aufnahme starten";
 "control.startRecording.description" = "Startet eine neue Kurn-Aufnahme. Wird sie zum Sperrbildschirm hinzugefügt, kann sie dort mit einem einzigen Tipp ausgelöst werden, während das Gerät gesperrt ist.";
+"widget.startRecording.displayName" = "Aufnahme starten";
+"widget.startRecording.description" = "Startet eine neue Kurn-Aufnahme über den Home-Bildschirm, den Sperrbildschirm oder den Standby-Modus. Das Widget zeigt nie Besprechungsinhalte an.";
+"widget.startRecording.title" = "Aufnehmen";
+"widget.startRecording.subtitle" = "Neue Besprechung starten";
 
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Aufnahme steuern";

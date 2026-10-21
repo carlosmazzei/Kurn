@@ -1559,7 +1559,8 @@ for it to drift, so it's shared rather than duplicated.
 
 `StartRecordingIntent` (Siri / Shortcuts via `KurnShortcuts`) and
 `StartRecordingControl` in `KurnLiveActivityExtension` (Control Center, Lock
-Screen, Action Button) both open the app and post a process-local start request;
+Screen, Action Button) and that target's `StartRecordingWidget` (Home Screen,
+Lock Screen accessory and StandBy on iPhone and iPad) all open the app and post a process-local start request;
 `RecordingLauncher` creates and queues the meeting through the same
 `RecorderView` path a tap uses, and the existing pause/resume/stop commands still
 converge on `RecordingCommandRouter`. Capture deliberately starts **without**
@@ -1568,6 +1569,12 @@ miss the moment it exists for — while `SecurityCoverWindow` keeps meeting cont
 hidden. External commands are idempotent (a duplicate start/stop is a no-op, not
 a second meeting), and the intent distinguishes "request accepted" from
 microphone permission and actual capture.
+
+`StartRecordingWidget` is static on purpose: one timeline entry with
+`.never` refresh, no App Group, nothing read from the app. A widget is
+visible on a locked device and in StandBy, so it must never show a meeting
+title, count or last recording — the same reasoning as
+`hideLiveActivityMeetingTitle`.
 
 ### Durability & recovery (`Infrastructure/`)
 
