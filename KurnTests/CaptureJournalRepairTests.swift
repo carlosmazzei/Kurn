@@ -72,6 +72,24 @@ struct CaptureJournalRepairTests {
         #expect(CaptureJournalRepair.isReadable(Self.recordingURL(fileName)))
     }
 
+    @Test func theReEncodeFallbackDecodesATruncatedJournal() async throws {
+        let journalURL = try AudioFixtures.adtsTone(seconds: 2, at: AudioFixtures.tempURL(ext: "aac"))
+        let handle = try FileHandle(forWritingTo: journalURL)
+        try handle.truncate(atOffset: try handle.seekToEnd() - 37)
+        try handle.close()
+        let destination = AudioFixtures.tempURL(ext: "m4a")
+        defer {
+            try? FileManager.default.removeItem(at: journalURL)
+            try? FileManager.default.removeItem(at: destination)
+        }
+
+        try await CaptureJournalRepair.transcode(from: journalURL, to: destination)
+
+        #expect(CaptureJournalRepair.isReadable(destination))
+        let file = try AVAudioFile(forReading: destination)
+        #expect(Double(file.length) / file.processingFormat.sampleRate > 1.8)
+    }
+
     @Test func withoutAJournalThereIsNothingToRebuild() async {
         let fileName = AudioFileStore.fileName(meetingID: UUID(), recordingID: UUID())
         #expect(await CaptureJournalRepair.rebuild(fileName: fileName) == .noJournal)
