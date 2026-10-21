@@ -182,6 +182,20 @@ struct RecordingSessionControllerTests {
         #expect(!harness.controller.canMinimize)
     }
 
+    @Test func isPausedFollowsTheLiveSession() async throws {
+        let harness = try Harness()
+        defer { harness.cleanUp() }
+        #expect(!harness.controller.isPaused)
+        let viewModel = try await harness.beginRecording()
+        #expect(!harness.controller.isPaused)
+
+        viewModel.togglePause()
+        #expect(harness.controller.isPaused)
+
+        viewModel.togglePause()
+        #expect(!harness.controller.isPaused)
+    }
+
     // MARK: - Attention
 
     @Test func anErrorBringsAMinimizedRecorderBack() async throws {

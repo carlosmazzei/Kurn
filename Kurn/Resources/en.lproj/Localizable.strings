@@ -244,6 +244,7 @@
 "recorder.mini.accessibility_label" = "%1$@, %2$@, %3$@";
 "recorder.mini.hint" = "Opens the recorder.";
 "detail.recording_in_progress" = "Recording in progress…";
+"detail.open_active_recording" = "Recording another meeting — open it";
 "library.delete_while_recording" = "This meeting is being recorded. Stop the recording before deleting it.";
 "settings.delete_all.while_recording" = "A recording is in progress. Stop it before deleting all data.";
 

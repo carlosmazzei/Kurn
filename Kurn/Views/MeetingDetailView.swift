@@ -412,16 +412,20 @@ struct MeetingDetailView: View {
         .scrollContentBackground(.hidden)
     }
 
+    /// Starts a new segment, or — while a recording runs minimized — says so
+    /// and re-opens it, since a second capture cannot start alongside it.
     private var addSegmentButton: some View {
         Button { recordingSession.begin(meeting: meeting) } label: {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(Theme.accent.opacity(0.12)).frame(width: 34, height: 34)
-                    Image(systemName: "plus").font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.accent)
+                    Image(systemName: recordingSession.isActive ? "waveform" : "plus")
+                        .font(.system(.footnote, design: .default, weight: .bold)).foregroundStyle(Theme.accent)
                         .accessibilityHidden(true)
                 }
-                Text(NSLocalizedString("detail.add_segment", comment: "Add segment"))
-                    .font(Theme.subheadline).foregroundStyle(Theme.textSecondary)
+                Text(addSegmentTitle)
+                    .font(Theme.subheadline)
+                    .foregroundStyle(recordingSession.isActive ? Theme.accent : Theme.textSecondary)
                 Spacer()
             }
             .padding(14)
@@ -433,8 +437,20 @@ struct MeetingDetailView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityHint(recordingSession.isActive
+            ? NSLocalizedString("recorder.mini.hint", comment: "Opens the full recorder")
+            : "")
     }
 
+    private var addSegmentTitle: String {
+        if recordingSession.isRecording(into: meeting) {
+            return NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress")
+        }
+        if recordingSession.isActive {
+            return NSLocalizedString("detail.open_active_recording", comment: "Another meeting is being recorded; opens it")
+        }
+        return NSLocalizedString("detail.add_segment", comment: "Add segment")
+    }
 
     // MARK: - Section picker
 
