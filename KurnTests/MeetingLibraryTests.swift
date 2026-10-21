@@ -67,6 +67,32 @@ struct MeetingLibraryTests {
         #expect(all.isEmpty)
     }
 
+    // A minimized recorder leaves the meeting reachable mid-capture; deleting
+    // it then would leave the recorder finalizing into a deleted row.
+    @Test(arguments: [RecordingCaptureState.preparing, .recording, .finalizing])
+    func deleteRefusesWhileCaptureIsInProgress(state: RecordingCaptureState) throws {
+        let (library, context) = makeLibrary()
+        let meeting = try library.createMeeting(title: "Live")
+        let recording = Recording(meeting: meeting, fileName: "live_\(UUID().uuidString).m4a", duration: 0, captureState: state)
+        context.insert(recording)
+        try context.save()
+
+        #expect(throws: AppError.self) { try library.deleteRecording(recording) }
+        #expect(throws: AppError.self) { try library.deleteMeeting(meeting) }
+        #expect(try context.fetch(FetchDescriptor<Meeting>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<Recording>()).count == 1)
+    }
+
+    @Test func recordingCaptureInProgressCoversOnlyTheLiveStates() {
+        let (_, context) = makeLibrary()
+        let live: [RecordingCaptureState] = [.preparing, .recording, .finalizing]
+        for state in [RecordingCaptureState.preparing, .recording, .finalizing, .ready, .recoveryNeeded] {
+            let recording = Recording(fileName: "x.m4a", duration: 0, captureState: state)
+            context.insert(recording)
+            #expect(recording.isCaptureInProgress == live.contains(state))
+        }
+    }
+
     // MARK: - Audio and photo file cleanup
 
     /// Write a placeholder file in Documents and return its name + URL.

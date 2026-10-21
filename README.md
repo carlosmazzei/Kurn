@@ -48,6 +48,8 @@ generates a summary with a configured AI provider.
 - Create and edit meeting sessions with title, notes, and preferred language.
 - Record meetings in one or more audio segments.
 - Pause, resume, cancel, and stop recordings from the app.
+- Minimize the recorder to a floating mini bar and keep using the app while
+  the meeting records.
 - Control active recordings from the Lock Screen, Dynamic Island, or Apple
   Watch.
 - Mirror recording state and the elapsed time to the Watch app.

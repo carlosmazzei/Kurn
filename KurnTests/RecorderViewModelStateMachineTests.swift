@@ -9,8 +9,9 @@
 //  doubled as well. Covers the paths only a device used to exercise: start
 //  (permission denied, engine failure, already active), pause/resume for every
 //  `PauseReason`, stop with a ready / partial / too-short / unreadable file,
-//  stop when nothing is active, cancel, error dismissal that completes the
-//  sheet, and the abandoned-view teardown.
+//  stop when nothing is active, cancel, and error dismissal that completes the
+//  sheet. The view no longer owns the session (`RecordingSessionController`
+//  does), so there is no abandoned-view teardown left to cover.
 //
 
 import AVFoundation
@@ -363,29 +364,6 @@ struct RecorderViewModelStateMachineTests {
         #expect(harness.viewModel.state == .idle)
         #expect(harness.viewModel.error == nil)
         #expect(harness.engine.calls.isEmpty)
-    }
-
-    @Test func finalizeIfAbandonedSavesAnInFlightRecording() async throws {
-        let harness = try Harness()
-        await harness.viewModel.startRecording()
-
-        harness.viewModel.finalizeIfAbandoned()
-
-        #expect(harness.viewModel.didSaveRecording)
-        #expect(harness.viewModel.state == .idle)
-        #expect(try harness.recordings().first?.captureState == .ready)
-    }
-
-    @Test func finalizeIfAbandonedAfterANormalStopIsANoOp() async throws {
-        let harness = try Harness()
-        await harness.viewModel.startRecording()
-        harness.viewModel.stopAndSave()
-        let saves = harness.recordingsSaved
-
-        harness.viewModel.finalizeIfAbandoned()
-
-        #expect(harness.recordingsSaved == saves)
-        #expect(try harness.recordings().count == 1)
     }
 
     @Test func meetingTitleEditsWriteThroughToTheMeeting() throws {

@@ -126,6 +126,18 @@ final class Recording {
 
     var isReadyForConsumption: Bool { captureState == .ready }
 
+    /// Still being written by the live recorder. Now that a recording can be
+    /// minimized, its row is visible mid-capture; it must read as recording,
+    /// not as a file that needs recovery, and it must not be deleted. Launch
+    /// recovery moves any of these states a dead process left behind to
+    /// `.recoveryNeeded`, so at runtime they mean a live capture.
+    var isCaptureInProgress: Bool {
+        switch captureState {
+        case .preparing, .recording, .finalizing: true
+        case .ready, .recoveryNeeded: false
+        }
+    }
+
     var transcriptionStatus: TranscriptionStatus {
         get { TranscriptionStatus(rawValue: transcriptionStatusRaw) ?? .none }
         set { transcriptionStatusRaw = newValue.rawValue }

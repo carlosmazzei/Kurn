@@ -238,6 +238,14 @@
 "recorder.live_unavailable" = "实时转录不可用。";
 "recorder.connecting" = "正在连接…";
 "recorder.choose_mic.title" = "选择麦克风";
+"recorder.minimize" = "最小化录音器";
+"recorder.mini.recording" = "正在录音";
+"recorder.mini.paused" = "已暂停";
+"recorder.mini.accessibility_label" = "%1$@，%2$@，%3$@";
+"recorder.mini.hint" = "打开录音器。";
+"detail.recording_in_progress" = "正在录音…";
+"library.delete_while_recording" = "此会议正在录音。请先停止录音再删除。";
+"settings.delete_all.while_recording" = "正在录音。请先停止录音再删除所有数据。";
 
 /* 会议 */
 "meeting.default_title" = "会议 – %@";

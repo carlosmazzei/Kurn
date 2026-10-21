@@ -207,6 +207,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.playbackEnhancement)
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)
+                .environment(appEnvironment.recordingSession)
                 // Both the app-switcher privacy placeholder and the lock screen
                 // live in a window above everything this hierarchy presents.
                 // They used to be an in-hierarchy `ZStack` branch and a view

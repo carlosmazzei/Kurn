@@ -61,13 +61,20 @@ extension MeetingsListView {
         .accessibilityIdentifier("meetings.record")
     }
 
-    /// Create the meeting the recorder will record into, then present it. A
+    /// Create the meeting the recorder will record into, then start the
+    /// session. While a recording is already running (minimized to the mini
+    /// bar) the button re-opens it instead of creating a second meeting. A
     /// failed save surfaces through `saveError` and opens no recorder, since
     /// there would be no committed meeting to record into.
     func startRecording() {
+        guard !recordingSession.isActive else {
+            recordingSession.expand()
+            return
+        }
         do throws(AppError) {
-            recordMeeting = try MeetingLibrary(context: modelContext)
+            let meeting = try MeetingLibrary(context: modelContext)
                 .createMeeting(title: "", language: settings.defaultLanguage)
+            recordingSession.begin(meeting: meeting)
         } catch {
             saveError = error
         }

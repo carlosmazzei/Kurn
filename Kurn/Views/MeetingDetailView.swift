@@ -37,6 +37,9 @@ struct MeetingDetailView: View {
     /// overflow menu's "Generate/Regenerate Wiki" reuses the same instance
     /// the post-transcription pipeline and Settings → Wiki already drive.
     @Environment(WikiCoordinator.self) var wiki
+    /// The app-wide recording session "Add segment" starts (or re-opens, when
+    /// a recording is already running minimized).
+    @Environment(RecordingSessionController.self) private var recordingSession
 
     enum Tab: Hashable, CaseIterable {
         case recordings, transcript, summary, chat
@@ -93,7 +96,6 @@ struct MeetingDetailView: View {
     }
     @State private var tab: Tab = .recordings
 
-    @State private var showingRecorder = false
     /// Drives the full-screen photo viewer from the Recordings tab's photo
     /// strip — shown there independently of the Transcript tab's inline
     /// markers, which need transcript segments to anchor to and so stay
@@ -162,11 +164,8 @@ struct MeetingDetailView: View {
         .toolbar { toolbarContent }
         .modelDownloadAlerts(downloads, settings: settings) { showingNetworkSettings = true }
         .onDisappear { player.stop() }
-        .readAloudCoordination(player: player, meetingID: meeting.id, isRecording: showingRecorder)
+        .readAloudCoordination(player: player, meetingID: meeting.id, isRecording: recordingSession.isActive)
         .errorAlert(Binding(get: { enhancement.error }, set: { enhancement.error = $0 }))
-        .sheet(isPresented: $showingRecorder) {
-            NavigationStack { RecorderView(meeting: meeting) }
-        }
         .sheet(isPresented: $showingEdit) {
             NavigationStack { MeetingFormView(meeting: meeting) }
         }
@@ -414,7 +413,7 @@ struct MeetingDetailView: View {
     }
 
     private var addSegmentButton: some View {
-        Button { showingRecorder = true } label: {
+        Button { recordingSession.begin(meeting: meeting) } label: {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(Theme.accent.opacity(0.12)).frame(width: 34, height: 34)

@@ -238,6 +238,14 @@
 "recorder.live_unavailable" = "Transcripción en vivo no disponible.";
 "recorder.connecting" = "Conectando…";
 "recorder.choose_mic.title" = "Elegir micrófono";
+"recorder.minimize" = "Minimizar grabadora";
+"recorder.mini.recording" = "Grabando";
+"recorder.mini.paused" = "En pausa";
+"recorder.mini.accessibility_label" = "%1$@, %2$@, %3$@";
+"recorder.mini.hint" = "Abre la grabadora.";
+"detail.recording_in_progress" = "Grabación en curso…";
+"library.delete_while_recording" = "Esta reunión se está grabando. Detén la grabación antes de eliminarla.";
+"settings.delete_all.while_recording" = "Hay una grabación en curso. Detenla antes de eliminar todos los datos.";
 
 /* Reuniones */
 "meeting.default_title" = "Reunión – %@";

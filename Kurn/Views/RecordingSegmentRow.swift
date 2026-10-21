@@ -40,7 +40,11 @@ struct RecordingSegmentRow: View {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(Theme.fill)
                             .frame(width: 34, height: 34)
-                        if !recording.isReadyForConsumption {
+                        if recording.isCaptureInProgress {
+                            Image(systemName: "record.circle")
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.accent)
+                        } else if !recording.isReadyForConsumption {
                             Image(systemName: "waveform.badge.exclamationmark")
                                 .font(Theme.footnote)
                                 .foregroundStyle(Theme.warning)
@@ -58,7 +62,9 @@ struct RecordingSegmentRow: View {
                 .buttonStyle(.plain)
                 .disabled(isEnhancing || !recording.isReadyForConsumption)
                 .accessibilityLabel(
-                    !recording.isReadyForConsumption
+                    recording.isCaptureInProgress
+                        ? NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress")
+                        : !recording.isReadyForConsumption
                         ? NSLocalizedString("detail.recording_recovery_needed", comment: "Recording needs recovery")
                         : (isEnhancing
                             ? NSLocalizedString("detail.enhancing_audio", comment: "Enhancing audio")
@@ -77,7 +83,9 @@ struct RecordingSegmentRow: View {
                 }
                 Spacer(minLength: 8)
 
-                if !recording.isReadyForConsumption {
+                if recording.isCaptureInProgress {
+                    EmptyView()
+                } else if !recording.isReadyForConsumption {
                     Button {
                         onRetryCaptureRecovery()
                     } label: {
@@ -178,7 +186,11 @@ struct RecordingSegmentRow: View {
                 }
             }
 
-            if !recording.isReadyForConsumption {
+            if recording.isCaptureInProgress {
+                Text(NSLocalizedString("detail.recording_in_progress", comment: "Recording in progress"))
+                    .font(.caption2)
+                    .foregroundStyle(Theme.accent)
+            } else if !recording.isReadyForConsumption {
                 Text(NSLocalizedString(
                     "detail.recording_recovery_message",
                     comment: "The recording is preserved but unavailable until recovery succeeds"

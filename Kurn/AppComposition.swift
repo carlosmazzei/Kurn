@@ -31,6 +31,9 @@ struct AppEnvironment {
     let playbackEnhancement: PlaybackEnhancementViewModel
     let semanticIndex: SemanticIndexCoordinator
     let wiki: WikiCoordinator
+    /// The live recording session, app-wide so the recorder can be minimized
+    /// while the rest of the app stays usable.
+    let recordingSession: RecordingSessionController
 }
 
 @MainActor
@@ -76,7 +79,8 @@ final class AppComposition {
             summaries: SummaryViewModel(modelContext: context, appSettings: settings),
             playbackEnhancement: PlaybackEnhancementViewModel(modelContext: context),
             semanticIndex: semanticIndex,
-            wiki: wiki
+            wiki: wiki,
+            recordingSession: RecordingSessionController(modelContext: context, settings: settings)
         )
     }
 
@@ -86,8 +90,8 @@ final class AppComposition {
         let context = container.mainContext
 
         // Lets `StartRecordingIntent` (Siri/Shortcuts/Control Center/Action
-        // Button) create a meeting and queue it for `MeetingsListView` to
-        // present, without any View having to hand it a `ModelContext`.
+        // Button) create a meeting and queue it for `RecordingSessionPresenter`
+        // to start, without any View having to hand it a `ModelContext`.
         RecordingLauncher.shared.configure(modelContext: context, settings: settings)
         // Clean up after a process that died mid-recording (orphaned Live
         // Activity + an unsaved audio file with no matching `Recording` row).
