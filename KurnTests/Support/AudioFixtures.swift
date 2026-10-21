@@ -57,6 +57,31 @@ enum AudioFixtures {
         )
     }
 
+    /// Write the ADTS stream `CaptureJournal` keeps beside a recording, at the
+    /// storage format, as a sine tone.
+    @discardableResult
+    static func adtsTone(seconds: Double = 1.0, at url: URL) throws -> URL {
+        try write(
+            segments: [(440, seconds)],
+            sampleRate: AudioRecorderService.storageSampleRate,
+            amplitude: 0.5,
+            settings: CaptureJournal.settings(bitRate: nil),
+            to: url
+        )
+    }
+
+    /// The `.m4a` a process killed mid-recording leaves: bytes on disk, no
+    /// container any reader can open.
+    @discardableResult
+    static func undecodableM4A(at url: URL) throws -> URL {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 0x5A, count: 4_096).write(to: url)
+        return url
+    }
+
     /// Write lossless mono PCM .wav from a list of `(hz, seconds)` segments. A
     /// segment with `hz == 0` is exact silence.
     @discardableResult

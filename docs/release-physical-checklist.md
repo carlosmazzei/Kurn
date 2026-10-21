@@ -21,6 +21,12 @@ the release the same as a failed CI job would.
 - [ ] Screen lock during capture: lock the screen mid-recording and
       mid-finalization; confirm the recording survives and finalizes
       correctly on unlock.
+- [ ] Force quit during capture: record for a minute in the foreground,
+      swipe the app away from the app switcher, relaunch; confirm the
+      recording was stopped and saved (`willTerminate`) or, if not, that it
+      shows as needing recovery and "recover" rebuilds it from its capture
+      journal with the audio up to the moment of the kill. Repeat with the
+      app backgrounded (screen locked) before swiping it away.
 - [ ] Nearly-full storage: fill the device to near capacity, start a
       recording, confirm `ResourceGuard`'s low-storage path engages instead
       of a silent truncated/corrupt file.

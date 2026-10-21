@@ -79,8 +79,20 @@ enum RecordingRecovery {
         recoverOrphanedAudioFiles(context: modelContainer.mainContext)
     }
 
+    /// The user's explicit "recover" on a recording that needs it. When the
+    /// file a killed process left is undecodable, it is first rebuilt from its
+    /// capture journal (`CaptureJournalRepair`); a readable file is accepted
+    /// as is.
     @MainActor
-    static func retryRecovery(for recording: Recording, context: ModelContext) -> AppError? {
+    static func retryRecovery(
+        for recording: Recording,
+        context: ModelContext,
+        export: CaptureJournalRepair.Exporter = CaptureJournalRepair.exportToM4A
+    ) async -> AppError? {
+        let fileName = recording.fileName
+        if CaptureJournal.exists(for: fileName) {
+            _ = await CaptureJournalRepair.rebuild(fileName: fileName, export: export)
+        }
         do {
             let metadata = try RecordingFileFinalizer().finalize(fileName: recording.fileName)
             recording.duration = metadata.duration

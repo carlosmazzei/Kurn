@@ -550,7 +550,8 @@ final class AudioRecorderService: NSObject {
 
     func prepareStorageForRecording(bitRate: Int, directory: URL) throws {
         storageMonitor = nil
-        let monitor = RecordingStorageMonitor(bitRate: bitRate)
+        // The capture journal writes a second copy at the same bit rate.
+        let monitor = RecordingStorageMonitor(bitRate: bitRate * CaptureJournal.storageMultiplier)
         let state = monitor.assess(
             capacity: storageProbe.capacity(at: directory),
             fileSize: nil,

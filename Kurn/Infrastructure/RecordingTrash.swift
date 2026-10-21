@@ -32,7 +32,7 @@ enum RecordingTrash {
     /// order — mirrored here so a moved file always knows where it came from
     /// and can be put back exactly there.
     private enum SourceDirectory: String, CaseIterable {
-        case main, enhanced, legacy, photos
+        case main, enhanced, legacy, photos, capture
 
         var url: URL {
             switch self {
@@ -40,7 +40,20 @@ enum RecordingTrash {
             case .enhanced: return AudioFileStore.enhancedDirectoryPath
             case .legacy: return AudioFileStore.documentsURL
             case .photos: return PhotoFileStore.photosDirectoryURL
+            case .capture: return CaptureJournal.directoryURL
             }
+        }
+
+        /// The name a recording's file has in this directory: its own,
+        /// except for the capture journal, which swaps the extension.
+        func storedName(for fileName: String) -> String {
+            self == .capture ? CaptureJournal.journalFileName(for: fileName) : fileName
+        }
+
+        /// Inverse of `storedName(for:)`, for matching a trashed item against
+        /// the store's file names.
+        func ownerFileName(of storedName: String) -> String {
+            self == .capture ? CaptureJournal.recordingFileName(forJournal: storedName) : storedName
         }
     }
 
@@ -54,7 +67,7 @@ enum RecordingTrash {
     }
 
     /// Atomically moves every on-disk copy of each name in `fileNames`
-    /// (original and any derived enhanced copy, wherever either currently
+    /// (original, any derived enhanced copy and any capture journal, wherever each currently
     /// lives) into a protected trash folder identified by `operationID`.
     ///
     /// A file that does not exist in a given location is silently skipped,
@@ -70,13 +83,14 @@ enum RecordingTrash {
         var movedAny = false
         for fileName in fileNames {
             for source in SourceDirectory.allCases {
-                let sourceURL = source.url.appendingPathComponent(fileName)
+                let storedName = source.storedName(for: fileName)
+                let sourceURL = source.url.appendingPathComponent(storedName)
                 guard fm.fileExists(atPath: sourceURL.path) else { continue }
                 guard let destinationDirectory = try? RecordingProtection.ensureProtectedDirectory(
                     named: source.rawValue,
                     in: operationDirectory(operationID)
                 ) else { continue }
-                let destinationURL = destinationDirectory.appendingPathComponent(fileName)
+                let destinationURL = destinationDirectory.appendingPathComponent(storedName)
                 guard (try? fm.moveItem(at: sourceURL, to: destinationURL)) != nil else { continue }
                 RecordingProtection.apply(to: destinationURL)
                 movedAny = true
@@ -149,7 +163,9 @@ enum RecordingTrash {
             guard let items = try? fm.contentsOfDirectory(at: sourceDirectory, includingPropertiesForKeys: nil) else {
                 continue
             }
-            if items.contains(where: { knownFileNames.contains($0.lastPathComponent) }) { return true }
+            if items.contains(where: { knownFileNames.contains(source.ownerFileName(of: $0.lastPathComponent)) }) {
+                return true
+            }
         }
         return false
     }

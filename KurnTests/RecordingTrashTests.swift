@@ -151,4 +151,39 @@ struct RecordingTrashTests {
         let context = makeContext()
         RecordingTrash.sweep(context: context)
     }
+
+    // MARK: - capture journal
+
+    @Test func trashAndRestoreCarryTheCaptureJournal() throws {
+        let file = try makeAudioFile(in: AudioFileStore.recordingsDirectoryURL)
+        let journalURL = CaptureJournal.url(for: file.name)
+        try FileManager.default.createDirectory(at: CaptureJournal.directoryURL, withIntermediateDirectories: true)
+        try Data([0xFF, 0xF1]).write(to: journalURL)
+        defer { AudioFileStore.delete(fileName: file.name) }
+        let operationID = UUID()
+
+        RecordingTrash.trash(fileNames: [file.name], operationID: operationID)
+        #expect(!FileManager.default.fileExists(atPath: journalURL.path))
+
+        RecordingTrash.restore(operationID: operationID)
+        #expect(FileManager.default.fileExists(atPath: journalURL.path))
+    }
+
+    @Test func sweepRestoresALoneJournalWhoseRecordingRowStillExists() throws {
+        let context = makeContext()
+        let meeting = Meeting(title: "Standup", language: .english)
+        context.insert(meeting)
+        let fileName = "kurn-trash-test-\(UUID().uuidString).m4a"
+        let journalURL = CaptureJournal.url(for: fileName)
+        try FileManager.default.createDirectory(at: CaptureJournal.directoryURL, withIntermediateDirectories: true)
+        try Data([0xFF, 0xF1]).write(to: journalURL)
+        defer { AudioFileStore.delete(fileName: fileName) }
+        context.insert(Recording(meeting: meeting, fileName: fileName, duration: 0))
+        try context.save()
+
+        RecordingTrash.trash(fileNames: [fileName], operationID: UUID())
+        RecordingTrash.sweep(context: context)
+
+        #expect(FileManager.default.fileExists(atPath: journalURL.path))
+    }
 }
