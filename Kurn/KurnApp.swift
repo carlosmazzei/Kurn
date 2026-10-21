@@ -264,6 +264,11 @@ struct KurnApp: App {
             // the sweep only handles pre-journal leftovers.
             RecordingOperationJournal.replay(context: environment.modelContainer.mainContext)
             RecordingTrash.sweep(context: environment.modelContainer.mainContext)
+            // A capture killed mid-recording (e.g. swiped away from the app
+            // switcher) leaves an undecodable `.m4a`; rebuild it from its
+            // crash-safe journal now that the sweeps above have marked it
+            // `.recoveryNeeded`.
+            Task { await RecordingRecovery.repairFromCaptureJournals(modelContainer: environment.modelContainer) }
             // Sweep again on every activation, not just at launch: a
             // background relaunch while the device was locked can't read the
             // protected store, leaving recordings stuck at `.inProgress`

@@ -30,9 +30,18 @@ protocol RecordingFileFinalizing {
 
 struct RecordingFileFinalizer: RecordingFileFinalizing {
     private let protect: (URL) throws -> Void
+    private let discardJournal: (String) -> Void
 
-    init(protect: @escaping (URL) throws -> Void = { try RecordingProtection.applyAndVerify(to: $0) }) {
+    /// `discardJournal` drops the recording's `CaptureJournal` once the file
+    /// itself is accepted: a readable, protected `.m4a` is the authoritative
+    /// copy, so the crash-safe one has done its job. It is never called on a
+    /// failure, which is when the journal is the only decodable copy.
+    init(
+        protect: @escaping (URL) throws -> Void = { try RecordingProtection.applyAndVerify(to: $0) },
+        discardJournal: @escaping (String) -> Void = { CaptureJournal.delete(for: $0) }
+    ) {
         self.protect = protect
+        self.discardJournal = discardJournal
     }
 
     func finalize(fileName: String) throws -> FinalizedRecordingFile {
@@ -57,6 +66,7 @@ struct RecordingFileFinalizer: RecordingFileFinalizing {
         } catch {
             throw RecordingFileFinalizationError.protectionFailed
         }
+        discardJournal(fileName)
         return FinalizedRecordingFile(duration: duration, fileSize: size)
     }
 }

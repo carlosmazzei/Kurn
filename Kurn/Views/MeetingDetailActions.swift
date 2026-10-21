@@ -146,8 +146,10 @@ extension MeetingDetailView {
     }
 
     func retryCaptureRecovery(_ recording: Recording) {
-        if let error = RecordingRecovery.retryRecovery(for: recording, context: modelContext) {
-            actionError = error
+        Task {
+            if let error = await RecordingRecovery.retryRecovery(for: recording, context: modelContext) {
+                actionError = error
+            }
         }
     }
 

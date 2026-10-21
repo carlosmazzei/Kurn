@@ -147,13 +147,15 @@ enum AudioFileStore {
     /// The enhanced directory is in this list so that *every* caller — deleting a
     /// meeting, deleting one recording, discarding a cancelled take — drops the
     /// derived copy along with the original, without any of them having to know
-    /// the copy exists.
+    /// the copy exists. The same goes for the crash-safe `CaptureJournal` of a
+    /// recording that never finalized.
     static func delete(fileName: String) {
         let fm = FileManager.default
         for directory in [recordingsDirectoryURL, enhancedDirectoryPath, documentsURL] {
             let url = directory.appendingPathComponent(fileName)
             try? fm.removeItem(at: url)
         }
+        CaptureJournal.delete(for: fileName)
     }
 
     /// Total bytes used by the derived enhanced copies. Reported separately from
@@ -196,7 +198,7 @@ enum AudioFileStore {
     static func deleteAllAudio(fileManager: FileManager = .default) -> Int {
         let fm = fileManager
         deleteAllEnhancedAudio()
-        var residual = 0
+        var residual = CaptureJournal.deleteAll(fileManager: fm)
         for directory in [recordingsDirectoryURL, documentsURL] {
             guard let items = try? fm.contentsOfDirectory(
                 at: directory,

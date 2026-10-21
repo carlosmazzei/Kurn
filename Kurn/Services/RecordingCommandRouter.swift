@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import UIKit
 
 @MainActor
 final class RecordingCommandRouter {
@@ -35,7 +36,23 @@ final class RecordingCommandRouter {
     private var recentCommands: [(id: String, handled: Bool, phase: WatchAckPhase)] = []
     private let recentCommandCapacity = 20
 
+    private var terminationObserver: NSObjectProtocol?
+
     private init() {}
+
+    /// Stop and save the live recording because the process is about to end.
+    /// iOS posts `willTerminateNotification` — with a few seconds to act — to
+    /// an app still running in the background when the user swipes it away
+    /// from the app switcher, which a recording app with the `audio`
+    /// background mode is. Stopping here closes the `.m4a` (writing its
+    /// sample table) and saves the row as `.ready`, so that common case needs
+    /// no recovery at all. iOS does not always post it (a suspended or
+    /// jetsammed process just dies); `CaptureJournal` covers those.
+    func stopForTermination() {
+        guard let onStop else { return }
+        AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: app terminating, stopping the live recording")
+        _ = onStop()
+    }
 
     /// Whether a live recorder session currently has its handlers registered.
     /// Used to gate maintenance that must never run mid-recording (e.g. the
@@ -55,6 +72,20 @@ final class RecordingCommandRouter {
         self.onResume = onResume
         self.onStop = onStop
         self.onHighlight = onHighlight
+        observeTermination()
+    }
+
+    private func observeTermination() {
+        guard terminationObserver == nil else { return }
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willTerminateNotification,
+            object: nil,
+            // UIKit posts it on the main thread; a nil queue runs the block
+            // right there, before `post` returns and the process goes away.
+            queue: nil
+        ) { _ in
+            MainActor.assumeIsolated { RecordingCommandRouter.shared.stopForTermination() }
+        }
     }
 
     func unregister() {
@@ -64,6 +95,10 @@ final class RecordingCommandRouter {
         onStop = nil
         onHighlight = nil
         recentCommands.removeAll()
+        if let terminationObserver {
+            NotificationCenter.default.removeObserver(terminationObserver)
+            self.terminationObserver = nil
+        }
     }
 
     /// Apply a Live Activity button (`RecordingControlIntent`). These used to

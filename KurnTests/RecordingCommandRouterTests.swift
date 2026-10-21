@@ -17,6 +17,7 @@
 //
 
 import Testing
+import UIKit
 @testable import Kurn
 
 @MainActor
@@ -141,5 +142,38 @@ struct RecordingCommandRouterTests {
             router.handle(action)
         }
         #expect(!router.hasActiveSession)
+    }
+
+    // MARK: - App termination
+
+    @Test func appTerminationStopsAndSavesTheLiveRecording() {
+        let router = RecordingCommandRouter.shared
+        defer { router.unregister() }
+        var stops = 0
+        router.register(
+            onTogglePause: {}, onPause: {}, onResume: {},
+            onStop: { stops += 1; return true },
+            onHighlight: {}
+        )
+
+        NotificationCenter.default.post(name: UIApplication.willTerminateNotification, object: nil)
+
+        #expect(stops == 1)
+    }
+
+    @Test func appTerminationAfterTheSessionEndedDoesNothing() {
+        let router = RecordingCommandRouter.shared
+        var stops = 0
+        router.register(
+            onTogglePause: {}, onPause: {}, onResume: {},
+            onStop: { stops += 1; return true },
+            onHighlight: {}
+        )
+        router.unregister()
+
+        NotificationCenter.default.post(name: UIApplication.willTerminateNotification, object: nil)
+        router.stopForTermination()
+
+        #expect(stops == 0)
     }
 }

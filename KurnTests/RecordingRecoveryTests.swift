@@ -130,7 +130,7 @@ struct RecordingRecoveryTests {
         #expect(recording.fileSize > 0)
     }
 
-    @Test func explicitRetryAcceptsAValidatedPartialFile() throws {
+    @Test func explicitRetryAcceptsAValidatedPartialFile() async throws {
         let container = TestModelContainer.make()
         let context = container.mainContext
         let meeting = Meeting(title: "Retry")
@@ -150,7 +150,7 @@ struct RecordingRecoveryTests {
         context.insert(recording)
         try context.save()
 
-        let error = RecordingRecovery.retryRecovery(for: recording, context: context)
+        let error = await RecordingRecovery.retryRecovery(for: recording, context: context)
 
         #expect(error == nil)
         #expect(recording.captureState == .ready)

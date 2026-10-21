@@ -242,7 +242,7 @@ actor AudioChunker {
     /// there is no `async` overload to await — so it is wrapped here. The handler
     /// reports a plain `Bool` with no error channel, hence the non-throwing
     /// continuation.
-    private static func preferredPreset(for asset: AVURLAsset) async -> String {
+    static func preferredPreset(for asset: AVURLAsset) async -> String {
         let compatible = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             AVAssetExportSession.determineCompatibility(
                 ofExportPreset: AVAssetExportPresetPassthrough,

@@ -64,7 +64,7 @@ final class AVFoundationCaptureEngine: AudioCaptureEngine, @unchecked Sendable {
     }
 
     func openOutputFile(at url: URL, bitRate: Int) throws -> any AudioFileWriting {
-        try CaptureOutputFile.open(at: url, bitRate: bitRate)
+        try CaptureOutputFile.openJournaled(at: url, bitRate: bitRate)
     }
 
     func installTap(format: AVAudioFormat, sink: any AudioSinkWriting) {

@@ -577,6 +577,32 @@ stop and `RecordingRecovery` use it. The simulator cannot observe iOS file
 protection, so enforcement is covered by the release device matrix while tests
 inject protection failure through the finalizer seam.
 
+**A killed capture keeps its audio through `CaptureJournal`**
+(`Services/CaptureJournal.swift`). An `.m4a`'s sample table (`moov`) is only
+written when `AVAudioFile` closes, so a process killed mid-recording — swiped
+away from the app switcher, jetsammed — used to leave a file full of audio
+that nothing could decode, and "recover" could only fail. So the capture file
+the engine opens is a `JournaledCaptureFile`: every buffer also goes to an
+ADTS stream in `Recordings/Capture/<name>.aac`, which has a header per frame
+and no trailer, so it is decodable up to its last whole frame wherever it was
+cut. The journal is a safety net, never a reason to lose the recording — one
+that fails to open or write is detached and the recording carries on — and
+the storage runway counts it (`CaptureJournal.storageMultiplier`).
+`RecordingFileFinalizer` discards it once the `.m4a` is accepted and never on
+a failure. After a kill, `CaptureJournalRepair` remuxes it (passthrough
+export, no second lossy generation) into a verified temporary `.m4a` that
+replaces the undecodable one; it never replaces a readable file. That runs
+from the user's recover action (`RecordingRecovery.retryRecovery`, now
+`async`) and on every activation after the sweeps
+(`repairFromCaptureJournals`), for `.recoveryNeeded` rows only — which keeps
+a live capture's file out of reach — leaving the row `.recoveryNeeded` as
+`.interruptedDuringCapture` for the user to confirm. Journals follow their
+recording through `AudioFileStore.delete`, `RecordingTrash` and "Delete All
+Data". Separately, `RecordingCommandRouter` stops and saves the live
+recording on `UIApplication.willTerminateNotification`, which iOS posts to a
+background-audio app swiped away from the app switcher; when it does, the
+recording finalizes normally and needs no recovery at all.
+
 `RecordingCompactor` (`Services/RecordingCompactor.swift`) re-encodes
 already-transcribed recordings down to the current quality, for libraries
 recorded before the fixed format. It is user-triggered from Settings → Storage
@@ -1149,7 +1175,7 @@ Every stage call is preceded by `ResourceGuard.requireTranscriptionHeadroom()`
 `AppError.resourceUnavailable` rather than let the pipeline run out of disk
 mid-transcription; `TempFileCleaner.cleanupOrphanedTempFiles()` runs at the
 start of every `transcribe` call to sweep temp files (`kurn_clean_`,
-`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_`, `kurn_enh_` prefixes,
+`kurn_vad_`, `kurn_diar_`, `kurn_chunk_`, `kurn_compact_`, `kurn_enh_`, `kurn_capture_` prefixes,
 plus stale
 Whisper upload spool files) older than an hour that earlier interrupted runs left
 behind; the same cleaner backs the manual "Free up space" action in Settings.

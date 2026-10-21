@@ -53,6 +53,12 @@ enum RecordingProtection {
     /// shallow-scan invisibility as `trashDirectoryName`, for the same reason.
     static let journalDirectoryName = "Journal"
 
+    /// Subdirectory of the recordings directory holding `CaptureJournal`'s
+    /// crash-safe ADTS copy of each recording still being captured (or one a
+    /// killed process never finalized). Same shallow-scan invisibility as
+    /// `enhancedDirectoryName`.
+    static let captureJournalDirectoryName = "Capture"
+
     /// Subdirectory of the recordings directory holding photos captured
     /// mid-recording (`PhotoFileStore`). Same shallow-scan invisibility as
     /// `enhancedDirectoryName` — every `.m4a`-filtered sweep over the
