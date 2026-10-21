@@ -4,10 +4,8 @@
 //
 //  Rebuilds a recording's `.m4a` from its `CaptureJournal` when the process
 //  that was capturing it died before closing the file. The rebuild is a remux
-//  (passthrough export of the ADTS frames into an MPEG-4 container), so the
-//  audio is the same encoded bytes the recording would have held — there is no
-//  second lossy generation, unless the system reports passthrough unavailable
-//  for the asset, in which case `AudioChunker.preferredPreset` re-encodes.
+//  (passthrough export of the ADTS frames into an MPEG-4 container) when
+//  AVFoundation manages one, and otherwise a re-encode — see `exportToM4A`.
 //
 //  The rebuild is written to a temporary file and verified decodable before it
 //  replaces anything, and it never replaces a recording that is already
@@ -92,8 +90,29 @@ enum CaptureJournalRepair {
         return file.length > 0
     }
 
-    /// Remux the ADTS journal into an `.m4a`.
+    /// Remux the ADTS journal into an `.m4a`, falling back to a re-encode.
+    ///
+    /// The passthrough export keeps the encoded frames as they are, but the
+    /// rebuild through it alone came back unusable for an ADTS source on the CI
+    /// simulator, so a throw or an unreadable result falls back to decoding the
+    /// journal through `OfflineAudioRenderer` — the decode path the app already
+    /// trusts for its own AAC on device — and encoding it at the storage format.
+    /// One more lossy generation is a fair price for the only copy of the audio.
     static func exportToM4A(from source: URL, to destination: URL) async throws {
+        do {
+            try await passthroughExport(from: source, to: destination)
+            if isReadable(destination) { return }
+            AppLog.recorder.atError.error("capture journal rebuild: passthrough export is not decodable; re-encoding")
+        } catch {
+            AppLog.recorder.atError.error(
+                "capture journal rebuild: passthrough export failed; re-encoding code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
+            )
+        }
+        try? FileManager.default.removeItem(at: destination)
+        try await transcode(from: source, to: destination)
+    }
+
+    static func passthroughExport(from source: URL, to destination: URL) async throws {
         let asset = AVURLAsset(url: source)
         let preset = await AudioChunker.preferredPreset(for: asset)
         guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
@@ -102,5 +121,22 @@ enum CaptureJournalRepair {
             )
         }
         try await session.export(to: destination, as: .m4a)
+    }
+
+    /// Decode `source` and encode it as the recording's own format. Its own
+    /// function so the output `AVAudioFile` is released — and the container
+    /// finalized — by the time it returns.
+    static func transcode(from source: URL, to destination: URL) async throws {
+        let failure = AppError.audioError(
+            NSLocalizedString("error.export_session", comment: "Export session unavailable")
+        )
+        guard let outputFormat = OfflineAudioRenderer.monoFormat(sampleRate: AudioRecorderService.storageSampleRate) else {
+            throw failure
+        }
+        let outFile = try CaptureOutputFile.open(at: destination, bitRate: AudioQuality.standard.bitRate)
+        let renderer = OfflineAudioRenderer(outputFormat: outputFormat, failure: failure, logLabel: "capture journal rebuild")
+        try await renderer.render(url: source) { buffer in
+            try outFile.write(from: buffer)
+        }
     }
 }
