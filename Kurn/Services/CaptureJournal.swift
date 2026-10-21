@@ -23,6 +23,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 enum CaptureJournal {
     static let fileExtension = "aac"

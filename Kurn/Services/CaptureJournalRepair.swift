@@ -18,6 +18,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 enum CaptureJournalRepair {
     /// Prefix of the in-flight rebuild in the temporary directory, swept by
