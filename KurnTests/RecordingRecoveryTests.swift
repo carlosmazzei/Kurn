@@ -8,6 +8,8 @@ import SwiftData
 import Testing
 @testable import Kurn
 
+// Nested so `RecordingsDirectorySuite`'s `.serialized` covers it.
+extension RecordingsDirectorySuite {
 @MainActor
 struct RecordingRecoveryTests {
 
@@ -185,4 +187,5 @@ struct RecordingRecoveryTests {
         let url = AudioFileStore.recordingsDirectoryURL.appendingPathComponent(fileName)
         return try AudioFixtures.m4aTone(seconds: seconds, at: url)
     }
+}
 }

@@ -14,6 +14,8 @@ import SwiftData
 import Testing
 @testable import Kurn
 
+// Nested so `RecordingsDirectorySuite`'s `.serialized` covers it.
+extension RecordingsDirectorySuite {
 @MainActor
 struct RecordingOperationJournalTests {
 
@@ -305,6 +307,7 @@ struct RecordingOperationJournalTests {
 
         #expect(residual == 0)
     }
+}
 }
 
 /// Deterministic fault injection: refuses every `removeItem`, simulating a

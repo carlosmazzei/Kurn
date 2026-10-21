@@ -14,6 +14,8 @@ import SwiftData
 import Testing
 @testable import Kurn
 
+// Nested so `RecordingsDirectorySuite`'s `.serialized` covers it.
+extension RecordingsDirectorySuite {
 @MainActor
 struct RecordingRecoveryEdgeCaseTests {
 
@@ -235,4 +237,5 @@ struct RecordingRecoveryEdgeCaseTests {
         #expect(!FileManager.default.fileExists(atPath: legacy.path))
         #expect(quarantined(fileName: fileName) == nil)
     }
+}
 }

@@ -15,6 +15,8 @@ import Foundation
 import Testing
 @testable import Kurn
 
+// Nested so `RecordingsDirectorySuite`'s `.serialized` covers it.
+extension RecordingsDirectorySuite {
 @MainActor
 struct CaptureJournalTests {
 
@@ -190,4 +192,5 @@ struct CaptureJournalTests {
 
         #expect(CaptureJournal.recordingFileNamesWithJournal().contains(fileName))
     }
+}
 }
