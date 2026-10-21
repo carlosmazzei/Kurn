@@ -37,6 +37,15 @@ struct DateFormattingTests {
         #expect(value.filter { $0 == "-" }.count == 2)
     }
 
+    @Test func titleStampIncludesTimeAndGMTOffset() {
+        let date = makeDate(year: 2025, month: 6, day: 16, time: DateComponents(hour: 9, minute: 30, second: 0))
+        let value = date.titleStamp
+        // "yyyy-MM-dd HH:mm GMT±N" — the offset depends on the machine's time zone.
+        #expect(value.hasPrefix(date.isoDay + " "))
+        #expect(value.contains(":"))
+        #expect(value.contains("GMT"))
+    }
+
     @Test func fileTimestampHasExpectedShape() {
         let date = makeDate(year: 2025, month: 6, day: 16, time: DateComponents(hour: 9, minute: 30, second: 12))
         let value = date.fileTimestamp

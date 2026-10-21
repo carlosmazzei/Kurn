@@ -111,7 +111,7 @@ struct MeetingFormView: View {
         } else {
             title = String(
                 format: NSLocalizedString("meeting.default_title", comment: "Default title"),
-                Date().isoDay
+                Date().titleStamp
             )
             language = settings.defaultLanguage
         }
