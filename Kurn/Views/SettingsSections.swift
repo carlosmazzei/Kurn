@@ -20,6 +20,15 @@ extension SettingsView {
     /// being inside an unlocked session is not proof of who is holding the
     /// device.
     func authorizeAndDeleteAllData() async {
+        // A recording minimized to the mini bar is still writing a row and a
+        // file this would erase out from under it.
+        guard !RecordingCommandRouter.shared.hasActiveSession else {
+            dataError = .audioError(NSLocalizedString(
+                "settings.delete_all.while_recording",
+                comment: "Delete all data is unavailable while a recording is in progress"
+            ))
+            return
+        }
         await SensitiveActionAuthorizer().perform(
             requireAuth: settings.requireAuthForRecordings,
             onDenied: { dataError = $0 },

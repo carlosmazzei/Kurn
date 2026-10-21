@@ -4,12 +4,11 @@
 //
 //  Reachable, app-wide entry point for starting a recording from outside any
 //  SwiftUI view — an App Intent (Siri/Shortcuts), a Control Center control, or
-//  the Action Button. `RecorderViewModel`/`AudioRecorderService` are otherwise
-//  constructed fresh inside `RecorderView.onAppear`, which only exists once
-//  the user has already navigated there; this singleton creates the `Meeting`
-//  the same way `MeetingsListToolbar.startRecording()` does and hands it off
-//  to `MeetingsListView`, so the intent-triggered start reuses the exact same
-//  `RecorderView` sheet, mic-permission flow, Live Activity, and
+//  the Action Button. This singleton creates the `Meeting` the same way
+//  `MeetingsListToolbar.startRecording()` does and hands it off to
+//  `RecordingSessionPresenter`, which starts it on the app-wide
+//  `RecordingSessionController`, so the intent-triggered start reuses the
+//  exact same recorder, mic-permission flow, Live Activity, and
 //  `RecordingCommandRouter` registration as a manual tap on the record button.
 //
 //  `StartRecordingIntent.perform()` (`Kurn/AppIntents/StartRecordingIntent.swift`)
@@ -35,8 +34,8 @@ final class RecordingLauncher {
     private var modelContext: ModelContext?
     private var settings: AppSettings?
 
-    /// Set by `requestAutoStart()`, observed by `MeetingsListView` to present
-    /// `RecorderView` exactly as it would for a manually created meeting.
+    /// Set by `requestAutoStart()`, observed by `RecordingSessionPresenter` to
+    /// start the session exactly as it would for a manually created meeting.
     private(set) var pendingAutoStartMeeting: Meeting?
 
     private init() {
@@ -70,8 +69,8 @@ final class RecordingLauncher {
         self.settings = settings
     }
 
-    /// Create a meeting to record into and queue it for `MeetingsListView` to
-    /// present. A no-op while a recording is already in progress, so a
+    /// Create a meeting to record into and queue it for
+    /// `RecordingSessionPresenter` to start. A no-op while a recording is already in progress, so a
     /// double-invocation (e.g. tapping the control twice) doesn't create a
     /// second `Meeting` — still a legitimate "accepted" outcome, not a
     /// failure, since the request's intent (a recording being in progress)

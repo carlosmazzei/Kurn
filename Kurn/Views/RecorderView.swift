@@ -4,7 +4,9 @@
 //
 //  Full-screen recorder: pulsing record control, live waveform meter, elapsed
 //  timer, pause/resume, and stop-and-save. Recording is offline-first; the file
-//  is written to Documents as it records.
+//  is written to Documents as it records. The session behind it is app-wide
+//  (`RecordingSessionController`), so the screen can be minimized into the
+//  floating mini bar and expanded again without touching the capture.
 //
 
 import Combine
@@ -13,48 +15,18 @@ import SwiftData
 import SwiftUI
 
 struct RecorderView: View {
-    let meeting: Meeting
-
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppSettings.self) private var settings
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var vm: RecorderViewModel?
+    /// The live session; this view only presents it. Capture outlives the
+    /// view, so dismissing the screen minimizes the recording into the mini
+    /// bar (`RecordingSessionPresenter`) rather than abandoning it.
+    let session: RecordingSessionController
 
     var body: some View {
         Group {
-            if let vm {
-                RecorderContent(vm: vm) {
-                    dismiss()
-                }
+            if let vm = session.viewModel {
+                RecorderContent(vm: vm, session: session)
             } else {
                 ProgressView()
             }
-        }
-        .onAppear {
-            if vm == nil {
-                AppLog.recorderUI.atDebug.debug("RecorderView.onAppear: creating view model")
-                vm = RecorderViewModel(
-                    meeting: meeting,
-                    modelContext: modelContext,
-                    defaultMode: settings.transcriptionEngine.storageMode,
-                    options: RecorderOptions(
-                        micPickup: settings.micPickup,
-                        audioQuality: settings.audioQuality,
-                        alwaysUseBuiltInMic: settings.alwaysUseBuiltInMic,
-                        liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
-                        liveTranscriptionModelsConsented: settings.fluidAudioASRModelsConsented,
-                        largeTransferPolicy: settings.largeTransferPolicy,
-                        hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
-                    ),
-                    onRecordingSaved: { settings.recordRecordingCompleted() }
-                )
-            }
-        }
-        .onDisappear {
-            // Safety net: never let this view's teardown silently abandon a
-            // running recording (no-op after a normal stop/cancel).
-            vm?.finalizeIfAbandoned()
         }
         // Locked for the whole screen, not just the photo sheet: this is a
         // fixed immersive layout with no landscape variant, and rotating
@@ -67,7 +39,7 @@ struct RecorderView: View {
 
 private struct RecorderContent: View {
     @Bindable var vm: RecorderViewModel
-    let onFinished: () -> Void
+    let session: RecordingSessionController
 
     @State private var levels: [Float] = Array(repeating: 0, count: 40)
     @State private var showingPhotoCapture = false
@@ -127,9 +99,20 @@ private struct RecorderContent: View {
                         : NSLocalizedString("common.cancel", comment: "Cancel"),
                     role: hasRecordingInProgress ? .destructive : .cancel
                 ) {
-                    vm.cancel()
-                    onFinished()
+                    session.discard()
                 }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                // Collapses the recorder into the floating mini bar so the
+                // rest of the app stays usable while capture continues.
+                Button {
+                    session.minimize()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .accessibilityLabel(NSLocalizedString("recorder.minimize", comment: "Minimize the recorder"))
+                }
+                .disabled(!session.canMinimize)
+                .accessibilityIdentifier("recorder.minimize")
             }
         }
         // The backdrop is a fixed immersive black, so pin the whole screen —
@@ -144,16 +127,6 @@ private struct RecorderContent: View {
             guard vm.state == .recording else { return }
             levels.removeFirst()
             levels.append(vm.level)
-        }
-        .onChange(of: vm.didSaveRecording) { _, saved in
-            if saved { onFinished() }
-        }
-        .task {
-            // The recorder spins up its audio engine off the main actor, so this
-            // does not block the sheet's present animation. `prepareToRecord`
-            // may first await the user's microphone choice via `micChoices`.
-            AppLog.recorderUI.atNotice.notice("RecorderContent.task: preparing to record")
-            await vm.prepareToRecord()
         }
         .confirmationDialog(
             NSLocalizedString("recorder.choose_mic.title", comment: "Choose microphone"),
@@ -179,7 +152,7 @@ private struct RecorderContent: View {
             title: NSLocalizedString("recorder.permission.title", comment: "Mic permission"),
             message: NSLocalizedString("recorder.permission.message", comment: ""),
             primaryTitle: NSLocalizedString("common.ok", comment: "OK"),
-            primaryAction: onFinished
+            primaryAction: { session.discard() }
         )
         .errorAlert(Binding(
             get: { vm.error },
@@ -191,7 +164,10 @@ private struct RecorderContent: View {
                 }
             }
         ))
-        .interactiveDismissDisabled(vm.state != .idle || vm.isStarting)
+        // Swiping the sheet down minimizes a running recording (the
+        // presentation binding routes it to `session.setPresented`); until
+        // capture is running there is nothing to minimize into.
+        .interactiveDismissDisabled(!session.canMinimize)
         .fullScreenCover(isPresented: $showingPhotoCapture) {
             PhotoCaptureView { data in
                 vm.capturePhoto(jpegData: data)
@@ -461,7 +437,8 @@ private struct RecorderContent: View {
 
 /// A self-contained pulsing dot. Isolating the `repeatForever` animation here
 /// keeps it from interacting with the recorder's 20 Hz metering re-renders.
-private struct PulsingDot: View {
+/// Shared with the mini bar (`RecordingMiniBar`).
+struct PulsingDot: View {
     let color: Color
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dim = false

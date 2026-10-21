@@ -12,7 +12,9 @@
 //  view specifically so the same `Binding<LibrarySelection>` can drive both
 //  `FolderSidebarView` (sidebar or sheet) and `MeetingsListView`'s own
 //  filtering without a sheet round-trip on regular width. Settings is
-//  presented as a sheet either way.
+//  presented as a sheet either way. The recorder and its minimized mini bar
+//  are attached here (`recordingSessionPresenter()`), above both layouts, so
+//  a recording stays reachable from every screen.
 //
 
 import SwiftData
@@ -38,6 +40,7 @@ struct ContentView: View {
                 }
             }
         }
+        .recordingSessionPresenter()
     }
 }
 
@@ -45,11 +48,17 @@ struct ContentView: View {
     // `ContentView` renders `MeetingsListView`; only `MeetingDetailView` (reached
     // via navigation) reads the shared `TranscriptionCoordinator` and
     // `SummaryViewModel`, so this preview doesn't inject them.
-    ContentView()
-        .environment(AppSettings())
-        .environment(RecordingAccessGate())
-        .modelContainer(for: [
-            Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
-            Folder.self, Tag.self, SmartFolder.self, GeneratedDocument.self
-        ], inMemory: true)
+    @Previewable @State var settings = AppSettings()
+    let container = try? ModelContainer(
+        for: Meeting.self, Recording.self, Transcript.self, Speaker.self, Summary.self,
+        Folder.self, Tag.self, SmartFolder.self, GeneratedDocument.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    if let container {
+        ContentView()
+            .environment(settings)
+            .environment(RecordingAccessGate())
+            .environment(RecordingSessionController(modelContext: container.mainContext, settings: settings))
+            .modelContainer(container)
+    }
 }

@@ -70,6 +70,7 @@ struct MeetingLibrary {
     /// back from the journal record on the next launch. See
     /// `RecordingOperationJournal`'s header comment.
     func deleteMeeting(_ meeting: Meeting) throws(AppError) {
+        try requireNoCaptureInProgress(meeting.recordings)
         let fileNames = meeting.recordings.map(\.fileName)
             + meeting.recordings.flatMap { $0.photos.map(\.fileName) }
         try journaledDelete(fileNames: fileNames) { context.delete(meeting) }
@@ -78,8 +79,21 @@ struct MeetingLibrary {
     /// Deletes one recording segment, its audio and the photos taken during
     /// it, through the same journaled path as `deleteMeeting`.
     func deleteRecording(_ recording: Recording) throws(AppError) {
+        try requireNoCaptureInProgress([recording])
         let fileNames = [recording.fileName] + recording.photos.map(\.fileName)
         try journaledDelete(fileNames: fileNames) { context.delete(recording) }
+    }
+
+    /// Refuses to delete a recording the live recorder is still writing. A
+    /// minimized recorder leaves the meeting reachable mid-capture, and
+    /// deleting the row under it would leave the recorder finalizing into a
+    /// deleted model and its audio file without an owner.
+    private func requireNoCaptureInProgress(_ recordings: [Recording]) throws(AppError) {
+        guard recordings.contains(where: \.isCaptureInProgress) else { return }
+        throw AppError.audioError(NSLocalizedString(
+            "library.delete_while_recording",
+            comment: "A meeting or recording cannot be deleted while it is being recorded"
+        ))
     }
 
     /// Deletes one photo and its file. A photo is meeting-derived content like

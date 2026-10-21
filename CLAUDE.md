@@ -1581,14 +1581,48 @@ is, by contrast, a single file compiled into both the `Kurn` and
 `KurnLiveActivityExtension` targets — unlike `WatchCommand`, there was no reason
 for it to drift, so it's shared rather than duplicated.
 
+### Minimizable recorder (`ViewModels/RecordingSessionController.swift`)
+
+The live recording is an app-wide session, not a property of the screen that
+shows it. `RecordingSessionController` (built by `AppComposition`, one per
+store) owns the session's `RecorderViewModel` and the task that starts it;
+`RecorderView` only presents it. `RecordingSessionPresenter`, attached once in
+`ContentView` above both layouts, shows the recorder as a sheet while the
+session is expanded and, once minimized (the chevron, or swiping the sheet
+down), a floating Liquid Glass mini bar — status, title, elapsed time,
+pause/resume, stop — in the bottom safe area of every screen; tapping it
+expands the recorder again. Capture, the Live Activity, the Watch and
+`RecordingCommandRouter` never depended on the view, so none of them changed.
+
+Rules that keep it safe:
+
+- **Only a running capture minimizes** (`canMinimize`): while the mic is being
+  chosen, permission was denied or the engine is still starting there is
+  nothing to collapse into, so dismissal stays disabled.
+- **Attention brings it back.** An error or permission denial is presented by
+  the full recorder, so `surfaceIfNeeded` re-expands a minimized session.
+  Every stop path (recorder, mini bar, Live Activity, Watch) lands on
+  `didSaveRecording`, which the presenter turns into `finishIfSaved()`.
+- **One session.** `begin(meeting:)` while one exists re-opens it rather than
+  starting a second capture; the list's record button and a meeting's "Add
+  segment" both go through it.
+- **The meeting being recorded stays reachable, so its live row is
+  protected.** `Recording.isCaptureInProgress` (`.preparing`/`.recording`/
+  `.finalizing` — launch recovery moves a dead process's leftovers to
+  `.recoveryNeeded`, so at runtime these mean a live capture) makes
+  `RecordingSegmentRow` show "recording in progress" instead of the recovery
+  affordance, and `MeetingLibrary` refuses to delete a meeting or recording
+  in that state; "Delete all data" is refused while
+  `RecordingCommandRouter.hasActiveSession`.
+
 ### Frictionless capture (`AppIntents/`, `Services/RecordingLauncher.swift`)
 
 `StartRecordingIntent` (Siri / Shortcuts via `KurnShortcuts`) and
 `StartRecordingControl` in `KurnLiveActivityExtension` (Control Center, Lock
 Screen, Action Button) and that target's `StartRecordingWidget` (Home Screen,
 Lock Screen accessory and StandBy on iPhone and iPad) all open the app and post a process-local start request;
-`RecordingLauncher` creates and queues the meeting through the same
-`RecorderView` path a tap uses, and the existing pause/resume/stop commands still
+`RecordingLauncher` creates and queues the meeting, which
+`RecordingSessionPresenter` starts through the same session a tap uses, and the existing pause/resume/stop commands still
 converge on `RecordingCommandRouter`. Capture deliberately starts **without**
 waiting for `RecordingAccessGate` — a control that first demanded Face ID would
 miss the moment it exists for — while `SecurityCoverWindow` keeps meeting content
@@ -1997,9 +2031,12 @@ toolbar would be the wrong control**:
   `MeetingDetailView`'s `toolbarContent` uses `ToolbarSpacer(.fixed,
   placement: .topBarTrailing)` the same way to separate the favorite toggle from
   the overflow menu.
-- Two places deliberately stay custom content: `RecorderView`'s transport
+- Three places deliberately stay custom content: `RecorderView`'s transport
   controls (full-width, thumb-sized targets mid-recording — they take
-  `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), and
+  `.buttonStyle(.glass)`/`.glassProminent` but are not toolbar items), the
+  minimized recorder's mini bar (`RecordingMiniBar`, a `.glassEffect` capsule in
+  a root `.safeAreaInset`, since it has to float over every screen's own
+  toolbar rather than belong to one), and
   `MeetingChatView`'s composer (an input surface: an inset glass card laid
   over the transcript with `.overlay(alignment: .bottom)` rather than a
   `.safeAreaBar`, so the conversation keeps scrolling beneath both the card

@@ -32,6 +32,8 @@ struct MeetingsListView: View {
     // not visible to an extension declared in another file.
     @Environment(\.modelContext) var modelContext
     @Environment(AppSettings.self) var settings
+    /// The app-wide recording session the record button starts or re-opens.
+    @Environment(RecordingSessionController.self) var recordingSession
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @Query private var folders: [Folder]
     @Query(sort: \SmartFolder.name) private var smartFolders: [SmartFolder]
@@ -40,8 +42,6 @@ struct MeetingsListView: View {
     @State private var pendingDelete: Meeting?
     /// Pushed meeting detail (item-based so cards have no disclosure chevron).
     @State private var selectedMeeting: Meeting?
-    /// Set when the toolbar's record button creates a meeting to record into.
-    @State var recordMeeting: Meeting?
     /// Set by the context-menu "Rename" action; presents `MeetingFormView`.
     @State private var editingMeeting: Meeting?
     /// Set by the context-menu "Share" action; presents `ActivityView`.
@@ -319,19 +319,6 @@ struct MeetingsListView: View {
         )
         .textInputAutocapitalization(.never)
         .toolbar { listToolbar }
-        .sheet(item: $recordMeeting) { meeting in
-            NavigationStack { RecorderView(meeting: meeting) }
-        }
-        // `StartRecordingIntent` (Siri/Shortcuts/Control Center/Action Button)
-        // queues a meeting here instead of calling into a View directly; pick
-        // it up and present it exactly like a manual tap on the record
-        // button. `initial: true` covers the case where the intent already
-        // ran (e.g. a cold launch triggered by `openAppWhenRun`) before this
-        // view's first appearance.
-        .onChange(of: RecordingLauncher.shared.pendingAutoStartMeeting, initial: true) { _, meeting in
-            guard meeting != nil else { return }
-            recordMeeting = RecordingLauncher.shared.consumePendingAutoStart()
-        }
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }
