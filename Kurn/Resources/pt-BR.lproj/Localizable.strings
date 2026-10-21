@@ -244,6 +244,7 @@
 "recorder.mini.accessibility_label" = "%1$@, %2$@, %3$@";
 "recorder.mini.hint" = "Abre o gravador.";
 "detail.recording_in_progress" = "Gravação em andamento…";
+"detail.open_active_recording" = "Gravando outra reunião — abrir";
 "library.delete_while_recording" = "Esta reunião está sendo gravada. Pare a gravação antes de excluí-la.";
 "settings.delete_all.while_recording" = "Há uma gravação em andamento. Pare-a antes de apagar todos os dados.";
 

@@ -244,6 +244,7 @@
 "recorder.mini.accessibility_label" = "%1$@, %2$@, %3$@";
 "recorder.mini.hint" = "Ouvre l’enregistreur.";
 "detail.recording_in_progress" = "Enregistrement en cours…";
+"detail.open_active_recording" = "Enregistrement d’une autre réunion — ouvrir";
 "library.delete_while_recording" = "Cette réunion est en cours d’enregistrement. Arrêtez l’enregistrement avant de la supprimer.";
 "settings.delete_all.while_recording" = "Un enregistrement est en cours. Arrêtez-le avant de supprimer toutes les données.";
 

@@ -47,17 +47,31 @@ extension MeetingsListView {
     // MARK: - Primary action
 
     /// The record button, deliberately alone in its glass group and tinted with
-    /// the brand accent so it stays the loudest thing on screen.
+    /// the brand accent so it stays the loudest thing on screen. While a
+    /// recording runs minimized it says so and re-opens it, rather than
+    /// reading "Record" over an action that cannot start a second capture.
     var recordButton: some View {
         Button(action: startRecording) {
-            Label(
-                NSLocalizedString("meetings.record", comment: "Record"),
-                systemImage: "record.circle.fill"
-            )
+            if recordingSession.isActive {
+                Label(
+                    recordingSession.isPaused
+                        ? NSLocalizedString("recorder.mini.paused", comment: "Mini recorder bar: paused")
+                        : NSLocalizedString("recorder.mini.recording", comment: "Mini recorder bar: recording"),
+                    systemImage: recordingSession.isPaused ? "pause.circle.fill" : "waveform"
+                )
+            } else {
+                Label(
+                    NSLocalizedString("meetings.record", comment: "Record"),
+                    systemImage: "record.circle.fill"
+                )
+            }
         }
         .labelStyle(.titleAndIcon)
         .tint(Theme.accent)
         .buttonStyle(.glassProminent)
+        .accessibilityHint(recordingSession.isActive
+            ? NSLocalizedString("recorder.mini.hint", comment: "Opens the full recorder")
+            : "")
         .accessibilityIdentifier("meetings.record")
     }
 

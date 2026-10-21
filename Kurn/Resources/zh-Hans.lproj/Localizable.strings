@@ -244,6 +244,7 @@
 "recorder.mini.accessibility_label" = "%1$@，%2$@，%3$@";
 "recorder.mini.hint" = "打开录音器。";
 "detail.recording_in_progress" = "正在录音…";
+"detail.open_active_recording" = "正在录制另一个会议 — 打开";
 "library.delete_while_recording" = "此会议正在录音。请先停止录音再删除。";
 "settings.delete_all.while_recording" = "正在录音。请先停止录音再删除所有数据。";
 

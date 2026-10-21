@@ -62,6 +62,10 @@ final class RecordingSessionController {
 
     var isActive: Bool { viewModel != nil }
 
+    /// Whether the live session is paused — the record buttons that re-open
+    /// a running session say "Paused" rather than "Recording" then.
+    var isPaused: Bool { viewModel?.state == .paused }
+
     /// Whether the recorder may collapse into the mini bar. Only once capture
     /// is actually running: before that the screen may still be asking which
     /// microphone to use or reporting a permission denial, and a minimized
