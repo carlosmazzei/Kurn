@@ -18,6 +18,8 @@ import SwiftData
 import Testing
 @testable import Kurn
 
+// Nested so `RecordingsDirectorySuite`'s `.serialized` covers it.
+extension RecordingsDirectorySuite {
 @MainActor
 struct CaptureJournalRepairTests {
 
@@ -256,4 +258,5 @@ struct CaptureJournalRepairTests {
         #expect(recording.captureRecoveryReason == .unreadableFile)
         #expect(CaptureJournal.exists(for: fileName))
     }
+}
 }
