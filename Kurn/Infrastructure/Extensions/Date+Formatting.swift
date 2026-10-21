@@ -21,6 +21,14 @@ extension Date {
         return formatter
     }()
 
+    // POSIX locale keeps the shape stable ("GMT-3", 24-hour clock) in every UI language.
+    private static let titleStampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm O"
+        return formatter
+    }()
+
     private static let fileTimestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
@@ -43,6 +51,10 @@ extension Date {
 
     /// Compact date used in default meeting titles. e.g. "2025-06-16".
     var isoDay: String { Self.isoDayFormatter.string(from: self) }
+
+    /// Date, time and time zone used in default meeting titles.
+    /// e.g. "2025-06-16 09:30 GMT-3".
+    var titleStamp: String { Self.titleStampFormatter.string(from: self) }
 
     /// Timestamp suitable for unique file names. e.g. "20250616-093012".
     var fileTimestamp: String { Self.fileTimestampFormatter.string(from: self) }

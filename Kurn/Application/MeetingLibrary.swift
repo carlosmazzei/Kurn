@@ -50,7 +50,7 @@ struct MeetingLibrary {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalTitle = trimmed.isEmpty
             ? String(format: NSLocalizedString("meeting.default_title", comment: "Default title"),
-                     Date().isoDay)
+                     Date().titleStamp)
             : trimmed
         let meeting = Meeting(title: finalTitle, notes: notes, language: language)
         context.insert(meeting)
