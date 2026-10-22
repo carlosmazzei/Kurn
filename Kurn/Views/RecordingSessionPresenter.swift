@@ -14,6 +14,12 @@
 //  earlier one, and come back. For the same reason the intent-driven start
 //  (`RecordingLauncher`) is picked up here.
 //
+//  A screen with a bottom toolbar (the meetings list) hosts the bar itself
+//  through `hostsRecordingMiniBar()`: the system toolbar is laid out against
+//  the navigation stack's own safe area and ignores an inset added outside it,
+//  so a root-level bar sat on top of the toolbar. Inside the screen, the safe
+//  area already includes the toolbar, so the bar floats just above it.
+//
 
 import Combine
 import SwiftUI
@@ -25,24 +31,73 @@ extension View {
     func recordingSessionPresenter() -> some View {
         modifier(RecordingSessionPresenter())
     }
+
+    /// Shows the mini bar inside this screen's safe area instead of at the
+    /// root, for a screen whose bottom toolbar the root bar would cover.
+    func hostsRecordingMiniBar() -> some View {
+        modifier(HostedRecordingMiniBar())
+    }
 }
 
-private struct RecordingSessionPresenter: ViewModifier {
+/// How many on-screen views currently host the mini bar themselves; the root
+/// presenter draws it only when none does.
+@MainActor @Observable
+final class RecordingMiniBarPlacement {
+    fileprivate var hostCount = 0
+    /// The keyboard state, shared so a hosted bar steps aside like the root one.
+    fileprivate var isKeyboardVisible = false
+}
+
+/// The mini bar as both placements show it.
+private struct MiniBarSlot: View {
     @Environment(RecordingSessionController.self) private var session
-    /// The mini bar steps aside while the keyboard is up, so it never sits
-    /// between a text field (the chat composer, search) and the keyboard.
-    @State private var isKeyboardVisible = false
+    @Environment(RecordingMiniBarPlacement.self) private var placement
+
+    var body: some View {
+        if let vm = session.viewModel, !session.isExpanded, !placement.isKeyboardVisible {
+            RecordingMiniBar(vm: vm, onExpand: { session.expand() })
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+}
+
+private struct HostedRecordingMiniBar: ViewModifier {
+    @Environment(RecordingMiniBarPlacement.self) private var placement
+    @State private var isHosting = false
 
     func body(content: Content) -> some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let vm = session.viewModel, !session.isExpanded, !isKeyboardVisible {
-                    RecordingMiniBar(vm: vm, onExpand: { session.expand() })
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+                if isHosting { MiniBarSlot() }
             }
+            .onAppear {
+                guard !isHosting else { return }
+                isHosting = true
+                placement.hostCount += 1
+            }
+            .onDisappear {
+                guard isHosting else { return }
+                isHosting = false
+                placement.hostCount -= 1
+            }
+    }
+}
+
+private struct RecordingSessionPresenter: ViewModifier {
+    @Environment(RecordingSessionController.self) private var session
+    /// Owned here and handed down so a screen can host the bar itself. The
+    /// bar steps aside while the keyboard is up, so it never sits between a
+    /// text field (the chat composer, search) and the keyboard.
+    @State private var placement = RecordingMiniBarPlacement()
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if placement.hostCount == 0 { MiniBarSlot() }
+            }
+            .environment(placement)
             .kurnAnimation(.spring(duration: 0.35), value: session.isExpanded)
             .sheet(isPresented: Binding(
                 get: { session.isExpanded },
@@ -69,10 +124,10 @@ private struct RecordingSessionPresenter: ViewModifier {
                 session.begin(meeting: next)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                isKeyboardVisible = true
+                placement.isKeyboardVisible = true
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                isKeyboardVisible = false
+                placement.isKeyboardVisible = false
             }
     }
 

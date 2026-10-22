@@ -319,6 +319,7 @@ struct MeetingsListView: View {
         )
         .textInputAutocapitalization(.never)
         .toolbar { listToolbar }
+        .hostsRecordingMiniBar()
         .sheet(isPresented: $showingSettings) {
             NavigationStack { SettingsView() }
         }
