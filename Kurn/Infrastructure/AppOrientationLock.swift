@@ -51,6 +51,12 @@ final class AppOrientationLock {
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive })
         else { return }
+        requestPortraitGeometry(on: scene)
+    }
+
+    /// Split from the active-scene lookup so a test can drive the request on
+    /// whatever scene the test host has, active or not.
+    func requestPortraitGeometry(on scene: UIWindowScene) {
         scene.requestGeometryUpdate(
             .iOS(interfaceOrientations: .portrait),
             errorHandler: Self.geometryUpdateFailed
