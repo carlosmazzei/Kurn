@@ -51,14 +51,20 @@ final class AppOrientationLock {
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive })
         else { return }
-        // UIKit calls the error handler on a background queue, so it must not
-        // inherit this class's main-actor isolation: Swift 6's runtime check
-        // traps (EXC_BREAKPOINT in `dispatch_assert_queue`) when it does.
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { @Sendable error in
-            AppLog.recorderUI.atDebug.debug(
-                "AppOrientationLock: geometry update failed code=\(error.publicLogCode, privacy: .public)"
-            )
-        }
+        scene.requestGeometryUpdate(
+            .iOS(interfaceOrientations: .portrait),
+            errorHandler: Self.geometryUpdateFailed
+        )
+    }
+
+    /// UIKit calls the geometry error handler on a background queue, so it
+    /// must not inherit this class's main-actor isolation: a closure literal
+    /// did, and Swift 6's runtime check trapped (EXC_BREAKPOINT in
+    /// `dispatch_assert_queue`) whenever the request failed.
+    nonisolated static func geometryUpdateFailed(_ error: any Error) {
+        AppLog.recorderUI.atDebug.debug(
+            "AppOrientationLock: geometry update failed code=\(error.publicLogCode, privacy: .public)"
+        )
     }
 }
 #endif
