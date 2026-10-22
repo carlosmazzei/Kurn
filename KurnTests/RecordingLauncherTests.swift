@@ -32,6 +32,10 @@ struct RecordingLauncherTests {
 
     @Test func requestAutoStartCreatesMeetingWithDefaultLanguage() throws {
         let (launcher, context) = makeLauncher(defaultLanguage: .portuguese)
+        // Never leave the request pending: the test host's
+        // `RecordingSessionPresenter` would start a real capture from it,
+        // holding the microphone while every other suite runs.
+        defer { _ = launcher.consumePendingAutoStart() }
         #expect(launcher.requestAutoStart())
 
         let meeting = try #require(launcher.pendingAutoStartMeeting)
