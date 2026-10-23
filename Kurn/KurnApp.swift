@@ -69,6 +69,10 @@ struct KurnApp: App {
     /// transcript, where the fallback to the heuristic engine is visible, and
     /// two controllers each holding their own `isDownloading` would disagree.
     @State private var downloads = ModelDownloadController()
+    /// PDFs shared into the app from another one, waiting for the user to
+    /// pick their meeting (`AttachToMeetingView`). App-level because
+    /// `onOpenURL` can deliver one before the store has finished booting.
+    @State private var incomingFiles = IncomingFileInbox()
     /// The H2 boot state machine. Assigned explicitly in `init()`, like
     /// `recoveryViewModel` below, rather than via a default-value expression:
     /// both need the *same* coordinator instance, and reading `self.boot`
@@ -176,6 +180,7 @@ struct KurnApp: App {
     var body: some Scene {
         WindowGroup {
             content
+                .onOpenURL { incomingFiles.receive($0) }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     // A background-only launch while locked, or a launch that
                     // failed to open, gets one retry attempt per activation —
@@ -208,6 +213,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)
                 .environment(appEnvironment.recordingSession)
+                .environment(incomingFiles)
                 // Both the app-switcher privacy placeholder and the lock screen
                 // live in a window above everything this hierarchy presents.
                 // They used to be an in-hierarchy `ZStack` branch and a view
@@ -265,6 +271,9 @@ struct KurnApp: App {
             // the sweep only handles pre-journal leftovers.
             RecordingOperationJournal.replay(context: environment.modelContainer.mainContext)
             RecordingTrash.sweep(context: environment.modelContainer.mainContext)
+            // Shared PDFs whose process ended before the user picked a
+            // meeting: their Inbox copies are outside protected storage.
+            incomingFiles.sweepStaleCopies()
             // A capture killed mid-recording (e.g. swiped away from the app
             // switcher) leaves an undecodable `.m4a`; rebuild it from its
             // crash-safe journal now that the sweeps above have marked it

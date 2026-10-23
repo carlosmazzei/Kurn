@@ -32,7 +32,7 @@ enum RecordingTrash {
     /// order — mirrored here so a moved file always knows where it came from
     /// and can be put back exactly there.
     private enum SourceDirectory: String, CaseIterable {
-        case main, enhanced, legacy, photos, capture
+        case main, enhanced, legacy, photos, attachments, capture
 
         var url: URL {
             switch self {
@@ -40,6 +40,7 @@ enum RecordingTrash {
             case .enhanced: return AudioFileStore.enhancedDirectoryPath
             case .legacy: return AudioFileStore.documentsURL
             case .photos: return PhotoFileStore.photosDirectoryURL
+            case .attachments: return AttachmentFileStore.attachmentsDirectoryURL
             case .capture: return CaptureJournal.directoryURL
             }
         }
@@ -144,7 +145,11 @@ enum RecordingTrash {
         // unconditionally, even when the process died before the model
         // mutation actually ran, permanently losing a photo whose row still
         // exists and now points at nothing.
-        let knownFileNames = Set(existingRecordings.map(\.fileName)).union(existingPhotos.map(\.fileName))
+        // Same for a lone `deleteAttachment(_:)`.
+        let existingAttachments = (try? context.fetch(FetchDescriptor<MeetingAttachment>())) ?? []
+        let knownFileNames = Set(existingRecordings.map(\.fileName))
+            .union(existingPhotos.map(\.fileName))
+            .union(existingAttachments.map(\.fileName))
 
         for folder in operationFolders {
             guard let operationID = UUID(uuidString: folder.lastPathComponent) else { continue }

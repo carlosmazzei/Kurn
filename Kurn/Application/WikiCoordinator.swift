@@ -117,7 +117,7 @@ final class WikiCoordinator {
         let model = settings.summaryModel(for: provider)
         let generator = Self.generatorIdentifier(provider: provider, model: model)
 
-        let text = meeting.assembledTranscriptText()
+        let text = meeting.assembledContextText()
         guard !text.isEmpty else { return .skipped }
         let hash = Self.contentHash(text)
         if !force, let existing = meeting.wikiArticle,

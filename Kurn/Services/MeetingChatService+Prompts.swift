@@ -23,6 +23,10 @@ extension MeetingChatService {
     - If the transcript does not contain the answer, say so plainly.
     - Cite the moments you rely on using their [mm:ss] timestamps from the \
     transcript.
+    - The transcript may be followed by documents attached to the meeting, \
+    under "Attached documents". Use them as reference material; when an answer \
+    comes from a document rather than from what was said, name the document \
+    instead of citing a timestamp.
     - Reply in the SAME LANGUAGE as the transcript.
     - Be concise and direct; quote a speaker verbatim only when it adds clarity.
     """

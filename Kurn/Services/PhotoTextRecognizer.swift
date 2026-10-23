@@ -20,6 +20,13 @@ enum PhotoTextRecognizer {
     static func recognizeText(at url: URL) async -> String? {
         guard let data = try? Data(contentsOf: url),
               let cgImage = cgImage(from: data) else { return nil }
+        return recognizeText(in: cgImage)
+    }
+
+    /// Recognize text in an already-decoded image — also how
+    /// `PDFTextExtractor` reads a scanned PDF page, which has no text layer.
+    /// Synchronous: Vision's `perform` blocks, so call it off the main actor.
+    static func recognizeText(in cgImage: CGImage) -> String? {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         // Language correction nudges each recognized token toward the

@@ -6,7 +6,7 @@
 //  they were stored when V2 was the app's current schema — the same reason
 //  `KurnSchemaV1Models.swift` exists for 1.0.0. Only the stored properties
 //  matter here; computed accessors, extensions, and rich initializers live on
-//  the live classes `KurnSchemaV3.models` points at. See that file's header
+//  the live classes `KurnModelGraph.currentModels` points at. See that file's header
 //  for the rules on why these must never be edited in place.
 //
 

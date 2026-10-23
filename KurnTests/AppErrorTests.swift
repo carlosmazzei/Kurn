@@ -53,6 +53,13 @@ struct AppErrorTests {
         }
     }
 
+    @Test func attachmentImportFailedMessageIncludesTheReason() {
+        let error = AppError.attachmentImportFailed("password protected")
+        #expect(error.errorDescription?.contains("password protected") == true)
+        #expect(error.logCode == "attachment_import")
+        #expect(error.category == .storage)
+    }
+
     @Test func resourceUnavailableMessageIncludesDetail() {
         let error = AppError.resourceUnavailable("free storage")
         #expect(error.errorDescription?.contains("free storage") == true)

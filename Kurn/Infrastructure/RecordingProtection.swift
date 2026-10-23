@@ -65,6 +65,11 @@ enum RecordingProtection {
     /// recordings directory skips it by construction.
     static let photosDirectoryName = "Photos"
 
+    /// Subdirectory of the recordings directory holding documents attached
+    /// to a meeting (`AttachmentFileStore`). Same shallow-scan invisibility
+    /// as `photosDirectoryName`, for the same reason.
+    static let attachmentsDirectoryName = "Attachments"
+
     /// Protection class applied to the recordings directory. `.completeUnlessOpen`
     /// is chosen over `.complete` so that an in-progress recording survives the
     /// screen locking mid-meeting — the file stays writable while it is open,

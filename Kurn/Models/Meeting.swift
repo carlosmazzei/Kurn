@@ -74,6 +74,13 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \ChatSession.meeting)
     var chatSessions: [ChatSession]
 
+    /// Documents (PDFs) attached to this meeting as reference material.
+    /// Cascade-deleted with the meeting like every other meeting-derived
+    /// artifact; their files go through the same journaled delete as audio
+    /// (`MeetingLibrary.deleteMeeting`).
+    @Relationship(deleteRule: .cascade, inverse: \MeetingAttachment.meeting)
+    var attachments: [MeetingAttachment] = []
+
     /// JSON-encoded `SummaryMapCheckpoint` while a staged (map-reduce) summary
     /// or wiki generation is in flight for this meeting (SwiftData can't store
     /// arbitrary `Codable` values directly). Cleared on success; kept on
@@ -222,6 +229,23 @@ final class Meeting {
                 )
             }
         return SummaryService.assembleTranscriptText(from: groups)
+    }
+
+    /// Attachments in the order they were added.
+    var sortedAttachments: [MeetingAttachment] {
+        attachments.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// `assembledTranscriptText()` followed by the text of the meeting's
+    /// attached documents (`AttachmentPromptContext`) — what every prompt
+    /// that grounds on this one meeting reads: its summaries, wiki, chat and
+    /// generated documents. Still empty when nothing is transcribed, so an
+    /// attachment alone never stands in for a transcript.
+    func assembledContextText() -> String {
+        AttachmentPromptContext.appending(
+            sortedAttachments.map(\.promptDocument),
+            to: assembledTranscriptText()
+        )
     }
 
     /// Whether this meeting contains `needle` anywhere the meetings list

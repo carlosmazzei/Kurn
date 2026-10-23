@@ -21,7 +21,7 @@
 //  Rules for this file: never edit a property, relationship, delete rule or
 //  optionality in here — a change to the live graph goes into a *new*
 //  `KurnSchemaVn` with its own frozen copies (or, for the current version,
-//  into the live classes `KurnSchemaV2.models` points at). Entity names come
+//  into the live classes `KurnModelGraph.currentModels` points at). Entity names come
 //  from the unqualified type name, so `KurnSchemaV1.Meeting` and the live
 //  `Meeting` are both the "Meeting" entity in the store, as they must be.
 //

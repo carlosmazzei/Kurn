@@ -123,21 +123,11 @@ final class SummaryViewModel {
         model: String,
         template: SummaryTemplate
     ) async {
-        // Assemble transcript text on the main actor (reads SwiftData). Each
-        // group carries the recording's absolute start offset so the timestamps
-        // stay chronological across multiple segments.
-        let groups = meeting.recordings
-            .sorted { $0.recordedAt < $1.recordedAt }
-            .compactMap { recording -> SummaryService.TranscriptGroup? in
-                guard let segments = recording.transcript?.segments else { return nil }
-                return SummaryService.TranscriptGroup(
-                    offset: meeting.startOffset(of: recording),
-                    segments: segments,
-                    highlights: recording.highlights,
-                    photos: recording.photos
-                )
-            }
-        let transcriptText = SummaryService.assembleTranscriptText(from: groups)
+        // Assemble the prompt text on the main actor (reads SwiftData): the
+        // transcript on one chronological timeline across every recording,
+        // with its highlights and photos, followed by the text of the
+        // meeting's attached documents.
+        let transcriptText = meeting.assembledContextText()
         let title = meeting.title
         // `Meeting` isn't `Sendable`; the `onMapStageCompleted` closure below
         // is, so it captures this id and looks the meeting back up on the

@@ -35,6 +35,7 @@ struct LibraryEraserTests {
         #expect(try context.fetchCount(FetchDescriptor<SemanticChunk>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<WikiArticle>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<MeetingPhoto>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<MeetingAttachment>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<ChatSession>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<GeneratedDocument>()) == 0)
 
@@ -136,6 +137,7 @@ struct LibraryEraserTests {
         context.insert(recording)
         context.insert(Transcript(recording: recording))
         context.insert(MeetingPhoto(recording: recording, fileName: "\(UUID().uuidString).jpg", capturedAt: 5))
+        context.insert(MeetingAttachment(meeting: meeting, fileName: "\(UUID().uuidString).pdf", displayName: "Agenda.pdf"))
         context.insert(Speaker(meeting: meeting, label: "Speaker 1", color: "#FF0000"))
         context.insert(Summary(meeting: meeting, provider: .openAI))
         context.insert(SemanticChunk(

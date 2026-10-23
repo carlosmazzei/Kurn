@@ -426,6 +426,22 @@
 "detail.total_duration" = "总时长：%@";
 "detail.recordings" = "录音";
 "detail.photos" = "照片";
+"detail.attachments" = "文档";
+"detail.attachments.add" = "添加 PDF";
+"detail.attachments.adding" = "正在添加 PDF…";
+"detail.attachments.open_hint" = "打开文档";
+"detail.attachments.no_text" = "没有可读文本，不会用于摘要";
+"detail.attachments.one_page" = "1 页";
+"detail.attachments.pages" = "%d 页";
+"attachment.untitled" = "文档";
+"attachment.error.unreadable" = "该文件不是可读取的 PDF。";
+"attachment.error.locked" = "该 PDF 受密码保护。请移除密码后重试。";
+"attach.title" = "添加到会议";
+"attach.files" = "文件";
+"attach.new_meeting" = "新会议";
+"attach.meetings" = "会议";
+"attach.done.title" = "已添加到“%@”";
+"attach.done.message" = "会议摘要将结合转录文本和照片使用此文档。";
 "detail.record_new" = "录制新片段";
 "detail.transcribe" = "转录";
 "detail.transcript" = "转录内容";
@@ -962,6 +978,7 @@
 
 /* Read aloud (text-to-speech) */
 "error.speech_synthesis" = "无法朗读：%@";
+"error.attachment_import" = "无法添加文档：%@";
 "read_aloud.error.unsupported" = "%@ 无法朗读文本。";
 "read_aloud.error.no_audio" = "语音提供商未返回可播放的音频。";
 "read_aloud.error.invalid_voice" = "语音 ID 只能包含字母和数字。";
