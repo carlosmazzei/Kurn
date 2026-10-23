@@ -6,9 +6,9 @@
 //  meeting, each opening in Quick Look, swipe to delete, and an "Add PDF"
 //  row that opens the Files picker. Isolated here, like
 //  `MeetingDetailPhotos.swift`, so the main view file stays under
-//  SwiftLint's file-length limit. The import itself is
-//  `MeetingAttachmentImporter`; the same importer serves a PDF shared into
-//  the app from elsewhere (`AttachToMeetingView`).
+//  SwiftLint's file-length limit. It only renders: state and actions are
+//  `MeetingAttachmentsViewModel`'s, the row's text is
+//  `MeetingAttachment.detailsText`.
 //
 
 import KurnCore
@@ -28,14 +28,14 @@ extension MeetingDetailView {
         }
         .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
         ForEach(meeting.sortedAttachments) { attachment in
-            Button { previewedAttachmentURL = attachment.fileURL } label: {
+            Button { attachments.preview(attachment) } label: {
                 AttachmentRow(attachment: attachment)
             }
             .buttonStyle(.plain)
             .accessibilityHint(NSLocalizedString("detail.attachments.open_hint", comment: "Opens the document"))
             .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
             .swipeActions(edge: .trailing) {
-                Button(role: .destructive) { deleteAttachment(attachment) } label: {
+                Button(role: .destructive) { attachments.delete(attachment, context: modelContext) } label: {
                     Label(NSLocalizedString("common.delete", comment: "Delete"), systemImage: "trash")
                 }
             }
@@ -45,11 +45,11 @@ extension MeetingDetailView {
     }
 
     private var addAttachmentButton: some View {
-        Button { showingAttachmentImporter = true } label: {
+        Button { attachments.requestImport() } label: {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(Theme.info.opacity(0.12)).frame(width: 34, height: 34)
-                    if isImportingAttachments {
+                    if attachments.isImporting {
                         ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "doc.badge.plus")
@@ -57,7 +57,7 @@ extension MeetingDetailView {
                             .accessibilityHidden(true)
                     }
                 }
-                Text(isImportingAttachments
+                Text(attachments.isImporting
                     ? NSLocalizedString("detail.attachments.adding", comment: "Adding PDF")
                     : NSLocalizedString("detail.attachments.add", comment: "Add PDF"))
                     .font(Theme.subheadline)
@@ -73,34 +73,8 @@ extension MeetingDetailView {
             )
         }
         .buttonStyle(.plain)
-        .disabled(isImportingAttachments)
+        .disabled(attachments.isImporting)
         .accessibilityIdentifier("detail.attachments.add")
-    }
-
-    /// The Files picker's result: imports the chosen PDFs into the meeting.
-    func importAttachments(_ result: Result<[URL], any Error>) {
-        switch result {
-        case .failure(let error):
-            actionError = .attachmentImportFailed(error.localizedDescription)
-        case .success(let urls):
-            guard !urls.isEmpty else { return }
-            isImportingAttachments = true
-            Task {
-                let report = await MeetingAttachmentImporter(context: modelContext)
-                    .importPDFs(from: urls, into: meeting)
-                isImportingAttachments = false
-                if let failure = report.firstFailure { actionError = failure }
-            }
-        }
-    }
-
-    func deleteAttachment(_ attachment: MeetingAttachment) {
-        if previewedAttachmentURL == attachment.fileURL { previewedAttachmentURL = nil }
-        do throws(AppError) {
-            try MeetingLibrary(context: modelContext).deleteAttachment(attachment)
-        } catch {
-            actionError = error
-        }
     }
 }
 
@@ -121,7 +95,7 @@ private struct AttachmentRow: View {
                     .font(Theme.subheadlineEmphasized)
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
-                Text(details)
+                Text(attachment.detailsText)
                     .font(Theme.caption)
                     .foregroundStyle(Theme.textSecondary)
                 if !attachment.hasExtractedText {
@@ -138,13 +112,5 @@ private struct AttachmentRow: View {
         .padding(12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .contentShape(Rectangle())
-    }
-
-    private var details: String {
-        let pages = attachment.pageCount == 1
-            ? NSLocalizedString("detail.attachments.one_page", comment: "1 page")
-            : String(format: NSLocalizedString("detail.attachments.pages", comment: "N pages"), attachment.pageCount)
-        let size = ByteCountFormatter.string(fromByteCount: attachment.fileSize, countStyle: .file)
-        return "\(pages) · \(size)"
     }
 }

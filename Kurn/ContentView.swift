@@ -24,6 +24,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.modelContext) private var modelContext
     @Environment(IncomingFileInbox.self) private var incomingFiles
     @State private var selection: LibrarySelection = .allMeetings
 
@@ -48,7 +49,9 @@ struct ContentView: View {
             get: { incomingFiles.hasPendingFiles },
             set: { if !$0 { incomingFiles.finish() } }
         )) {
-            AttachToMeetingView(files: incomingFiles.pendingFiles) { incomingFiles.finish() }
+            AttachToMeetingView(files: incomingFiles.pendingFiles, modelContext: modelContext) {
+                incomingFiles.finish()
+            }
         }
     }
 }

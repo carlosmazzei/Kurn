@@ -132,6 +132,65 @@ struct MeetingAttachmentImporterTests {
         #expect(storedFiles(for: meeting).count == 2)
     }
 
+    @Test func aCancelledImportRemovesItsCopy() async throws {
+        let (meeting, context) = try makeMeeting()
+        defer { cleanUp(meeting) }
+        let source = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(source) }
+        let importer = MeetingAttachmentImporter(context: context)
+
+        // Cancelled before it runs: the test holds the main actor, so the
+        // task body only starts once this function suspends on its value.
+        let task = Task { () -> AppError? in
+            do throws(AppError) {
+                try await importer.importPDF(from: source, into: meeting)
+                return nil
+            } catch {
+                return error
+            }
+        }
+        task.cancel()
+        let failure = await task.value
+
+        #expect(failure?.logCode == "attachment_import")
+        #expect(storedFiles(for: meeting).isEmpty)
+        #expect(meeting.attachments.isEmpty)
+    }
+
+    @Test func aSaveFailureRemovesTheCopyAndReportsIt() async throws {
+        let (meeting, context) = try makeMeeting()
+        defer { cleanUp(meeting) }
+        let source = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(source) }
+        let failing = MeetingLibrary(context: context, persist: { _ in .persistenceFailed("disk") })
+
+        do throws(AppError) {
+            try await MeetingAttachmentImporter(library: failing).importPDF(from: source, into: meeting)
+            Issue.record("a failed save must not report success")
+        } catch {
+            #expect(error.logCode == AppError.persistenceFailed("").logCode)
+        }
+        #expect(storedFiles(for: meeting).isEmpty)
+        #expect(meeting.attachments.isEmpty)
+    }
+
+    @Test func importingIntoANewMeetingKeepsItWhenAFileWentIn() async throws {
+        let context = ModelContext(TestModelContainer.make())
+        let good = try PDFFixtures.makePDF(pages: ["Plan"], name: "Plan.pdf")
+        let broken = try PDFFixtures.makeNonPDF()
+        defer { [good, broken].forEach(PDFFixtures.remove) }
+
+        let (meeting, report) = await MeetingAttachmentImporter(context: context)
+            .importPDFsIntoNewMeeting(from: [good, broken])
+
+        let created = try #require(meeting)
+        defer { cleanUp(created) }
+        #expect(created.title == "Plan")
+        #expect(report.importedCount == 1)
+        #expect(report.firstFailure != nil)
+        #expect(try context.fetchCount(FetchDescriptor<Meeting>()) == 1)
+    }
+
     @Test func displayNameIsTheFileNameWithAFallback() {
         #expect(MeetingAttachmentImporter.displayName(for: URL(fileURLWithPath: "/tmp/Agenda Q3.pdf")) == "Agenda Q3.pdf")
         #expect(!MeetingAttachmentImporter.displayName(for: URL(fileURLWithPath: "/")).isEmpty)

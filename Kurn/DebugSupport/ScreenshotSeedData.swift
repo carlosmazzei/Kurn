@@ -142,6 +142,17 @@ enum ScreenshotSeedData {
             model: "gpt-4o-mini"
         )
         context.insert(summary)
+
+        // Metadata only, no file: enough for the Recordings tab's Documents
+        // row (and its accessibility audit), which never opens it.
+        context.insert(MeetingAttachment(
+            meeting: meeting,
+            fileName: "screenshot-roadmap.pdf",
+            displayName: "Q3 Roadmap.pdf",
+            fileSize: 482_000,
+            pageCount: 6,
+            extractedText: "Q3 roadmap: onboarding redesign, offline sync, pricing page."
+        ))
     }
 
     // MARK: - "Design Review" — second-newest, two speakers, one recording,

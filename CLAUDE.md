@@ -1892,6 +1892,15 @@ it has no moment on a timeline.
   `MeetingLibrary.addAttachment`. Each step undoes the previous on failure; a
   locked or unreadable PDF is refused (`AppError.attachmentImportFailed`), one
   with no readable text is kept and adds nothing to prompts.
+- **The two screens hold no logic.** `MeetingDetailAttachments` renders
+  `MeetingAttachmentsViewModel` (picker, Quick Look preview, import in flight,
+  delete) and `AttachToMeetingView` renders `AttachToMeetingViewModel` (search
+  via `Meeting.matches(search:)`, attach to a meeting, or
+  `MeetingAttachmentImporter.importPDFsIntoNewMeeting`, which deletes the new
+  meeting again when nothing went in); the row text is
+  `MeetingAttachment.detailsText`. Both view models take their importer and
+  library as factories, and `MeetingLibrary`'s `persist` seam lets tests fail
+  a commit to reach every rollback.
 - **The Inbox copy is unprotected, so it never outlives the decision.**
   `IncomingFileInbox.finish()` deletes it whichever way the sheet closes,
   deletes only files inside the Inbox (never a URL elsewhere), and

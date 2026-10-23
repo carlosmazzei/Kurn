@@ -31,9 +31,17 @@ import SwiftData
 @MainActor
 struct MeetingLibrary {
     let context: ModelContext
+    /// Commits the context. Production saves it; a test substitutes a failing
+    /// commit to reach the rollback paths, which a real store will not fail on
+    /// demand.
+    private let persist: @MainActor (ModelContext) -> AppError?
 
-    init(context: ModelContext) {
+    init(
+        context: ModelContext,
+        persist: @escaping @MainActor (ModelContext) -> AppError? = { $0.saveOrError() }
+    ) {
         self.context = context
+        self.persist = persist
     }
 
     // MARK: - Meetings
@@ -54,7 +62,7 @@ struct MeetingLibrary {
             : trimmed
         let meeting = Meeting(title: finalTitle, notes: notes, language: language)
         context.insert(meeting)
-        if let failure = context.saveOrError() {
+        if let failure = persist(context) {
             context.delete(meeting)
             throw failure
         }
@@ -127,7 +135,7 @@ struct MeetingLibrary {
             extractedText: extractedText
         )
         context.insert(attachment)
-        if let failure = context.saveOrError() {
+        if let failure = persist(context) {
             context.delete(attachment)
             AttachmentFileStore.delete(fileName: fileName)
             throw failure
@@ -278,13 +286,13 @@ struct MeetingLibrary {
     }
 
     private func save() throws(AppError) {
-        if let failure = context.saveOrError() { throw failure }
+        if let failure = persist(context) { throw failure }
     }
 
     private func journaledDelete(fileNames: [String], mutation: () -> Void) throws(AppError) {
         let failure = RecordingOperationJournal.performDelete(fileNames: fileNames) {
             mutation()
-            return context.saveOrError()
+            return persist(context)
         }
         if let failure { throw failure }
     }

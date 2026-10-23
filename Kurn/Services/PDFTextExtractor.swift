@@ -39,7 +39,14 @@ enum PDFTextExtractor {
     /// Longest side, in points, a page is rendered at for OCR.
     static let ocrRenderSide: CGFloat = 2_000
 
-    static func extract(from url: URL, maxOCRPages: Int = Self.maxOCRPages) throws(Failure) -> PDFTextExtraction {
+    /// Reads `url`. `recognize` OCRs a rendered page — Vision in production,
+    /// a stub in tests, since what Vision reads off a simulator is not
+    /// something a test should depend on.
+    static func extract(
+        from url: URL,
+        maxOCRPages: Int = Self.maxOCRPages,
+        recognize: (CGImage) -> String? = PhotoTextRecognizer.recognizeText(in:)
+    ) throws(Failure) -> PDFTextExtraction {
         guard let document = PDFDocument(url: url) else { throw Failure.unreadable }
         guard !document.isLocked else { throw Failure.locked }
         guard document.pageCount > 0 else { throw Failure.unreadable }
@@ -52,7 +59,7 @@ enum PDFTextExtractor {
                 pages.append(text)
             } else if ocrBudget > 0 {
                 ocrBudget -= 1
-                if let text = recognizeText(on: page).flatMap(normalized) {
+                if let text = render(page).flatMap(recognize).flatMap(normalized) {
                     pages.append(text)
                 }
             }
@@ -76,14 +83,13 @@ enum PDFTextExtractor {
         return joined.isEmpty ? nil : joined
     }
 
-    /// Renders `page` and OCRs the image.
-    private static func recognizeText(on page: PDFPage) -> String? {
+    /// `page` as an image sized for OCR.
+    private static func render(_ page: PDFPage) -> CGImage? {
         let bounds = page.bounds(for: .mediaBox)
         let longest = max(bounds.width, bounds.height)
         guard longest > 0 else { return nil }
         let scale = ocrRenderSide / longest
         let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
-        guard let image = page.thumbnail(of: size, for: .mediaBox).cgImage else { return nil }
-        return PhotoTextRecognizer.recognizeText(in: image)
+        return page.thumbnail(of: size, for: .mediaBox).cgImage
     }
 }

@@ -4,10 +4,11 @@
 //
 //  The sheet a PDF shared into Kurn from another app opens on: pick the
 //  meeting it belongs to — or start a new one named after the file — and it
-//  is attached there (`MeetingAttachmentImporter`), to be read alongside the
-//  transcript and photos by the meeting's next summary. Presented by
-//  `ContentView` while `IncomingFileInbox` holds files; `onFinished` empties
-//  the inbox (deleting its copies) whichever way the sheet closes.
+//  is attached there, to be read alongside the transcript and photos by the
+//  meeting's next summary. Presented by `ContentView` while
+//  `IncomingFileInbox` holds files; `onFinished` empties the inbox (deleting
+//  its copies) whichever way the sheet closes. Every decision lives in
+//  `AttachToMeetingViewModel`; this file only renders it.
 //
 
 import KurnCore
@@ -15,23 +16,21 @@ import SwiftData
 import SwiftUI
 
 struct AttachToMeetingView: View {
-    let files: [URL]
     let onFinished: () -> Void
 
-    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
+    @State private var viewModel: AttachToMeetingViewModel
 
-    @State private var searchText = ""
-    @State private var isImporting = false
-    @State private var importError: AppError?
-    /// Title of the meeting the files went into, once they have.
-    @State private var attachedMeetingTitle: String?
+    init(files: [URL], modelContext: ModelContext, onFinished: @escaping () -> Void) {
+        _viewModel = State(initialValue: AttachToMeetingViewModel(files: files, modelContext: modelContext))
+        self.onFinished = onFinished
+    }
 
     var body: some View {
         NavigationStack {
             Group {
-                if let attachedMeetingTitle {
-                    doneView(meetingTitle: attachedMeetingTitle)
+                if let title = viewModel.attachedMeetingTitle {
+                    doneView(meetingTitle: title)
                 } else {
                     pickerList
                 }
@@ -39,48 +38,52 @@ struct AttachToMeetingView: View {
             .navigationTitle(NSLocalizedString("attach.title", comment: "Add to meeting"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if attachedMeetingTitle == nil {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(NSLocalizedString("common.cancel", comment: "Cancel"), action: onFinished)
-                            .disabled(isImporting)
-                    }
-                } else {
+                if viewModel.isFinished {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(NSLocalizedString("common.done", comment: "Done"), action: onFinished)
+                    }
+                } else {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(NSLocalizedString("common.cancel", comment: "Cancel"), action: onFinished)
+                            .disabled(viewModel.isImporting)
                     }
                 }
             }
             .overlay {
-                if isImporting {
+                if viewModel.isImporting {
                     ProgressView(NSLocalizedString("detail.attachments.adding", comment: "Adding PDF"))
                         .padding(20)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
         }
-        .interactiveDismissDisabled(isImporting)
-        .errorAlert($importError)
+        .interactiveDismissDisabled(viewModel.isImporting)
+        .errorAlert($viewModel.error)
     }
 
     private var pickerList: some View {
         List {
             Section(NSLocalizedString("attach.files", comment: "Files being added")) {
-                ForEach(files, id: \.self) { file in
+                ForEach(viewModel.files, id: \.self) { file in
                     Label(file.lastPathComponent, systemImage: "doc.richtext")
                         .font(Theme.subheadline)
                         .foregroundStyle(Theme.textPrimary)
                 }
             }
             Section {
-                Button(action: attachToNewMeeting) {
+                Button {
+                    Task { await viewModel.attachToNewMeeting() }
+                } label: {
                     Label(NSLocalizedString("attach.new_meeting", comment: "New meeting"), systemImage: "plus.circle.fill")
                         .foregroundStyle(Theme.accent)
                 }
                 .accessibilityIdentifier("attach.new_meeting")
             }
             Section(NSLocalizedString("attach.meetings", comment: "Meetings")) {
-                ForEach(filteredMeetings) { meeting in
-                    Button { attach(to: meeting) } label: {
+                ForEach(viewModel.matchingMeetings(meetings)) { meeting in
+                    Button {
+                        Task { await viewModel.attach(to: meeting) }
+                    } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(meeting.title)
                                 .font(Theme.body)
@@ -97,8 +100,8 @@ struct AttachToMeetingView: View {
                 }
             }
         }
-        .searchable(text: $searchText)
-        .disabled(isImporting)
+        .searchable(text: $viewModel.searchText)
+        .disabled(viewModel.isImporting)
     }
 
     private func doneView(meetingTitle: String) -> some View {
@@ -109,40 +112,6 @@ struct AttachToMeetingView: View {
             )
         } description: {
             Text(NSLocalizedString("attach.done.message", comment: "The document will be used in the summary"))
-        }
-    }
-
-    private var filteredMeetings: [Meeting] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return meetings }
-        return meetings.filter { $0.title.localizedCaseInsensitiveContains(query) }
-    }
-
-    private func attachToNewMeeting() {
-        let title = files.first.map { $0.deletingPathExtension().lastPathComponent } ?? ""
-        do throws(AppError) {
-            let meeting = try MeetingLibrary(context: modelContext).createMeeting(title: title)
-            attach(to: meeting, isNewMeeting: true)
-        } catch {
-            importError = error
-        }
-    }
-
-    private func attach(to meeting: Meeting, isNewMeeting: Bool = false) {
-        guard !isImporting else { return }
-        isImporting = true
-        Task {
-            let report = await MeetingAttachmentImporter(context: modelContext)
-                .importPDFs(from: files, into: meeting)
-            isImporting = false
-            if report.importedCount > 0 {
-                attachedMeetingTitle = meeting.title
-            } else if isNewMeeting {
-                // Nothing went in, so the meeting created for it would be an
-                // empty leftover.
-                try? MeetingLibrary(context: modelContext).deleteMeeting(meeting)
-            }
-            importError = report.firstFailure
         }
     }
 }

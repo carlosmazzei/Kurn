@@ -104,11 +104,9 @@ struct MeetingDetailView: View {
     /// empty until transcription finishes. Not `private` —
     /// `MeetingDetailPhotos.swift` needs it.
     @State var presentedPhoto: MeetingPhoto?
-    /// The Documents section's Files picker, Quick Look preview and import
-    /// progress. Not `private` — `MeetingDetailAttachments.swift` needs them.
-    @State var showingAttachmentImporter = false
-    @State var previewedAttachmentURL: URL?
-    @State var isImportingAttachments = false
+    /// The Documents section's state. Not `private` —
+    /// `MeetingDetailAttachments.swift` and the toolbar need it.
+    @State var attachments = MeetingAttachmentsViewModel()
     /// Not `private` — `MeetingDetailToolbar.swift` needs it.
     @State var showingEdit = false
     /// Presents the generated article without adding a fifth item to the compact
@@ -186,12 +184,14 @@ struct MeetingDetailView: View {
             PhotoViewerView(photo: photo, onDelete: { deletePhoto(photo) })
         }
         .fileImporter(
-            isPresented: $showingAttachmentImporter,
+            isPresented: $attachments.isShowingImporter,
             allowedContentTypes: [.pdf],
-            allowsMultipleSelection: true,
-            onCompletion: importAttachments
-        )
-        .quickLookPreview($previewedAttachmentURL)
+            allowsMultipleSelection: true
+        ) { result in
+            Task { await attachments.importPicked(result, into: meeting, context: modelContext) }
+        }
+        .quickLookPreview($attachments.previewURL)
+        .errorAlert($attachments.error)
         .sheet(isPresented: $showingShareSelection) {
             MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
                 shareItem = ShareItem(urls: urls)

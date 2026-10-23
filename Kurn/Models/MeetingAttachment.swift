@@ -68,6 +68,15 @@ final class MeetingAttachment {
         extractedText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
     }
 
+    /// "12 pages · 1.4 MB" — the row's secondary line.
+    var detailsText: String {
+        let pages = pageCount == 1
+            ? NSLocalizedString("detail.attachments.one_page", comment: "1 page")
+            : String(format: NSLocalizedString("detail.attachments.pages", comment: "N pages"), pageCount)
+        let size = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+        return "\(pages) · \(size)"
+    }
+
     /// This attachment as prompt context.
     var promptDocument: AttachmentPromptContext.Document {
         AttachmentPromptContext.Document(name: displayName, text: extractedText ?? "")

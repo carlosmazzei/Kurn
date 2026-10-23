@@ -38,10 +38,10 @@ extension MeetingDetailView {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
                 .accessibilityIdentifier("detail.share")
-                Button { showingAttachmentImporter = true } label: {
+                Button { attachments.requestImport() } label: {
                     Label(NSLocalizedString("detail.attachments.add", comment: "Add PDF"), systemImage: "doc.badge.plus")
                 }
-                .disabled(isImportingAttachments)
+                .disabled(attachments.isImporting)
                 if canGenerateTitle {
                     Button { regenerateTitle() } label: {
                         if isGeneratingTitle {

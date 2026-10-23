@@ -59,6 +59,18 @@ struct AttachmentFileStoreTests {
         }
     }
 
+    @Test func aDirectoryThatCannotBeProtectedIsReportedAsProtectedStorage() {
+        let fileManager = AttachmentsDirectoryRefusingFileManager()
+        do {
+            try AttachmentFileStore.ensureAttachmentsDirectory(fileManager: fileManager)
+            Issue.record("a refused directory must throw")
+        } catch let error as AppError {
+            #expect(error.logCode == AppError.protectedStorageUnavailable("").logCode)
+        } catch {
+            Issue.record("expected an AppError, got \(error)")
+        }
+    }
+
     @Test func deletingAMissingAttachmentIsHarmless() {
         AttachmentFileStore.delete(fileName: "\(UUID().uuidString).pdf")
         #expect(AttachmentFileStore.byteSize(fileName: "\(UUID().uuidString).pdf") == 0)
@@ -80,5 +92,28 @@ struct AttachmentFileStoreTests {
         #expect(residual == 0)
         #expect(try fileManager.contentsOfDirectory(atPath: directory.path).isEmpty)
         #expect(AttachmentFileStore.deleteAllAttachments(in: directory.appendingPathComponent("missing")) == 0)
+    }
+}
+
+/// Deterministic fault injection: refuses to create or re-stamp the
+/// attachments directory, and only that one, so the recordings directory
+/// above it is still set up normally.
+private final class AttachmentsDirectoryRefusingFileManager: FileManager, @unchecked Sendable {
+    override func createDirectory(
+        at url: URL,
+        withIntermediateDirectories createIntermediates: Bool,
+        attributes: [FileAttributeKey: Any]? = nil
+    ) throws {
+        guard url.lastPathComponent != RecordingProtection.attachmentsDirectoryName else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        try super.createDirectory(at: url, withIntermediateDirectories: createIntermediates, attributes: attributes)
+    }
+
+    override func setAttributes(_ attributes: [FileAttributeKey: Any], ofItemAtPath path: String) throws {
+        guard (path as NSString).lastPathComponent != RecordingProtection.attachmentsDirectoryName else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        try super.setAttributes(attributes, ofItemAtPath: path)
     }
 }

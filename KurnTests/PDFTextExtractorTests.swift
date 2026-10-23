@@ -47,6 +47,36 @@ struct PDFTextExtractorTests {
         #expect(extraction.text?.contains("Agenda") == true)
     }
 
+    @Test func aPageWithoutATextLayerIsRecognizedFromItsImage() throws {
+        let url = try PDFFixtures.makePDF(pages: ["Agenda", ""])
+        defer { PDFFixtures.remove(url) }
+        var renderedPages = 0
+
+        let extraction = try PDFTextExtractor.extract(from: url) { image in
+            renderedPages += 1
+            #expect(image.width > 0 && image.height > image.width)
+            return "  Scanned budget \n\n\n table  "
+        }
+
+        #expect(extraction.text == "Agenda\n\nScanned budget\n\ntable")
+        // Only the page without a text layer is rendered (portrait, like the page).
+        #expect(renderedPages == 1)
+    }
+
+    @Test func ocrStopsAtItsPageBudget() throws {
+        let url = try PDFFixtures.makePDF(pages: ["", "", ""])
+        defer { PDFFixtures.remove(url) }
+        var calls = 0
+
+        let extraction = try PDFTextExtractor.extract(from: url, maxOCRPages: 2) { _ in
+            calls += 1
+            return "page"
+        }
+
+        #expect(calls == 2)
+        #expect(extraction.text == "page\n\npage")
+    }
+
     @Test func aFileThatIsNotAPDFIsUnreadable() throws {
         let url = try PDFFixtures.makeNonPDF()
         defer { PDFFixtures.remove(url) }

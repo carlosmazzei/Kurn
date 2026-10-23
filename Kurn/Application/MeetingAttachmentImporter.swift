@@ -41,9 +41,13 @@ struct MeetingAttachmentImporter {
     private let library: MeetingLibrary
     private let extract: Extract
 
-    init(context: ModelContext, extract: @escaping Extract = MeetingAttachmentImporter.liveExtract) {
-        self.library = MeetingLibrary(context: context)
+    init(library: MeetingLibrary, extract: @escaping Extract = MeetingAttachmentImporter.liveExtract) {
+        self.library = library
         self.extract = extract
+    }
+
+    init(context: ModelContext, extract: @escaping Extract = MeetingAttachmentImporter.liveExtract) {
+        self.init(library: MeetingLibrary(context: context), extract: extract)
     }
 
     /// What `importPDFs` did: how many files were attached, and the first
@@ -66,6 +70,24 @@ struct MeetingAttachmentImporter {
             }
         }
         return report
+    }
+
+    /// Imports `sources` into a meeting created for them and named after the
+    /// first file. The meeting is deleted again when none of the files made
+    /// it in, so a failed share leaves no empty meeting behind; it is `nil`
+    /// in the result then.
+    func importPDFsIntoNewMeeting(from sources: [URL]) async -> (meeting: Meeting?, report: Report) {
+        let title = sources.first.map { $0.deletingPathExtension().lastPathComponent } ?? ""
+        let meeting: Meeting
+        do throws(AppError) {
+            meeting = try library.createMeeting(title: title)
+        } catch {
+            return (nil, Report(firstFailure: error))
+        }
+        let report = await importPDFs(from: sources, into: meeting)
+        guard report.importedCount == 0 else { return (meeting, report) }
+        try? library.deleteMeeting(meeting)
+        return (nil, report)
     }
 
     @discardableResult
