@@ -17,11 +17,16 @@ import SwiftUI
 extension MeetingDetailView {
     @ViewBuilder
     var attachmentsSection: some View {
-        Divider()
-            .padding(.horizontal, 20)
-            .clearListRow(insets: EdgeInsets(top: 12, leading: 0, bottom: 0, trailing: 0))
-        sectionLabel(NSLocalizedString("detail.attachments", comment: "Documents attached to the meeting"))
-            .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+        // One row, like `photosStrip`'s: a Divider alone in a List row is an
+        // accessibility element with nothing to describe.
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+                .padding(.top, 12)
+                .accessibilityHidden(true)
+            sectionLabel(NSLocalizedString("detail.attachments", comment: "Documents attached to the meeting"))
+                .padding(.top, 4)
+        }
+        .clearListRow(insets: EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
         ForEach(meeting.sortedAttachments) { attachment in
             Button { previewedAttachmentURL = attachment.fileURL } label: {
                 AttachmentRow(attachment: attachment)
