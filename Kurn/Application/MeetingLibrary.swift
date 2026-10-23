@@ -136,6 +136,10 @@ struct MeetingLibrary {
         )
         context.insert(attachment)
         if let failure = persist(context) {
+            // Detach first: deleting a never-saved row leaves it in the
+            // meeting's in-memory `attachments` until the next save, where
+            // the screen would still show it.
+            attachment.meeting = nil
             context.delete(attachment)
             AttachmentFileStore.delete(fileName: fileName)
             throw failure
