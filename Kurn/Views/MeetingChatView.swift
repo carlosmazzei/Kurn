@@ -600,11 +600,12 @@ struct MeetingChatView: View {
         return all.map(\.searchCandidate)
     }
 
-    /// The whole meeting transcript as `[mm:ss] Speaker: text` lines, for
-    /// full-context grounding. Nil for the library-wide ask (no single meeting).
+    /// The whole meeting transcript as `[mm:ss] Speaker: text` lines, plus
+    /// the text of its attached documents, for full-context grounding. Nil
+    /// for the library-wide ask (no single meeting).
     private func meetingTranscriptText() -> String? {
         guard let meeting else { return nil }
-        let text = meeting.assembledTranscriptText()
+        let text = meeting.assembledContextText()
         return text.isEmpty ? nil : text
     }
 }

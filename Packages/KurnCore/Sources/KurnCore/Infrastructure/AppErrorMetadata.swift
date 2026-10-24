@@ -63,7 +63,8 @@ extension AppError {
             return .transcription
         case .audioError, .speechSynthesisFailed:
             return .audio
-        case .decodingError, .persistenceFailed, .protectedStorageUnavailable, .logExportFailed:
+        case .decodingError, .persistenceFailed, .protectedStorageUnavailable, .logExportFailed,
+             .attachmentImportFailed:
             return .storage
         case .permissionDenied:
             return .permission
@@ -166,7 +167,8 @@ extension AppError {
              .titleGenerationFailed(let detail),
              .documentGenerationFailed(let detail),
              .onDeviceModelUnavailable(let detail),
-             .speechSynthesisFailed(let detail):
+             .speechSynthesisFailed(let detail),
+             .attachmentImportFailed(let detail):
             return detail
         case .networkError(let urlError):
             return urlError.localizedDescription

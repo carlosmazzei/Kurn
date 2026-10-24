@@ -61,6 +61,11 @@ public enum AppError: LocalizedError, Identifiable {
     /// provider returned nothing playable, or the audio could not be opened.
     /// Provider HTTP failures keep their own cases (`.apiError`, `.noAPIKey`, …).
     case speechSynthesisFailed(String)
+    /// A file the user attached to a meeting (a PDF picked from Files or
+    /// shared into the app) could not be added: it is not a readable PDF, it
+    /// is password-protected, or it could not be copied into protected
+    /// storage. The associated string is the localized reason.
+    case attachmentImportFailed(String)
 
     /// Stable identity for item-based presentation and comparisons.
     public var id: String { errorDescription ?? "AppError" }
@@ -106,6 +111,7 @@ public enum AppError: LocalizedError, Identifiable {
         case .keychainAccessFailed: return "keychain_access"
         case .summarizationUnsupported: return "summarization_unsupported"
         case .speechSynthesisFailed: return "speech_synthesis"
+        case .attachmentImportFailed: return "attachment_import"
         }
     }
 
@@ -290,6 +296,11 @@ public enum AppError: LocalizedError, Identifiable {
         case .speechSynthesisFailed(let detail):
             return String(
                 format: NSLocalizedString("error.speech_synthesis", comment: "Read aloud failed"),
+                detail
+            )
+        case .attachmentImportFailed(let detail):
+            return String(
+                format: NSLocalizedString("error.attachment_import", comment: "Attaching a file to a meeting failed"),
                 detail
             )
         }

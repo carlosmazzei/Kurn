@@ -63,6 +63,8 @@ generates a summary with a configured AI provider.
 - Save a filter as a Smart Folder that dynamically lists matching meetings.
 - View folder analytics: meeting counts, durations, status breakdown, tag
   distribution, and top speakers.
+- Attach PDFs to a meeting — from inside it, or shared from another app — so
+  summaries use them together with the transcript and photos.
 - Play saved recordings and seek from transcript timestamps.
 - Delete meetings and individual recording segments. Deletion moves audio into
   a protected trash folder first and only purges it once the SwiftData
@@ -183,6 +185,18 @@ and bullet items, so provider output can use emphasis, links, inline code,
 headings, and ordered or unordered lists where helpful. Built-in templates
 cover General, Stand-up, Interview, and Outline; users can also create,
 edit, and delete their own custom templates in Settings.
+
+PDFs can be attached to a meeting as reference material — an agenda, a slide
+deck, a report — either with **Add PDF** in the meeting's Recordings tab or by
+sharing a PDF to Kurn from any other app (Files, Mail, Safari…) and picking the
+meeting it belongs to (or starting a new one). The text is read on device
+(PDFKit, with Vision OCR for scanned pages) and the file is stored encrypted
+next to the recordings. Every summary, the meeting's wiki, its chat and the
+documents generated from it then read that text alongside the transcript and
+photos, so names, figures and terms come out right; the model is told the
+documents are reference material, not something said in the meeting. A
+password-protected PDF is refused, and one with no readable text is kept but
+adds nothing to the prompt.
 
 Long transcripts are summarized in stages. The Summary tab keeps the generation
 state in place, shows progress for staged summaries, and lets the user cancel

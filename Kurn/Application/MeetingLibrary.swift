@@ -3,7 +3,7 @@
 //  Kurn
 //
 //  The library's user-initiated mutations: creating and deleting meetings,
-//  recordings, photos and summaries, and managing tags, folders, smart folders
+//  recordings, photos, attachments and summaries, and managing tags, folders, smart folders
 //  and generated documents.
 //
 //  These used to be spread across eight Views, each inserting or deleting
@@ -31,9 +31,17 @@ import SwiftData
 @MainActor
 struct MeetingLibrary {
     let context: ModelContext
+    /// Commits the context. Production saves it; a test substitutes a failing
+    /// commit to reach the rollback paths, which a real store will not fail on
+    /// demand.
+    private let persist: @MainActor (ModelContext) -> AppError?
 
-    init(context: ModelContext) {
+    init(
+        context: ModelContext,
+        persist: @escaping @MainActor (ModelContext) -> AppError? = { $0.saveOrError() }
+    ) {
         self.context = context
+        self.persist = persist
     }
 
     // MARK: - Meetings
@@ -54,15 +62,16 @@ struct MeetingLibrary {
             : trimmed
         let meeting = Meeting(title: finalTitle, notes: notes, language: language)
         context.insert(meeting)
-        if let failure = context.saveOrError() {
+        if let failure = persist(context) {
             context.delete(meeting)
             throw failure
         }
         return meeting
     }
 
-    /// Deletes a meeting (its recordings, transcripts, summaries, chats and
-    /// photos cascade with it) and every audio and photo file it owns.
+    /// Deletes a meeting (its recordings, transcripts, summaries, chats,
+    /// photos and attachments cascade with it) and every audio, photo and
+    /// attachment file it owns.
     ///
     /// Runs as a journaled trash → model commit → purge operation: intent is
     /// durable before any file moves, a `save()` failure restores the files
@@ -73,6 +82,7 @@ struct MeetingLibrary {
         try requireNoCaptureInProgress(meeting.recordings)
         let fileNames = meeting.recordings.map(\.fileName)
             + meeting.recordings.flatMap { $0.photos.map(\.fileName) }
+            + meeting.attachments.map(\.fileName)
         try journaledDelete(fileNames: fileNames) { context.delete(meeting) }
     }
 
@@ -100,6 +110,47 @@ struct MeetingLibrary {
     /// any other, so it gets the same crash-safety guarantee as a recording.
     func deletePhoto(_ photo: MeetingPhoto) throws(AppError) {
         try journaledDelete(fileNames: [photo.fileName]) { context.delete(photo) }
+    }
+
+    // MARK: - Attachments
+
+    /// Records a document already copied into `AttachmentFileStore` as an
+    /// attachment of `meeting`. When the save fails the insert is undone and
+    /// the copied file removed, so neither an orphaned file nor a row
+    /// pointing at nothing survives.
+    @discardableResult
+    func addAttachment(
+        to meeting: Meeting,
+        fileName: String,
+        displayName: String,
+        pageCount: Int,
+        extractedText: String?
+    ) throws(AppError) -> MeetingAttachment {
+        let attachment = MeetingAttachment(
+            meeting: meeting,
+            fileName: fileName,
+            displayName: displayName,
+            fileSize: AttachmentFileStore.byteSize(fileName: fileName),
+            pageCount: pageCount,
+            extractedText: extractedText
+        )
+        context.insert(attachment)
+        if let failure = persist(context) {
+            // Detach first: deleting a never-saved row leaves it in the
+            // meeting's in-memory `attachments` until the next save, where
+            // the screen would still show it.
+            attachment.meeting = nil
+            context.delete(attachment)
+            AttachmentFileStore.delete(fileName: fileName)
+            throw failure
+        }
+        return attachment
+    }
+
+    /// Deletes one attachment and its file, through the same journaled path
+    /// as a photo.
+    func deleteAttachment(_ attachment: MeetingAttachment) throws(AppError) {
+        try journaledDelete(fileNames: [attachment.fileName]) { context.delete(attachment) }
     }
 
     /// Deletes one of a meeting's summaries; the others are left alone.
@@ -239,13 +290,13 @@ struct MeetingLibrary {
     }
 
     private func save() throws(AppError) {
-        if let failure = context.saveOrError() { throw failure }
+        if let failure = persist(context) { throw failure }
     }
 
     private func journaledDelete(fileNames: [String], mutation: () -> Void) throws(AppError) {
         let failure = RecordingOperationJournal.performDelete(fileNames: fileNames) {
             mutation()
-            return context.saveOrError()
+            return persist(context)
         }
         if let failure { throw failure }
     }

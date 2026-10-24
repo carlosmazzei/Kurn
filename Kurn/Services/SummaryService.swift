@@ -240,7 +240,10 @@ struct SummaryService {
         always preserve the ⭐ marker and the line's timestamp when carrying \
         it into these notes. Record action items as markdown task checkboxes \
         ("- [ ] task — owner, deadline") so their status survives into the \
-        final summary. Do not editorialize and do not drop topics.
+        final summary. Text under an "Attached documents" header comes from \
+        files attached to the meeting, not from speech: carry its relevant \
+        facts into the notes attributed to the document by name, without \
+        timestamps. Do not editorialize and do not drop topics.
         """,
         sections: ["Discussion", "Decisions", "Action Items", "Open Questions"]
     )

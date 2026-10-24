@@ -362,7 +362,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 
 - **Models/** — SwiftData `@Model` classes (`Meeting`, `Recording`, `Transcript`,
   `Speaker`, `Summary`, `Tag`, `Folder`, `SmartFolder`, `SemanticChunk`,
-  `WikiArticle`, `GeneratedDocument`, `ChatSession`, `MeetingPhoto`) plus
+  `WikiArticle`, `GeneratedDocument`, `ChatSession`, `MeetingPhoto`,
+  `MeetingAttachment`) plus
   shared value types grouped by subject — `AIProvider.swift`,
   `PipelineEngines.swift` (one engine enum per pipeline stage),
   `ProgressPhases.swift` (the progress vocabulary reported to the UI),
@@ -385,7 +386,7 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
 - **Application/** — `@MainActor` use cases over the store that sit below the
   UI, driven by the scene and by non-UI entry points alike:
   - `MeetingLibrary` owns every user-initiated library mutation (create and
-    delete meetings, recordings, photos, summaries; tags, folders, smart
+    delete meetings, recordings, photos, attachments, summaries; tags, folders, smart
     folders, generated documents), with their rules — trimmed names,
     case-insensitive tag uniqueness, journaled file cleanup — and throws the
     save failure as `AppError`. Views call it; they never `insert`/`delete`
@@ -446,7 +447,8 @@ file/type limits as a refactoring signal rather than using the remaining line bu
 ### Data model
 
 `Meeting` is the aggregate root. It cascades deletes to its `recordings`,
-`speakers`, `summaries`, `semanticChunks`, `wikiArticle`, and `chatSessions` —
+`speakers`, `summaries`, `semanticChunks`, `wikiArticle`, `chatSessions` and
+`attachments` —
 every transcript-derived artifact dies with the meeting it came from, which is
 what makes "delete the meeting" a complete erasure rather than a partial one.
 `GeneratedDocument` is the deliberate exception: it snapshots its sources
@@ -1695,7 +1697,7 @@ that writes audio, the store, or the network:
   through `LibraryEraser` (`Infrastructure/`), never an ad hoc model delete in a
   view. It deletes every content model (including library-wide `ChatSession`s
   and `GeneratedDocument`s, which no meeting cascade reaches), saves, and only
-  then removes audio, photos and every recovery location
+  then removes audio, photos, attachments and every recovery location
   (`ModelStoreBackupManager.eraseAllRecoveryCopies()` is that type's one
   deletion of anything but a redundant backup). Tags, folders, smart folders,
   reliability events and diagnostic reports are kept — none carries meeting
@@ -1803,13 +1805,14 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   cut of V2 did exactly that, so "V1" already contained `chatSessions`, no
   real 1.0.0 store matched it, and the migration failed on upgrade while
   `LegacyStoreAdoptionTests` stayed green (its fixture was written with the
-  same live classes). `KurnSchemaV3` (1.2.0, adding `MeetingPhoto`) followed
-  that recipe and is the current version, with V2 frozen in
-  `KurnSchemaV2Models.swift`. The next model change therefore means: edit the
-  live class, add `KurnSchemaV4` listing the live classes, demote
-  `KurnSchemaV3` to frozen copies in a `KurnSchemaV3Models.swift`, add the
-  stage, and bump `KurnModelGraph.currentSchemaVersion` (which backup metadata
-  records). When
+  same live classes). `KurnSchemaV3` (1.2.0, adding `MeetingPhoto`) and
+  `KurnSchemaV4` (1.3.0, adding `MeetingAttachment`) followed that recipe;
+  V4 is the current version, with V3 frozen in `KurnSchemaV3Models.swift`
+  (whose every entity `SchemaV3MigrationTests` writes and migrates). The next
+  model change therefore means: edit the live class, add `KurnSchemaV5`
+  listing the live classes, demote `KurnSchemaV4` to frozen copies in a
+  `KurnSchemaV4Models.swift`, add the stage, and bump
+  `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
   `wikiEnabled` is on, the library-wide path additionally grounds on the
   condensed per-meeting articles — see "Derived artifacts" below for why that
   answers synthesis and counting questions retrieval alone cannot.
@@ -1867,6 +1870,54 @@ synthesized from one or more transcripts against a user's prompt, surfaced by
   from rather than a live relationship.
 - `DocumentGenerationService` map/reduces long selections, so picking a folder
   never silently truncates the meetings that happen to sort last.
+
+### Attached documents (PDFs)
+
+A meeting can carry PDFs as reference material for its summaries
+(`MeetingAttachment`, one-to-many on `Meeting`, `.cascade`). Unlike a
+`MeetingPhoto`, an attachment belongs to the meeting rather than a recording:
+it has no moment on a timeline.
+
+- **Two entry points, one importer.** "Add PDF" in the Recordings tab (and the
+  overflow menu) opens a `.fileImporter`; a PDF shared from another app arrives
+  through `CFBundleDocumentTypes` (PDF, `LSHandlerRank` Alternate,
+  `LSSupportsOpeningDocumentsInPlace` **false**, so iOS copies it into
+  `Documents/Inbox/`) and `onOpenURL` → `IncomingFileInbox`, which
+  `ContentView` turns into `AttachToMeetingView` (pick a meeting or start a new
+  one). Both call `MeetingAttachmentImporter`: copy into
+  `AttachmentFileStore` (`Recordings/Attachments/`, same protection and
+  shallow-scan invisibility as `Photos/`), extract the text off main under the
+  `.photoTextRecognition` reservation (`PDFTextExtractor` — PDFKit's text
+  layer, Vision OCR for at most `maxOCRPages` scanned pages), then
+  `MeetingLibrary.addAttachment`. Each step undoes the previous on failure; a
+  locked or unreadable PDF is refused (`AppError.attachmentImportFailed`), one
+  with no readable text is kept and adds nothing to prompts.
+- **The two screens hold no logic.** `MeetingDetailAttachments` renders
+  `MeetingAttachmentsViewModel` (picker, Quick Look preview, import in flight,
+  delete) and `AttachToMeetingView` renders `AttachToMeetingViewModel` (search
+  via `Meeting.matches(search:)`, attach to a meeting, or
+  `MeetingAttachmentImporter.importPDFsIntoNewMeeting`, which deletes the new
+  meeting again when nothing went in); the row text is
+  `MeetingAttachment.detailsText`. Both view models take their importer and
+  library as factories, and `MeetingLibrary`'s `persist` seam lets tests fail
+  a commit to reach every rollback.
+- **The Inbox copy is unprotected, so it never outlives the decision.**
+  `IncomingFileInbox.finish()` deletes it whichever way the sheet closes,
+  deletes only files inside the Inbox (never a URL elsewhere), and
+  `sweepStaleCopies` on every activation removes what a killed process left.
+  The sheet sits below `SecurityCoverWindow` like every other presentation.
+- **Prompts read it through `Meeting.assembledContextText()`** — the
+  transcript followed by KurnCore's `AttachmentPromptContext` block — used by
+  summaries, the wiki (so adding a PDF makes the article stale), the per-meeting
+  chat and generated documents. The block is capped per document and in total,
+  hard-wraps long lines (`SummaryService.splitTranscript` only breaks on lines),
+  and is empty when nothing is transcribed: a document is context for a meeting,
+  not a meeting. `SummaryPrompt`, the map-stage `notesTemplate` and the
+  full-context chat prompt tell the model the documents are reference material,
+  never speech, and carry no `[mm:ss]`.
+- Deletion goes through the journal like photos (`RecordingTrash` knows the
+  `attachments` source and the sweep counts attachment rows), and
+  `LibraryEraser` deletes the rows and `AttachmentFileStore.deleteAllAttachments`.
 
 ### Read aloud (text-to-speech)
 

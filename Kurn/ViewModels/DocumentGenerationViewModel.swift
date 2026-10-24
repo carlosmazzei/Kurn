@@ -34,7 +34,7 @@ final class DocumentGenerationViewModel {
         let runID = OperationID()
         let startedAt = Date()
         let sources = meetings.compactMap { meeting -> DocumentTranscriptSource? in
-            let transcript = meeting.assembledTranscriptText()
+            let transcript = meeting.assembledContextText()
             guard !transcript.isEmpty else { return nil }
             return DocumentTranscriptSource(
                 meetingID: meeting.id,

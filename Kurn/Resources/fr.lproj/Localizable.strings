@@ -426,6 +426,22 @@
 "detail.total_duration" = "Durée totale : %@";
 "detail.recordings" = "Enregistrements";
 "detail.photos" = "Photos";
+"detail.attachments" = "Documents";
+"detail.attachments.add" = "Ajouter un PDF";
+"detail.attachments.adding" = "Ajout du PDF…";
+"detail.attachments.open_hint" = "Ouvre le document";
+"detail.attachments.no_text" = "Aucun texte lisible — non utilisé dans les résumés";
+"detail.attachments.one_page" = "1 page";
+"detail.attachments.pages" = "%d pages";
+"attachment.untitled" = "Document";
+"attachment.error.unreadable" = "Le fichier n'est pas un PDF lisible.";
+"attachment.error.locked" = "Le PDF est protégé par un mot de passe. Supprimez le mot de passe et réessayez.";
+"attach.title" = "Ajouter à la réunion";
+"attach.files" = "Fichiers";
+"attach.new_meeting" = "Nouvelle réunion";
+"attach.meetings" = "Réunions";
+"attach.done.title" = "Ajouté à « %@ »";
+"attach.done.message" = "Les résumés de la réunion utiliseront ce document avec la transcription et les photos.";
 "detail.record_new" = "Enregistrer un nouveau segment";
 "detail.transcribe" = "Transcrire";
 "detail.transcript" = "Transcription";
@@ -962,6 +978,7 @@
 
 /* Read aloud (text-to-speech) */
 "error.speech_synthesis" = "Impossible de lire à voix haute : %@";
+"error.attachment_import" = "Impossible d'ajouter le document : %@";
 "read_aloud.error.unsupported" = "%@ ne peut pas lire de texte à voix haute.";
 "read_aloud.error.no_audio" = "Le fournisseur de voix n'a renvoyé aucun audio lisible.";
 "read_aloud.error.invalid_voice" = "L'identifiant de voix ne peut contenir que des lettres et des chiffres.";

@@ -67,7 +67,7 @@ enum LibraryEraser {
     ///
     /// Meetings go first and are saved on their own, so their cascade (
     /// recordings, transcripts, speakers, summaries, chunks, wiki, chats,
-    /// photos) is resolved by SwiftData before the sweep below looks for
+    /// photos, attachments) is resolved by SwiftData before the sweep below looks for
     /// leftovers. Fetch-and-delete rather than batch `delete(model:)`, so the
     /// in-context delete rules are guaranteed to run. Safe to call again after
     /// a partial failure: every step only deletes what still exists.
@@ -86,15 +86,17 @@ enum LibraryEraser {
         try deleteAll(SemanticChunk.self, in: context)
         try deleteAll(WikiArticle.self, in: context)
         try deleteAll(MeetingPhoto.self, in: context)
+        try deleteAll(MeetingAttachment.self, in: context)
         try context.save()
     }
 
     /// Removes every meeting-derived file: audio (with enhanced copies),
-    /// photos, and every recovery copy (`eraseRecoveryCopies`). Returns how
+    /// photos, attachments, and every recovery copy (`eraseRecoveryCopies`). Returns how
     /// many items are still on disk.
     nonisolated static func eraseFiles(appSupportDirectory: URL?) -> Int {
         let residual = AudioFileStore.deleteAllAudio()
             + PhotoFileStore.deleteAllPhotos()
+            + AttachmentFileStore.deleteAllAttachments()
             + eraseRecoveryCopies(appSupportDirectory: appSupportDirectory)
         if residual > 0 {
             AppLog.persistence.atError.error("Library erase left \(residual, privacy: .public) item(s) on disk")

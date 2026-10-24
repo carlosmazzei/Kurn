@@ -46,10 +46,11 @@ enum ResourceWorkKind: Sendable, Equatable {
     case enhancement
     case modelLoading
     /// On-device Vision OCR over a captured meeting photo
-    /// (`PhotoTextRecognizer`). Light and brief relative to the other
-    /// kinds, but still reserved so a burst of photo captures during a
-    /// recording cannot stack unboundedly alongside a concurrent
-    /// transcription/diarization run on another meeting.
+    /// (`PhotoTextRecognizer`), and text extraction from a PDF attached to a
+    /// meeting (`PDFTextExtractor`, which OCRs scanned pages the same way).
+    /// Light and brief relative to the other kinds, but still reserved so a
+    /// burst of photo captures during a recording cannot stack unboundedly
+    /// alongside a concurrent transcription/diarization run on another meeting.
     case photoTextRecognition
 
     /// Abstract units against `ResourceScheduler.defaultTotalWeight`'s

@@ -10,7 +10,9 @@
 
 import SwiftData
 import KurnCore
+import QuickLook
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MeetingDetailView: View {
     @Bindable var meeting: Meeting
@@ -102,6 +104,9 @@ struct MeetingDetailView: View {
     /// empty until transcription finishes. Not `private` —
     /// `MeetingDetailPhotos.swift` needs it.
     @State var presentedPhoto: MeetingPhoto?
+    /// The Documents section's state. Not `private` —
+    /// `MeetingDetailAttachments.swift` and the toolbar need it.
+    @State var attachments = MeetingAttachmentsViewModel()
     /// Not `private` — `MeetingDetailToolbar.swift` needs it.
     @State var showingEdit = false
     /// Presents the generated article without adding a fifth item to the compact
@@ -178,6 +183,15 @@ struct MeetingDetailView: View {
         .sheet(item: $presentedPhoto) { photo in
             PhotoViewerView(photo: photo, onDelete: { deletePhoto(photo) })
         }
+        .fileImporter(
+            isPresented: $attachments.isShowingImporter,
+            allowedContentTypes: [.pdf],
+            allowsMultipleSelection: true
+        ) { result in
+            Task { await attachments.importPicked(result, into: meeting, context: modelContext) }
+        }
+        .quickLookPreview($attachments.previewURL)
+        .errorAlert($attachments.error)
         .sheet(isPresented: $showingShareSelection) {
             MeetingShareSelectionView(meeting: meeting, preselectedSummary: selectedSummary) { urls in
                 shareItem = ShareItem(urls: urls)
@@ -407,6 +421,7 @@ struct MeetingDetailView: View {
             addSegmentButton
                 .clearListRow(insets: EdgeInsets(top: 8, leading: 20, bottom: 24, trailing: 20))
             photosStrip
+            attachmentsSection
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)

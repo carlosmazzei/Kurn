@@ -198,7 +198,13 @@ enum RecordingOperationJournal {
             // re-adopt, a purged one is gone.
             return true
         }
+        // A lone photo or attachment delete owns no recording's file name, so
+        // checking recordings alone would purge one whose row survived.
+        let photos = (try? context.fetch(FetchDescriptor<MeetingPhoto>())) ?? []
+        let attachments = (try? context.fetch(FetchDescriptor<MeetingAttachment>())) ?? []
         let known = Set(recordings.map(\.fileName))
+            .union(photos.map(\.fileName))
+            .union(attachments.map(\.fileName))
         return fileNames.contains(where: known.contains)
     }
 

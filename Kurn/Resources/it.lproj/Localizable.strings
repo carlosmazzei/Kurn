@@ -426,6 +426,22 @@
 "detail.total_duration" = "Durata totale: %@";
 "detail.recordings" = "Registrazioni";
 "detail.photos" = "Foto";
+"detail.attachments" = "Documenti";
+"detail.attachments.add" = "Aggiungi PDF";
+"detail.attachments.adding" = "Aggiunta del PDF…";
+"detail.attachments.open_hint" = "Apre il documento";
+"detail.attachments.no_text" = "Nessun testo leggibile: non usato nei riepiloghi";
+"detail.attachments.one_page" = "1 pagina";
+"detail.attachments.pages" = "%d pagine";
+"attachment.untitled" = "Documento";
+"attachment.error.unreadable" = "Il file non è un PDF leggibile.";
+"attachment.error.locked" = "Il PDF è protetto da password. Rimuovi la password e riprova.";
+"attach.title" = "Aggiungi alla riunione";
+"attach.files" = "File";
+"attach.new_meeting" = "Nuova riunione";
+"attach.meetings" = "Riunioni";
+"attach.done.title" = "Aggiunto a «%@»";
+"attach.done.message" = "I riepiloghi della riunione useranno questo documento insieme alla trascrizione e alle foto.";
 "detail.record_new" = "Registra Nuovo Segmento";
 "detail.transcribe" = "Trascrivi";
 "detail.transcript" = "Trascrizione";
@@ -962,6 +978,7 @@
 
 /* Read aloud (text-to-speech) */
 "error.speech_synthesis" = "Impossibile leggere ad alta voce: %@";
+"error.attachment_import" = "Impossibile aggiungere il documento: %@";
 "read_aloud.error.unsupported" = "%@ non può leggere il testo ad alta voce.";
 "read_aloud.error.no_audio" = "Il fornitore della voce non ha restituito audio riproducibile.";
 "read_aloud.error.invalid_voice" = "L'ID della voce può contenere solo lettere e numeri.";

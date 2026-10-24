@@ -33,6 +33,15 @@ enum SummaryPrompt {
         photo. Omit "photoReferences" entirely for a section that draws on no \
         photo.
 
+        The transcript may be followed by an "Attached documents" part: text \
+        extracted from files attached to the meeting (an agenda, slides, a \
+        report), each under a "=== 📄 Document: <name> ===" line. Use them as \
+        reference material — to get names, figures and terms right and to \
+        complete what was discussed — but the meeting is what was said: never \
+        present a document's content as something said in the meeting, and \
+        never give it a [mm:ss] timestamp. When a document adds substance the \
+        conversation does not cover, say it comes from that document by name.
+
         \(template.instructions)
         """
 

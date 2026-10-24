@@ -131,6 +131,30 @@ struct RecordingOperationJournalTests {
         #expect(!hasRecord(operationID))
     }
 
+    @Test func replayRestoresAnInDoubtAttachmentDeleteWhoseRowSurvived() throws {
+        // A lone attachment delete owns no recording's file name; its own
+        // surviving row must still bring the file back.
+        let context = makeContext()
+        let meeting = Meeting(title: "Standup", language: .english)
+        context.insert(meeting)
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).pdf")
+        try Data([0x25, 0x50]).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let fileName = try AttachmentFileStore.importCopy(of: source, meetingID: meeting.id)
+        defer { AttachmentFileStore.delete(fileName: fileName) }
+        context.insert(MeetingAttachment(meeting: meeting, fileName: fileName, displayName: "Agenda.pdf"))
+        try context.save()
+
+        let operationID = UUID()
+        RecordingTrash.trash(fileNames: [fileName], operationID: operationID)
+        try writeRecord(id: operationID, kind: .delete, fileNames: [fileName], state: .trashed)
+
+        RecordingOperationJournal.replay(context: context)
+
+        #expect(FileManager.default.fileExists(atPath: AttachmentFileStore.resolveURL(fileName: fileName).path))
+        #expect(!hasRecord(operationID))
+    }
+
     @Test func replayPurgesInDoubtOperationWhoseRowIsGone() throws {
         // Same in-doubt window, but the save did commit before the death:
         // no row references the file, so the trashed copy is discarded.

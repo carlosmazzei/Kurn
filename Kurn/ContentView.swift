@@ -14,7 +14,9 @@
 //  filtering without a sheet round-trip on regular width. Settings is
 //  presented as a sheet either way. The recorder and its minimized mini bar
 //  are attached here (`recordingSessionPresenter()`), above both layouts, so
-//  a recording stays reachable from every screen.
+//  a recording stays reachable from every screen. A PDF shared into the app
+//  from another one is offered here too (`AttachToMeetingView`), above both
+//  layouts, for the user to pick the meeting it belongs to.
 //
 
 import SwiftData
@@ -22,6 +24,8 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.modelContext) private var modelContext
+    @Environment(IncomingFileInbox.self) private var incomingFiles
     @State private var selection: LibrarySelection = .allMeetings
 
     var body: some View {
@@ -41,6 +45,14 @@ struct ContentView: View {
             }
         }
         .recordingSessionPresenter()
+        .sheet(isPresented: Binding(
+            get: { incomingFiles.hasPendingFiles },
+            set: { if !$0 { incomingFiles.finish() } }
+        )) {
+            AttachToMeetingView(files: incomingFiles.pendingFiles, modelContext: modelContext) {
+                incomingFiles.finish()
+            }
+        }
     }
 }
 
@@ -58,6 +70,7 @@ struct ContentView: View {
         ContentView()
             .environment(settings)
             .environment(RecordingAccessGate())
+            .environment(IncomingFileInbox())
             .environment(RecordingSessionController(modelContext: container.mainContext, settings: settings))
             .modelContainer(container)
     }

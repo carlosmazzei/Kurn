@@ -426,6 +426,22 @@
 "detail.total_duration" = "Total duration: %@";
 "detail.recordings" = "Recordings";
 "detail.photos" = "Photos";
+"detail.attachments" = "Documents";
+"detail.attachments.add" = "Add PDF";
+"detail.attachments.adding" = "Adding PDF…";
+"detail.attachments.open_hint" = "Opens the document";
+"detail.attachments.no_text" = "No readable text — not used in summaries";
+"detail.attachments.one_page" = "1 page";
+"detail.attachments.pages" = "%d pages";
+"attachment.untitled" = "Document";
+"attachment.error.unreadable" = "The file is not a readable PDF.";
+"attachment.error.locked" = "The PDF is protected by a password. Remove the password and try again.";
+"attach.title" = "Add to Meeting";
+"attach.files" = "Files";
+"attach.new_meeting" = "New Meeting";
+"attach.meetings" = "Meetings";
+"attach.done.title" = "Added to “%@”";
+"attach.done.message" = "The meeting's summaries will use this document together with the transcript and photos.";
 "detail.record_new" = "Record New Segment";
 "detail.transcribe" = "Transcribe";
 "detail.transcript" = "Transcript";
@@ -962,6 +978,7 @@
 
 /* Read aloud (text-to-speech) */
 "error.speech_synthesis" = "Couldn't read aloud: %@";
+"error.attachment_import" = "Couldn't add the document: %@";
 "read_aloud.error.unsupported" = "%@ can't read text aloud.";
 "read_aloud.error.no_audio" = "The voice provider returned no playable audio.";
 "read_aloud.error.invalid_voice" = "The voice ID may contain only letters and numbers.";

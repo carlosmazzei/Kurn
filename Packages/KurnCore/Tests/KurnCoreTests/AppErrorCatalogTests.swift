@@ -57,13 +57,14 @@ struct AppErrorCatalogTests {
         .transcriptIntegrityFailed("empty_transcript"),
         .keychainAccessFailed("locked"),
         .summarizationUnsupported(provider: detail),
-        .speechSynthesisFailed(detail)
+        .speechSynthesisFailed(detail),
+        .attachmentImportFailed(detail)
     ]
 
     @Test func catalogCoversEveryLogCode() {
         let codes = Self.allCases.map(\.logCode)
         #expect(Set(codes).count == codes.count, "every case has its own log code")
-        #expect(codes.count == 36)
+        #expect(codes.count == 37)
     }
 
     @Test func logCodesAreClosedVocabularyAndNeverCarryDetail() {
