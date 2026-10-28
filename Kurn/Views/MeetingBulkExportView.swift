@@ -4,8 +4,8 @@
 //
 //  Exports several meetings at once from the list's selection mode: their
 //  latest summaries and/or transcripts, one file per meeting or a single file
-//  grouped by meeting, in any `MeetingExportFormat`. The planning lives in
-//  `MeetingBulkExport`; this view only renders it and writes the files.
+//  grouped by meeting, in any `MeetingExportFormat`. It only renders
+//  `MeetingBulkExportViewModel`; the plan is `MeetingBulkExport`.
 //
 
 import KurnCore
@@ -15,15 +15,11 @@ struct MeetingBulkExportView: View {
     let onShare: ([URL]) -> Void
 
     @Environment(\.dismiss) private var dismiss
-
-    @State private var export: MeetingBulkExport
-    @State private var copied = false
-    @State private var shareError: AppError?
-    @State private var isExporting = false
+    @State private var model: MeetingBulkExportViewModel
 
     init(meetings: [Meeting], onShare: @escaping ([URL]) -> Void) {
         self.onShare = onShare
-        _export = State(initialValue: MeetingBulkExport(meetings: meetings))
+        _model = State(initialValue: MeetingBulkExportViewModel(meetings: meetings))
     }
 
     var body: some View {
@@ -32,24 +28,24 @@ struct MeetingBulkExportView: View {
                 Section {
                     Toggle(
                         NSLocalizedString("share.select.summaries", comment: "Summaries"),
-                        isOn: $export.includesSummaries
+                        isOn: $model.export.includesSummaries
                     )
                     .accessibilityIdentifier("bulk_export.summaries")
                     Toggle(
                         NSLocalizedString("share.select.transcripts", comment: "Transcripts"),
-                        isOn: $export.includesTranscripts
+                        isOn: $model.export.includesTranscripts
                     )
                     .accessibilityIdentifier("bulk_export.transcripts")
                 } header: {
                     Text(NSLocalizedString("bulk_export.include", comment: "Include"))
                 } footer: {
-                    Text(export.availabilityText)
+                    Text(model.export.availabilityText)
                 }
 
                 Section {
                     Picker(
                         NSLocalizedString("bulk_export.grouping", comment: "Files"),
-                        selection: $export.grouping
+                        selection: $model.export.grouping
                     ) {
                         ForEach(MeetingBulkExport.Grouping.allCases) { grouping in
                             Text(grouping.title).tag(grouping)
@@ -60,9 +56,7 @@ struct MeetingBulkExportView: View {
                 } header: {
                     Text(NSLocalizedString("bulk_export.grouping", comment: "Files"))
                 } footer: {
-                    Text(export.grouping == .singleFile
-                        ? NSLocalizedString("bulk_export.grouping.single.detail", comment: "Single file detail")
-                        : NSLocalizedString("bulk_export.grouping.per_meeting.detail", comment: "Per-meeting detail"))
+                    Text(model.export.grouping.detail)
                 }
             }
             .navigationTitle(NSLocalizedString("bulk_export.title", comment: "Export meetings"))
@@ -73,16 +67,16 @@ struct MeetingBulkExportView: View {
                         .accessibilityIdentifier("bulk_export.cancel")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: copyAll) {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    Button { model.copyAll() } label: {
+                        Image(systemName: model.didCopy ? "checkmark" : "doc.on.doc")
                     }
-                    .disabled(!export.canExport)
+                    .disabled(!model.export.canExport)
                     .accessibilityLabel(NSLocalizedString("share.copy_all", comment: "Copy All"))
                     .accessibilityIdentifier("bulk_export.copy_all")
                 }
             }
             .safeAreaBar(edge: .bottom) { shareBar }
-            .errorAlert($shareError)
+            .errorAlert($model.error)
         }
         .presentationDetents([.medium, .large])
     }
@@ -95,7 +89,7 @@ struct MeetingBulkExportView: View {
                     .font(Theme.subheadline)
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
-                Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $export.format) {
+                Picker(NSLocalizedString("share.format.picker", comment: "Format"), selection: $model.export.format) {
                     ForEach(MeetingExportFormat.allCases, id: \.self) { option in
                         Text(option.title).tag(option)
                     }
@@ -105,15 +99,21 @@ struct MeetingBulkExportView: View {
                 .accessibilityIdentifier("bulk_export.format_picker")
             }
 
-            Text(export.format.explanation)
+            Text(model.export.format.explanation)
                 .font(Theme.caption)
                 .foregroundStyle(Theme.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button(action: performShare) {
+            Button {
+                Task {
+                    guard let urls = await model.share() else { return }
+                    dismiss()
+                    onShare(urls)
+                }
+            } label: {
                 ZStack {
-                    Text(export.shareButtonTitle).opacity(isExporting ? 0 : 1)
-                    if isExporting {
+                    Text(model.export.shareButtonTitle).opacity(model.isExporting ? 0 : 1)
+                    if model.isExporting {
                         ProgressView()
                             .accessibilityLabel(NSLocalizedString("share.exporting", comment: "Preparing files"))
                     }
@@ -122,43 +122,10 @@ struct MeetingBulkExportView: View {
             }
             .buttonStyle(.glassProminent)
             .tint(Theme.accent)
-            .disabled(!export.canExport || isExporting)
+            .disabled(!model.canShare)
             .accessibilityIdentifier("bulk_export.share_button")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-    }
-
-    private func copyAll() {
-        let text = export.clipboardText()
-        guard !text.isEmpty else { return }
-        MeetingPasteboard.copy(text)
-        copied = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.5))
-            copied = false
-        }
-    }
-
-    /// Builds the documents on the main actor, where the meetings live, then
-    /// renders and writes the files in the background.
-    private func performShare() {
-        let items = export.exportItems()
-        guard !items.isEmpty, !isExporting else { return }
-        let pageSize = ExportPageSize.preferred(forRegion: Locale.current.region?.identifier)
-        isExporting = true
-        Task {
-            let result = await Task.detached(priority: .userInitiated) {
-                Result { try items.map { try $0.writeTemporaryFile(pageSize: pageSize) } }
-            }.value
-            isExporting = false
-            switch result {
-            case .success(let urls):
-                dismiss()
-                onShare(urls)
-            case .failure(let error):
-                shareError = .audioError(error.localizedDescription)
-            }
-        }
     }
 }

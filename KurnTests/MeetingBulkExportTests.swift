@@ -165,6 +165,7 @@ struct MeetingBulkExportTests {
     @Test func groupingTitlesAreLocalized() {
         for grouping in MeetingBulkExport.Grouping.allCases {
             #expect(!grouping.title.isEmpty)
+            #expect(!grouping.detail.isEmpty)
             #expect(grouping.id == grouping.rawValue)
         }
     }

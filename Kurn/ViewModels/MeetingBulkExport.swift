@@ -25,6 +25,16 @@ struct MeetingBulkExport {
             case .singleFile: NSLocalizedString("bulk_export.grouping.single", comment: "Single file")
             }
         }
+
+        /// What the choice produces, shown under the picker.
+        var detail: String {
+            switch self {
+            case .filePerMeeting:
+                NSLocalizedString("bulk_export.grouping.per_meeting.detail", comment: "Per-meeting detail")
+            case .singleFile:
+                NSLocalizedString("bulk_export.grouping.single.detail", comment: "Single file detail")
+            }
+        }
     }
 
     /// The selected meetings, oldest first: a combined file reads as a

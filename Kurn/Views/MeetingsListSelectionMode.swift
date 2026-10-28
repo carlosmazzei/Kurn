@@ -5,8 +5,8 @@
 //  The meetings list's selection mode: a checkmark beside each card, a toolbar
 //  that swaps browsing and recording for Select All / Done / Export / Delete,
 //  and the bulk delete. Entered from the toolbar's Select button or a card's
-//  context menu. The rules — what is selected, what an action applies to —
-//  live in `MeetingListSelection`; deletion in `MeetingLibrary`.
+//  context menu. Rendering only: what is selected, what an action applies to,
+//  the titles and the delete itself all live in `MeetingListSelection`.
 //
 //  Its own file because `MeetingsListView.swift` is close to the SwiftLint
 //  limits; the state it reads is declared non-private over there.
@@ -21,14 +21,7 @@ extension MeetingsListView {
     /// to these only, never to a selection the current filter hides.
     var selectedMeetings: [Meeting] { listSelection.selected(from: filtered) }
 
-    /// "3 selected" while selecting, the app name otherwise.
-    var listTitle: String {
-        guard listSelection.isActive else { return "Kurn" }
-        return String(
-            format: NSLocalizedString("meetings.selection.count", comment: "N meetings selected"),
-            selectedMeetings.count
-        )
-    }
+    var listTitle: String { listSelection.navigationTitle(visible: filtered) }
 
     @ViewBuilder
     func selectableCard(for meeting: Meeting) -> some View {
@@ -51,8 +44,7 @@ extension MeetingsListView {
     func deleteSelectedMeetings() {
         pendingBulkDelete = false
         do throws(AppError) {
-            try MeetingLibrary(context: modelContext).deleteMeetings(selectedMeetings)
-            listSelection.end()
+            try listSelection.deleteSelected(from: filtered, using: MeetingLibrary(context: modelContext))
         } catch {
             saveError = error
         }
@@ -76,10 +68,7 @@ extension MeetingsListView {
     var selectionToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             let visible = filtered.map(\.id)
-            Button(listSelection.selectsAll(of: visible)
-                ? NSLocalizedString("meetings.selection.deselect_all", comment: "Deselect All")
-                : NSLocalizedString("meetings.selection.select_all", comment: "Select All")
-            ) {
+            Button(listSelection.toggleAllTitle(for: visible)) {
                 listSelection.toggleAll(of: visible)
             }
             .disabled(visible.isEmpty)

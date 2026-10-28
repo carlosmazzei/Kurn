@@ -217,11 +217,7 @@ struct MeetingsListView: View {
             } else {
                 ForEach(filtered) { meeting in
                     Button {
-                        if listSelection.isActive {
-                            listSelection.toggle(meeting.id)
-                        } else {
-                            selectedMeeting = meeting
-                        }
+                        if !listSelection.handleTap(on: meeting.id) { selectedMeeting = meeting }
                     } label: {
                         selectableCard(for: meeting)
                     }
