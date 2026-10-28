@@ -145,7 +145,15 @@ struct MeetingListSelectionTests {
 
         var selection = MeetingListSelection()
         selection.begin(with: meeting.id)
-        #expect(throws: AppError.self) { try selection.deleteSelected(from: [meeting], using: failing) }
+        // Not `#expect(throws:)`: its closure cannot call a mutating method
+        // on the captured selection.
+        var failed = false
+        do {
+            try selection.deleteSelected(from: [meeting], using: failing)
+        } catch {
+            failed = true
+        }
+        #expect(failed)
         #expect(selection.isActive)
         #expect(selection.isSelected(meeting.id))
     }
