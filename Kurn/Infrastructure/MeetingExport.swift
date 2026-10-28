@@ -43,12 +43,11 @@ enum MeetingExport {
 
     /// The whole meeting as a format-neutral document: notes, the given
     /// summary, highlights, then every transcribed recording in order.
+    /// `includesTranscript: false` leaves out the transcript and the
+    /// highlights that point into it, for an export of summaries alone.
     @MainActor
-    static func document(for meeting: Meeting, summary: Summary?) -> ExportDocument {
-        let transcribed = meeting.recordings
-            .filter(\.isReadyForConsumption)
-            .sorted { $0.recordedAt < $1.recordedAt }
-            .filter { $0.transcript != nil }
+    static func document(for meeting: Meeting, summary: Summary?, includesTranscript: Bool = true) -> ExportDocument {
+        let transcribed = includesTranscript ? transcribedRecordings(of: meeting) : []
         // The summary decides the language when there is one: it is what the
         // reader reads first, and it may have been translated on request.
         let sample = [summary.map(summaryText) ?? "", transcriptText(transcribed), meeting.notes].joined(separator: "\n")
@@ -64,7 +63,9 @@ enum MeetingExport {
             document.blocks += summaryBlocks(summary, labels: labels)
         }
 
-        document.blocks += highlightBlocks(for: meeting, labels: labels)
+        if includesTranscript {
+            document.blocks += highlightBlocks(for: meeting, labels: labels)
+        }
 
         if !transcribed.isEmpty {
             document.blocks.append(.heading(level: 2, text: labels.transcript))
@@ -78,6 +79,15 @@ enum MeetingExport {
         }
 
         return document
+    }
+
+    /// Ready recordings with a transcript, in recording order.
+    @MainActor
+    static func transcribedRecordings(of meeting: Meeting) -> [Recording] {
+        meeting.recordings
+            .filter(\.isReadyForConsumption)
+            .sorted { $0.recordedAt < $1.recordedAt }
+            .filter { $0.transcript != nil }
     }
 
     /// One recording's transcript, standalone.

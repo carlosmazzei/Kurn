@@ -514,6 +514,12 @@ transcript when exporting it alone), so a Portuguese summary reads "Resumo",
 "Transcrição", whatever language the app runs in. Every format renders the
 same format-neutral `ExportDocument`, so they differ only in presentation.
 
+Several meetings can be exported (or deleted) at once: tap **Select** on the
+meetings list, pick the meetings, then **Export**. Choose whether to include
+their latest summaries, their transcripts or both, and whether to get one file
+per meeting — one note each in an Obsidian vault — or a single file with every
+meeting grouped under its own heading, e.g. one PDF of a whole project.
+
 Export generation is implemented in:
 
 - `Kurn/Infrastructure/MeetingExport.swift` (meeting → `ExportDocument`, temp files)
