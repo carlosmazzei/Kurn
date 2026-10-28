@@ -12,6 +12,7 @@
 //  limits; the state it reads is declared non-private over there.
 //
 
+import KurnCore
 import SwiftUI
 
 extension MeetingsListView {
