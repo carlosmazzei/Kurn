@@ -86,11 +86,14 @@ struct MeetingListSelectionTests {
     @Test func aTapTogglesOnlyInSelectionMode() {
         var selection = MeetingListSelection()
         let id = UUID()
-        #expect(!selection.handleTap(on: id))
+        // Called outside `#expect`: the macro cannot evaluate a mutating call.
+        let handledWhileBrowsing = selection.handleTap(on: id)
+        #expect(!handledWhileBrowsing)
         #expect(!selection.isSelected(id))
 
         selection.begin()
-        #expect(selection.handleTap(on: id))
+        let handledWhileSelecting = selection.handleTap(on: id)
+        #expect(handledWhileSelecting)
         #expect(selection.isSelected(id))
     }
 
