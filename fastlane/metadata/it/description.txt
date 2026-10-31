@@ -26,6 +26,11 @@ PRIVATA PER PROGETTAZIONE
 - Nulla lascia il tuo iPhone a meno che tu non attivi un fornitore cloud.
 - Nessun tracciamento, nessuna analisi, nessuna pubblicità, nessun account.
 
+GRATUITA E OPEN SOURCE
+- Gratuita da scaricare e da usare, senza abbonamenti, acquisti in-app o pubblicità.
+- Tutto il codice sorgente è pubblico su GitHub con licenza MIT, così chiunque può verificare come vengono trattate le registrazioni.
+- I fornitori cloud sono facoltativi e ti addebitano direttamente sulla tua chiave API; Kurn non aggiunge nulla.
+
 ACCESSIBILE PER PROGETTAZIONE
 - Supporto completo a VoiceOver nell'app, su Apple Watch e nella Live Activity.
 - Testo dinamico, Riduci movimento e stati che non dipendono mai solo dal colore.

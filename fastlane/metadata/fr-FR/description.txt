@@ -26,6 +26,11 @@ CONFIDENTIEL PAR CONCEPTION
 - Rien ne quitte votre iPhone sauf si vous activez un fournisseur cloud.
 - Aucun pistage, aucune analyse, aucune publicité, aucun compte.
 
+GRATUIT ET OPEN SOURCE
+- Gratuit à télécharger et à utiliser, sans abonnement, sans achat intégré et sans publicité.
+- Tout le code source est public sur GitHub sous licence MIT : chacun peut vérifier comment vos enregistrements sont traités.
+- Les fournisseurs cloud sont facultatifs et vous facturent directement via votre propre clé d'API ; Kurn n'ajoute rien.
+
 ACCESSIBLE PAR CONCEPTION
 - Prise en charge complète de VoiceOver dans l'app, sur l'Apple Watch et dans la Live Activity.
 - Texte dynamique, Réduire les animations et des états qui ne reposent jamais sur la seule couleur.

@@ -12,7 +12,10 @@ but which silently waste the only fields search indexes:
 - the app name, category names and duplicates are indexed already or twice;
 - keywords are one comma-separated list with no spaces around the commas;
 - other apps' names are not allowed in metadata (App Review Guideline
-  2.3.7), however much search traffic they carry.
+  2.3.7), however much search traffic they carry;
+- neither is price in the name, subtitle or screenshots (also 2.3.7): that
+  the app is free belongs in the description and promotional text, so the
+  screenshot captions (scripts/screenshots/config.json) are checked too.
 
 Each localization directory is a store language. Which storefront shows
 which language is Apple's table ("App Store localizations" in App Store
@@ -23,6 +26,7 @@ Spanish localization. Only languages the app's UI is translated into are
 listed; a store page in a language the app does not speak would mislead.
 """
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -74,6 +78,28 @@ COMPETITOR_NAMES = {
     "tldv",
     "trint",
 }
+# Price terms (Guideline 2.3.7) in the store languages. Whole words, except
+# Chinese, which has no spaces and is matched as a substring.
+PRICE_WORDS = {
+    "free",
+    "gratis",
+    "grátis",
+    "gratuito",
+    "gratuita",
+    "gratuitos",
+    "gratuitas",
+    "gratuiti",
+    "gratuit",
+    "gratuite",
+    "gratuits",
+    "gratuites",
+    "kostenlos",
+    "kostenlose",
+    "gratuitamente",
+}
+PRICE_SUBSTRINGS = ("免费",)
+CAPTIONS = ROOT / "scripts" / "screenshots" / "config.json"
+CAPTION_FIELDS = ("badge", "title", "titleHighlight", "subtitle", "cardStat", "cardLabel")
 WORD = re.compile(r"[^\W_]+", re.UNICODE)
 CJK = re.compile(r"[぀-ヿ㐀-䶿一-鿿가-힯]")
 
@@ -114,7 +140,30 @@ def competitor_problems(text: str) -> list:
     return [f"mentions another app ({', '.join(found)}); Guideline 2.3.7"] if found else []
 
 
-def validate(metadata: Path, locales: set = LOCALES) -> list:
+# Hyphenated compounds stay one word here, so "hands-free" is not a price.
+COMPOUND_WORD = re.compile(r"[^\W_]+(?:-[^\W_]+)*", re.UNICODE)
+
+
+def price_problems(text: str) -> list:
+    compounds = {match.group(0).casefold() for match in COMPOUND_WORD.finditer(text)}
+    found = sorted(compounds & PRICE_WORDS) + [term for term in PRICE_SUBSTRINGS if term in text]
+    return [f"mentions price ({', '.join(found)}); Guideline 2.3.7 keeps it out of this field"] if found else []
+
+
+def caption_problems(captions: dict) -> list:
+    """(location, problem) pairs for price terms in screenshot captions."""
+    problems = []
+    for locale, screens in captions.items():
+        if locale.startswith("_") or not isinstance(screens, dict):
+            continue
+        for screen, copy in screens.items():
+            for field in CAPTION_FIELDS:
+                for problem in price_problems(str(copy.get(field, ""))):
+                    problems.append((f"{locale}/{screen}/{field}", problem))
+    return problems
+
+
+def validate(metadata: Path, locales: set = LOCALES, captions_path: Path = CAPTIONS) -> list:
     errors = []
 
     def report(path: Path, message: str) -> None:
@@ -181,6 +230,14 @@ def validate(metadata: Path, locales: set = LOCALES) -> list:
         for filename in ("name.txt", "subtitle.txt", "keywords.txt", "promotional_text.txt", "description.txt"):
             for problem in competitor_problems(values.get(filename, "")):
                 report(directory / filename, problem)
+        for filename in ("name.txt", "subtitle.txt"):
+            for problem in price_problems(values.get(filename, "")):
+                report(directory / filename, problem)
+
+    if captions_path.is_file():
+        captions = json.loads(captions_path.read_text(encoding="utf-8"))
+        for location, problem in caption_problems(captions):
+            report(captions_path, f"{location}: {problem}")
 
     return errors
 

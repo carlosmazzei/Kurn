@@ -26,6 +26,11 @@ PRIVACIDADE POR OMISSÃO
 - Nada sai do seu iPhone a não ser que ative um fornecedor na nuvem.
 - Sem rastreio, sem análises, sem anúncios e sem conta.
 
+GRATUITA E DE CÓDIGO ABERTO
+- Gratuita para descarregar e usar, sem subscrições, sem compras na app e sem anúncios.
+- Todo o código-fonte é público no GitHub, sob a licença MIT, para que qualquer pessoa possa verificar como as gravações são tratadas.
+- Os fornecedores na nuvem são opcionais e cobram diretamente na sua própria chave de API; o Kurn não acrescenta nada.
+
 ACESSÍVEL DE RAIZ
 - Suporte completo ao VoiceOver na app, no Apple Watch e na Live Activity.
 - Texto dinâmico, Reduzir movimento e estados que nunca dependem só da cor.

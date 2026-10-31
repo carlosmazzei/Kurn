@@ -26,6 +26,11 @@ PRIVATE BY DESIGN
 - Nothing leaves your iPhone unless you turn on a cloud provider.
 - No tracking, no analytics, no ads and no account.
 
+FREE AND OPEN SOURCE
+- Free to download and use, with no subscriptions, no in-app purchases and no ads.
+- The complete source code is public on GitHub under the MIT licence, so anyone can check how your recordings are handled.
+- Cloud providers are optional and bill you directly through your own API key; Kurn adds nothing on top.
+
 ACCESSIBLE BY DESIGN
 - Full VoiceOver support in the app, on Apple Watch and in the Live Activity.
 - Dynamic Type, Reduce Motion, and status that never relies on colour alone.

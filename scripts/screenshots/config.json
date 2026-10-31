@@ -43,8 +43,8 @@
       "titleHighlight": "cloud only if you choose",
       "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "Your data",
-      "cardLabel": "Stays on your device"
+      "cardStat": "Open source",
+      "cardLabel": "MIT license on GitHub"
     }
   },
   "en-US": {
@@ -90,8 +90,8 @@
       "titleHighlight": "cloud only if you choose",
       "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "Your data",
-      "cardLabel": "Stays on your device"
+      "cardStat": "Open source",
+      "cardLabel": "MIT license on GitHub"
     }
   },
   "en-CA": {
@@ -137,8 +137,8 @@
       "titleHighlight": "cloud only if you choose",
       "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "Your data",
-      "cardLabel": "Stays on your device"
+      "cardStat": "Open source",
+      "cardLabel": "MIT license on GitHub"
     }
   },
   "en-GB": {
@@ -184,8 +184,8 @@
       "titleHighlight": "cloud only if you choose",
       "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "Your data",
-      "cardLabel": "Stays on your device"
+      "cardStat": "Open source",
+      "cardLabel": "MIT licence on GitHub"
     }
   },
   "en-AU": {
@@ -231,8 +231,8 @@
       "titleHighlight": "cloud only if you choose",
       "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "Your data",
-      "cardLabel": "Stays on your device"
+      "cardStat": "Open source",
+      "cardLabel": "MIT licence on GitHub"
     }
   },
   "pt-BR": {
@@ -278,8 +278,8 @@
       "titleHighlight": "nuvem só se você quiser",
       "subtitle": "Sem rastreamento, anúncios ou conta. Use sua própria chave de API para IA na nuvem.",
       "cardIcon": "◈",
-      "cardStat": "Seus dados",
-      "cardLabel": "Ficam no seu aparelho"
+      "cardStat": "Código aberto",
+      "cardLabel": "Licença MIT no GitHub"
     }
   },
   "pt-PT": {
@@ -325,8 +325,8 @@
       "titleHighlight": "nuvem só se quiser",
       "subtitle": "Sem rastreio, anúncios ou conta. Use a sua própria chave de API para IA na nuvem.",
       "cardIcon": "◈",
-      "cardStat": "Os seus dados",
-      "cardLabel": "Ficam no seu dispositivo"
+      "cardStat": "Código aberto",
+      "cardLabel": "Licença MIT no GitHub"
     }
   },
   "es-ES": {
@@ -372,8 +372,8 @@
       "titleHighlight": "nube solo si quieres",
       "subtitle": "Sin rastreo, anuncios ni cuenta. Usa tu propia clave de API para la IA en la nube.",
       "cardIcon": "◈",
-      "cardStat": "Tus datos",
-      "cardLabel": "Se quedan en tu dispositivo"
+      "cardStat": "Código abierto",
+      "cardLabel": "Licencia MIT en GitHub"
     }
   },
   "es-MX": {
@@ -419,8 +419,8 @@
       "titleHighlight": "nube solo si quieres",
       "subtitle": "Sin rastreo, anuncios ni cuenta. Usa tu propia clave de API para la IA en la nube.",
       "cardIcon": "◈",
-      "cardStat": "Tus datos",
-      "cardLabel": "Se quedan en tu dispositivo"
+      "cardStat": "Código abierto",
+      "cardLabel": "Licencia MIT en GitHub"
     }
   },
   "fr-FR": {
@@ -466,8 +466,8 @@
       "titleHighlight": "cloud si vous le voulez",
       "subtitle": "Aucun pistage, aucune pub, aucun compte. Votre propre clé d'API pour l'IA cloud.",
       "cardIcon": "◈",
-      "cardStat": "Vos données",
-      "cardLabel": "Restent sur votre appareil"
+      "cardStat": "Open source",
+      "cardLabel": "Licence MIT sur GitHub"
     }
   },
   "fr-CA": {
@@ -513,8 +513,8 @@
       "titleHighlight": "nuage au besoin",
       "subtitle": "Aucun pistage, aucune pub, aucun compte. Votre propre clé d'API pour l'IA infonuagique.",
       "cardIcon": "◈",
-      "cardStat": "Vos données",
-      "cardLabel": "Restent sur votre appareil"
+      "cardStat": "Code source ouvert",
+      "cardLabel": "Licence MIT sur GitHub"
     }
   },
   "it": {
@@ -560,8 +560,8 @@
       "titleHighlight": "cloud solo se vuoi",
       "subtitle": "Nessun tracciamento, pubblicità o account. Usa la tua chiave API per l'IA cloud.",
       "cardIcon": "◈",
-      "cardStat": "I tuoi dati",
-      "cardLabel": "Restano sul dispositivo"
+      "cardStat": "Open source",
+      "cardLabel": "Licenza MIT su GitHub"
     }
   },
   "de-DE": {
@@ -607,8 +607,8 @@
       "titleHighlight": "Cloud nur, wenn du willst",
       "subtitle": "Kein Tracking, keine Werbung, kein Konto. Eigener API-Schlüssel für Cloud-KI.",
       "cardIcon": "◈",
-      "cardStat": "Deine Daten",
-      "cardLabel": "Bleiben auf dem Gerät"
+      "cardStat": "Open Source",
+      "cardLabel": "MIT-Lizenz auf GitHub"
     }
   },
   "zh-Hans": {
@@ -654,8 +654,8 @@
       "titleHighlight": "云端由你决定",
       "subtitle": "无追踪、无广告、无需账号。云端 AI 使用你自己的 API 密钥。",
       "cardIcon": "◈",
-      "cardStat": "你的数据",
-      "cardLabel": "只留在你的设备上"
+      "cardStat": "开源",
+      "cardLabel": "GitHub 上的 MIT 许可证"
     }
   }
 }

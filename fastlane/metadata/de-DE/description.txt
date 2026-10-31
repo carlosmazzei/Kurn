@@ -26,6 +26,11 @@ PRIVAT VON GRUND AUF
 - Nichts verlässt dein iPhone, außer du aktivierst einen Cloud-Anbieter.
 - Kein Tracking, keine Analysen, keine Werbung, kein Konto.
 
+KOSTENLOS UND OPEN SOURCE
+- Kostenlos laden und nutzen, ohne Abo, ohne In-App-Käufe und ohne Werbung.
+- Der gesamte Quellcode ist auf GitHub unter der MIT-Lizenz öffentlich, sodass jeder prüfen kann, wie deine Aufnahmen behandelt werden.
+- Cloud-Anbieter sind optional und rechnen direkt über deinen eigenen API-Schlüssel ab; Kurn schlägt nichts auf.
+
 BARRIEREFREI VON GRUND AUF
 - Volle VoiceOver-Unterstützung in der App, auf der Apple Watch und in der Live-Aktivität.
 - Dynamische Schrift, Bewegung reduzieren und Status, der nie nur über Farbe vermittelt wird.

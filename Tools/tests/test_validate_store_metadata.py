@@ -38,9 +38,9 @@ def make_metadata(root: Path, locales, overrides=None, root_files=None):
         (root / name).write_text(value + "\n", encoding="utf-8")
 
 
-def run(root: Path, locales):
+def run(root: Path, locales, captions_path=None):
     with redirect_stdout(io.StringIO()):
-        return vsm.validate(root, set(locales))
+        return vsm.validate(root, set(locales), captions_path or root / "no-captions.json")
 
 
 class KeywordHygieneTests(unittest.TestCase):
@@ -68,6 +68,20 @@ class KeywordHygieneTests(unittest.TestCase):
     def test_competitor_names_are_refused(self):
         self.assertTrue(vsm.competitor_problems("Better than Otter and Plaud"))
         self.assertEqual(vsm.competitor_problems("Pinch to zoom your teams notes"), [])
+
+
+class PriceTests(unittest.TestCase):
+    def test_price_words_are_found_in_every_store_language(self):
+        for text in ("Free AI notes", "Notas grátis", "Notes gratuites", "Kostenlos notieren", "免费会议记录"):
+            self.assertTrue(vsm.price_problems(text), text)
+        self.assertEqual(vsm.price_problems("Hands-free, open source notes"), [])
+        self.assertEqual(vsm.price_problems("Open source meeting notes"), [])
+
+    def test_captions_are_checked_per_field(self):
+        captions = {"_comment": "Free text here is fine",
+                    "en-US": {"01": {"title": "Free forever", "cardLabel": "MIT license"}}}
+        problems = vsm.caption_problems(captions)
+        self.assertEqual([location for location, _ in problems], ["en-US/01/title"])
 
 
 class ValidateTests(unittest.TestCase):
@@ -103,10 +117,23 @@ class ValidateTests(unittest.TestCase):
             )
             errors = " ".join(run(root, ["en-US"]))
             self.assertIn("brand name", errors)
+            self.assertNotIn("mentions price", errors)
             self.assertIn("only repeats the name", errors)
             self.assertIn("already in the name or subtitle", errors)
             self.assertIn("Guideline 2.3.7", errors)
             self.assertIn("must differ from the primary", errors)
+
+    def test_price_in_the_subtitle_or_a_caption_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_metadata(root, ["en-US"], {"en-US": {"subtitle.txt": "Free Meeting Recorder",
+                                                      "description.txt": "Kurn is free and open source."}})
+            captions = root / "captions.json"
+            captions.write_text('{"en-US": {"05": {"badge": "FREE"}}}', encoding="utf-8")
+            errors = run(root, ["en-US"], captions)
+            self.assertEqual(len(errors), 2, errors)
+            self.assertTrue(any("subtitle.txt" in e for e in errors))
+            self.assertTrue(any("en-US/05/badge" in e for e in errors))
 
     def test_repository_metadata_is_valid(self):
         with redirect_stdout(io.StringIO()):

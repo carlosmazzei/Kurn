@@ -108,8 +108,10 @@ attaches the processed build, and submits it to App Review with
 `.github/workflows/app-store-submit.yml` remains a manual retry path.
 `Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
 URLs and the App Store search rules the listing is written against (no keyword
-that repeats the name, subtitle, brand or a category; no competitor names) in
-the regular CI job. The store languages are not the UI languages: Apple shows
+that repeats the name, subtitle, brand or a category; no competitor names; no
+price term such as "free" in the name, subtitle or screenshot captions, so that
+the app is free and open source is said in the description and promotional
+text) in the regular CI job. The store languages are not the UI languages: Apple shows
 English (U.K.) or Spanish (Mexico) in most storefronts, so `fastlane/metadata/`
 carries regional variants (`en-GB`, `es-MX`, …) of the 7 UI languages.
 Screenshots are captured in all 7 UI languages — one macOS job per language in

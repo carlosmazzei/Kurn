@@ -37,7 +37,8 @@ This is what's still needed to take a tagged build public, split by who does it.
       the regular `iOS CI` workflow and checks locale/file completeness, Apple's
       text limits (including the 100-byte keyword limit), HTTPS URLs, and the
       search rules — no keyword repeating the name or subtitle, the brand or a
-      category, no duplicates or spaced commas, no competitor names (Guideline
+      category, no duplicates or spaced commas, no competitor names and no
+      price term in the name, subtitle or screenshot captions (Guideline
       2.3.7) — before a release tag can reach the metadata upload job.
 - [x] Accessibility Nutrition Labels — `fastlane/accessibility.json` declares
       VoiceOver, Larger Text, Reduced Motion, and Differentiate Without Color
