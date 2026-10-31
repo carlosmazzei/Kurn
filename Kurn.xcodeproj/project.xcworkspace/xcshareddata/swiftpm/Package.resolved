@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/k2-fsa/sherpa-onnx.git",
       "state" : {
-        "revision" : "11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf",
-        "version" : "1.13.8"
+        "revision" : "af2d8d81dbfa61c4cea4c568da78f3982edca005",
+        "version" : "2.0.1"
       }
     }
   ],
