@@ -15,6 +15,14 @@ import Testing
 
 @MainActor
 struct ReviewPromptCoordinatorTests {
+    /// A main-actor switch the suppression closure reads: the closure is
+    /// `@MainActor` (and so `@Sendable`), which cannot capture a local `var`.
+    @MainActor
+    private final class Switch {
+        var isOn: Bool
+        init(_ isOn: Bool) { self.isOn = isOn }
+    }
+
     private let defaults: UserDefaults
     private let policy = ReviewPromptPolicy(minimumMoments: 2, minimumInterval: 60)
     private let start = Date(timeIntervalSince1970: 2_000_000)
@@ -26,7 +34,7 @@ struct ReviewPromptCoordinatorTests {
     private func makeCoordinator(
         version: String = "1.0.0",
         now: Date? = nil,
-        suppressed: @escaping () -> Bool = { false }
+        suppressed: @escaping @MainActor () -> Bool = { false }
     ) -> ReviewPromptCoordinator {
         let fixed = now ?? start
         return ReviewPromptCoordinator(
@@ -61,17 +69,17 @@ struct ReviewPromptCoordinatorTests {
     }
 
     @Test func aSuppressedMomentCountsButDoesNotAsk() {
-        var suppressed = true
-        let coordinator = makeCoordinator(suppressed: { suppressed })
+        let suppressed = Switch(true)
+        let coordinator = makeCoordinator(suppressed: { suppressed.isOn })
         coordinator.noteSuccessfulMoment()
         coordinator.noteSuccessfulMoment()
         #expect(coordinator.requestToken == 0)
         #expect(coordinator.state.successfulMoments == 2)
 
-        suppressed = false
+        suppressed.isOn = false
         coordinator.noteSuccessfulMoment()
         #expect(coordinator.requestToken == 1)
-        suppressed = true
+        suppressed.isOn = true
         #expect(!coordinator.consumePendingRequest())
         #expect(coordinator.state.lastPromptedVersion == nil)
     }
