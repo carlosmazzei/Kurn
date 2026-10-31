@@ -19,6 +19,34 @@ struct RecordingSurfacePayloadsTests {
 
     // MARK: - Live Activity
 
+    @Test func pausingFreezesTheRunningTime() {
+        let running = RecordingActivityAttributes.ContentState(
+            isPaused: false, elapsed: 30, referenceDate: now, highlightCount: 1
+        )
+        let paused = running.togglingPause(at: now.addingTimeInterval(15))
+        #expect(paused == RecordingActivityAttributes.ContentState(
+            isPaused: true, elapsed: 45, referenceDate: now.addingTimeInterval(15), highlightCount: 1
+        ))
+    }
+
+    @Test func resumingRestartsTheTimerFromTheFrozenTime() {
+        let paused = RecordingActivityAttributes.ContentState(
+            isPaused: true, elapsed: 45, referenceDate: now, highlightCount: 0
+        )
+        let resumed = paused.togglingPause(at: now.addingTimeInterval(600))
+        #expect(resumed == RecordingActivityAttributes.ContentState(
+            isPaused: false, elapsed: 45, referenceDate: now.addingTimeInterval(600), highlightCount: 0
+        ))
+    }
+
+    // A reference date in the future (a clock change) must not take time away.
+    @Test func pausingNeverRemovesTime() {
+        let running = RecordingActivityAttributes.ContentState(
+            isPaused: false, elapsed: 30, referenceDate: now, highlightCount: 0
+        )
+        #expect(running.togglingPause(at: now.addingTimeInterval(-10)).elapsed == 30)
+    }
+
     @Test func onlyAnActiveRecordingReadsAsRunning() {
         let recording = RecordingSurfacePayloads.activityState(for: .recording, elapsed: 12, highlightCount: 2, now: now)
         #expect(recording == RecordingActivityAttributes.ContentState(
