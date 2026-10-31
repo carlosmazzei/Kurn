@@ -2200,8 +2200,9 @@ enforced by lint and by a CI audit test, not just convention:
   flaking is demoted with a `-skip-testing` line in `swift.yml` and
   re-measured there before coming back.
 - **Speaker identity, not color, carries meaning** everywhere it matters: the
-  Live Activity's Lock Screen status dot differs by *shape* (pause icon vs.
-  filled circle), not only color, and status text is never color-only.
+  Live Activity says "Recording"/"Paused" in words — under "Kurn" on the Lock
+  Screen, beside the dot in the expanded Dynamic Island — rather than with a
+  colored dot alone, and status text is never color-only.
 - **Locale parity** — `KurnWatch/` and `KurnLiveActivityExtension/` each carry
   the same 7 locales as the main app (`en`, `pt-BR`, `es`, `fr`, `it`, `de`,
   `zh-Hans`), not just `en`/`pt-BR` — a VoiceOver user on the Watch or reading
