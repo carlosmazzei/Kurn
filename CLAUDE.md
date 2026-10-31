@@ -111,9 +111,12 @@ URLs and the App Store search rules the listing is written against (no keyword
 that repeats the name, subtitle, brand or a category; no competitor names) in
 the regular CI job. The store languages are not the UI languages: Apple shows
 English (U.K.) or Spanish (Mexico) in most storefronts, so `fastlane/metadata/`
-carries regional variants (`en-GB`, `es-MX`, …) of the 7 UI languages, and
-`scripts/screenshots/render.js --fallback-locale en-US` frames each of them with
-its own captions over the en-US captures. The app asks for a rating through
+carries regional variants (`en-GB`, `es-MX`, …) of the 7 UI languages.
+Screenshots are captured in all 7 UI languages — one macOS job per language in
+`screenshots.yml`, the seeded meetings following the launch language
+(`DebugSupport/ScreenshotSeedText`) — and `scripts/screenshots/render.js` frames
+every store language with its own captions over the capture of its language
+(`es-MX` over `es-ES`, `en-GB` over `en-US`). The app asks for a rating through
 `ReviewPromptCoordinator` (`Application/`): a finished transcript or summary is
 a moment of value, KurnCore's `ReviewPromptPolicy` decides when one is due
 (three moments, once per version, 120 days apart), and nothing asks during a
@@ -432,7 +435,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   non-UI entry point, and never inject a dependency by assigning a property
   after construction.
 - **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
-  `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
+  `ScreenshotSeedData` seeds a handful of plausible meetings (text from
+  `ScreenshotSeedText`, in the launch language) into the in-memory
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
   backing both the fastlane screenshot run and `AccessibilityAuditUITests`. It
   never seeds a real recording or transcript.

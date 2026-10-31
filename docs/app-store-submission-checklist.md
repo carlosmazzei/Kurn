@@ -21,15 +21,11 @@ This is what's still needed to take a tagged build public, split by who does it.
       through the reusable `App Store Screenshots` workflow, and always uploaded
       as the `screenshots` artifact before their protected upload job starts.
       The workflow can still be dispatched manually for ad-hoc captures.
-      Captured in **English (`en-US`) only for now**; `render.js
-      --fallback-locale en-US` then frames every store language with its own
-      captions over those captures. `KurnUITests/ScreenshotUITests.swift`
-      already drives navigation purely through `.accessibilityIdentifier`,
-      but `Kurn/DebugSupport/ScreenshotSeedData.swift`'s seeded meeting
-      titles, transcript lines, and summaries are hardcoded English, so
-      adding more `Snapfile` languages today would just localize the chrome
-      around still-English content. Translating the seed data is a
-      prerequisite, not wired up here.
+      Captured in all **7 UI languages**, one macOS job per language
+      (`screenshots.yml`'s matrix, merged back into one artifact); the seeded
+      meetings follow the launch language (`ScreenshotSeedText`), and
+      `render.js` frames every store language with its own captions over the
+      capture of its language (es-MX over es-ES, en-GB over en-US, …).
 - [x] Pushing screenshots + text metadata together — `fastlane store_assets`
       targets the exact `MARKETING_VERSION` and runs automatically for the tag
       after capture, behind its own `release` Environment approval. Screenshot
@@ -119,8 +115,8 @@ information this repo has no business holding):
 ## Note on localization
 
 Text metadata (`fastlane/metadata/`) covers 13 store languages and is
-pushed automatically on every tag (see above). Screenshot captions follow the
-same 13; the captures under them (`Snapfile`) are still `en-US` only: the seeded meeting content in `ScreenshotSeedData.swift`
-is hardcoded English, so localizing screenshots means translating that seed
-data first, then adding `languages` entries to `Snapfile` — not required to
-submit, but worth doing before or shortly after the first public release.
+pushed automatically on every tag (see above). Screenshots are captured in the
+7 UI languages and framed for all 13: a regional store language (`en-GB`,
+`es-MX`, `fr-CA`, `pt-PT`, …) uses the capture of its language with its own
+captions. A new UI language needs a `ScreenshotSeedText` table, a `Snapfile`
+entry and a matrix entry in `screenshots.yml`.

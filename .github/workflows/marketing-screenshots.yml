@@ -65,13 +65,18 @@ jobs:
         working-directory: scripts/screenshots
         run: npm install
 
+      - name: Test the render plan
+        working-directory: scripts/screenshots
+        run: node --test
+
       - name: Install Playwright Chromium
         working-directory: scripts/screenshots
         run: npx playwright install --with-deps chromium
 
-      # Capture is en-US only (fastlane/Snapfile); --fallback-locale renders
-      # every other locale in config.json with its own captions over those
-      # captures, so each store language gets captions in its language.
+      # Captures exist for the 7 UI languages (fastlane/Snapfile); every other
+      # store locale in config.json (en-GB, es-MX, fr-CA, pt-PT, ...) is
+      # rendered with its own captions over the captures of its language, and
+      # --fallback-locale only covers a language whose capture is missing.
       - name: Render marketing screenshots
         working-directory: scripts/screenshots
         run: |

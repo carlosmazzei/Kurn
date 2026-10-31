@@ -221,13 +221,23 @@ end
 # (46mm)" is the current-generation large-case simulator as of Xcode 26; if a
 # local Xcode install doesn't have it, substitute an installed Watch simulator
 # name (`xcrun simctl list devicetypes`).
-lane :screenshots do
-  capture_screenshots
+#
+# `languages:` (comma-separated App Store locales, e.g. "pt-BR,de-DE") narrows
+# the Snapfile's list; screenshots.yml runs one language per matrix job.
+# `watch:false` skips the Watch pass, for a quicker local run of the
+# iPhone/iPad screens.
+lane :screenshots do |options|
+  languages = options[:languages].to_s.split(",").map(&:strip).reject(&:empty?)
+  language_options = languages.empty? ? {} : { languages: languages }
+  capture_screenshots(**language_options)
+  next if options[:watch].to_s == "false"
+
   capture_screenshots(
     scheme: "KurnWatchUITests",
     devices: ["Apple Watch Series 11 (46mm)"],
     only_testing: ["KurnWatchUITests/ScreenshotUITests"],
-    clear_previous_screenshots: false
+    clear_previous_screenshots: false,
+    **language_options
   )
 end
 

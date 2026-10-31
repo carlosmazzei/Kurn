@@ -239,10 +239,6 @@ Connect or a decision the repository cannot make:
   Kong, Macau and Taiwan, which fall back to English today. It needs the app
   UI localized first — a store page in a language the app does not speak
   would mislead — and then a `zh-Hant` metadata directory.
-- **Localized screenshot capture.** Captions are localized; the app UI under
-  them is the en-US capture, because `ScreenshotSeedData` is English and a
-  capture per locale multiplies the macOS screenshot job. Translating the seed
-  data and splitting `screenshots.yml` into a per-locale matrix removes both.
 - **Apple Search Ads** on the brand term and on the long-tail terms the
   listing already targets, once there is a rating count worth showing.
 
@@ -337,9 +333,6 @@ The H1–H10 hardening track is closed; its invariants and types are in
   check covers large accessibility text sizes; Watch VoiceOver is verified
   manually because `KurnWatchUITests` does not run in CI; the Chat tab's live
   conversation UI only renders against a real provider.
-- **Localized screenshots.** `ScreenshotSeedData` is hardcoded English, so App
-  Store screenshots are `en-US` only; translate the seed data, then add
-  `Snapfile` languages.
 
 ### UI test stability and speed
 

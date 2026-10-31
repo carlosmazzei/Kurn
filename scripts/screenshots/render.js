@@ -17,12 +17,13 @@
 // assets + placement come from frames.json + frames/*.png (vendored from
 // fastlane/frameit-frames, MIT).
 //
-// With --fallback-locale (screenshots.yml passes en-US), every locale that
-// has copy in config.json but no captures of its own is rendered too, with
-// its own captions over the fallback locale's captures. Capture runs in one
-// language (fastlane/Snapfile), but a store page whose captions are in the
-// searcher's language converts better than one showing another locale's,
-// and caption text is reported to count towards that locale's search.
+// Every locale with copy in config.json is rendered, also those with no
+// captures of their own: the store has regional languages (en-GB, es-MX,
+// fr-CA, pt-PT, ...) the app UI does not, so those get their own captions
+// over the captures of the same language, or of --fallback-locale
+// (screenshots.yml passes en-US) when the language was not captured. A store
+// page whose captions are in the searcher's language converts better, and
+// caption text is reported to count towards that locale's search.
 //
 // Usage:
 //   node render.js --input-dir <dir> --output-dir <dir> \
@@ -243,24 +244,34 @@ function resolveFrame(deviceName, colorArg, framesManifest, framesDir, cache) {
 }
 
 // Which captures each output locale is rendered from: every captured locale
-// from its own directory, then (with a fallback) every configured locale that
-// was not captured from the fallback's. A configured locale is any top-level
-// config.json key other than "default" and "_"-prefixed comments.
+// from its own directory, then every configured locale that was not captured
+// from a captured locale of the same language (es-MX from es-ES, pt-PT from
+// pt-BR, en-GB from en-US: the app UI has one localization per language), or
+// from --fallback-locale when its language was not captured at all. A
+// configured locale is any top-level config.json key other than "default"
+// and "_"-prefixed comments.
+function languageOf(locale) {
+  return locale.split(/[-_]/)[0].toLowerCase();
+}
+
 function planLocales(capturedLocales, config, fallbackLocale) {
   const plan = capturedLocales.map((locale) => ({ locale, source: locale }));
-  if (!fallbackLocale) {
-    return plan;
-  }
-  if (!capturedLocales.includes(fallbackLocale)) {
-    console.warn(`[render] Fallback locale "${fallbackLocale}" has no captures; rendering captured locales only.`);
-    return plan;
-  }
   const configured = Object.keys(config)
     .filter((key) => key !== 'default' && !key.startsWith('_'))
     .filter((key) => !capturedLocales.includes(key))
     .sort();
+  const fallback = fallbackLocale && capturedLocales.includes(fallbackLocale) ? fallbackLocale : null;
+  if (fallbackLocale && !fallback) {
+    console.warn(`[render] Fallback locale "${fallbackLocale}" has no captures; it will not be used.`);
+  }
   for (const locale of configured) {
-    plan.push({ locale, source: fallbackLocale });
+    const sameLanguage = capturedLocales
+      .filter((captured) => languageOf(captured) === languageOf(locale))
+      .sort()[0];
+    const source = sameLanguage || fallback;
+    if (source) {
+      plan.push({ locale, source });
+    }
   }
   return plan;
 }
@@ -433,4 +444,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { planLocales, splitDeviceAndScreen };
+module.exports = { languageOf, planLocales, splitDeviceAndScreen };
