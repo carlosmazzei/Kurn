@@ -1,0 +1,33 @@
+Kurn est une app de prise de notes de réunion par IA qui enregistre, transcrit et résume vos réunions, cours et entrevues, en toute confidentialité sur votre iPhone. Aucun robot ne se joint à votre appel, aucun compte n'est nécessaire et vos enregistrements restent sur votre appareil par défaut.
+
+ENREGISTREZ TOUT
+- Enregistrez réunions en personne, cours, entretiens et notes vocales, en un ou plusieurs segments.
+- Démarrez, mettez en pause et arrêtez depuis l'app, l'écran verrouillé, la Dynamic Island, le centre de contrôle, Siri et Raccourcis ou votre Apple Watch.
+- Continuez à enregistrer dans d'autres apps : l'enregistreuse se réduit en mini-barre.
+
+TRANSCRIVEZ L'AUDIO EN TEXTE
+- Transcription sur l'appareil avec la reconnaissance vocale d'Apple, un modèle multilingue local ou Whisper exécuté directement sur votre iPhone.
+- Transcription infonuagique en option, avec votre propre clé OpenAI, Groq ou ElevenLabs.
+- L'identification des intervenants montre qui a dit quoi et suggère le nom d'une voix déjà nommée dans une autre réunion.
+- Les longues transcriptions reprennent là où elles s'étaient arrêtées si l'app est interrompue.
+
+PROCÈS-VERBAUX, RÉSUMÉS ET SUIVIS PAR IA
+- Résumés structurés avec décisions, actions et points clés : modèles général, point quotidien, entretien ou plan, ou le vôtre.
+- Fonctionne avec Apple Intelligence sur les appareils compatibles, ou avec le fournisseur de votre choix et votre propre clé d'API.
+- Posez des questions sur une réunion ou toute votre bibliothèque et obtenez des réponses avec des horodatages à toucher.
+- Joignez des PDF comme référence, créez des documents à partir de plusieurs réunions et écoutez les résumés à voix haute.
+
+ORGANISEZ ET PARTAGEZ
+- Dossiers, dossiers intelligents, étiquettes, favoris et archives, avec une recherche dans toutes les transcriptions.
+- Exportez résumés et transcriptions en PDF, Word, Markdown, Obsidian, HTML ou texte brut.
+
+CONFIDENTIEL PAR CONCEPTION
+- Enregistrements et transcriptions sont stockés sur votre appareil, chiffrés et protégés par Face ID, Touch ID ou votre code.
+- Rien ne quitte votre iPhone sauf si vous activez un fournisseur infonuagique.
+- Aucun pistage, aucune analyse, aucune publicité, aucun compte.
+
+ACCESSIBLE PAR CONCEPTION
+- Prise en charge complète de VoiceOver dans l'app, sur l'Apple Watch et dans la Live Activity.
+- Texte dynamique, Réduire les animations et des états qui ne reposent jamais sur la seule couleur.
+
+Kurn est disponible en français, anglais, portugais, espagnol, italien, allemand et chinois simplifié, et transcrit des dizaines de langues.

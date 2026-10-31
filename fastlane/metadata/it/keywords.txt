@@ -1,1 +1,1 @@
-riunione,trascrizione,note,diarizzazione,speaker,riepilogo,registratore,privacy,offline,whisper
+trascrizione,registratore,voce,audio,testo,verbale,riassunto,offline,lezione,intervista,appunti

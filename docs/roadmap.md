@@ -215,6 +215,33 @@ data exists.
 Cross-meeting voice matching is in place, but it can only suggest a name the
 user already typed somewhere. Candidate names from the calendar are F4.
 
+## App Store presence
+
+The listing itself is in the repository (`fastlane/metadata/`, the captions in
+`scripts/screenshots/config.json`) and `Tools/validate_store_metadata.py`
+enforces the search rules it is written against. What is left needs App Store
+Connect or a decision the repository cannot make:
+
+- **Custom product pages with keywords.** Since July 2025 a custom product page
+  can be assigned keywords and is then shown in organic search for them, each
+  keyword pointing to one page only. Candidates: students (lecture, class),
+  interviews (journalists, hiring), and privacy-sensitive work (legal, health).
+  Fastlane's `deliver` has no model for these, so they are created by hand or
+  by a small Spaceship lane like `accessibility_labels.rb`.
+- **In-App Events.** Indexed in search and shown as cards in results. A
+  release with a user-visible feature, or the start of a school term, is the
+  natural occasion.
+- **Featuring nomination** (App Store Connect → Featuring Nominations) before
+  each larger release: Liquid Glass, Apple Intelligence through
+  `FoundationModelsProvider`, accessibility and privacy are the story Apple's
+  editors look for.
+- **Traditional Chinese (`zh-Hant`)** is the default store language of Hong
+  Kong, Macau and Taiwan, which fall back to English today. It needs the app
+  UI localized first — a store page in a language the app does not speak
+  would mislead — and then a `zh-Hant` metadata directory.
+- **Apple Search Ads** on the brand term and on the long-tail terms the
+  listing already targets, once there is a rating count worth showing.
+
 ## Follow-ups on shipped work
 
 Gaps each shipped track recorded about itself. None blocks feature work; each
@@ -306,9 +333,6 @@ The H1–H10 hardening track is closed; its invariants and types are in
   check covers large accessibility text sizes; Watch VoiceOver is verified
   manually because `KurnWatchUITests` does not run in CI; the Chat tab's live
   conversation UI only renders against a real provider.
-- **Localized screenshots.** `ScreenshotSeedData` is hardcoded English, so App
-  Store screenshots are `en-US` only; translate the seed data, then add
-  `Snapfile` languages.
 
 ### UI test stability and speed
 

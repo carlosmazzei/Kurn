@@ -1,387 +1,661 @@
 {
-  "_comment": "Copywriting for marketing screenshots, indexed by App Store locale (matching fastlane/metadata/<locale>/) then by screen name (the suffix after the device name in the raw fastlane snapshot filename, e.g. 'iPhone 17 Pro Max-01Meetings.png' -> '01Meetings'). 'default' is used by render.js when a captured locale has no entry here.",
-
+  "_comment": "Copywriting for marketing screenshots, indexed by App Store locale (matching fastlane/metadata/<locale>/) then by screen name (the suffix after the device name in the raw fastlane snapshot filename, e.g. 'iPhone 17 Pro Max-01Meetings.png' -> '01Meetings'). The caption leads with the search terms the listing targets (the same ones as that locale's name, subtitle and keywords), because Apple is reported to read caption text from screenshots and, indexed or not, it is the first thing a searcher reads. Every locale here is rendered: one with no raw captures of its own is rendered over render.js's --fallback-locale captures. 'default' is used by render.js when a captured locale has no entry here.",
   "default": {
     "01Meetings": {
-      "badge": "NEW",
-      "title": "Every meeting,",
-      "titleHighlight": "organized",
-      "subtitle": "Record, search, and revisit every conversation - all in one place.",
+      "badge": "PRIVATE",
+      "title": "AI meeting notes,",
+      "titleHighlight": "no bot, no account",
+      "subtitle": "Record meetings, classes and interviews. Everything stays on your iPhone by default.",
       "cardIcon": "✦",
       "cardStat": "100% On-Device",
-      "cardLabel": "Private by design"
+      "cardLabel": "Encrypted & Face ID locked"
     },
     "02MeetingRecordings": {
       "badge": "RECORD",
-      "title": "Capture every",
-      "titleHighlight": "word",
-      "subtitle": "High-quality audio recording that keeps working even in the background.",
+      "title": "Record in one tap,",
+      "titleHighlight": "from anywhere",
+      "subtitle": "Lock Screen, Dynamic Island, Control Center, Siri or Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "24kHz AAC",
-      "cardLabel": "Studio-grade capture"
+      "cardStat": "Hands-free",
+      "cardLabel": "Siri, Watch & Shortcuts"
     },
     "03Transcript": {
-      "badge": "AI-POWERED",
-      "title": "Transcripts that",
-      "titleHighlight": "know who's talking",
-      "subtitle": "Automatic speaker detection turns raw audio into a readable conversation.",
+      "badge": "TRANSCRIBE",
+      "title": "Audio to text that",
+      "titleHighlight": "knows who's talking",
+      "subtitle": "On-device transcription with speaker identification, in dozens of languages.",
       "cardIcon": "◐",
       "cardStat": "Speaker ID",
-      "cardLabel": "Built-in diarization"
+      "cardLabel": "Name every voice"
     },
     "04Summary": {
-      "badge": "SMART",
-      "title": "Meetings,",
-      "titleHighlight": "summarized",
-      "subtitle": "Get structured takeaways and action items generated automatically.",
+      "badge": "SUMMARIZE",
+      "title": "AI summaries and",
+      "titleHighlight": "action items",
+      "subtitle": "Decisions, next steps and key points. Then ask your meetings anything.",
       "cardIcon": "✨",
-      "cardStat": "AI Summaries",
-      "cardLabel": "Key points, instantly"
+      "cardStat": "Ask AI",
+      "cardLabel": "Answers with timestamps"
     },
     "05Settings": {
-      "badge": "EXCLUSIVE",
-      "title": "Your data,",
-      "titleHighlight": "your control",
-      "subtitle": "Choose on-device or cloud processing - and keep everything encrypted.",
+      "badge": "OFFLINE",
+      "title": "Works offline,",
+      "titleHighlight": "cloud only if you choose",
+      "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "You decide",
-      "cardLabel": "Flexible & secure"
+      "cardStat": "Your data",
+      "cardLabel": "Stays on your device"
     }
   },
-
   "en-US": {
     "01Meetings": {
-      "badge": "NEW",
-      "title": "Every meeting,",
-      "titleHighlight": "organized",
-      "subtitle": "Record, search, and revisit every conversation - all in one place.",
+      "badge": "PRIVATE",
+      "title": "AI meeting notes,",
+      "titleHighlight": "no bot, no account",
+      "subtitle": "Record meetings, classes and interviews. Everything stays on your iPhone by default.",
       "cardIcon": "✦",
       "cardStat": "100% On-Device",
-      "cardLabel": "Private by design"
+      "cardLabel": "Encrypted & Face ID locked"
     },
     "02MeetingRecordings": {
       "badge": "RECORD",
-      "title": "Capture every",
-      "titleHighlight": "word",
-      "subtitle": "High-quality audio recording that keeps working even in the background.",
+      "title": "Record in one tap,",
+      "titleHighlight": "from anywhere",
+      "subtitle": "Lock Screen, Dynamic Island, Control Center, Siri or Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "24kHz AAC",
-      "cardLabel": "Studio-grade capture"
+      "cardStat": "Hands-free",
+      "cardLabel": "Siri, Watch & Shortcuts"
     },
     "03Transcript": {
-      "badge": "AI-POWERED",
-      "title": "Transcripts that",
-      "titleHighlight": "know who's talking",
-      "subtitle": "Automatic speaker detection turns raw audio into a readable conversation.",
+      "badge": "TRANSCRIBE",
+      "title": "Audio to text that",
+      "titleHighlight": "knows who's talking",
+      "subtitle": "On-device transcription with speaker identification, in dozens of languages.",
       "cardIcon": "◐",
       "cardStat": "Speaker ID",
-      "cardLabel": "Built-in diarization"
+      "cardLabel": "Name every voice"
     },
     "04Summary": {
-      "badge": "SMART",
-      "title": "Meetings,",
-      "titleHighlight": "summarized",
-      "subtitle": "Get structured takeaways and action items generated automatically.",
+      "badge": "SUMMARIZE",
+      "title": "AI summaries and",
+      "titleHighlight": "action items",
+      "subtitle": "Decisions, next steps and key points. Then ask your meetings anything.",
       "cardIcon": "✨",
-      "cardStat": "AI Summaries",
-      "cardLabel": "Key points, instantly"
+      "cardStat": "Ask AI",
+      "cardLabel": "Answers with timestamps"
     },
     "05Settings": {
-      "badge": "EXCLUSIVE",
-      "title": "Your data,",
-      "titleHighlight": "your control",
-      "subtitle": "Choose on-device or cloud processing - and keep everything encrypted.",
+      "badge": "OFFLINE",
+      "title": "Works offline,",
+      "titleHighlight": "cloud only if you choose",
+      "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
       "cardIcon": "◈",
-      "cardStat": "You decide",
-      "cardLabel": "Flexible & secure"
+      "cardStat": "Your data",
+      "cardLabel": "Stays on your device"
     }
   },
-
+  "en-CA": {
+    "01Meetings": {
+      "badge": "PRIVATE",
+      "title": "AI meeting notes,",
+      "titleHighlight": "no bot, no account",
+      "subtitle": "Record meetings, classes and interviews. Everything stays on your iPhone by default.",
+      "cardIcon": "✦",
+      "cardStat": "100% On-Device",
+      "cardLabel": "Encrypted & Face ID locked"
+    },
+    "02MeetingRecordings": {
+      "badge": "RECORD",
+      "title": "Record in one tap,",
+      "titleHighlight": "from anywhere",
+      "subtitle": "Lock Screen, Dynamic Island, Control Center, Siri or Apple Watch.",
+      "cardIcon": "●",
+      "cardStat": "Hands-free",
+      "cardLabel": "Siri, Watch & Shortcuts"
+    },
+    "03Transcript": {
+      "badge": "TRANSCRIBE",
+      "title": "Audio to text that",
+      "titleHighlight": "knows who's talking",
+      "subtitle": "On-device transcription with speaker identification, in dozens of languages.",
+      "cardIcon": "◐",
+      "cardStat": "Speaker ID",
+      "cardLabel": "Name every voice"
+    },
+    "04Summary": {
+      "badge": "SUMMARIZE",
+      "title": "AI summaries and",
+      "titleHighlight": "action items",
+      "subtitle": "Decisions, next steps and key points. Then ask your meetings anything.",
+      "cardIcon": "✨",
+      "cardStat": "Ask AI",
+      "cardLabel": "Answers with timestamps"
+    },
+    "05Settings": {
+      "badge": "OFFLINE",
+      "title": "Works offline,",
+      "titleHighlight": "cloud only if you choose",
+      "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
+      "cardIcon": "◈",
+      "cardStat": "Your data",
+      "cardLabel": "Stays on your device"
+    }
+  },
+  "en-GB": {
+    "01Meetings": {
+      "badge": "PRIVATE",
+      "title": "AI meeting notes,",
+      "titleHighlight": "no bot, no account",
+      "subtitle": "Record meetings, classes and interviews. Everything stays on your iPhone by default.",
+      "cardIcon": "✦",
+      "cardStat": "100% On-Device",
+      "cardLabel": "Encrypted & Face ID locked"
+    },
+    "02MeetingRecordings": {
+      "badge": "RECORD",
+      "title": "Record in one tap,",
+      "titleHighlight": "from anywhere",
+      "subtitle": "Lock Screen, Dynamic Island, Control Centre, Siri or Apple Watch.",
+      "cardIcon": "●",
+      "cardStat": "Hands-free",
+      "cardLabel": "Siri, Watch & Shortcuts"
+    },
+    "03Transcript": {
+      "badge": "TRANSCRIBE",
+      "title": "Audio to text that",
+      "titleHighlight": "knows who's talking",
+      "subtitle": "On-device transcription with speaker identification, in dozens of languages.",
+      "cardIcon": "◐",
+      "cardStat": "Speaker ID",
+      "cardLabel": "Name every voice"
+    },
+    "04Summary": {
+      "badge": "SUMMARISE",
+      "title": "AI summaries and",
+      "titleHighlight": "action items",
+      "subtitle": "Decisions, next steps and key points. Then ask your meetings anything.",
+      "cardIcon": "✨",
+      "cardStat": "Ask AI",
+      "cardLabel": "Answers with timestamps"
+    },
+    "05Settings": {
+      "badge": "OFFLINE",
+      "title": "Works offline,",
+      "titleHighlight": "cloud only if you choose",
+      "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
+      "cardIcon": "◈",
+      "cardStat": "Your data",
+      "cardLabel": "Stays on your device"
+    }
+  },
+  "en-AU": {
+    "01Meetings": {
+      "badge": "PRIVATE",
+      "title": "AI meeting notes,",
+      "titleHighlight": "no bot, no account",
+      "subtitle": "Record meetings, classes and interviews. Everything stays on your iPhone by default.",
+      "cardIcon": "✦",
+      "cardStat": "100% On-Device",
+      "cardLabel": "Encrypted & Face ID locked"
+    },
+    "02MeetingRecordings": {
+      "badge": "RECORD",
+      "title": "Record in one tap,",
+      "titleHighlight": "from anywhere",
+      "subtitle": "Lock Screen, Dynamic Island, Control Centre, Siri or Apple Watch.",
+      "cardIcon": "●",
+      "cardStat": "Hands-free",
+      "cardLabel": "Siri, Watch & Shortcuts"
+    },
+    "03Transcript": {
+      "badge": "TRANSCRIBE",
+      "title": "Audio to text that",
+      "titleHighlight": "knows who's talking",
+      "subtitle": "On-device transcription with speaker identification, in dozens of languages.",
+      "cardIcon": "◐",
+      "cardStat": "Speaker ID",
+      "cardLabel": "Name every voice"
+    },
+    "04Summary": {
+      "badge": "SUMMARISE",
+      "title": "AI summaries and",
+      "titleHighlight": "action items",
+      "subtitle": "Decisions, next steps and key points. Then ask your meetings anything.",
+      "cardIcon": "✨",
+      "cardStat": "Ask AI",
+      "cardLabel": "Answers with timestamps"
+    },
+    "05Settings": {
+      "badge": "OFFLINE",
+      "title": "Works offline,",
+      "titleHighlight": "cloud only if you choose",
+      "subtitle": "No tracking, no ads, no account. Bring your own API key for cloud AI.",
+      "cardIcon": "◈",
+      "cardStat": "Your data",
+      "cardLabel": "Stays on your device"
+    }
+  },
   "pt-BR": {
     "01Meetings": {
-      "badge": "NOVO",
-      "title": "Cada reunião,",
-      "titleHighlight": "organizada",
-      "subtitle": "Grave, pesquise e revisite qualquer conversa - tudo em um só lugar.",
+      "badge": "PRIVADO",
+      "title": "Notas de reunião com IA,",
+      "titleHighlight": "sem bot e sem conta",
+      "subtitle": "Grave reuniões, aulas e entrevistas. Tudo fica no seu iPhone por padrão.",
       "cardIcon": "✦",
       "cardStat": "100% no aparelho",
-      "cardLabel": "Privacidade por padrão"
+      "cardLabel": "Criptografado e com Face ID"
     },
     "02MeetingRecordings": {
-      "badge": "GRAVAÇÃO",
-      "title": "Capture cada",
-      "titleHighlight": "palavra",
-      "subtitle": "Gravação de áudio de alta qualidade que continua funcionando mesmo em segundo plano.",
+      "badge": "GRAVE",
+      "title": "Grave com um toque,",
+      "titleHighlight": "de qualquer lugar",
+      "subtitle": "Tela Bloqueada, Dynamic Island, Central de Controle, Siri ou Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "AAC 24kHz",
-      "cardLabel": "Captura de estúdio"
+      "cardStat": "Mãos livres",
+      "cardLabel": "Siri, Watch e Atalhos"
     },
     "03Transcript": {
-      "badge": "COM IA",
-      "title": "Transcrições que",
-      "titleHighlight": "sabem quem fala",
-      "subtitle": "Identificação automática de interlocutores transforma áudio em texto legível.",
+      "badge": "TRANSCREVA",
+      "title": "Áudio em texto que",
+      "titleHighlight": "sabe quem fala",
+      "subtitle": "Transcrição no aparelho com identificação de quem fala, em dezenas de idiomas.",
       "cardIcon": "◐",
-      "cardStat": "ID de falantes",
-      "cardLabel": "Diarização integrada"
+      "cardStat": "Quem fala",
+      "cardLabel": "Dê nome a cada voz"
     },
     "04Summary": {
-      "badge": "INTELIGENTE",
-      "title": "Reuniões,",
-      "titleHighlight": "resumidas",
-      "subtitle": "Receba pontos-chave e próximos passos gerados automaticamente.",
+      "badge": "RESUMA",
+      "title": "Ata e resumo com IA,",
+      "titleHighlight": "com próximos passos",
+      "subtitle": "Decisões, tarefas e pontos-chave. Depois, pergunte o que quiser às suas reuniões.",
       "cardIcon": "✨",
-      "cardStat": "Resumos com IA",
-      "cardLabel": "Pontos-chave, na hora"
+      "cardStat": "Pergunte à IA",
+      "cardLabel": "Respostas com tempo marcado"
     },
     "05Settings": {
-      "badge": "EXCLUSIVO",
-      "title": "Seus dados,",
-      "titleHighlight": "seu controle",
-      "subtitle": "Escolha processamento local ou na nuvem - tudo sempre criptografado.",
+      "badge": "OFFLINE",
+      "title": "Funciona offline,",
+      "titleHighlight": "nuvem só se você quiser",
+      "subtitle": "Sem rastreamento, anúncios ou conta. Use sua própria chave de API para IA na nuvem.",
       "cardIcon": "◈",
-      "cardStat": "Você decide",
-      "cardLabel": "Flexível e seguro"
+      "cardStat": "Seus dados",
+      "cardLabel": "Ficam no seu aparelho"
     }
   },
-
+  "pt-PT": {
+    "01Meetings": {
+      "badge": "PRIVADO",
+      "title": "Notas de reunião com IA,",
+      "titleHighlight": "sem bot e sem conta",
+      "subtitle": "Grave reuniões, aulas e entrevistas. Tudo fica no seu iPhone por omissão.",
+      "cardIcon": "✦",
+      "cardStat": "100% no dispositivo",
+      "cardLabel": "Cifrado e com Face ID"
+    },
+    "02MeetingRecordings": {
+      "badge": "GRAVE",
+      "title": "Grave com um toque,",
+      "titleHighlight": "a partir de qualquer sítio",
+      "subtitle": "Ecrã bloqueado, Dynamic Island, central de controlo, Siri ou Apple Watch.",
+      "cardIcon": "●",
+      "cardStat": "Mãos livres",
+      "cardLabel": "Siri, Watch e Atalhos"
+    },
+    "03Transcript": {
+      "badge": "TRANSCREVA",
+      "title": "Áudio para texto que",
+      "titleHighlight": "sabe quem fala",
+      "subtitle": "Transcrição no dispositivo com identificação de oradores, em dezenas de idiomas.",
+      "cardIcon": "◐",
+      "cardStat": "Oradores",
+      "cardLabel": "Dê nome a cada voz"
+    },
+    "04Summary": {
+      "badge": "RESUMA",
+      "title": "Ata e resumo com IA,",
+      "titleHighlight": "com próximos passos",
+      "subtitle": "Decisões, tarefas e pontos-chave. Depois, pergunte o que quiser às suas reuniões.",
+      "cardIcon": "✨",
+      "cardStat": "Pergunte à IA",
+      "cardLabel": "Respostas com marcas de tempo"
+    },
+    "05Settings": {
+      "badge": "OFFLINE",
+      "title": "Funciona offline,",
+      "titleHighlight": "nuvem só se quiser",
+      "subtitle": "Sem rastreio, anúncios ou conta. Use a sua própria chave de API para IA na nuvem.",
+      "cardIcon": "◈",
+      "cardStat": "Os seus dados",
+      "cardLabel": "Ficam no seu dispositivo"
+    }
+  },
   "es-ES": {
     "01Meetings": {
-      "badge": "NUEVO",
-      "title": "Cada reunión,",
-      "titleHighlight": "organizada",
-      "subtitle": "Graba, busca y revisa cualquier conversación, todo en un solo lugar.",
+      "badge": "PRIVADO",
+      "title": "Notas de reunión con IA,",
+      "titleHighlight": "sin bots ni cuentas",
+      "subtitle": "Graba reuniones, clases y entrevistas. Todo se queda en tu iPhone por defecto.",
       "cardIcon": "✦",
       "cardStat": "100% en el dispositivo",
-      "cardLabel": "Privacidad por diseño"
+      "cardLabel": "Cifrado y con Face ID"
     },
     "02MeetingRecordings": {
-      "badge": "GRABACIÓN",
-      "title": "Capta cada",
-      "titleHighlight": "palabra",
-      "subtitle": "Grabación de audio de alta calidad que sigue funcionando en segundo plano.",
+      "badge": "GRABA",
+      "title": "Graba con un toque,",
+      "titleHighlight": "desde cualquier lugar",
+      "subtitle": "Pantalla de bloqueo, Dynamic Island, centro de control, Siri o Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "AAC 24kHz",
-      "cardLabel": "Captura de estudio"
+      "cardStat": "Manos libres",
+      "cardLabel": "Siri, Watch y Atajos"
     },
     "03Transcript": {
-      "badge": "CON IA",
-      "title": "Transcripciones que",
-      "titleHighlight": "saben quién habla",
-      "subtitle": "La identificación automática de hablantes convierte el audio en texto legible.",
+      "badge": "TRANSCRIBE",
+      "title": "Audio a texto que",
+      "titleHighlight": "sabe quién habla",
+      "subtitle": "Transcripción en el dispositivo con identificación de hablantes, en decenas de idiomas.",
       "cardIcon": "◐",
-      "cardStat": "ID de hablantes",
-      "cardLabel": "Diarización integrada"
+      "cardStat": "Hablantes",
+      "cardLabel": "Pon nombre a cada voz"
     },
     "04Summary": {
-      "badge": "INTELIGENTE",
-      "title": "Reuniones,",
-      "titleHighlight": "resumidas",
-      "subtitle": "Obtén puntos clave y próximos pasos generados automáticamente.",
+      "badge": "RESUME",
+      "title": "Actas y resúmenes con IA,",
+      "titleHighlight": "con tareas",
+      "subtitle": "Decisiones, próximos pasos y puntos clave. Luego pregunta lo que quieras.",
       "cardIcon": "✨",
-      "cardStat": "Resúmenes con IA",
-      "cardLabel": "Puntos clave al instante"
+      "cardStat": "Pregunta a la IA",
+      "cardLabel": "Respuestas con marcas de tiempo"
     },
     "05Settings": {
-      "badge": "EXCLUSIVO",
-      "title": "Tus datos,",
-      "titleHighlight": "tu control",
-      "subtitle": "Elige procesamiento local o en la nube, todo siempre cifrado.",
+      "badge": "OFFLINE",
+      "title": "Funciona sin conexión,",
+      "titleHighlight": "nube solo si quieres",
+      "subtitle": "Sin rastreo, anuncios ni cuenta. Usa tu propia clave de API para la IA en la nube.",
       "cardIcon": "◈",
-      "cardStat": "Tú decides",
-      "cardLabel": "Flexible y seguro"
+      "cardStat": "Tus datos",
+      "cardLabel": "Se quedan en tu dispositivo"
     }
   },
-
+  "es-MX": {
+    "01Meetings": {
+      "badge": "PRIVADO",
+      "title": "Notas de juntas con IA,",
+      "titleHighlight": "sin bots ni cuentas",
+      "subtitle": "Graba juntas, clases y entrevistas. Todo se queda en tu iPhone por defecto.",
+      "cardIcon": "✦",
+      "cardStat": "100% en el dispositivo",
+      "cardLabel": "Cifrado y con Face ID"
+    },
+    "02MeetingRecordings": {
+      "badge": "GRABA",
+      "title": "Graba con un toque,",
+      "titleHighlight": "desde cualquier lugar",
+      "subtitle": "Pantalla de bloqueo, Dynamic Island, centro de control, Siri o Apple Watch.",
+      "cardIcon": "●",
+      "cardStat": "Manos libres",
+      "cardLabel": "Siri, Watch y Atajos"
+    },
+    "03Transcript": {
+      "badge": "TRANSCRIBE",
+      "title": "Audio a texto que",
+      "titleHighlight": "sabe quién habla",
+      "subtitle": "Transcripción en el dispositivo con identificación de hablantes, en decenas de idiomas.",
+      "cardIcon": "◐",
+      "cardStat": "Hablantes",
+      "cardLabel": "Pon nombre a cada voz"
+    },
+    "04Summary": {
+      "badge": "RESUME",
+      "title": "Minutas y resúmenes con IA,",
+      "titleHighlight": "con pendientes",
+      "subtitle": "Decisiones, próximos pasos y puntos clave. Luego pregunta lo que quieras.",
+      "cardIcon": "✨",
+      "cardStat": "Pregunta a la IA",
+      "cardLabel": "Respuestas con marcas de tiempo"
+    },
+    "05Settings": {
+      "badge": "OFFLINE",
+      "title": "Funciona sin conexión,",
+      "titleHighlight": "nube solo si quieres",
+      "subtitle": "Sin rastreo, anuncios ni cuenta. Usa tu propia clave de API para la IA en la nube.",
+      "cardIcon": "◈",
+      "cardStat": "Tus datos",
+      "cardLabel": "Se quedan en tu dispositivo"
+    }
+  },
   "fr-FR": {
     "01Meetings": {
-      "badge": "NOUVEAU",
-      "title": "Chaque réunion,",
-      "titleHighlight": "organisée",
-      "subtitle": "Enregistrez, recherchez et retrouvez chaque conversation, au même endroit.",
+      "badge": "PRIVÉ",
+      "title": "Notes de réunion IA,",
+      "titleHighlight": "sans bot ni compte",
+      "subtitle": "Enregistrez réunions, cours et entretiens. Tout reste sur votre iPhone par défaut.",
       "cardIcon": "✦",
       "cardStat": "100 % sur l'appareil",
-      "cardLabel": "Confidentialité par conception"
+      "cardLabel": "Chiffré et protégé par Face ID"
     },
     "02MeetingRecordings": {
-      "badge": "ENREGISTREMENT",
-      "title": "Capturez chaque",
-      "titleHighlight": "mot",
-      "subtitle": "Un enregistrement audio haute qualité qui continue même en arrière-plan.",
+      "badge": "ENREGISTREZ",
+      "title": "Enregistrez d'un geste,",
+      "titleHighlight": "depuis partout",
+      "subtitle": "Écran verrouillé, Dynamic Island, centre de contrôle, Siri ou Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "AAC 24 kHz",
-      "cardLabel": "Qualité studio"
+      "cardStat": "Mains libres",
+      "cardLabel": "Siri, Watch et Raccourcis"
     },
     "03Transcript": {
-      "badge": "PAR IA",
-      "title": "Des transcriptions qui",
-      "titleHighlight": "savent qui parle",
-      "subtitle": "La détection automatique des locuteurs transforme l'audio en texte lisible.",
+      "badge": "TRANSCRIVEZ",
+      "title": "Une transcription",
+      "titleHighlight": "qui sait qui parle",
+      "subtitle": "Transcription sur l'appareil avec identification des intervenants, en des dizaines de langues.",
       "cardIcon": "◐",
-      "cardStat": "ID des locuteurs",
-      "cardLabel": "Diarisation intégrée"
+      "cardStat": "Intervenants",
+      "cardLabel": "Nommez chaque voix"
     },
     "04Summary": {
-      "badge": "INTELLIGENT",
-      "title": "Réunions,",
-      "titleHighlight": "résumées",
-      "subtitle": "Obtenez des points clés et des actions générés automatiquement.",
+      "badge": "RÉSUMEZ",
+      "title": "Comptes rendus IA",
+      "titleHighlight": "et actions à suivre",
+      "subtitle": "Décisions, prochaines étapes et points clés. Puis interrogez vos réunions.",
       "cardIcon": "✨",
-      "cardStat": "Résumés par IA",
-      "cardLabel": "L'essentiel, instantanément"
+      "cardStat": "Demandez à l'IA",
+      "cardLabel": "Réponses horodatées"
     },
     "05Settings": {
-      "badge": "EXCLUSIF",
-      "title": "Vos données,",
-      "titleHighlight": "votre contrôle",
-      "subtitle": "Choisissez un traitement local ou cloud, toujours chiffré.",
+      "badge": "HORS LIGNE",
+      "title": "Fonctionne hors ligne,",
+      "titleHighlight": "cloud si vous le voulez",
+      "subtitle": "Aucun pistage, aucune pub, aucun compte. Votre propre clé d'API pour l'IA cloud.",
       "cardIcon": "◈",
-      "cardStat": "Vous décidez",
-      "cardLabel": "Flexible et sécurisé"
+      "cardStat": "Vos données",
+      "cardLabel": "Restent sur votre appareil"
     }
   },
-
+  "fr-CA": {
+    "01Meetings": {
+      "badge": "PRIVÉ",
+      "title": "Notes de réunion IA,",
+      "titleHighlight": "sans robot ni compte",
+      "subtitle": "Enregistrez réunions, cours et entrevues. Tout reste sur votre iPhone par défaut.",
+      "cardIcon": "✦",
+      "cardStat": "100 % sur l'appareil",
+      "cardLabel": "Chiffré et protégé par Face ID"
+    },
+    "02MeetingRecordings": {
+      "badge": "ENREGISTREZ",
+      "title": "Enregistrez d'un geste,",
+      "titleHighlight": "depuis partout",
+      "subtitle": "Écran verrouillé, Dynamic Island, centre de contrôle, Siri ou Apple Watch.",
+      "cardIcon": "●",
+      "cardStat": "Mains libres",
+      "cardLabel": "Siri, Watch et Raccourcis"
+    },
+    "03Transcript": {
+      "badge": "TRANSCRIVEZ",
+      "title": "Une transcription",
+      "titleHighlight": "qui sait qui parle",
+      "subtitle": "Transcription sur l'appareil avec identification des intervenants, en des dizaines de langues.",
+      "cardIcon": "◐",
+      "cardStat": "Intervenants",
+      "cardLabel": "Nommez chaque voix"
+    },
+    "04Summary": {
+      "badge": "RÉSUMEZ",
+      "title": "Procès-verbaux IA",
+      "titleHighlight": "et suivis",
+      "subtitle": "Décisions, prochaines étapes et points clés. Puis interrogez vos réunions.",
+      "cardIcon": "✨",
+      "cardStat": "Demandez à l'IA",
+      "cardLabel": "Réponses horodatées"
+    },
+    "05Settings": {
+      "badge": "HORS LIGNE",
+      "title": "Fonctionne hors ligne,",
+      "titleHighlight": "nuage au besoin",
+      "subtitle": "Aucun pistage, aucune pub, aucun compte. Votre propre clé d'API pour l'IA infonuagique.",
+      "cardIcon": "◈",
+      "cardStat": "Vos données",
+      "cardLabel": "Restent sur votre appareil"
+    }
+  },
   "it": {
     "01Meetings": {
-      "badge": "NOVITÀ",
-      "title": "Ogni riunione,",
-      "titleHighlight": "organizzata",
-      "subtitle": "Registra, cerca e rivedi ogni conversazione, tutto in un unico posto.",
+      "badge": "PRIVATO",
+      "title": "Note riunioni con IA,",
+      "titleHighlight": "senza bot né account",
+      "subtitle": "Registra riunioni, lezioni e interviste. Tutto resta sul tuo iPhone per impostazione predefinita.",
       "cardIcon": "✦",
-      "cardStat": "100% on-device",
-      "cardLabel": "Privacy per progettazione"
+      "cardStat": "100% sul dispositivo",
+      "cardLabel": "Crittografato e con Face ID"
     },
     "02MeetingRecordings": {
-      "badge": "REGISTRAZIONE",
-      "title": "Cattura ogni",
-      "titleHighlight": "parola",
-      "subtitle": "Registrazione audio di alta qualità che continua anche in background.",
+      "badge": "REGISTRA",
+      "title": "Registra con un tocco,",
+      "titleHighlight": "da ovunque",
+      "subtitle": "Schermata di blocco, Dynamic Island, Centro di Controllo, Siri o Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "AAC 24kHz",
-      "cardLabel": "Qualità da studio"
+      "cardStat": "Mani libere",
+      "cardLabel": "Siri, Watch e Comandi Rapidi"
     },
     "03Transcript": {
-      "badge": "CON IA",
-      "title": "Trascrizioni che",
-      "titleHighlight": "sanno chi parla",
-      "subtitle": "Il riconoscimento automatico degli speaker trasforma l'audio in testo leggibile.",
+      "badge": "TRASCRIVI",
+      "title": "Audio in testo che",
+      "titleHighlight": "sa chi parla",
+      "subtitle": "Trascrizione sul dispositivo con identificazione di chi parla, in decine di lingue.",
       "cardIcon": "◐",
-      "cardStat": "ID speaker",
-      "cardLabel": "Diarizzazione integrata"
+      "cardStat": "Chi parla",
+      "cardLabel": "Dai un nome a ogni voce"
     },
     "04Summary": {
-      "badge": "INTELLIGENTE",
-      "title": "Riunioni,",
-      "titleHighlight": "riassunte",
-      "subtitle": "Ottieni punti chiave e prossimi passi generati automaticamente.",
+      "badge": "RIASSUMI",
+      "title": "Verbali e riassunti IA,",
+      "titleHighlight": "con le azioni",
+      "subtitle": "Decisioni, prossimi passi e punti chiave. Poi chiedi qualsiasi cosa alle tue riunioni.",
       "cardIcon": "✨",
-      "cardStat": "Riepiloghi IA",
-      "cardLabel": "Punti chiave, all'istante"
+      "cardStat": "Chiedi all'IA",
+      "cardLabel": "Risposte con i tempi"
     },
     "05Settings": {
-      "badge": "ESCLUSIVO",
-      "title": "I tuoi dati,",
-      "titleHighlight": "il tuo controllo",
-      "subtitle": "Scegli l'elaborazione locale o cloud, sempre crittografata.",
+      "badge": "OFFLINE",
+      "title": "Funziona offline,",
+      "titleHighlight": "cloud solo se vuoi",
+      "subtitle": "Nessun tracciamento, pubblicità o account. Usa la tua chiave API per l'IA cloud.",
       "cardIcon": "◈",
-      "cardStat": "Decidi tu",
-      "cardLabel": "Flessibile e sicuro"
+      "cardStat": "I tuoi dati",
+      "cardLabel": "Restano sul dispositivo"
     }
   },
-
   "de-DE": {
     "01Meetings": {
-      "badge": "NEU",
-      "title": "Jedes Meeting,",
-      "titleHighlight": "organisiert",
-      "subtitle": "Nimm auf, durchsuche und rufe jedes Gespräch ab - alles an einem Ort.",
+      "badge": "PRIVAT",
+      "title": "KI-Meeting-Notizen,",
+      "titleHighlight": "ohne Bot und Konto",
+      "subtitle": "Nimm Besprechungen, Vorlesungen und Interviews auf. Alles bleibt standardmäßig auf deinem iPhone.",
       "cardIcon": "✦",
-      "cardStat": "100% auf dem Gerät",
-      "cardLabel": "Datenschutz von Anfang an"
+      "cardStat": "100 % auf dem Gerät",
+      "cardLabel": "Verschlüsselt, mit Face ID"
     },
     "02MeetingRecordings": {
-      "badge": "AUFNAHME",
-      "title": "Jedes Wort",
-      "titleHighlight": "erfasst",
-      "subtitle": "Hochwertige Audioaufnahme, die auch im Hintergrund weiterläuft.",
+      "badge": "AUFNEHMEN",
+      "title": "Aufnahme mit einem Tipp,",
+      "titleHighlight": "von überall",
+      "subtitle": "Sperrbildschirm, Dynamic Island, Kontrollzentrum, Siri oder Apple Watch.",
       "cardIcon": "●",
-      "cardStat": "AAC 24 kHz",
-      "cardLabel": "Studioqualität"
+      "cardStat": "Freihändig",
+      "cardLabel": "Siri, Watch & Kurzbefehle"
     },
     "03Transcript": {
-      "badge": "MIT KI",
-      "title": "Transkripte, die",
-      "titleHighlight": "wissen, wer spricht",
-      "subtitle": "Automatische Sprechererkennung macht aus Audio lesbaren Text.",
+      "badge": "TRANSKRIBIEREN",
+      "title": "Sprache zu Text, der",
+      "titleHighlight": "weiß, wer spricht",
+      "subtitle": "Transkription auf dem Gerät mit Sprechererkennung, in Dutzenden Sprachen.",
       "cardIcon": "◐",
       "cardStat": "Sprecher-ID",
-      "cardLabel": "Integrierte Diarisierung"
+      "cardLabel": "Gib jeder Stimme einen Namen"
     },
     "04Summary": {
-      "badge": "SMART",
-      "title": "Meetings,",
-      "titleHighlight": "zusammengefasst",
-      "subtitle": "Erhalte automatisch generierte Kernpunkte und nächste Schritte.",
+      "badge": "ZUSAMMENFASSEN",
+      "title": "KI-Protokolle",
+      "titleHighlight": "mit Aufgaben",
+      "subtitle": "Entscheidungen, nächste Schritte und Kernpunkte. Dann frag deine Meetings, was du willst.",
       "cardIcon": "✨",
-      "cardStat": "KI-Zusammenfassungen",
-      "cardLabel": "Kernpunkte, sofort"
+      "cardStat": "Frag die KI",
+      "cardLabel": "Antworten mit Zeitmarken"
     },
     "05Settings": {
-      "badge": "EXKLUSIV",
-      "title": "Deine Daten,",
-      "titleHighlight": "deine Kontrolle",
-      "subtitle": "Wähle lokale oder Cloud-Verarbeitung - immer verschlüsselt.",
+      "badge": "OFFLINE",
+      "title": "Funktioniert offline,",
+      "titleHighlight": "Cloud nur, wenn du willst",
+      "subtitle": "Kein Tracking, keine Werbung, kein Konto. Eigener API-Schlüssel für Cloud-KI.",
       "cardIcon": "◈",
-      "cardStat": "Du entscheidest",
-      "cardLabel": "Flexibel & sicher"
+      "cardStat": "Deine Daten",
+      "cardLabel": "Bleiben auf dem Gerät"
     }
   },
-
   "zh-Hans": {
     "01Meetings": {
-      "badge": "全新",
-      "title": "每场会议，",
-      "titleHighlight": "井井有条",
-      "subtitle": "录制、搜索并回顾每一次对话——一切尽在一处。",
+      "badge": "隐私",
+      "title": "AI 会议纪要，",
+      "titleHighlight": "无机器人，无需账号",
+      "subtitle": "录制会议、课堂和访谈，默认一切只保存在你的 iPhone 上。",
       "cardIcon": "✦",
       "cardStat": "100% 本地处理",
-      "cardLabel": "隐私优先设计"
+      "cardLabel": "加密并受面容 ID 保护"
     },
     "02MeetingRecordings": {
       "badge": "录音",
-      "title": "捕捉每一个",
-      "titleHighlight": "字",
-      "subtitle": "高品质音频录制，切换应用时仍然持续工作。",
+      "title": "一点即录，",
+      "titleHighlight": "随时随地",
+      "subtitle": "锁定屏幕、灵动岛、控制中心、Siri 或 Apple Watch 都能控制。",
       "cardIcon": "●",
-      "cardStat": "AAC 24kHz",
-      "cardLabel": "录音室级品质"
+      "cardStat": "解放双手",
+      "cardLabel": "Siri、手表与快捷指令"
     },
     "03Transcript": {
-      "badge": "AI 驱动",
-      "title": "转录文本，",
-      "titleHighlight": "自动识别发言人",
-      "subtitle": "自动说话人识别，把音频变成清晰易读的文字。",
+      "badge": "转写",
+      "title": "录音转文字，",
+      "titleHighlight": "分清谁在说话",
+      "subtitle": "设备端转写并识别说话人，支持数十种语言。",
       "cardIcon": "◐",
       "cardStat": "说话人识别",
-      "cardLabel": "内置分离技术"
+      "cardLabel": "为每个声音命名"
     },
     "04Summary": {
-      "badge": "智能",
-      "title": "会议内容，",
-      "titleHighlight": "一键总结",
-      "subtitle": "自动生成关键要点和后续行动事项。",
+      "badge": "摘要",
+      "title": "AI 会议纪要",
+      "titleHighlight": "与待办事项",
+      "subtitle": "决策、下一步和要点一目了然，还能向会议提问。",
       "cardIcon": "✨",
-      "cardStat": "AI 摘要",
-      "cardLabel": "要点，即刻呈现"
+      "cardStat": "问问 AI",
+      "cardLabel": "答案附时间戳"
     },
     "05Settings": {
-      "badge": "专属",
-      "title": "你的数据，",
-      "titleHighlight": "你做主",
-      "subtitle": "自由选择本地或云端处理——始终加密保护。",
+      "badge": "离线",
+      "title": "离线可用，",
+      "titleHighlight": "云端由你决定",
+      "subtitle": "无追踪、无广告、无需账号。云端 AI 使用你自己的 API 密钥。",
       "cardIcon": "◈",
-      "cardStat": "自主选择",
-      "cardLabel": "灵活又安全"
+      "cardStat": "你的数据",
+      "cardLabel": "只留在你的设备上"
     }
   }
 }

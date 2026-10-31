@@ -65,16 +65,25 @@ jobs:
         working-directory: scripts/screenshots
         run: npm install
 
+      - name: Test the render plan
+        working-directory: scripts/screenshots
+        run: node --test
+
       - name: Install Playwright Chromium
         working-directory: scripts/screenshots
         run: npx playwright install --with-deps chromium
 
+      # Captures exist for the 7 UI languages (fastlane/Snapfile); every other
+      # store locale in config.json (en-GB, es-MX, fr-CA, pt-PT, ...) is
+      # rendered with its own captions over the captures of its language, and
+      # --fallback-locale only covers a language whose capture is missing.
       - name: Render marketing screenshots
         working-directory: scripts/screenshots
         run: |
           node render.js \
             --input-dir "$GITHUB_WORKSPACE/raw-screenshots" \
-            --output-dir "$GITHUB_WORKSPACE/screenshots-framed"
+            --output-dir "$GITHUB_WORKSPACE/screenshots-framed" \
+            --fallback-locale en-US
 
       - name: Upload marketing screenshots artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

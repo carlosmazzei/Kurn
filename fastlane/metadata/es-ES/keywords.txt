@@ -1,1 +1,1 @@
-reunión,transcripción,notas,diarización,hablantes,resumen,grabadora,privacidad,offline,whisper
+transcripción,grabadora,voz,audio,texto,acta,resumen,offline,privado,clase,entrevista,apuntes

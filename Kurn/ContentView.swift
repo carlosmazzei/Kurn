@@ -16,7 +16,9 @@
 //  are attached here (`recordingSessionPresenter()`), above both layouts, so
 //  a recording stays reachable from every screen. A PDF shared into the app
 //  from another one is offered here too (`AttachToMeetingView`), above both
-//  layouts, for the user to pick the meeting it belongs to.
+//  layouts, for the user to pick the meeting it belongs to. The App Store
+//  rating prompt (`reviewPromptPresenter()`) is attached at the same level,
+//  so it can follow a finished transcript or summary on any screen.
 //
 
 import SwiftData
@@ -45,6 +47,7 @@ struct ContentView: View {
             }
         }
         .recordingSessionPresenter()
+        .reviewPromptPresenter()
         .sheet(isPresented: Binding(
             get: { incomingFiles.hasPendingFiles },
             set: { if !$0 { incomingFiles.finish() } }
@@ -72,6 +75,7 @@ struct ContentView: View {
             .environment(RecordingAccessGate())
             .environment(IncomingFileInbox())
             .environment(RecordingSessionController(modelContext: container.mainContext, settings: settings))
+            .environment(ReviewPromptCoordinator())
             .modelContainer(container)
     }
 }

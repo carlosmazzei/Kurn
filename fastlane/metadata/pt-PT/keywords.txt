@@ -1,0 +1,1 @@
+transcrição,gravador,voz,áudio,texto,ata,resumo,offline,privado,aula,apontamentos,conversa,gravar

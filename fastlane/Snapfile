@@ -19,11 +19,23 @@ devices([
   "iPad Pro 13-inch (M5)"
 ])
 
-# English-only for the first pass. Add "pt-BR" once every UI test navigation
-# call is driven by `.accessibilityIdentifier` (not label text), so a
-# locale-specific label change can't silently break screenshot capture.
+# Every UI language. Navigation is driven by `.accessibilityIdentifier` only,
+# and the seeded meetings follow the launch language
+# (Kurn/DebugSupport/ScreenshotSeedText.swift), so each store language gets
+# its own app UI rather than English under translated captions. CI captures
+# one language per job (`fastlane screenshots languages:<code>` from the
+# matrix in .github/workflows/screenshots.yml) because all seven in one job
+# would far exceed its time limit; a local run without the option captures
+# them all. Codes are App Store locales (fastlane/metadata/<locale>/), not
+# .lproj names.
 languages([
-  "en-US"
+  "en-US",
+  "pt-BR",
+  "es-ES",
+  "fr-FR",
+  "it",
+  "de-DE",
+  "zh-Hans"
 ])
 
 output_directory("./fastlane/screenshots")
