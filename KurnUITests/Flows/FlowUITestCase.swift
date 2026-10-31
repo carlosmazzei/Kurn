@@ -8,7 +8,16 @@
 //  accessibility audit uses, so a flow never depends on real recordings,
 //  downloaded models or a configured cloud provider. Flows only touch elements
 //  through `accessibilityIdentifier`s; the few places that still match text
-//  (menu-picker options) are called out at the site.
+//  (menu-picker options) are called out at the site, and the language is
+//  pinned to English so those stay valid on a simulator set to any other.
+//
+//  Stability rules every flow follows (CLAUDE.md, "Accessibility"):
+//  - never sleep; wait for a condition (`waitForExistence`, `waitUntil`);
+//  - a tap that starts a transition is checked by what it should produce,
+//    and repeated once if it was dropped (`tapUntilCovered`, `tap(_:until:)`);
+//  - UIKit animations are off (`UITestLaunchOptions.disableAnimations`);
+//  - every launch starts from the same in-memory seed, and anything a flow
+//    creates carries a per-launch suffix, so no test depends on another.
 //
 
 import XCTest
@@ -20,7 +29,12 @@ class FlowUITestCase: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["UI-Testing-Screenshots"]
+        app.launchArguments += [
+            "UI-Testing-Screenshots",
+            "UI-Testing-DisableAnimations",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US"
+        ]
         app.launch()
     }
 
@@ -44,7 +58,39 @@ class FlowUITestCase: XCTestCase {
         }
         XCTAssertTrue(row.waitForExistence(timeout: 5), "Settings row \(identifier) missing")
         scrollIntoSafeArea(row)
-        row.tap()
+        XCTAssertTrue(tapUntilCovered(row), "Settings row \(identifier) did not open its screen")
+    }
+
+    /// Waits up to `timeout` for `predicate` to hold for `element`.
+    @discardableResult
+    func waitUntil(_ element: XCUIElement, _ predicate: String, timeout: TimeInterval = 5) -> Bool {
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate), object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Taps an element that pushes or presents a screen, and confirms the new
+    /// screen covered it. A tap that lands while the previous transition is
+    /// still settling is dropped without an error, so the tap is repeated once
+    /// when the element is still hittable afterwards.
+    @discardableResult
+    func tapUntilCovered(_ element: XCUIElement, timeout: TimeInterval = 5) -> Bool {
+        for _ in 0..<2 {
+            element.tap()
+            if waitUntil(element, "hittable == false", timeout: timeout) { return true }
+        }
+        return false
+    }
+
+    /// Taps `element` until `outcome` appears, retrying once if the first tap
+    /// produced nothing and `element` can still be tapped.
+    @discardableResult
+    func tap(_ element: XCUIElement, until outcome: XCUIElement, timeout: TimeInterval = 5) -> Bool {
+        for _ in 0..<2 {
+            element.tap()
+            if outcome.waitForExistence(timeout: timeout) { return true }
+            guard element.exists, element.isHittable else { break }
+        }
+        return outcome.exists
     }
 
     /// Rows at the bottom of the Settings hub sit under the home indicator /
