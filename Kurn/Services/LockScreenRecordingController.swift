@@ -148,8 +148,8 @@ final class LockScreenRecordingController {
         startTask?.cancel()
         startTask = nil
 
-        Task { @MainActor [weak self] in
-            guard let self else { return }
+        Task { @MainActor in
+            // Strong on purpose: the recorder session can be released right after a stop.
             await self.activity?.end(finalContent, dismissalPolicy: .immediate)
             self.activity = nil
         }

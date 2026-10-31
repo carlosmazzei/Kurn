@@ -1573,7 +1573,14 @@ single-screen remote control. `Services/LockScreenRecordingController.swift` own
 ActivityKit (`Activity<RecordingActivityAttributes>`) lifecycle — `start`/
 `update`/`end` mirror `AudioRecorderService.State` into the activity's
 `ContentState`; the actual Live Activity UI is rendered separately by the
-`KurnLiveActivityExtension` widget target.
+`KurnLiveActivityExtension` widget target. The Live Activity's Stop and
+Pause buttons also end or update the activity inside
+`RecordingControlIntent.perform()` and await it: once capture stops or pauses,
+nothing may keep a backgrounded app alive, so the controller's own unstructured
+tasks could be suspended before they ran, leaving the Lock Screen timer
+counting over a stopped or paused recording. Pause applies
+`ContentState.togglingPause(at:)` to the state read *before* the recorder acts,
+and only when `RecordingCommandRouter.handle` reports a live session handled it.
 
 The watchOS target does **not** share source files with the app — types like
 `WatchCommand` and the wire-contract constants in `WatchSessionProtocol.swift`
@@ -2213,8 +2220,9 @@ enforced by lint and by a CI audit test, not just convention:
   flaking is demoted with a `-skip-testing` line in `swift.yml` and
   re-measured there before coming back.
 - **Speaker identity, not color, carries meaning** everywhere it matters: the
-  Live Activity's Lock Screen status dot differs by *shape* (pause icon vs.
-  filled circle), not only color, and status text is never color-only.
+  Live Activity says "Recording"/"Paused" in words — under "Kurn" on the Lock
+  Screen, beside the dot in the expanded Dynamic Island — rather than with a
+  colored dot alone, and status text is never color-only.
 - **Locale parity** — `KurnWatch/` and `KurnLiveActivityExtension/` each carry
   the same 7 locales as the main app (`en`, `pt-BR`, `es`, `fr`, `it`, `de`,
   `zh-Hans`), not just `en`/`pt-BR` — a VoiceOver user on the Watch or reading

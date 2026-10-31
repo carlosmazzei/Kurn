@@ -129,7 +129,8 @@ struct RecordingCommandRouterTests {
         )
 
         for action in RecordingControlAction.allCases {
-            router.handle(action)
+            let handled = router.handle(action)
+            #expect(handled)
         }
 
         #expect(calls == ["toggle", "stop", "highlight"])
@@ -139,7 +140,8 @@ struct RecordingCommandRouterTests {
         let router = RecordingCommandRouter.shared
         router.unregister()
         for action in RecordingControlAction.allCases {
-            router.handle(action)
+            let handled = router.handle(action)
+            #expect(!handled)
         }
         #expect(!router.hasActiveSession)
     }
