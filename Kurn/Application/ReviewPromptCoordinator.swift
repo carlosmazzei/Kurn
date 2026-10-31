@@ -38,7 +38,7 @@ final class ReviewPromptCoordinator {
     @ObservationIgnored private let policy: ReviewPromptPolicy
     @ObservationIgnored private let appVersion: String
     @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private let isSuppressed: () -> Bool
+    @ObservationIgnored private let isSuppressed: @MainActor () -> Bool
     @ObservationIgnored private var isRequestPending = false
 
     init(
@@ -46,7 +46,7 @@ final class ReviewPromptCoordinator {
         policy: ReviewPromptPolicy = .standard,
         appVersion: String = ReviewPromptCoordinator.bundleVersion,
         now: @escaping () -> Date = Date.init,
-        isSuppressed: @escaping () -> Bool = ReviewPromptCoordinator.liveSuppression
+        isSuppressed: @escaping @MainActor () -> Bool = ReviewPromptCoordinator.liveSuppression
     ) {
         self.defaults = defaults
         self.policy = policy
