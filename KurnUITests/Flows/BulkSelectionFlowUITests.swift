@@ -66,10 +66,9 @@ final class BulkSelectionFlowUITests: FlowUITestCase {
         // `bulk_export.grouping.single` is the en string.
         let singleFile = app.buttons["Single file"]
         XCTAssertTrue(singleFile.waitForExistence(timeout: 5))
-        // At the sheet's medium height the grouping row sits partly under the
-        // share bar laid over the form, where a tap reaches the bar instead.
-        // Swipe until the segment clears it (the form scrolls, or the sheet
-        // grows to its large height — either uncovers it).
+        // The share bar is laid over the form; a segment under it takes no
+        // tap. The sheet opens at its large height so it should already be
+        // clear — swipe only if a small screen still covers it.
         let barTop = app.buttons["bulk_export.format_picker"]
         for _ in 0..<3 where singleFile.frame.maxY > barTop.frame.minY - 8 {
             app.swipeUp()
