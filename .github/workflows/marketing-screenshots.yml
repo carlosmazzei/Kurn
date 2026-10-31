@@ -69,12 +69,16 @@ jobs:
         working-directory: scripts/screenshots
         run: npx playwright install --with-deps chromium
 
+      # Capture is en-US only (fastlane/Snapfile); --fallback-locale renders
+      # every other locale in config.json with its own captions over those
+      # captures, so each store language gets captions in its language.
       - name: Render marketing screenshots
         working-directory: scripts/screenshots
         run: |
           node render.js \
             --input-dir "$GITHUB_WORKSPACE/raw-screenshots" \
-            --output-dir "$GITHUB_WORKSPACE/screenshots-framed"
+            --output-dir "$GITHUB_WORKSPACE/screenshots-framed" \
+            --fallback-locale en-US
 
       - name: Upload marketing screenshots artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

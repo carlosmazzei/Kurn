@@ -17,11 +17,19 @@
 // assets + placement come from frames.json + frames/*.png (vendored from
 // fastlane/frameit-frames, MIT).
 //
+// With --fallback-locale (screenshots.yml passes en-US), every locale that
+// has copy in config.json but no captures of its own is rendered too, with
+// its own captions over the fallback locale's captures. Capture runs in one
+// language (fastlane/Snapfile), but a store page whose captions are in the
+// searcher's language converts better than one showing another locale's,
+// and caption text is reported to count towards that locale's search.
+//
 // Usage:
 //   node render.js --input-dir <dir> --output-dir <dir> \
 //     [--config <config.json>] [--template <template.html>] \
 //     [--frames-manifest <frames.json>] [--frames-dir <frames/>] \
-//     [--frame-color <name>] [--width 1290] [--height 2796]
+//     [--frame-color <name>] [--fallback-locale <locale>] \
+//     [--width 1290] [--height 2796]
 //
 'use strict';
 
@@ -41,6 +49,7 @@ function parseArgs(argv) {
     framesManifestPath: path.join(__dirname, 'frames.json'),
     framesDir: path.join(__dirname, 'frames'),
     frameColor: null,
+    fallbackLocale: null,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT
   };
@@ -69,6 +78,9 @@ function parseArgs(argv) {
       case '--frame-color':
         args.frameColor = argv[++i];
         break;
+      case '--fallback-locale':
+        args.fallbackLocale = argv[++i];
+        break;
       case '--width':
         args.width = parseInt(argv[++i], 10);
         break;
@@ -85,6 +97,7 @@ function parseArgs(argv) {
       '[render] Usage: node render.js --input-dir <dir> --output-dir <dir> ' +
         '[--config <config.json>] [--template <template.html>] ' +
         '[--frames-manifest <frames.json>] [--frames-dir <frames/>] [--frame-color <name>] ' +
+        '[--fallback-locale <locale>] ' +
         '[--width N] [--height N]'
     );
     process.exit(1);
@@ -229,6 +242,29 @@ function resolveFrame(deviceName, colorArg, framesManifest, framesDir, cache) {
   return resolved;
 }
 
+// Which captures each output locale is rendered from: every captured locale
+// from its own directory, then (with a fallback) every configured locale that
+// was not captured from the fallback's. A configured locale is any top-level
+// config.json key other than "default" and "_"-prefixed comments.
+function planLocales(capturedLocales, config, fallbackLocale) {
+  const plan = capturedLocales.map((locale) => ({ locale, source: locale }));
+  if (!fallbackLocale) {
+    return plan;
+  }
+  if (!capturedLocales.includes(fallbackLocale)) {
+    console.warn(`[render] Fallback locale "${fallbackLocale}" has no captures; rendering captured locales only.`);
+    return plan;
+  }
+  const configured = Object.keys(config)
+    .filter((key) => key !== 'default' && !key.startsWith('_'))
+    .filter((key) => !capturedLocales.includes(key))
+    .sort();
+  for (const locale of configured) {
+    plan.push({ locale, source: fallbackLocale });
+  }
+  return plan;
+}
+
 function fillTemplate(template, { copy, screenshotSrc, frame }) {
   return template
     .replaceAll('{{BADGE}}', escapeHTML(copy.badge || ''))
@@ -287,8 +323,11 @@ async function main() {
   let skipped = 0;
 
   try {
-    for (const locale of locales) {
-      const localeInputDir = path.join(args.inputDir, locale);
+    for (const { locale, source } of planLocales(locales, config, args.fallbackLocale)) {
+      const localeInputDir = path.join(args.inputDir, source);
+      if (source !== locale) {
+        console.log(`[render] Rendering "${locale}" captions over "${source}" captures.`);
+      }
       let localeConfig = config[locale];
       if (!localeConfig) {
         console.warn(
@@ -387,7 +426,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[render] Fatal error: ${err.stack || err}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[render] Fatal error: ${err.stack || err}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { planLocales, splitDeviceAndScreen };

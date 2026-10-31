@@ -11,15 +11,19 @@ This is what's still needed to take a tagged build public, split by who does it.
       automatically in the `beta` job whenever a `vX.Y.Z` tag is pushed
       (`.github/workflows/swift.yml`).
 - [x] Text metadata (description, keywords, subtitle, promotional text,
-      release notes, support/marketing/privacy URLs, copyright, category),
-      **for all 7 UI locales** (`fastlane/metadata/{en-US,pt-BR,es-ES,fr-FR,
-      it,de-DE,zh-Hans}/`) — uploaded together with screenshots by the
-      `store-assets` job after the tag passes `build-and-test`.
+      release notes, support/marketing/privacy URLs, copyright, primary and
+      secondary category) for **13 store languages** — the 7 UI languages
+      plus the regional store languages Apple shows in other storefronts
+      (`en-GB`, `en-AU`, `en-CA`, `es-MX`, `fr-CA`, `pt-PT`; see the
+      validator's docstring for why) — uploaded together with screenshots by
+      the `store-assets` job after the tag passes `build-and-test`.
 - [x] Screenshots — captured automatically for every successful `vX.Y.Z` tag
       through the reusable `App Store Screenshots` workflow, and always uploaded
       as the `screenshots` artifact before their protected upload job starts.
       The workflow can still be dispatched manually for ad-hoc captures.
-      **English (`en-US`) only for now** — `KurnUITests/ScreenshotUITests.swift`
+      Captured in **English (`en-US`) only for now**; `render.js
+      --fallback-locale en-US` then frames every store language with its own
+      captions over those captures. `KurnUITests/ScreenshotUITests.swift`
       already drives navigation purely through `.accessibilityIdentifier`,
       but `Kurn/DebugSupport/ScreenshotSeedData.swift`'s seeded meeting
       titles, transcript lines, and summaries are hardcoded English, so
@@ -35,8 +39,10 @@ This is what's still needed to take a tagged build public, split by who does it.
       touching App Store Connect; manual upload requires a `vX.Y.Z` ref.
 - [x] Static metadata validation — `Tools/validate_store_metadata.py` runs in
       the regular `iOS CI` workflow and checks locale/file completeness, Apple's
-      text limits (including the 100-byte keyword limit), and HTTPS URLs before
-      a release tag can reach the metadata upload job.
+      text limits (including the 100-byte keyword limit), HTTPS URLs, and the
+      search rules — no keyword repeating the name or subtitle, the brand or a
+      category, no duplicates or spaced commas, no competitor names (Guideline
+      2.3.7) — before a release tag can reach the metadata upload job.
 - [x] Accessibility Nutrition Labels — `fastlane/accessibility.json` declares
       VoiceOver, Larger Text, Reduced Motion, and Differentiate Without Color
       Alone for iPhone, iPad, and Apple Watch. `store_assets` upserts those
@@ -68,6 +74,10 @@ automating (each is either a one-off judgment call or requires PII/business
 information this repo has no business holding):
 
 - [ ] **Pricing and Availability** — free vs. paid, which countries/regions.
+      The store languages in `fastlane/metadata/` assume worldwide
+      availability; China mainland additionally requires a generative-AI
+      approval Apple checks at review, so exclude it there unless that is in
+      hand.
 - [ ] **App Privacy** ("nutrition label") — data collection questionnaire.
       Per `PRIVACY.md` and the Privacy Manifest, the honest answer is "Data
       Not Collected."
@@ -108,9 +118,9 @@ information this repo has no business holding):
 
 ## Note on localization
 
-Text metadata (`fastlane/metadata/`) now covers all 7 UI locales and is
-pushed automatically on every tag (see above). Screenshots (`Snapfile`) are
-still `en-US` only: the seeded meeting content in `ScreenshotSeedData.swift`
+Text metadata (`fastlane/metadata/`) covers 13 store languages and is
+pushed automatically on every tag (see above). Screenshot captions follow the
+same 13; the captures under them (`Snapfile`) are still `en-US` only: the seeded meeting content in `ScreenshotSeedData.swift`
 is hardcoded English, so localizing screenshots means translating that seed
 data first, then adding `languages` entries to `Snapfile` — not required to
 submit, but worth doing before or shortly after the first public release.

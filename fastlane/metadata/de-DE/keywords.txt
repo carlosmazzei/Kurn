@@ -1,1 +1,1 @@
-meeting,transkription,notizen,diarisierung,sprecher,zusammenfassung,rekorder,privat,offline,whisper
+besprechung,protokoll,sprachaufnahme,audio,text,zusammenfassung,offline,privat,vorlesung,interview

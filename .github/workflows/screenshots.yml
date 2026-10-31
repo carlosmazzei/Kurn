@@ -123,9 +123,23 @@ jobs:
       # so the delete must run before the copy - it does. Apple Watch files
       # are untouched by either glob, since their names start with "Apple
       # Watch", and they are the one device this pipeline never frames.
+      #
+      # render.js also produces locales that were never captured (their own
+      # captions over the en-US captures, see marketing-screenshots.yml).
+      # Those directories get the en-US Apple Watch captures as well, so a
+      # localization's screenshot set is complete for every device rather
+      # than leaving App Store Connect to mix one locale's iPhone images with
+      # another's Watch ones.
       - name: Replace raw iPhone/iPad captures with framed versions
         run: |
           set -euo pipefail
+          for framed_dir in screenshots-framed/*/; do
+            locale="$(basename "$framed_dir")"
+            mkdir -p "fastlane/screenshots/$locale"
+            if [ "$locale" != "en-US" ] && ! ls "fastlane/screenshots/$locale"/Apple\ Watch*.png >/dev/null 2>&1; then
+              find fastlane/screenshots/en-US -maxdepth 1 -type f -iname "Apple Watch*.png" -exec cp -v {} "fastlane/screenshots/$locale/" \;
+            fi
+          done
           for locale_dir in fastlane/screenshots/*/; do
             locale="$(basename "$locale_dir")"
             find "$locale_dir" -maxdepth 1 -type f \( -iname "iPhone*.png" -o -iname "iPad*.png" \) -print -delete

@@ -213,6 +213,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)
                 .environment(appEnvironment.recordingSession)
+                .environment(appEnvironment.reviewPrompt)
                 .environment(incomingFiles)
                 // Both the app-switcher privacy placeholder and the lock screen
                 // live in a window above everything this hierarchy presents.

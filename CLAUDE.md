@@ -107,7 +107,17 @@ attaches the processed build, and submits it to App Review with
 `automatic_release: false`. The standalone
 `.github/workflows/app-store-submit.yml` remains a manual retry path.
 `Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
-and URLs in the regular CI job. No Apple ID password or 2FA prompt is required;
+URLs and the App Store search rules the listing is written against (no keyword
+that repeats the name, subtitle, brand or a category; no competitor names) in
+the regular CI job. The store languages are not the UI languages: Apple shows
+English (U.K.) or Spanish (Mexico) in most storefronts, so `fastlane/metadata/`
+carries regional variants (`en-GB`, `es-MX`, …) of the 7 UI languages, and
+`scripts/screenshots/render.js --fallback-locale en-US` frames each of them with
+its own captions over the en-US captures. The app asks for a rating through
+`ReviewPromptCoordinator` (`Application/`): a finished transcript or summary is
+a moment of value, KurnCore's `ReviewPromptPolicy` decides when one is due
+(three moments, once per version, 120 days apart), and nothing asks during a
+recording, in the background or in a UI test run. No Apple ID password or 2FA prompt is required;
 App Store Connect calls use its API key, while signing credentials come from the
 private `kurn-certificates` repository. `store_assets` also calls the private
 `sync_accessibility_labels` lane to upsert draft Accessibility Nutrition Labels

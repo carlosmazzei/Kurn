@@ -31,6 +31,8 @@ struct AppCompositionTests {
         #expect(environment.wiki.appSettings === settings)
         #expect(environment.summaries.appSettings === settings)
         #expect(environment.summaries.modelContext === container.mainContext)
+        #expect(environment.summaries.reviewPrompt === environment.reviewPrompt)
+        #expect(environment.transcription.reviewPrompt === environment.reviewPrompt)
     }
 
     @Test func eachCallBuildsIndependentCoordinators() throws {
