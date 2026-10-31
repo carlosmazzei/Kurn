@@ -19,12 +19,12 @@
 //  hook exists for the same reason `StartRecordingIntent` posts a
 //  notification: the extension target cannot name `RecordingCommandRouter`.
 //
-//  Stop also ends the Live Activity here, before `perform()` returns. The
-//  recorder's own `LockScreenRecordingController.end()` runs in an
-//  unstructured task, and once capture stops nothing keeps a backgrounded app
-//  running: iOS can suspend it as soon as the intent returns, before that task
-//  runs, leaving the activity on the Lock Screen with its timer still counting
-//  over a recording that has already stopped.
+//  Stop and pause also update the Live Activity here, before `perform()`
+//  returns. The recorder's own `LockScreenRecordingController` calls run in
+//  unstructured tasks, and once capture stops or pauses nothing may keep a
+//  backgrounded app running: iOS can suspend it as soon as the intent returns,
+//  before those tasks run, leaving the activity on the Lock Screen with its
+//  timer still counting over a recording that has stopped or paused.
 //
 
 import ActivityKit
@@ -39,9 +39,10 @@ enum RecordingControlAction: String, Sendable, CaseIterable {
 }
 
 /// The app-side receiver for `RecordingControlIntent`. `nil` in the widget
-/// extension's process, where there is no recorder to reach.
+/// extension's process, where there is no recorder to reach. Returns whether
+/// a live recorder handled the action.
 enum RecordingControlRouting {
-    @MainActor static var handler: ((RecordingControlAction) -> Void)?
+    @MainActor static var handler: ((RecordingControlAction) -> Bool)?
 }
 
 struct RecordingControlIntent: LiveActivityIntent {
@@ -62,11 +63,31 @@ struct RecordingControlIntent: LiveActivityIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard let action = RecordingControlAction(rawValue: actionRawValue) else { return .result() }
-        RecordingControlRouting.handler?(action)
-        if action == .stop {
+        // Read before the recorder acts, so a recorder update that lands
+        // while this intent awaits cannot be toggled a second time.
+        let toggled = Self.currentActivityState()?.togglingPause()
+        let handled = RecordingControlRouting.handler?(action) ?? false
+        switch action {
+        case .stop:
             await Self.endRecordingActivities()
+        case .togglePause:
+            if handled, let toggled { await Self.updateRecordingActivities(to: toggled) }
+        case .highlight:
+            break
         }
         return .result()
+    }
+
+    private nonisolated static func currentActivityState() -> RecordingActivityAttributes.ContentState? {
+        Activity<RecordingActivityAttributes>.activities.first?.content.state
+    }
+
+    private nonisolated static func updateRecordingActivities(
+        to state: RecordingActivityAttributes.ContentState
+    ) async {
+        for activity in Activity<RecordingActivityAttributes>.activities {
+            await activity.update(ActivityContent(state: state, staleDate: nil))
+        }
     }
 
     /// Ends every recording Live Activity and waits for it, so the activity is
