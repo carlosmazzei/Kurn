@@ -103,17 +103,24 @@ final class RecordingCommandRouter {
 
     /// Apply a Live Activity button (`RecordingControlIntent`). These used to
     /// arrive as `kurn://recording/...` deep links, which any app could open;
-    /// an App Intent only reaches here from the Live Activity itself.
-    func handle(_ action: RecordingControlAction) {
+    /// an App Intent only reaches here from the Live Activity itself. Returns
+    /// whether a live recorder session handled it, so the intent only
+    /// reflects a pause on the Lock Screen when one actually happened.
+    @discardableResult
+    func handle(_ action: RecordingControlAction) -> Bool {
         AppLog.recorderUI.atNotice.notice("RecordingCommandRouter: Live Activity \(action.rawValue, privacy: .public) received")
         switch action {
         case .togglePause:
-            onTogglePause?()
+            guard let onTogglePause else { return false }
+            onTogglePause()
         case .stop:
-            _ = onStop?()
+            guard let onStop else { return false }
+            _ = onStop()
         case .highlight:
-            onHighlight?()
+            guard let onHighlight else { return false }
+            onHighlight()
         }
+        return true
     }
 
     /// Apply a command issued from the Watch app, deduplicated by
