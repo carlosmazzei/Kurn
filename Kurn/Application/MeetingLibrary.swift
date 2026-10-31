@@ -86,6 +86,21 @@ struct MeetingLibrary {
         try journaledDelete(fileNames: fileNames) { context.delete(meeting) }
     }
 
+    /// Deletes several meetings as one journaled operation: one save commits
+    /// them all or none, so a failure never leaves half a selection deleted.
+    /// Refused as a whole when any of them is still being recorded.
+    func deleteMeetings(_ meetings: [Meeting]) throws(AppError) {
+        guard !meetings.isEmpty else { return }
+        let recordings = meetings.flatMap(\.recordings)
+        try requireNoCaptureInProgress(recordings)
+        let fileNames = recordings.map(\.fileName)
+            + recordings.flatMap { $0.photos.map(\.fileName) }
+            + meetings.flatMap { $0.attachments.map(\.fileName) }
+        try journaledDelete(fileNames: fileNames) {
+            for meeting in meetings { context.delete(meeting) }
+        }
+    }
+
     /// Deletes one recording segment, its audio and the photos taken during
     /// it, through the same journaled path as `deleteMeeting`.
     func deleteRecording(_ recording: Recording) throws(AppError) {

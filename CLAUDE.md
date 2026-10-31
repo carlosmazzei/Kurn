@@ -1550,6 +1550,19 @@ renderer remembered it.
   Word's proofing `w:lang` carry the same code.
 - Copy puts the format's own text on the clipboard for Markdown, Obsidian and
   plain text, and Markdown for the file formats.
+- **Several meetings at once** come from the list's selection mode
+  (`MeetingsListSelectionMode`, which only renders `MeetingListSelection` —
+  picks, chrome titles and the delete), which bulk-deletes through
+  `MeetingLibrary.deleteMeetings` — one journaled
+  operation, refused whole if any meeting is being recorded. Actions apply to
+  the selected meetings *shown*, never to ones the current filter hides.
+  `MeetingBulkExportView` renders `MeetingBulkExportViewModel` (file writing
+  and the pasteboard injected), and `MeetingBulkExport` plans the export: each meeting's latest summary and/or
+  transcripts, either one file per meeting (named `yyyy-MM-dd title`, one note
+  each in a vault) or a single file built by KurnCore's
+  `ExportDocument.combining`, which puts each meeting's own document under a
+  level-1 heading — so every renderer handles a collection with no code of
+  its own.
 
 ### Cross-device control (Watch + Live Activity)
 
@@ -2209,16 +2222,25 @@ enforced by lint and by a CI audit test, not just convention:
   `chat.*`, and `dialog.title`/`dialog.primary`/`dialog.secondary` on the
   shared `kurnDialog`): `SettingsFlowUITests` (Providers, declining a model
   download keeps the engine, Storage, Health & Recovery),
-  `LibraryFlowUITests` (tag and folder create/delete) and
+  `LibraryFlowUITests` (tag and folder create/delete),
   `ShareAndChatFlowUITests` (share sheet up to the Obsidian format, Ask with
-  no provider → empty state, composer disabled). They run in the required
+  no provider → empty state, composer disabled) and
+  `BulkSelectionFlowUITests` (selection mode: pick count, bulk export with one
+  file per meeting or one file, bulk delete cancelled then confirmed). Every
+  flow launches with UIKit animations off (`UITestLaunchOptions`, DEBUG only)
+  and the language pinned to English, never sleeps, and confirms a tap that
+  starts a transition by its outcome, repeating it once if UIKit dropped it
+  (`FlowUITestCase.tapUntilCovered` / `tap(_:until:)`); CI runs them with test
+  timeouts so a hang fails in minutes. The open stability and speed work is in
+  `docs/roadmap.md` ("UI test stability and speed"). They run in the required
   `ui-accessibility-tests` job (promoted after 5/5 green attempts in
   `reliability-hardening.yml`'s `ui-flake-rate` lane); a suite that starts
   flaking is demoted with a `-skip-testing` line in `swift.yml` and
   re-measured there before coming back.
 - **Speaker identity, not color, carries meaning** everywhere it matters: the
-  Live Activity's Lock Screen status dot differs by *shape* (pause icon vs.
-  filled circle), not only color, and status text is never color-only.
+  Live Activity says "Recording"/"Paused" in words — under "Kurn" on the Lock
+  Screen, beside the dot in the expanded Dynamic Island — rather than with a
+  colored dot alone, and status text is never color-only.
 - **Locale parity** — `KurnWatch/` and `KurnLiveActivityExtension/` each carry
   the same 7 locales as the main app (`en`, `pt-BR`, `es`, `fr`, `it`, `de`,
   `zh-Hans`), not just `en`/`pt-BR` — a VoiceOver user on the Watch or reading

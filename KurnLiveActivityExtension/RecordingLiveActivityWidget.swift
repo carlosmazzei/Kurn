@@ -86,26 +86,25 @@ private struct LockScreenRecordingView: View {
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
                     KurnLogo(size: 28)
-                    Text("Kurn")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.55))
+                    // The status word, not a colored dot beside the timer,
+                    // says whether it is recording or paused: text carries
+                    // the state without relying on color, and VoiceOver
+                    // reads it as is.
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Kurn")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.55))
+                        Text(statusText(context))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    HStack(spacing: 8) {
-                        // Shape, not just color, carries the paused/recording
-                        // state here — the Lock Screen has no adjacent status
-                        // word the way `RecordingStatusBadge` does — plus a
-                        // VoiceOver label since the icon alone is decorative.
-                        Image(systemName: context.state.isPaused ? "pause.fill" : "circle.fill")
-                            .font(.system(size: 7, weight: .bold))
-                            .foregroundStyle(context.state.isPaused ? Color.kurnPaused : Color.kurnAccent)
-                            .frame(width: 7, height: 7)
-                            .accessibilityLabel(Text(statusText(context)))
-                        elapsedText(context)
-                            .font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
-                            .foregroundStyle(.white)
-                    }
+                    elapsedText(context)
+                        .font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.white)
                     if context.state.highlightCount > 0 {
                         highlightCountBadge(context)
                     }

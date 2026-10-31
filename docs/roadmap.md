@@ -324,7 +324,7 @@ The H1–H10 hardening track is closed; its invariants and types are in
 - **CI.** The fault-injection seams exist per component (`ClockProviding`,
   `FakeFileSystem`, `ModelDownloading`, …) but there is no single fault-matrix
   artifact; the three macOS jobs each run a full clean build (no
-  build-once/test-many).
+  build-once/test-many — see "UI test stability and speed").
 
 ### Design and accessibility
 
@@ -340,6 +340,47 @@ The H1–H10 hardening track is closed; its invariants and types are in
 - **Localized screenshots.** `ScreenshotSeedData` is hardcoded English, so App
   Store screenshots are `en-US` only; translate the seed data, then add
   `Snapfile` languages.
+
+### UI test stability and speed
+
+The flow suites (`KurnUITests/Flows/`) are a required check, so a flake costs a
+re-run and a slow one costs every PR. Already in place: identifiers instead of
+text, the seeded in-memory store per launch, per-launch name suffixes, no
+sleeps, `tapUntilCovered`/`tap(_:until:)` for taps that start a transition,
+UIKit animations off and the language pinned to English
+(`UITestLaunchOptions`, `FlowUITestCase`), test timeouts in CI, and the
+measured `ui-flake-rate` lane. Open, in the order they pay off:
+
+1. **Measure every new flow suite before trusting it.** Dispatch
+   `reliability-hardening.yml` on the branch that adds it; 5/5 green attempts
+   is the bar the existing suites met. A suite that later flakes is demoted with
+   a `-skip-testing` line in `swift.yml` and fixed, never retried into green.
+2. **Build once, test many.** Each `ui-tests` shard and `unit-tests` runs its
+   own `clean test`, so the app and test bundles are compiled three times per
+   PR — most of each job's wall time. `build-for-testing` in one job, the
+   `.xctestrun` plus products uploaded as an artifact, and
+   `test-without-building` in the shards removes two builds; the artifact
+   transfer has to be measured against the build it saves.
+3. **Boot the simulator before `xcodebuild`.** `xcrun simctl boot` +
+   `simctl bootstatus -b` in `prepare-simulator` keeps the cold boot out of the
+   first test's time budget, which is where launch-time waits most often run
+   out.
+4. **Fewer launches per suite.** Each test relaunches the app (~10–15 s on a
+   CI runner); checks that share a screen belong in one test, as
+   `testMeetingDetailTabs` already does for the audit. Separate tests only
+   where a failure would otherwise hide the next check.
+5. **Rebalance the shards from measured times.** `main` now also runs
+   `BulkSelectionFlowUITests`; read the per-suite durations from the
+   `.xcresult` and move suites so neither shard waits on the other.
+6. **Replace the remaining text handles.** Menu-picker options, segmented
+   segments ("Single file") and the selection title ("Selected: N") are still
+   matched by their en string, because SwiftUI does not surface an identifier
+   set on a picker option. A custom `Menu` of identified `Button`s, or an
+   `accessibilityValue` on the title, would remove the last locale coupling.
+
+Deliberately not used: `-retry-tests-on-failure`. It would turn a flaky test
+green on its second attempt and hide exactly the signal the flake-rate lane
+exists to count.
 
 ### Test coverage
 

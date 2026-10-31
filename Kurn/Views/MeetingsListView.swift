@@ -7,8 +7,10 @@
 //  buckets All / Inbox / Favorites / Archive plus user folders), date filters,
 //  a configurable sort menu, status/summary chips, leading swipe for
 //  favorite/archive, trailing swipe for delete, a long-press context menu
-//  (favorite / archive / move to folder / rename / share / delete), and entry
-//  points for creating a meeting or opening settings.
+//  (favorite / archive / move to folder / rename / share / select / delete),
+//  a selection mode for deleting or exporting several meetings at once (see
+//  `MeetingsListSelectionMode.swift`), and entry points for creating a meeting
+//  or opening settings.
 //
 
 import KurnCore
@@ -75,6 +77,10 @@ struct MeetingsListView: View {
     /// Set when a favorite/archive/create/delete persistence op fails, so the
     /// failure surfaces instead of being dropped silently.
     @State var saveError: AppError?
+    /// Selection mode: which meetings are picked for a bulk delete or export.
+    @State var listSelection = MeetingListSelection()
+    @State var showingBulkExport = false
+    @State var pendingBulkDelete = false
 
     /// The currently-selected folder, looked up through the dedicated `@Query`
     /// so renames and deletions reflect immediately in the chip title.
@@ -123,7 +129,7 @@ struct MeetingsListView: View {
         }
     }
 
-    private var filtered: [Meeting] {
+    var filtered: [Meeting] {
         let base = scoped
         guard !searchText.isEmpty else { return settings.meetingsSortOrder.apply(to: base) }
 
@@ -210,10 +216,13 @@ struct MeetingsListView: View {
                 .clearListRow()
             } else {
                 ForEach(filtered) { meeting in
-                    Button { selectedMeeting = meeting } label: {
-                        MeetingCard(meeting: meeting, preview: preview(for: meeting))
+                    Button {
+                        if !listSelection.handleTap(on: meeting.id) { selectedMeeting = meeting }
+                    } label: {
+                        selectableCard(for: meeting)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(listSelection.isSelected(meeting.id) ? .isSelected : [])
                     .accessibilityIdentifier("meetingCard")
                     .clearListRow(insets: EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
@@ -295,6 +304,14 @@ struct MeetingsListView: View {
                                 systemImage: "square.and.arrow.up"
                             )
                         }
+                        Button {
+                            listSelection.begin(with: meeting.id)
+                        } label: {
+                            Label(
+                                NSLocalizedString("meetings.select", comment: "Select"),
+                                systemImage: "checkmark.circle"
+                            )
+                        }
                         Divider()
                         Button(role: .destructive) {
                             pendingDelete = meeting
@@ -311,7 +328,7 @@ struct MeetingsListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("Kurn")
+        .navigationTitle(listTitle)
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
@@ -334,6 +351,12 @@ struct MeetingsListView: View {
         }
         .sheet(item: $shareItem) { item in
             ActivityView(items: item.urls)
+        }
+        .sheet(isPresented: $showingBulkExport) {
+            MeetingBulkExportView(meetings: selectedMeetings) { urls in
+                listSelection.end()
+                shareItem = ShareItem(urls: urls)
+            }
         }
         .sheet(item: $movingMeeting) { meeting in
             FolderPickerView(meeting: meeting)
@@ -390,6 +413,11 @@ struct MeetingsListView: View {
             secondaryAction: {
                 pendingDelete = nil
             }
+        )
+        .bulkDeleteDialog(
+            isPresented: $pendingBulkDelete,
+            count: selectedMeetings.count,
+            onConfirm: deleteSelectedMeetings
         )
         .errorAlert($saveError)
     }

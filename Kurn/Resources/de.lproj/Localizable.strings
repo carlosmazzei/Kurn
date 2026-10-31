@@ -1015,3 +1015,21 @@
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "Aufnahme steuern";
 "intent.recordingControl.action" = "Aktion";
+
+/* Meetings list selection mode and bulk export */
+"meetings.select" = "Auswählen";
+"meetings.selection.count" = "Ausgewählt: %d";
+"meetings.selection.select_all" = "Alle auswählen";
+"meetings.selection.deselect_all" = "Auswahl aufheben";
+"meetings.selection.export" = "Exportieren";
+"meetings.bulk_delete.confirm" = "Ausgewählte Meetings (%d) löschen?";
+"meetings.bulk_delete.message" = "Ihre Aufnahmen, Transkripte, Zusammenfassungen und Anhänge werden dauerhaft gelöscht.";
+"bulk_export.title" = "Meetings exportieren";
+"bulk_export.include" = "Einschließen";
+"bulk_export.availability" = "Meetings mit exportierbarem Inhalt: %d von %d.";
+"bulk_export.grouping" = "Dateien";
+"bulk_export.grouping.per_meeting" = "Eine pro Meeting";
+"bulk_export.grouping.single" = "Eine Datei";
+"bulk_export.grouping.per_meeting.detail" = "Jedes Meeting wird eine eigene Datei, benannt nach Datum und Titel – eine Notiz pro Meeting in Obsidian.";
+"bulk_export.grouping.single.detail" = "Alle Meetings in einer Datei, jedes unter eigener Überschrift mit Zusammenfassung und Transkript.";
+"bulk_export.combined_title" = "Meetings (%d)";

@@ -83,6 +83,64 @@ struct MeetingLibraryTests {
         #expect(try context.fetch(FetchDescriptor<Recording>()).count == 1)
     }
 
+    // MARK: - Bulk delete
+
+    @Test func deleteMeetingsRemovesEverySelectedMeetingAndItsFiles() throws {
+        let (library, context) = makeLibrary()
+        let first = try library.createMeeting(title: "Standup")
+        let second = try library.createMeeting(title: "Retro")
+        let kept = try library.createMeeting(title: "Planning")
+        let firstFile = try makeFile()
+        let secondFile = try makeFile()
+        defer {
+            try? FileManager.default.removeItem(at: firstFile.url)
+            try? FileManager.default.removeItem(at: secondFile.url)
+        }
+        context.insert(Recording(meeting: first, fileName: firstFile.name, duration: 5))
+        context.insert(Recording(meeting: second, fileName: secondFile.name, duration: 6))
+        try context.save()
+
+        try library.deleteMeetings([first, second])
+
+        #expect(try context.fetch(FetchDescriptor<Meeting>()).map(\.id) == [kept.id])
+        #expect(try context.fetch(FetchDescriptor<Recording>()).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: firstFile.url.path))
+        #expect(!FileManager.default.fileExists(atPath: secondFile.url.path))
+    }
+
+    @Test func deleteMeetingsWithNothingSelectedIsANoOp() throws {
+        let (library, context) = makeLibrary()
+        try library.createMeeting(title: "Standup")
+        try library.deleteMeetings([])
+        #expect(try context.fetch(FetchDescriptor<Meeting>()).count == 1)
+    }
+
+    // One live capture in the selection refuses the whole batch, so the
+    // others are not deleted behind a failure the user then has to explain.
+    @Test func deleteMeetingsRefusesTheBatchWhenOneIsBeingRecorded() throws {
+        let (library, context) = makeLibrary()
+        let idle = try library.createMeeting(title: "Idle")
+        let live = try library.createMeeting(title: "Live")
+        context.insert(Recording(meeting: live, fileName: "live_\(UUID().uuidString).m4a", duration: 0, captureState: .recording))
+        try context.save()
+
+        #expect(throws: AppError.self) { try library.deleteMeetings([idle, live]) }
+        #expect(try context.fetch(FetchDescriptor<Meeting>()).count == 2)
+    }
+
+    @Test func deleteMeetingsKeepsTheFilesWhenTheSaveFails() throws {
+        let (library, context) = makeLibrary()
+        let meeting = try library.createMeeting(title: "Standup")
+        let file = try makeFile()
+        defer { try? FileManager.default.removeItem(at: file.url) }
+        context.insert(Recording(meeting: meeting, fileName: file.name, duration: 5))
+        try context.save()
+
+        let failing = MeetingLibrary(context: context, persist: { _ in .persistenceFailed("disk") })
+        #expect(throws: AppError.self) { try failing.deleteMeetings([meeting]) }
+        #expect(FileManager.default.fileExists(atPath: file.url.path))
+    }
+
     @Test func recordingCaptureInProgressCoversOnlyTheLiveStates() {
         let (_, context) = makeLibrary()
         let live: [RecordingCaptureState] = [.preparing, .recording, .finalizing]
