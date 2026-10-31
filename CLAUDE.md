@@ -1560,7 +1560,11 @@ single-screen remote control. `Services/LockScreenRecordingController.swift` own
 ActivityKit (`Activity<RecordingActivityAttributes>`) lifecycle — `start`/
 `update`/`end` mirror `AudioRecorderService.State` into the activity's
 `ContentState`; the actual Live Activity UI is rendered separately by the
-`KurnLiveActivityExtension` widget target.
+`KurnLiveActivityExtension` widget target. The Live Activity's Stop button also ends the activity
+inside `RecordingControlIntent.perform()` and awaits it: once capture stops,
+nothing keeps a backgrounded app alive, so the controller's own unstructured
+`end()` task could be suspended before it ran, leaving the Lock Screen timer
+counting over a stopped recording.
 
 The watchOS target does **not** share source files with the app — types like
 `WatchCommand` and the wire-contract constants in `WatchSessionProtocol.swift`

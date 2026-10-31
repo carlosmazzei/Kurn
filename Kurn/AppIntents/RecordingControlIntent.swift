@@ -19,7 +19,15 @@
 //  hook exists for the same reason `StartRecordingIntent` posts a
 //  notification: the extension target cannot name `RecordingCommandRouter`.
 //
+//  Stop also ends the Live Activity here, before `perform()` returns. The
+//  recorder's own `LockScreenRecordingController.end()` runs in an
+//  unstructured task, and once capture stops nothing keeps a backgrounded app
+//  running: iOS can suspend it as soon as the intent returns, before that task
+//  runs, leaving the activity on the Lock Screen with its timer still counting
+//  over a recording that has already stopped.
+//
 
+import ActivityKit
 import AppIntents
 import Foundation
 
@@ -53,9 +61,20 @@ struct RecordingControlIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        if let action = RecordingControlAction(rawValue: actionRawValue) {
-            RecordingControlRouting.handler?(action)
+        guard let action = RecordingControlAction(rawValue: actionRawValue) else { return .result() }
+        RecordingControlRouting.handler?(action)
+        if action == .stop {
+            await Self.endRecordingActivities()
         }
         return .result()
+    }
+
+    /// Ends every recording Live Activity and waits for it, so the activity is
+    /// gone before the system may suspend the app. After a stop none of them
+    /// has a live recorder behind it, including one a killed process left.
+    private nonisolated static func endRecordingActivities() async {
+        for activity in Activity<RecordingActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 }
