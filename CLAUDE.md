@@ -2212,9 +2212,17 @@ enforced by lint and by a CI audit test, not just convention:
   `chat.*`, and `dialog.title`/`dialog.primary`/`dialog.secondary` on the
   shared `kurnDialog`): `SettingsFlowUITests` (Providers, declining a model
   download keeps the engine, Storage, Health & Recovery),
-  `LibraryFlowUITests` (tag and folder create/delete) and
+  `LibraryFlowUITests` (tag and folder create/delete),
   `ShareAndChatFlowUITests` (share sheet up to the Obsidian format, Ask with
-  no provider → empty state, composer disabled). They run in the required
+  no provider → empty state, composer disabled) and
+  `BulkSelectionFlowUITests` (selection mode: pick count, bulk export with one
+  file per meeting or one file, bulk delete cancelled then confirmed). Every
+  flow launches with UIKit animations off (`UITestLaunchOptions`, DEBUG only)
+  and the language pinned to English, never sleeps, and confirms a tap that
+  starts a transition by its outcome, repeating it once if UIKit dropped it
+  (`FlowUITestCase.tapUntilCovered` / `tap(_:until:)`); CI runs them with test
+  timeouts so a hang fails in minutes. The open stability and speed work is in
+  `docs/roadmap.md` ("UI test stability and speed"). They run in the required
   `ui-accessibility-tests` job (promoted after 5/5 green attempts in
   `reliability-hardening.yml`'s `ui-flake-rate` lane); a suite that starts
   flaking is demoted with a `-skip-testing` line in `swift.yml` and
