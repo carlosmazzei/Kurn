@@ -1,0 +1,1 @@
+Esta versão traz suporte completo de acessibilidade: etiquetas do VoiceOver em toda a app, na app complementar para Apple Watch e na Live Activity do ecrã bloqueado/Dynamic Island; texto dinâmico, para que o texto se ajuste ao tamanho de leitura preferido; e suporte para Reduzir movimento. O estado nunca é indicado apenas pela cor.

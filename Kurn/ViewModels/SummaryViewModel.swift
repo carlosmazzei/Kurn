@@ -70,14 +70,19 @@ final class SummaryViewModel {
     let summaryService: SummaryService
     /// Records which template was used (`UsageStats`). `nil` only in tests.
     let appSettings: AppSettings?
+    /// Told about each summary written, to time the App Store rating
+    /// request. `nil` only in tests.
+    let reviewPrompt: ReviewPromptCoordinator?
 
     init(
         modelContext: ModelContext,
         appSettings: AppSettings? = nil,
+        reviewPrompt: ReviewPromptCoordinator? = nil,
         summaryService: SummaryService = SummaryService()
     ) {
         self.modelContext = modelContext
         self.appSettings = appSettings
+        self.reviewPrompt = reviewPrompt
         self.summaryService = summaryService
     }
 
@@ -196,6 +201,9 @@ final class SummaryViewModel {
             persist()
             AppLog.transcription.atNotice.notice("VM: summary done")
             appSettings?.recordSummaryTemplateUsed(template.id)
+            // A failed save is surfaced through `error`; a rating request on
+            // top of that alert would ask at the worst possible moment.
+            if error == nil { reviewPrompt?.noteSuccessfulMoment() }
         } catch is CancellationError {
             AppLog.transcription.atNotice.notice("VM: summary cancelled")
         } catch let AppError.networkError(urlError) where urlError.code == .cancelled || Task.isCancelled || isCancellingSummary {

@@ -1,1 +1,1 @@
-Grabadora de reuniones local-first con transcripción on-device, identificación de hablantes y resúmenes con IA. Tus grabaciones se quedan en el dispositivo por defecto.
+Gratis y de código abierto. Sin bots en la llamada y sin cuenta. Graba reuniones y clases y obtén transcripción con hablantes y resumen con IA, privado en tu iPhone.

@@ -52,14 +52,18 @@ struct SummaryViewModelStateTests {
         let llm: ScriptedLLM
         let viewModel: SummaryViewModel
         let meeting: Meeting
+        let reviewPrompt: ReviewPromptCoordinator
 
         init(withTranscript: Bool = true) throws {
             container = TestModelContainer.make()
             context = container.mainContext
             llm = ScriptedLLM()
             let scripted = llm
+            let defaults = try #require(UserDefaults(suiteName: "SummaryViewModelStateTests.\(UUID().uuidString)"))
+            reviewPrompt = ReviewPromptCoordinator(defaults: defaults, appVersion: "1.0.0", isSuppressed: { false })
             viewModel = SummaryViewModel(
                 modelContext: context,
+                reviewPrompt: reviewPrompt,
                 summaryService: SummaryService(resolveProvider: { _, _ in scripted })
             )
             meeting = Meeting(title: "Summary")
@@ -110,6 +114,7 @@ struct SummaryViewModelStateTests {
         #expect(harness.meeting.summaries.first?.model == "gpt-4o")
         #expect(harness.meeting.summaryMapCheckpointData == nil)
         #expect(harness.llm.calls == 1)
+        #expect(harness.reviewPrompt.state.successfulMoments == 1)
     }
 
     @Test func theDraftIsShownOnlyWhileARunIsInFlightAndNeverGoesBackwards() async throws {

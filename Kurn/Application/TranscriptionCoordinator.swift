@@ -126,12 +126,16 @@ final class TranscriptionCoordinator {
     /// App-wide wiki coordinator. A finished transcription refreshes the
     /// meeting's condensed wiki article through it (opt-in). `nil` only in tests.
     let wikiCoordinator: WikiCoordinator?
+    /// Told about each finished transcript, to time the App Store rating
+    /// request. `nil` only in tests.
+    let reviewPrompt: ReviewPromptCoordinator?
 
     init(
         modelContext: ModelContext,
         appSettings: AppSettings? = nil,
         semanticIndexCoordinator: SemanticIndexCoordinator? = nil,
         wikiCoordinator: WikiCoordinator? = nil,
+        reviewPrompt: ReviewPromptCoordinator? = nil,
         aiTitleCoordinator: AITitleCoordinator = AITitleCoordinator(),
         transcriptionService: TranscriptionService = TranscriptionService()
     ) {
@@ -139,6 +143,7 @@ final class TranscriptionCoordinator {
         self.appSettings = appSettings
         self.semanticIndexCoordinator = semanticIndexCoordinator
         self.wikiCoordinator = wikiCoordinator
+        self.reviewPrompt = reviewPrompt
         self.aiTitleCoordinator = aiTitleCoordinator
         self.transcriptionService = transcriptionService
     }
@@ -415,6 +420,7 @@ final class TranscriptionCoordinator {
                 elapsedSeconds: Date().timeIntervalSince(startedAt)
             ))
             appSettings?.recordTranscriptionEngineUsed(config.transcription)
+            reviewPrompt?.noteSuccessfulMoment()
             if let settings = appSettings {
                 startPostTranscriptionWork(for: recording, settings: settings)
             }

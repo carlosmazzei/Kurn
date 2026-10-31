@@ -95,6 +95,9 @@ struct KurnApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        #if DEBUG
+        UITestLaunchOptions.apply()
+        #endif
         // KurnCore has no `os` dependency (it needs to build on Linux), so it
         // exposes this seam instead of logging directly. Wired once, here,
         // before any transcription can run.
@@ -213,6 +216,7 @@ struct KurnApp: App {
                 .environment(appEnvironment.semanticIndex)
                 .environment(appEnvironment.wiki)
                 .environment(appEnvironment.recordingSession)
+                .environment(appEnvironment.reviewPrompt)
                 .environment(incomingFiles)
                 // Both the app-switcher privacy placeholder and the lock screen
                 // live in a window above everything this hierarchy presents.

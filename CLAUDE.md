@@ -107,7 +107,22 @@ attaches the processed build, and submits it to App Review with
 `automatic_release: false`. The standalone
 `.github/workflows/app-store-submit.yml` remains a manual retry path.
 `Tools/validate_store_metadata.py` checks locale/file completeness, text limits,
-and URLs in the regular CI job. No Apple ID password or 2FA prompt is required;
+URLs and the App Store search rules the listing is written against (no keyword
+that repeats the name, subtitle, brand or a category; no competitor names; no
+price term such as "free" in the name, subtitle or screenshot captions, so that
+the app is free and open source is said in the description and promotional
+text) in the regular CI job. The store languages are not the UI languages: Apple shows
+English (U.K.) or Spanish (Mexico) in most storefronts, so `fastlane/metadata/`
+carries regional variants (`en-GB`, `es-MX`, …) of the 7 UI languages.
+Screenshots are captured in all 7 UI languages — one macOS job per language in
+`screenshots.yml`, the seeded meetings following the launch language
+(`DebugSupport/ScreenshotSeedText`) — and `scripts/screenshots/render.js` frames
+every store language with its own captions over the capture of its language
+(`es-MX` over `es-ES`, `en-GB` over `en-US`). The app asks for a rating through
+`ReviewPromptCoordinator` (`Application/`): a finished transcript or summary is
+a moment of value, KurnCore's `ReviewPromptPolicy` decides when one is due
+(three moments, once per version, 120 days apart), and nothing asks during a
+recording, in the background or in a UI test run. No Apple ID password or 2FA prompt is required;
 App Store Connect calls use its API key, while signing credentials come from the
 private `kurn-certificates` repository. `store_assets` also calls the private
 `sync_accessibility_labels` lane to upsert draft Accessibility Nutrition Labels
@@ -422,7 +437,8 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
   non-UI entry point, and never inject a dependency by assigning a property
   after construction.
 - **DebugSupport/** — `#if DEBUG` only, compiled out of Release.
-  `ScreenshotSeedData` seeds a handful of plausible meetings into the in-memory
+  `ScreenshotSeedData` seeds a handful of plausible meetings (text from
+  `ScreenshotSeedText`, in the launch language) into the in-memory
   container `KurnApp` builds when launched with `"UI-Testing-Screenshots"`,
   backing both the fastlane screenshot run and `AccessibilityAuditUITests`. It
   never seeds a real recording or transcript.
@@ -2212,9 +2228,17 @@ enforced by lint and by a CI audit test, not just convention:
   `chat.*`, and `dialog.title`/`dialog.primary`/`dialog.secondary` on the
   shared `kurnDialog`): `SettingsFlowUITests` (Providers, declining a model
   download keeps the engine, Storage, Health & Recovery),
-  `LibraryFlowUITests` (tag and folder create/delete) and
+  `LibraryFlowUITests` (tag and folder create/delete),
   `ShareAndChatFlowUITests` (share sheet up to the Obsidian format, Ask with
-  no provider → empty state, composer disabled). They run in the required
+  no provider → empty state, composer disabled) and
+  `BulkSelectionFlowUITests` (selection mode: pick count, bulk export with one
+  file per meeting or one file, bulk delete cancelled then confirmed). Every
+  flow launches with UIKit animations off (`UITestLaunchOptions`, DEBUG only)
+  and the language pinned to English, never sleeps, and confirms a tap that
+  starts a transition by its outcome, repeating it once if UIKit dropped it
+  (`FlowUITestCase.tapUntilCovered` / `tap(_:until:)`); CI runs them with test
+  timeouts so a hang fails in minutes. The open stability and speed work is in
+  `docs/roadmap.md` ("UI test stability and speed"). They run in the required
   `ui-accessibility-tests` job (promoted after 5/5 green attempts in
   `reliability-hardening.yml`'s `ui-flake-rate` lane); a suite that starts
   flaking is demoted with a `-skip-testing` line in `swift.yml` and

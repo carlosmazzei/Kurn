@@ -215,6 +215,9 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -only-testing:KurnUITests \
             -skip-testing:KurnUITests/ScreenshotUITests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 600 \
             clean test
 
       - name: Collect failure diagnostics

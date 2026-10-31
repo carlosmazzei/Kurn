@@ -185,6 +185,11 @@ jobs:
   # runner would make flakier. The `flows` shard names the two long flow
   # suites; `main` runs everything else in KurnUITests, so a new test class
   # lands in a shard without anyone having to list it.
+  #
+  # Test timeouts turn a hung UI test (a dialog nothing dismisses, a wait on
+  # an element that never comes) into a failure with diagnostics after four
+  # minutes, instead of the job sitting until its own timeout. The slowest
+  # flow takes under two.
   ui-tests:
     name: ui-tests (${{ matrix.shard }})
     runs-on: macos-26
@@ -234,6 +239,9 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
             -enableCodeCoverage YES \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 600 \
             $TEST_SELECTION \
             clean test
 
@@ -431,7 +439,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
+        uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -461,7 +469,7 @@ jobs:
         run: xcodebuild -version
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
+        uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
@@ -516,7 +524,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec # v1.334.0
+        uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
         with:
           ruby-version: '3.3'
           bundler-cache: true

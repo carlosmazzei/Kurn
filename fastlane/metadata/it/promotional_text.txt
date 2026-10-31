@@ -1,1 +1,1 @@
-Registratore di riunioni local-first con trascrizione on-device, identificazione degli speaker e riepiloghi IA. Registrazioni sempre sul tuo dispositivo.
+Gratuita e open source. Nessun bot nella chiamata e nessun account. Registra riunioni e lezioni, ottieni trascrizione, chi parla e riassunto IA, in privato su iPhone.

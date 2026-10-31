@@ -78,7 +78,10 @@ struct MeetingBulkExportView: View {
             .safeAreaBar(edge: .bottom) { shareBar }
             .errorAlert($model.error)
         }
-        .presentationDetents([.medium, .large])
+        // Large only: at the medium height the share bar laid over the form
+        // covers the grouping picker, so the choice it explains sits under
+        // the button it changes.
+        .presentationDetents([.large])
     }
 
     /// The same format picker and share button as `MeetingShareSelectionView`.
