@@ -1015,3 +1015,21 @@
 /* Live Activity button intent (hidden from Shortcuts) */
 "intent.recordingControl.title" = "控制录音";
 "intent.recordingControl.action" = "操作";
+
+/* Meetings list selection mode and bulk export */
+"meetings.select" = "选择";
+"meetings.selection.count" = "已选择：%d";
+"meetings.selection.select_all" = "全选";
+"meetings.selection.deselect_all" = "取消全选";
+"meetings.selection.export" = "导出";
+"meetings.bulk_delete.confirm" = "删除所选会议（%d）？";
+"meetings.bulk_delete.message" = "它们的录音、转录、摘要和附件将被永久删除。";
+"bulk_export.title" = "导出会议";
+"bulk_export.include" = "包含";
+"bulk_export.availability" = "有可导出内容的会议：%d / %d。";
+"bulk_export.grouping" = "文件";
+"bulk_export.grouping.per_meeting" = "每个会议一个";
+"bulk_export.grouping.single" = "单个文件";
+"bulk_export.grouping.per_meeting.detail" = "每个会议各成一个文件，以日期和标题命名——在 Obsidian 中每个会议一条笔记。";
+"bulk_export.grouping.single.detail" = "所有会议合并到一个文件，每个会议在各自标题下附有摘要和转录。";
+"bulk_export.combined_title" = "会议（%d）";

@@ -20,6 +20,16 @@ extension MeetingsListView {
 
     @ToolbarContentBuilder
     var listToolbar: some ToolbarContent {
+        if listSelection.isActive {
+            selectionToolbar
+        } else {
+            browsingToolbar
+        }
+    }
+
+    @ToolbarContentBuilder
+    var browsingToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) { selectButton }
         ToolbarItem(placement: .topBarTrailing) { sortMenu }
         // Splits the shared glass background so sorting and settings read as
         // two separate controls rather than one segmented capsule.

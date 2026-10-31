@@ -1540,6 +1540,19 @@ renderer remembered it.
   Word's proofing `w:lang` carry the same code.
 - Copy puts the format's own text on the clipboard for Markdown, Obsidian and
   plain text, and Markdown for the file formats.
+- **Several meetings at once** come from the list's selection mode
+  (`MeetingsListSelectionMode`, which only renders `MeetingListSelection` —
+  picks, chrome titles and the delete), which bulk-deletes through
+  `MeetingLibrary.deleteMeetings` — one journaled
+  operation, refused whole if any meeting is being recorded. Actions apply to
+  the selected meetings *shown*, never to ones the current filter hides.
+  `MeetingBulkExportView` renders `MeetingBulkExportViewModel` (file writing
+  and the pasteboard injected), and `MeetingBulkExport` plans the export: each meeting's latest summary and/or
+  transcripts, either one file per meeting (named `yyyy-MM-dd title`, one note
+  each in a vault) or a single file built by KurnCore's
+  `ExportDocument.combining`, which puts each meeting's own document under a
+  level-1 heading — so every renderer handles a collection with no code of
+  its own.
 
 ### Cross-device control (Watch + Live Activity)
 
