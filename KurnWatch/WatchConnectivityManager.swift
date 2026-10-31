@@ -92,11 +92,33 @@ final class WatchConnectivityManager: NSObject {
     private func seedForScreenshot() {
         isAvailable = true
         state = .recording(
-            meetingTitle: "Product Roadmap Sync",
+            meetingTitle: Self.screenshotMeetingTitle(),
             referenceDate: Date().addingTimeInterval(-642),
             accumulatedElapsed: 0,
             highlightCount: 2
         )
+    }
+
+    /// The hero meeting's title in the launch language, matching the iPhone
+    /// screenshots' `ScreenshotSeedText.roadmapTitle` (the Watch target does
+    /// not share source files with the app, so the titles are repeated here).
+    private static func screenshotMeetingTitle(
+        preferredLanguages: [String] = Locale.preferredLanguages
+    ) -> String {
+        let titles = [
+            "pt": "Alinhamento do roadmap",
+            "es": "Revisión del roadmap",
+            "fr": "Point roadmap produit",
+            "it": "Allineamento roadmap",
+            "de": "Produkt-Roadmap-Abstimmung",
+            "zh": "产品路线图同步会"
+        ]
+        for identifier in preferredLanguages {
+            let code = identifier.split(separator: "-").first.map { String($0).lowercased() } ?? ""
+            if code == "en" { break }
+            if let title = titles[code] { return title }
+        }
+        return "Product Roadmap Sync"
     }
     #endif
 

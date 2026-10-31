@@ -1,27 +1,38 @@
-Kurn è un'app local-first per registrare riunioni, trascrivere l'audio, identificare chi parla e generare riepiloghi strutturati con IA, pensata perché le tue registrazioni restino sul tuo dispositivo per impostazione predefinita.
+Kurn è un'app di note per riunioni con IA che registra, trascrive e riassume le tue riunioni, lezioni e interviste, in modo privato sul tuo iPhone. Nessun bot entra nella tua chiamata, non serve un account e le registrazioni restano sul tuo dispositivo per impostazione predefinita.
 
-REGISTRA E TRASCRIVI
-- Registra riunioni in uno o più segmenti, con controlli di pausa, ripresa e stop dall'app, dalla Lock Screen, dalla Dynamic Island o dal tuo Apple Watch.
-- Trascrivi sul dispositivo con il framework Speech di Apple o un modello multilingue on-device, oppure usa facoltativamente un'API compatibile con Whisper nel cloud per registrazioni più lunghe.
-- La diarizzazione automatica degli speaker indica chi ha detto cosa, con nomi modificabili.
-- Un'anteprima di trascrizione live (facoltativa) mostra una bozza in tempo reale mentre registri.
-- Le trascrizioni lunghe riprendono automaticamente se l'app va in background o viene interrotta, continuando da dove si erano fermate invece di ricominciare.
+REGISTRA QUALSIASI CONVERSAZIONE
+- Registra riunioni in presenza, lezioni, interviste e note vocali, in uno o più segmenti.
+- Avvia, metti in pausa e interrompi dall'app, dalla schermata di blocco, dalla Dynamic Island, dal Centro di Controllo, con Siri e Comandi Rapidi o dal tuo Apple Watch.
+- Continua a registrare mentre usi altre app: il registratore si riduce a una mini barra.
 
-COMPRENDI LE TUE RIUNIONI
-- Riepiloghi strutturati con IA basati su modelli: generale, standup o colloquio, oppure un tuo modello personalizzato.
-- Cerca le riunioni e filtra per data, tag, stato o durata.
-- Organizza le riunioni in cartelle, Cartelle Intelligenti, preferiti e un archivio.
-- Assegna tag alle riunioni manualmente o con tag suggeriti dall'IA (facoltativo).
-- Fai domande su una singola riunione o su tutta la tua libreria, con timestamp citati e selezionabili che ti portano direttamente a quel momento nella trascrizione.
+TRASCRIVI L'AUDIO IN TESTO
+- Trascrizione sul dispositivo con il riconoscimento vocale di Apple, un modello multilingue locale o Whisper eseguito direttamente sul tuo iPhone.
+- Trascrizione cloud facoltativa, con la tua chiave OpenAI, Groq o ElevenLabs.
+- L'identificazione di chi parla mostra chi ha detto cosa e suggerisce il nome di una voce già nominata in un'altra riunione.
+- Le trascrizioni lunghe riprendono da dove si erano fermate se l'app viene interrotta.
 
-ACCESSIBILE FIN DALLA PROGETTAZIONE
-- Supporto completo a VoiceOver in tutta l'app, nell'app companion per Apple Watch e nella Live Activity della Lock Screen/Dynamic Island.
-- Testo dinamico: il testo si adatta alla dimensione di lettura che preferisci.
-- Rispetta Riduci movimento e non si basa mai solo sul colore per mostrare lo stato.
+VERBALI, RIASSUNTI E AZIONI CON L'IA
+- Riassunti strutturati con decisioni, azioni e punti chiave: modelli generale, stand-up, intervista o schema, oppure il tuo.
+- Funziona con Apple Intelligence sui dispositivi compatibili, oppure con il fornitore che scegli e la tua chiave API.
+- Fai domande su una riunione o su tutta la libreria e ottieni risposte con indicazioni temporali da toccare.
+- Allega PDF come materiale di riferimento, crea documenti da più riunioni e ascolta i riassunti letti ad alta voce.
 
-PRIVATA FIN DALLA PROGETTAZIONE
-- Registrazioni e dati delle riunioni sono archiviati sul tuo dispositivo, cifrati a riposo e protetti da Face ID, Touch ID o dal codice di accesso.
-- Le richieste di rete avvengono solo se scegli la trascrizione cloud o un provider di riepiloghi IA: tutto il resto viene eseguito interamente sul dispositivo.
-- Nessun tracciamento, nessuna analitica, nessun account richiesto.
+ORGANIZZA E CONDIVIDI
+- Cartelle, cartelle smart, tag, preferiti e archivio, con ricerca in tutte le trascrizioni.
+- Esporta riassunti e trascrizioni in PDF, Word, Markdown, Obsidian, HTML o testo semplice.
 
-L'interfaccia di Kurn è disponibile in inglese, portoghese brasiliano, spagnolo, francese, italiano, tedesco e cinese semplificato. La trascrizione supporta tutte le lingue riconosciute da Whisper.
+PRIVATA PER PROGETTAZIONE
+- Registrazioni e trascrizioni restano sul tuo dispositivo, crittografate e protette da Face ID, Touch ID o codice.
+- Nulla lascia il tuo iPhone a meno che tu non attivi un fornitore cloud.
+- Nessun tracciamento, nessuna analisi, nessuna pubblicità, nessun account.
+
+GRATUITA E OPEN SOURCE
+- Gratuita da scaricare e da usare, senza abbonamenti, acquisti in-app o pubblicità.
+- Tutto il codice sorgente è pubblico su GitHub con licenza MIT, così chiunque può verificare come vengono trattate le registrazioni.
+- I fornitori cloud sono facoltativi e ti addebitano direttamente sulla tua chiave API; Kurn non aggiunge nulla.
+
+ACCESSIBILE PER PROGETTAZIONE
+- Supporto completo a VoiceOver nell'app, su Apple Watch e nella Live Activity.
+- Testo dinamico, Riduci movimento e stati che non dipendono mai solo dal colore.
+
+Kurn è disponibile in italiano, inglese, portoghese, spagnolo, francese, tedesco e cinese semplificato, e trascrive decine di lingue.

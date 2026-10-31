@@ -1,0 +1,1 @@
+transcription,voice,text,audio,recorder,summary,offline,private,lecture,interview,minutes,dictaphone

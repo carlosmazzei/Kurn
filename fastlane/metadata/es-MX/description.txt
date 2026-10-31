@@ -1,0 +1,38 @@
+Kurn es una app de notas de reuniones con IA que graba, transcribe y resume tus juntas, reuniones, clases y entrevistas, con privacidad y en tu iPhone. Ningún bot se une a tu llamada, no necesitas cuenta y tus grabaciones se quedan en tu dispositivo por defecto.
+
+GRABA CUALQUIER CONVERSACIÓN
+- Graba reuniones presenciales, clases, entrevistas y notas de voz, en uno o varios fragmentos.
+- Inicia, pausa y detén desde la app, la pantalla de bloqueo, la Dynamic Island, el centro de control, Siri y Atajos o tu Apple Watch.
+- Sigue grabando mientras usas otras apps: la grabadora se reduce a una minibarra.
+
+TRANSCRIBE AUDIO A TEXTO
+- Transcripción en el dispositivo con el reconocimiento de voz de Apple, un modelo multilingüe local o Whisper funcionando en tu propio iPhone.
+- Transcripción en la nube opcional, con tu propia clave de OpenAI, Groq o ElevenLabs.
+- La identificación de hablantes muestra quién dijo qué y sugiere el nombre de una voz que ya nombraste en otra reunión.
+- Las transcripciones largas continúan donde se quedaron si la app se interrumpe.
+
+MINUTAS, RESÚMENES Y PENDIENTES CON IA
+- Resúmenes estructurados con decisiones, pendientes y puntos clave: plantillas general, daily, entrevista o esquema, o la tuya propia.
+- Funciona con Apple Intelligence en los dispositivos compatibles, o con el proveedor que elijas y tu propia clave de API.
+- Haz preguntas sobre una reunión o sobre toda tu biblioteca y recibe respuestas con marcas de tiempo que puedes tocar.
+- Adjunta archivos PDF como material de referencia, crea documentos a partir de varias reuniones y escucha los resúmenes en voz alta.
+
+ORGANIZA Y COMPARTE
+- Carpetas, carpetas inteligentes, etiquetas, favoritos y archivo, con búsqueda en todas las transcripciones.
+- Exporta resúmenes y transcripciones en PDF, Word, Markdown, Obsidian, HTML o texto sin formato.
+
+PRIVACIDAD POR DEFECTO
+- Las grabaciones y transcripciones se guardan en tu dispositivo, cifradas y protegidas con Face ID, Touch ID o tu código.
+- Nada sale de tu iPhone salvo que actives un proveedor en la nube.
+- Sin rastreo, sin analíticas, sin anuncios y sin cuenta.
+
+GRATIS Y DE CÓDIGO ABIERTO
+- Gratis para descargar y usar, sin suscripciones, sin compras dentro de la app y sin anuncios.
+- Todo el código fuente es público en GitHub con licencia MIT, para que cualquiera pueda comprobar cómo se manejan tus grabaciones.
+- Los proveedores en la nube son opcionales y te cobran directamente en tu propia clave de API; Kurn no agrega nada.
+
+ACCESIBLE POR DISEÑO
+- Compatibilidad total con VoiceOver en la app, en el Apple Watch y en la Live Activity.
+- Texto dinámico, Reducir movimiento y estados que nunca dependen solo del color.
+
+Kurn está disponible en español, inglés, portugués, francés, italiano, alemán y chino simplificado, y transcribe decenas de idiomas.

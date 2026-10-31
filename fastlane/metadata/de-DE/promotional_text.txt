@@ -1,1 +1,1 @@
-Local-first Meeting-Rekorder mit On-Device-Transkription, Sprechererkennung und KI-Zusammenfassungen. Deine Aufnahmen bleiben standardmäßig auf dem Gerät.
+Kostenlos und Open Source. Kein Bot im Anruf, kein Konto. Nimm Besprechungen und Vorlesungen auf und erhalte Transkript, Sprecher und KI-Zusammenfassung – privat.

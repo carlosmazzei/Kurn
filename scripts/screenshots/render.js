@@ -17,11 +17,20 @@
 // assets + placement come from frames.json + frames/*.png (vendored from
 // fastlane/frameit-frames, MIT).
 //
+// Every locale with copy in config.json is rendered, also those with no
+// captures of their own: the store has regional languages (en-GB, es-MX,
+// fr-CA, pt-PT, ...) the app UI does not, so those get their own captions
+// over the captures of the same language, or of --fallback-locale
+// (screenshots.yml passes en-US) when the language was not captured. A store
+// page whose captions are in the searcher's language converts better, and
+// caption text is reported to count towards that locale's search.
+//
 // Usage:
 //   node render.js --input-dir <dir> --output-dir <dir> \
 //     [--config <config.json>] [--template <template.html>] \
 //     [--frames-manifest <frames.json>] [--frames-dir <frames/>] \
-//     [--frame-color <name>] [--width 1290] [--height 2796]
+//     [--frame-color <name>] [--fallback-locale <locale>] \
+//     [--width 1290] [--height 2796]
 //
 'use strict';
 
@@ -41,6 +50,7 @@ function parseArgs(argv) {
     framesManifestPath: path.join(__dirname, 'frames.json'),
     framesDir: path.join(__dirname, 'frames'),
     frameColor: null,
+    fallbackLocale: null,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT
   };
@@ -69,6 +79,9 @@ function parseArgs(argv) {
       case '--frame-color':
         args.frameColor = argv[++i];
         break;
+      case '--fallback-locale':
+        args.fallbackLocale = argv[++i];
+        break;
       case '--width':
         args.width = parseInt(argv[++i], 10);
         break;
@@ -85,6 +98,7 @@ function parseArgs(argv) {
       '[render] Usage: node render.js --input-dir <dir> --output-dir <dir> ' +
         '[--config <config.json>] [--template <template.html>] ' +
         '[--frames-manifest <frames.json>] [--frames-dir <frames/>] [--frame-color <name>] ' +
+        '[--fallback-locale <locale>] ' +
         '[--width N] [--height N]'
     );
     process.exit(1);
@@ -229,6 +243,39 @@ function resolveFrame(deviceName, colorArg, framesManifest, framesDir, cache) {
   return resolved;
 }
 
+// Which captures each output locale is rendered from: every captured locale
+// from its own directory, then every configured locale that was not captured
+// from a captured locale of the same language (es-MX from es-ES, pt-PT from
+// pt-BR, en-GB from en-US: the app UI has one localization per language), or
+// from --fallback-locale when its language was not captured at all. A
+// configured locale is any top-level config.json key other than "default"
+// and "_"-prefixed comments.
+function languageOf(locale) {
+  return locale.split(/[-_]/)[0].toLowerCase();
+}
+
+function planLocales(capturedLocales, config, fallbackLocale) {
+  const plan = capturedLocales.map((locale) => ({ locale, source: locale }));
+  const configured = Object.keys(config)
+    .filter((key) => key !== 'default' && !key.startsWith('_'))
+    .filter((key) => !capturedLocales.includes(key))
+    .sort();
+  const fallback = fallbackLocale && capturedLocales.includes(fallbackLocale) ? fallbackLocale : null;
+  if (fallbackLocale && !fallback) {
+    console.warn(`[render] Fallback locale "${fallbackLocale}" has no captures; it will not be used.`);
+  }
+  for (const locale of configured) {
+    const sameLanguage = capturedLocales
+      .filter((captured) => languageOf(captured) === languageOf(locale))
+      .sort()[0];
+    const source = sameLanguage || fallback;
+    if (source) {
+      plan.push({ locale, source });
+    }
+  }
+  return plan;
+}
+
 function fillTemplate(template, { copy, screenshotSrc, frame }) {
   return template
     .replaceAll('{{BADGE}}', escapeHTML(copy.badge || ''))
@@ -287,8 +334,11 @@ async function main() {
   let skipped = 0;
 
   try {
-    for (const locale of locales) {
-      const localeInputDir = path.join(args.inputDir, locale);
+    for (const { locale, source } of planLocales(locales, config, args.fallbackLocale)) {
+      const localeInputDir = path.join(args.inputDir, source);
+      if (source !== locale) {
+        console.log(`[render] Rendering "${locale}" captions over "${source}" captures.`);
+      }
       let localeConfig = config[locale];
       if (!localeConfig) {
         console.warn(
@@ -387,7 +437,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[render] Fatal error: ${err.stack || err}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[render] Fatal error: ${err.stack || err}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { languageOf, planLocales, splitDeviceAndScreen };

@@ -1,0 +1,1 @@
+Cette version ajoute une prise en charge complète de l'accessibilité : libellés VoiceOver dans toute l'app, l'app compagnon Apple Watch et la Live Activity de l'écran verrouillé/Dynamic Island ; texte dynamique, pour que le texte s'adapte à la taille de lecture préférée ; et prise en charge de Réduire les animations. L'état n'est jamais indiqué uniquement par la couleur.

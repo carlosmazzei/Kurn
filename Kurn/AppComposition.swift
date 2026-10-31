@@ -34,6 +34,9 @@ struct AppEnvironment {
     /// The live recording session, app-wide so the recorder can be minimized
     /// while the rest of the app stays usable.
     let recordingSession: RecordingSessionController
+    /// Times the App Store rating request after finished transcripts and
+    /// summaries; presented by `reviewPromptPresenter()`.
+    let reviewPrompt: ReviewPromptCoordinator
 }
 
 @MainActor
@@ -67,20 +70,23 @@ final class AppComposition {
         let context = container.mainContext
         let semanticIndex = SemanticIndexCoordinator(modelContext: context, appSettings: settings)
         let wiki = WikiCoordinator(modelContext: context, appSettings: settings)
+        let reviewPrompt = ReviewPromptCoordinator()
         let transcription = TranscriptionCoordinator(
             modelContext: context,
             appSettings: settings,
             semanticIndexCoordinator: semanticIndex,
-            wikiCoordinator: wiki
+            wikiCoordinator: wiki,
+            reviewPrompt: reviewPrompt
         )
         return AppEnvironment(
             modelContainer: container,
             transcription: transcription,
-            summaries: SummaryViewModel(modelContext: context, appSettings: settings),
+            summaries: SummaryViewModel(modelContext: context, appSettings: settings, reviewPrompt: reviewPrompt),
             playbackEnhancement: PlaybackEnhancementViewModel(modelContext: context),
             semanticIndex: semanticIndex,
             wiki: wiki,
-            recordingSession: RecordingSessionController(modelContext: context, settings: settings)
+            recordingSession: RecordingSessionController(modelContext: context, settings: settings),
+            reviewPrompt: reviewPrompt
         )
     }
 
