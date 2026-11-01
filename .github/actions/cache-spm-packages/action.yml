@@ -7,9 +7,12 @@ description: >
   alongside a `clean test` build — it cannot serve a stale compiled artifact,
   only avoid re-fetching unchanged package sources. Keyed on the files that
   actually pin what gets resolved: project.pbxproj's
-  `XCRemoteSwiftPackageReference` entries and WhisperCpp's manifest (which
-  pins the XCFramework's download URL/checksum). Shared across every job
-  that resolves the same packages from the same scheme.
+  `XCRemoteSwiftPackageReference` entries, Package.resolved, and WhisperCpp's
+  manifest (which pins the XCFramework's download URL/checksum). Shared across
+  every job that resolves the same packages from the same scheme. Restores
+  require an exact key: Xcode validates selected package traits against a
+  restored checkout before updating it, so a prefix fallback to an older
+  version can reject traits introduced by the new version.
 
 runs:
   using: composite
@@ -17,6 +20,4 @@ runs:
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/DerivedData/SourcePackages
-        key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Packages/WhisperCpp/Package.swift') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-
+        key: ${{ runner.os }}-spm-${{ hashFiles('Kurn.xcodeproj/project.pbxproj', 'Kurn.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/WhisperCpp/Package.swift') }}

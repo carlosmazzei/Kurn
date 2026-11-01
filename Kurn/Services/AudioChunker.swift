@@ -31,6 +31,13 @@ actor AudioChunker {
     struct Chunk: Sendable {
         let url: URL
         let offset: TimeInterval
+        let duration: TimeInterval?
+
+        init(url: URL, offset: TimeInterval, duration: TimeInterval? = nil) {
+            self.url = url
+            self.offset = offset
+            self.duration = duration
+        }
     }
 
     /// Size above which a recording is chunked before upload (~20 MB).
@@ -58,13 +65,14 @@ actor AudioChunker {
     /// same timeline as the file. See `ChunkBoundary`.
     func chunk(url: URL, cutPoints: [TimeInterval] = []) async throws -> [Chunk] {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-        let duration = (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds) ?? 0
+        let measuredDuration = (try? await AVURLAsset(url: url).load(.duration)).map(CMTimeGetSeconds)
+        let duration = measuredDuration ?? 0
         AppLog.transcription.atInfo.info("chunk: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", duration), privacy: .public)s")
         let fitsSize = Int64(size) <= Self.sizeThresholdBytes
         let fitsDuration = duration.isFinite && duration <= chunkDuration
         if fitsSize, fitsDuration {
             AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes / \(String(format: "%.1f", duration), privacy: .public)s <= thresholds, single chunk")
-            return [Chunk(url: url, offset: 0)]
+            return [Chunk(url: url, offset: 0, duration: measuredDuration)]
         }
         AppLog.transcription.atDebug.debug("chunk: \(size, privacy: .public) bytes / \(String(format: "%.1f", duration), privacy: .public)s exceeds thresholds, splitting…")
         return try await split(url: url, knownDuration: duration, cutPoints: cutPoints)
@@ -80,7 +88,7 @@ actor AudioChunker {
         let totalSeconds = try await CMTimeGetSeconds(asset.load(.duration))
         AppLog.transcription.atInfo.info("chunkByDuration: file \(url.lastPathComponent, privacy: .public) size=\(size, privacy: .public) bytes duration=\(String(format: "%.1f", totalSeconds), privacy: .public)s")
         guard totalSeconds.isFinite, totalSeconds > chunkDuration else {
-            return [Chunk(url: url, offset: 0)]
+            return [Chunk(url: url, offset: 0, duration: totalSeconds)]
         }
         AppLog.transcription.atDebug.debug("chunk: \(totalSeconds, privacy: .public)s > \(self.chunkDuration, privacy: .public)s, splitting by duration…")
         return try await split(url: url, knownDuration: totalSeconds, cutPoints: cutPoints)
@@ -103,7 +111,7 @@ actor AudioChunker {
             : (try? await CMTimeGetSeconds(asset.load(.duration))) ?? 0
         guard totalSeconds.isFinite, totalSeconds > 0 else {
             AppLog.transcription.atError.error("chunk: split failed, duration is invalid or zero")
-            return [Chunk(url: url, offset: 0)]
+            return [Chunk(url: url, offset: 0, duration: totalSeconds)]
         }
 
         let preset = await Self.preferredPreset(for: asset)
@@ -177,7 +185,7 @@ actor AudioChunker {
             // wrong by a bounded, non-cumulative amount, while summing measured
             // durations would fold the same slop in once per chunk and drift
             // forward across the whole meeting.
-            chunks.append(Chunk(url: outURL, offset: start))
+            chunks.append(Chunk(url: outURL, offset: start, duration: length))
             start = end
             index += 1
         }

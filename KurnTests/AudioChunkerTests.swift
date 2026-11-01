@@ -92,6 +92,39 @@ struct AudioChunkerTests {
         #expect(chunks[0].offset == 0)
     }
 
+    @Test func singleChunkCarriesMeasuredDurationForBothEntryPoints() async throws {
+        let url = try AudioFixtures.m4aTone(seconds: 0.5)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let measured = await Self.duration(url)
+        for chunks in [try await AudioChunker().chunk(url: url), try await AudioChunker().chunkByDuration(url: url)] {
+            let duration = try #require(chunks.first?.duration)
+            #expect(abs(duration - measured) < 0.001)
+        }
+    }
+
+    @Test func exportedChunksCarryPlannedOwnershipDurationsWithoutAACAccumulation() async throws {
+        try await tempFileTestLock.run {
+            let url = try Self.lowRateFixture(seconds: 25)
+            defer { try? FileManager.default.removeItem(at: url) }
+            let sourceDuration = await Self.duration(url)
+            let chunker = AudioChunker(chunkDuration: Self.fixtureChunkDuration)
+            let chunks = try await chunker.chunkByDuration(url: url)
+            #expect(chunks.count == 3)
+            #expect(chunks.map(\.offset) == [0, 10, 20])
+            for (index, chunk) in chunks.enumerated() {
+                let duration = try #require(chunk.duration)
+                let end = index + 1 < chunks.count ? chunks[index + 1].offset : sourceDuration
+                #expect(abs(duration - (end - chunk.offset)) < 0.001)
+            }
+            await chunker.cleanup(chunks)
+        }
+    }
+
+    @Test func manuallyConstructedChunksDefaultToUnknownDuration() {
+        let chunk = AudioChunker.Chunk(url: URL(fileURLWithPath: "/unavailable/test.m4a"), offset: 600)
+        #expect(chunk.duration == nil)
+    }
+
     @Test func cleanupWithEmptyListDoesNothing() async {
         // Should be a safe no-op (e.g. when transcription bailed before chunking).
         await AudioChunker().cleanup([])

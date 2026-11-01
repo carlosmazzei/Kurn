@@ -32,6 +32,24 @@ struct TimedWordSpanBuilderTests {
         ])
     }
 
+    @Test func preservesRealZeroDurationWordsWithoutInventingTimesForInvalidTokens() {
+        let spans = TimedWordSpanBuilder.spans(
+            from: [
+                TimedWord(text: "first", start: 0, end: 1),
+                TimedWord(text: "instant", start: 1, end: 1),
+                TimedWord(text: "invalid", start: -1, end: -1),
+                TimedWord(text: "past", start: 5, end: 5),
+                TimedWord(text: "inverted", start: 2, end: 1),
+                TimedWord(text: "last", start: 1, end: 2)
+            ],
+            fallbackText: "",
+            duration: 3
+        )
+        #expect(spans.map(\.text) == ["first", "instant", "last"])
+        #expect(spans.map(\.start) == [0, 1, 1])
+        #expect(spans.map(\.end) == [1, 1, 2])
+    }
+
     @Test func fallsBackWhenWordTimingsAreUnavailable() {
         let spans = TimedWordSpanBuilder.spans(
             from: [],

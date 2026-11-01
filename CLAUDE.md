@@ -905,13 +905,26 @@ stage (enums in `Models/PipelineEngines.swift`; `TranscriptionEngine` in KurnCor
    attributed to the speaker holding the most of its *duration* (not the
    speaker whose turn contains its midpoint — a sub-second turn under the
    midpoint would otherwise take the whole utterance), then consecutive
-   same-speaker spans are merged, capped at 30s. `splitCoarseSpan` distributes a
-   long span's words across turns proportionally when it crosses a handover;
-   with word timestamps now available (below) it is the fallback, not the
-   normal path.
+   same-speaker spans are merged, capped at 30s. Group bounds are the earliest
+   start and latest end, not the first and last word's times: providers can
+   return slightly reordered word timings, and text must keep its original
+   order. Malformed individual spans stay visible to the integrity gate rather
+   than being hidden by merging. Same-speaker pauses of at least 1.5s start a
+   new block. At the duration cap, fusion looks back for a sentence ending
+   (including non-Latin punctuation and closing quotes), then a pause of at
+   least 0.5s, in the latter half of the block; with no natural boundary it
+   breaks at the span boundary. Speaker changes always take precedence.
+   `splitCoarseSpan` distributes a long span's words across turns proportionally
+   when it crosses a handover; with word timestamps now available (below) it is
+   the fallback, not the normal path.
 6. **Correct** (opt-in) — an LLM pass over the already-fused, speaker-attributed
    segments, fixing spelling, punctuation and homophones. Skipped entirely when
    `effectiveCorrection == .none`, which is the default.
+7. **Validate** with `TranscriptIntegrityGate` before returning anything to the
+   save path. `diagnose` preserves the existing failure codes and 30s bounds
+   slack, adding a closed-vocabulary detail and segment index to local logs —
+   never text, speaker identity or timestamps. Rejected output cannot replace
+   an existing transcript.
 
 #### LLM transcript correction
 
@@ -1007,7 +1020,26 @@ duration, split evenly across its spans in order, before fusion ever sees it —
 still an estimate, like any engine without real word timings, but an
 attribution rather than none. Text is never touched.
 
+Zero-duration word timings are retained when the provider actually supplied a
+finite, nonnegative instant; they still carry real text. Invalid sentinel tokens
+and words entirely outside the supplied range do not become invented timings.
+Cloud word indices are assigned to at most one segment, including shared or
+overlapping segment boundaries, so expansion cannot duplicate the same word.
+
 #### Where chunks are cut
+
+Before the shared chunk runner adds an offset or saves a checkpoint,
+`ChunkTimestampNormalization` validates spans and native speaker turns against
+that chunk's ownership duration. It repairs only bounded drift (at most 1s
+before zero, a 0.1s inversion, or trailing padding within the existing integrity
+gate's 30s slack); gross outliers and non-finite times fail explicitly through
+the existing localized integrity error. Text, order, confidence and speaker
+labels are preserved. Exported chunks use their planned lengths, not accumulated
+AAC padding; unmodified chunks carry measured duration. Resumed checkpoint spans
+are revalidated without another upload or a schema change when usable; an
+unusable checkpoint is declined with a logged reason and the run starts fresh,
+rather than failing on the same cached data on every retry. These policies run
+in KurnCore tests without audio models or the network.
 
 `ChunkBoundary` (bottom of `Services/AudioChunker.swift`) moves each nominal
 boundary to the nearest silence within 30 s, subject to a minimum chunk length,
@@ -1275,6 +1307,15 @@ Like the FluidAudio engines it can't run from the background (Metal is
 unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too.
 
 #### FluidAudio on-device models and download consent
+
+FluidAudio is pinned to 0.18.0. Its `Diarizer`, `NemoTextProcessing` and `TTS`
+traits are selected explicitly on the Xcode package reference, matching the
+upstream defaults. Without explicit selection Xcode can compile 0.18 without
+its diarization API, leaving `OfflineDiarizerManager` and related types missing.
+The version update does not change the app's chosen ASR models or download consent.
+The shared SPM cache restores only exact manifest/lockfile keys: Xcode validates
+selected traits against a restored checkout before updating it, so falling back
+to a 0.17 checkout makes a 0.18 trait selection fail before dependency resolution.
 
 The FluidAudio-backed engines above (and the live transcription preview below)
 download CoreML models on first use rather than bundling them, so enabling one
@@ -2317,7 +2358,11 @@ enforced by lint and by a CI audit test, not just convention:
   pair `acquire` with a `defer { Task { release } }`.
 - **Tests:** Swift Testing (`@Test`, `#expect`). Use
   `TestModelContainer.make()` for an in-memory `ModelContainer` when exercising real
-  SwiftData relationship behavior.
+  SwiftData relationship behavior. Suites whose fixtures live in the shared
+  recordings directory belong inside `RecordingsDirectorySuite`: its serialized
+  parent prevents recovery sweeps or directory-wide deletion from moving another
+  test's file while its writer is open. `tempFileTestLock` alone does not serialize
+  against those recording-directory operations.
 - **Git & PRs:** write all commit messages and pull request titles/descriptions in
   English, regardless of the language used in chat. (User-facing app strings are
   still localized per the localization convention above — this rule is only about
