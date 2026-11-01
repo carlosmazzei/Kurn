@@ -43,6 +43,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -75,6 +77,70 @@ FALLBACK_MEETING_IDS = (
 # `EN2002a` -> `EN2002`: the sessions of one meeting series share a room and,
 # more to the point, the same four people.
 SERIES = re.compile(r"^(?P<series>.+?)(?P<session>[a-z])$")
+
+
+# The Edinburgh mirror throttles GitHub-hosted runners: on 2026-11-01, five
+# dispatches started together got HTTP 403 on most files and one transfer cut
+# off at 17 MB of 68 MB, while the same URLs had served every run before. So a
+# download is retried with backoff and resumed from where it stopped, rather
+# than one refusal costing the meeting.
+DOWNLOAD_ATTEMPTS = 4
+DOWNLOAD_BACKOFF_SECONDS = (10, 30, 90)
+RETRYABLE_HTTP_STATUSES = {403, 408, 429, 500, 502, 503, 504}
+USER_AGENT = "kurn-eval-fetch (+https://github.com/carlosmazzei/Kurn)"
+
+
+def download(url: str, destination: Path, *, attempts: int = DOWNLOAD_ATTEMPTS,
+             backoff: tuple[float, ...] = DOWNLOAD_BACKOFF_SECONDS,
+             opener=urllib.request.urlopen, sleep=time.sleep, timeout: int = 120) -> None:
+    """Download `url` to `destination`, resuming a partial file between attempts.
+
+    A transfer is complete only when the bytes on disk reach the length the
+    server announced; anything shorter is resumed with a `Range` request on the
+    next attempt instead of being restarted. Raises the last error when every
+    attempt fails, and leaves no partial file behind in that case.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_name(destination.name + ".part")
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        if attempt:
+            delay = backoff[min(attempt - 1, len(backoff) - 1)] if backoff else 0
+            print(f"[fetch] ami: retrying {url} in {delay:.0f}s ({last_error})", file=sys.stderr, flush=True)
+            sleep(delay)
+        offset = partial.stat().st_size if partial.exists() else 0
+        headers = {"User-Agent": USER_AGENT}
+        if offset:
+            headers["Range"] = f"bytes={offset}-"
+        try:
+            with opener(urllib.request.Request(url, headers=headers), timeout=timeout) as response:
+                status = getattr(response, "status", 200)
+                if offset and status != 206:
+                    # The server ignored the range: start over rather than append.
+                    offset = 0
+                announced = response.headers.get("Content-Length")
+                expected = offset + int(announced) if announced is not None else None
+                with open(partial, "ab" if offset else "wb") as handle:
+                    while chunk := response.read(1 << 20):
+                        handle.write(chunk)
+            received = partial.stat().st_size
+            if expected is not None and received < expected:
+                raise OSError(f"retrieval incomplete: got only {received} out of {expected} bytes")
+            partial.replace(destination)
+            return
+        except urllib.error.HTTPError as error:
+            last_error = error
+            if error.code == 416 and partial.exists():
+                # Range past the end: what is on disk is already the whole file.
+                partial.replace(destination)
+                return
+            if error.code not in RETRYABLE_HTTP_STATUSES:
+                break
+        except OSError as error:  # URLError, timeouts, truncated bodies
+            last_error = error
+    partial.unlink(missing_ok=True)
+    assert last_error is not None
+    raise last_error
 
 
 def fetch_json(url: str, timeout: int = 60):
@@ -194,7 +260,7 @@ def download_annotations(destination: Path) -> zipfile.ZipFile | None:
     """
     print(f"[fetch] ami: downloading manual annotations {ANNOTATIONS_URL}", flush=True)
     try:
-        urllib.request.urlretrieve(ANNOTATIONS_URL, destination)
+        download(ANNOTATIONS_URL, destination)
         return zipfile.ZipFile(destination)
     except Exception as error:  # noqa: BLE001 - any failure means "no transcript"
         print(
@@ -293,6 +359,40 @@ def speaker_attributed_reference(
     return entries
 
 
+def is_cached(out_dir: Path, meeting_id: str) -> bool:
+    """Whether a previous fetch left a usable clip and reference for `meeting_id`."""
+    audio = out_dir / f"{meeting_id}.audio.wav"
+    rttm = out_dir / f"{meeting_id}.reference.rttm"
+    return audio.is_file() and audio.stat().st_size > 0 and rttm.is_file() and rttm.stat().st_size > 0
+
+
+def write_transcript(archive: zipfile.ZipFile, words_index: dict[str, list[str]], out_dir: Path,
+                     meeting_id: str, clip_seconds: float, clipped_rttm: str) -> int:
+    """Write the WER references for one meeting; 1 if written, 0 if left DER-only."""
+    if meeting_id not in words_index:
+        print(
+            f"[fetch] ami: {meeting_id}: no words/*.words.xml in the annotation zip, leaving it DER-only",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 0
+    transcript = transcript_for(
+        archive,
+        words_index[meeting_id],
+        meeting_id,
+        clip_seconds,
+        speech_seconds(clipped_rttm),
+    )
+    if not transcript:
+        return 0
+    (out_dir / f"{meeting_id}.reference.txt").write_text(transcript, encoding="utf-8")
+    seglst = speaker_attributed_reference(archive, words_index[meeting_id], meeting_id, clip_seconds)
+    (out_dir / f"{meeting_id}.reference.seglst.json").write_text(
+        json.dumps(seglst, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return 1
+
+
 def fetch(entry: dict, out_dir: Path) -> None:
     """Fetch one AMI corpus entry into `out_dir`."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -328,14 +428,29 @@ def fetch(entry: dict, out_dir: Path) -> None:
     meeting_ids = select_meetings(meeting_ids, meeting_count)
     print(f"[fetch] ami: selected {', '.join(meeting_ids)}", flush=True)
 
+    # A meeting the dataset cache already holds is not fetched again: every
+    # request avoided is one the mirror cannot refuse.
+    cached = {meeting_id for meeting_id in meeting_ids if is_cached(out_dir, meeting_id)}
+    needs_annotations = any(
+        not (out_dir / f"{meeting_id}.reference.txt").exists() for meeting_id in meeting_ids
+    )
     annotations_path = Path(tempfile.gettempdir()) / "ami_public_manual.zip"
-    archive = download_annotations(annotations_path)
+    archive = download_annotations(annotations_path) if needs_annotations else None
     words_index = index_words_members(archive) if archive else {}
 
     written: list[str] = []
     scored_wer = 0
     for meeting_id in meeting_ids:
         print(f"[fetch] ami: {meeting_id}", flush=True)
+        if meeting_id in cached:
+            if not (out_dir / f"{meeting_id}.reference.txt").exists() and archive is not None:
+                clipped_rttm = (out_dir / f"{meeting_id}.reference.rttm").read_text(encoding="utf-8")
+                scored_wer += write_transcript(archive, words_index, out_dir, meeting_id, clip_seconds, clipped_rttm)
+            elif (out_dir / f"{meeting_id}.reference.txt").exists():
+                scored_wer += 1
+            print(f"[fetch] ami: {meeting_id}: reusing the cached clip", flush=True)
+            written.append(meeting_id)
+            continue
         try:
             rttm = fetch_text(f"{RAW_BASE}/{meeting_id}.rttm")
         except Exception as error:
@@ -350,7 +465,7 @@ def fetch(entry: dict, out_dir: Path) -> None:
         audio_url = f"{AUDIO_BASE}/{meeting_id}/audio/{meeting_id}.Mix-Headset.wav"
         raw_path = out_dir / f"{meeting_id}.full.wav"
         try:
-            urllib.request.urlretrieve(audio_url, raw_path)
+            download(audio_url, raw_path)
         except Exception as error:
             print(f"[fetch] ami: {meeting_id}: could not download {audio_url} ({error}), skipping", file=sys.stderr, flush=True)
             continue
@@ -371,28 +486,8 @@ def fetch(entry: dict, out_dir: Path) -> None:
                 raw_path.unlink(missing_ok=True)
 
         (out_dir / f"{meeting_id}.reference.rttm").write_text(clipped_rttm, encoding="utf-8")
-
-        if archive is not None and meeting_id in words_index:
-            transcript = transcript_for(
-                archive,
-                words_index[meeting_id],
-                meeting_id,
-                clip_seconds,
-                speech_seconds(clipped_rttm),
-            )
-            if transcript:
-                (out_dir / f"{meeting_id}.reference.txt").write_text(transcript, encoding="utf-8")
-                seglst = speaker_attributed_reference(archive, words_index[meeting_id], meeting_id, clip_seconds)
-                (out_dir / f"{meeting_id}.reference.seglst.json").write_text(
-                    json.dumps(seglst, ensure_ascii=False) + "\n", encoding="utf-8"
-                )
-                scored_wer += 1
-        elif archive is not None:
-            print(
-                f"[fetch] ami: {meeting_id}: no words/*.words.xml in the annotation zip, leaving it DER-only",
-                file=sys.stderr,
-                flush=True,
-            )
+        if archive is not None:
+            scored_wer += write_transcript(archive, words_index, out_dir, meeting_id, clip_seconds, clipped_rttm)
 
         written.append(meeting_id)
 
