@@ -13,6 +13,7 @@
 //
 
 import Foundation
+import KurnCore
 
 enum ModelStore {
 
@@ -24,6 +25,8 @@ enum ModelStore {
         case vad
         case whisperCpp
         case sherpaOnnxDiarization
+        case fluidAudioASR
+        case nemotronDiarization
 
         var id: String { rawValue }
 
@@ -35,7 +38,7 @@ enum ModelStore {
             switch self {
             case .whisperCpp: return WhisperCppModelDownloader.modelsDirectory
             case .sherpaOnnxDiarization: return SherpaOnnxModelDownloader.modelsDirectory
-            case .liveTranscription, .onDeviceLanguage, .diarization, .vad: return ModelStore.modelsDirectory
+            case .liveTranscription, .onDeviceLanguage, .diarization, .vad, .fluidAudioASR, .nemotronDiarization: return ModelStore.modelsDirectory
             }
         }
 
@@ -68,6 +71,10 @@ enum ModelStore {
                     "silero-vad",
                     "silero-vad-coreml"
                 ]
+            case .fluidAudioASR:
+                return FluidAudioASRModel.allCases.filter { $0 != .parakeetV3 }.map(\.folderName)
+            case .nemotronDiarization:
+                return [FluidAudioDiarizationModel.nemotron3.folderName]
             case .whisperCpp:
                 // Deterministic: the app names these folders itself, so unlike
                 // the FluidAudio groups there is nothing to discover.
@@ -92,6 +99,10 @@ enum ModelStore {
                 return NSLocalizedString("settings.models.whisper_cpp", comment: "On-device Whisper models")
             case .sherpaOnnxDiarization:
                 return NSLocalizedString("settings.models.sherpa_onnx", comment: "Sherpa-ONNX diarization models")
+            case .fluidAudioASR:
+                return "FluidAudio ASR"
+            case .nemotronDiarization:
+                return FluidAudioDiarizationModel.nemotron3.displayName
             }
         }
 
@@ -101,7 +112,7 @@ enum ModelStore {
         /// to want — whereas FluidAudio's folders (and sherpa-onnx's
         /// segmentation/embedding pair) are parts of one feature that only
         /// work together, so those stay a single row.
-        var listsFoldersSeparately: Bool { self == .whisperCpp }
+        var listsFoldersSeparately: Bool { self == .whisperCpp || self == .fluidAudioASR }
 
         /// Whether this group's own downloader already runs a post-install
         /// health probe and records its own `ModelVerification` entry
@@ -113,12 +124,15 @@ enum ModelStore {
         var isSelfVerifying: Bool {
             switch self {
             case .whisperCpp, .sherpaOnnxDiarization: return true
-            case .liveTranscription, .onDeviceLanguage, .diarization, .vad: return false
+            case .liveTranscription, .onDeviceLanguage, .diarization, .vad, .fluidAudioASR, .nemotronDiarization: return false
             }
         }
 
         /// Name for one folder when the group lists its folders separately.
         func displayName(forFolder folder: String) -> String {
+            if self == .fluidAudioASR {
+                return FluidAudioASRModel.allCases.first { $0 != .parakeetV3 && $0.folderName == folder }?.displayName ?? displayName
+            }
             guard let model = WhisperCppModel.allCases.first(where: { $0.folderName == folder }) else {
                 return displayName
             }
@@ -170,17 +184,19 @@ enum ModelStore {
         let changed = after.folders.compactMap { name, signature -> String? in
             before.folders[name] == signature ? nil : name
         }
-        let discovered = changed.isEmpty ? existingFallbackFolders(for: group) : changed
-        guard !discovered.isEmpty else { return }
         var registry = folderRegistry()
+        let claimedElsewhere = Set(registry.filter { $0.key != group.rawValue }.flatMap(\.value))
+        let candidates = changed.isEmpty ? existingFallbackFolders(for: group) : changed
+        let discovered = candidates.filter { group.canClaimFolder($0) && !claimedElsewhere.contains($0) }
+        guard !discovered.isEmpty else { return }
         let existing = Set(registry[group.rawValue] ?? [])
         registry[group.rawValue] = Array(existing.union(discovered)).sorted()
         setFolderRegistry(registry)
     }
 
     /// Total bytes used on disk by a group's model folders (0 if none present).
-    static func sizeOnDisk(_ group: ModelGroup) -> Int64 {
-        folders(for: group).reduce(Int64(0)) { running, folder in
+    static func sizeOnDisk(_ group: ModelGroup, folder: String? = nil) -> Int64 {
+        (folder.map { [$0] } ?? folders(for: group)).reduce(Int64(0)) { running, folder in
             running + directorySize(group.root.appendingPathComponent(folder, isDirectory: true))
         }
     }
@@ -209,7 +225,8 @@ enum ModelStore {
         if let group = model.group {
             clearVerification(for: group, folders: model.folderNames)
             var registry = folderRegistry()
-            registry[group.rawValue] = nil
+            let remaining = (registry[group.rawValue] ?? []).filter { !model.folderNames.contains($0) }
+            registry[group.rawValue] = remaining.isEmpty ? nil : remaining
             setFolderRegistry(registry)
         }
     }
@@ -293,7 +310,7 @@ enum ModelStore {
 
     private static func folders(for group: ModelGroup) -> [String] {
         let registered = folderRegistry()[group.rawValue] ?? []
-        return Array(Set(registered + group.fallbackFolderNames)).sorted()
+        return Array(Set(registered.filter { group.canClaimFolder($0) } + group.fallbackFolderNames)).sorted()
     }
 
     private static func existingFallbackFolders(for group: ModelGroup) -> [String] {

@@ -107,9 +107,10 @@ struct WhisperCppModelTests {
     /// per row — keeping `small` while dropping `large-v3-turbo` is a reasonable
     /// thing to want. FluidAudio's folders are parts of one feature and stay
     /// grouped.
-    @Test func onlyTheWhisperGroupListsItsFoldersSeparately() {
+    @Test func independentModelGroupsListTheirFoldersSeparately() {
         #expect(ModelStore.ModelGroup.whisperCpp.listsFoldersSeparately)
-        for group in ModelStore.ModelGroup.allCases where group != .whisperCpp {
+        #expect(ModelStore.ModelGroup.fluidAudioASR.listsFoldersSeparately)
+        for group in ModelStore.ModelGroup.allCases where group != .whisperCpp && group != .fluidAudioASR {
             #expect(group.listsFoldersSeparately == false)
         }
     }

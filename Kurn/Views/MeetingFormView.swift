@@ -47,7 +47,9 @@ struct MeetingFormView: View {
                     selection: $language
                 ) {
                     ForEach(MeetingLanguage.allCases) { lang in
-                        LanguagePickerRow(language: lang, engine: settings.transcriptionEngine).tag(lang)
+                        LanguagePickerRow(
+                            language: lang, engine: settings.transcriptionEngine, fluidAudioASRModel: settings.fluidAudioASRModel
+                        ).tag(lang)
                     }
                 }
             } header: {

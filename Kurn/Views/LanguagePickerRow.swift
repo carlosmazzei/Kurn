@@ -13,11 +13,12 @@ import SwiftUI
 struct LanguagePickerRow: View {
     let language: MeetingLanguage
     let engine: TranscriptionEngine
+    var fluidAudioASRModel: FluidAudioASRModel = .default
 
     var body: some View {
         HStack {
             Text(language.displayName)
-            if !TranscriptionLanguageSupport.isSupported(language, by: engine) {
+            if !TranscriptionLanguageSupport.isSupported(language, by: engine, fluidAudioASRModel: fluidAudioASRModel) {
                 Spacer()
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)

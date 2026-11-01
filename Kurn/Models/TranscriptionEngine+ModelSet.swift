@@ -18,10 +18,13 @@ extension TranscriptionEngine {
     /// Unlike the other stage enums this is a function, because whisper.cpp has
     /// a variant axis: the set has to name *which* weight file to fetch, and a
     /// defaulted parameter would let a caller silently download the wrong one.
-    func requiredModelSet(whisperCppModel: WhisperCppModel) -> ModelSet? {
+    func requiredModelSet(
+        whisperCppModel: WhisperCppModel,
+        fluidAudioASRModel: FluidAudioASRModel = .default
+    ) -> ModelSet? {
         switch self {
         case .appleSpeech, .whisperAPI: return nil
-        case .fluidAudioParakeet: return .onDeviceASR
+        case .fluidAudioParakeet: return fluidAudioASRModel.requiredModelSet
         case .whisperCpp: return .whisperCppASR(whisperCppModel)
         }
     }

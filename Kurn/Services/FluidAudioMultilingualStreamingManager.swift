@@ -14,6 +14,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 
 #if canImport(FluidAudio)
 import FluidAudio
@@ -42,7 +43,13 @@ actor FluidAudioMultilingualStreamingManager: StreamingAsrManager {
     var displayName: String { "Nemotron Multilingual 0.6B (\(chunkMs)ms)" }
 
     func loadModels() async throws {
-        try await loadModels(progressHandler: nil)
+        guard FluidAudioAutomaticStreamingRuntime.multilingualIsInstalled(chunkMs: chunkMs) else {
+            throw AppError.modelDownloadRequired(FluidAudioLiveModel.automatic.displayName)
+        }
+        try await manager.loadModels(from: FluidAudioAutomaticStreamingRuntime.multilingualDirectory(chunkMs: chunkMs))
+        await manager.setPartialCallback { [weak self] text in
+            Task { await self?.handlePartial(text) }
+        }
     }
 
     func loadModels(progressHandler: ProgressHandler?) async throws {

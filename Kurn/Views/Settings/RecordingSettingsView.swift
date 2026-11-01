@@ -106,7 +106,8 @@ struct RecordingSettingsView: View {
                 )
             )
             .disabled(downloads.isDownloading)
-            if downloads.downloadingModel == .liveTranscriptionASR {
+            FluidAudioLiveSettingsControls()
+            if FluidAudioModelPresentation.downloadSection(for: downloads.downloadingModel) == .live {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {

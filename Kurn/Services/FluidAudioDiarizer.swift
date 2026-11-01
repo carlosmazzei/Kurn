@@ -30,11 +30,11 @@ actor FluidAudioDiarizer: Diarizing {
     // so there's no real aliasing risk — `nonisolated(unsafe)` matches the same
     // pattern already used for `LockScreenRecordingController.activity`.
     private nonisolated(unsafe) var manager = OfflineDiarizerManager(config: FluidAudioDiarizer.tunedConfig(speakerCount: 0))
-    private var modelsReady = false
+    private var modelsReady: OfflineDiarizerModels?
     /// Speaker count the current `manager` was built with. The manager bakes its
     /// config at init (it has no per-call config), so a change here forces a
     /// rebuild + re-prepare.
-    private var currentSpeakerCount = 0
+    private var currentConfiguration = FluidAudioDiarizerConfiguration()
     /// First model preparation of a session also compiles the CoreML artifacts
     /// (and may finish a download), which is far slower than a warm load.
     private let prepareTimeout: TimeInterval = 300
@@ -74,22 +74,18 @@ actor FluidAudioDiarizer: Diarizing {
     /// just as necessary when the speaker count is pinned. The payload is ~1–2 MB
     /// per hour of audio and is transient — it never reaches disk.
     private static func tunedConfig(speakerCount: Int) -> OfflineDiarizerConfig {
-        var config = OfflineDiarizerConfig.default
-        if speakerCount > 1 {
-            config.clustering.numSpeakers = speakerCount
-        }
-        config.exposeChunkEmbeddings = true
-        return config
+        FluidAudioPyannoteConfiguration.make(FluidAudioDiarizerConfiguration(speakerCount: speakerCount))
     }
 
     /// Rebuild `manager` if the requested speaker count differs from the one it
     /// was constructed with. Resets `modelsReady` so models re-prepare against
     /// the new config (cheap: weights are cached on disk, only recompiled).
-    private func ensureManager(speakerCount: Int) {
-        guard speakerCount != currentSpeakerCount else { return }
-        manager = OfflineDiarizerManager(config: Self.tunedConfig(speakerCount: speakerCount))
-        currentSpeakerCount = speakerCount
-        modelsReady = false
+    private func ensureManager(speakerCount: Int, segmentationBatchSize: FluidAudioSegmentationBatchSize) {
+        let requested = FluidAudioDiarizerConfiguration(speakerCount: speakerCount, segmentationBatchSize: segmentationBatchSize)
+        guard requested != currentConfiguration else { return }
+        manager = OfflineDiarizerManager(config: FluidAudioPyannoteConfiguration.make(requested))
+        currentConfiguration = requested
+        modelsReady = nil
     }
 
     func diarize(url: URL) async -> [SpeakerTurn] {
@@ -121,21 +117,21 @@ actor FluidAudioDiarizer: Diarizing {
     func outcome(
         url: URL,
         speakerCount: Int,
+        segmentationBatchSize: FluidAudioSegmentationBatchSize = .maximum,
         onDownloadFailure: (@Sendable (String) -> Void)?,
         onProgress: (@Sendable (Double) -> Void)? = nil
     ) async -> DiarizationOutcome {
-        ensureManager(speakerCount: speakerCount)
+        ensureManager(speakerCount: speakerCount, segmentationBatchSize: segmentationBatchSize)
         if speakerCount > 1 {
             AppLog.transcription.atNotice.notice("FluidAudioDiarizer: speakerCount=\(speakerCount, privacy: .public) (pinned, KMeans re-cluster)")
         }
-        if !modelsReady {
+        if modelsReady == nil {
             let preparationStarted = Date()
             AppLog.transcription.atNotice.notice("FluidAudioDiarizer: preparing models file=\(url.lastPathComponent, privacy: .public) timeout=\(self.prepareTimeout, privacy: .public)s")
             do {
                 try await withTimeout(seconds: prepareTimeout, timeoutError: Self.timeoutError) {
                     try await self.prepareModels()
                 }
-                modelsReady = true
                 AppLog.transcription.atNotice.notice("FluidAudioDiarizer: models ready in \(Date().timeIntervalSince(preparationStarted), privacy: .public)s")
             } catch {
                 AppLog.transcription.atError.error("FluidAudioDiarizer: model preparation failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
@@ -169,7 +165,7 @@ actor FluidAudioDiarizer: Diarizing {
     /// only ever touches `self` (an actor, hence `Sendable`), never `manager`
     /// directly.
     private func prepareModels() async throws {
-        try await manager.prepareModels()
+        modelsReady = try await FluidAudioDiarizationModelRuntime.loadPyannoteLocal()
     }
 
     /// Same isolation reasoning as `prepareModels()`, and also keeps
@@ -181,6 +177,8 @@ actor FluidAudioDiarizer: Diarizing {
     ) async throws -> DiarizationOutcome {
         let started = Date()
         let fileName = url.lastPathComponent
+        guard let models = modelsReady else { throw AppError.modelDownloadRequired(FluidAudioDiarizationModel.pyannote.displayName) }
+        manager.initialize(models: models)
         let result = try await manager.process(url) { processed, total in
             let step = ChunkProgressSampler.step(
                 processed: processed,
@@ -257,6 +255,7 @@ actor FluidAudioDiarizer: Diarizing {
     func outcome(
         url: URL,
         speakerCount: Int,
+        segmentationBatchSize: FluidAudioSegmentationBatchSize = .maximum,
         onDownloadFailure: (@Sendable (String) -> Void)?,
         onProgress: (@Sendable (Double) -> Void)? = nil
     ) async -> DiarizationOutcome {

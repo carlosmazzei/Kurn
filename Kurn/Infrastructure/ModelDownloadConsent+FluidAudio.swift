@@ -70,7 +70,7 @@ extension ModelDownloadConsent {
             // Silero VAD CoreML model; `VadManager`'s initializer downloads
             // and loads it on first use.
             _ = try await VadManager(progressHandler: scaledProgress(from: 0, to: 1, onProgress: onProgress))
-        case .whisperCppASR, .sherpaOnnxDiarization:
+        case .whisperCppASR, .sherpaOnnxDiarization, .fluidAudioASR, .fluidAudioDiarization, .fluidAudioUnifiedStreaming:
             // Unreachable — `download` returned for both before reaching here.
             break
         }

@@ -69,7 +69,25 @@
 
 /* 识别流水线引擎 */
 "transcription.apple_speech" = "Apple Speech";
-"transcription.fluid_parakeet" = "FluidAudio（多语言）";
+"transcription.fluid_parakeet" = "FluidAudio（设备端）";
+"settings.fluid_audio.asr_model" = "转录模型";
+"settings.fluid_audio.model_size" = "%@ · 约 %@";
+"settings.fluid_audio.asr_english_only" = "Bark 3.0、Bark 3.0 Clean、Phonon-2 和 Nemotron 3.5 Transcribe Lite 需要在下方明确选择英语，不支持自动检测语言。";
+"settings.fluid_audio.asr_language_footer" = "在下方选择模型支持的默认语言以启用该模型。Parakeet TDT v3 和 Nemotron Unified 支持自动检测语言和葡萄牙语。";
+"settings.fluid_audio.asr_language_unavailable" = "此模型不支持所选的默认语言。请在转录前选择兼容的模型或语言。";
+"settings.fluid_audio.diarization_model" = "说话人分离模型";
+"settings.fluid_audio.segmentation_batch" = "分段批次大小";
+"settings.fluid_audio.batch_recommended" = "%d（推荐）";
+"settings.fluid_audio.segmentation_batch_footer" = "较小的批次可降低 Pyannote 分段时的峰值内存占用。默认值为 32；建议选择 8 以减少内存占用。";
+"settings.fluid_audio.nemotron_diarization_footer" = "Nemotron 3 最多支持 8 位说话人，并自动检测人数。它没有兼容的声纹。重新处理后请核对说话人名称：编号标签不能确认声音的身份。";
+"settings.fluid_audio.live_model" = "实时预览模型";
+"settings.fluid_audio.live_automatic" = "自动（%@）";
+"settings.fluid_audio.live_model_footer" = "此模型仅用于录制时的实时预览。其选择和下载独立于“转录”设置中的最终转录模型。";
+"settings.fluid_audio.download_selected" = "下载所选模型";
+"settings.fluid_audio.download_message" = "要下载 %@（约 %@）以在此设备上使用吗？模型只需下载一次。音频会保留在你的设备上。";
+"ack.fluid_audio_model_licenses" = "FluidAudio 模型许可";
+"settings.models.fluid_audio_asr" = "FluidAudio 转录模型";
+"settings.models.nemotron_diarization" = "Nemotron 说话人分离";
 "transcription.cloud_provider" = "云端提供方";
 "transcription.whisper_cpp" = "Whisper（设备端）";
 "preprocessing.standard" = "标准清理";

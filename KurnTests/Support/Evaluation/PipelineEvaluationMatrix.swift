@@ -329,6 +329,9 @@ enum PipelineEvaluationMatrix {
         case .vad: return "vad"
         case .whisperCppASR(let model): return "whisperCppASR:\(model.rawValue)"
         case .sherpaOnnxDiarization: return "sherpaOnnxDiarization"
+        case .fluidAudioASR(let model): return "fluidAudioASR:\(model.rawValue)"
+        case .fluidAudioDiarization(let model): return "fluidAudioDiarization:\(model.rawValue)"
+        case .fluidAudioUnifiedStreaming: return "fluidAudioUnifiedStreaming"
         }
     }
 

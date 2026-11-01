@@ -69,7 +69,25 @@
 
 /* Motores do pipeline de reconhecimento */
 "transcription.apple_speech" = "Apple Speech";
-"transcription.fluid_parakeet" = "FluidAudio (multilíngue)";
+"transcription.fluid_parakeet" = "FluidAudio (no dispositivo)";
+"settings.fluid_audio.asr_model" = "Modelo de transcrição";
+"settings.fluid_audio.model_size" = "%@ · aprox. %@";
+"settings.fluid_audio.asr_english_only" = "Bark 3.0, Bark 3.0 Clean, Phonon-2 e Nemotron 3.5 Transcribe Lite exigem que o inglês seja selecionado abaixo. Eles não aceitam a detecção automática de idioma.";
+"settings.fluid_audio.asr_language_footer" = "Selecione abaixo um idioma padrão compatível para habilitar um modelo. Parakeet TDT v3 e Nemotron Unified aceitam a detecção automática e o português.";
+"settings.fluid_audio.asr_language_unavailable" = "Este modelo não aceita o idioma padrão selecionado. Escolha um modelo ou idioma compatível antes de transcrever.";
+"settings.fluid_audio.diarization_model" = "Modelo de separação de falantes";
+"settings.fluid_audio.segmentation_batch" = "Tamanho do lote de segmentação";
+"settings.fluid_audio.batch_recommended" = "%d (recomendado)";
+"settings.fluid_audio.segmentation_batch_footer" = "Lotes menores reduzem o pico de uso de memória na segmentação com Pyannote. O valor padrão é 32; recomenda-se 8 para reduzir o uso de memória.";
+"settings.fluid_audio.nemotron_diarization_footer" = "Nemotron 3 aceita até 8 falantes e detecta a quantidade automaticamente. Ele não possui impressões vocais compatíveis. Revise os nomes dos falantes após o reprocessamento: os rótulos numerados não confirmam a identidade da voz.";
+"settings.fluid_audio.live_model" = "Modelo da prévia ao vivo";
+"settings.fluid_audio.live_automatic" = "Automático (%@)";
+"settings.fluid_audio.live_model_footer" = "Este modelo serve apenas para a prévia ao vivo durante a gravação. A seleção e o download são independentes do modelo de transcrição final nos ajustes de Transcrição.";
+"settings.fluid_audio.download_selected" = "Baixar modelo selecionado";
+"settings.fluid_audio.download_message" = "Baixar %@ (aproximadamente %@) para usar neste dispositivo? O modelo é baixado uma única vez. O áudio permanece no seu dispositivo.";
+"ack.fluid_audio_model_licenses" = "Licenças dos modelos FluidAudio";
+"settings.models.fluid_audio_asr" = "Modelos de transcrição FluidAudio";
+"settings.models.nemotron_diarization" = "Separação de falantes Nemotron";
 "transcription.cloud_provider" = "Provedor na Nuvem";
 "transcription.whisper_cpp" = "Whisper (no dispositivo)";
 "preprocessing.standard" = "Limpeza padrão";

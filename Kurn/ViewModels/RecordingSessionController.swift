@@ -168,9 +168,10 @@ final class RecordingSessionController {
                 audioQuality: settings.audioQuality,
                 alwaysUseBuiltInMic: settings.alwaysUseBuiltInMic,
                 liveTranscriptionEnabled: settings.liveTranscriptionEnabled,
-                liveTranscriptionModelsConsented: settings.fluidAudioASRModelsConsented,
+                liveTranscriptionModelsConsented: settings.selectedFluidAudioLiveModelsConsented,
                 largeTransferPolicy: settings.largeTransferPolicy,
-                hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle
+                hideLiveActivityMeetingTitle: settings.hideLiveActivityMeetingTitle,
+                liveTranscriptionModel: settings.fluidAudioLiveModel
             ),
             onRecordingSaved: { [weak settings] in settings?.recordRecordingCompleted() }
         )

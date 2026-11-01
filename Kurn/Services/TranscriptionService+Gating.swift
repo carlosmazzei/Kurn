@@ -35,6 +35,7 @@ extension TranscriptionService {
         transcriptionModel: String = "whisper-1",
         cloudTransfer: CloudTranscriptionTransfer = CloudTranscriptionTransfer(),
         whisperCppModel: WhisperCppModel = .default,
+        fluidAudioASRModel: FluidAudioASRModel = .default,
         language: MeetingLanguage,
         sourceFileSize: Int64 = 0,
         sourceDuration: TimeInterval = 0,
@@ -61,6 +62,7 @@ extension TranscriptionService {
                 transcriptionModel: transcriptionModel,
                 cloudTransfer: cloudTransfer,
                 whisperCppModel: whisperCppModel,
+                fluidAudioASRModel: fluidAudioASRModel,
                 language: language,
                 sourceFileSize: sourceFileSize,
                 sourceDuration: sourceDuration,
@@ -83,6 +85,7 @@ extension TranscriptionService {
         transcriptionModel: String,
         cloudTransfer: CloudTranscriptionTransfer,
         whisperCppModel: WhisperCppModel,
+        fluidAudioASRModel: FluidAudioASRModel,
         language: MeetingLanguage,
         sourceFileSize: Int64,
         sourceDuration: TimeInterval,
@@ -138,12 +141,12 @@ extension TranscriptionService {
         // `.whisperAPI`, the weight file for `.whisperCpp` (resuming a
         // small-model run with the large model would splice two transcripts of
         // different quality). The remaining engines have no such axis.
-        let checkpointProviderID: String?
-        switch engine {
-        case .whisperAPI: checkpointProviderID = transcriptionProvider.id
-        case .whisperCpp: checkpointProviderID = "whispercpp:\(whisperCppModel.rawValue)"
-        case .appleSpeech, .fluidAudioParakeet: checkpointProviderID = nil
-        }
+        let checkpointProviderID = FluidAudioPipelineSelection.checkpointProviderID(
+            engine: engine,
+            provider: transcriptionProvider,
+            whisperCppModel: whisperCppModel,
+            fluidAudioASRModel: fluidAudioASRModel
+        )
         // H4: the compaction map's own identity, not just "compaction ran" —
         // two runs can agree on VAD engine and still compact differently.
         let compactionDigest = compaction.map { PipelineDigest.sha256Hex(of: $0.map) }
@@ -202,7 +205,8 @@ extension TranscriptionService {
             onChunkCompleted: checkpointSink,
             onProgress: { progress, chunks in
                 onPhase(.transcribing(progress: progress, chunks: chunks))
-            }
+            },
+            fluidAudioASRModel: fluidAudioASRModel
         ))
         try await ResourceGuard.requireTranscriptionHeadroom()
         // The engine either produced spans or threw; no spans at all from a
@@ -221,6 +225,10 @@ extension TranscriptionService {
         // from spans alone dropped `speakerTurns`, so whenever compaction ran,
         // `.transcriptionProviderNative` fell back to one synthetic speaker
         // (measured on AMI with ElevenLabs: 64% raw DER instead of ~39%).
+        return GatedTranscription(raw: Self.remappedTranscript(raw, map: map), stages: stages)
+    }
+
+    private static func remappedTranscript(_ raw: RawTranscript, map: [TimelineSegment]) -> RawTranscript {
         let spans = raw.spans.map { span -> TranscribedSpan in
             let start = VADAudioCompactor.remap(span.start, map: map)
             let end = VADAudioCompactor.remap(span.end, map: map)
@@ -231,9 +239,6 @@ extension TranscriptionService {
             let end = VADAudioCompactor.remap(turn.end, map: map)
             return SpeakerTurn(speakerLabel: turn.speakerLabel, start: start, end: max(start, end))
         }
-        return GatedTranscription(
-            raw: RawTranscript(spans: spans, language: raw.language, speakerTurns: speakerTurns),
-            stages: stages
-        )
+        return RawTranscript(spans: spans, language: raw.language, speakerTurns: speakerTurns)
     }
 }

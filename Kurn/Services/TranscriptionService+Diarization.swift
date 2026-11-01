@@ -38,7 +38,9 @@ extension TranscriptionService {
         regions: [SpeechRegion],
         speakerCount: Int,
         onWarning: DiarizationWarningHandler?,
-        onProgress: @escaping @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void,
+        fluidAudioModel: FluidAudioDiarizationModel = .default,
+        segmentationBatchSize: FluidAudioSegmentationBatchSize = .default
     ) async throws -> DiarizationOutcome {
         let started = Date()
         let originalSize = (try? originalURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
@@ -59,7 +61,9 @@ extension TranscriptionService {
                 speakerCount: speakerCount,
                 onWarning: onWarning,
                 onProgress: onProgress,
-                started: started
+                started: started,
+                fluidAudioModel: fluidAudioModel,
+                segmentationBatchSize: segmentationBatchSize
             )
         }
     }
@@ -73,7 +77,9 @@ extension TranscriptionService {
         speakerCount: Int,
         onWarning: DiarizationWarningHandler?,
         onProgress: @escaping @Sendable (Double) -> Void,
-        started: Date
+        started: Date,
+        fluidAudioModel: FluidAudioDiarizationModel,
+        segmentationBatchSize: FluidAudioSegmentationBatchSize
     ) async throws -> DiarizationOutcome {
         let diarURL: URL
         let cleanupURL: URL?
@@ -115,7 +121,9 @@ extension TranscriptionService {
             regions: regions,
             speakerCount: speakerCount,
             onWarning: onWarning,
-            onProgress: { onProgress(0.60 + 0.36 * $0) }
+            onProgress: { onProgress(0.60 + 0.36 * $0) },
+            fluidAudioDiarizationModel: fluidAudioModel,
+            fluidAudioSegmentationBatchSize: segmentationBatchSize
         ))
         try Task.checkCancellation()
         try await ResourceGuard.requireTranscriptionHeadroom()
