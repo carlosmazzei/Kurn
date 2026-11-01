@@ -22,6 +22,10 @@ struct ReadAloudSettingsView: View {
         settings.providers.filter { settings.credentials.isUsableForSpeech($0) }
     }
 
+    /// Speech models a provider listed itself, by provider id. Until (or
+    /// unless) that answers, the picker shows `suggestedSpeechModels`.
+    @State private var listedSpeechModels: [String: [String]] = [:]
+
     private var provider: AIProvider { settings.speechProvider }
 
     var body: some View {
@@ -69,6 +73,11 @@ struct ReadAloudSettingsView: View {
         }
         .navigationTitle(NSLocalizedString("settings.read_aloud.title", comment: "Read Aloud"))
         .onDisappear { ReadAloudController.shared.stop(owner: Self.previewOwner) }
+        .task(id: provider.id) {
+            let current = provider
+            guard current.speechSynthesisAPI != .system, listedSpeechModels[current.id] == nil else { return }
+            listedSpeechModels[current.id] = await ProviderModelsService().speechModels(for: current)
+        }
     }
 
     // MARK: - Voice rows
@@ -106,7 +115,7 @@ struct ReadAloudSettingsView: View {
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
 
-        let models = provider.suggestedSpeechModels
+        let models = listedSpeechModels[provider.id] ?? provider.suggestedSpeechModels
         let currentModel = settings.readAloud.model(for: provider)
         Picker(
             NSLocalizedString("settings.model", comment: "Model"),

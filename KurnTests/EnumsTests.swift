@@ -109,8 +109,9 @@ struct EnumsTests {
         #expect(AIProvider.elevenLabs.defaultTranscriptionModel == "scribe_v1")
     }
 
-    @Test func elevenLabsFallbackModelsIsJustScribe() {
-        #expect(AIProvider.elevenLabs.fallbackModels == ["scribe_v1"])
+    @Test func elevenLabsFallbackModelsAreTheScribeBatchModels() {
+        #expect(AIProvider.elevenLabs.fallbackModels == ["scribe_v1", "scribe_v2"])
+        #expect(AIProvider.elevenLabs.fallbackModels.contains(AIProvider.elevenLabs.defaultTranscriptionModel))
     }
 
     @Test func groqFallbackModelsIncludeBothWhisperVariants() {
