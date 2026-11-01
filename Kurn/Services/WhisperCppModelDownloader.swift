@@ -67,17 +67,14 @@ enum WhisperCppModelDownloader {
             minimumPlausibleBytes: model.minimumPlausibleBytes,
             policy: policy,
             logLabel: "whisperCppDownload",
-            // No pin yet: upstream publishes no SHA-256 for these quantized
-            // files (see `ModelFileDownloader`'s header). Hugging Face's own
-            // `X-Linked-ETag` digest is still checked.
-            pinnedSHA256: nil
+            pinnedSHA256: model.sha256
         ) { fraction in
             onProgress(ModelDownloadStatus(fractionCompleted: fraction, phase: .downloading))
         }
         onProgress(ModelDownloadStatus(fractionCompleted: 1, phase: .compiling))
 
         // H7 PR 16: PR 15's `fetch` already proved the transfer matched its
-        // declared size (and, when offered, a checksum) — but a byte-correct
+        // declared size and its pinned checksum — but a byte-correct
         // file can still fail to load (wrong GGML version, a corruption PR
         // 15's checks don't cover). Prove it loads before calling this
         // install done, so that failure surfaces now instead of at the next
