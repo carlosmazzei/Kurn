@@ -129,8 +129,11 @@ struct AIProvider: Codable, Sendable, Identifiable, Hashable {
     /// such fallback is known for this provider.
     var fallbackModels: [String] {
         if kind == .elevenLabs {
-            // No /models-equivalent endpoint at all — this is the only model.
-            return ["scribe_v1"]
+            // ElevenLabs' `/v1/models` lists text-to-speech models only, so
+            // the Scribe batch models are kept here by hand.
+            // `scribe_v2_realtime` is deliberately absent: it is served over
+            // a WebSocket, not the `/speech-to-text` upload this app uses.
+            return ["scribe_v1", "scribe_v2"]
         }
         if id == AIProvider.groq.id {
             return [
