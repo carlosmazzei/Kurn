@@ -1308,6 +1308,12 @@ unavailable there), so `TranscriptionScheduler.pipelineUsesCoreML` covers it too
 
 #### FluidAudio on-device models and download consent
 
+FluidAudio is pinned to 0.18.0. Its `Diarizer`, `NemoTextProcessing` and `TTS`
+traits are selected explicitly on the Xcode package reference, matching the
+upstream defaults. Without explicit selection Xcode can compile 0.18 without
+its diarization API, leaving `OfflineDiarizerManager` and related types missing.
+The version update does not change the app's chosen ASR models or download consent.
+
 The FluidAudio-backed engines above (and the live transcription preview below)
 download CoreML models on first use rather than bundling them, so enabling one
 never fetches models for a feature the user hasn't opted into:
@@ -2349,7 +2355,11 @@ enforced by lint and by a CI audit test, not just convention:
   pair `acquire` with a `defer { Task { release } }`.
 - **Tests:** Swift Testing (`@Test`, `#expect`). Use
   `TestModelContainer.make()` for an in-memory `ModelContainer` when exercising real
-  SwiftData relationship behavior.
+  SwiftData relationship behavior. Suites whose fixtures live in the shared
+  recordings directory belong inside `RecordingsDirectorySuite`: its serialized
+  parent prevents recovery sweeps or directory-wide deletion from moving another
+  test's file while its writer is open. `tempFileTestLock` alone does not serialize
+  against those recording-directory operations.
 - **Git & PRs:** write all commit messages and pull request titles/descriptions in
   English, regardless of the language used in chat. (User-facing app strings are
   still localized per the localization convention above — this rule is only about

@@ -17,6 +17,7 @@ import SwiftData
 import Testing
 @testable import Kurn
 
+extension RecordingsDirectorySuite {
 struct PlaybackEnhancementTests {
 
     // MARK: - Renderer
@@ -280,6 +281,7 @@ struct PlaybackEnhancementTests {
         ) else { return [] }
         return Set(files.filter { $0.lastPathComponent.hasPrefix(prefix) })
     }
+}
 }
 
 private struct SuspendedEnhancementRenderer: PlaybackEnhancementRendering {
