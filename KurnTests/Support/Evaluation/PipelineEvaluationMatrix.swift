@@ -53,7 +53,9 @@ enum PipelineEvaluationMatrix {
         cloudProviders: cloudProvidersFromEnvironment(),
         transcriptionEngines: transcriptionEnginesFromEnvironment(),
         diarizationEngines: diarizationEnginesFromEnvironment(),
-        cloudModels: cloudModelsFromEnvironment()
+        cloudModels: cloudModelsFromEnvironment(),
+        fluidAudioASRModels: fluidAudioASRModelsFromEnvironment(),
+        fluidAudioDiarizationModels: fluidAudioDiarizationModelsFromEnvironment()
     )
 
     /// On-device transcription engines to sweep. Defaults to every on-device
@@ -108,6 +110,48 @@ enum PipelineEvaluationMatrix {
             return WhisperCppModel.allCases
         }
         return WhisperCppModel.allCases.filter { tokens.contains($0.rawValue.lowercased()) }
+    }
+
+    /// FluidAudio ASR models to sweep when the transcription engine is
+    /// `.fluidAudioParakeet` (the stored engine ID for every FluidAudio ASR
+    /// choice). Defaults to `[.parakeetV3]`, which is what every run recorded
+    /// before the model axis existed measured; set
+    /// `KURN_PUBLIC_EVAL_FLUIDAUDIO_ASR_MODELS` to `all` or a comma-separated
+    /// list such as `nemotronUnified,bark3`. English-only models skip the
+    /// Portuguese corpora instead of failing them.
+    static func fluidAudioASRModelsFromEnvironment() -> [FluidAudioASRModel] {
+        fluidAudioASRModels(from: ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_FLUIDAUDIO_ASR_MODELS"])
+    }
+
+    static func fluidAudioASRModels(from raw: String?) -> [FluidAudioASRModel] {
+        selection(from: raw, all: FluidAudioASRModel.allCases, default: [.default])
+    }
+
+    /// FluidAudio diarization models to sweep when the diarizer is
+    /// `.fluidAudio`. Defaults to `[.pyannote]`; set
+    /// `KURN_PUBLIC_EVAL_FLUIDAUDIO_DIARIZATION_MODELS` to `all` or
+    /// `nemotron3`.
+    static func fluidAudioDiarizationModelsFromEnvironment() -> [FluidAudioDiarizationModel] {
+        fluidAudioDiarizationModels(
+            from: ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_FLUIDAUDIO_DIARIZATION_MODELS"]
+        )
+    }
+
+    static func fluidAudioDiarizationModels(from raw: String?) -> [FluidAudioDiarizationModel] {
+        selection(from: raw, all: FluidAudioDiarizationModel.allCases, default: [.default])
+    }
+
+    /// Blank → `default`, `all` → every case, otherwise the cases whose raw
+    /// value appears in the comma-separated list, in declaration order.
+    private static func selection<Model: RawRepresentable>(
+        from raw: String?,
+        all: [Model],
+        default defaultModels: [Model]
+    ) -> [Model] where Model.RawValue == String {
+        guard let raw, !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return defaultModels }
+        let tokens = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        if tokens == ["all"] { return all }
+        return all.filter { tokens.contains($0.rawValue.lowercased()) }
     }
 
     /// Cloud transcription providers to add to the matrix. Decided by the
@@ -185,7 +229,21 @@ enum PipelineEvaluationMatrix {
     /// whisper.cpp model variant, or a cloud Whisper provider.
     private enum ASRChoice {
         case onDevice(WhisperCppModel?)
+        case fluidAudio(FluidAudioASRModel)
         case cloud(AIProvider, model: String)
+    }
+
+    /// The ASR choices one on-device engine expands into.
+    private static func asrChoices(
+        for transcription: TranscriptionEngine,
+        whisperCppModels: [WhisperCppModel],
+        fluidAudioASRModels: [FluidAudioASRModel]
+    ) -> [ASRChoice] {
+        switch transcription {
+        case .whisperCpp: return whisperCppModels.map { .onDevice($0) }
+        case .fluidAudioParakeet: return fluidAudioASRModels.map { .fluidAudio($0) }
+        default: return [.onDevice(nil)]
+        }
     }
 
     static func build(
@@ -193,54 +251,33 @@ enum PipelineEvaluationMatrix {
         cloudProviders: [AIProvider],
         transcriptionEngines: [TranscriptionEngine],
         diarizationEngines: [DiarizationEngine],
-        cloudModels: [String: [String]] = [:]
+        cloudModels: [String: [String]] = [:],
+        fluidAudioASRModels: [FluidAudioASRModel] = [.default],
+        fluidAudioDiarizationModels: [FluidAudioDiarizationModel] = [.default]
     ) -> [Entry] {
         var entries: [Entry] = []
         for preprocessing in PreprocessingEngine.allCases {
             for vad in VADEngine.allCases {
                 for diarization in diarizationEngines {
-                    // `.transcriptionProviderNative` is honored only for a cloud
-                    // provider that returns its own speaker labels; everywhere
-                    // else `effectiveDiarization` quietly runs `.heuristic`. Those
-                    // cells would re-measure the heuristic diarizer under another
-                    // name — same number, double the cost, misleading label.
-                    if diarization != .transcriptionProviderNative {
-                        for transcription in transcriptionEngines {
-                            if transcription == .whisperCpp {
-                                for model in whisperCppModels {
-                                    entries.append(entry(
-                                        preprocessing: preprocessing,
-                                        vad: vad,
-                                        diarization: diarization,
-                                        transcription: transcription,
-                                        asr: .onDevice(model)
-                                    ))
-                                }
-                            } else {
-                                entries.append(entry(
-                                    preprocessing: preprocessing,
-                                    vad: vad,
-                                    diarization: diarization,
-                                    transcription: transcription,
-                                    asr: .onDevice(nil)
-                                ))
-                            }
-                        }
-                    }
-                    for provider in cloudProviders {
-                        if diarization == .transcriptionProviderNative, !provider.supportsNativeDiarization {
-                            continue
-                        }
-                        let models = cloudModels[provider.id.lowercased()] ?? [provider.defaultTranscriptionModel]
-                        for model in models {
-                            entries.append(entry(
-                                preprocessing: preprocessing,
-                                vad: vad,
-                                diarization: diarization,
-                                transcription: .whisperAPI,
-                                asr: .cloud(provider, model: model)
-                            ))
-                        }
+                    // Only `.fluidAudio` has a model axis; every other diarizer
+                    // runs once, labelled exactly as before the axis existed.
+                    let diarizationModels: [FluidAudioDiarizationModel?] = diarization == .fluidAudio
+                        ? fluidAudioDiarizationModels.map { $0 }
+                        : [nil]
+                    for diarizationModel in diarizationModels {
+                        let cell = Cell(
+                            preprocessing: preprocessing,
+                            vad: vad,
+                            diarization: diarization,
+                            diarizationModel: diarizationModel
+                        )
+                        entries += onDeviceEntries(
+                            for: cell,
+                            transcriptionEngines: transcriptionEngines,
+                            whisperCppModels: whisperCppModels,
+                            fluidAudioASRModels: fluidAudioASRModels
+                        )
+                        entries += cloudEntries(for: cell, cloudProviders: cloudProviders, cloudModels: cloudModels)
                     }
                 }
             }
@@ -248,13 +285,57 @@ enum PipelineEvaluationMatrix {
         return entries
     }
 
-    private static func entry(
-        preprocessing: PreprocessingEngine,
-        vad: VADEngine,
-        diarization: DiarizationEngine,
-        transcription: TranscriptionEngine,
-        asr: ASRChoice
-    ) -> Entry {
+    /// One preprocessing x VAD x diarization (x diarization model) cell, which
+    /// the ASR axis then expands.
+    private struct Cell {
+        var preprocessing: PreprocessingEngine
+        var vad: VADEngine
+        var diarization: DiarizationEngine
+        var diarizationModel: FluidAudioDiarizationModel?
+    }
+
+    private static func onDeviceEntries(
+        for cell: Cell,
+        transcriptionEngines: [TranscriptionEngine],
+        whisperCppModels: [WhisperCppModel],
+        fluidAudioASRModels: [FluidAudioASRModel]
+    ) -> [Entry] {
+        // `.transcriptionProviderNative` is honored only for a cloud
+        // provider that returns its own speaker labels; everywhere
+        // else `effectiveDiarization` quietly runs `.heuristic`. Those
+        // cells would re-measure the heuristic diarizer under another
+        // name — same number, double the cost, misleading label.
+        guard cell.diarization != .transcriptionProviderNative else { return [] }
+        return transcriptionEngines.flatMap { transcription in
+            asrChoices(
+                for: transcription,
+                whisperCppModels: whisperCppModels,
+                fluidAudioASRModels: fluidAudioASRModels
+            ).map { entry(cell: cell, transcription: transcription, asr: $0) }
+        }
+    }
+
+    private static func cloudEntries(
+        for cell: Cell,
+        cloudProviders: [AIProvider],
+        cloudModels: [String: [String]]
+    ) -> [Entry] {
+        cloudProviders.flatMap { provider -> [Entry] in
+            if cell.diarization == .transcriptionProviderNative, !provider.supportsNativeDiarization {
+                return []
+            }
+            let models = cloudModels[provider.id.lowercased()] ?? [provider.defaultTranscriptionModel]
+            return models.map { model in
+                entry(cell: cell, transcription: .whisperAPI, asr: .cloud(provider, model: model))
+            }
+        }
+    }
+
+    private static func entry(cell: Cell, transcription: TranscriptionEngine, asr: ASRChoice) -> Entry {
+        let preprocessing = cell.preprocessing
+        let vad = cell.vad
+        let diarization = cell.diarization
+        let diarizationModel = cell.diarizationModel
         var configuration = PipelineConfiguration(
             preprocessing: preprocessing,
             vad: vad,
@@ -265,12 +346,22 @@ enum PipelineEvaluationMatrix {
             transcription: transcription,
             diarizationPreprocessingEnabled: true
         )
+        if let diarizationModel { configuration.fluidAudioDiarizationModel = diarizationModel }
 
         let asrLabel: String
         switch asr {
         case .onDevice(let model):
             if let model { configuration.whisperCppModel = model }
             let modelSuffix = model.map { "@\($0.rawValue)" } ?? ""
+            asrLabel = "\(transcription.rawValue)\(modelSuffix)"
+        case .fluidAudio(let model):
+            configuration.fluidAudioASRModel = model
+            // The harness downloads every model up front, which is the
+            // consent this flag stands for in the app.
+            configuration.fluidAudioASRConsented = true
+            // Parakeet v3 stays unsuffixed so labels recorded before the
+            // model axis existed still match.
+            let modelSuffix = model == .default ? "" : "@\(model.rawValue)"
             asrLabel = "\(transcription.rawValue)\(modelSuffix)"
         case .cloud(let provider, let model):
             configuration.transcriptionProvider = provider
@@ -289,10 +380,11 @@ enum PipelineEvaluationMatrix {
         // "|"-separated, not ","-separated: the label is embedded as a single
         // CSV field by the harness report, and a comma inside it would
         // silently shift every column after it.
+        let diarizationSuffix = diarizationModel.map { $0 == .default ? "" : "@\($0.rawValue)" } ?? ""
         let label = [
             "prep=\(preprocessing.rawValue)",
             "vad=\(vad.rawValue)",
-            "diar=\(diarization.rawValue)",
+            "diar=\(diarization.rawValue)\(diarizationSuffix)",
             "asr=\(asrLabel)"
         ].joined(separator: "|")
         return Entry(label: label, configuration: configuration)
@@ -313,10 +405,7 @@ enum PipelineEvaluationMatrix {
             sets.append(set)
         }
         for entry in all {
-            let config = entry.configuration
-            add(config.vad.requiredModelSet)
-            add(config.effectiveDiarization.requiredModelSet)
-            add(config.transcription.requiredModelSet(whisperCppModel: config.whisperCppModel))
+            FluidAudioPipelineSelection.requiredModelSets(for: entry.configuration).forEach(add)
         }
         return sets
     }

@@ -1,3 +1,4 @@
+import KurnCore
 import Testing
 @testable import Kurn
 
@@ -74,6 +75,60 @@ struct PipelineEvaluationMatrixTests {
         let labels = Set(entries.map { $0.label.components(separatedBy: "|asr=").last ?? "" })
         #expect(labels == ["whisperAPI:openAI@gpt-4o-transcribe", "whisperAPI:openAI"])
         #expect(Set(entries.map(\.configuration.transcriptionModel)) == ["gpt-4o-transcribe", "whisper-1"])
+    }
+
+    @Test func fluidAudioModelFiltersDefaultToTheRecordedModels() {
+        #expect(PipelineEvaluationMatrix.fluidAudioASRModels(from: nil) == [.parakeetV3])
+        #expect(PipelineEvaluationMatrix.fluidAudioASRModels(from: " ") == [.parakeetV3])
+        #expect(PipelineEvaluationMatrix.fluidAudioASRModels(from: "all") == FluidAudioASRModel.allCases)
+        #expect(PipelineEvaluationMatrix.fluidAudioASRModels(from: "BARK3, nemotronUnified") == [.nemotronUnified, .bark3])
+        #expect(PipelineEvaluationMatrix.fluidAudioDiarizationModels(from: nil) == [.pyannote])
+        #expect(PipelineEvaluationMatrix.fluidAudioDiarizationModels(from: "all") == FluidAudioDiarizationModel.allCases)
+        #expect(PipelineEvaluationMatrix.fluidAudioDiarizationModels(from: "nemotron3") == [.nemotron3])
+    }
+
+    /// Defaults must produce exactly the labels earlier runs recorded, so
+    /// `resume` and cross-run tables keep matching.
+    @Test func defaultFluidAudioModelsKeepUnsuffixedLabels() {
+        let entries = PipelineEvaluationMatrix.build(
+            whisperCppModels: [],
+            cloudProviders: [],
+            transcriptionEngines: [.fluidAudioParakeet],
+            diarizationEngines: [.fluidAudio]
+        )
+        #expect(entries.count == 4)
+        #expect(entries.allSatisfy { $0.label.hasSuffix("|diar=fluidAudio|asr=fluidAudioParakeet") })
+        #expect(entries.allSatisfy { $0.configuration.fluidAudioASRModel == .parakeetV3 })
+        #expect(entries.allSatisfy { $0.configuration.fluidAudioDiarizationModel == .pyannote })
+    }
+
+    @Test func fluidAudioModelAxesExpandWithSuffixedLabelsAndModelSets() {
+        let entries = PipelineEvaluationMatrix.build(
+            whisperCppModels: [],
+            cloudProviders: [],
+            transcriptionEngines: [.fluidAudioParakeet],
+            diarizationEngines: [.heuristic, .fluidAudio],
+            fluidAudioASRModels: [.parakeetV3, .bark3],
+            fluidAudioDiarizationModels: [.pyannote, .nemotron3]
+        )
+        // 4 prep x VAD cells x (heuristic once + fluidAudio twice) x 2 ASR models.
+        #expect(entries.count == 4 * 3 * 2)
+        #expect(Set(entries.map(\.label)).count == entries.count)
+
+        let variant = entries.filter { $0.label.hasSuffix("|diar=fluidAudio@nemotron3|asr=fluidAudioParakeet@bark3") }
+        #expect(variant.count == 4)
+        #expect(variant.allSatisfy { $0.configuration.fluidAudioASRConsented })
+        #expect(variant.allSatisfy {
+            FluidAudioPipelineSelection.requiredModelSets(for: $0.configuration)
+                .contains(.fluidAudioDiarization(.nemotron3))
+        })
+        #expect(variant.allSatisfy {
+            FluidAudioPipelineSelection.requiredModelSets(for: $0.configuration).contains(.fluidAudioASR(.bark3))
+        })
+        // The heuristic diarizer has no model axis and keeps its old label.
+        let heuristic = entries.filter { $0.configuration.diarization == .heuristic }
+        #expect(heuristic.count == 8)
+        #expect(heuristic.allSatisfy { $0.label.contains("|diar=heuristic|") })
     }
 
     @Test func corpusSelectionAcceptsSpacesOrCommasAndBlankMeansAll() {

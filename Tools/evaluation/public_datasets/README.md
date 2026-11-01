@@ -137,6 +137,18 @@ For example, `KURN_PUBLIC_EVAL_MATRIX=essential` together with
 cells (cleanup on/off x the two VAD engines). The CI workflow exposes the same
 filter as its `diarization_engines` dispatch input.
 
+The FluidAudio stages have a model axis of their own, selected the same way:
+`KURN_PUBLIC_EVAL_FLUIDAUDIO_ASR_MODELS` (`fluidaudio_asr_models`; default
+`parakeetV3`, or any of `nemotronUnified`, `bark3`, `bark3Clean`, `phonon2`,
+`nemotronTranscribeLite`, or `all`) expands every `fluidAudioParakeet` cell,
+and `KURN_PUBLIC_EVAL_FLUIDAUDIO_DIARIZATION_MODELS`
+(`fluidaudio_diarization_models`; default `pyannote`, or `nemotron3`, or
+`all`) expands every `fluidAudio` diarizer cell. A non-default model is named
+in the label (`asr=fluidAudioParakeet@bark3`, `diar=fluidAudio@nemotron3`);
+the defaults keep the unsuffixed labels earlier runs recorded. The
+English-only ASR models (Bark 3.0/Clean, Phonon-2, Transcribe Lite) are
+skipped on the Portuguese corpora rather than failed.
+
 ### Including cloud transcription (OpenAI, Groq, ElevenLabs)
 
 Every engine above is on-device and free to run unattended. `.whisperAPI` is

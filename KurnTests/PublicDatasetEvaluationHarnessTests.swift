@@ -81,6 +81,10 @@ struct PublicDatasetEvaluationHarnessTests {
         print("[pipeline-eval]   diarization: \(diarizers)")
         print("[pipeline-eval]   on-device ASR: \(TranscriptionEngine.allCases.filter { !$0.isCloudTranscription }.map(\.rawValue).joined(separator: ", "))")
         print("[pipeline-eval]   whisper.cpp models: \(whisperModels)")
+        let fluidASRModels = PipelineEvaluationMatrix.fluidAudioASRModelsFromEnvironment().map(\.rawValue)
+        let fluidDiarizationModels = PipelineEvaluationMatrix.fluidAudioDiarizationModelsFromEnvironment().map(\.rawValue)
+        print("[pipeline-eval]   FluidAudio ASR models: \(fluidASRModels.joined(separator: ", "))")
+        print("[pipeline-eval]   FluidAudio diarization models: \(fluidDiarizationModels.joined(separator: ", "))")
         print("[pipeline-eval]   cloud mode: \(cloudMode)")
         if cloudProviders.isEmpty {
             print("[pipeline-eval]   cloud ASR providers: none")
@@ -149,8 +153,12 @@ struct PublicDatasetEvaluationHarnessTests {
             }
             for item in items {
                 for entry in corpusEntries {
-                    guard TranscriptionLanguageSupport.isSupported(item.language, by: entry.configuration.transcription) else {
-                        print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(entry.configuration.transcription) does not support \(item.language)")
+                    guard TranscriptionLanguageSupport.isSupported(
+                        item.language,
+                        by: entry.configuration.transcription,
+                        fluidAudioASRModel: entry.configuration.fluidAudioASRModel
+                    ) else {
+                        print("[pipeline-eval] SKIP \(item.corpusName)/\(item.name) [\(entry.label)]: \(entry.label) does not support \(item.language)")
                         continue
                     }
                     if writer?.alreadyHas(corpus: item.corpusName, name: item.name, configLabel: entry.label) == true {
@@ -244,7 +252,15 @@ struct PublicDatasetEvaluationHarnessTests {
         for items: [PublicEvaluationDataset.Item]
     ) -> [PipelineEvaluationMatrix.Entry] {
         guard !items.isEmpty, items.allSatisfy({ $0.referenceRTTM == nil }) else { return entries }
-        let collapsed = entries.filter { $0.configuration.diarization == diarizerForWEROnlyCorpora }
+        // The FluidAudio diarizer has a model axis too; keep only the first
+        // model swept (Pyannote whenever it is in the sweep), for the same
+        // reason the engine axis is collapsed.
+        let kept = entries.first { $0.configuration.diarization == diarizerForWEROnlyCorpora }?
+            .configuration.fluidAudioDiarizationModel
+        let collapsed = entries.filter {
+            $0.configuration.diarization == diarizerForWEROnlyCorpora
+                && $0.configuration.fluidAudioDiarizationModel == kept
+        }
         return collapsed.isEmpty ? entries : collapsed
     }
 
@@ -278,11 +294,9 @@ struct PublicDatasetEvaluationHarnessTests {
         var seen = Set<String>()
         for entry in entries {
             let config = entry.configuration
-            for set in [
-                config.vad.requiredModelSet,
-                config.effectiveDiarization.requiredModelSet,
-                config.transcription.requiredModelSet(whisperCppModel: config.whisperCppModel)
-            ].compactMap({ $0 }) {
+            // The same resolution the pipeline itself uses, so a FluidAudio
+            // ASR or diarization variant downloads the variant's weights.
+            for set in FluidAudioPipelineSelection.requiredModelSets(for: config) {
                 let key = "\(set)"
                 guard seen.insert(key).inserted else { continue }
                 print("[pipeline-eval] downloading model set \(key)")
