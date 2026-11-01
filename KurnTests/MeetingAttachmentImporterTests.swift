@@ -69,6 +69,51 @@ struct MeetingAttachmentImporterTests {
         #expect(attachment.promptDocument.text.isEmpty)
     }
 
+    @Test func truncatedTextIsStillAttached() async throws {
+        let (meeting, context) = try makeMeeting()
+        defer { cleanUp(meeting) }
+        let source = try PDFFixtures.makePDF(pages: ["ignored"])
+        defer { PDFFixtures.remove(source) }
+        let importer = MeetingAttachmentImporter(context: context) { _ in
+            .success(PDFTextExtraction(pageCount: 5_000, text: "First pages", isTruncated: true))
+        }
+
+        let attachment = try await importer.importPDF(from: source, into: meeting)
+
+        #expect(attachment.pageCount == 5_000)
+        #expect(attachment.extractedText == "First pages")
+    }
+
+    @Test func aPDFOverTheSizeLimitIsRefusedAndItsCopyRemoved() async throws {
+        let (meeting, context) = try makeMeeting()
+        defer { cleanUp(meeting) }
+        let source = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(source) }
+        let importer = MeetingAttachmentImporter(context: context) { url in
+            do throws(PDFTextExtractor.Failure) {
+                return .success(try PDFTextExtractor.extract(from: url, maxFileBytes: 16))
+            } catch {
+                return .failure(error)
+            }
+        }
+
+        do throws(AppError) {
+            try await importer.importPDF(from: source, into: meeting)
+            Issue.record("an oversized PDF must be refused")
+        } catch {
+            #expect(error.logCode == "attachment_import")
+            #expect(error.privateContext == MeetingAttachmentImporter.message(for: .tooLarge))
+        }
+        #expect(storedFiles(for: meeting).isEmpty)
+        #expect(meeting.attachments.isEmpty)
+    }
+
+    @Test func theReliabilityCodeSaysWhenTextIsMissingOrCut() {
+        #expect(MeetingAttachmentImporter.code(for: PDFTextExtraction(pageCount: 1, text: nil)) == "no_text")
+        #expect(MeetingAttachmentImporter.code(for: PDFTextExtraction(pageCount: 1, text: "a", isTruncated: true)) == "text_truncated")
+        #expect(MeetingAttachmentImporter.code(for: PDFTextExtraction(pageCount: 1, text: "a")) == nil)
+    }
+
     @Test func aLockedPDFIsRefusedAndItsCopyRemoved() async throws {
         let (meeting, context) = try makeMeeting()
         defer { cleanUp(meeting) }
@@ -200,8 +245,9 @@ struct MeetingAttachmentImporterTests {
     @Test func eachRefusalHasItsOwnMessage() {
         let unreadable = MeetingAttachmentImporter.message(for: .unreadable)
         let locked = MeetingAttachmentImporter.message(for: .locked)
+        let tooLarge = MeetingAttachmentImporter.message(for: .tooLarge)
         #expect(!unreadable.isEmpty)
-        #expect(unreadable != locked)
+        #expect(Set([unreadable, locked, tooLarge]).count == 3)
     }
 
     @Test func attachedTextFollowsTheTranscriptInTheMeetingsContext() throws {

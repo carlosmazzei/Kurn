@@ -436,6 +436,7 @@
 "attachment.untitled" = "文档";
 "attachment.error.unreadable" = "该文件不是可读取的 PDF。";
 "attachment.error.locked" = "该 PDF 受密码保护。请移除密码后重试。";
+"attachment.error.too_large" = "该 PDF 太大，无法添加。";
 "attach.title" = "添加到会议";
 "attach.files" = "文件";
 "attach.new_meeting" = "新会议";
