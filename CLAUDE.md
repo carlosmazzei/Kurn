@@ -1313,6 +1313,9 @@ traits are selected explicitly on the Xcode package reference, matching the
 upstream defaults. Without explicit selection Xcode can compile 0.18 without
 its diarization API, leaving `OfflineDiarizerManager` and related types missing.
 The version update does not change the app's chosen ASR models or download consent.
+The shared SPM cache restores only exact manifest/lockfile keys: Xcode validates
+selected traits against a restored checkout before updating it, so falling back
+to a 0.17 checkout makes a 0.18 trait selection fail before dependency resolution.
 
 The FluidAudio-backed engines above (and the live transcription preview below)
 download CoreML models on first use rather than bundling them, so enabling one
