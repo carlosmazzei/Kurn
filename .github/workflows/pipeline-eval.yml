@@ -34,6 +34,14 @@ on:
         description: "whisper.cpp models to sweep (small, base, largeTurbo, all)"
         type: string
         default: "small"
+      fluidaudio_asr_models:
+        description: "FluidAudio ASR models for fluidAudioParakeet (parakeetV3, nemotronUnified, bark3, bark3Clean, phonon2, nemotronTranscribeLite, all); English-only models skip Portuguese"
+        type: string
+        default: "parakeetV3"
+      fluidaudio_diarization_models:
+        description: "FluidAudio diarization models for the fluidAudio diarizer (pyannote, nemotron3, all)"
+        type: string
+        default: "pyannote"
       transcription_engines:
         description: "on-device engines to sweep: appleSpeech,fluidAudioParakeet,whisperCpp / none (only cloud_providers) / blank=all"
         type: string
@@ -152,6 +160,8 @@ jobs:
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_PROVIDERS: ${{ github.event.inputs.cloud_providers }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CLOUD_MODELS: ${{ github.event.inputs.cloud_models }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_WHISPERCPP_MODELS: ${{ github.event.inputs.whispercpp_models }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_FLUIDAUDIO_ASR_MODELS: ${{ github.event.inputs.fluidaudio_asr_models }}
+          TEST_RUNNER_KURN_PUBLIC_EVAL_FLUIDAUDIO_DIARIZATION_MODELS: ${{ github.event.inputs.fluidaudio_diarization_models }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_ENGINES: ${{ github.event.inputs.transcription_engines }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_DIARIZATION_ENGINES: ${{ github.event.inputs.diarization_engines }}
           TEST_RUNNER_KURN_PUBLIC_EVAL_CORRECTION: ${{ github.event.inputs.correction }}
