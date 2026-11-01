@@ -26,6 +26,12 @@ updates:
     schedule:
       interval: "weekly"
     labels: ["dependencies"]
+    ignore:
+      # sherpa-onnx's Package.swift requires onnxruntime-libs with `exact:`,
+      # so any bump of its pin in Package.resolved is unsatisfiable — SPM
+      # re-resolves it back down on every build and the committed file ends
+      # up inconsistent. Only sherpa-onnx itself can move this pin.
+      - dependency-name: "onnxruntime-libs"
 
   # scripts/screenshots/package.json (Playwright, marketing screenshot renderer).
   - package-ecosystem: "npm"
