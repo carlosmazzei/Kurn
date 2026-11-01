@@ -165,6 +165,8 @@ Latest recorded results:
 | English | standardDSP + FluidAudio Parakeet | 22.73% | 33.26% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
 | English, cloud | ElevenLabs Scribe + its own diarization | 16.51% (cpWER 18.47%) | 24.72% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
 
+ElevenLabs `scribe_v2` was measured on [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412) and matched `scribe_v1` without beating it (CORAA 13.01% against 12.50%), so the table and the default are unchanged.
+
 Two caveats travel with every number above: there is deliberately no pass/fail
 threshold, and the rates are comparable between runs over the same material —
 **not** against published figures for the same corpora, since the text
