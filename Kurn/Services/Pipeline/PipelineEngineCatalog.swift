@@ -37,6 +37,7 @@ struct EngineTranscriptionRequest: Sendable {
     var onChunkCompleted: (@Sendable (ChunkedTranscriptionRunner.Progress) async throws -> Void)?
     /// `0...1` fraction plus chunk position for engines that chunk.
     var onProgress: @Sendable (Double, ChunkProgress?) -> Void
+    var fluidAudioASRModel: FluidAudioASRModel = .default
 }
 
 /// A transcription engine as the orchestrator sees it: single-pass engines
@@ -57,6 +58,8 @@ struct PipelineDiarizationRequest: Sendable {
     /// should hear about.
     var onWarning: (@Sendable (String) -> Void)?
     var onProgress: @Sendable (Double) -> Void
+    var fluidAudioDiarizationModel: FluidAudioDiarizationModel = .default
+    var fluidAudioSegmentationBatchSize: FluidAudioSegmentationBatchSize = .default
 }
 
 /// A diarization engine as the orchestrator sees it. Never throws: every
@@ -101,11 +104,16 @@ struct PipelineEngineCatalog: Sendable {
         let noOpLanguageDetector = NoOpLanguageDetector()
         let fluidAudioLanguageDetector = FluidAudioLanguageDetector()
         let appleTranscriber = OnDeviceTranscriber()
-        let fluidAudioTranscriber = FluidAudioTranscriber()
+        let fluidAudioTranscriber = FluidAudioModelTranscriber()
         let whisperTranscriber = WhisperTranscriber()
         let whisperCppTranscriber = WhisperCppTranscriber()
         let heuristicDiarizer = SpeakerDiarizer()
-        let fluidAudioDiarizer = FluidAudioDiarizer()
+        let pyannoteDiarizer = FluidAudioDiarizer()
+        let nemotronDiarizer = FluidAudioNemotronDiarizer()
+        let fluidAudioDiarizer = FluidAudioDiarizationRouter(
+            pyannote: { await pyannoteDiarizer.diarize($0) },
+            nemotron: { await nemotronDiarizer.outcome(url: $0.url, onProgress: $0.onProgress) }
+        )
         let sherpaOnnxDiarizer = SherpaOnnxDiarizer()
         let noOpCorrector = NoOpTranscriptCorrector()
         let llmCorrector = LLMTranscriptCorrector()
@@ -231,6 +239,7 @@ extension FluidAudioDiarizer: PipelineDiarizing {
         await outcome(
             url: request.url,
             speakerCount: request.speakerCount,
+            segmentationBatchSize: request.fluidAudioSegmentationBatchSize,
             onDownloadFailure: request.onWarning,
             onProgress: request.onProgress
         )

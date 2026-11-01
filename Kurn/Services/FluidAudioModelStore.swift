@@ -59,7 +59,7 @@ actor FluidAudioModelStore {
                 // caller — concurrent callers already await this one load
                 // rather than each starting their own.
                 return try await withResourceReservation(.modelLoading) {
-                    let models = try await AsrModels.downloadAndLoad(version: .v3)
+                    let models = try AsrModels.loadLocal(from: AsrModels.defaultCacheDirectory(for: .v3), version: .v3)
                     return AsrManager(config: Self.transcriptionConfig, models: models)
                 }
             }

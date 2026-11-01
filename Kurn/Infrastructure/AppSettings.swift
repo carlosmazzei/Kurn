@@ -50,6 +50,13 @@ final class AppSettings {
         static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
         static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
         static let whisperCppModel = "settings.whisperCppModel"
+        static let fluidAudioASRModel = "settings.fluidAudioASRModel"
+        static let fluidAudioLiveModel = "settings.fluidAudioLiveModel"
+        static let fluidAudioDiarizationModel = "settings.fluidAudioDiarizationModel"
+        static let fluidAudioSegmentationBatchSize = "settings.fluidAudioSegmentationBatchSize"
+        static let fluidAudioASRModelConsents = "settings.fluidAudioASRModelConsents"
+        static let fluidAudioNemotronModelsConsented = "settings.fluidAudioNemotronModelsConsented"
+        static let fluidAudioUnifiedStreamingConsented = "settings.fluidAudioUnifiedStreamingConsented"
         static let whisperCppModelsConsented = "settings.whisperCppModelsConsented"
         static let sherpaOnnxModelsConsented = "settings.sherpaOnnxModelsConsented"
         static let allowsExpensiveNetworkTransfers = "settings.allowsExpensiveNetworkTransfers"
@@ -281,6 +288,34 @@ final class AppSettings {
         didSet { defaults.set(whisperCppModel.rawValue, forKey: Keys.whisperCppModel) }
     }
 
+    var fluidAudioASRModel: FluidAudioASRModel {
+        didSet { defaults.set(fluidAudioASRModel.rawValue, forKey: Keys.fluidAudioASRModel) }
+    }
+
+    var fluidAudioLiveModel: FluidAudioLiveModel {
+        didSet { defaults.set(fluidAudioLiveModel.rawValue, forKey: Keys.fluidAudioLiveModel) }
+    }
+
+    var fluidAudioDiarizationModel: FluidAudioDiarizationModel {
+        didSet { defaults.set(fluidAudioDiarizationModel.rawValue, forKey: Keys.fluidAudioDiarizationModel) }
+    }
+
+    var fluidAudioSegmentationBatchSize: FluidAudioSegmentationBatchSize {
+        didSet { defaults.set(fluidAudioSegmentationBatchSize.rawValue, forKey: Keys.fluidAudioSegmentationBatchSize) }
+    }
+
+    var fluidAudioASRModelConsents: Set<String> {
+        didSet { defaults.set(fluidAudioASRModelConsents.sorted(), forKey: Keys.fluidAudioASRModelConsents) }
+    }
+
+    var fluidAudioNemotronModelsConsented: Bool {
+        didSet { defaults.set(fluidAudioNemotronModelsConsented, forKey: Keys.fluidAudioNemotronModelsConsented) }
+    }
+
+    var fluidAudioUnifiedStreamingConsented: Bool {
+        didSet { defaults.set(fluidAudioUnifiedStreamingConsented, forKey: Keys.fluidAudioUnifiedStreamingConsented) }
+    }
+
     /// Offline audio-cleanup engine applied before the transcription path.
     var preprocessingEngine: PreprocessingEngine {
         didSet { defaults.set(preprocessingEngine.rawValue, forKey: Keys.preprocessingEngine) }
@@ -304,7 +339,7 @@ final class AppSettings {
             vad: vadEngine,
             languageDetection: languageDetectionEngine,
             diarization: diarizationEngine,
-            diarizationConsented: fluidAudioDiarizationModelsConsented,
+            diarizationConsented: selectedFluidDiarizationConsented,
             sherpaOnnxConsented: sherpaOnnxModelsConsented,
             transcription: transcriptionEngine,
             transcriptionProvider: transcriptionProvider,
@@ -314,6 +349,10 @@ final class AppSettings {
             fluidAudioSpeakerCount: fluidAudioSpeakerCount,
             diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
             whisperCppModel: whisperCppModel,
+            fluidAudioASRModel: fluidAudioASRModel,
+            fluidAudioASRConsented: selectedFluidAudioASRModelsConsented,
+            fluidAudioDiarizationModel: fluidAudioDiarizationModel,
+            fluidAudioSegmentationBatchSize: fluidAudioSegmentationBatchSize,
             correction: correctionEnabled ? .llm : .none,
             correctionProvider: aiProvider,
             correctionModel: correctionEnabled ? summaryModel(for: aiProvider) : "",
@@ -327,7 +366,7 @@ final class AppSettings {
     /// is only loaded for users who will actually use it, and never downloaded
     /// without consent. See `FluidAudioModelStore.prewarm()`.
     var usesFluidAudioModel: Bool {
-        let needsOnDeviceASR = transcriptionEngine.requiredModelSet(whisperCppModel: whisperCppModel) == .onDeviceASR
+        let needsOnDeviceASR = (transcriptionEngine == .fluidAudioParakeet && fluidAudioASRModel == .parakeetV3)
             || languageDetectionEngine.requiredModelSet == .onDeviceASR
         return needsOnDeviceASR && fluidAudioBatchASRModelsConsented
     }
@@ -669,6 +708,15 @@ final class AppSettings {
         vadEngine = defaults.enumValue(forKey: Keys.vadEngine, default: .energyThreshold)
         languageDetectionEngine = defaults.enumValue(forKey: Keys.languageDetectionEngine, default: .byTranscriber)
         whisperCppModel = defaults.enumValue(forKey: Keys.whisperCppModel, default: WhisperCppModel.default)
+        fluidAudioASRModel = defaults.enumValue(forKey: Keys.fluidAudioASRModel, default: FluidAudioASRModel.default)
+        fluidAudioLiveModel = defaults.enumValue(forKey: Keys.fluidAudioLiveModel, default: FluidAudioLiveModel.default)
+        fluidAudioDiarizationModel = defaults.enumValue(forKey: Keys.fluidAudioDiarizationModel, default: FluidAudioDiarizationModel.default)
+        fluidAudioSegmentationBatchSize = FluidAudioSegmentationBatchSize(
+            rawValue: defaults.integer(forKey: Keys.fluidAudioSegmentationBatchSize)
+        ) ?? .default
+        fluidAudioASRModelConsents = Set(defaults.stringArray(forKey: Keys.fluidAudioASRModelConsents) ?? [])
+        fluidAudioNemotronModelsConsented = defaults.bool(forKey: Keys.fluidAudioNemotronModelsConsented)
+        fluidAudioUnifiedStreamingConsented = defaults.bool(forKey: Keys.fluidAudioUnifiedStreamingConsented)
         // Fall back to the environment-derived default (set on `AppLog` at
         // launch) when the user hasn't chosen a level yet.
         let resolvedLogLevel = defaults.enumValue(forKey: Keys.logLevel, default: AppLog.minimumLevel)

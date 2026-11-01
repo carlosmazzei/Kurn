@@ -106,6 +106,7 @@ struct TranscriptionService {
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         let fileDuration = (try? await AVURLAsset(url: fileURL).load(.duration)).map(CMTimeGetSeconds) ?? 0
         AppLog.transcription.atNotice.notice("transcribe: start file=\(fileName, privacy: .public) size=\(fileSize, privacy: .public) bytes duration=\(String(format: "%.1f", fileDuration), privacy: .public)s engine=\(config.transcription.rawValue, privacy: .public) language=\(language.rawValue, privacy: .public)")
+        try FluidAudioPipelineSelection.validateASR(config: config, language: language)
         try await ResourceGuard.requireTranscriptionHeadroom()
         try validateModelTransferPolicy(config)
         try validateCloudUploadPolicy(config)
@@ -326,6 +327,7 @@ struct TranscriptionService {
                 transcriptionModel: config.transcriptionModel,
                 cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
+                fluidAudioASRModel: config.fluidAudioASRModel,
                 language: resolvedLanguage,
                 sourceFileSize: sourceFileSize,
                 sourceDuration: sourceDuration,
@@ -347,6 +349,7 @@ struct TranscriptionService {
                 transcriptionModel: config.transcriptionModel,
                 cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
+                fluidAudioASRModel: config.fluidAudioASRModel,
                 language: resolvedLanguage,
                 sourceFileSize: sourceFileSize,
                 sourceDuration: sourceDuration,
@@ -364,7 +367,9 @@ struct TranscriptionService {
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning,
-                onProgress: diarizationProgress.update
+                onProgress: diarizationProgress.update,
+                fluidAudioModel: config.fluidAudioDiarizationModel,
+                segmentationBatchSize: config.fluidAudioSegmentationBatchSize
             )
             gated = try await rawTranscript
             AppLog.transcription.atNotice.notice("transcribe: Whisper complete, spans=\(gated.raw.spans.count, privacy: .public) — waiting for diarization")
@@ -381,6 +386,7 @@ struct TranscriptionService {
                 transcriptionModel: config.transcriptionModel,
                 cloudTransfer: config.cloudTransfer,
                 whisperCppModel: config.whisperCppModel,
+                fluidAudioASRModel: config.fluidAudioASRModel,
                 language: resolvedLanguage,
                 sourceFileSize: sourceFileSize,
                 sourceDuration: sourceDuration,
@@ -399,7 +405,9 @@ struct TranscriptionService {
                 regions: regions,
                 speakerCount: config.fluidAudioSpeakerCount,
                 onWarning: onDiarizationWarning,
-                onProgress: diarizationProgress.update
+                onProgress: diarizationProgress.update,
+                fluidAudioModel: config.fluidAudioDiarizationModel,
+                segmentationBatchSize: config.fluidAudioSegmentationBatchSize
             )
         }
         return (gated, diarization)
@@ -474,15 +482,10 @@ struct TranscriptionService {
     }
 
     private func validateModelTransferPolicy(_ config: PipelineConfiguration) throws {
-        let sets: [ModelSet?] = [
-            config.transcription.requiredModelSet(whisperCppModel: config.whisperCppModel),
-            config.languageDetection.requiredModelSet,
-            config.vad.requiredModelSet,
-            config.effectiveDiarization.requiredModelSet
-        ]
         try ModelDownloadConsent.validateNetworkIfDownloadNeeded(
-            for: sets.compactMap { $0 },
-            policy: config.largeTransferPolicy
+            for: FluidAudioPipelineSelection.runtimeNetworkModelSets(for: config),
+            policy: config.largeTransferPolicy,
+            network: network
         )
     }
 

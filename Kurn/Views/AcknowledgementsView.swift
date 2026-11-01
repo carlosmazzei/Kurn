@@ -46,6 +46,36 @@ struct AcknowledgementsView: View {
             urlString: "https://github.com/NVIDIA/NeMo"
         ),
         Credit(
+            name: "NVIDIA Nemotron Labs Unified ASR 0.6B",
+            license: "OpenMDW License Agreement 1.1 (OpenMDW-1.1)",
+            urlString: "https://huggingface.co/FluidInference/nemotron-labs-unified-asr-0.6b-coreml"
+        ),
+        Credit(
+            name: "Nemotron 3.5 Transcribe Lite (Fluid Inference)",
+            license: "OpenMDW License Agreement 1.1 (OpenMDW-1.1)",
+            urlString: "https://huggingface.co/FluidInference/nemotron-3.5-transcribe-lite-coreml"
+        ),
+        Credit(
+            name: "Underdog Bark 3.0 (Conway Research)",
+            license: "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
+            urlString: "https://huggingface.co/FluidInference/bark-3.0-coreml"
+        ),
+        Credit(
+            name: "Underdog Bark 3.0 Clean (Conway Research)",
+            license: "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
+            urlString: "https://huggingface.co/FluidInference/bark-3.0-coreml"
+        ),
+        Credit(
+            name: "Phonon-2 (Fermion Research)",
+            license: "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
+            urlString: "https://huggingface.co/FluidInference/phonon-2-coreml"
+        ),
+        Credit(
+            name: "NVIDIA Nemotron 3 Diarization (8 speakers)",
+            license: "OpenMDW License Agreement 1.1 (OpenMDW-1.1)",
+            urlString: "https://huggingface.co/FluidInference/nemotron-3-diarization-coreml"
+        ),
+        Credit(
             name: "pyannote-audio (diarization)",
             license: "MIT License",
             urlString: "https://github.com/pyannote/pyannote-audio"
@@ -82,6 +112,31 @@ struct AcknowledgementsView: View {
         )
     ]
 
+    private var modelLicensesTitle: String {
+        NSLocalizedString("ack.fluid_audio_model_licenses", comment: "")
+    }
+
+    private var modelLicensesText: String? {
+        guard let url = Bundle.main.url(forResource: "FluidAudioModelLicenses", withExtension: "txt") else {
+            return nil
+        }
+        return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    private var modelLicensesView: some View {
+        ScrollView {
+            Text(verbatim: modelLicensesText ?? NSLocalizedString("common.error", comment: ""))
+                .font(Theme.footnote)
+                .foregroundStyle(Theme.textPrimary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle(modelLicensesTitle)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
     var body: some View {
         Form {
             Section {
@@ -96,6 +151,9 @@ struct AcknowledgementsView: View {
 
             Section {
                 ForEach(models) { creditRow($0) }
+                NavigationLink(modelLicensesTitle) {
+                    modelLicensesView
+                }
             } header: {
                 Text(NSLocalizedString("ack.models", comment: "Machine-learning models"))
             } footer: {

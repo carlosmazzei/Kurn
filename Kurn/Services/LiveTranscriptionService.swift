@@ -22,51 +22,74 @@ import FluidAudio
 @MainActor
 @Observable
 final class LiveTranscriptionService {
+    typealias EngineFactory = @MainActor @Sendable (MeetingLanguage, FluidAudioLiveModel) async throws -> any StreamingAsrManager
+
     private(set) var partialText = ""
     private(set) var isActive = false
     private(set) var isLoading = false
     private(set) var isUnavailable = false
 
     private var engine: (any StreamingAsrManager)?
-    /// Guards against unbounded `Task` growth: `append` drops a buffer instead
-    /// of scheduling another `process` call while one is already in flight, so
-    /// a slow/stalled engine can't pile up queued copies and Tasks.
-    private let inFlight = InFlightGate()
+    private let isUnifiedInstalled: () -> Bool
+    private let engineFactory: EngineFactory
+    @ObservationIgnored private var pumpTask: Task<Void, Never>?
+
+    init(
+        isUnifiedInstalled: @escaping () -> Bool = { FluidAudioASRModelRuntime.isUnifiedStreamingInstalled },
+        engineFactory: @escaping EngineFactory = LiveTranscriptionService.makeEngine
+    ) {
+        self.isUnifiedInstalled = isUnifiedInstalled
+        self.engineFactory = engineFactory
+    }
+
+    deinit {
+        audioQueue.invalidate()
+        pumpTask?.cancel()
+    }
+
+    var droppedAudioBufferCount: Int { audioQueue.snapshot.droppedCount }
+    var queuedAudioDuration: TimeInterval { audioQueue.snapshot.cost }
+
+    /// Bounds queued audio while a single session pump awaits the model, so
+    /// incoming buffers remain available when processing resumes. Only backlog
+    /// beyond eight seconds drops oldest buffers; append never creates Tasks.
+    private nonisolated let audioQueue = LiveAudioQueue(maximumCost: 8)
 
     func start(
         language: MeetingLanguage,
         modelsConsented: Bool = false,
-        policy: LargeTransferPolicy = .wifiOnly
+        policy: LargeTransferPolicy = .wifiOnly,
+        model: FluidAudioLiveModel = .default
     ) async {
         guard engine == nil, !isLoading else { return }
         guard modelsConsented else {
             isUnavailable = true
             return
         }
-        isLoading = true
-        isUnavailable = false
-        partialText = ""
-        defer { isLoading = false }
-        do {
-            try ModelDownloadConsent.validateNetworkIfDownloadNeeded(
-                for: [.liveTranscriptionASR],
-                policy: policy
-            )
-        } catch {
-            AppLog.transcription.atError.error("LiveTranscriptionService: model load blocked code=network_policy_restricted")
+        if model == .nemotronUnified && (!model.supports(language) || !isUnifiedInstalled()) {
             isUnavailable = true
             return
         }
-        let candidate: any StreamingAsrManager = language.usesEnglishOnlyStreamingModel
-            ? StreamingModelVariant.parakeetEou160ms.createManager()
-            : FluidAudioMultilingualStreamingManager()
+        let session = audioQueue.begin()
+        isLoading = true
+        isUnavailable = false
+        partialText = ""
+        defer { if audioQueue.isCurrent(session) { isLoading = false } }
+        let candidate: any StreamingAsrManager
         AppLog.transcription.atInfo.info("LiveTranscriptionService: loading streaming model for language=\(language.rawValue, privacy: .public)…")
         do {
-            try await candidate.loadModels()
+            candidate = try await engineFactory(language, model)
         } catch {
+            guard audioQueue.isCurrent(session) else { return }
             let code = (error as? AppError)?.logCode ?? "unexpected"
             AppLog.transcription.atError.error("LiveTranscriptionService: model load failed code=\(code, privacy: .public)")
             isUnavailable = true
+            isLoading = false
+            audioQueue.invalidate(session)
+            return
+        }
+        guard audioQueue.isCurrent(session) else {
+            await candidate.cleanup()
             return
         }
         AppLog.transcription.atNotice.notice("LiveTranscriptionService: model loaded, activating live preview")
@@ -75,58 +98,87 @@ final class LiveTranscriptionService {
         // callback was set after, racing with `processBufferedAudio` callers
         // and occasionally dropping the first partial emission.)
         await candidate.setPartialTranscriptCallback { [weak self] text in
-            Task { @MainActor in self?.partialText = text }
+            Task { @MainActor in
+                guard let self, self.audioQueue.isCurrent(session), self.isActive else { return }
+                self.partialText = text
+            }
+        }
+        guard audioQueue.activate(session) else {
+            await candidate.cleanup()
+            return
         }
         engine = candidate
         isActive = true
+        startPump(engine: candidate, session: session)
+    }
+
+    static func makeEngine(language: MeetingLanguage, model: FluidAudioLiveModel) async throws -> any StreamingAsrManager {
+        if model == .nemotronUnified {
+            let unified = FluidAudioUnifiedStreamingManager(language: language)
+            try await unified.loadModels()
+            return unified
+        }
+        return try await FluidAudioAutomaticStreamingRuntime.load(language: language)
     }
 
     /// Called from the audio render thread via `AudioRecorderService.onAudioBuffer`.
     /// Copies the buffer synchronously before dispatching, since the engine may
-    /// recycle the original before an async task can read it. Drops the buffer
-    /// if a previous one is still being processed instead of queuing more work.
+    /// recycle the original before an async task can read it. Queues audio while
+    /// the session pump awaits the model, discarding only oldest overflow.
     nonisolated func append(_ buffer: AVAudioPCMBuffer) {
-        guard inFlight.tryAcquire() else { return }
-        guard let copy = Self.copy(buffer) else {
-            inFlight.release()
-            return
-        }
+        guard let session = audioQueue.receivingToken else { return }
+        let duration = Double(buffer.frameLength) / buffer.format.sampleRate
+        guard duration.isFinite, duration > 0, let copy = Self.copy(buffer) else { return }
         // AVAudioPCMBuffer isn't Sendable; box it so the compiler doesn't have
         // to prove this freshly-allocated, never-aliased copy is safe to hand
         // off to the Task below.
         let box = UncheckedBufferBox(buffer: copy)
-        Task { @MainActor [weak self] in
-            await self?.process(box.buffer)
-            self?.inFlight.release()
+        audioQueue.enqueue(box, cost: duration, for: session)
+    }
+
+    private func startPump(engine: any StreamingAsrManager, session: LiveAudioQueue.Token) {
+        let queue = audioQueue
+        pumpTask = Task { @MainActor [weak self] in
+            while let box = await queue.next(for: session) {
+                guard queue.isCurrent(session), !Task.isCancelled else { return }
+                await self?.process(box.buffer, engine: engine, session: session)
+            }
         }
     }
 
     func stop() async {
-        guard let engine else {
-            isActive = false
-            isLoading = false
-            partialText = ""
-            return
-        }
+        audioQueue.invalidate()
+        let engine = self.engine
+        self.engine = nil
+        let pump = pumpTask
+        pumpTask = nil
+        isActive = false
+        isLoading = false
+        partialText = ""
+        pump?.cancel()
+        await pump?.value
+        guard let engine else { return }
         do {
             _ = try await engine.finish()
         } catch {
             AppLog.transcription.atError.error("LiveTranscriptionService: finish failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
         await engine.cleanup()
-        self.engine = nil
-        isActive = false
-        isLoading = false
-        partialText = ""
     }
 
-    private func process(_ buffer: sending AVAudioPCMBuffer) async {
-        guard let engine, isActive else { return }
+    private func process(
+        _ buffer: sending AVAudioPCMBuffer,
+        engine: any StreamingAsrManager,
+        session: LiveAudioQueue.Token
+    ) async {
+        guard audioQueue.isCurrent(session), isActive else { return }
         do {
             try await engine.appendAudio(buffer)
+            guard audioQueue.isCurrent(session) else { return }
             try await engine.processBufferedAudio()
         } catch {
             // Best-effort preview; drop the buffer and keep listening.
+            guard audioQueue.isCurrent(session) else { return }
             AppLog.transcription.atError.error("LiveTranscriptionService: append/process failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
@@ -157,26 +209,11 @@ private struct UncheckedBufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
 }
 
-/// Lock-protected single-slot in-flight flag, safe to call from the audio
-/// render thread (`append`) and from the `@MainActor` completion (`process`).
-private final class InFlightGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var isBusy = false
+/// Bounded session queue, safe to feed from the audio render thread
+/// (`append`) and drain from the `@MainActor` pump across model awaits.
+private typealias LiveAudioQueue = BoundedSessionQueue<UncheckedBufferBox>
 
-    func tryAcquire() -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        guard !isBusy else { return false }
-        isBusy = true
-        return true
-    }
-
-    func release() {
-        lock.lock(); defer { lock.unlock() }
-        isBusy = false
-    }
-}
-
-private extension MeetingLanguage {
+extension MeetingLanguage {
     /// English uses the lighter English-only Parakeet EOU streaming model;
     /// everything else — including auto-detect, so a Portuguese speaker who
     /// leaves the meeting on "Auto" still gets sensible output — uses the
@@ -198,10 +235,14 @@ final class LiveTranscriptionService {
     private(set) var isLoading = false
     private(set) var isUnavailable = false
 
+    var droppedAudioBufferCount: Int { 0 }
+    var queuedAudioDuration: TimeInterval { 0 }
+
     func start(
         language: MeetingLanguage,
         modelsConsented: Bool = false,
-        policy: LargeTransferPolicy = .wifiOnly
+        policy: LargeTransferPolicy = .wifiOnly,
+        model: FluidAudioLiveModel = .default
     ) async {
         isUnavailable = true
     }

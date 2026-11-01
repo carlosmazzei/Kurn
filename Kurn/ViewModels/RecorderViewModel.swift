@@ -24,6 +24,7 @@ struct RecorderOptions {
     var liveTranscriptionModelsConsented: Bool = false
     var largeTransferPolicy: LargeTransferPolicy = .wifiOnly
     var hideLiveActivityMeetingTitle: Bool = true
+    var liveTranscriptionModel: FluidAudioLiveModel = .default
 }
 
 /// One entry in the microphone picker shown before recording starts when more
@@ -60,6 +61,7 @@ final class RecorderViewModel {
     private let alwaysUseBuiltInMic: Bool
     private let liveTranscriptionEnabled: Bool
     private let liveTranscriptionModelsConsented: Bool
+    private let liveTranscriptionModel: FluidAudioLiveModel
     private let largeTransferPolicy: LargeTransferPolicy
     private let hideLiveActivityMeetingTitle: Bool
     private let fileFinalizer: any RecordingFileFinalizing
@@ -96,6 +98,7 @@ final class RecorderViewModel {
         self.alwaysUseBuiltInMic = options.alwaysUseBuiltInMic
         self.liveTranscriptionEnabled = options.liveTranscriptionEnabled
         self.liveTranscriptionModelsConsented = options.liveTranscriptionModelsConsented
+        self.liveTranscriptionModel = options.liveTranscriptionModel
         self.largeTransferPolicy = options.largeTransferPolicy
         self.hideLiveActivityMeetingTitle = options.hideLiveActivityMeetingTitle
         self.onRecordingSaved = onRecordingSaved
@@ -312,7 +315,8 @@ final class RecorderViewModel {
                 await liveTranscription.start(
                     language: liveLanguage,
                     modelsConsented: liveTranscriptionModelsConsented,
-                    policy: largeTransferPolicy
+                    policy: largeTransferPolicy,
+                    model: liveTranscriptionModel
                 )
             }
             : nil

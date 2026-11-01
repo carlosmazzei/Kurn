@@ -69,7 +69,25 @@
 
 /* Moteurs du pipeline de reconnaissance */
 "transcription.apple_speech" = "Apple Speech";
-"transcription.fluid_parakeet" = "FluidAudio (multilingue)";
+"transcription.fluid_parakeet" = "FluidAudio (sur l'appareil)";
+"settings.fluid_audio.asr_model" = "Modèle de transcription";
+"settings.fluid_audio.model_size" = "%@ · env. %@";
+"settings.fluid_audio.asr_english_only" = "Bark 3.0, Bark 3.0 Clean, Phonon-2 et Nemotron 3.5 Transcribe Lite nécessitent de sélectionner l'anglais ci-dessous. Ils ne prennent pas en charge la détection automatique de la langue.";
+"settings.fluid_audio.asr_language_footer" = "Sélectionnez ci-dessous une langue par défaut compatible pour activer un modèle. Parakeet TDT v3 et Nemotron Unified prennent en charge la détection automatique et le portugais.";
+"settings.fluid_audio.asr_language_unavailable" = "Ce modèle ne prend pas en charge la langue par défaut sélectionnée. Choisissez un modèle ou une langue compatible avant de transcrire.";
+"settings.fluid_audio.diarization_model" = "Modèle de séparation des locuteurs";
+"settings.fluid_audio.segmentation_batch" = "Taille des lots de segmentation";
+"settings.fluid_audio.batch_recommended" = "%d (recommandé)";
+"settings.fluid_audio.segmentation_batch_footer" = "Des lots plus petits réduisent le pic d'utilisation de la mémoire lors de la segmentation avec Pyannote. La valeur par défaut est 32 ; 8 est recommandé pour réduire l'utilisation de la mémoire.";
+"settings.fluid_audio.nemotron_diarization_footer" = "Nemotron 3 prend en charge jusqu'à 8 locuteurs et détecte automatiquement leur nombre. Il ne dispose pas d'empreintes vocales compatibles. Vérifiez les noms des locuteurs après un nouveau traitement : les étiquettes numérotées ne confirment pas l'identité vocale.";
+"settings.fluid_audio.live_model" = "Modèle d'aperçu en direct";
+"settings.fluid_audio.live_automatic" = "Automatique (%@)";
+"settings.fluid_audio.live_model_footer" = "Ce modèle sert uniquement à l'aperçu en direct pendant l'enregistrement. Sa sélection et son téléchargement sont indépendants du modèle de transcription finale choisi dans les réglages de transcription.";
+"settings.fluid_audio.download_selected" = "Télécharger le modèle sélectionné";
+"settings.fluid_audio.download_message" = "Télécharger %@ (environ %@) pour l'utiliser sur cet appareil ? Le modèle n'est téléchargé qu'une seule fois. L'audio reste sur votre appareil.";
+"ack.fluid_audio_model_licenses" = "Licences des modèles FluidAudio";
+"settings.models.fluid_audio_asr" = "Modèles de transcription FluidAudio";
+"settings.models.nemotron_diarization" = "Séparation des locuteurs Nemotron";
 "transcription.cloud_provider" = "Fournisseur cloud";
 "transcription.whisper_cpp" = "Whisper (sur l'appareil)";
 "preprocessing.standard" = "Nettoyage standard";

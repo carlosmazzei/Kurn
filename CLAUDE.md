@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kurn is a local-first iOS + watchOS app (Swift 6, SwiftUI, SwiftData) for recording
 meetings, transcribing audio, diarizing speakers, and generating structured AI
-summaries. Everything is stored on device; network calls happen only when the user
-opts into cloud (Whisper-compatible) transcription or a cloud summary provider.
+summaries. Everything is stored on device; optional models require explicit
+user-approved downloads, and cloud (Whisper-compatible) transcription and cloud
+AI features send data only to the selected provider. ASR, diarization, and live
+preview load cached models locally, never downloading as runtime recovery.
 
 Beyond the summary, a transcript also feeds three further derived artifacts, each
 opt-in and each described in its own section below: a per-meeting **wiki**
@@ -854,20 +856,47 @@ Each stage is a protocol seam (`Services/Pipeline/PipelineStages.swift`:
 `AudioPreprocessing`, `VoiceActivityDetecting`, `LanguageDetecting`,
 `Transcribing`, plus `Diarizing` in `TranscriptionTypes.swift`) so the engine per
 stage is swappable without touching the orchestrator. `PipelineConfiguration`
-(built from `AppSettings`) picks one engine per stage; defaults are the
-always-available, no-download engines so a fresh install works offline.
-`TranscriptionService` holds one instance of every engine and maps the chosen
-enum to it — engines are never spun up per call. The concrete choices per
+(built from `AppSettings`) picks one engine per stage; all defaults except the
+FluidAudio diarization preference are no-download engines. Unconsented neural
+diarization falls back to the heuristic so a fresh install works offline.
+`TranscriptionService` holds reusable engine/router instances; non-default
+FluidAudio ASR managers and weights have per-chunk lifetimes. The concrete choices per
 stage (enums in `Models/PipelineEngines.swift`; `TranscriptionEngine` in KurnCore) are:
 
-| Stage              | `AppSettings` property    | Default (no download)                                                                                                                                                            | Alternative (model download)                                                                                                                                                                             |
+| Stage              | `AppSettings` property    | Default preference                                                                                                                                                            | Alternative (model download)                                                                                                                                                                             |
 | ------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Preprocessing      | `preprocessingEngine`     | `.standardDSP` (`AudioPreprocessor`)                                                                                                                                             | `.none` (passthrough — not FluidAudio, just skips cleanup)                                                                                                                                               |
 | VAD                | `vadEngine`               | `.energyThreshold` (`Pipeline/EnergyVAD.swift`)                                                                                                                                  | `.fluidAudio` (`Pipeline/FluidAudioVAD.swift`, Silero VAD)                                                                                                                                               |
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber)                                                                                                                              | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`)                    |
-| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizer`, neural embeddings via `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) or `.transcriptionProviderNative` (speaker turns from the `.whisperAPI` provider's own response, e.g. ElevenLabs Scribe) are the no-download alternatives; `.sherpaOnnx` downloads its own model pair (`SherpaOnnxModelDownloader`, gated by `sherpaOnnxModelsConsented`) |
-| Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (`FluidAudioTranscriber`, multilingual, auto-detects language), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud, any provider whose `AIProvider.supportsTranscription` is true — OpenAI's `whisper-1`/`gpt-4o-transcribe`/`gpt-4o-mini-transcribe`, Groq, ElevenLabs Scribe, or a custom OpenAI-compatible endpoint) |
+| Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizationRouter`; default `.pyannote` uses `FluidAudioDiarizer` / `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) or `.transcriptionProviderNative` (speaker turns from the `.whisperAPI` provider's own response, e.g. ElevenLabs Scribe) are the no-download alternatives; `.sherpaOnnx` downloads its own model pair (`SherpaOnnxModelDownloader`, gated by `sherpaOnnxModelsConsented`) |
+| Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (the stored engine ID for all six FluidAudio ASR choices; default Parakeet v3), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud, any provider whose `AIProvider.supportsTranscription` is true — OpenAI's `whisper-1`/`gpt-4o-transcribe`/`gpt-4o-mini-transcribe`, Groq, ElevenLabs Scribe, or a custom OpenAI-compatible endpoint) |
 | Correction         | `correctionEnabled`       | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work)                                                                                       | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below)                                                          |
+
+**FluidAudio has a model axis, not new engine IDs.** The KurnCore catalogs
+`FluidAudioASRModel`, `FluidAudioLiveModel`, `FluidAudioDiarizationModel`, and
+`FluidAudioSegmentationBatchSize` are persisted by `AppSettings` as
+`fluidAudioASRModel`, `fluidAudioLiveModel`, `fluidAudioDiarizationModel`, and
+`fluidAudioSegmentationBatchSize` under the matching `settings.*` keys.
+Missing/unknown selections default to `.parakeetV3`, `.automatic`, `.pyannote`,
+and `.maximum` (32). Existing engine raw values and defaults are unchanged;
+never migrate `.fluidAudioParakeet` to a model-specific engine string.
+
+| ASR case | Runtime mapping | Language contract |
+| --- | --- | --- |
+| `.parakeetV3` (default) | Existing `FluidAudioTranscriber` / shared `FluidAudioModelStore`, `AsrModelVersion.v3` | 25 European languages + Auto |
+| `.nemotronUnified` | `FluidAudioModelTranscriber` → `UnifiedAsrManager`, fp16 offline encoder | Same 25 + Auto; generic `pt`, no detected-language code returned in Auto |
+| `.bark3`, `.bark3Clean`, `.phonon2` | `FluidAudioModelTranscriber` → versioned `AsrModels.loadLocal` / `AsrManager` | Explicit English only; Auto unsupported |
+| `.nemotronTranscribeLite` | `FluidAudioModelTranscriber` → `NemotronTranscribeLiteModels` / manager, CPU + ANE | Explicit English only; Auto unsupported |
+
+`FluidAudioRuntimePolicy` owns backend selection, language and installation
+validation, and resource/error policy; `FluidAudioPipelineSelection` owns model
+sets and checkpoint identity. Settings disables incompatible ASR choices and the
+pipeline checks again before inference. An Auto recording is not an exception
+for an English-only model. `TranscriptionLanguageSupport` uses the selected ASR
+family, not the legacy engine name. The full language set is in
+`docs/supported-languages.md`; `pt` does not imply validated Brazilian Portuguese
+quality. Optional FluidAudio LID still uses Parakeet v3 independently of the
+chosen batch/live model and requires the existing batch-v3 consent.
 
 `TranscriptionService.transcribe` drives the stages in order:
 
@@ -999,6 +1028,12 @@ durations (`splitCoarseSpan`, now the fallback).
 | whisper.cpp  | `params.token_timestamps`, then `whisper_full_get_token_data`'s `t0`/`t1`; SentencePiece pieces are aggregated into words (a piece beginning with a space opens a new one) |
 | Cloud        | `timestamp_granularities[]` = `segment` + `word`, returned as a **flat top-level array** that `OpenAIProvider` regroups under the segment each word's midpoint falls in    |
 
+FluidAudio TDT and Unified use their native token timings. Transcribe Lite
+reports only word starts; `FluidAudioWordTiming` estimates each end from the
+next start but caps it at 1.5s (40ms for a backward-start fallback), always within
+the chunk. A pause or trailing silence must not become part of one word and
+steal its speaker attribution. The end estimates are not exact word alignments.
+
 Two rules hold across all of them. **Missing timings are never an error** —
 each engine falls back to exactly the span it produced before. And Apple's
 timings are checked against the result's own range before being trusted:
@@ -1075,13 +1110,13 @@ The default is `.fluidAudio`, and it is the only stage default that needs a
 download. `.heuristic` — three scalars and one greedy nearest-centroid pass, one
 speaker per VAD region — was what every user got who never opened Settings.
 
-Flipping the default alone would have been worse than leaving it, because
-FluidAudio downloads its models on first use: without consent that either
-fetches a model for a feature the user never chose, or fails and returns one
-turn for the whole meeting. So the selection is a **pair**:
-`PipelineConfiguration.effectiveDiarization` reads `diarization` together with
-`diarizationConsented` and steps back to `.heuristic` until the models are
-consented to, with `diarizationFellBack` saying that it did.
+The selection is a **pair**: `PipelineConfiguration.effectiveDiarization`
+reads `diarization` together with the selected model's `diarizationConsented`
+and steps back to `.heuristic` until consent exists, with
+`diarizationFellBack` saying that it did. Runtime loading is local-only; a
+consent flag is not proof that the weights are still present or healthy.
+Missing/corrupt diarization models produce visible model-preparation degradation
+and a user download/repair action, not an automatic fetch.
 
 That report is the other half. A user who never opens Settings never consents,
 so without it "the default is now neural" would describe a setting rather than a
@@ -1089,9 +1124,24 @@ behaviour — which is why the transcript's diarization warning banner
 (`MeetingDetailView`) carries the download action, and why
 `ModelDownloadController` moved from `SettingsView` to `KurnApp`.
 
+Within `.fluidAudio`, `FluidAudioDiarizationRouter` dispatches `.pyannote`
+(the default) to the existing `FluidAudioDiarizer`, and `.nemotron3` to
+`FluidAudioNemotronDiarizer`. Nemotron uses `Nemotron3Config.fast32`, supports
+at most eight speakers, and has no exact-count constraint or compatible
+speaker voiceprints. Its probabilities are accumulated by KurnCore's
+`NemotronDiarizationTimeline` into bounded source-timeline turns. Do not infer
+that its "fast32" profile is an iPhone speed benchmark.
+
+Pyannote alone honors `fluidAudioSpeakerCount` as before. Its segmentation batch
+size is user-selectable as 4/8/16/32 via `fluidAudioSegmentationBatchSize`;
+32 remains the persisted default and 8 is the recommended memory-reduction
+choice. `FluidAudioPyannoteConfiguration` applies this without changing the
+existing exact-count/refinement semantics. This is a memory-control setting,
+not measured evidence of improved throughput or diarization accuracy.
+
 #### Diarization accuracy
 
-The neural (`.fluidAudio`) diarizer's weak point is the speaker count, not the
+The Pyannote (`.fluidAudio` + `.pyannote`) diarizer's weak point is the speaker count, not the
 segment boundaries — its VBx clustering step routinely drives every mixture
 weight but one to ~1e-20 on far-field/single-mic audio, so the whole meeting
 comes back as one speaker. Four things address that, all outside FluidAudio:
@@ -1111,7 +1161,7 @@ comes back as one speaker. Four things address that, all outside FluidAudio:
   cluster centroids are at least `minSpeakerSeparation` apart — the same
   same-speaker calibration FluidAudio's own agglomerative step uses — so a
   genuinely single-speaker recording is left alone.
-- **`Pipeline/SpeakerTurnSmoothing.swift`** runs on every FluidAudio result:
+- **`Pipeline/SpeakerTurnSmoothing.swift`** runs on every Pyannote result:
   merge same-speaker turns across short gaps, absorb sub-second turns into
   their neighbours (the mid-sentence flip), drop speakers with negligible total
   speech. It never returns an empty result for a non-empty input.
@@ -1145,8 +1195,10 @@ recording in the same sync pass hasn't already claimed. Within one recording's
 pass, matching is total — every candidate row against every one of that
 recording's labels (the common case is the label set staying the same while
 the assignment permutes — matching only what appeared or disappeared misses
-exactly that) — voice wins, label identity fills the rest, and a row already
-placed by an earlier recording can still be *reconfirmed* by a later one's
+exactly that) — voice wins; when there is no compatible voice match, the existing
+reconciliation can fall back to this recording's unclaimed labels. A numbered
+label is not evidence of voice identity. A row already placed by an earlier
+recording can still be *reconfirmed* by a later one's
 matching voice rather than relabelled or duplicated. `Recording.speakerVoiceprints`
 is what makes this possible: each recording persists its own diarization run's
 voiceprints, not just the one that just finished, so a second recording's
@@ -1160,13 +1212,15 @@ recording is applied at once so a swap has no colliding intermediate state.
 The same-voice threshold is `SpeakerClusterRefiner.minSpeakerSeparation`,
 inherited rather than invented.
 
-Where no voiceprint exists — the heuristic engine, or a transcript from before
-this — identity genuinely cannot be recovered, so only the conservative half
-applies: **a row the user has named is never deleted**, and a label already
-claimed within a sync pass is never handed to a different recording's
-same-numbered speaker. Preserved rows can then outlive their labels, which is
-why `MeetingDetailTabs` filters the chips and the speaker list to labels
-actually present in the transcript.
+Where no compatible voiceprint exists — including Nemotron 3 diarization,
+the heuristic engine, or older transcripts — identity cannot be recovered from
+a numbered label. **Review speaker names after reprocessing or changing models:**
+the legacy label-only fallback may retain a name without confirming the voice.
+Nemotron returns turns without voiceprints, so it cannot perform Pyannote-compatible
+voice matching or produce cross-meeting voice-match suggestions. Labels already
+claimed in a sync pass are never handed to another recording's same-numbered
+speaker. `MeetingDetailTabs` filters chips and the speaker list to labels present
+in the transcript; typed names are not evidence of a compatible voice embedding.
 
 **Across meetings, identity is suggested, never applied.**
 `TranscriptionCoordinator+CrossMeetingSpeakerMatch` asks "have we heard this
@@ -1313,36 +1367,90 @@ FluidAudio is pinned to 0.18.0. Its `Diarizer`, `NemoTextProcessing` and `TTS`
 traits are selected explicitly on the Xcode package reference, matching the
 upstream defaults. Without explicit selection Xcode can compile 0.18 without
 its diarization API, leaving `OfflineDiarizerManager` and related types missing.
-The version update does not change the app's chosen ASR models or download consent.
 The shared SPM cache restores only exact manifest/lockfile keys: Xcode validates
 selected traits against a restored checkout before updating it, so falling back
 to a 0.17 checkout makes a 0.18 trait selection fail before dependency resolution.
+The selected `TTS` trait is not an implementation of the new model choices as
+TTS, Canary translation, or voice cloning; this integration is transcription
+and diarization only.
 
-The FluidAudio-backed engines above (and the live transcription preview below)
-download CoreML models on first use rather than bundling them, so enabling one
-never fetches models for a feature the user hasn't opted into:
+**Runtime loading and downloading are separate boundaries.** ASR (including
+legacy v3), Pyannote/Nemotron diarization, automatic live, and Unified live
+load local files only. `FluidAudioASRModelRuntime`,
+`FluidAudioDiarizationModelRuntime`, `FluidAudioAutomaticStreamingRuntime`, and
+`FluidAudioModelAvailability` check the relevant artifacts rather than trusting
+a consent flag or a folder's existence. Compiled-model contents and partial
+artifacts are checked; Pyannote additionally validates its cached revision and
+PLDA parameters locally (`PyannoteDiarizationCache`, `PyannotePLDAParameters`).
+Missing/corrupt weights require a user download/repair, not a framework
+`downloadAndLoad` recovery call. A missing new ASR variant surfaces the existing
+ASR-model-required UI/error, not a cellular-network error. The legacy Silero
+VAD framework loader is the exception: it remains gated by runtime network
+policy because it can still download.
 
-- `Infrastructure/ModelDownloadConsent.swift` is the single place that
-  triggers a download, one `ModelSet` case (`.liveTranscriptionASR`,
-  `.onDeviceASR`, `.diarization`, `.vad`, plus `.whisperCppASR`) at a time, gated
-  behind a matching `AppSettings.*Consented` flag the user sets in Settings.
-  `.whisperCppASR` is handled *before* the `#if canImport(FluidAudio)` branch so
-  it still works in a build without FluidAudio linked. Each
-  engine's `requiredModelSet` (on the `TranscriptionEngine`/`VADEngine`/
-  `DiarizationEngine`/`LanguageDetectionEngine` enums) says which set it needs.
-- `Services/FluidAudioModelStore.swift` (`actor`, `.shared`) caches the loaded
-  multilingual Parakeet batch ASR model so `FluidAudioTranscriber` and
-  `FluidAudioLanguageDetector` share one loaded copy instead of each compiling
-  their own CoreML/ANE artifacts; `prewarm()` is called from the foreground
-  (from `AppSettings.usesFluidAudioModel`) since ANE compilation can fail if
-  attempted from the background.
-- `Services/ModelStore.swift` (distinct from the above) is a pure-Foundation
-  on-disk manager for the downloaded model folders under
-  `Application Support/FluidAudio/Models`, grouped by `ModelGroup`. It backs
-  the Settings screen that lists installed models with disk usage and lets the
-  user delete a group to reclaim space.
-- `ResourceGuard.requireModelDownloadHeadroom()` (2.5GB disk floor) gates every
-  download attempt in addition to the 750MB transcription floor above.
+`ModelDownloadConsent.download` is the explicit network boundary. It validates
+`LargeTransferPolicy` **on every explicit call, even if a cache appears installed**:
+upstream download/recovery may access the network. Runtime preflight excludes
+local-only model sets from download-network checks, retaining `.vad`; it must
+not block installed local inference merely because the device is on cellular.
+`ResourceGuard.requireModelDownloadHeadroom()` (2.5GB disk floor) and the model
+loading resource reservation also gate downloads. Whisper/sherpa sets remain
+handled outside the FluidAudio import branch.
+
+The model-to-consent mapping is explicit (`Models/FluidAudioModels+ModelSet.swift`,
+`AppSettings+FluidAudio.swift`):
+
+| Choice | `ModelSet` | Persisted consent |
+| --- | --- | --- |
+| Parakeet v3 ASR / independent FluidAudio LID | `.onDeviceASR` | Existing `fluidAudioBatchASRModelsConsented` |
+| Non-default ASR variant | `.fluidAudioASR(model)` | Its raw value in `fluidAudioASRModelConsents` |
+| Pyannote | `.diarization` | Existing `fluidAudioDiarizationModelsConsented` |
+| Nemotron 3 diarization | `.fluidAudioDiarization(.nemotron3)` | `fluidAudioNemotronModelsConsented` |
+| Automatic live | `.liveTranscriptionASR` | Existing `fluidAudioASRModelsConsented` |
+| Unified live | `.fluidAudioUnifiedStreaming` | `fluidAudioUnifiedStreamingConsented` |
+
+`ModelDownloadController+FluidAudioSelection` stages a pending selection and
+applies it only once installation succeeds (or when the required variant is
+already installed). New variants may be selected from a valid existing cache
+without a transfer; legacy default choices still require their legacy consent.
+Cancel/failure does not silently switch engines, and ASR language compatibility
+is rechecked before applying a pending choice. Settings exposes an explicit
+missing-model download button even when the selected case has not changed.
+Batch Unified and live Unified have separate consent/installation checks: a
+shared folder does not mean the other encoder has been installed or consented.
+
+`Services/FluidAudioModelStore.swift` (`actor`, `.shared`) still caches **only
+Parakeet v3** so `FluidAudioTranscriber` and `FluidAudioLanguageDetector` share
+one loaded manager. `AppSettings.usesFluidAudioModel` prewarms it in the
+foreground only for v3 ASR or LID with batch-v3 consent. Other ASR managers and
+weights are loaded locally and released per chunk; do not add them to this
+process-wide cache and defeat the long-recording memory bound. The v3 decoding
+path otherwise stays unchanged.
+
+`Services/ModelStore.swift` is the distinct on-disk manager under
+`Application Support/FluidAudio/Models`. Storage shows one grouped row per
+variant, not one per weight component. Non-default ASR folders are listed
+separately in `.fluidAudioASR`; Nemotron diarization uses
+`.nemotronDiarization`. Unified's offline and fp16 streaming encoders share
+`nemotron-labs-unified-asr`, while their required file sets differ. Deleting
+that row clears both the ASR-variant and Unified-live consent flags, resets the
+selected ASR/live cases as needed, and disables affected live preview. Other
+variant deletion invalidates only its matching consent/selection. If the
+fallback v3/Pyannote model lacks cache or consent, the active engine falls back
+to Apple Speech/heuristic rather than trying to run absent default weights.
+
+Model licenses are not inherited from FluidAudio's Apache-2.0 framework:
+Unified, Transcribe Lite, and Nemotron 3 diarization use NVIDIA's OpenMDW-1.1;
+Bark 3.0/Clean (Conway Research) and Phonon-2 (Fermion Research) use CC-BY-4.0.
+`THIRD_PARTY_NOTICES.md` retains attribution, and Settings → Acknowledgements
+opens the bundled offline copies in `Kurn/Resources/FluidAudioModelLicenses.txt`
+(full agreements and required origin notices, not just model-card links).
+
+KurnCore tests cover the pure catalog, timeline, timing, and cache/PLDA
+validation policies without model inference. The iOS 26 floor makes the APIs
+available; it does not validate physical-device ANE behavior, fp16 memory,
+real-audio quality, or speed. Those remain to be measured for the new models;
+upstream Mac/M5 benchmarks are not iPhone results.
 
 #### Resumable transcription
 
@@ -1353,9 +1461,21 @@ instead of restarting from scratch:
   `Recording.transcriptionCheckpointData`) after every completed chunk: engine,
   language, whether the VAD-compacted input was used, total/completed chunk
   counts, and spans transcribed so far. `Pipeline/ChunkedTranscriptionRunner.swift`
-  is the shared chunk loop for both Whisper and chunked Apple Speech; a resume
-  is only honored if the re-derived chunk plan matches exactly (same engine,
-  language, compaction, chunk count), otherwise it starts over.
+  is shared by cloud Whisper, whisper.cpp, chunked Apple Speech, and every
+  **non-default FluidAudio ASR** model. `FluidAudioPipelineAdapters.swift` sends
+  those five ASR choices through `AudioChunker(chunkDuration: 300)` with the
+  existing deterministic silence-cut adjustment (±30 s); each chunk loads and
+  releases its own model manager/weights. This bounds retained ASR input and
+  model lifetime for long recordings (including 96-minute sessions), not a
+  claim of measured device peak memory or speed. Parakeet v3 keeps its existing
+  decoding path rather than adopting this outer chunk runner.
+- A resume requires matching source/pipeline fingerprints and the re-derived
+  chunk plan, including language, compaction, count, and boundary digest.
+  `FluidAudioPipelineSelection.checkpointProviderID` records
+  `fluidaudio:<model raw value>` separately from the unchanged
+  `.fluidAudioParakeet` engine ID for non-default ASR (v3 retains `nil`).
+  Switching FluidAudio models must invalidate a checkpoint, never splice two
+  models' output; an incompatible/malformed checkpoint starts fresh.
 - `Services/WhisperBackgroundUploader.swift` uploads Whisper chunks over a
   background `URLSession` (file-based request bodies) so an in-flight upload
   survives the app suspending or the device locking.
@@ -1384,14 +1504,29 @@ preview-only transcript shown while recording — nothing it produces is
 persisted; the authoritative transcript still comes from `TranscriptionService`
 after the recording stops. `RecorderViewModel` feeds it live audio buffers
 through a `nonisolated append(_:)` entry point wired to
-`AudioRecorderService.onAudioBuffer`. It picks a streaming engine by the
-meeting's language: English uses the lightweight
-`StreamingModelVariant.parakeetEou160ms` manager; every other language
-(including auto-detect) uses `Services/FluidAudioMultilingualStreamingManager.swift`,
-which adapts FluidAudio's `StreamingNemotronMultilingualAsrManager` to the
-app's `StreamingAsrManager` protocol. An in-flight gate drops buffers instead
-of queuing them when a previous chunk is still processing, so the preview
-never falls behind the microphone.
+`AudioRecorderService.onAudioBuffer`. `AppSettings.fluidAudioLiveModel` is
+independent of the post-recording ASR model:
+
+- **`.automatic` (default)** preserves the legacy language routing: English
+  uses `StreamingModelVariant.parakeetEou160ms`; other supported languages and
+  Auto use `FluidAudioMultilingualStreamingManager`, adapting
+  `StreamingNemotronMultilingualAsrManager`. The explicit-language set is
+  `en/es/fr/it/pt/de/zh/ja`, plus Auto. `FluidAudioAutomaticStreamingRuntime`
+  validates the relevant local installation before creating either manager.
+- **`.nemotronUnified`** uses `FluidAudioUnifiedStreamingManager` /
+  `StreamingUnifiedAsrManager` with the **fp16 streaming encoder** and the same
+  25-language + Auto contract as Unified batch. Batch's offline encoder is not
+  sufficient; the streaming encoder needs its own consented download even
+  though decoder/vocabulary files and the folder are shared.
+
+Both paths load local models only and expose missing-model repair through the
+shared download controller. `BoundedSessionQueue` keeps up to eight seconds of
+copied audio behind one session pump; buffers are dropped oldest-first only
+when that bound is exceeded. Session tokens prevent a stopped or stale load,
+callback or pump from mutating a later recording. Appending from the render
+thread creates no per-buffer task. Preview remains best-effort, not a measured
+latency guarantee. Unified drains consumed token timings because preview text
+is not a durable word-timing transcript.
 
 ### Providers (`Providers/`)
 

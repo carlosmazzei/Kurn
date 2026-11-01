@@ -427,7 +427,7 @@ struct ModelDownloadAlerts: ViewModifier {
             .modelDownloadDialog(
                 isPresented: $downloads.showingASRConsent,
                 onConfirm: { downloads.confirmLiveTranscriptionASR(settings: settings) },
-                onCancel: {}
+                onCancel: { downloads.clearPendingFluidAudioSelection(for: .liveTranscriptionASR) }
             )
             .modelDownloadDialog(
                 isPresented: $downloads.showingBatchASRConsent,
@@ -479,6 +479,7 @@ struct ModelDownloadAlerts: ViewModifier {
             } message: {
                 Text(NSLocalizedString("settings.model_download.message_whisper_cpp", comment: ""))
             }
+            .fluidAudioModelDownloadConsent(downloads, settings: settings)
             .errorAlert($downloads.error, onOpenNetworkSettings: onOpenNetworkSettings)
     }
 

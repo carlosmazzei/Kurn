@@ -69,7 +69,25 @@
 
 /* Recognition pipeline engines */
 "transcription.apple_speech" = "Apple Speech";
-"transcription.fluid_parakeet" = "FluidAudio (multilingual)";
+"transcription.fluid_parakeet" = "FluidAudio (on-device)";
+"settings.fluid_audio.asr_model" = "Transcription Model";
+"settings.fluid_audio.model_size" = "%@ · approx. %@";
+"settings.fluid_audio.asr_english_only" = "Bark 3.0, Bark 3.0 Clean, Phonon-2 and Nemotron 3.5 Transcribe Lite require English to be selected below. They do not support Auto-detect.";
+"settings.fluid_audio.asr_language_footer" = "Select a supported default language below to enable a model. Parakeet TDT v3 and Nemotron Unified support Auto-detect and Portuguese.";
+"settings.fluid_audio.asr_language_unavailable" = "This model does not support the selected default language. Choose a compatible model or language before transcribing.";
+"settings.fluid_audio.diarization_model" = "Speaker Diarization Model";
+"settings.fluid_audio.segmentation_batch" = "Segmentation Batch Size";
+"settings.fluid_audio.batch_recommended" = "%d (recommended)";
+"settings.fluid_audio.segmentation_batch_footer" = "Smaller batches reduce peak memory use for Pyannote segmentation. The default is 32; 8 is recommended to reduce memory use.";
+"settings.fluid_audio.nemotron_diarization_footer" = "Nemotron 3 supports up to 8 speakers and detects the count automatically. It has no compatible voiceprints. Review speaker names after reprocessing: numbered labels do not confirm voice identity.";
+"settings.fluid_audio.live_model" = "Live Preview Model";
+"settings.fluid_audio.live_automatic" = "Automatic (%@)";
+"settings.fluid_audio.live_model_footer" = "This model is only for the live preview while recording. Its selection and download are separate from the final transcription model in Transcription settings.";
+"settings.fluid_audio.download_selected" = "Download selected model";
+"settings.fluid_audio.download_message" = "Download %@ (approximately %@) to use it on this device? This is a one-time model download. Audio stays on your device.";
+"ack.fluid_audio_model_licenses" = "FluidAudio Model Licenses";
+"settings.models.fluid_audio_asr" = "FluidAudio Transcription Models";
+"settings.models.nemotron_diarization" = "Nemotron Speaker Diarization";
 "transcription.cloud_provider" = "Cloud Provider";
 "transcription.whisper_cpp" = "Whisper (on-device)";
 "preprocessing.standard" = "Standard cleanup";

@@ -160,6 +160,10 @@ struct TranscriptionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if settings.transcriptionEngine == .fluidAudioParakeet {
+                FluidAudioASRSettingsControls()
+            }
+
             Picker(
                 selection: Binding(
                     get: { settings.defaultLanguage },
@@ -167,7 +171,11 @@ struct TranscriptionSettingsView: View {
                 )
             ) {
                 ForEach(MeetingLanguage.allCases) { lang in
-                    LanguagePickerRow(language: lang, engine: settings.transcriptionEngine).tag(lang)
+                    LanguagePickerRow(
+                        language: lang,
+                        engine: settings.transcriptionEngine,
+                        fluidAudioASRModel: settings.fluidAudioASRModel
+                    ).tag(lang)
                 }
             } label: {
                 SettingsRowLabel(
@@ -176,7 +184,7 @@ struct TranscriptionSettingsView: View {
                 )
             }
 
-            if downloads.downloadingModel == .onDeviceASR || Self.isDownloadingWhisperCpp(downloads) {
+            if FluidAudioModelPresentation.downloadSection(for: downloads.downloadingModel) == .transcription {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {
@@ -188,11 +196,6 @@ struct TranscriptionSettingsView: View {
     /// picking it.
     private static func sizeLabel(_ model: WhisperCppModel) -> String {
         ByteCountFormatter.string(fromByteCount: model.approximateBytes, countStyle: .file)
-    }
-
-    private static func isDownloadingWhisperCpp(_ downloads: ModelDownloadController) -> Bool {
-        if case .whisperCppASR = downloads.downloadingModel { return true }
-        return false
     }
 
     private var networkTransferSection: some View {
@@ -286,6 +289,10 @@ struct TranscriptionSettingsView: View {
             }
             .disabled(downloads.isDownloading)
 
+            if settings.diarizationEngine == .fluidAudio {
+                FluidAudioDiarizationSettingsControls()
+            }
+
             // Dedicated diarization cleanup. This controls only the diarization
             // input; the ASR cleanup toggle above controls only the
             // transcription path.
@@ -304,7 +311,7 @@ struct TranscriptionSettingsView: View {
             // embeddings into exactly that many. Left at Auto, the engine
             // decides and the app re-clusters on its own if it collapsed.
             // Hidden for the heuristic engine, which auto-detects.
-            if settings.diarizationEngine == .fluidAudio {
+            if settings.diarizationEngine == .fluidAudio && settings.fluidAudioDiarizationModel.supportsPinnedSpeakerCount {
                 Stepper(
                     value: Binding(
                         get: { settings.fluidAudioSpeakerCount },
@@ -329,9 +336,7 @@ struct TranscriptionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if downloads.downloadingModel == .diarization
-                || downloads.downloadingModel == .sherpaOnnxDiarization
-                || downloads.downloadingModel == .vad {
+            if FluidAudioModelPresentation.downloadSection(for: downloads.downloadingModel) == .diarization {
                 ModelDownloadProgressRow(progress: downloads.downloadProgress, onCancel: downloads.cancelDownload)
             }
         } header: {

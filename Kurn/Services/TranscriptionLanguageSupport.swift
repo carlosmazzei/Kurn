@@ -12,6 +12,16 @@ import Speech
 
 enum TranscriptionLanguageSupport {
 
+    static func isSupported(
+        _ language: MeetingLanguage,
+        by engine: TranscriptionEngine,
+        fluidAudioASRModel: FluidAudioASRModel
+    ) -> Bool {
+        engine == .fluidAudioParakeet
+            ? fluidAudioASRModel.supports(language)
+            : isSupported(language, by: engine)
+    }
+
     /// `.autoDetect` is always considered supported (every engine has some
     /// notion of auto-detection or ignores the hint entirely).
     static func isSupported(_ language: MeetingLanguage, by engine: TranscriptionEngine) -> Bool {

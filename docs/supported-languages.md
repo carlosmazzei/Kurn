@@ -41,17 +41,61 @@ OpenAI's Whisper model supports, plus auto-detect — 101 options in total.
 This list is independent of the UI languages above; it's available for
 transcription regardless of which UI language is active.
 
-Not every transcription *engine* supports every language equally:
+Support depends on the selected engine **and model family**, not just the
+language picker. All FluidAudio choices below run on device after an explicit
+model download.
 
-- **Whisper API** (cloud) supports the full list below.
-- **Apple on-device Speech** supports whichever locales `SFSpeechRecognizer`
-  ships on the current device/iOS version (checked dynamically at runtime).
-- **FluidAudio** (on-device, multilingual) supports 25 European languages
-  plus auto-detect.
+| Engine / model family | Explicit transcription languages | Auto-detect |
+| --- | --- | --- |
+| Whisper API (cloud) / Whisper via whisper.cpp (on device) | Full list below | Yes |
+| Apple on-device Speech | Locales available through `SFSpeechRecognizer` on the current device/iOS version; checked at runtime | Not a multilingual Auto mode |
+| FluidAudio Parakeet TDT v3 (default FluidAudio ASR model) | 25 European languages listed below | Yes |
+| FluidAudio Nemotron Unified 0.6B | Same 25 European languages, including generic Portuguese (`pt`) | Yes; no detected-language code is reported by this integration |
+| FluidAudio Bark 3.0 / Bark 3.0 Clean | **English only**, explicitly selected | **No** |
+| FluidAudio Phonon-2 | **English only**, explicitly selected | **No** |
+| FluidAudio Nemotron 3.5 Transcribe Lite | **English only**, explicitly selected | **No** |
 
-The app surfaces this as a warning icon next to unsupported languages in the
-language pickers (see `Kurn/Services/TranscriptionLanguageSupport.swift`)
-rather than only failing when you try to transcribe.
+The 25-language FluidAudio set is Bulgarian (`bg`), Croatian (`hr`), Czech
+(`cs`), Danish (`da`), Dutch (`nl`), English (`en`), Estonian (`et`), Finnish
+(`fi`), French (`fr`), German (`de`), Greek (`el`), Hungarian (`hu`), Italian
+(`it`), Latvian (`lv`), Lithuanian (`lt`), Maltese (`mt`), Polish (`pl`),
+Portuguese (`pt`), Romanian (`ro`), Russian (`ru`), Slovak (`sk`), Slovenian
+(`sl`), Spanish (`es`), Swedish (`sv`), and Ukrainian (`uk`).
+
+**Portuguese is a transcription language, not a UI locale or a quality claim.**
+The Portuguese picker entry is generic `pt`; the Brazilian Portuguese UI locale
+(`pt-BR`) does not select a Brazilian-specific ASR model. Parakeet v3 and
+Nemotron Unified accept `pt` and Auto, but Unified's language coverage does not
+establish Brazilian Portuguese accuracy. In Auto, Unified does not populate a
+detected-language code. Bark, Bark Clean, Phonon-2, and Transcribe Lite do not
+support Portuguese. They require the meeting language to be **English**;
+Auto is unsupported even if the recording happens to be in English.
+The existing Parakeet measurements in [pipeline evaluation](pipeline-evaluation.md)
+are not evidence of accuracy for the additional models.
+
+Live preview has an independent model choice and download:
+
+| Live-preview choice | Explicit languages | Auto-detect |
+| --- | --- | --- |
+| Automatic Parakeet EOU / Nemotron Multilingual (default) | English (`en`, EOU); Chinese (`zh`), French (`fr`), German (`de`), Italian (`it`), Japanese (`ja`), Portuguese (`pt`), Spanish (`es`) through the multilingual model | Yes, through the multilingual model |
+| Nemotron Unified 0.6B | The same 25 European languages as Unified batch ASR | Yes |
+
+Unified live uses an fp16 streaming encoder distinct from its batch encoder;
+installing one does not install the other. They share a Storage folder, so
+deleting it removes both. Live output is a temporary preview, not the saved
+transcript or a detected-language result. Selecting a batch ASR model does not
+change live preview or the optional language detector: FluidAudio language
+detection still uses Parakeet v3 under its own consented setting.
+
+Language pickers warn about unsupported selections, Settings disables incompatible
+model choices, and the pipeline validates again before running (see
+`Kurn/Services/TranscriptionLanguageSupport.swift`). Auto is not a bypass for an
+English-only model. The additional models' real-audio accuracy, speed, and
+physical-device inference/memory behavior still need validation. These choices
+cover transcription and diarization only, not TTS, Canary translation, or voice
+cloning.
+
+### Full transcription-language picker
 
 | Language | Whisper code |
 | --- | --- |

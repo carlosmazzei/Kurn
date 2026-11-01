@@ -34,14 +34,14 @@ struct PipelineEngineCatalogLiveTests {
 
     @Test func everyTranscriptionChoiceResolves() {
         #expect(live.transcriber(.appleSpeech) is OnDeviceTranscriber)
-        #expect(live.transcriber(.fluidAudioParakeet) is FluidAudioTranscriber)
+        #expect(live.transcriber(.fluidAudioParakeet) is FluidAudioModelTranscriber)
         #expect(live.transcriber(.whisperAPI) is WhisperTranscriber)
         #expect(live.transcriber(.whisperCpp) is WhisperCppTranscriber)
     }
 
     @Test func everyDiarizationChoiceResolves() {
         #expect(live.diarizer(.heuristic) is SpeakerDiarizer)
-        #expect(live.diarizer(.fluidAudio) is FluidAudioDiarizer)
+        #expect(live.diarizer(.fluidAudio) is FluidAudioDiarizationRouter)
         #expect(live.diarizer(.sherpaOnnx) is SherpaOnnxDiarizer)
         // Never called for provider-native turns; the defensive answer is the
         // engine that needs nothing.

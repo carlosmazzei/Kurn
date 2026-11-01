@@ -51,6 +51,8 @@ final class ModelDownloadController {
     var showingSherpaOnnxConsent = false
     var showingVADConsent = false
     var showingWhisperCppConsent = false
+    var showingFluidAudioModelConsent = false
+    var pendingFluidAudioSelection: FluidAudioModelSelection?
 
     /// Variant chooser shown when whisper.cpp is picked and its weights aren't on
     /// disk yet. This is a separate presentation from `showingWhisperCppConsent`
@@ -96,15 +98,27 @@ final class ModelDownloadController {
 
     private let downloader: Downloader
     private let isWhisperCppInstalled: (WhisperCppModel) -> Bool
+    let isFluidAudioASRInstalled: (FluidAudioASRModel) -> Bool
+    let isFluidAudioDiarizationInstalled: (FluidAudioDiarizationModel) -> Bool
+    let isFluidAudioUnifiedStreamingInstalled: () -> Bool
+    let isAutomaticFluidAudioLiveInstalled: () -> Bool
 
     init(
         downloader: @escaping Downloader = { set, policy, onProgress in
             try await ModelDownloadConsent.download(set, policy: policy, onProgress: onProgress)
         },
-        isWhisperCppInstalled: @escaping (WhisperCppModel) -> Bool = WhisperCppModelDownloader.isInstalled
+        isWhisperCppInstalled: @escaping (WhisperCppModel) -> Bool = WhisperCppModelDownloader.isInstalled,
+        isFluidAudioASRInstalled: @escaping (FluidAudioASRModel) -> Bool = FluidAudioModelAvailability.isASRInstalled,
+        isFluidAudioDiarizationInstalled: @escaping (FluidAudioDiarizationModel) -> Bool = FluidAudioModelAvailability.isDiarizationInstalled,
+        isFluidAudioUnifiedStreamingInstalled: @escaping () -> Bool = FluidAudioModelAvailability.isUnifiedStreamingInstalled,
+        isAutomaticFluidAudioLiveInstalled: @escaping () -> Bool = { FluidAudioModelAvailability.automaticLive }
     ) {
         self.downloader = downloader
         self.isWhisperCppInstalled = isWhisperCppInstalled
+        self.isFluidAudioASRInstalled = isFluidAudioASRInstalled
+        self.isFluidAudioDiarizationInstalled = isFluidAudioDiarizationInstalled
+        self.isFluidAudioUnifiedStreamingInstalled = isFluidAudioUnifiedStreamingInstalled
+        self.isAutomaticFluidAudioLiveInstalled = isAutomaticFluidAudioLiveInstalled
     }
 
     // MARK: - Engine selection (consent gates)
@@ -119,6 +133,8 @@ final class ModelDownloadController {
         settings: AppSettings,
         transcriptionProviders: [AIProvider]
     ) {
+        guard !isDownloading else { return }
+        if interceptFluidAudioTranscription(engine, settings: settings) { return }
         if engine == .whisperAPI {
             guard let first = transcriptionProviders.first else { return }
             // Point the transcription provider at a configured, capable provider
@@ -127,11 +143,11 @@ final class ModelDownloadController {
                 settings.transcriptionProviderID = first.id
             }
         }
-        let required = engine.requiredModelSet(whisperCppModel: settings.whisperCppModel)
+        let required = engine.requiredModelSet(
+            whisperCppModel: settings.whisperCppModel,
+            fluidAudioASRModel: settings.fluidAudioASRModel
+        )
         switch required {
-        case .onDeviceASR where !settings.fluidAudioBatchASRModelsConsented:
-            pendingTranscriptionEngine = engine
-            showingBatchASRConsent = true
         case .whisperCppASR(let model) where needsWhisperCppDownload(model):
             // Don't commit to a size here — let the chooser offer all of them.
             pendingTranscriptionEngine = engine
@@ -177,7 +193,9 @@ final class ModelDownloadController {
     /// Apply a language-detection choice, intercepting the FluidAudio detector
     /// to trigger the same one-time on-device-ASR model download.
     func selectLanguageDetectionEngine(_ engine: LanguageDetectionEngine, settings: AppSettings) {
-        if engine.requiredModelSet == .onDeviceASR && !settings.fluidAudioBatchASRModelsConsented {
+        guard !isDownloading else { return }
+        if engine.requiredModelSet == .onDeviceASR &&
+            (!settings.fluidAudioBatchASRModelsConsented || !isFluidAudioASRInstalled(.parakeetV3)) {
             pendingLanguageDetectionEngine = engine
             showingBatchASRConsent = true
         } else {
@@ -186,10 +204,9 @@ final class ModelDownloadController {
     }
 
     func selectDiarizationEngine(_ engine: DiarizationEngine, settings: AppSettings) {
-        if engine == .fluidAudio && !settings.fluidAudioDiarizationModelsConsented {
-            pendingDiarizationEngine = engine
-            showingDiarizationConsent = true
-        } else if engine == .sherpaOnnx && !settings.sherpaOnnxModelsConsented {
+        guard !isDownloading else { return }
+        if interceptFluidAudioDiarization(engine, settings: settings) { return }
+        if engine == .sherpaOnnx && !settings.sherpaOnnxModelsConsented {
             pendingDiarizationEngine = engine
             showingSherpaOnnxConsent = true
         } else {
@@ -209,25 +226,29 @@ final class ModelDownloadController {
     }
 
     func setLiveTranscriptionEnabled(_ enabled: Bool, settings: AppSettings) {
-        if enabled && !settings.fluidAudioASRModelsConsented {
-            showingASRConsent = true
-        } else {
-            settings.liveTranscriptionEnabled = enabled
-        }
+        guard !isDownloading else { return }
+        if interceptFluidAudioLive(enabled, settings: settings) { return }
+        settings.liveTranscriptionEnabled = enabled
     }
 
     // MARK: - Confirmed downloads
 
     func confirmLiveTranscriptionASR(settings: AppSettings) {
-        download(.liveTranscriptionASR, recordingAs: .liveTranscription, policy: settings.largeTransferPolicy) {
+        download(.liveTranscriptionASR, recordingAs: .liveTranscription, policy: settings.largeTransferPolicy) { [self] in
             settings.fluidAudioASRModelsConsented = true
-            settings.liveTranscriptionEnabled = true
+            if !applyPendingDefaultFluidAudioSelection(for: .liveTranscriptionASR, settings: settings) {
+                settings.liveTranscriptionEnabled = true
+            }
+        } cleanup: { [self] in
+            clearPendingFluidAudioSelection(for: .liveTranscriptionASR)
         }
     }
 
     func confirmBatchASR(settings: AppSettings) {
         download(.onDeviceASR, recordingAs: .onDeviceLanguage, policy: settings.largeTransferPolicy) { [self] in
+            guard validatePendingFluidAudioSelection(for: .onDeviceASR, settings: settings) else { return }
             settings.fluidAudioBatchASRModelsConsented = true
+            _ = applyPendingDefaultFluidAudioSelection(for: .onDeviceASR, settings: settings)
             // Apply whichever picker requested the download.
             if let engine = pendingTranscriptionEngine {
                 settings.transcriptionEngine = engine
@@ -238,25 +259,31 @@ final class ModelDownloadController {
         } cleanup: { [self] in
             pendingTranscriptionEngine = nil
             pendingLanguageDetectionEngine = nil
+            clearPendingFluidAudioSelection(for: .onDeviceASR)
         }
     }
 
     func cancelBatchASR() {
         pendingTranscriptionEngine = nil
         pendingLanguageDetectionEngine = nil
+        clearPendingFluidAudioSelection(for: .onDeviceASR)
     }
 
     func confirmDiarization(settings: AppSettings) {
         guard let engine = pendingDiarizationEngine else { return }
         pendingDiarizationEngine = nil
-        download(.diarization, recordingAs: .diarization, policy: settings.largeTransferPolicy) {
+        download(.diarization, recordingAs: .diarization, policy: settings.largeTransferPolicy) { [self] in
             settings.fluidAudioDiarizationModelsConsented = true
+            _ = applyPendingDefaultFluidAudioSelection(for: .diarization, settings: settings)
             settings.diarizationEngine = engine
+        } cleanup: { [self] in
+            clearPendingFluidAudioSelection(for: .diarization)
         }
     }
 
     func cancelDiarization() {
         pendingDiarizationEngine = nil
+        clearPendingFluidAudioSelection(for: .diarization)
     }
 
     func confirmSherpaOnnx(settings: AppSettings) {
@@ -309,13 +336,14 @@ final class ModelDownloadController {
     /// The shared download body: mark the set as in flight, keep a finite
     /// background window so the download isn't aborted the moment Settings
     /// leaves the foreground, then apply `onSuccess` only if it actually landed.
-    private func download(
+    func download(
         _ set: ModelSet,
         recordingAs group: ModelStore.ModelGroup,
         policy: LargeTransferPolicy,
         onSuccess: @escaping @MainActor () -> Void,
         cleanup: @escaping @MainActor () -> Void = {}
     ) {
+        guard !isDownloading else { return }
         downloadingModel = set
         downloadProgress = ModelDownloadStatus(fractionCompleted: 0, phase: .preparing)
         activeDownloadTask = Task { [self] in
@@ -323,6 +351,7 @@ final class ModelDownloadController {
             background.begin(name: "ai.kurn.modelDownload")
             defer { background.end() }
             do {
+                try Task.checkCancellation()
                 let before = ModelStore.snapshot()
                 try await downloader(set, policy) { status in
                     Task { @MainActor in
@@ -330,6 +359,7 @@ final class ModelDownloadController {
                         self.downloadProgress = status
                     }
                 }
+                try Task.checkCancellation()
                 ModelStore.recordDownload(for: group, before: before)
                 // H7 PR 16: whisper.cpp/sherpa-onnx already probed and
                 // recorded their own verification inside `downloader.fetch`'s
@@ -342,7 +372,7 @@ final class ModelDownloadController {
                 // successful return here already *is* a passed health
                 // probe — recording it is all that's left to do.
                 if !group.isSelfVerifying {
-                    ModelVerification.record(id: ModelVerification.recordID(for: group), size: ModelStore.sizeOnDisk(group))
+                    ModelStore.recordVerification(for: set, group: group)
                 }
                 onSuccess()
             } catch is CancellationError {
@@ -393,13 +423,13 @@ final class ModelDownloadController {
         }
         switch group {
         case .liveTranscription:
-            settings.liveTranscriptionEnabled = false
+            disableDeletedLegacyFluidAudioLive(settings: settings)
             settings.fluidAudioASRModelsConsented = false
         case .onDeviceLanguage:
             settings.fluidAudioBatchASRModelsConsented = false
             // Turn off the engines that depend on the multilingual on-device
             // model so the UI doesn't point at a now-missing model.
-            if settings.transcriptionEngine == .fluidAudioParakeet {
+            if settings.transcriptionEngine == .fluidAudioParakeet && settings.fluidAudioASRModel == .parakeetV3 {
                 settings.transcriptionEngine = .appleSpeech
             }
             if settings.languageDetectionEngine == .fluidAudioLID {
@@ -407,7 +437,9 @@ final class ModelDownloadController {
             }
         case .diarization:
             settings.fluidAudioDiarizationModelsConsented = false
-            settings.diarizationEngine = .heuristic
+            disableDeletedLegacyFluidAudioDiarization(settings: settings)
+        case .fluidAudioASR, .nemotronDiarization:
+            handleDeletedFluidAudioVariant(model, settings: settings)
         case .sherpaOnnxDiarization:
             settings.sherpaOnnxModelsConsented = false
             if settings.diarizationEngine == .sherpaOnnx {

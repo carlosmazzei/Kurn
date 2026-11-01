@@ -75,7 +75,11 @@ private struct Harness {
         settings = AppSettings(cloudStore: InMemoryCloudKeyValueStore(), defaults: defaults)
         controller = ModelDownloadController(
             downloader: downloader.closure,
-            isWhisperCppInstalled: { installedWhisperCpp.contains($0) }
+            isWhisperCppInstalled: { installedWhisperCpp.contains($0) },
+            isFluidAudioASRInstalled: { $0 == .parakeetV3 },
+            isFluidAudioDiarizationInstalled: { $0 == .pyannote },
+            isFluidAudioUnifiedStreamingInstalled: { false },
+            isAutomaticFluidAudioLiveInstalled: { true }
         )
     }
 

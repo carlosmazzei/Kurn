@@ -16,6 +16,9 @@ enum ModelSet: Sendable, Equatable {
     case onDeviceASR
     case diarization
     case vad
+    case fluidAudioASR(FluidAudioASRModel)
+    case fluidAudioDiarization(FluidAudioDiarizationModel)
+    case fluidAudioUnifiedStreaming
     /// whisper.cpp GGML weights. Carries the variant because, unlike the
     /// FluidAudio sets, the user chooses which weight file to download.
     case whisperCppASR(WhisperCppModel)
@@ -31,13 +34,19 @@ enum ModelSet: Sendable, Equatable {
         case .sherpaOnnxDiarization:
             SherpaOnnxModelDownloader.isInstalled
         case .liveTranscriptionASR:
-            ModelStore.isInstalled(.liveTranscription)
+            FluidAudioModelAvailability.automaticLive
         case .onDeviceASR:
-            ModelStore.isInstalled(.onDeviceLanguage)
+            FluidAudioModelAvailability.isASRInstalled(.parakeetV3)
         case .diarization:
-            ModelStore.isInstalled(.diarization)
+            FluidAudioModelAvailability.isDiarizationInstalled(.pyannote)
         case .vad:
             ModelStore.isInstalled(.vad)
+        case .fluidAudioASR(let model):
+            FluidAudioModelAvailability.isASRInstalled(model)
+        case .fluidAudioDiarization(let model):
+            FluidAudioModelAvailability.isDiarizationInstalled(model)
+        case .fluidAudioUnifiedStreaming:
+            FluidAudioModelAvailability.isUnifiedStreamingInstalled()
         }
     }
 }
@@ -90,12 +99,7 @@ struct ModelDownloadConsent {
         isInstalled: @escaping @Sendable (ModelSet) -> Bool = { $0.isInstalled },
         onProgress: @escaping @Sendable (ModelDownloadStatus) -> Void = { _ in }
     ) async throws {
-        try validateNetworkIfDownloadNeeded(
-            for: [set],
-            policy: policy,
-            network: network,
-            isInstalled: isInstalled
-        )
+        try policy.validate(network.snapshot)
         try await ResourceGuard.requireModelDownloadHeadroom()
         // Handled before the FluidAudio branch below: whisper.cpp brings its own
         // downloader, so this set must work in a build without FluidAudio linked.
@@ -117,6 +121,18 @@ struct ModelDownloadConsent {
                 onProgress: onProgress
             )
             try await ResourceGuard.requireModelDownloadHeadroom()
+            return
+        }
+        if set.isFluidAudioVariant {
+            do {
+                try await withResourceReservation(.modelLoading) {
+                    try await downloadFluidAudioVariant(set, onProgress: onProgress)
+                }
+                try await ResourceGuard.requireModelDownloadHeadroom()
+            } catch {
+                if error is CancellationError { throw error }
+                throw downloadFailure(for: error, policy: policy, snapshot: network.snapshot)
+            }
             return
         }
         #if canImport(FluidAudio)

@@ -43,13 +43,48 @@
     },
     {
       "pattern": "Kurn/Services/FluidAudioModelStore.swift",
-      "reason": "Adapter: loads FluidAudio's Parakeet models (download + CoreML/ANE compile). Load-once, coalescing and retry-after-failure live in KurnCore's CoalescedLoader (tested).",
+      "reason": "Adapter: locally loads FluidAudio's cached Parakeet models and compiles CoreML/ANE artifacts; downloads occur only through explicit consent. Load-once, coalescing and retry-after-failure live in KurnCore's CoalescedLoader (tested).",
       "maxLines": 83
     },
     {
+      "pattern": "Kurn/Services/FluidAudioASRModelRuntime+Download.swift",
+      "reason": "Adapter: downloads, loads and releases real CoreML model bundles. Backend selection, cache requirements, progress mapping and consent/network policy remain in measured FluidAudioASRModelRuntime, FluidAudioRuntimePolicy and ModelDownloadConsent.",
+      "maxLines": 60
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioModelTranscriber+Models.swift",
+      "reason": "Adapter: local CoreML model loading and native ASR inference require downloaded weights. Validation, backend selection and result assembly remain in measured FluidAudioRuntimePolicy, FluidAudioModelTranscriber and KurnCore timing types.",
+      "maxLines": 81
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioAutomaticStreamingRuntime+Models.swift",
+      "reason": "Adapter: locally loads native EOU and multilingual streaming managers. Language, backend choice, complete-cache validation and installation policy remain in measured FluidAudioAutomaticStreamingRuntime and FluidAudioRuntimePolicy.",
+      "maxLines": 30
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioUnifiedStreamingManager+Models.swift",
+      "reason": "Adapter: constructs and locally loads FluidAudio's native streaming model and drains its native timing buffer. Language/installation gates, buffering and lifecycle are tested in the measured FluidAudioUnifiedStreamingManager.",
+      "maxLines": 27
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioDiarizationModelRuntime+Models.swift",
+      "reason": "Adapter: loads four real cached CoreML models and constructs the Pyannote model payload. Cache completeness, revision and PLDA decoding are tested in KurnCore's PyannoteDiarizationCache and PyannotePLDAParameters.",
+      "maxLines": 42
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioDiarizationModelRuntime+Download.swift",
+      "reason": "Adapter: explicit consent-only loading/downloading of Pyannote and Nemotron model bundles. Selection, consent, network policy and progress mapping remain in measured controller, ModelDownloadConsent and runtime metadata types.",
+      "maxLines": 40
+    },
+    {
+      "pattern": "Kurn/Services/FluidAudioNemotronDiarizer+Models.swift",
+      "reason": "Adapter: local CoreML loading, audio decoding and native streaming diarization. Installation, cancellation, failure and fallback policy remain in the measured actor; speaker timelines and budgets are tested in KurnCore.",
+      "maxLines": 60
+    },
+    {
       "pattern": "Kurn/Services/FluidAudioMultilingualStreamingManager.swift",
-      "reason": "Adapter: forwards the StreamingAsrManager protocol to FluidAudio's Nemotron streaming manager, which needs a downloaded model; it buffers and forwards, with no decision of its own.",
-      "maxLines": 102
+      "reason": "Adapter: forwards the streaming protocol to a downloaded native model. Cache completeness and local-only load requirements live in measured FluidAudioAutomaticStreamingRuntime and FluidAudioRuntimePolicy. Budget grows by seven lines for local-only loading and callback wiring, not new decision logic.",
+      "maxLines": 109
     },
     {
       "pattern": "Kurn/Services/LockScreenRecordingController.swift",

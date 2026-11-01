@@ -19,9 +19,10 @@ transcribing audio, identifying speakers, and generating structured AI
 summaries. It is built with Swift 6, SwiftUI, SwiftData, AVFoundation, Apple's
 Speech framework, ActivityKit, and WatchConnectivity.
 
-Recordings and meeting data are stored on device by default. Network requests
-only happen when the user chooses cloud (Whisper-compatible) transcription or
-generates a summary with a configured AI provider.
+Recordings and meeting data are stored on device by default. Transcription
+runs locally unless the user chooses a cloud (Whisper-compatible) provider;
+optional on-device models require an explicit download. Cloud AI features
+send data only to the configured provider.
 
 > **Kurn is available on the App Store:**
 > [apps.apple.com/app/id6804278920](https://apps.apple.com/app/id6804278920).
@@ -102,14 +103,16 @@ generates a summary with a configured AI provider.
 - Handles audio interruptions and route changes, including automatic pause on
   relevant route changes.
 - Optional live transcription preview while recording (opt-in, off by
-  default) — a rolling on-device preview shown during the meeting; it never
-  replaces the full transcript generated afterward.
+  default) — a rolling on-device preview that never replaces the full
+  transcript generated afterward. Choose automatic Parakeet EOU / Nemotron
+  Multilingual (the default) or Nemotron Unified with its own streaming download.
 - Cleans audio before transcription with preprocessing, while falling back to
   the original file if preprocessing fails.
-- Transcribes on device with Apple's Speech framework, with FluidAudio's
-  multilingual Parakeet model (which additionally auto-detects the spoken
-  language), or with Whisper itself via whisper.cpp — Whisper's accuracy and
-  language coverage with nothing leaving the device.
+- Transcribes on device with Apple's Speech framework, Whisper via whisper.cpp,
+  or a choice of six FluidAudio ASR models: Parakeet TDT v3 (the default),
+  Nemotron Unified 0.6B, Bark 3.0, Bark 3.0 Clean, Phonon-2, and Nemotron 3.5
+  Transcribe Lite. Parakeet and Unified support 25 European languages plus
+  Auto; the other four require **English** explicitly (not Auto).
 - Optionally transcribes with a cloud Whisper-compatible API using chunked
   uploads for longer recordings. The transcription provider (OpenAI —
   `whisper-1`, `gpt-4o-transcribe`, or `gpt-4o-mini-transcribe` — Groq,
@@ -125,13 +128,24 @@ generates a summary with a configured AI provider.
 - Voice-activity detection and language detection are each independently
   configurable between an always-available built-in engine and a FluidAudio
   on-device model.
-- FluidAudio's on-device models are downloaded only after the user opts in per
-  feature in Settings, and can be listed and deleted individually to reclaim
-  storage.
+- Within FluidAudio diarization, choose Pyannote (the default, with an optional
+  exact speaker count) or Nemotron 3 (up to eight speakers, no pinned count).
+  Nemotron 3 has no compatible voiceprints for voice-based identity matching;
+  review names after reruns because numbered labels cannot confirm identity.
+  Pyannote segmentation batches can be 4, 8, 16, or 32; 32
+  remains the default, while 8 is recommended to reduce memory use, not as a
+  measured speed or accuracy improvement.
+- FluidAudio model downloads require user consent for the selected model.
+  Missing or corrupt ASR, diarization, and live-preview weights require an
+  explicit download/repair in Settings, never a hidden runtime download.
+  Storage lists model variants separately; Unified batch and live share one
+  folder, so deleting it removes both. Language detection still uses a
+  separately consented Parakeet v3 download.
 - Lets users rename detected speakers.
-- Resumes long transcriptions automatically after the app is backgrounded,
-  terminated, or interrupted, continuing from the last completed chunk instead
-  of starting over.
+- Resumes chunked transcriptions after backgrounding, termination, or
+  interruption, continuing from the last completed chunk when the source and
+  settings still match. Non-default FluidAudio ASR models use five-minute
+  chunks; FluidAudio work resumes in the foreground.
 
 Transcription supports auto-detect plus every language OpenAI's Whisper model
 recognizes (101 options total) — see [Supported Languages](#supported-languages)
@@ -156,6 +170,10 @@ implements word error rate and NIST diarization error rate, and the
 [pipeline evaluation workflow](.github/workflows/pipeline-eval.yml) runs the
 app's real pipeline over public benchmark audio once per configuration in the
 preprocessing × VAD × diarization × ASR-engine matrix, scoring each.
+
+The additional FluidAudio models have not yet been validated here for real-audio
+accuracy, inference speed, or physical-device memory/ANE behavior. The results
+below describe the named configurations only, not the new choices.
 
 Latest recorded results:
 
@@ -242,10 +260,11 @@ Cloud features require user-provided API keys.
   a typed success/failure outcome rather than a silent write.
 - Non-secret preferences are stored in `UserDefaults`.
 - Large downloads (on-device transcription and diarization models) are
-  Wi-Fi-only by default and are only fetched after the user enables the
-  corresponding feature in Settings; an "allow expensive network transfers"
-  setting opts into cellular/constrained paths. Downloads resume, verify a checksum before staging, and replace the
-  previous model only after verification.
+  Wi-Fi-only by default and require an explicit download action in Settings;
+  an "allow expensive network transfers" setting opts into
+  cellular/constrained paths. The network policy also applies to explicit
+  repair/download requests when cached files exist. Model downloads are
+  verified before use; missing-model buttons let users download again.
 
 Default preferences are managed in:
 
@@ -269,8 +288,10 @@ Kurn is designed to avoid a backend service controlled by the app.
 - Meeting metadata, transcripts, summaries, speakers, and recordings are stored
   locally with SwiftData.
 - API keys are stored in the Keychain.
-- Network requests are only made when the user selects a cloud transcription or
-  summary feature; the default summary provider is Apple's on-device model.
+- ASR, diarization, and live-preview model loading is local-only; missing or
+  corrupt weights do not trigger a background download. Explicit model
+  downloads and opted-in cloud features use the network; the default summary
+  provider is Apple's on-device model.
 - Cloud provider calls go through a hardened HTTP boundary: request timeouts,
   bounded retries, HTTPS-only URL validation with redirect limits, and a
   per-provider circuit breaker that stops retrying a failing vendor.
@@ -668,9 +689,12 @@ single document, [`docs/roadmap.md`](docs/roadmap.md).
 On-device speech recognition, speaker diarization, and voice-activity detection
 are **Powered by [Fluid Inference](https://github.com/FluidInference/FluidAudio)**.
 Kurn depends on the [FluidAudio](https://github.com/FluidInference/FluidAudio)
-Swift package (Apache 2.0) and downloads several CoreML models on demand —
-NVIDIA Parakeet TDT for ASR, pyannote / WeSpeaker / NVIDIA Sortformer for
-diarization, and Silero VAD. Each carries its own license.
+Swift package (Apache 2.0) and offers separately downloaded CoreML models for
+transcription, diarization, and VAD. The weights are **not all Apache-licensed**:
+NVIDIA's Nemotron Unified, Transcribe Lite, and Nemotron 3 diarization choices
+use OpenMDW-1.1; Bark 3.0/Clean (Conway Research) and Phonon-2 (Fermion
+Research) use CC-BY-4.0. Parakeet, Pyannote / WeSpeaker / NVIDIA Sortformer,
+and Silero VAD retain their respective licenses and notices.
 
 The optional third diarization engine depends on
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0) and
@@ -679,8 +703,9 @@ speaker-embedding model (Apache 2.0), both converted to ONNX by the
 sherpa-onnx project.
 
 The full attribution list and license details are in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and the same notices are
-available in the app under **Settings → Acknowledgements**.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). **Settings → Acknowledgements**
+also provides offline model license and notice copies bundled in
+`Kurn/Resources/FluidAudioModelLicenses.txt`.
 
 ## License
 

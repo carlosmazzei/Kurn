@@ -153,6 +153,10 @@ struct PipelineConfiguration: Sendable, Equatable {
     /// GGML weight file the `.whisperCpp` engine loads. Ignored by every other
     /// engine.
     var whisperCppModel: WhisperCppModel = .default
+    var fluidAudioASRModel: FluidAudioASRModel = .default
+    var fluidAudioASRConsented = false
+    var fluidAudioDiarizationModel: FluidAudioDiarizationModel = .default
+    var fluidAudioSegmentationBatchSize: FluidAudioSegmentationBatchSize = .default
     var correction: CorrectionEngine = .none
     /// Provider used by the `.llm` correction engine — the app's single summary
     /// provider (`AppSettings.aiProvider`), not a dedicated slot: there is
