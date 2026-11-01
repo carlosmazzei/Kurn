@@ -271,6 +271,251 @@ struct ChunkedTranscriptionRunnerTests {
         #expect(turns[0].start == 600)
     }
 
+}
+
+extension ChunkedTranscriptionRunnerTests {
+
+    private func expectIntegrityFailure(
+        _ expectedReason: TranscriptIntegrityFailure,
+        operation: () async throws -> RawTranscript
+    ) async {
+        do {
+            _ = try await operation()
+            Issue.record("Expected a localized transcript integrity failure")
+        } catch AppError.transcriptIntegrityFailed(let reason) {
+            #expect(reason == expectedReason.rawValue)
+        } catch {
+            Issue.record("Unexpected error type: \(type(of: error))")
+        }
+    }
+
+    private func boundedChunks() -> [AudioChunker.Chunk] {
+        [0.0, 10.0].enumerated().map { index, offset in
+            AudioChunker.Chunk(url: URL(fileURLWithPath: "/tmp/bounded_\(index).m4a"), offset: offset, duration: 10)
+        }
+    }
+
+    @Test func normalizesSpansAndNativeTurnsBeforeOffsetsAndCheckpointing() async throws {
+        let snapshots = ProgressSnapshots()
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: boundedChunks(),
+            planDigest: planDigest([0, 10]),
+            resume: nil,
+            transcribeChunk: { _, _ in
+                RawTranscript(spans: [
+                    TranscribedSpan(text: " tail! ", start: 9.8, end: 40, confidence: 0.7),
+                    TranscribedSpan(text: "earlier", start: -0.05, end: 1, confidence: nil),
+                    TranscribedSpan(text: "tiny", start: 2.04, end: 2, confidence: 0.9)
+                ], language: "pt-BR", speakerTurns: [SpeakerTurn(speakerLabel: "host", start: -0.1, end: 13.5)])
+            },
+            onChunkCompleted: { snapshots.record($0) }
+        )
+        #expect(result.spans.map(\.text) == [" tail! ", "earlier", "tiny", " tail! ", "earlier", "tiny"])
+        #expect(result.spans.map(\.confidence) == [0.7, nil, 0.9, 0.7, nil, 0.9])
+        #expect(result.spans.map(\.start) == [9.8, 0, 2.04, 19.8, 10, 12.04])
+        #expect(result.spans.map(\.end) == [10, 1, 2.04, 20, 11, 12.04])
+        #expect(result.speakerTurns == [
+            SpeakerTurn(speakerLabel: "host", start: 0, end: 10),
+            SpeakerTurn(speakerLabel: "host", start: 10, end: 20)
+        ])
+        #expect(result.language == "pt-BR")
+        #expect(snapshots.values[0].spans.map(\.end) == [10, 1, 2.04])
+        #expect(snapshots.values.last?.spans == result.spans)
+    }
+
+    @Test(arguments: [false, true])
+    func invalidChunkIsNeverCheckpointedAndStopsBeforeTheNextRequest(nativeTurn: Bool) async throws {
+        let indexes = TranscribedIndexes()
+        let snapshots = ProgressSnapshots()
+        await expectIntegrityFailure(.segmentOutOfBounds) {
+            try await ChunkedTranscriptionRunner.run(
+                chunks: boundedChunks(),
+                planDigest: planDigest([0, 10]),
+                resume: nil,
+                transcribeChunk: { _, index in
+                    await indexes.record(index)
+                    return RawTranscript(
+                        spans: [TranscribedSpan(text: "keep", start: 0, end: nativeTurn ? 1 : 40.01)],
+                        language: "en",
+                        speakerTurns: nativeTurn ? [SpeakerTurn(speakerLabel: "bad", start: 0, end: 40.01)] : nil
+                    )
+                },
+                onChunkCompleted: { snapshots.record($0) }
+            )
+        }
+        #expect(await indexes.values == [0])
+        #expect(snapshots.values.isEmpty)
+    }
+
+    @Test func invalidLaterChunkLeavesOnlyTheEarlierDurableCheckpoint() async throws {
+        let indexes = TranscribedIndexes()
+        let snapshots = ProgressSnapshots()
+        let plan = [0.0, 10.0, 20.0].enumerated().map { index, offset in
+            AudioChunker.Chunk(url: URL(fileURLWithPath: "/tmp/later_\(index).m4a"), offset: offset, duration: 10)
+        }
+        await expectIntegrityFailure(.segmentOutOfBounds) {
+            try await ChunkedTranscriptionRunner.run(
+                chunks: plan, planDigest: planDigest([0, 10, 20]), resume: nil,
+                transcribeChunk: { _, index in
+                    await indexes.record(index)
+                    return RawTranscript(spans: [TranscribedSpan(text: "word", start: 0, end: index == 1 ? .nan : 1)], language: "en")
+                },
+                onChunkCompleted: { snapshots.record($0) }
+            )
+        }
+        #expect(await indexes.values == [0, 1])
+        #expect(snapshots.values.map(\.completedChunks) == [1])
+        #expect(snapshots.values[0].spans == [TranscribedSpan(text: "word", start: 0, end: 1)])
+    }
+
+    @Test func zeroDurationKeepsSpeechButDoesNotInventTime() async throws {
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: [AudioChunker.Chunk(url: URL(fileURLWithPath: "/tmp/zero.m4a"), offset: 0, duration: 0)],
+            planDigest: planDigest([0]), resume: nil,
+            transcribeChunk: { _, _ in
+                RawTranscript(spans: [TranscribedSpan(text: "keep", start: -0.1, end: 0.2, confidence: 0.5)], language: "en")
+            }
+        )
+        #expect(result.spans == [TranscribedSpan(text: "keep", start: 0, end: 0, confidence: 0.5)])
+    }
+
+    @Test func invalidKnownDurationFailsBeforeTheRequest() async throws {
+        let indexes = TranscribedIndexes()
+        let snapshots = ProgressSnapshots()
+        await expectIntegrityFailure(.sourceUnreadable) {
+            try await ChunkedTranscriptionRunner.run(
+                chunks: [AudioChunker.Chunk(url: URL(fileURLWithPath: "/tmp/invalid.m4a"), offset: 0, duration: .nan)],
+                planDigest: planDigest([0]), resume: nil,
+                transcribeChunk: { _, index in
+                    await indexes.record(index)
+                    return RawTranscript(spans: [], language: "en")
+                },
+                onChunkCompleted: { snapshots.record($0) }
+            )
+        }
+        #expect(await indexes.values.isEmpty)
+        #expect(snapshots.values.isEmpty)
+    }
+
+    @Test func completedResumeNormalizesLegacyBoundaryDriftWithoutNetwork() async throws {
+        let spans = [
+            TranscribedSpan(text: "first", start: -0.04, end: 10.3, confidence: 0.6),
+            TranscribedSpan(text: "last", start: 19.6, end: 50, confidence: nil),
+            TranscribedSpan(text: "reordered", start: 10.5, end: 11, confidence: 0.8)
+        ]
+        let resume = ChunkedTranscriptionRunner.Progress(
+            totalChunks: 2, completedChunks: 2, detectedLanguage: "pt", planDigest: planDigest([0, 10]), spans: spans
+        )
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: boundedChunks(), planDigest: planDigest([0, 10]), resume: resume,
+            transcribeChunk: { _, _ in
+                Issue.record("completed checkpoint must not use the network")
+                return RawTranscript(spans: [], language: "")
+            }
+        )
+        #expect(result.spans.map(\.text) == spans.map(\.text))
+        #expect(result.spans.map(\.confidence) == spans.map(\.confidence))
+        #expect(result.spans.map(\.start) == [0, 19.6, 10.5])
+        #expect(result.spans.map(\.end) == [10, 20, 11])
+        #expect(result.language == "pt")
+    }
+
+    @Test(arguments: [0, 1, 2])
+    func unusableResumeRestartsAndRewritesDurableCheckpoint(completedChunks: Int) async throws {
+        let indexes = TranscribedIndexes()
+        let snapshots = ProgressSnapshots()
+        let progress = ProgressFractionSnapshots()
+        let resume = ChunkedTranscriptionRunner.Progress(
+            totalChunks: 2, completedChunks: completedChunks, detectedLanguage: "stale", planDigest: planDigest([0, 10]),
+            spans: [TranscribedSpan(text: "bad", start: 0, end: 100)]
+        )
+        let result = try await ChunkedTranscriptionRunner.run(
+            chunks: boundedChunks(), planDigest: planDigest([0, 10]), resume: resume,
+            transcribeChunk: { _, index in
+                await indexes.record(index)
+                return RawTranscript(spans: [
+                    TranscribedSpan(text: "late\(index)", start: 4, end: 5, confidence: 0.7),
+                    TranscribedSpan(text: "early\(index)", start: 1, end: 2)
+                ], language: "pt")
+            },
+            onChunkCompleted: { snapshots.record($0) },
+            onProgress: { fraction, current, total in progress.record(fraction: fraction, currentChunk: current, total: total) }
+        )
+        #expect(await indexes.values == [0, 1])
+        #expect(progress.values.first?.fraction == 0)
+        #expect(result.spans.map(\.text) == ["late0", "early0", "late1", "early1"])
+        #expect(result.spans.map(\.start) == [4, 1, 14, 11])
+        #expect(result.language == "pt")
+        #expect(snapshots.values.map(\.completedChunks) == [1, 2])
+        #expect(snapshots.values.allSatisfy { $0.detectedLanguage == "pt" })
+        #expect(snapshots.values[0].spans == Array(result.spans.prefix(2)))
+        #expect(snapshots.values.last?.spans == result.spans)
+    }
+
+    @Test func resumedSpansAreNormalizedInTheNextDurableCheckpoint() async throws {
+        let snapshots = ProgressSnapshots()
+        let resume = ChunkedTranscriptionRunner.Progress(
+            totalChunks: 2, completedChunks: 1, detectedLanguage: "pt", planDigest: planDigest([0, 10]),
+            spans: [TranscribedSpan(text: "saved", start: 9.8, end: 10.4, confidence: 0.5)]
+        )
+        _ = try await ChunkedTranscriptionRunner.run(
+            chunks: boundedChunks(), planDigest: planDigest([0, 10]), resume: resume,
+            transcribeChunk: { _, index in
+                #expect(index == 1)
+                return RawTranscript(spans: [TranscribedSpan(text: "new", start: 0, end: 1)], language: "en")
+            },
+            onChunkCompleted: { snapshots.record($0) }
+        )
+        #expect(snapshots.values.count == 1)
+        #expect(snapshots.values[0].spans.map(\.end) == [10, 11])
+        #expect(snapshots.values[0].detectedLanguage == "pt")
+    }
+
+    @Test func invalidPlanMapsToIntegrityFailureBeforeAnyRequestOrCheckpoint() async throws {
+        let indexes = TranscribedIndexes()
+        let snapshots = ProgressSnapshots()
+        let plan = [10.0, 0.0].map { offset in
+            AudioChunker.Chunk(url: URL(fileURLWithPath: "/tmp/plan.m4a"), offset: offset, duration: 10)
+        }
+        await expectIntegrityFailure(.segmentOutOfBounds) {
+            try await ChunkedTranscriptionRunner.run(
+                chunks: plan, planDigest: planDigest([10, 0]), resume: nil,
+                transcribeChunk: { _, index in
+                    await indexes.record(index)
+                    return RawTranscript(spans: [], language: "en")
+                },
+                onChunkCompleted: { snapshots.record($0) }
+            )
+        }
+        #expect(await indexes.values.isEmpty)
+        #expect(snapshots.values.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func providerFailuresAndCancellationAreNotWrapped(cancellation: Bool) async throws {
+        struct ProviderFailure: Error {}
+        let indexes = TranscribedIndexes()
+        let snapshots = ProgressSnapshots()
+        let operation = {
+            try await ChunkedTranscriptionRunner.run(
+                chunks: boundedChunks(), planDigest: planDigest([0, 10]), resume: nil,
+                transcribeChunk: { _, index in
+                    await indexes.record(index)
+                    if cancellation { throw CancellationError() }
+                    throw ProviderFailure()
+                },
+                onChunkCompleted: { snapshots.record($0) }
+            )
+        }
+        if cancellation {
+            await #expect(throws: CancellationError.self) { try await operation() }
+        } else {
+            await #expect(throws: ProviderFailure.self) { try await operation() }
+        }
+        #expect(await indexes.values == [0])
+        #expect(snapshots.values.isEmpty)
+    }
+
     @Test func completedResumeTranscribesNothing() async throws {
         let resume = ChunkedTranscriptionRunner.Progress(
             totalChunks: 1,

@@ -256,13 +256,14 @@ struct TranscriptionService {
         // transcript: `TranscriptionCoordinator.saveTranscript` only deletes the
         // existing transcript after this function has already returned
         // successfully, so throwing here leaves it untouched.
-        if let failure = TranscriptIntegrityGate.validate(
+        if let diagnostic = TranscriptIntegrityGate.diagnose(
             segments: correctedSegments,
             sourceDuration: fileDuration,
             hadTranscribedInput: !spans.isEmpty
         ) {
-            AppLog.transcription.atError.error("transcribe: integrity gate rejected output: \(failure.rawValue, privacy: .public)")
-            throw AppError.transcriptIntegrityFailed(failure.rawValue)
+            let segmentIndex = diagnostic.segmentIndex.map { String($0) } ?? "none"
+            AppLog.transcription.atError.error("transcribe: integrity gate rejected output: reason=\(diagnostic.failure.rawValue, privacy: .public) detail=\(diagnostic.detail.rawValue, privacy: .public) segmentIndex=\(segmentIndex, privacy: .public)")
+            throw AppError.transcriptIntegrityFailed(diagnostic.failure.rawValue)
         }
 
         var labels: [String] = []

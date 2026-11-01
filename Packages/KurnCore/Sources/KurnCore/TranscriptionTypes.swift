@@ -53,7 +53,8 @@ public enum TimedWordSpanBuilder {
 
             let start = min(upperBound, max(0, word.start))
             let end = min(upperBound, max(start, word.end))
-            guard end > start else { return nil }
+            let isInstant = word.start == word.end && word.start >= 0 && word.start <= upperBound
+            guard end > start || isInstant else { return nil }
             return TranscribedSpan(text: text, start: start, end: end, confidence: nil)
         }
 

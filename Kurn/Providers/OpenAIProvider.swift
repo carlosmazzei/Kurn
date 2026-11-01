@@ -182,6 +182,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
             let decoded = try JSONDecoder().decode(WhisperVerboseResponse.self, from: data)
             let spans: [TranscribedSpan]
             if let segments = decoded.segments, !segments.isEmpty {
+                var assignedWordIndices: Set<Int> = []
                 // `verbose_json` carries the decoder's own confidence signals per
                 // segment; they are the only way to tell an invented sentence
                 // from a real one, since both read as fluent prose.
@@ -205,7 +206,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
                                 noSpeechProb: segment.noSpeechProb,
                                 compressionRatio: segment.compressionRatio
                             ),
-                            words: words(decoded.words, within: segment)
+                            words: words(decoded.words, within: segment, assignedIndices: &assignedWordIndices)
                         )
                     },
                     engine: "whisperAPI"
@@ -226,13 +227,16 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
     /// straddling the boundary lands on one side rather than both.
     private static func words(
         _ words: [WhisperVerboseResponse.Word]?,
-        within segment: WhisperVerboseResponse.Segment
+        within segment: WhisperVerboseResponse.Segment,
+        assignedIndices: inout Set<Int>
     ) -> [TimedWord] {
         guard let words, !words.isEmpty else { return [] }
-        return words.compactMap { word in
-            guard word.start.isFinite, word.end.isFinite, word.end >= word.start else { return nil }
-            let midpoint = (word.start + word.end) / 2
+        return words.enumerated().compactMap { index, word in
+            guard !assignedIndices.contains(index), word.start.isFinite, word.end.isFinite,
+                  word.end >= word.start else { return nil }
+            let midpoint = word.start / 2 + word.end / 2
             guard midpoint >= segment.start, midpoint <= segment.end else { return nil }
+            assignedIndices.insert(index)
             return TimedWord(text: word.word, start: word.start, end: word.end)
         }
     }

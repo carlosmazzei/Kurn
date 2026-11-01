@@ -45,13 +45,14 @@ extension TranscriptionCoordinator {
                 )
                 try Task.checkCancellation()
                 let sourceDuration = original.map(\.endTime).max() ?? 0
-                if let failure = TranscriptIntegrityGate.validate(
+                if let diagnostic = TranscriptIntegrityGate.diagnose(
                     segments: step.segments,
                     sourceDuration: sourceDuration,
                     hadTranscribedInput: !original.isEmpty
                 ) {
-                    AppLog.transcription.atError.error("retryCorrection: integrity gate rejected output: \(failure.rawValue, privacy: .public)")
-                    self.error = .transcriptIntegrityFailed(failure.rawValue)
+                    let segmentIndex = diagnostic.segmentIndex.map { String($0) } ?? "none"
+                    AppLog.transcription.atError.error("retryCorrection: integrity gate rejected output: reason=\(diagnostic.failure.rawValue, privacy: .public) detail=\(diagnostic.detail.rawValue, privacy: .public) segmentIndex=\(segmentIndex, privacy: .public)")
+                    self.error = .transcriptIntegrityFailed(diagnostic.failure.rawValue)
                     return
                 }
                 // Re-fetch rather than reuse the captured `transcript`: the

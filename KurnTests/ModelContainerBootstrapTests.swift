@@ -105,7 +105,7 @@ struct KurnModelGraphTests {
             ObjectIdentifier(Speaker.self),
             ObjectIdentifier(Summary.self),
             ObjectIdentifier(Folder.self),
-            ObjectIdentifier(Tag.self),
+            ObjectIdentifier(Kurn.Tag.self),
             ObjectIdentifier(SmartFolder.self),
             ObjectIdentifier(SemanticChunk.self),
             ObjectIdentifier(WikiArticle.self),

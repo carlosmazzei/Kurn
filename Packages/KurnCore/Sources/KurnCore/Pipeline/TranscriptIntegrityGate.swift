@@ -45,6 +45,28 @@ public enum TranscriptIntegrityFailure: String, Codable, Sendable, CaseIterable 
     case correctionIdentityViolation
 }
 
+public enum TranscriptIntegrityDetail: String, Codable, Sendable, CaseIterable {
+    case sourceDurationNonFinite
+    case sourceDurationNegative
+    case emptyOutputFromNonEmptyInput
+    case nonFiniteStartTime
+    case nonFiniteEndTime
+    case negativeStartTime
+    case negativeEndTime
+    case invertedTimeRange
+    case startBeyondSourceDuration
+    case endBeyondSourceDuration
+    case startOutOfOrder
+    case emptyText
+    case emptySpeaker
+}
+
+public struct TranscriptIntegrityDiagnostic: Codable, Equatable, Sendable {
+    public let failure: TranscriptIntegrityFailure
+    public let segmentIndex: Int?
+    public let detail: TranscriptIntegrityDetail
+}
+
 /// Validates a finished run's fused, corrected segments before they are
 /// allowed to replace an existing transcript. Pure and Linux-buildable like
 /// the rest of `Pipeline/`, so it is testable without the Apple toolchain.
@@ -64,32 +86,61 @@ public enum TranscriptIntegrityGate {
         sourceDuration: TimeInterval,
         hadTranscribedInput: Bool
     ) -> TranscriptIntegrityFailure? {
-        guard sourceDuration.isFinite, sourceDuration >= 0 else {
-            return .sourceUnreadable
+        diagnose(
+            segments: segments,
+            sourceDuration: sourceDuration,
+            hadTranscribedInput: hadTranscribedInput
+        )?.failure
+    }
+
+    public static func diagnose(
+        segments: [TranscriptSegment],
+        sourceDuration: TimeInterval,
+        hadTranscribedInput: Bool
+    ) -> TranscriptIntegrityDiagnostic? {
+        guard sourceDuration.isFinite else {
+            return .init(failure: .sourceUnreadable, segmentIndex: nil, detail: .sourceDurationNonFinite)
+        }
+        guard sourceDuration >= 0 else {
+            return .init(failure: .sourceUnreadable, segmentIndex: nil, detail: .sourceDurationNegative)
         }
         guard !segments.isEmpty else {
-            return hadTranscribedInput ? .emptyOutputFromNonEmptyInput : nil
+            return hadTranscribedInput
+                ? .init(failure: .emptyOutputFromNonEmptyInput, segmentIndex: nil, detail: .emptyOutputFromNonEmptyInput)
+                : nil
         }
 
         let upperBound = sourceDuration + boundsSlack
         var maxStartSoFar: TimeInterval = -boundsSlack
-        for segment in segments {
-            guard segment.startTime.isFinite, segment.endTime.isFinite,
-                  segment.startTime >= 0, segment.endTime >= segment.startTime,
-                  segment.startTime <= upperBound, segment.endTime <= upperBound else {
-                return .segmentOutOfBounds
+        for (index, segment) in segments.enumerated() {
+            if let detail = boundsDetail(for: segment, upperBound: upperBound) {
+                return .init(failure: .segmentOutOfBounds, segmentIndex: index, detail: detail)
             }
             guard segment.startTime >= maxStartSoFar - boundsSlack else {
-                return .segmentsOutOfOrder
+                return .init(failure: .segmentsOutOfOrder, segmentIndex: index, detail: .startOutOfOrder)
             }
             maxStartSoFar = max(maxStartSoFar, segment.startTime)
             guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return .emptySegmentText
+                return .init(failure: .emptySegmentText, segmentIndex: index, detail: .emptyText)
             }
             guard !segment.speakerLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return .unattributedSpeaker
+                return .init(failure: .unattributedSpeaker, segmentIndex: index, detail: .emptySpeaker)
             }
         }
+        return nil
+    }
+
+    private static func boundsDetail(
+        for segment: TranscriptSegment,
+        upperBound: TimeInterval
+    ) -> TranscriptIntegrityDetail? {
+        guard segment.startTime.isFinite else { return .nonFiniteStartTime }
+        guard segment.endTime.isFinite else { return .nonFiniteEndTime }
+        guard segment.startTime >= 0 else { return .negativeStartTime }
+        guard segment.endTime >= 0 else { return .negativeEndTime }
+        guard segment.endTime >= segment.startTime else { return .invertedTimeRange }
+        guard segment.startTime <= upperBound else { return .startBeyondSourceDuration }
+        guard segment.endTime <= upperBound else { return .endBeyondSourceDuration }
         return nil
     }
 

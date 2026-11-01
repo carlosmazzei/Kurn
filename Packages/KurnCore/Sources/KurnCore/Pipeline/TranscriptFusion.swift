@@ -15,6 +15,12 @@ public enum TranscriptFusion {
     /// Default cap on a single fused segment's spoken duration before it's split.
     public static let defaultMaxSegmentDuration: TimeInterval = 30
 
+    private static let paragraphPause: TimeInterval = 1.5
+    private static let phrasePause: TimeInterval = 0.5
+    private static let sentenceClosers = CharacterSet.whitespacesAndNewlines.union(
+        CharacterSet(charactersIn: "\"'”’»›)]}）」』】》")
+    )
+
     /// Attribute each text span to a speaker turn, then merge consecutive
     /// same-speaker spans into segments (capped at `maxSegmentDuration`).
     public static func segments(
@@ -23,58 +29,90 @@ public enum TranscriptFusion {
         maxSegmentDuration: TimeInterval = defaultMaxSegmentDuration
     ) -> [TranscriptSegment] {
         guard !spans.isEmpty else { return [] }
-        let attributableSpans = spans.flatMap {
-            splitCoarseSpan($0, at: turns, maxSegmentDuration: maxSegmentDuration)
+        let durationLimit = maxSegmentDuration.isFinite && maxSegmentDuration > 0
+            ? maxSegmentDuration : defaultMaxSegmentDuration
+        let attributableSpans = spans.flatMap { span in
+            validTiming(span) ? splitCoarseSpan(span, at: turns, maxSegmentDuration: durationLimit) : [span]
         }
 
         var segments: [TranscriptSegment] = []
         var currentLabel: String?
-        var currentText: [String] = []
+        var pending: [TranscribedSpan] = []
         var currentStart: TimeInterval = 0
         var currentEnd: TimeInterval = 0
-        var confidenceSum: Float = 0
-        var confidenceCount = 0
 
-        func flush() {
-            guard let label = currentLabel, !currentText.isEmpty else { return }
-            let text = currentText.joined(separator: " ")
+        func flush(_ count: Int? = nil) {
+            guard let label = currentLabel, !pending.isEmpty else { return }
+            let count = count ?? pending.count
+            let group = pending.prefix(count)
+            let text = group.map(\.text).joined(separator: " ")
                 .replacingOccurrences(of: "  ", with: " ")
                 .trimmingCharacters(in: .whitespaces)
-            let confidence = confidenceCount > 0 ? confidenceSum / Float(confidenceCount) : nil
+            let confidences = group.compactMap(\.confidence)
+            let confidence = confidences.isEmpty ? nil : confidences.reduce(0, +) / Float(confidences.count)
             segments.append(
                 TranscriptSegment(
                     speakerLabel: label,
-                    startTime: currentStart,
-                    endTime: currentEnd,
+                    startTime: group.map(\.start).min() ?? 0,
+                    endTime: group.map(\.end).max() ?? 0,
                     text: text,
                     confidence: confidence
                 )
             )
-            currentText = []
-            confidenceSum = 0
-            confidenceCount = 0
+            pending.removeFirst(count)
+            currentStart = pending.map(\.start).min() ?? 0
+            currentEnd = pending.map(\.end).max() ?? 0
         }
 
         for span in attributableSpans {
+            guard validTiming(span) else {
+                flush()
+                segments.append(TranscriptSegment(
+                    speakerLabel: "Speaker 1", startTime: span.start, endTime: span.end,
+                    text: span.text, confidence: span.confidence
+                ))
+                currentLabel = nil
+                continue
+            }
             let label = speakerLabel(for: span, in: turns)
-            let wouldExceed = currentLabel != nil
-                && (span.end - currentStart) > maxSegmentDuration
-
-            if label != currentLabel || wouldExceed {
+            if label != currentLabel || (!pending.isEmpty && span.start - currentEnd >= paragraphPause) {
                 flush()
                 currentLabel = label
-                currentStart = span.start
             }
-            currentText.append(span.text)
-            currentEnd = span.end
-            if let confidence = span.confidence {
-                confidenceSum += confidence
-                confidenceCount += 1
+            while !pending.isEmpty && max(currentEnd, span.end) - min(currentStart, span.start) > durationLimit {
+                flush(preferredBreak(in: pending, durationLimit: durationLimit))
             }
+            currentStart = pending.isEmpty ? span.start : min(currentStart, span.start)
+            currentEnd = pending.isEmpty ? span.end : max(currentEnd, span.end)
+            pending.append(span)
         }
         flush()
 
         return segments
+    }
+
+    private static func validTiming(_ span: TranscribedSpan) -> Bool {
+        span.start.isFinite && span.end.isFinite && span.start >= 0 && span.end >= span.start
+    }
+
+    private static func preferredBreak(in spans: [TranscribedSpan], durationLimit: TimeInterval) -> Int {
+        var sentenceBreak: Int?
+        var pauseBreak: Int?
+        var start = spans[0].start
+        var end = spans[0].end
+        for index in spans.indices.dropLast() {
+            start = min(start, spans[index].start)
+            end = max(end, spans[index].end)
+            guard end - start >= durationLimit / 2 else { continue }
+            if endsSentence(spans[index].text) { sentenceBreak = index + 1 }
+            if spans[index + 1].start - end >= phrasePause { pauseBreak = index + 1 }
+        }
+        return sentenceBreak ?? pauseBreak ?? spans.count
+    }
+
+    private static func endsSentence(_ text: String) -> Bool {
+        guard let last = text.trimmingCharacters(in: sentenceClosers).last else { return false }
+        return ".!?…。！？".contains(last)
     }
 
     /// Some ASR engines only return one text result for the entire recording.

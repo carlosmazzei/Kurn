@@ -43,12 +43,10 @@ enum ChunkedTranscriptionRunner {
         var turns: [SpeakerTurn] = []
         var sawAny = false
 
-        mutating func append(_ chunkTurns: [SpeakerTurn]?, offset: TimeInterval) {
+        mutating func append(_ chunkTurns: [SpeakerTurn]?) {
             guard let chunkTurns else { return }
             sawAny = true
-            turns.append(contentsOf: chunkTurns.map {
-                SpeakerTurn(speakerLabel: $0.speakerLabel, start: $0.start + offset, end: $0.end + offset)
-            })
+            turns.append(contentsOf: chunkTurns)
         }
 
         /// `nil` when no chunk ever returned speaker turns, `[]` distinguished
@@ -82,16 +80,26 @@ enum ChunkedTranscriptionRunner {
         onChunkCompleted: (@Sendable (Progress) async throws -> Void)? = nil,
         onProgress: @Sendable (Double, Int, Int) -> Void = { _, _, _ in }
     ) async throws -> RawTranscript {
-        var state: Progress
+        let bounds = chunks.map { ChunkTimestampNormalization.Bounds(offset: $0.offset, duration: $0.duration) }
+        try withTimingValidation {
+            try ChunkTimestampNormalization.validate(bounds)
+        }
+        var state = Progress(totalChunks: chunks.count, completedChunks: 0, detectedLanguage: "", planDigest: planDigest, spans: [])
         if let resume, resume.planDigest == planDigest, resume.totalChunks == chunks.count,
            (0...chunks.count).contains(resume.completedChunks) {
-            state = resume
-            AppLog.transcription.atNotice.notice("chunked: resuming at chunk \(resume.completedChunks + 1, privacy: .public)/\(chunks.count, privacy: .public)")
-        } else {
-            if resume != nil {
-                AppLog.transcription.atNotice.notice("chunked: checkpoint plan mismatch, starting over")
+            do {
+                let spans = try ChunkTimestampNormalization.normalizeCompletedSpans(
+                    resume.spans,
+                    chunks: Array(bounds.prefix(resume.completedChunks))
+                )
+                state = resume
+                state.spans = spans
+                AppLog.transcription.atNotice.notice("chunked: resuming at chunk \(resume.completedChunks + 1, privacy: .public)/\(chunks.count, privacy: .public)")
+            } catch let failure as ChunkTimestampNormalization.Failure {
+                AppLog.transcription.atNotice.notice("chunked: checkpoint timing invalid, starting over detail=\(failure.rawValue, privacy: .public)")
             }
-            state = Progress(totalChunks: chunks.count, completedChunks: 0, detectedLanguage: "", planDigest: planDigest, spans: [])
+        } else if resume != nil {
+            AppLog.transcription.atNotice.notice("chunked: checkpoint plan mismatch, starting over")
         }
         var speakerTurns = SpeakerTurnAccumulator()
 
@@ -105,7 +113,14 @@ enum ChunkedTranscriptionRunner {
         for index in state.completedChunks..<chunks.count {
             try Task.checkCancellation()
             let chunk = chunks[index]
-            let result = try await transcribeChunk(chunk, index)
+            let rawResult = try await transcribeChunk(chunk, index)
+            let result = try withTimingValidation {
+                try ChunkTimestampNormalization.normalize(
+                    rawResult,
+                    duration: chunk.duration,
+                    offset: chunk.offset
+                )
+            }
             let coveredDuration = result.spans.reduce(0) {
                 $0 + max(0, $1.end - $1.start)
             }
@@ -115,17 +130,10 @@ enum ChunkedTranscriptionRunner {
             if state.detectedLanguage.isEmpty {
                 state.detectedLanguage = result.language
             }
-            speakerTurns.append(result.speakerTurns, offset: chunk.offset)
+            speakerTurns.append(result.speakerTurns)
             // Offset chunk-local timestamps back to the input's timeline.
             for span in result.spans {
-                state.spans.append(
-                    TranscribedSpan(
-                        text: span.text,
-                        start: span.start + chunk.offset,
-                        end: span.end + chunk.offset,
-                        confidence: span.confidence
-                    )
-                )
+                state.spans.append(span)
             }
             state.completedChunks = index + 1
             // Awaited, not fired-and-forgotten: chunk N+1 must not start
@@ -144,6 +152,16 @@ enum ChunkedTranscriptionRunner {
         }
 
         return RawTranscript(spans: state.spans, language: state.detectedLanguage, speakerTurns: speakerTurns.result)
+    }
+
+    private static func withTimingValidation<Result>(_ operation: () throws -> Result) throws -> Result {
+        do {
+            return try operation()
+        } catch let failure as ChunkTimestampNormalization.Failure {
+            AppLog.transcription.atError.error("chunked: timestamp validation rejected detail=\(failure.rawValue, privacy: .public)")
+            let reason: TranscriptIntegrityFailure = failure == .invalidDuration ? .sourceUnreadable : .segmentOutOfBounds
+            throw AppError.transcriptIntegrityFailed(reason.rawValue)
+        }
     }
 }
 
