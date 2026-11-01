@@ -436,6 +436,7 @@
 "attachment.untitled" = "Dokument";
 "attachment.error.unreadable" = "Die Datei ist kein lesbares PDF.";
 "attachment.error.locked" = "Das PDF ist passwortgeschützt. Entferne das Passwort und versuche es erneut.";
+"attachment.error.too_large" = "Das PDF ist zu groß, um es hinzuzufügen.";
 "attach.title" = "Zu Meeting hinzufügen";
 "attach.files" = "Dateien";
 "attach.new_meeting" = "Neues Meeting";

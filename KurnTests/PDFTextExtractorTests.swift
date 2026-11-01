@@ -4,10 +4,12 @@
 //
 //  Text extraction from a PDF attached to a meeting, against real documents
 //  (`PDFFixtures`): every page's text layer, a page with none, the OCR
-//  budget, and the two refusals — not a PDF, and locked by a password.
+//  budget, the page, character and file-size limits, and the refusals — not
+//  a PDF, locked by a password, and too large.
 //
 
 import Foundation
+import KurnCore
 import Testing
 @testable import Kurn
 
@@ -25,6 +27,7 @@ struct PDFTextExtractorTests {
         let hiring = try #require(text.range(of: "Hiring plan"))
         #expect(budget.upperBound < hiring.lowerBound)
         #expect(text.contains("\n\n"))
+        #expect(!extraction.isTruncated)
     }
 
     @Test func aPageWithNoTextLayerAndNothingToRecognizeYieldsNoText() throws {
@@ -75,6 +78,61 @@ struct PDFTextExtractorTests {
 
         #expect(calls == 2)
         #expect(extraction.text == "page\n\npage")
+    }
+
+    @Test func pagesPastThePageLimitAreNotRead() throws {
+        let url = try PDFFixtures.makePDF(pages: (1...30).map { "Item-\($0)-end" })
+        defer { PDFFixtures.remove(url) }
+
+        let extraction = try PDFTextExtractor.extract(from: url, maxPages: 10)
+
+        #expect(extraction.pageCount == 30)
+        #expect(extraction.isTruncated)
+        let text = try #require(extraction.text)
+        #expect(text.contains("Item-10-end"))
+        #expect(!text.contains("Item-11-end"))
+        #expect(!text.contains("Item-30-end"))
+    }
+
+    @Test func textStopsAtTheCharacterLimitOfAManyPageDocument() throws {
+        let line = String(repeating: "budget ", count: 12)
+        let url = try PDFFixtures.makePDF(pages: (1...120).map { "Page \($0) \(line)" })
+        defer { PDFFixtures.remove(url) }
+        let limit = 1_000
+
+        let extraction = try PDFTextExtractor.extract(from: url, maxCharacters: limit)
+
+        #expect(extraction.pageCount == 120)
+        #expect(extraction.isTruncated)
+        let text = try #require(extraction.text)
+        #expect(text.count == limit)
+        #expect(text.hasPrefix("Page 1 budget"))
+        #expect(!text.contains("Page 120 "))
+    }
+
+    @Test func textExactlyAtTheCharacterLimitIsNotTruncated() throws {
+        let url = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(url) }
+
+        let extraction = try PDFTextExtractor.extract(from: url, maxCharacters: "Agenda".count)
+
+        #expect(extraction.text == "Agenda")
+        #expect(!extraction.isTruncated)
+    }
+
+    @Test func aFileOverTheSizeLimitIsRefusedBeforeItIsOpened() throws {
+        let url = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(url) }
+
+        #expect(throws: PDFTextExtractor.Failure.tooLarge) {
+            try PDFTextExtractor.extract(from: url, maxFileBytes: 16)
+        }
+    }
+
+    @Test func theDefaultLimitsKeepEverythingAPromptCanUse() {
+        #expect(PDFTextExtractor.maxCharacters >= AttachmentPromptContext.maxTotalCharacters)
+        #expect(PDFTextExtractor.maxPages >= PDFTextExtractor.maxOCRPages)
+        #expect(PDFTextExtractor.maxFileBytes > 0)
     }
 
     @Test func aFileThatIsNotAPDFIsUnreadable() throws {
