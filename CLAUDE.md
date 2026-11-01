@@ -42,7 +42,8 @@ package is FluidAudio.
 ### Where documentation lives
 
 This file is the architecture and conventions reference; `README.md` describes
-what the app does. `docs/` holds only documents with a lasting job:
+what the app does; `SECURITY_MODEL.md` is the threat model security scans
+rerank findings against (keep its component names stable). `docs/` holds only documents with a lasting job:
 `docs/roadmap.md` (the single list of open work — nothing shipped is described
 there), `docs/pipeline-evaluation.md` (the recorded accuracy history),
 `docs/supported-languages.md`, and the two release checklists
@@ -2511,8 +2512,9 @@ enforced by lint and by a CI audit test, not just convention:
   `UIPasteboard.general.string`; LLM-written Markdown is rendered with links
   disabled (`MarkdownPresentation.inlineAttributedString`), since a transcript
   can steer the model into a link that exfiltrates it; and a downloaded model
-  gets a `pinnedSHA256` in its catalog entry whenever the publisher's own
-  artifact lets one be taken.
+  is fetched from an immutable revision with a `pinnedSHA256` in its catalog
+  entry — `ModelFileDownloader` refuses to install a file it has no digest to
+  check against.
 - **CI supply chain:** every `uses:` in `.github/` is pinned to a full commit
   SHA with the version in a trailing comment (Dependabot keeps both current),
   checkouts set `persist-credentials: false`, and workflow inputs reach `run:`

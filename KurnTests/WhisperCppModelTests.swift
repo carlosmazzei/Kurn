@@ -48,7 +48,19 @@ struct WhisperCppModelTests {
     @Test func downloadURLsPointAtTheWhisperCppModelRepository() {
         for model in WhisperCppModel.allCases {
             let url = model.downloadURL
-            #expect(url.absoluteString == "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(model.fileName)")
+            #expect(url.absoluteString == "https://huggingface.co/ggerganov/whisper.cpp/resolve/\(WhisperCppModel.repositoryRevision)/\(model.fileName)")
+        }
+    }
+
+    /// `main` moves; a commit does not. A branch name here would let a later
+    /// upstream push change what this app downloads.
+    @Test func downloadURLsArePinnedToAFixedCommit() {
+        let revision = WhisperCppModel.repositoryRevision
+        let isHex = revision.allSatisfy { $0.isHexDigit }
+        #expect(revision.count == 40)
+        #expect(isHex)
+        for model in WhisperCppModel.allCases {
+            #expect(!model.downloadURL.path.contains("/resolve/main/"))
         }
     }
 

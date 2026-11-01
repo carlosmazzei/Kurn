@@ -12,8 +12,10 @@
 //     to its own copies.
 //  2. Read its text off the main actor (`PDFTextExtractor`), under the same
 //     resource reservation as photo OCR. This is also the validation: a file
-//     PDFKit cannot open, or one locked with a password, is refused and its
-//     copy removed.
+//     PDFKit cannot open, one locked with a password, or one over the
+//     extractor's size limit is refused and its copy removed. Text past the
+//     extractor's page and character limits is dropped, and the import's
+//     reliability event says so (`text_truncated`).
 //  3. Record the attachment (`MeetingLibrary.addAttachment`), which removes
 //     the copy itself when the save fails.
 //
@@ -136,7 +138,7 @@ struct MeetingAttachmentImporter {
             }
             record(
                 operationID, stage: "save", outcome: .succeeded, startedAt: startedAt,
-                code: extraction.text == nil ? "no_text" : nil
+                code: Self.code(for: extraction)
             )
             return attachment
         }
@@ -158,6 +160,8 @@ struct MeetingAttachmentImporter {
             return NSLocalizedString("attachment.error.unreadable", comment: "The file is not a readable PDF")
         case .locked:
             return NSLocalizedString("attachment.error.locked", comment: "The PDF is protected by a password")
+        case .tooLarge:
+            return NSLocalizedString("attachment.error.too_large", comment: "The PDF is over the size limit")
         }
     }
 
@@ -165,7 +169,13 @@ struct MeetingAttachmentImporter {
         switch failure {
         case .unreadable: return "unreadable"
         case .locked: return "locked"
+        case .tooLarge: return "too_large"
         }
+    }
+
+    static func code(for extraction: PDFTextExtraction) -> String? {
+        if extraction.text == nil { return "no_text" }
+        return extraction.isTruncated ? "text_truncated" : nil
     }
 
     private func record(

@@ -2,7 +2,8 @@
 //  ProviderModelsService.swift
 //  Kurn
 //
-//  Lists usable summary models from each configured provider's own API.
+//  Lists usable summary models from each configured provider's own API, and
+//  ElevenLabs' speech models for Read Aloud.
 //
 
 import Foundation
@@ -34,8 +35,9 @@ struct ProviderModelsService: Sendable {
     func models(for provider: AIProvider) async throws -> [String] {
         // There is exactly one on-device model and no `/models` endpoint to ask.
         guard provider.kind != .appleOnDevice else { return [provider.defaultModel] }
-        // ElevenLabs has no `/models` endpoint compatible with any of the
-        // shapes below; its one supported model is the known fallback list.
+        // ElevenLabs' `/v1/models` lists only text-to-speech models, never
+        // the Scribe speech-to-text ones, so its known fallback list is the
+        // whole answer.
         guard provider.kind != .elevenLabs else { return provider.fallbackModels }
 
         let apiKey = apiKey ?? KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
@@ -104,6 +106,41 @@ struct ProviderModelsService: Sendable {
         }
     }
 
+    /// Models that can read text aloud for `provider`. Only ElevenLabs is
+    /// asked: its `/models` is a speech catalog, narrowed here to the models
+    /// marked `can_do_text_to_speech`, kept in the order ElevenLabs lists them
+    /// (newest first). Every other vendor's listing is a chat catalog, so they
+    /// keep `suggestedSpeechModels`. Never throws: a failed or empty listing
+    /// falls back to the suggestions, since the Read Aloud picker is better
+    /// off with a known list than with an error row.
+    func speechModels(for provider: AIProvider) async -> [String] {
+        let suggested = provider.suggestedSpeechModels
+        guard provider.speechSynthesisAPI == .elevenLabs else { return suggested }
+        let apiKey = apiKey ?? KeychainManager.shared.value(for: provider.keychainAccount) ?? ""
+        do {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+            var request = URLRequest(url: try LLMHTTP.requireEndpoint(provider: provider, path: "models"))
+            request.httpMethod = "GET"
+            request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
+            let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+            var seen = Set<String>()
+            let speaking = try JSONDecoder().decode([ElevenLabsModel].self, from: data)
+                .filter { $0.canDoTextToSpeech == true && !$0.modelID.isEmpty }
+                .map(\.modelID)
+                .filter { seen.insert($0).inserted }
+            guard !speaking.isEmpty else {
+                AppLog.transcription.atInfo.info("ProviderModelsService: \(provider.displayName, privacy: .public) listed no speech models, using suggestions")
+                return suggested
+            }
+            AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(speaking.count, privacy: .public) speech model(s) from \(provider.displayName, privacy: .public)")
+            return speaking
+        } catch {
+            let code = (error as? AppError)?.logCode ?? "unexpected"
+            AppLog.transcription.atError.error("ProviderModelsService: failed to load speech models from \(provider.displayName, privacy: .public) code=\(code, privacy: .public)")
+            return suggested
+        }
+    }
+
     /// Shared GET-and-decode flow for a provider's `/models` listing: build the
     /// endpoint, apply provider-specific auth via `configure`, send, decode, and
     /// reduce to a unique sorted list via `extract`.
@@ -160,6 +197,25 @@ private struct OpenAIModelListResponse: Decodable {
     }
 
     let data: [Model]
+}
+
+/// One entry of ElevenLabs' `/models` array. Only the two fields the speech
+/// picker needs; `canDoTextToSpeech` is optional so an entry shaped
+/// differently is skipped rather than failing the whole listing.
+private struct ElevenLabsModel: Decodable {
+    let modelID: String
+    let canDoTextToSpeech: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case modelID = "model_id"
+        case canDoTextToSpeech = "can_do_text_to_speech"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        modelID = (try? container.decode(String.self, forKey: .modelID)) ?? ""
+        canDoTextToSpeech = try? container.decodeIfPresent(Bool.self, forKey: .canDoTextToSpeech)
+    }
 }
 
 private struct AnthropicModelListResponse: Decodable {

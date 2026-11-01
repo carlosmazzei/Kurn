@@ -25,29 +25,14 @@
 //  verification, or the install step itself) always leaves the previous
 //  valid model exactly as it was, never absent and never silently corrupt.
 //
-//  Since then, a catalog entry may pass `pinnedSHA256`: a digest taken from
-//  the publisher's own release artifact and checked against the received
-//  bytes regardless of what the origin's headers say. The sherpa-onnx models
-//  carry one. The whisper.cpp weights do not yet — upstream publishes no
-//  SHA-256 for the quantized variants, and the reasoning below still holds
-//  for any value that was not confirmed against the real file.
-//
-//  What this originally did NOT do, and why: pin an exact SHA-256 or an
-//  immutable source revision (commit SHA / release asset digest) as a
-//  hardcoded manifest. Doing that responsibly requires fetching the real,
-//  current values from the hosting services (HuggingFace, GitHub) to pin
-//  against — and this change was authored in an environment with no
-//  network path to either host to obtain them. A wrong hardcoded hash or a
-//  commit SHA that stops existing would be worse than the loose check it
-//  replaced: every future download would fail outright instead of just
-//  being under-verified. `linkedHashHex(from:)` below is the honest
-//  middle ground the roadmap's own wording allows for ("verify a
-//  published exact size plus SHA-256, **or a stronger signed manifest**"):
-//  it verifies the downloaded bytes against whatever integrity signal the
-//  origin volunteers for *this* transfer, over HTTPS, rather than
-//  fabricating a pinned value that was never actually confirmed against
-//  the real file. Pinning an immutable revision for whisper.cpp is the
-//  open follow-up, tracked in docs/roadmap.md.
+//  Since then, every catalog entry passes `pinnedSHA256`: a digest taken
+//  from the publisher's own artifact (the sherpa-onnx release archive, the
+//  Git LFS object ID at whisper.cpp's pinned Hugging Face commit) and checked
+//  against the received bytes regardless of what the origin's headers say.
+//  The origin's own `X-Linked-ETag`, when present, is checked as well. A
+//  transfer with no digest to check at all is rejected rather than
+//  installed unverified: a size check alone cannot tell a swapped file from
+//  the real one.
 //
 //  Pure `Foundation` (+ `CryptoKit` via `PipelineDigest`), no engine
 //  imports, so it compiles whether or not the binary packages are linked
@@ -118,8 +103,8 @@ actor ModelFileDownloader: ModelDownloading {
     /// (never wrapped, so a caller's `catch is CancellationError` still
     /// works), and everything else becomes `.modelDownloadFailed`.
     /// `logLabel` prefixes the log lines so each downloader's stream stays
-    /// greppable. `pinnedSHA256`, when the catalog has one, is the digest
-    /// the file must have, checked against the bytes received — unlike the
+    /// greppable. `pinnedSHA256` is the catalog's digest the file must
+    /// have (a transfer with neither it nor an `X-Linked-ETag` is rejected), checked against the bytes received — unlike the
     /// origin's own `X-Linked-ETag`, it cannot be changed by whoever controls
     /// the origin, which is what makes it protection against a swapped file
     /// rather than only against a corrupted transfer.
@@ -237,10 +222,10 @@ actor ModelFileDownloader: ModelDownloading {
 
     /// Checks the downloaded byte count against the server's own declared
     /// `Content-Length` exactly (falling back to the loose plausibility
-    /// floor only when the server didn't report a length at all), and — if
-    /// the origin volunteered one — the file's SHA-256 against it. See the
-    /// file header for why this app cannot pin an out-of-band manifest
-    /// value here instead.
+    /// floor only when the server didn't report a length at all), and the
+    /// file's SHA-256 against the pinned digest and any `X-Linked-ETag` the
+    /// origin sent. Fails when neither is available, so nothing is ever
+    /// installed without a hash check.
     private static func verify(
         _ outcome: Downloader.Outcome,
         minimumPlausibleBytes: Int64,
@@ -260,7 +245,9 @@ actor ModelFileDownloader: ModelDownloading {
             }
         }
         let expectedHexes = [pinnedSHA256, linkedHashHex(from: outcome.response)].compactMap { $0 }
-        guard !expectedHexes.isEmpty else { return }
+        guard !expectedHexes.isEmpty else {
+            throw AppError.modelDownloadFailed("no checksum available to verify the downloaded file")
+        }
         let actualHex = try PipelineDigest.sha256Hex(ofFileAt: outcome.fileURL)
         for expectedHex in expectedHexes {
             guard actualHex.caseInsensitiveCompare(expectedHex) == .orderedSame else {

@@ -454,6 +454,7 @@
 "attachment.untitled" = "Document";
 "attachment.error.unreadable" = "Le fichier n'est pas un PDF lisible.";
 "attachment.error.locked" = "Le PDF est protégé par un mot de passe. Supprimez le mot de passe et réessayez.";
+"attachment.error.too_large" = "Le PDF est trop volumineux pour être ajouté.";
 "attach.title" = "Ajouter à la réunion";
 "attach.files" = "Fichiers";
 "attach.new_meeting" = "Nouvelle réunion";
