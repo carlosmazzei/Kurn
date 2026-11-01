@@ -40,7 +40,8 @@ package is FluidAudio.
 ### Where documentation lives
 
 This file is the architecture and conventions reference; `README.md` describes
-what the app does. `docs/` holds only documents with a lasting job:
+what the app does; `SECURITY_MODEL.md` is the threat model security scans
+rerank findings against (keep its component names stable). `docs/` holds only documents with a lasting job:
 `docs/roadmap.md` (the single list of open work — nothing shipped is described
 there), `docs/pipeline-evaluation.md` (the recorded accuracy history),
 `docs/supported-languages.md`, and the two release checklists
