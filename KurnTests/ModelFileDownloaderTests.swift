@@ -4,8 +4,8 @@
 //
 //  H7 PR 15: proves the fetch → verify → install sequence actually behaves
 //  as documented — exact-size verification against the server's declared
-//  `Content-Length`, opportunistic SHA-256 verification via `X-Linked-ETag`,
-//  atomic replacement of an existing file, and preservation of the previous
+//  `Content-Length`, SHA-256 verification against the pinned digest and
+//  `X-Linked-ETag` (and rejection when neither is available), atomic replacement of an existing file, and preservation of the previous
 //  file whenever verification or install fails.
 //
 //  Uses a dedicated `StubDownloadProtocol` rather than the shared
@@ -100,6 +100,11 @@ struct ModelFileDownloaderTests {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    private static func isModelDownloadFailed(_ error: AppError?) -> Bool {
+        guard case .modelDownloadFailed = error else { return false }
+        return true
+    }
+
     // MARK: - Exact size verification
 
     @Test("installs a file whose size matches the declared Content-Length")
@@ -116,7 +121,8 @@ struct ModelFileDownloaderTests {
             destination: destination,
             minimumPlausibleBytes: 500,
             policy: .wifiOnly,
-            logLabel: "test"
+            logLabel: "test",
+            pinnedSHA256: sha256Hex(of: body)
         ) { _ in }
 
         let installed = try Data(contentsOf: destination)
@@ -146,7 +152,7 @@ struct ModelFileDownloaderTests {
         #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
-    // MARK: - Opportunistic hash verification
+    // MARK: - Origin digest verification
 
     @Test("installs a file whose SHA-256 matches X-Linked-ETag")
     func installsWhenHashMatches() async throws {
@@ -251,6 +257,67 @@ struct ModelFileDownloaderTests {
         #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
+    @Test("rejects a file whose SHA-256 does not match the pinned digest")
+    func rejectsWhenPinMismatches() async throws {
+        let downloader = makeDownloader()
+        let destination = tempDestination()
+        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+
+        let expected = Data(repeating: 0x33, count: 2_048)
+        let received = Data(repeating: 0x44, count: 2_048)
+        StubDownloadProtocol.enqueue(.init(body: received, headers: ["Content-Length": "\(received.count)"]))
+
+        let error = await #expect(throws: AppError.self) {
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                minimumPlausibleBytes: 500,
+                policy: .wifiOnly,
+                logLabel: "test",
+                pinnedSHA256: sha256Hex(of: expected)
+            ) { _ in }
+        }
+
+        #expect(Self.isModelDownloadFailed(error))
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    /// A size check alone cannot tell a swapped file from the real one, so a
+    /// transfer with neither a pin nor an `X-Linked-ETag` must not install.
+    @Test("rejects a download when no checksum is available to verify it")
+    func rejectsWhenNoHashIsAvailable() async throws {
+        let downloader = makeDownloader()
+        let destination = tempDestination()
+        defer { try? FileManager.default.removeItem(at: destination.deletingLastPathComponent()) }
+
+        let body = Data(repeating: 0x41, count: 1_000)
+        StubDownloadProtocol.enqueue(.init(body: body, headers: ["Content-Length": "\(body.count)"]))
+
+        let error = await #expect(throws: AppError.self) {
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                minimumPlausibleBytes: 500,
+                policy: .wifiOnly,
+                logLabel: "test"
+            ) { _ in }
+        }
+
+        #expect(Self.isModelDownloadFailed(error))
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    @Test("the whisper.cpp catalog pins a well-formed SHA-256 digest for every model")
+    func whisperCppCatalogPinsAreWellFormed() {
+        let pins = WhisperCppModel.allCases.map(\.sha256)
+        #expect(Set(pins).count == pins.count)
+        for pin in pins {
+            let isHex = pin.allSatisfy { $0.isHexDigit }
+            #expect(pin.count == 64)
+            #expect(isHex)
+        }
+    }
+
     @Test("the sherpa-onnx catalog pins well-formed SHA-256 digests")
     func sherpaCatalogPinsAreWellFormed() {
         for pin in [SherpaOnnxModelDownloader.segmentationSHA256, SherpaOnnxModelDownloader.embeddingSHA256] {
@@ -270,21 +337,25 @@ struct ModelFileDownloaderTests {
 
         let body = Data(repeating: 0x11, count: 512)
         // A short, quoted git-blob-style ETag: not 64 hex characters, so it
-        // must be ignored rather than compared against as a checksum.
+        // must be ignored rather than compared against as a checksum — and,
+        // being the only integrity signal, it is not enough to install.
         StubDownloadProtocol.enqueue(.init(body: body, headers: [
             "Content-Length": "\(body.count)",
             "ETag": "\"abc123\""
         ]))
 
-        try await downloader.fetch(
-            url: URL(string: "https://example.com/model.bin")!,
-            destination: destination,
-            minimumPlausibleBytes: 100,
-            policy: .wifiOnly,
-            logLabel: "test"
-        ) { _ in }
+        let error = await #expect(throws: AppError.self) {
+            try await downloader.fetch(
+                url: URL(string: "https://example.com/model.bin")!,
+                destination: destination,
+                minimumPlausibleBytes: 100,
+                policy: .wifiOnly,
+                logLabel: "test"
+            ) { _ in }
+        }
 
-        #expect(FileManager.default.fileExists(atPath: destination.path))
+        #expect(Self.isModelDownloadFailed(error))
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
     // MARK: - Atomic replacement and preservation of the previous file
@@ -311,7 +382,8 @@ struct ModelFileDownloaderTests {
             // "already installed" and skip the network call entirely.
             minimumPlausibleBytes: replacement.count.int64Value,
             policy: .wifiOnly,
-            logLabel: "test"
+            logLabel: "test",
+            pinnedSHA256: sha256Hex(of: replacement)
         ) { _ in }
 
         let installed = try Data(contentsOf: destination)

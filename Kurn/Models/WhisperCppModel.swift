@@ -30,10 +30,14 @@ enum WhisperCppModel: String, Codable, Sendable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// HuggingFace repository hosting whisper.cpp's converted GGML weights.
-    /// Matches `models/download-ggml-model.sh` upstream.
+    /// HuggingFace repository hosting whisper.cpp's converted GGML weights
+    /// (the one `models/download-ggml-model.sh` upstream uses), pinned to a
+    /// fixed commit rather than the moving `main` branch so a later push
+    /// cannot change what this app downloads.
+    static let repositoryRevision = "5359861c739e955e79d9a303bcbc70fb988958b1"
+
     private static let repositoryURL = URL(
-        string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
+        string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/\(repositoryRevision)"
     )!
 
     /// Upstream model identifier, i.e. the `ggml-<name>.bin` suffix.
@@ -53,6 +57,19 @@ enum WhisperCppModel: String, Codable, Sendable, CaseIterable, Identifiable {
 
     var downloadURL: URL {
         Self.repositoryURL.appendingPathComponent(fileName)
+    }
+
+    /// SHA-256 of the weight file at `repositoryRevision` — the Git LFS object
+    /// ID committed at that revision, confirmed by hashing the downloaded
+    /// bytes. Checked against the received file as `pinnedSHA256`, so a file
+    /// swapped at the origin fails the download instead of reaching
+    /// whisper.cpp's GGML loader.
+    var sha256: String {
+        switch self {
+        case .base: return "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898"
+        case .small: return "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"
+        case .largeTurbo: return "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"
+        }
     }
 
     /// Published size of the weight file, used to tell the user what a download

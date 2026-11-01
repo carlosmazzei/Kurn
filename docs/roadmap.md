@@ -283,11 +283,8 @@ The H1–H10 hardening track is closed; its invariants and types are in
   `docs/release-physical-checklist.md` (Data Protection, interruptions, route
   changes, background expiry, low storage, thermal/memory, Watch, model
   compilation) — run per release, not a one-off task.
-- **Model integrity.** Pin `WhisperCppModel`'s download source to an immutable
-  HuggingFace revision instead of `resolve/main` (sherpa-onnx is already
-  pinned); a wrong hardcoded SHA would break every download, so it needs a real
-  commit hash fetched with network access. Models installed before verification
-  existed read `.unverified` until re-downloaded. Download resume data survives
+- **Model integrity.** Models installed before verification existed read
+  `.unverified` until re-downloaded. Download resume data survives
   backgrounding but not a relaunch, and there is no automatic
   retry-with-backoff.
 - **Operation state.** A full operation-state enum (queued / running / paused /
