@@ -88,6 +88,7 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | `924702e` | ElevenLabs `scribe_v2` only, 8 configs (prep × VAD × `fluidAudio`/native diarization). AMI was DER-only on 3 meetings: the AMI server returned 403 for the annotation zip and one audio file | AMI (3, DER only), LibriSpeech (6), CAMOES (40), CORAA (40) | [41305791412](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412) |
 | 2026-09-26 | `986697b`…`5ae7fed` | Nine dispatches: AMI and VoxConverse × all three diarizers (Parakeet); full on-device baseline; OpenAI `whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe` (before and after the untimed-span fix, plus a Portuguese confirmation); Groq + LLM correction; ElevenLabs Scribe with `fluidAudio` and its own diarization (before and after the compaction fix) | AMI (4), VoxConverse (4, first run), LibriSpeech (6), CAMOES (40), CORAA (40) | [AMI diar](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898), [VoxConverse](https://github.com/carlosmazzei/Kurn/actions/runs/36258371882), [baseline](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738), [OpenAI](https://github.com/carlosmazzei/Kurn/actions/runs/36258538786), [OpenAI after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012), [OpenAI pt](https://github.com/carlosmazzei/Kurn/actions/runs/36268996027), [Groq+corr](https://github.com/carlosmazzei/Kurn/actions/runs/36258540773), [ElevenLabs](https://github.com/carlosmazzei/Kurn/actions/runs/36270575700), [ElevenLabs after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
 | 2026-08-27 | `6f0a094` | `sherpaOnnx` diarizer only × `whisperCpp@small`, 4 configs (prep × VAD) — first runtime measurement of D4, not yet compared against `fluidAudio` | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [33029297796](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796) |
 | 2026-08-09 | `53db49c` | LLM transcript correction (D-stage), `essential`×`whisperCpp/small` paired on/off (16 rows) + `full`×`fluidAudioParakeet` corrected-only (8 rows) vs. the 2026-08-03 baseline | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [essential+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299) |
@@ -256,6 +257,110 @@ The measured consequence: the gated path produced the only real improvements
 "correct what the decoder is unsure about" are not the same feature.
 
 ## Runs
+
+### 2026-11-01 — `924702e` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412))
+
+**First measurement of ElevenLabs `scribe_v2`.** It was added to the
+transcription model list with `scribe_v1` still the default; this run asks
+whether it should become the default. Short answer: not on this evidence.
+
+Read this run with three limits in mind:
+
+- **No AMI WER and no cpWER.** The AMI server (`groups.inf.ed.ac.uk`)
+  returned HTTP 403 for the manual-annotation zip, so `fetch_ami.py` fell back
+  to DER only, as designed. The 403 also cost one meeting's audio
+  (`TS3003a`), so AMI DER here covers **3 meetings, not 4**, and is not
+  comparable with the 4-meeting rows of earlier runs.
+- **The comparison with `scribe_v1` crosses runs**: 162 commits between
+  `5ae7fed` and `924702e`, including the fusion timing/break fix. The
+  diarizer cannot move WER, so the WER comparison is a fair signal; DER is
+  not.
+- Three other dispatches from the same batch (whisper.cpp `base` and
+  `largeTurbo`, Groq `whisper-large-v3-turbo`) were cancelled or hit the
+  same AMI 403 before scoring anything. Nothing from them is recorded.
+
+What it says:
+
+- **WER is level with `scribe_v1`, not better.** LibriSpeech is the same
+  0.53%. CAMOES is 43.43–47.45% (v1: 42.70–47.08%) and CORAA is 13.01–13.78%
+  (v1: 12.50–13.78%). Every range overlaps, and v1 holds the best figure on
+  both Portuguese corpora. The reference-tool re-score matches the harness to
+  0.0000pp.
+- **Native turns keep the same shape as with `scribe_v1`**: worst on raw DER
+  (40.58–53.48% against 21.03% for `fluidAudio`), yet the best fused DER
+  measured here (21.20%, `none` + FluidAudio VAD). That gap is why cpWER was
+  the deciding metric on 2026-09-26, and this run could not measure it.
+- **`standardDSP` + `energyThreshold` is the outlier on fused DER** for both
+  diarizers (31.48% and 32.54%, against 21–28% for the other three
+  combinations), while the raw `fluidAudio` DER is identical in all four.
+  Three meetings are too few to tell this apart from noise.
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 | 23.95% | 3 | 21.03% | 3 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 | 23.74% | 3 | 21.03% | 3 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 | 31.48% | 3 | 21.03% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 | 23.26% | 3 | 21.03% | 3 |
+| none | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | — | — | 21.20% | 3 | 40.58% | 3 |
+| none | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | — | — | 22.05% | 3 | 53.46% | 3 |
+| standardDSP | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | — | — | 27.70% | 3 | 43.48% | 3 |
+| standardDSP | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | — | — | 32.54% | 3 | 53.48% | 3 |
+
+#### Portuguese
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 25.53% | 80 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 26.73% | 80 |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 27.03% | 80 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 27.63% | 80 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 21.20% | 3 | 40.58% | 3 |
+| none | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 22.05% | 3 | 53.46% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 23.26% | 3 | 21.03% | 3 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 23.74% | 3 | 21.03% | 3 |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 23.95% | 3 | 21.03% | 3 |
+| standardDSP | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 27.70% | 3 | 43.48% | 3 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 31.48% | 3 | 21.03% | 3 |
+| standardDSP | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 32.54% | 3 | 53.48% | 3 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 0.53% | 6 |
+
+##### portuguese / camoes-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 43.43% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 45.62% | 40 |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 46.35% | 40 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 47.45% | 40 |
+
+##### portuguese / coraa-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 13.01% | 40 |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 13.52% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 13.52% | 40 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 13.78% | 40 |
+
+</details>
+
 
 ### 2026-09-26 — `986697b`…`5ae7fed` (nine dispatches, linked under Runs at a glance)
 
