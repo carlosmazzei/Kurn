@@ -99,6 +99,26 @@ python3 fetch_all.py --out ~/kurn-eval-public
 Fetches every corpus with `"enabled": true` in `manifest.json`. Add
 `--only librispeech-en ami-en` to fetch a subset while iterating.
 
+### AMI's mirror throttles CI runners
+
+Every corpus except AMI comes from Hugging Face, which has served every run.
+AMI's audio and manual annotations come from the University of Edinburgh's
+mirror (`groups.inf.ed.ac.uk`), which on 2026-11-01 answered GitHub-hosted
+runners with HTTP 403 and cut one transfer off at 17 MB of 68 MB. Earlier runs
+had fetched the same URLs without trouble. Three things limit the damage:
+
+- `fetch_ami.download` retries a 403/429/5xx with backoff and resumes a
+  truncated file with a `Range` request instead of restarting it.
+- A meeting whose clip and RTTM are already in the dataset cache is reused
+  without a request. The workflow saves the cache right after the fetch, under
+  a key that ends in a hash of what was fetched, so one successful AMI fetch
+  serves every later run.
+- `fetch_all.py` fails the step only when *every* requested corpus failed.
+  Otherwise it prints a `::warning::` and the run scores the corpora it has.
+
+Dispatches that need AMI should still go one at a time. Several started
+together reach the mirror at the same moment, which is how the 403s began.
+
 ### Gated datasets (Common Voice, and CORAA once enabled)
 
 Hugging Face gates Common Voice behind an account that has clicked "agree" on
