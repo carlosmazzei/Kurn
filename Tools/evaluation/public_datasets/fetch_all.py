@@ -48,6 +48,11 @@ def _format_corpus(entry: dict) -> str:
     return f"{entry['id']}: {entry.get('corpus_name', entry['id'])} [{entry.get('language', '?')}] -> {_scoring_description(entry)} ({count}){token_note}"
 
 
+def fetch_should_fail(attempted: list[str], failures: list[str]) -> bool:
+    """Fail the step only when nothing the dispatch asked for could be fetched."""
+    return bool(failures) and set(failures) >= set(attempted)
+
+
 def print_summary(manifest: dict, token: str | None, only: list[str] | None) -> None:
     enabled: list[dict] = []
     skipped: list[tuple[dict, str]] = []
@@ -94,6 +99,7 @@ def main() -> None:
     print_summary(manifest, token, args.only)
 
     failures: list[str] = []
+    attempted: list[str] = []
     for entry in manifest["corpora"]:
         if args.only and entry["id"] not in args.only:
             continue
@@ -109,6 +115,7 @@ def main() -> None:
             continue
 
         out_dir = args.out / entry["id"]
+        attempted.append(entry["id"])
         try:
             if entry["kind"] == "huggingface_audio":
                 from fetch_huggingface_audio_dataset import fetch as fetch_huggingface
@@ -133,7 +140,17 @@ def main() -> None:
 
     if failures:
         print(f"[fetch] failed to fetch: {', '.join(failures)}", file=sys.stderr, flush=True)
-        os._exit(1)
+        if fetch_should_fail(attempted, failures):
+            os._exit(1)
+        # One unreachable host (AMI's mirror, most often) must not throw away
+        # every other corpus the dispatch asked for. The harness only scores
+        # what is on disk and prints the corpus list, so the gap stays visible;
+        # the annotation puts it on the run page too.
+        print(
+            f"::warning title=Corpus fetch failed::{', '.join(failures)} could not be fetched; "
+            "this run scores only the other corpora.",
+            flush=True,
+        )
     print(f"[fetch] done -- corpora written under {args.out}", flush=True)
     # The datasets/fsspec stack can leave non-daemon background threads (e.g.
     # HTTP connection pools, file-system monitors) that prevent the interpreter
