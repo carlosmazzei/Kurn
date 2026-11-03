@@ -88,12 +88,23 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | `aebf04e` | Nemotron 3 against Pyannote diarization, Parakeet ASR, 8 configs (prep × VAD × diarization model) | VoxConverse (4, DER) | [41339676563](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563) |
+| 2026-11-01 | `f6745bb` | Five dispatches on the new FluidAudio model axes: Nemotron Unified, Bark 3.0/Clean, Phonon-2 and Transcribe Lite in English (20 configs) and Nemotron Unified in Portuguese (4); whisper.cpp `base` + `largeTurbo` in English and Portuguese (8 each); Groq `whisper-large-v3-turbo` (4). AMI's mirror throttled the runners, so AMI coverage differs per dispatch | AMI (4 with WER for the FluidAudio models; 3 DER-only for whisper.cpp; 1 for Groq), LibriSpeech (6), CAMOES (40), CORAA (40) | [FluidAudio en](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736), [Unified pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336076180), [whisper.cpp en](https://github.com/carlosmazzei/Kurn/actions/runs/41336081989), [whisper.cpp pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871), [Groq turbo](https://github.com/carlosmazzei/Kurn/actions/runs/41336088010) |
+| 2026-11-01 | `924702e` | whisper.cpp `base` × `heuristic` / `fluidAudio` / `sherpaOnnx`, 12 configs | AMI (3 DER, 2 WER), LibriSpeech (6), CAMOES (40), CORAA (40) | [41315829712](https://github.com/carlosmazzei/Kurn/actions/runs/41315829712) |
 | 2026-11-01 | `924702e` | ElevenLabs `scribe_v2` only, 8 configs (prep × VAD × `fluidAudio`/native diarization). AMI was DER-only on 3 meetings: the AMI server returned 403 for the annotation zip and one audio file | AMI (3, DER only), LibriSpeech (6), CAMOES (40), CORAA (40) | [41305791412](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412) |
 | 2026-09-26 | `986697b`…`5ae7fed` | Nine dispatches: AMI and VoxConverse × all three diarizers (Parakeet); full on-device baseline; OpenAI `whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe` (before and after the untimed-span fix, plus a Portuguese confirmation); Groq + LLM correction; ElevenLabs Scribe with `fluidAudio` and its own diarization (before and after the compaction fix) | AMI (4), VoxConverse (4, first run), LibriSpeech (6), CAMOES (40), CORAA (40) | [AMI diar](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898), [VoxConverse](https://github.com/carlosmazzei/Kurn/actions/runs/36258371882), [baseline](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738), [OpenAI](https://github.com/carlosmazzei/Kurn/actions/runs/36258538786), [OpenAI after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012), [OpenAI pt](https://github.com/carlosmazzei/Kurn/actions/runs/36268996027), [Groq+corr](https://github.com/carlosmazzei/Kurn/actions/runs/36258540773), [ElevenLabs](https://github.com/carlosmazzei/Kurn/actions/runs/36270575700), [ElevenLabs after fix](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
 | 2026-08-27 | `6f0a094` | `sherpaOnnx` diarizer only × `whisperCpp@small`, 4 configs (prep × VAD) — first runtime measurement of D4, not yet compared against `fluidAudio` | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [33029297796](https://github.com/carlosmazzei/Kurn/actions/runs/33029297796) |
 | 2026-08-09 | `53db49c` | LLM transcript correction (D-stage), `essential`×`whisperCpp/small` paired on/off (16 rows) + `full`×`fluidAudioParakeet` corrected-only (8 rows) vs. the 2026-08-03 baseline | AMI (4), LibriSpeech (6), CAMOES (40), CORAA (40) | [essential+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31284831125), [Parakeet+correction](https://github.com/carlosmazzei/Kurn/actions/runs/31307328299) |
 | 2026-08-03 | `2644589` | `full` matrix — 32 English configs (on-device × `whisperAPI:groq`) + 16 Portuguese configs (diarizer axis collapsed, no PT reference RTTM) | AMI (4, WER+DER), LibriSpeech (6, WER), CAMOES (40, WER), CORAA (40, WER) | [30800039020](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
 | 2026-08-02 | `3eecdcc` | Portuguese only, 16 configs — predates the corpus rebalance and the per-corpus aggregate | CAMOES (12), CORAA (12) | [30752932441](https://github.com/carlosmazzei/Kurn/actions/runs/30752932441) |
+
+Dispatches with no entry, and why (audited 2026-11-03 against every run of the
+workflow): the 2026-08-01/02 runs before `3eecdcc` were the harness being
+built, and their logs and artifacts have expired; `36258542329` selected zero
+configurations; `33025851651` failed on a sherpa-onnx model download (HTTP
+404) before scoring; `41316277469` (whisper.cpp `largeTurbo`) was cancelled
+after 324 rows and superseded by `41336081989`/`41336084871`; `41336079434`
+failed in the AMI fetch; every other cancelled run scored nothing.
 
 Open questions no run has answered yet:
 
@@ -105,10 +116,26 @@ Open questions no run has answered yet:
 - **DER for Portuguese**: no public, freely downloadable multi-speaker
   Portuguese corpus with turn-level annotation comparable to AMI has been
   identified, so every Portuguese row is WER-only.
+- **Nemotron 3 on meetings.** It beat Pyannote decisively on VoxConverse
+  (raw DER 1.39% against 10.61%, same run), but most of that is one file and
+  AMI, the corpus that matches the app, has not been run.
+- **The new FluidAudio ASR models against Parakeet v3 on the same code.**
+  Their WER ties Parakeet's, but fused DER cannot be compared across the
+  fusion fix that landed between the two runs.
+- **Speed and memory on a phone.** Every run here is a macOS CI simulator;
+  none says how the new models behave on an iPhone's ANE or within its
+  memory limit (CLAUDE.md, "FluidAudio on-device models").
+- **Live preview models are outside the harness.** The preview never goes
+  through `TranscriptionService`, so neither automatic nor Unified streaming
+  has a number.
 - **Native diarization vs. the local one, per file.** ElevenLabs' own speaker
   turns give the best cpWER measured but a worse raw DER than `fluidAudio`
   (see Cross-run findings), and swing with the VAD choice. Four meetings
   cannot say whether that is the provider or the material.
+
+Answered on 2026-11-01: the first measurements of every FluidAudio model added
+in `2ccd8b6`, whisper.cpp `base` and `largeTurbo`, Groq `whisper-large-v3-turbo`
+and ElevenLabs `scribe_v2`; and D4 read per file (below, "D4 per file").
 
 Answered on 2026-09-26: D4 (sherpa-onnx is behind FluidAudio on raw DER on
 both AMI and VoxConverse, same run), Groq + correction (ran clean, no 429),
@@ -134,10 +161,16 @@ qualified.
 | Meetings (AMI, en), on-device | `standardDSP` + `energyThreshold` + `fluidAudio` + `fluidAudioParakeet` | 22.73% | 33.26% | 2026-09-26 (22.70% / 32.89% on 2026-08-03) |
 | Meetings (AMI, en), cloud | `none` + `fluidAudio` VAD + `fluidAudio` + `whisperAPI:elevenLabs` | 15.67% (14.43% standard) | 32.26% | 2026-09-26 |
 | Meetings (AMI, en), who said what | `standardDSP` or `none` + `fluidAudio` VAD + `transcriptionProviderNative` + `whisperAPI:elevenLabs` | 16.40–16.51% | 24.72–28.08% (cpWER **18.19–18.47%**) | 2026-09-26, after the compaction fix |
-| Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet` | 26.43% | not measured | 2026-09-26 |
-| Portuguese, spontaneous interviews (CAMOES) | `standardDSP` + `energyThreshold` + `whisperAPI:groq` + LLM correction | 36.13% | not measured | 2026-09-26 (37.96% uncorrected, 2026-08-03) |
-| Portuguese, short clips (CORAA), on-device | `none` + `energyThreshold` + `fluidAudioParakeet` | 15.31% | not measured | 2026-09-26 |
+| Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 23.87% | not measured | 2026-11-01 (Parakeet v3: 26.43%, 2026-09-26) |
+| Portuguese, spontaneous interviews (CAMOES) | `none` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 35.04% | not measured | 2026-11-01, on-device (best cloud: Groq + LLM correction, 36.13%, 2026-09-26) |
+| Portuguese, short clips (CORAA), on-device | `standardDSP` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 14.54% | not measured | 2026-11-01 (Parakeet v3: 15.31%, 2026-09-26) |
 | Portuguese, short clips (CORAA), cloud | `standardDSP` + `energyThreshold` + `whisperAPI:elevenLabs` | 12.50% | not measured | 2026-09-26 |
+| Speaker turns (VoxConverse, en), on-device | `none` + `energyThreshold` + `fluidAudio@nemotron3` | — | 4.44% (raw **1.39%**) | 2026-11-01, same run as Pyannote's 13.13% (raw 10.61%) |
+
+The AMI on-device row stays on Parakeet v3 for now. Phonon-2 (22.35%) and
+Bark 3.0 (22.43%) tie it on WER, and their fused DER (22.07% and 26.25%) reads
+far lower, but that DER crosses the fusion fix merged between the runs; a
+same-code Parakeet dispatch decides it.
 
 On AMI — the corpus that matches what the app records — Parakeet leads the
 on-device engines on both metrics at once, by ~5pp WER and ~15pp DER over
@@ -149,6 +182,11 @@ words attributed by `fluidAudio`. CAMOES remains the one corpus where no
 cloud model beats Groq + correction. Portuguese has no single winner: the per-corpus rows reverse
 each other, so the aggregate is a property of the corpus mix, not of an
 engine.
+
+In Portuguese the picture changed on 2026-11-01: Nemotron Unified, on device,
+leads every engine measured on CAMOES and aggregate Portuguese, and is within
+2pp of ElevenLabs on CORAA. It is also the weakest of the new models in English
+(28.07% on AMI), so it is a per-language choice, not a new default.
 
 **How this lines up with the app's shipped defaults.** Preprocessing
 (`.standardDSP`), VAD (`.energyThreshold`), diarization (`.fluidAudio`) and
@@ -168,11 +206,39 @@ constant across preprocessing × VAD, since the diarizer reads its own copy:
 | AMI (4 meetings, 4 speakers each) | **18.28%** | 37.41% | 49.92–78.27% |
 | VoxConverse (4 files, first run) | **10.62%** | 23.32% | 30.54–40.94% |
 
+`fluidAudio@nemotron3` (Nemotron 3, 2026-11-01) on VoxConverse: **1.39%**.
+Raw DER does not depend on the ASR engine, and Pyannote reproduced its 10.62%
+as 10.61% in that run, so the comparison holds across the two dates. AMI has
+not been run with Nemotron 3.
+
 This settles D4 as far as these eight files go: the segmentation-first
 engine is about twice FluidAudio's error on both corpora. FluidAudio's VBx
 step still collapses to two centroids on a four-speaker AMI meeting
 (`TS3003a`: 141/10 assignment) and still scores 11.7% there, so the
 collapse is real but not what dominates DER on this material.
+
+### D4 per file: sherpa-onnx never holds where Pyannote collapses
+
+The roadmap's question was narrower than the aggregate: does any single
+recording show Pyannote collapsing while sherpa-onnx holds? Raw DER per file,
+2026-09-26 (`none` + `energyThreshold`; confusion seconds in brackets):
+
+| File | `fluidAudio` (Pyannote) | `sherpaOnnx` | `heuristic` | `fluidAudio@nemotron3` (2026-11-01) |
+| --- | --- | --- | --- | --- |
+| VoxConverse `0000` | 32.2% (81.1 s) | 45.0% (112.2 s) | 61.2% (142.8 s) | **2.5% (0.0 s)** |
+| VoxConverse `0001` | 3.6% | 4.1% | 48.9% | 0.3% |
+| VoxConverse `0002` | 1.1% | 0.8% | 3.3% | 0.7% |
+| VoxConverse `0003` | 5.8% | 49.1% | 54.5% | 2.2% |
+| AMI `EN2002a` | 31.1% | 45.4% | 67.7% | not run |
+| AMI `ES2004a` | 9.4% | 28.1% | 119.9% | not run |
+| AMI `IS1009a` | 13.4% | 24.0% | 76.4% | not run |
+| AMI `TS3003a` | 11.7% | 42.4% | 67.4% | not run |
+
+`voxconverse-en-0000` is the one file where Pyannote's clustering visibly
+fails, and sherpa-onnx confuses **more** speech there, not less. It is ahead
+on one file, by 0.3pp. So no file supports the reason the engine was added;
+by the roadmap's own rule it is a candidate for removal. The file that does
+recover is Nemotron 3's.
 
 ### sherpa-onnx vs. FluidAudio: the diarizer axis, ASR held constant
 
@@ -258,6 +324,456 @@ The measured consequence: the gated path produced the only real improvements
 
 ## Runs
 
+> The tables in the entries for 2026-11-01 below were rebuilt from the job logs,
+> because the `pipeline-eval-report` artifacts live on blob storage this
+> environment cannot reach. WER counts are exact; the log prints DER seconds
+> to 0.1 s, so a DER here can differ from the harness's by up to ~0.05pp. Each
+> run's reference-tool re-score matched its own CSV to 0.0000pp.
+
+
+### 2026-11-01 — `aebf04e` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563))
+
+**First measurement of Nemotron 3 diarization, against Pyannote in the same
+run.** VoxConverse only: AMI's mirror refused every meeting that afternoon, and
+the first dispatch of this comparison (`41336079434`) failed in the fetch step
+before anything ran (see "AMI's mirror throttles CI runners" in
+`Tools/evaluation/public_datasets/README.md`).
+
+- **Raw DER 1.39% against Pyannote's 10.61%.** Pyannote reproduced its
+  2026-09-26 figure (10.62%), so the comparison stands. Fused DER is
+  4.44–7.45% against 13.13–15.93%.
+- **Most of the gap is one recording.** On `voxconverse-en-0000` Pyannote
+  confused 81.1 s of 265.6 s (32.2% raw) and Nemotron 3 none (2.5%). On the
+  other three files Nemotron 3 is ahead by 0.4–3.6pp or level.
+- **The eight-speaker ceiling did not bite here.** `voxconverse-en-0001` has 12
+  reference speakers in its first five minutes and scored 0.3% raw; the
+  speakers beyond eight carry little speech in that clip.
+- **It costs about twice the time** (≈110 s per five-minute file on the runner
+  against 55–65 s) and returns no voiceprints, so speaker identity matching is
+  unavailable with it (CLAUDE.md, "Speaker identity").
+- Four files are a signal, not a verdict. AMI is the next measurement.
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio@nemotron3 | fluidAudioParakeet | 4.44% | 4 | 1.39% | 4 |
+| standardDSP | energyThreshold | fluidAudio@nemotron3 | fluidAudioParakeet | 6.64% | 4 | 1.39% | 4 |
+| none | fluidAudio | fluidAudio@nemotron3 | fluidAudioParakeet | 6.88% | 4 | 1.39% | 4 |
+| standardDSP | fluidAudio | fluidAudio@nemotron3 | fluidAudioParakeet | 7.45% | 4 | 1.39% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 13.13% | 4 | 10.61% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 15.02% | 4 | 10.61% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 15.20% | 4 | 10.61% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 15.93% | 4 | 10.61% | 4 |
+
+### 2026-11-01 — `f6745bb` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736))
+
+**First measurement of the five FluidAudio ASR models added in `2ccd8b6`**
+(Nemotron Unified, Bark 3.0, Bark 3.0 Clean, Phonon-2, Nemotron 3.5 Transcribe
+Lite), with the Pyannote diarizer. AMI came down in full: 4 meetings, WER and DER.
+
+- **Phonon-2 and Bark 3.0 tie Parakeet v3 on WER**: best AMI 22.35% and
+  22.43% against Parakeet's 21.31–24.31% on 2026-09-26. Transcribe Lite is
+  close (23.00%); Nemotron Unified (28.07%) and Bark 3.0 Clean (30.34%) are
+  behind in English.
+- **Transcribe Lite regresses on read speech**: 5.26–6.84% on LibriSpeech
+  against 0.53% for every other model. It also has the lowest fused DER
+  (21.88%) but the worst cpWER (35.77–36.97%): its word ends are estimated
+  from the next word's start (CLAUDE.md, "Word timestamps"), so boundaries
+  land well and words do not.
+- **Fused DER looks ~10pp better than Parakeet's 33.26%** (Phonon-2 22.07%,
+  Bark 3.0 26.25%), but that compares across the fusion timing/break fix
+  merged between the two runs. Raw DER (18.08% here, 18.28% on 2026-09-26)
+  shows the diarizer itself is unchanged; a same-code Parakeet run is needed
+  before crediting the model.
+- **The FluidAudio VAD inflates fused DER for every model** (30–46% against
+  22–31% with `energyThreshold`), as recorded for Parakeet before.
+- cpWER (re-scored, `none` + `energyThreshold`): Bark 3.0 32.76%, Nemotron
+  Unified 33.32%, Phonon-2 34.36%, Bark 3.0 Clean 34.36%, Transcribe Lite
+  36.97%.
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@phonon2 | 20.87% | 10 | 31.43% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@bark3 | 20.94% | 10 | 26.27% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@phonon2 | 20.94% | 10 | 22.08% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@bark3 | 21.80% | 10 | 41.28% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 21.80% | 10 | 21.99% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@phonon2 | 21.90% | 10 | 30.40% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 22.15% | 10 | 45.68% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@bark3 | 22.19% | 10 | 26.91% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 22.26% | 10 | 45.41% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@bark3 | 22.33% | 10 | 41.88% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 22.73% | 10 | 21.86% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@phonon2 | 23.09% | 10 | 22.29% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 26.20% | 10 | 29.68% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 26.70% | 10 | 34.17% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 26.95% | 10 | 31.49% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 27.49% | 10 | 39.81% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@bark3Clean | 28.31% | 10 | 27.82% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@bark3Clean | 28.56% | 10 | 28.91% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@bark3Clean | 29.31% | 10 | 44.11% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@bark3Clean | 30.14% | 10 | 44.05% | 4 | 18.08% | 4 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@phonon2 | 22.35% | 4 | 31.43% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@bark3 | 22.43% | 4 | 26.27% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@phonon2 | 22.43% | 4 | 22.08% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 23.00% | 4 | 21.99% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@bark3 | 23.35% | 4 | 41.28% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 23.39% | 4 | 45.41% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 23.39% | 4 | 45.68% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@phonon2 | 23.46% | 4 | 30.40% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@bark3 | 23.77% | 4 | 26.91% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 23.89% | 4 | 21.86% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@bark3 | 23.92% | 4 | 41.88% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@phonon2 | 24.73% | 4 | 22.29% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 28.07% | 4 | 29.68% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 28.61% | 4 | 34.17% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 28.88% | 4 | 31.49% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 29.45% | 4 | 39.81% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@bark3Clean | 30.34% | 4 | 27.82% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@bark3Clean | 30.61% | 4 | 28.91% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@bark3Clean | 31.41% | 4 | 44.11% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@bark3Clean | 32.30% | 4 | 44.05% | 4 | 18.08% | 4 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@bark3 | 0.53% | 6 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@bark3Clean | 0.53% | 6 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 0.53% | 6 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@phonon2 | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@bark3 | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@bark3Clean | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@phonon2 | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@bark3 | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@bark3Clean | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@phonon2 | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@bark3 | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@bark3Clean | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@phonon2 | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 5.26% | 6 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 5.26% | 6 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 6.84% | 6 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronTranscribeLite | 6.84% | 6 |
+
+</details>
+
+### 2026-11-01 — `f6745bb` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41336076180))
+
+**Nemotron Unified in Portuguese**, the only new FluidAudio model that accepts
+`pt` (the others are English-only and skip these corpora).
+
+- **The best Portuguese on-device result recorded**: 23.87–24.62% aggregate
+  against Parakeet's best of 26.43% (2026-09-26).
+- **CAMOES 35.04–37.59%** is 5–7pp better than Parakeet (42.34–42.70%) and
+  beats every cloud model measured, including Groq + correction (36.13%).
+- CORAA 14.54–17.09% overlaps Parakeet's 15.31–17.09%.
+- The comparison crosses runs, but the diarizer cannot move WER and the CAMOES
+  gap is well above the ~2pp noise floor. A same-code Parakeet dispatch is
+  queued to confirm.
+
+#### Portuguese
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 23.87% | 80 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 24.02% | 80 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 24.17% | 80 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 24.62% | 80 |
+
+<details><summary>Per corpus</summary>
+
+##### portuguese / camoes-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 35.04% | 40 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 35.40% | 40 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 37.59% | 40 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 37.59% | 40 |
+
+##### portuguese / coraa-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 14.54% | 40 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 14.80% | 40 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet@nemotronUnified | 16.07% | 40 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet@nemotronUnified | 17.09% | 40 |
+
+</details>
+
+### 2026-11-01 — `f6745bb` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41336081989))
+
+**whisper.cpp `base` and `largeTurbo`, English.** AMI is DER-only on 3
+meetings here: the mirror refused the manual-annotation zip and one meeting's
+audio. `largeTurbo` matches every strong model on LibriSpeech (0.53%); `base`
+is 2.11–2.63%.
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 | 64.72% | 3 | 21.00% | 3 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 | 44.02% | 3 | 21.00% | 3 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 | 53.13% | 3 | 21.00% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 | 38.53% | 3 | 21.00% | 3 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 2.11% | 6 | 48.39% | 3 | 21.00% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 2.11% | 6 | 48.95% | 3 | 21.00% | 3 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 2.63% | 6 | 44.06% | 3 | 21.00% | 3 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 2.63% | 6 | 59.42% | 3 | 21.00% | 3 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 38.53% | 3 | 21.00% | 3 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 44.02% | 3 | 21.00% | 3 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 44.06% | 3 | 21.00% | 3 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 48.39% | 3 | 21.00% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 48.95% | 3 | 21.00% | 3 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 53.13% | 3 | 21.00% | 3 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 59.42% | 3 | 21.00% | 3 |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 64.72% | 3 | 21.00% | 3 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 2.11% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 2.11% | 6 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 2.63% | 6 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 2.63% | 6 |
+
+</details>
+
+### 2026-11-01 — `f6745bb` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871))
+
+**whisper.cpp `base` and `largeTurbo`, Portuguese.**
+
+- **`largeTurbo` is 10–14pp better than `small`**: CAMOES 40.51–40.88%
+  (`small` 54.38–58.76% on 2026-08-09) and CORAA 19.39–20.66% (`small`
+  29.08–31.38%). It still trails Nemotron Unified (35.04% / 14.54%).
+- `base` is not usable for Portuguese: CAMOES 72.99–74.09%, CORAA
+  44.13–44.64%.
+
+#### Portuguese
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 28.23% | 80 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 28.38% | 80 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 28.68% | 80 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 28.98% | 80 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 56.01% | 80 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 56.31% | 80 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 56.46% | 80 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 56.61% | 80 |
+
+<details><summary>Per corpus</summary>
+
+##### portuguese / camoes-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 40.51% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 40.51% | 40 |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 40.88% | 40 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 40.88% | 40 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 72.99% | 40 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 72.99% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 74.09% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 74.09% | 40 |
+
+##### portuguese / coraa-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 19.39% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 19.90% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 20.41% | 40 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 20.66% | 40 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 44.13% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 44.13% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 44.39% | 40 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 44.64% | 40 |
+
+</details>
+
+### 2026-11-01 — `f6745bb` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41336088010))
+
+**Groq `whisper-large-v3-turbo`**, against `whisper-large-v3` from 2026-08-03
+(cross-run, so a signal only). AMI covers **one meeting** (`TS3003a`); the mirror
+refused the other three, so the AMI rows are not comparable with any 4-meeting
+figure.
+
+- CAMOES 40.51–43.43% is 2.5–5.5pp worse than v3's 37.96%; CORAA
+  20.66–21.94% is within noise of v3's 22.45%. Nothing here argues for
+  changing Groq's default model.
+- LibriSpeech 0.53%. All 348 cells ran with no rate limit.
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 14.11% | 7 | 16.76% | 1 | 11.10% | 1 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 14.61% | 7 | 13.46% | 1 | 11.10% | 1 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 15.36% | 7 | 14.75% | 1 | 11.10% | 1 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 15.98% | 7 | 14.62% | 1 | 11.10% | 1 |
+
+#### Portuguese
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 28.83% | 80 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 29.58% | 80 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 30.03% | 80 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 30.33% | 80 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 18.33% | 1 | 16.76% | 1 | 11.10% | 1 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 18.99% | 1 | 13.46% | 1 | 11.10% | 1 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 19.97% | 1 | 14.75% | 1 | 11.10% | 1 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 20.79% | 1 | 14.62% | 1 | 11.10% | 1 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+
+##### portuguese / camoes-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 40.51% | 40 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 40.51% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 43.43% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 43.43% | 40 |
+
+##### portuguese / coraa-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 20.66% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 20.66% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 21.17% | 40 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 21.94% | 40 |
+
+</details>
+
+### 2026-11-01 — `924702e` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41315829712))
+
+**whisper.cpp `base` with all three local diarizers.** The one dispatch of the
+`924702e` batch that completed: AMI came down for 3 meetings (DER) and 2 of them
+with a transcript (WER).
+
+- Raw DER on those 3 meetings: `fluidAudio` 21.03%, `sherpaOnnx` 35.33%,
+  `heuristic` 57.51–82.81% — the same ordering as 2026-09-26.
+- `base` WER is the weakest on-device figure measured: AMI 31.50–37.83%,
+  CAMOES 73.72–75.18%, CORAA 44.39–44.90%.
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 28.32% | 8 | 48.39% | 3 | 21.00% | 3 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 31.28% | 8 | 59.42% | 3 | 21.00% | 3 |
+| standardDSP | energyThreshold | heuristic | whisperCpp@base | 31.50% | 2 | 82.35% | 3 | 82.82% | 3 |
+| standardDSP | energyThreshold | sherpaOnnx | whisperCpp@base | 31.50% | 2 | 60.22% | 3 | 35.32% | 3 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 31.62% | 8 | 45.14% | 3 | 21.00% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 33.96% | 8 | 48.95% | 3 | 21.00% | 3 |
+| none | energyThreshold | heuristic | whisperCpp@base | 34.38% | 2 | 78.74% | 3 | 82.82% | 3 |
+| none | energyThreshold | sherpaOnnx | whisperCpp@base | 34.38% | 2 | 56.70% | 3 | 35.32% | 3 |
+| none | fluidAudio | heuristic | whisperCpp@base | 34.76% | 2 | 87.47% | 3 | 62.27% | 3 |
+| none | fluidAudio | sherpaOnnx | whisperCpp@base | 34.76% | 2 | 71.17% | 3 | 35.32% | 3 |
+| standardDSP | fluidAudio | heuristic | whisperCpp@base | 37.83% | 2 | 75.15% | 3 | 57.56% | 3 |
+| standardDSP | fluidAudio | sherpaOnnx | whisperCpp@base | 37.83% | 2 | 61.15% | 3 | 35.32% | 3 |
+
+#### Portuguese
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 56.46% | 80 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 56.76% | 80 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 56.91% | 80 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 57.06% | 80 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 31.50% | 2 | 48.39% | 3 | 21.00% | 3 |
+| standardDSP | energyThreshold | heuristic | whisperCpp@base | 31.50% | 2 | 82.35% | 3 | 82.82% | 3 |
+| standardDSP | energyThreshold | sherpaOnnx | whisperCpp@base | 31.50% | 2 | 60.22% | 3 | 35.32% | 3 |
+| none | energyThreshold | heuristic | whisperCpp@base | 34.38% | 2 | 78.74% | 3 | 82.82% | 3 |
+| none | energyThreshold | sherpaOnnx | whisperCpp@base | 34.38% | 2 | 56.70% | 3 | 35.32% | 3 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 34.76% | 2 | 59.42% | 3 | 21.00% | 3 |
+| none | fluidAudio | heuristic | whisperCpp@base | 34.76% | 2 | 87.47% | 3 | 62.27% | 3 |
+| none | fluidAudio | sherpaOnnx | whisperCpp@base | 34.76% | 2 | 71.17% | 3 | 35.32% | 3 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 35.14% | 2 | 45.14% | 3 | 21.00% | 3 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 37.83% | 2 | 48.95% | 3 | 21.00% | 3 |
+| standardDSP | fluidAudio | heuristic | whisperCpp@base | 37.83% | 2 | 75.15% | 3 | 57.56% | 3 |
+| standardDSP | fluidAudio | sherpaOnnx | whisperCpp@base | 37.83% | 2 | 61.15% | 3 | 35.32% | 3 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 2.11% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 2.11% | 6 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 2.63% | 6 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 2.63% | 6 |
+
+##### portuguese / camoes-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 73.72% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 73.72% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 74.45% | 40 |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 75.18% | 40 |
+
+##### portuguese / coraa-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperCpp@base | 44.39% | 40 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@base | 44.39% | 40 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@base | 44.64% | 40 |
+| none | fluidAudio | fluidAudio | whisperCpp@base | 44.90% | 40 |
+
+</details>
+
 ### 2026-11-01 — `924702e` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412))
 
 **First measurement of ElevenLabs `scribe_v2`.** It was added to the
@@ -276,8 +792,9 @@ Read this run with three limits in mind:
   diarizer cannot move WER, so the WER comparison is a fair signal; DER is
   not.
 - Three other dispatches from the same batch (whisper.cpp `base` and
-  `largeTurbo`, Groq `whisper-large-v3-turbo`) were cancelled or hit the
-  same AMI 403 before scoring anything. Nothing from them is recorded.
+  `largeTurbo`, Groq `whisper-large-v3-turbo`) were cancelled before
+  scoring anything. A `base` dispatch two hours later completed and is
+  recorded above; `largeTurbo` and Groq turbo were measured at `f6745bb`.
 
 What it says:
 

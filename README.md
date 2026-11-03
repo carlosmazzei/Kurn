@@ -171,22 +171,70 @@ implements word error rate and NIST diarization error rate, and the
 app's real pipeline over public benchmark audio once per configuration in the
 preprocessing × VAD × diarization × ASR-engine matrix, scoring each.
 
-The additional FluidAudio models have not yet been validated here for real-audio
-accuracy, inference speed, or physical-device memory/ANE behavior. The results
-below describe the named configurations only, not the new choices.
+Best WER measured per engine and corpus (lower is better), each the best of the
+four preprocessing × VAD combinations, with the FluidAudio (Pyannote) diarizer.
+AMI is four people around a table, the material that matches what Kurn records;
+LibriSpeech is read speech; CAMOES and CORAA are Portuguese interviews and
+spontaneous Brazilian speech. "—" means not measured: the engine cannot serve
+that language, or no run has scored it on that corpus.
 
-Latest recorded results:
+| Engine | AMI (meetings) | AMI DER (fused) | LibriSpeech | CAMOES (pt) | CORAA (pt) | Measured |
+| --- | --- | --- | --- | --- | --- | --- |
+| **On device** | | | | | | |
+| FluidAudio Parakeet v3 | 21.31% | 33.26% | 0.53% | 42.34% | 15.31% | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
+| FluidAudio Nemotron Unified 0.6B | 28.07% | 29.68% | 0.53% | **35.04%** | **14.54%** | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736) |
+| FluidAudio Phonon-2 | 22.35% | 22.07%* | 0.53% | — | — | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736) |
+| FluidAudio Bark 3.0 | 22.43% | 26.25%* | 0.53% | — | — | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736) |
+| FluidAudio Nemotron 3.5 Transcribe Lite | 23.00% | 21.88%* | 5.26% | — | — | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736) |
+| FluidAudio Bark 3.0 Clean | 30.34% | 26.93%* | 0.53% | — | — | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736) |
+| whisper.cpp large-v3-turbo | — | 38.53%† | 0.53% | 40.51% | 19.39% | 2026-11-01 ([en](https://github.com/carlosmazzei/Kurn/actions/runs/41336081989), [pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871)) |
+| whisper.cpp small | 27.65% | 44.65% | — | 54.38% | 29.08% | 2026-08-03 / 2026-08-09 |
+| whisper.cpp base | 31.50%† | 44.04%† | 2.11% | 72.99% | 44.13% | 2026-11-01 ([1](https://github.com/carlosmazzei/Kurn/actions/runs/41315829712), [2](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871)) |
+| **Cloud** | | | | | | |
+| ElevenLabs Scribe `scribe_v1` | **15.67%** | 24.72%‡ | 0.53% | 42.70% | **12.50%** | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
+| ElevenLabs Scribe `scribe_v2` | — | 21.20%‡ | 0.53% | 43.43% | 13.01% | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412) |
+| OpenAI `gpt-4o-mini-transcribe` | 24.31% | 24.72% | 0.53% | 46.35% | 17.69% | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012) |
+| OpenAI `whisper-1` | 30.45% | 32.05% | 3.16% | 39.11% | 18.96% | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36263668012) |
+| Groq `whisper-large-v3` | 27.84% | 39.61% | — | 37.96% (36.13% with LLM correction) | 22.45% | [2026-08-03](https://github.com/carlosmazzei/Kurn/actions/runs/30800039020) |
+| Groq `whisper-large-v3-turbo` | 18.33%§ | 13.48%§ | 0.53% | 40.51% | 20.66% | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41336088010) |
 
-| Language | Best measured configuration | WER | DER | Material |
-| --- | --- | --- | --- | --- |
-| Portuguese | no preprocessing + FluidAudio Parakeet | 26.43% | not measured | 80 items from CAMOES + CORAA, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
-| English | standardDSP + FluidAudio Parakeet | 22.73% | 33.26% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258373738) |
-| English, cloud | ElevenLabs Scribe + its own diarization | 16.51% (cpWER 18.47%) | 24.72% | AMI Meeting Corpus, 4 meetings, [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36272374417) |
+\* Measured after a fusion fix that Parakeet's 33.26% predates, so it is not yet
+a like-for-like comparison. † 2–3 meetings (WER on 2, DER on 3). ‡ ElevenLabs'
+own speaker turns, not Pyannote's; 3 meetings for `scribe_v2`. § 1 meeting only; not comparable with the
+4-meeting rows. AMI's mirror refused CI runners on 2026-11-01, which is why some
+of that day's rows have no AMI WER.
 
-ElevenLabs `scribe_v2` was measured on [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41305791412) and matched `scribe_v1` without beating it (CORAA 13.01% against 12.50%), so the table and the default are unchanged.
+Speaker diarization, raw DER of each diarizer's own turns (±0.25 s collar,
+lower is better):
+
+| Diarizer | AMI (4 meetings) | VoxConverse (4 files) | Measured |
+| --- | --- | --- | --- |
+| FluidAudio Nemotron 3 | not run yet | **1.39%** | [2026-11-01](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563) |
+| FluidAudio Pyannote (default) | **18.28%** | 10.62% | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898) |
+| sherpa-onnx | 37.41% | 23.32% | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258371882) |
+| Heuristic | 49.92% | 30.54% | [2026-09-26](https://github.com/carlosmazzei/Kurn/actions/runs/36258369898) |
+
+What the numbers say, briefly:
+
+- **On device, Parakeet v3 is still the English engine to beat**; Phonon-2 and
+  Bark 3.0 tie it on meetings. In Portuguese, **Nemotron Unified is the most
+  accurate engine measured, cloud included, on CAMOES**, and second only to
+  ElevenLabs on CORAA. It is the weakest of the new models in English, so it is
+  a per-language choice.
+- **In the cloud, ElevenLabs Scribe is the most accurate on meetings**, and with
+  its own speaker turns it gives the best "who said what" transcript measured
+  (cpWER 18.19%, against ~33% for the same words attributed by Pyannote).
+- **Nemotron 3 diarization beat Pyannote by a wide margin on VoxConverse**,
+  mostly by recovering one recording where Pyannote collapsed; it has not been
+  run on AMI yet. It is about twice as slow and has no voiceprints for speaker
+  matching.
+- **Apple Speech, the app's default transcription engine, has no number**: the
+  CI simulator does not support it. Speed and memory of the on-device models on
+  an iPhone are not measured here either.
 
 Two caveats travel with every number above: there is deliberately no pass/fail
-threshold, and the rates are comparable between runs over the same material —
+threshold, and the rates are comparable between runs over the same material
+(rows measured on different dates are a signal, not a controlled comparison) —
 **not** against published figures for the same corpora, since the text
 normalization here is language-neutral by design. Since 2026-09-26 each run is
 also re-scored with the reference tools (Whisper's normalizers, `meeteval`,
