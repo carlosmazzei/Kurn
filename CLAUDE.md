@@ -117,8 +117,8 @@ the app is free and open source is said in the description and promotional
 text) in the regular CI job. The store languages are not the UI languages: Apple shows
 English (U.K.) or Spanish (Mexico) in most storefronts, so `fastlane/metadata/`
 carries regional variants (`en-GB`, `es-MX`, …) of the 7 UI languages.
-Screenshots are captured in all 7 UI languages — one macOS job per language in
-`screenshots.yml`, the seeded meetings following the launch language
+Screenshots are captured in all 7 UI languages — one macOS job per language and device
+in `screenshots.yml` (a retry or rerun repeats only the slice that failed), the seeded meetings following the launch language
 (`DebugSupport/ScreenshotSeedText`) — and `scripts/screenshots/render.js` frames
 every store language with its own captions over the capture of its language
 (`es-MX` over `es-ES`, `en-GB` over `en-US`). The app asks for a rating through

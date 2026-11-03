@@ -54,3 +54,9 @@ concurrent_simulators(false)
 # test, so this multiplies worst-case capture time — screenshots.yml's
 # timeout-minutes was widened to match.
 number_of_retries(3)
+
+# On CI, start every attempt from a clean simulator. The launch flake the
+# retries above exist for ("Simulator device failed to launch ...xctrunner")
+# otherwise recurs on the same, already-degraded simulator. Local runs keep
+# their simulators untouched.
+erase_simulator(true) if ENV["CI"]
