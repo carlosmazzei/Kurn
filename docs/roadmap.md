@@ -206,10 +206,15 @@ left is removal: the engine, its download and consent flag
 
 Nemotron 3 (`.fluidAudio` + `.nemotron3`), added since, is what does recover
 that file (0 s confused; raw DER 1.39% against Pyannote's 10.61% over the four
-VoxConverse files, same run). **Next measurement:** Nemotron 3 against Pyannote
-on AMI, per file, before considering it as the default — it is ~2× slower, caps
-at eight speakers, and returns no voiceprints, so choosing it gives up voice-based
-speaker identity (CLAUDE.md, "Speaker identity").
+VoxConverse files, same run). On AMI (2026-11-03) the picture splits: raw DER is
+worse (28.26% against 18.08%) because it misses twice the speech, but it
+confuses less than half as much, so the transcript a user reads is better
+attributed (cpWER ~25% against ~33%), and it fixes Pyannote's worst meeting
+(`EN2002a`). **Decision left:** whether that is worth its costs as the default —
+it is ~2× slower, caps at eight speakers, and returns no voiceprints, so
+choosing it gives up voice-based speaker identity (CLAUDE.md, "Speaker
+identity"). A Settings choice, with Pyannote staying the default until the
+voiceprint gap is closed, is the conservative reading.
 
 ### Speaker names from outside the app
 

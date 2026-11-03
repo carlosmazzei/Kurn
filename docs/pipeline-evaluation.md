@@ -88,6 +88,7 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
+| 2026-11-03 | `5cfc919` | Six dispatches to fill the gaps the 2026-11-01 runs left: Parakeet v3 + whisper.cpp `largeTurbo` (8 configs); Parakeet v3 in Portuguese (4); Nemotron 3 diarization × Parakeet v3 / Phonon-2 (8); ElevenLabs `scribe_v1` + `scribe_v2` × `fluidAudio` / native diarization (16); whisper.cpp `small` (4); Groq `whisper-large-v3` + turbo (8). All four AMI meetings fetched in every English run | AMI (4, WER+DER), LibriSpeech (6), CAMOES (40), CORAA (40) | [Parakeet + largeTurbo](https://github.com/carlosmazzei/Kurn/actions/runs/41693244971), [Parakeet pt](https://github.com/carlosmazzei/Kurn/actions/runs/41693250571), [Nemotron 3 AMI](https://github.com/carlosmazzei/Kurn/actions/runs/41694750856), [ElevenLabs](https://github.com/carlosmazzei/Kurn/actions/runs/41699659363), [whisper.cpp small](https://github.com/carlosmazzei/Kurn/actions/runs/41699664893), [Groq](https://github.com/carlosmazzei/Kurn/actions/runs/41702642987) |
 | 2026-11-01 | `aebf04e` | Nemotron 3 against Pyannote diarization, Parakeet ASR, 8 configs (prep × VAD × diarization model) | VoxConverse (4, DER) | [41339676563](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563) |
 | 2026-11-01 | `f6745bb` | Five dispatches on the new FluidAudio model axes: Nemotron Unified, Bark 3.0/Clean, Phonon-2 and Transcribe Lite in English (20 configs) and Nemotron Unified in Portuguese (4); whisper.cpp `base` + `largeTurbo` in English and Portuguese (8 each); Groq `whisper-large-v3-turbo` (4). AMI's mirror throttled the runners, so AMI coverage differs per dispatch | AMI (4 with WER for the FluidAudio models; 3 DER-only for whisper.cpp; 1 for Groq), LibriSpeech (6), CAMOES (40), CORAA (40) | [FluidAudio en](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736), [Unified pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336076180), [whisper.cpp en](https://github.com/carlosmazzei/Kurn/actions/runs/41336081989), [whisper.cpp pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871), [Groq turbo](https://github.com/carlosmazzei/Kurn/actions/runs/41336088010) |
 | 2026-11-01 | `924702e` | whisper.cpp `base` × `heuristic` / `fluidAudio` / `sherpaOnnx`, 12 configs | AMI (3 DER, 2 WER), LibriSpeech (6), CAMOES (40), CORAA (40) | [41315829712](https://github.com/carlosmazzei/Kurn/actions/runs/41315829712) |
@@ -116,12 +117,11 @@ Open questions no run has answered yet:
 - **DER for Portuguese**: no public, freely downloadable multi-speaker
   Portuguese corpus with turn-level annotation comparable to AMI has been
   identified, so every Portuguese row is WER-only.
-- **Nemotron 3 on meetings.** It beat Pyannote decisively on VoxConverse
-  (raw DER 1.39% against 10.61%, same run), but most of that is one file and
-  AMI, the corpus that matches the app, has not been run.
-- **The new FluidAudio ASR models against Parakeet v3 on the same code.**
-  Their WER ties Parakeet's, but fused DER cannot be compared across the
-  fusion fix that landed between the two runs.
+- **Whether Nemotron 3 should become the default diarizer.** On AMI it
+  misses twice Pyannote's speech (raw DER 28.26% against 18.08%) but confuses
+  less than half as much, and cpWER is ~8pp better (2026-11-03). Which metric
+  should decide, and what the missing voiceprints cost, is a product decision
+  the numbers alone do not make (roadmap, D4).
 - **Speed and memory on a phone.** Every run here is a macOS CI simulator;
   none says how the new models behave on an iPhone's ANE or within its
   memory limit (CLAUDE.md, "FluidAudio on-device models").
@@ -132,6 +132,12 @@ Open questions no run has answered yet:
   turns give the best cpWER measured but a worse raw DER than `fluidAudio`
   (see Cross-run findings), and swing with the VAD choice. Four meetings
   cannot say whether that is the provider or the material.
+
+Answered on 2026-11-03: Nemotron 3 on AMI; the new FluidAudio ASR models
+against Parakeet v3 on the same code (Phonon-2 ~2.5pp ahead on fused DER at
+equal WER, Parakeet v3 Portuguese reproduced exactly, so Nemotron Unified's
+lead holds); `scribe_v2` WER on meetings; Groq and whisper.cpp `largeTurbo`
+on all four AMI meetings.
 
 Answered on 2026-11-01: the first measurements of every FluidAudio model added
 in `2ccd8b6`, whisper.cpp `base` and `largeTurbo`, Groq `whisper-large-v3-turbo`
@@ -158,27 +164,30 @@ qualified.
 
 | Use case | Configuration | WER | DER (fused) | Source |
 | --- | --- | --- | --- | --- |
-| Meetings (AMI, en), on-device | `standardDSP` + `energyThreshold` + `fluidAudio` + `fluidAudioParakeet` | 22.73% | 33.26% | 2026-09-26 (22.70% / 32.89% on 2026-08-03) |
-| Meetings (AMI, en), cloud | `none` + `fluidAudio` VAD + `fluidAudio` + `whisperAPI:elevenLabs` | 15.67% (14.43% standard) | 32.26% | 2026-09-26 |
-| Meetings (AMI, en), who said what | `standardDSP` or `none` + `fluidAudio` VAD + `transcriptionProviderNative` + `whisperAPI:elevenLabs` | 16.40–16.51% | 24.72–28.08% (cpWER **18.19–18.47%**) | 2026-09-26, after the compaction fix |
-| Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 23.87% | not measured | 2026-11-01 (Parakeet v3: 26.43%, 2026-09-26) |
+| Meetings (AMI, en), on-device | `standardDSP` + `energyThreshold` + `fluidAudio` + `fluidAudioParakeet` | 22.27% | 24.66% | 2026-11-03 (33.26% fused DER on 2026-09-26, before the fusion fix) |
+| Meetings (AMI, en), on-device, who said what | `standardDSP` + `energyThreshold` + `fluidAudio@nemotron3` + `fluidAudioParakeet@phonon2` | 22.43% | 20.44% (cpWER **25.05%**) | 2026-11-03 (Parakeet v3 + Nemotron 3: cpWER 24.49–27.22%; with Pyannote 33.28–33.96%) |
+| Meetings (AMI, en), cloud | `standardDSP` + `energyThreshold` + `fluidAudio` + `whisperAPI:elevenLabs` | 15.86% (14.44% standard) | 19.73% | 2026-11-03 (`scribe_v2` ties: 16.01%) |
+| Meetings (AMI, en), cloud, who said what | `none` + `fluidAudio` VAD + `transcriptionProviderNative` + `whisperAPI:elevenLabs@scribe_v2` | 16.01% | 18.54% (cpWER **17.06%**) | 2026-11-03 (`scribe_v1`: cpWER 17.66%; 18.19–18.47% on 2026-09-26) |
+| Portuguese, aggregate | `none` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 23.87% | not measured | 2026-11-01 (Parakeet v3: 26.43%, reproduced on 2026-11-03) |
 | Portuguese, spontaneous interviews (CAMOES) | `none` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 35.04% | not measured | 2026-11-01, on-device (best cloud: Groq + LLM correction, 36.13%, 2026-09-26) |
 | Portuguese, short clips (CORAA), on-device | `standardDSP` + `energyThreshold` + `fluidAudioParakeet@nemotronUnified` | 14.54% | not measured | 2026-11-01 (Parakeet v3: 15.31%, 2026-09-26) |
 | Portuguese, short clips (CORAA), cloud | `standardDSP` + `energyThreshold` + `whisperAPI:elevenLabs` | 12.50% | not measured | 2026-09-26 |
 | Speaker turns (VoxConverse, en), on-device | `none` + `energyThreshold` + `fluidAudio@nemotron3` | — | 4.44% (raw **1.39%**) | 2026-11-01, same run as Pyannote's 13.13% (raw 10.61%) |
 
-The AMI on-device row stays on Parakeet v3 for now. Phonon-2 (22.35%) and
-Bark 3.0 (22.43%) tie it on WER, and their fused DER (22.07% and 26.25%) reads
-far lower, but that DER crosses the fusion fix merged between the runs; a
-same-code Parakeet dispatch decides it.
+The AMI on-device row stays on Parakeet v3, the shipped FluidAudio ASR
+default. On the same code Phonon-2 ties it on WER (22.35–24.73% against
+22.27–23.85%) and is ~2.3–2.6pp ahead on fused DER, which is inside what four
+meetings can tell apart; it is also English-only. With Nemotron 3 instead of
+Pyannote, the speaker-attributed transcript improves far more than any ASR
+swap moves it (cpWER ~25% against ~33%).
 
 On AMI — the corpus that matches what the app records — Parakeet leads the
-on-device engines on both metrics at once, by ~5pp WER and ~15pp DER over
-Groq and ~20pp WER over whisper.cpp. In the cloud, ElevenLabs Scribe is
+established on-device engines on both metrics at once: ~4pp WER over Groq
+turbo and ~4pp over whisper.cpp `largeTurbo` at their best (2026-11-03). In the cloud, ElevenLabs Scribe is
 the most accurate recognizer measured on meetings and on CORAA (~6pp WER
 under Parakeet on AMI), and with its own diarization it produces the best
-speaker-attributed transcript measured: cpWER ~18% against ~33% for the same
-words attributed by `fluidAudio`. CAMOES remains the one corpus where no
+speaker-attributed transcript measured: cpWER ~17% against ~35% for the same
+words attributed by `fluidAudio` (Pyannote). CAMOES remains the one corpus where no
 cloud model beats Groq + correction. Portuguese has no single winner: the per-corpus rows reverse
 each other, so the aggregate is a property of the corpus mix, not of an
 engine.
@@ -208,8 +217,10 @@ constant across preprocessing × VAD, since the diarizer reads its own copy:
 
 `fluidAudio@nemotron3` (Nemotron 3, 2026-11-01) on VoxConverse: **1.39%**.
 Raw DER does not depend on the ASR engine, and Pyannote reproduced its 10.62%
-as 10.61% in that run, so the comparison holds across the two dates. AMI has
-not been run with Nemotron 3.
+as 10.61% in that run, so the comparison holds across the two dates. On AMI
+(2026-11-03) it is **28.26%**, against Pyannote's 18.08% on the same code:
+almost all missed speech (197.9 s of 762.1 s), with less than half Pyannote's
+confusion (12.6 s against 28.5 s), and cpWER ~8pp better.
 
 This settles D4 as far as these eight files go: the segmentation-first
 engine is about twice FluidAudio's error on both corpora. FluidAudio's VBx
@@ -223,22 +234,25 @@ The roadmap's question was narrower than the aggregate: does any single
 recording show Pyannote collapsing while sherpa-onnx holds? Raw DER per file,
 2026-09-26 (`none` + `energyThreshold`; confusion seconds in brackets):
 
-| File | `fluidAudio` (Pyannote) | `sherpaOnnx` | `heuristic` | `fluidAudio@nemotron3` (2026-11-01) |
+| File | `fluidAudio` (Pyannote) | `sherpaOnnx` | `heuristic` | `fluidAudio@nemotron3` (2026-11-01 / 2026-11-03) |
 | --- | --- | --- | --- | --- |
 | VoxConverse `0000` | 32.2% (81.1 s) | 45.0% (112.2 s) | 61.2% (142.8 s) | **2.5% (0.0 s)** |
 | VoxConverse `0001` | 3.6% | 4.1% | 48.9% | 0.3% |
 | VoxConverse `0002` | 1.1% | 0.8% | 3.3% | 0.7% |
 | VoxConverse `0003` | 5.8% | 49.1% | 54.5% | 2.2% |
-| AMI `EN2002a` | 31.1% | 45.4% | 67.7% | not run |
-| AMI `ES2004a` | 9.4% | 28.1% | 119.9% | not run |
-| AMI `IS1009a` | 13.4% | 24.0% | 76.4% | not run |
-| AMI `TS3003a` | 11.7% | 42.4% | 67.4% | not run |
+| AMI `EN2002a` | 31.1% | 45.4% | 67.7% | 26.7% (0.8 s) |
+| AMI `ES2004a` | 9.4% | 28.1% | 119.9% | 29.4% |
+| AMI `IS1009a` | 13.4% | 24.0% | 76.4% | 24.4% |
+| AMI `TS3003a` | 11.7% | 42.4% | 67.4% | 32.0% |
 
 `voxconverse-en-0000` is the one file where Pyannote's clustering visibly
 fails, and sherpa-onnx confuses **more** speech there, not less. It is ahead
 on one file, by 0.3pp. So no file supports the reason the engine was added;
-by the roadmap's own rule it is a candidate for removal. The file that does
-recover is Nemotron 3's.
+by the roadmap's own rule it is a candidate for removal. The files that do
+recover are Nemotron 3's: VoxConverse `0000` and AMI `EN2002a`, Pyannote's two
+worst (confusion 0.8 s against 23.8 s on `EN2002a`). On the other three AMI
+meetings Nemotron 3 is worse than Pyannote, by missing speech rather than
+confusing it.
 
 ### sherpa-onnx vs. FluidAudio: the diarizer axis, ASR held constant
 
@@ -324,11 +338,376 @@ The measured consequence: the gated path produced the only real improvements
 
 ## Runs
 
-> The tables in the entries for 2026-11-01 below were rebuilt from the job logs,
+> The tables in the entries for 2026-11-01 and 2026-11-03 below were rebuilt from the job logs,
 > because the `pipeline-eval-report` artifacts live on blob storage this
 > environment cannot reach. WER counts are exact; the log prints DER seconds
 > to 0.1 s, so a DER here can differ from the harness's by up to ~0.05pp. Each
 > run's reference-tool re-score matched its own CSV to 0.0000pp.
+
+
+### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41702642987))
+
+**Groq `whisper-large-v3` and `whisper-large-v3-turbo` on all four AMI
+meetings.** The 2026-11-01 turbo dispatch got one AMI meeting through the
+mirror; this one got all four, with the fetch retries from `5cfc919`.
+
+- **Turbo is the better of the two Groq models on meetings**: 26.38–28.46% AMI
+  WER against 28.34–29.84% for `whisper-large-v3`, with fused DER 28.47–42.34%
+  against 36.08–45.20%. Both are behind Parakeet v3 on device (22.27–23.85%,
+  same code).
+- **cpWER 34.73–35.93%** for both, about the same as Parakeet + Pyannote
+  (33.28–33.96%). The words are worse, and the attribution is just as bad.
+- LibriSpeech 0.53% for every turbo cell and the two `none` v3 cells (1.05%
+  with `standardDSP`), as with every strong engine on read speech.
+
+- matrix: full (8 configuration(s))
+- preprocessing: standardDSP, none
+- VAD: energyThreshold, fluidAudio
+- diarization: fluidAudio
+- on-device ASR: appleSpeech, fluidAudioParakeet, whisperCpp
+- whisper.cpp models: small
+- FluidAudio ASR models: parakeetV3
+- FluidAudio diarization models: pyannote
+- cloud mode: groq
+- cloud ASR providers: Groq
+- LLM correction: off
+- total: 8 configuration(s) x 10 item(s) = ~80 run(s)
+- corpora:
+  - AMI Meeting Corpus (Mix-Headset, first 5 min) (english, 4 item(s), WER+DER) [CC BY 4.0 (AMI Corpus, audio + manual annotation); MIT (pyannote/AMI-diarization-setup RTTM)]
+  - LibriSpeech test-clean (english, 6 item(s), WER) [CC BY 4.0]
+- 80 scored (item, configuration) row(s)
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 24.62% | 10 | 28.47% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 25.23% | 10 | 29.52% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 25.45% | 10 | 42.34% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq | 26.49% | 10 | 38.80% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 26.56% | 10 | 32.82% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq | 26.66% | 10 | 37.33% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq | 27.34% | 10 | 36.08% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq | 27.88% | 10 | 45.20% | 4 | 18.08% | 4 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 26.38% | 4 | 28.47% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 27.04% | 4 | 29.52% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 27.27% | 4 | 42.34% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq | 28.34% | 4 | 38.80% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 28.46% | 4 | 32.82% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq | 28.57% | 4 | 37.33% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq | 29.30% | 4 | 36.08% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq | 29.84% | 4 | 45.20% | 4 | 18.08% | 4 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperAPI:groq | 0.53% | 6 |
+| none | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq@whisper-large-v3-turbo | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:groq | 1.05% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:groq | 1.05% | 6 |
+
+</details>
+
+### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41699664893))
+
+**whisper.cpp `small` on LibriSpeech, the one cell the README table was
+missing.** 1.05% in all four configurations, against 0.53% for `base`,
+`largeTurbo` and Parakeet. Read speech separates nothing at this size: one
+extra error over 6 files.
+
+- matrix: full (4 configuration(s))
+- preprocessing: standardDSP, none
+- VAD: energyThreshold, fluidAudio
+- diarization: fluidAudio
+- on-device ASR: appleSpeech, fluidAudioParakeet, whisperCpp
+- whisper.cpp models: small
+- FluidAudio ASR models: parakeetV3
+- FluidAudio diarization models: pyannote
+- cloud mode: none
+- cloud ASR providers: none
+- LLM correction: off
+- total: 4 configuration(s) x 6 item(s) = ~24 run(s)
+- corpora:
+  - LibriSpeech test-clean (english, 6 item(s), WER) [CC BY 4.0]
+- 24 scored (item, configuration) row(s)
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | whisperCpp@small | 1.05% | 6 |
+| none | fluidAudio | fluidAudio | whisperCpp@small | 1.05% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@small | 1.05% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@small | 1.05% | 6 |
+
+### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41699659363))
+
+**ElevenLabs `scribe_v1` against `scribe_v2`, same run, with both diarization
+choices, on all four AMI meetings.** The 2026-11-01 `scribe_v2` run was DER-only
+on three meetings because AMI's annotation zip returned 403; this is the first
+`scribe_v2` WER on meetings.
+
+- **The two models tie on words**: `scribe_v1` 15.86–16.94% and `scribe_v2`
+  16.01–17.55% AMI WER (14.44–16.12% standard). The difference between them is
+  inside the spread one model shows across VAD and preprocessing.
+- **Native diarization still gives the best speaker-attributed transcript
+  measured**: cpWER **17.06%** (`scribe_v2`, `none` + Silero VAD) and 17.66%
+  (`scribe_v1`, same configuration), against 34.28–36.09% when the same words
+  are attributed by Pyannote. That reproduces the 2026-09-26 finding
+  (18.19–18.47%).
+- **The native turns swing with the VAD choice**: cpWER rises to 19.47–27.58%
+  and raw DER to 41.92–46.25% with `energyThreshold`. Silero VAD is the
+  setting to use with native diarization.
+- **Fused DER with Pyannote dropped to 19.0–20.1%**, from 32.26% on 2026-09-26,
+  while Pyannote's raw DER stayed 18.08%. The diarizer did not change, so the
+  drop is the fusion fix that landed between the two runs, not the recognizer.
+
+- matrix: full (16 configuration(s))
+- preprocessing: standardDSP, none
+- VAD: energyThreshold, fluidAudio
+- diarization: fluidAudio, transcriptionProviderNative
+- on-device ASR: appleSpeech, fluidAudioParakeet, whisperCpp
+- whisper.cpp models: small
+- FluidAudio ASR models: parakeetV3
+- FluidAudio diarization models: pyannote
+- cloud mode: elevenlabs
+- cloud ASR providers: ElevenLabs
+- LLM correction: off
+- total: 16 configuration(s) x 4 item(s) = ~64 run(s)
+- corpora:
+  - AMI Meeting Corpus (Mix-Headset, first 5 min) (english, 4 item(s), WER+DER) [CC BY 4.0 (AMI Corpus, audio + manual annotation); MIT (pyannote/AMI-diarization-setup RTTM)]
+- 64 scored (item, configuration) row(s)
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs | 15.86% | 4 | 19.73% | 4 | 18.08% | 4 |
+| none | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 16.01% | 4 | 18.54% | 4 | 33.55% | 4 |
+| standardDSP | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 16.01% | 4 | 19.60% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs | 16.21% | 4 | 19.32% | 4 | 43.17% | 4 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 16.24% | 4 | 20.09% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperAPI:elevenLabs | 16.28% | 4 | 19.84% | 4 | 18.08% | 4 |
+| none | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs | 16.55% | 4 | 18.30% | 4 | 33.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs | 16.71% | 4 | 19.13% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 16.71% | 4 | 19.80% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperAPI:elevenLabs | 16.74% | 4 | 20.00% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 16.82% | 4 | 22.39% | 4 | 35.11% | 4 |
+| standardDSP | fluidAudio | transcriptionProviderNative | whisperAPI:elevenLabs | 16.90% | 4 | 18.88% | 4 | 31.51% | 4 |
+| none | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs | 16.94% | 4 | 22.11% | 4 | 46.25% | 4 |
+| none | energyThreshold | fluidAudio | whisperAPI:elevenLabs@scribe_v2 | 16.97% | 4 | 19.01% | 4 | 18.08% | 4 |
+| none | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 16.97% | 4 | 18.86% | 4 | 41.91% | 4 |
+| standardDSP | energyThreshold | transcriptionProviderNative | whisperAPI:elevenLabs@scribe_v2 | 17.55% | 4 | 21.93% | 4 | 45.60% | 4 |
+
+### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41694750856))
+
+**Nemotron 3 diarization on AMI, the measurement the 2026-11-01 VoxConverse run
+left open.** Parakeet v3 and Phonon-2 ASR, so the result can be read against
+the same-code Pyannote run below.
+
+- **Raw DER is worse than Pyannote: 28.26% against 18.08%** (25.43% in one
+  cell, the run's only non-constant raw DER, so Nemotron 3 is not fully
+  deterministic on the runner). Over the four meetings, 197.9 s of 762.1 s
+  reference speech is **missed** (Pyannote: 97.4 s), with 4.9 s false alarm
+  (11.9 s) and only **12.6 s confusion** (28.5 s). Nemotron 3 drops overlapped
+  and quiet speech, but assigns what it keeps to the right speaker more often.
+- **That trade is what a reader of the transcript sees, and it wins**:
+  cpWER **24.49–27.22%** with Parakeet against 33.28–33.96% for Pyannote, same
+  ASR and same words. Fusion still attributes every word to the nearest turn,
+  so missed speech costs few words while confusion costs whole utterances.
+- **Fused DER 20.30–22.99% with `energyThreshold`**, against Pyannote's
+  24.66–25.01%. Silero VAD makes it 29.6–49.0%, the same VAD penalty the
+  fused DER shows for every diarizer on Parakeet.
+- **Per file** (D4 table): it fixes Pyannote's worst meeting, `EN2002a`
+  (confusion 0.8 s against 23.8 s), and is worse on the other three, where
+  Pyannote had little confusion to remove.
+- No voiceprints and an eight-speaker ceiling still apply (CLAUDE.md,
+  "Choosing the diarizer"), so it is not a drop-in default.
+
+- matrix: full (8 configuration(s))
+- preprocessing: standardDSP, none
+- VAD: energyThreshold, fluidAudio
+- diarization: fluidAudio
+- on-device ASR: appleSpeech, fluidAudioParakeet, whisperCpp
+- whisper.cpp models: small
+- FluidAudio ASR models: parakeetV3, phonon2
+- FluidAudio diarization models: nemotron3
+- cloud mode: none
+- cloud ASR providers: none
+- LLM correction: off
+- total: 8 configuration(s) x 4 item(s) = ~32 run(s)
+- corpora:
+  - AMI Meeting Corpus (Mix-Headset, first 5 min) (english, 4 item(s), WER+DER) [CC BY 4.0 (AMI Corpus, audio + manual annotation); MIT (pyannote/AMI-diarization-setup RTTM)]
+- 32 scored (item, configuration) row(s)
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio@nemotron3 | fluidAudioParakeet | 21.31% | 4 | 42.05% | 4 | 28.26% | 4 |
+| standardDSP | energyThreshold | fluidAudio@nemotron3 | fluidAudioParakeet | 22.27% | 4 | 22.74% | 4 | 25.43% | 4 |
+| none | fluidAudio | fluidAudio@nemotron3 | fluidAudioParakeet@phonon2 | 22.35% | 4 | 29.71% | 4 | 28.26% | 4 |
+| standardDSP | energyThreshold | fluidAudio@nemotron3 | fluidAudioParakeet@phonon2 | 22.43% | 4 | 20.44% | 4 | 28.26% | 4 |
+| standardDSP | fluidAudio | fluidAudio@nemotron3 | fluidAudioParakeet@phonon2 | 23.46% | 4 | 29.58% | 4 | 28.26% | 4 |
+| none | energyThreshold | fluidAudio@nemotron3 | fluidAudioParakeet | 23.58% | 4 | 22.99% | 4 | 28.26% | 4 |
+| standardDSP | fluidAudio | fluidAudio@nemotron3 | fluidAudioParakeet | 23.85% | 4 | 48.97% | 4 | 28.26% | 4 |
+| none | energyThreshold | fluidAudio@nemotron3 | fluidAudioParakeet@phonon2 | 24.73% | 4 | 20.30% | 4 | 28.26% | 4 |
+
+### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41693250571))
+
+**Parakeet v3 in Portuguese on the current code**, to check that Nemotron
+Unified's lead from 2026-11-01 is not a code difference.
+
+- **It reproduced 2026-09-26 exactly**: 26.43–27.48% aggregate, CAMOES
+  42.34–42.70%, CORAA 15.31–17.09%. Nothing between the two commits changed
+  Parakeet's Portuguese output.
+- So Nemotron Unified's 23.87% aggregate, 35.04% on CAMOES and 14.54% on CORAA
+  (2026-11-01) stand as a same-code lead: ~2.6pp on aggregate, ~7pp on CAMOES,
+  ~0.8pp on CORAA.
+
+- matrix: full (4 configuration(s))
+- preprocessing: standardDSP, none
+- VAD: energyThreshold, fluidAudio
+- diarization: fluidAudio
+- on-device ASR: appleSpeech, fluidAudioParakeet, whisperCpp
+- whisper.cpp models: small
+- FluidAudio ASR models: parakeetV3
+- FluidAudio diarization models: pyannote
+- cloud mode: none
+- cloud ASR providers: none
+- LLM correction: off
+- total: 4 configuration(s) x 80 item(s) = ~320 run(s)
+- corpora:
+  - CAMOES Sociolinguistic Interviews (pt) (portuguese, 40 item(s), WER) [CC BY 4.0]
+  - CORAA v1.1 (pt) (portuguese, 40 item(s), WER) [CC BY-NC-ND 4.0]
+- 320 scored (item, configuration) row(s)
+
+#### Portuguese
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 26.43% | 80 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 27.18% | 80 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 27.33% | 80 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 27.48% | 80 |
+
+<details><summary>Per corpus</summary>
+
+##### portuguese / camoes-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 42.34% | 40 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 42.34% | 40 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 42.34% | 40 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 42.70% | 40 |
+
+##### portuguese / coraa-pt
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 15.31% | 40 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 16.58% | 40 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 16.58% | 40 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 17.09% | 40 |
+
+</details>
+
+### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41693244971))
+
+**Parakeet v3 and whisper.cpp `largeTurbo` on all four AMI meetings, on the
+current code.** Two questions: does Parakeet v3's fused DER fall like the new
+models' did after the fusion fix, and what does `largeTurbo` score on meetings
+(the 2026-11-01 dispatch was DER-only on three).
+
+- **Parakeet v3: 20.79–22.01% English WER (AMI 22.27–23.58% with
+  `energyThreshold`), fused DER 24.66–25.01%** against 33.26% on 2026-09-26.
+  Raw DER is unchanged (18.08%), so the fusion fix accounts for the drop. The
+  2026-11-01 Phonon-2 (22.07%) and Bark 3.0 (26.25%) fused DER can now be read
+  against this: Phonon-2 is ~2.6pp ahead of Parakeet on fused DER at the same
+  WER (also ~2.3pp ahead with Nemotron 3 in the run above), Bark 3.0 ~1.6pp
+  behind.
+- **cpWER 33.28–33.96%** for every Parakeet cell. The attribution, not the
+  words, is what a reader of a Pyannote transcript loses.
+- **whisper.cpp `largeTurbo` on AMI: 26.00–46.27% WER.** The spread is
+  hallucination: 530 insertions over 2,604 reference words with `none` +
+  `energyThreshold`, 49 with `standardDSP` + Silero VAD. Behind Parakeet on
+  every cell; best with `standardDSP` + Silero VAD (26.00%, cpWER 36.17%).
+- LibriSpeech 0.53% for both engines in every cell.
+- The run took 4h30m of the 6h ceiling; `largeTurbo` is the slowest engine
+  in the matrix.
+
+- matrix: full (8 configuration(s))
+- preprocessing: standardDSP, none
+- VAD: energyThreshold, fluidAudio
+- diarization: fluidAudio
+- on-device ASR: appleSpeech, fluidAudioParakeet, whisperCpp
+- whisper.cpp models: largeTurbo
+- FluidAudio ASR models: parakeetV3
+- FluidAudio diarization models: pyannote
+- cloud mode: none
+- cloud ASR providers: none
+- LLM correction: off
+- total: 8 configuration(s) x 10 item(s) = ~80 run(s)
+- corpora:
+  - AMI Meeting Corpus (Mix-Headset, first 5 min) (english, 4 item(s), WER+DER) [CC BY 4.0 (AMI Corpus, audio + manual annotation); MIT (pyannote/AMI-diarization-setup RTTM)]
+  - LibriSpeech test-clean (english, 6 item(s), WER) [CC BY 4.0]
+- 80 scored (item, configuration) row(s)
+
+#### English
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 19.90% | 10 | 44.89% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 20.79% | 10 | 24.66% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 22.01% | 10 | 25.01% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 22.26% | 10 | 51.03% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 24.27% | 10 | 31.40% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 27.42% | 10 | 35.74% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 31.21% | 10 | 42.79% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 43.16% | 10 | 52.30% | 4 | 18.08% | 4 |
+
+<details><summary>Per corpus</summary>
+
+##### english / ami-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items | DER (fused) | DER (fused) items | DER (raw) | DER (raw) items |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 21.31% | 4 | 44.89% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 22.27% | 4 | 24.66% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 23.58% | 4 | 25.01% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 23.85% | 4 | 51.03% | 4 | 18.08% | 4 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 26.00% | 4 | 31.40% | 4 | 18.08% | 4 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 29.38% | 4 | 35.74% | 4 | 18.08% | 4 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 33.45% | 4 | 42.79% | 4 | 18.08% | 4 |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 46.27% | 4 | 52.30% | 4 | 18.08% | 4 |
+
+##### english / librispeech-en
+
+| Preprocessing | VAD | Diarization | ASR | WER | WER items |
+| --- | --- | --- | --- | --- | --- |
+| none | energyThreshold | fluidAudio | fluidAudioParakeet | 0.53% | 6 |
+| none | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | fluidAudioParakeet | 0.53% | 6 |
+| none | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | fluidAudioParakeet | 0.53% | 6 |
+| standardDSP | energyThreshold | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | fluidAudioParakeet | 0.53% | 6 |
+| standardDSP | fluidAudio | fluidAudio | whisperCpp@largeTurbo | 0.53% | 6 |
+
+</details>
 
 
 ### 2026-11-01 — `aebf04e` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563))
