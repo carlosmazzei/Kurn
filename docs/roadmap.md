@@ -193,22 +193,28 @@ language. **Do not index excerpts by default.**
 
 ## Diarization
 
-### D4 · Does sherpa-onnx actually resist the VBx collapse?
+### D4 · Retire sherpa-onnx, and decide on Nemotron 3
 
 `.sherpaOnnx` shipped as an opt-in, segmentation-first diarizer whose only
-justification is surviving the failure `FluidAudioDiarizer` is known for — VBx
-collapsing a far-field meeting into one speaker. On AMI it measures ~17pp
-*behind* `fluidAudio` on DER (`docs/pipeline-evaluation.md`, "sherpa-onnx vs.
-FluidAudio"), but FluidAudio did not collapse on that material, so the run
-could not test the one thing the engine was added for.
+justification was surviving the failure `FluidAudioDiarizer` is known for —
+VBx collapsing a meeting into too few speakers. Read per file
+(`docs/pipeline-evaluation.md`, "D4 per file"), it never does: on the one
+recording where Pyannote collapses (VoxConverse `0000`, 81 s confused) it
+confuses more (112 s), and it trails Pyannote on 7 of 8 files. The decision
+left is removal: the engine, its download and consent flag
+(`sherpaOnnxModelsConsented`), the Storage row and the matrix axis.
 
-**Next measurement:** a dispatch with `diarization_engines: fluidAudio,sherpaOnnx`
-for both raw DERs in one run, read **per file** rather than in aggregate — the
-question is whether any single meeting shows FluidAudio collapsing and
-sherpa-onnx holding. If none does on a corpus that exercises the collapse
-(VoxConverse, single far-field mic), the engine is a candidate for removal.
-Its clustering threshold (`SherpaOnnxDiarizer`) is likewise untuned until that
-data exists.
+Nemotron 3 (`.fluidAudio` + `.nemotron3`), added since, is what does recover
+that file (0 s confused; raw DER 1.39% against Pyannote's 10.61% over the four
+VoxConverse files, same run). On AMI (2026-11-03) the picture splits: raw DER is
+worse (28.26% against 18.08%) because it misses twice the speech, but it
+confuses less than half as much, so the transcript a user reads is better
+attributed (cpWER ~25% against ~33%), and it fixes Pyannote's worst meeting
+(`EN2002a`). **Decision left:** whether that is worth its costs as the default —
+it is ~2× slower, caps at eight speakers, and returns no voiceprints, so
+choosing it gives up voice-based speaker identity (CLAUDE.md, "Speaker
+identity"). A Settings choice, with Pyannote staying the default until the
+voiceprint gap is closed, is the conservative reading.
 
 ### Speaker names from outside the app
 
