@@ -23,14 +23,30 @@ extension ProviderHTTPTests {
         }
     }
 
-    @Test func malformedSummaryContentThrowsDecodingError() async {
+    @Test func proseWithoutHeadingsIsOneUntitledSection() async throws {
         MockURLProtocol.enqueue([
             MockURLProtocol.json(["choices": [["message": ["content": "this is not json"]]]])
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
-        await #expect(throws: AppError.self) {
+        let result = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+        #expect(result.sections.map(\.title) == [""])
+        #expect(result.sections.first?.body == "this is not json")
+    }
+
+    @Test func blankSummaryContentThrowsDecodingError() async {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json(["choices": [["message": ["content": "  \n  "]]]])
+        ])
+        let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
+
+        do {
             _ = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+            Issue.record("expected a decoding error")
+        } catch AppError.decodingError {
+            // expected
+        } catch {
+            Issue.record("unexpected error: \(error)")
         }
     }
 }
