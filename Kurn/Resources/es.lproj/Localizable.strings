@@ -557,24 +557,23 @@
 "settings.templates_sync" = "Sincronizar Plantillas con iCloud";
 "settings.templates_sync_footer" = "Las plantillas personalizadas que crees se sincronizan mediante iCloud, para que estén disponibles al cambiar de dispositivo. Las plantillas predeterminadas ya se mantienen actualizadas por sí solas.";
 "settings.template_name" = "Nombre";
+"settings.template_description" = "Descripción";
+"settings.template_description_placeholder" = "Una línea que se muestra en la lista de plantillas";
+"settings.template_description_footer" = "Aparece bajo el nombre para distinguir las plantillas. Déjalo vacío para usar la primera frase de las instrucciones.";
 "settings.template_instructions" = "Instrucciones";
-"settings.template_instructions_footer" = "Describe el enfoque y el tono del resumen. El modelo siempre responde en el idioma de la transcripción.";
-"settings.template_sections" = "Secciones";
-"settings.template_section" = "Título de la sección";
-"settings.template_add_section" = "Añadir Sección";
-"settings.template_sections_footer" = "Encabezados de sección sugeridos para guiar la estructura. El modelo puede adaptarlos.";
+"settings.template_instructions_footer" = "Describe el enfoque y el tono del resumen, y las secciones que quieres (por ejemplo: Hecho, Siguiente, Bloqueos). El modelo siempre responde en el idioma de la transcripción.";
 "settings.template.builtin" = "Predefinida";
 "settings.template.custom" = "Personalizada";
 "settings.delete_template" = "Eliminar Plantilla";
 "settings.delete_template.confirm" = "¿Eliminar esta plantilla?";
 "template.general.name" = "Reunión General";
-"template.general.desc" = "Resumen general, puntos clave, decisiones y tareas.";
+"template.general.desc" = "Un resumen para quien no estuvo en la reunión: qué se habló, qué se decidió y quién hace qué.";
 "template.standup.name" = "Standup Diario";
-"template.standup.desc" = "Qué se hizo, qué sigue y los bloqueos.";
+"template.standup.desc" = "El avance, los próximos pasos y los bloqueos de cada persona, de un vistazo.";
 "template.interview.name" = "Entrevista";
-"template.interview.desc" = "Preguntas, respuestas, fortalezas y valoración.";
+"template.interview.desc" = "Cómo le fue al candidato: respuestas clave, fortalezas, dudas y una valoración.";
 "template.outline.name" = "Esquema de la Reunión";
-"template.outline.desc" = "Resumen breve y estructura cronológica y jerárquica de los temas tratados.";
+"template.outline.desc" = "Un resumen breve y luego los temas en el orden en que surgieron.";
 
 /* Ajustes */
 "settings.title" = "Ajustes";

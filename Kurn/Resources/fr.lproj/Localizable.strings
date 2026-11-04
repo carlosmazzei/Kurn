@@ -557,24 +557,23 @@
 "settings.templates_sync" = "Synchroniser les modèles via iCloud";
 "settings.templates_sync_footer" = "Les modèles personnalisés que vous créez sont synchronisés via iCloud, afin d'être disponibles après un changement d'appareil. Les modèles intégrés restent toujours à jour d'eux-mêmes.";
 "settings.template_name" = "Nom";
+"settings.template_description" = "Description";
+"settings.template_description_placeholder" = "Une ligne affichée dans la liste des modèles";
+"settings.template_description_footer" = "Affichée sous le nom pour distinguer les modèles. Laissez vide pour utiliser la première phrase des instructions.";
 "settings.template_instructions" = "Instructions";
-"settings.template_instructions_footer" = "Décrivez l'objectif et le ton du résumé. Le modèle répond toujours dans la langue de la transcription.";
-"settings.template_sections" = "Sections";
-"settings.template_section" = "Titre de la section";
-"settings.template_add_section" = "Ajouter une section";
-"settings.template_sections_footer" = "Titres de section suggérés pour guider la structure. Le modèle peut les adapter.";
+"settings.template_instructions_footer" = "Décrivez l'objectif et le ton du résumé, ainsi que les sections souhaitées (par exemple : Fait, À venir, Blocages). Le modèle répond toujours dans la langue de la transcription.";
 "settings.template.builtin" = "Prédéfini";
 "settings.template.custom" = "Personnalisé";
 "settings.delete_template" = "Supprimer le modèle";
 "settings.delete_template.confirm" = "Supprimer ce modèle ?";
 "template.general.name" = "Réunion générale";
-"template.general.desc" = "Vue d'ensemble, points clés, décisions et actions à suivre.";
+"template.general.desc" = "Un compte rendu pour les absents : ce qui a été discuté, décidé et qui fait quoi.";
 "template.standup.name" = "Point quotidien";
-"template.standup.desc" = "Ce qui a été fait, la suite, et les blocages.";
+"template.standup.desc" = "L'avancement, la suite et les blocages de chacun, en un coup d'œil.";
 "template.interview.name" = "Entretien";
-"template.interview.desc" = "Questions, réponses, points forts et évaluation.";
+"template.interview.desc" = "Le bilan du candidat : réponses clés, points forts, réserves et avis final.";
 "template.outline.name" = "Plan de la Réunion";
-"template.outline.desc" = "Bref résumé et structure chronologique et hiérarchique des sujets abordés.";
+"template.outline.desc" = "Un bref résumé, puis les sujets dans l'ordre où ils ont été abordés.";
 
 /* Réglages */
 "settings.title" = "Réglages";

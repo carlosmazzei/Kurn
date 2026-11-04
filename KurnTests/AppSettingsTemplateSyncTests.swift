@@ -60,7 +60,7 @@ struct AppSettingsTemplateSyncTests {
     }
 
     private func customTemplate(name: String) -> SummaryTemplate {
-        .custom(name: name, instructions: "Instructions", sections: ["Section"])
+        .custom(name: name, instructions: "Instructions")
     }
 
     @Test func syncDisabledByDefaultNeverTouchesCloud() {

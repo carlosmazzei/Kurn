@@ -557,24 +557,23 @@
 "settings.templates_sync" = "通过 iCloud 同步模板";
 "settings.templates_sync_footer" = "你创建的自定义模板会通过 iCloud 同步，更换设备后依然可用。内置模板始终自行保持最新，无需同步。";
 "settings.template_name" = "名称";
+"settings.template_description" = "描述";
+"settings.template_description_placeholder" = "在模板列表中显示的一行文字";
+"settings.template_description_footer" = "显示在名称下方，便于区分模板。留空则使用说明的第一句话。";
 "settings.template_instructions" = "指示";
-"settings.template_instructions_footer" = "描述摘要的重点和语气，模型始终使用转录内容所用的语言回复。";
-"settings.template_sections" = "分节";
-"settings.template_section" = "分节标题";
-"settings.template_add_section" = "添加分节";
-"settings.template_sections_footer" = "建议的分节标题，用于引导结构，模型可能会对其进行调整。";
+"settings.template_instructions_footer" = "描述摘要的重点和语气，以及你想要的分节（例如：已完成、下一步、阻碍）。模型始终使用转录内容所用的语言回复。";
 "settings.template.builtin" = "预设";
 "settings.template.custom" = "自定义";
 "settings.delete_template" = "删除模板";
 "settings.delete_template.confirm" = "删除此模板？";
 "template.general.name" = "常规会议";
-"template.general.desc" = "概览、要点、决策及行动事项。";
+"template.general.desc" = "为未参会者准备的回顾：讨论了什么、决定了什么、由谁负责。";
 "template.standup.name" = "每日站会";
-"template.standup.desc" = "已完成的工作、下一步计划及阻碍。";
+"template.standup.desc" = "一目了然地查看每个人的进展、下一步计划和阻碍。";
 "template.interview.name" = "面试";
-"template.interview.desc" = "问题、回答、优势及评估。";
+"template.interview.desc" = "候选人表现如何：关键回答、优势、顾虑和总体结论。";
 "template.outline.name" = "会议大纲";
-"template.outline.desc" = "简要总结，加上按时间顺序列出讨论主题的分层大纲。";
+"template.outline.desc" = "先给出简短总结，再按讨论顺序列出各个主题。";
 
 /* 设置 */
 "settings.title" = "设置";

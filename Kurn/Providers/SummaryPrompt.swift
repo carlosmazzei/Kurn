@@ -4,88 +4,46 @@
 //
 
 import Foundation
+import KurnCore
 
 // MARK: - Shared prompt
 
 enum SummaryPrompt {
-    /// Build the system prompt for a template. Combines a fixed base + the
-    /// template's persona/focus + its suggested sections + the JSON contract.
-    /// The summary is requested in the transcript's own language.
+    /// Build the system prompt for a template: a fixed base, the template's
+    /// instructions (which name its sections, if it wants particular ones),
+    /// and the Markdown output contract `SummaryMarkdown` parses. The summary
+    /// is requested in the transcript's own language.
     static func system(for template: SummaryTemplate) -> String {
-        var prompt = """
+        """
         You are an expert meeting assistant. Given a meeting transcript with \
-        speaker labels, produce a structured summary in the SAME LANGUAGE as the \
-        transcript.
-
-        Some transcript lines are prefixed with ⭐ — these mark moments the \
-        speaker explicitly flagged as important while the meeting was being \
-        recorded. Whenever at least one ⭐-marked line is present, include a \
-        dedicated section (title translated into the transcript's language, \
-        along the lines of "Highlighted Moments") listing each one with its \
-        [mm:ss] timestamp and a short description of what was said, in \
-        chronological order.
-
-        Some transcript lines read "[mm:ss] 📷 Photo: <text>" — text recognized \
-        in a photo taken during the meeting (e.g. a whiteboard or slide). \
-        Whenever a section's content draws on one of these, copy that line's \
-        exact "mm:ss" stamp (do not compute or reformat it) into that \
-        section's "photoReferences" array, so the reader can jump back to the \
-        photo. Omit "photoReferences" entirely for a section that draws on no \
-        photo.
-
-        The transcript may be followed by an "Attached documents" part: text \
-        extracted from files attached to the meeting (an agenda, slides, a \
-        report), each under a "=== 📄 Document: <name> ===" line. Use them as \
-        reference material — to get names, figures and terms right and to \
-        complete what was discussed — but the meeting is what was said: never \
-        present a document's content as something said in the meeting, and \
-        never give it a [mm:ss] timestamp. When a document adds substance the \
-        conversation does not cover, say it comes from that document by name.
+        speaker labels, write a summary in the SAME LANGUAGE as the transcript, \
+        section headings included.
 
         \(template.instructions)
+
+        Transcript conventions:
+        - Lines prefixed with ⭐ are moments the speaker flagged as important \
+        while recording. When there is at least one, add a section (along the \
+        lines of "Highlighted Moments") listing each with its [mm:ss] timestamp \
+        and what was said, in order.
+        - Lines reading "[mm:ss] 📷 Photo: <text>" are text recognized in a \
+        photo taken during the meeting (a whiteboard, a slide).
+        - An "Attached documents" part after the transcript, one "=== 📄 \
+        Document: <name> ===" header per file, is reference material: use it \
+        to get names, figures and terms right, but never present it as \
+        something said in the meeting or give it a [mm:ss] timestamp. When it \
+        adds substance the conversation does not cover, name the document.
+
+        Output format — Markdown only, no preamble and no code fence around it:
+        - Start every section with a "## " heading. Use "#### " for headings \
+        inside a section; never "#".
+        - Use task checkboxes ("- [ ]" open, "- [x]" done) for action items, \
+        with owner and deadline when stated; a table for comparisons or \
+        structured facts; "> " for verbatim quotes; plain prose everywhere \
+        else. Do not force formatting where it does not help.
+        - When a section draws on a photo, end it with one line made of \
+        \(SummaryMarkdown.photoMarker) and that photo's stamp copied exactly, \
+        e.g. "\(SummaryMarkdown.photoMarker) [12:34] [15:02]".
         """
-
-        let sections = template.sections
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if !sections.isEmpty {
-            let list = sections.map { "- \($0)" }.joined(separator: "\n")
-            prompt += """
-
-
-            Organize the summary into sections along these lines (adapt, merge, \
-            rename, or add sections as the content requires):
-            \(list)
-            """
-        }
-
-        prompt += """
-
-
-        Output valid JSON with this shape:
-        {
-          "sections": [
-            { "title": "Section heading", "body": "markdown paragraph(s)", "items": ["bullet", "bullet"], "photoReferences": ["mm:ss"] }
-          ]
-        }
-        Each section needs a "title". Use "body" for prose and "items" for bullet \
-        lists; either may be omitted when not needed. "photoReferences" is \
-        optional — see the photo instruction above.
-        "body" is rendered as Markdown and supports: **bold** and *italic*, #### \
-        subheadings, bullet and numbered lists (nest by indenting two spaces), task \
-        checkboxes ("- [ ]" open, "- [x]" done), "> " blockquotes, pipe tables with \
-        a |---| separator row, and ``` fenced code blocks.
-        Prefer task checkboxes for action items and to-dos (include owner and \
-        deadline when stated), a table when comparing options or listing structured \
-        facts, and "> " blockquotes when quoting a speaker verbatim. Use plain \
-        prose everywhere else — do not force formatting where it does not help.
-        "items" entries render as bullets; start an entry with "[ ] " or "[x] " to \
-        render it as a task checkbox instead.
-        Use real line breaks inside "body" — never write the two characters \
-        backslash-n. Keep each "items" entry to a single line.
-        Translate the section titles into the transcript's language.
-        Output ONLY the JSON object itself — no markdown fences around it.
-        """
-        return prompt
     }
 }

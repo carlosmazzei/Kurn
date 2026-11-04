@@ -3,19 +3,18 @@
 //  KurnCore
 //
 //  The readable draft of a summary while it is still streaming. A summary is
-//  generated as JSON (`{"sections":[{"title":…,"body":…,"items":[…]}]}`), and
-//  showing that raw would put keys, braces and `\n` escapes in front of the
-//  user. This walks the JSON incrementally — one fragment at a time, never
-//  needing the rest of the document — and emits only the text a reader
-//  cares about: each section's title on its own line, its body, its items as
-//  bullets. Values are emitted as they arrive, so the draft grows character
-//  by character like a chat reply; keys are buffered until they close, since
-//  they decide where a value goes.
+//  generated as Markdown with "## " section headings (`SummaryMarkdown`), and
+//  the draft is that text with the syntax a reader should not see removed:
+//  heading markers (the title stays, on its own line after a blank one),
+//  photo-reference lines and code-fence lines. Everything else passes through
+//  character by character, so the draft grows like a chat reply.
+//
+//  Only the start of a line is held back, and only while it could still turn
+//  out to be one of those markers ("#", "📷", "`"); as soon as it cannot, the
+//  held text is emitted and the rest of the line streams.
 //
 //  Deliberately unformatted and forgiving: it is a preview of work in
 //  progress, replaced by the parsed summary the moment generation finishes.
-//  Anything that is not a section title, body or item (photo references,
-//  unknown keys, prose or code fences around the JSON) is simply not shown.
 //
 
 import Foundation
@@ -26,195 +25,106 @@ public struct SummaryDraftPreview: Sendable, Equatable {
     /// Approximate words in `text`; see `StreamedWordCount`.
     public var words: Int { wordCount.words }
 
-    /// `isSection` marks an object that is an element of the top-level
-    /// `sections` array (and an array belonging to one): only those carry
-    /// text worth showing, so a `body` key nested anywhere else is ignored.
-    private enum Container: Equatable {
-        case object(key: String?, isSection: Bool)
-        case array(key: String?, inSection: Bool)
+    private enum LineMode: Equatable {
+        /// At the start of a line, holding `pending` until it is classified.
+        case undecided
+        /// Shown as it arrives (a heading's title or ordinary text).
+        case visible
+        /// Dropped up to the end of the line.
+        case hidden
     }
 
-    private var stack: [Container] = []
-    private var inString = false
-    private var stringIsKey = false
-    private var keyBuffer = ""
-    private var valueTarget: ValueTarget?
-    private var escape = EscapeState.none
-    private var pendingHighSurrogate: UInt32?
+    private static let photoScalar: Unicode.Scalar = "\u{1F4F7}"
+
+    private var mode = LineMode.undecided
+    private var pending = ""
     private var wordCount = StreamedWordCount()
-
-    private enum ValueTarget: Equatable {
-        case title, body, item
-    }
-
-    private enum EscapeState: Equatable {
-        case none
-        case backslash
-        case unicode(String)
-    }
 
     public init() {}
 
     public mutating func add(_ fragment: String) {
         for scalar in fragment.unicodeScalars {
-            if inString {
-                consumeInString(scalar)
-            } else {
-                consumeStructure(scalar)
+            if scalar == "\n" {
+                endLine()
+                continue
+            }
+            switch mode {
+            case .undecided:
+                pending.unicodeScalars.append(scalar)
+                classify(isComplete: false)
+            case .visible:
+                emit(String(scalar))
+            case .hidden:
+                break
             }
         }
     }
 
-    // MARK: - Structure
+    // MARK: - Lines
 
-    private mutating func consumeStructure(_ scalar: Unicode.Scalar) {
-        switch scalar {
-        case "{":
-            let isSection: Bool
-            if case .array(let key, _) = stack.last { isSection = key == "sections" } else { isSection = false }
-            stack.append(.object(key: nil, isSection: isSection))
-        case "[":
-            let inSection: Bool
-            if case .object(_, let isSection) = stack.last { inSection = isSection } else { inSection = false }
-            stack.append(.array(key: lastClosedKey, inSection: inSection))
-        case "}", "]":
-            if !stack.isEmpty { stack.removeLast() }
-        case "\"":
-            beginString()
-        case ",":
-            clearKeyIfInObject()
-        default:
-            break
-        }
+    private mutating func endLine() {
+        if mode == .undecided { classify(isComplete: true) }
+        if mode == .visible { emit("\n") }
+        // A hidden line leaves no trace, not even its line break; a blank line
+        // is kept, but never more than one in a row.
+        if mode == .undecided, !text.isEmpty, !text.hasSuffix("\n\n") { emit("\n") }
+        mode = .undecided
+        pending = ""
     }
 
-    /// The key a value in the innermost object belongs to, once its `:` has
-    /// been read.
-    private var lastClosedKey: String? {
-        guard case .object(let key, _) = stack.last else { return nil }
-        return key
-    }
-
-    private mutating func clearKeyIfInObject() {
-        setKeyOfInnermostObject(nil)
-    }
-
-    private mutating func beginString() {
-        inString = true
-        switch stack.last {
-        case .object(let key, _) where key == nil:
-            stringIsKey = true
-            keyBuffer = ""
-            valueTarget = nil
-        case .object(let key, let isSection):
-            stringIsKey = false
-            valueTarget = isSection ? Self.target(forKey: key, inArray: false) : nil
-        case .array(let key, let inSection):
-            stringIsKey = false
-            valueTarget = inSection ? Self.target(forKey: key, inArray: true) : nil
-        case nil:
-            stringIsKey = false
-            valueTarget = nil
-        }
-        startValue()
-    }
-
-    private static func target(forKey key: String?, inArray: Bool) -> ValueTarget? {
-        switch (key, inArray) {
-        case ("title", false): return .title
-        case ("body", false): return .body
-        case ("items", true): return .item
-        default: return nil
-        }
-    }
-
-    private mutating func startValue() {
-        switch valueTarget {
-        case .title:
-            if !text.isEmpty { emit(text.hasSuffix("\n") ? "\n" : "\n\n") }
-        case .item:
-            if !text.isEmpty, !text.hasSuffix("\n") { emit("\n") }
-            emit("• ")
-        case .body, nil:
-            break
-        }
-    }
-
-    private mutating func endString() {
-        inString = false
-        escape = .none
-        pendingHighSurrogate = nil
-        if stringIsKey {
-            // The key takes effect once its `:` arrives; recording it now is
-            // equivalent, since nothing else can come between them.
-            setKeyOfInnermostObject(keyBuffer)
-            stringIsKey = false
+    /// Decide what the held start of a line is, once enough of it has
+    /// arrived — or, at the end of the line, with whatever did.
+    private mutating func classify(isComplete: Bool) {
+        let content = pending.drop(while: { $0 == " " || $0 == "\t" })
+        guard let first = content.unicodeScalars.first else {
+            // Only indentation so far: an empty line stays undecided.
             return
         }
-        if valueTarget != nil, !text.hasSuffix("\n") { emit("\n") }
-        valueTarget = nil
-    }
-
-    private mutating func setKeyOfInnermostObject(_ key: String?) {
-        guard case .object(_, let isSection) = stack.last else { return }
-        stack[stack.count - 1] = .object(key: key, isSection: isSection)
-    }
-
-    // MARK: - Strings
-
-    private mutating func consumeInString(_ scalar: Unicode.Scalar) {
-        switch escape {
-        case .backslash:
-            escape = .none
-            switch scalar {
-            case "n", "r": appendCharacter("\n")
-            case "t": appendCharacter(" ")
-            case "u": escape = .unicode("")
-            case "b", "f": break
-            default: appendCharacter(scalar)
-            }
-        case .unicode(let digits):
-            let collected = digits + String(scalar)
-            guard collected.count == 4 else {
-                escape = .unicode(collected)
+        switch first {
+        case "#":
+            let hashes = content.prefix(while: { $0 == "#" })
+            let afterHashes = content.dropFirst(hashes.count)
+            guard let next = afterHashes.first else {
+                if isComplete { show(pending) }
                 return
             }
-            escape = .none
-            if let value = UInt32(collected, radix: 16) { appendCodeUnit(value) }
-        case .none:
-            switch scalar {
-            case "\\": escape = .backslash
-            case "\"": endString()
-            default: appendCharacter(scalar)
+            guard hashes.count <= 6, next == " " || next == "\t" else {
+                show(pending)
+                return
             }
+            startHeading(with: afterHashes.trimmingCharacters(in: .whitespaces))
+        case "`", "~":
+            let marker = String(first)
+            let fence = String(repeating: marker, count: 3)
+            if content.hasPrefix(fence) {
+                mode = .hidden
+            } else if fence.hasPrefix(String(content)), !isComplete {
+                return
+            } else {
+                show(pending)
+            }
+        case Self.photoScalar:
+            mode = .hidden
+        default:
+            show(pending)
         }
     }
 
-    /// A `\uXXXX` escape; joins a UTF-16 surrogate pair split across two.
-    private mutating func appendCodeUnit(_ value: UInt32) {
-        if (0xD800...0xDBFF).contains(value) {
-            pendingHighSurrogate = value
-            return
+    private mutating func startHeading(with title: String) {
+        if !text.isEmpty {
+            emit(text.hasSuffix("\n\n") ? "" : (text.hasSuffix("\n") ? "\n" : "\n\n"))
         }
-        if (0xDC00...0xDFFF).contains(value), let high = pendingHighSurrogate {
-            pendingHighSurrogate = nil
-            let combined = 0x10000 + ((high - 0xD800) << 10) + (value - 0xDC00)
-            if let scalar = Unicode.Scalar(combined) { appendCharacter(scalar) }
-            return
-        }
-        pendingHighSurrogate = nil
-        if let scalar = Unicode.Scalar(value) { appendCharacter(scalar) }
+        mode = .visible
+        emit(title)
     }
 
-    private mutating func appendCharacter(_ scalar: Unicode.Scalar) {
-        if stringIsKey {
-            keyBuffer.unicodeScalars.append(scalar)
-        } else if valueTarget != nil {
-            emit(String(scalar))
-        }
+    private mutating func show(_ held: String) {
+        mode = .visible
+        emit(held)
     }
 
     private mutating func emit(_ piece: String) {
+        guard !piece.isEmpty else { return }
         text += piece
         wordCount.add(piece)
     }

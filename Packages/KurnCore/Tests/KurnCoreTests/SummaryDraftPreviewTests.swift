@@ -2,7 +2,7 @@
 //  SummaryDraftPreviewTests.swift
 //  KurnCoreTests
 //
-//  The readable draft shown while a summary's JSON streams in.
+//  The readable draft shown while a summary's Markdown streams in.
 //
 
 import Foundation
@@ -11,20 +11,27 @@ import Testing
 
 struct SummaryDraftPreviewTests {
 
-    private static let json = #"""
-    {"sections":[{"title":"Decisions","body":"We ship on Monday.","items":["Ana: QA","Rui: notes"]},{"title":"Risks","body":"Line one\nLine two"}]}
-    """#
+    private static let markdown = """
+    ## Decisions
+    We ship on Monday.
+    - Ana: QA
+    - Rui: notes
+    📷 [01:02]
+
+    ## Risks
+    Line one
+    Line two
+    """
 
     private static let expected = """
     Decisions
     We ship on Monday.
-    • Ana: QA
-    • Rui: notes
+    - Ana: QA
+    - Rui: notes
 
     Risks
     Line one
     Line two
-
     """
 
     private func preview(_ fragments: [String]) -> SummaryDraftPreview {
@@ -33,43 +40,45 @@ struct SummaryDraftPreviewTests {
         return preview
     }
 
-    @Test func showsTitlesBodiesAndItemsWithoutTheJSON() {
-        #expect(preview([Self.json]).text == Self.expected)
+    @Test func showsTitlesAndTextWithoutHeadingMarkersOrPhotoLines() {
+        #expect(preview([Self.markdown]).text == Self.expected)
     }
 
     @Test func theResultDoesNotDependOnWhereFragmentsSplit() {
-        let characters = Self.json.map(String.init)
+        let characters = Self.markdown.map(String.init)
         #expect(preview(characters).text == Self.expected)
-        let mid = Self.json.index(Self.json.startIndex, offsetBy: 37)
-        #expect(preview([String(Self.json[..<mid]), String(Self.json[mid...])]).text == Self.expected)
+        let mid = Self.markdown.index(Self.markdown.startIndex, offsetBy: 37)
+        let halves = [String(Self.markdown[..<mid]), String(Self.markdown[mid...])]
+        #expect(preview(halves).text == Self.expected)
     }
 
-    @Test func valuesAppearAsTheyArriveNotWhenTheyClose() {
-        #expect(preview([#"{"sections":[{"title":"Deci"#]).text == "Deci")
+    @Test func textAppearsAsItArrivesNotWhenTheLineEnds() {
+        #expect(preview(["## Deci"]).text == "Deci")
+        #expect(preview(["Hello wor"]).text == "Hello wor")
     }
 
-    @Test func keysAndUnknownFieldsAreNeverShown() {
-        let text = preview([#"{"sections":[{"title":"T","photoReferences":["01:02"],"extra":{"body":"x"},"body":"B"}]}"#]).text
-        #expect(text == "T\nB\n")
+    @Test func aLineStartIsHeldOnlyWhileItCouldBeAMarker() {
+        #expect(preview(["#"]).text.isEmpty)
+        #expect(preview(["#hashtag"]).text == "#hashtag")
+        #expect(preview(["`"]).text.isEmpty)
+        #expect(preview(["`code` here"]).text == "`code` here")
     }
 
-    @Test func escapesAreDecodedIncludingSplitUnicodeAndSurrogatePairs() {
-        let text = preview([#"{"sections":[{"title":"Say \"hi\" \u00e"#, #"9 \ud83d"#, #"\ude80 a\\b"}]}"#]).text
-        #expect(text == "Say \"hi\" é 🚀 a\\b\n")
+    @Test func headingsAreSeparatedByOneBlankLine() {
+        #expect(preview(["Intro\n## A\nx\n\n\n## B\ny"]).text == "Intro\n\nA\nx\n\nB\ny")
     }
 
-    @Test func proseAndFencesAroundTheJSONAreIgnored() {
-        let text = preview(["Here you go:\n```json\n", #"{"sections":[{"title":"T"}]}"#, "\n```"]).text
-        #expect(text == "T\n")
+    @Test func fenceLinesAreHiddenButTheirContentIsShown() {
+        #expect(preview(["```markdown\n## T\nbody\n```"]).text == "T\nbody\n")
     }
 
     @Test func wordsCountOnlyTheVisibleText() {
         // Decisions We ship on Monday Ana QA Rui notes Risks Line one Line two.
-        #expect(preview([Self.json]).words == 14)
+        #expect(preview([Self.markdown]).words == 14)
     }
 
     @Test func nothingVisibleMeansAnEmptyDraft() {
-        #expect(preview([#"{"sections":["#]).text.isEmpty)
+        #expect(preview(["📷 [00:01]\n"]).text.isEmpty)
         #expect(SummaryDraftPreview().words == 0)
     }
 }

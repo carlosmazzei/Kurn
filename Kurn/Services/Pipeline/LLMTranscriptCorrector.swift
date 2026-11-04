@@ -95,7 +95,7 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     }
 
     /// Pure. Reuses `ModelJSON`'s tolerant fence/prose-stripping (the same
-    /// parser `SummaryJSON.parse` uses). Any JSON failure yields an empty map
+    /// parser the auto-tagger uses). Any JSON failure yields an empty map
     /// so the caller fails open for that whole batch.
     static func parseCorrections(from reply: String) -> [UUID: String] {
         parsedCorrections(from: reply) ?? [:]

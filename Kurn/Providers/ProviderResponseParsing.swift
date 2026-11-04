@@ -8,13 +8,13 @@ import KurnCore
 
 extension LLMHTTP {
     /// Decode a summary response, extract its text content, and parse the shared
-    /// JSON contract into a `SummaryResult`. Centralizes the decode→parse→error
-    /// flow every provider's `summarize` shares. `isTruncated` inspects the
-    /// vendor's finish/stop reason: a generation cut off by the output-token cap
-    /// is syntactically broken JSON, so surface the specific truncation error
-    /// instead of the confusing decode failure it would otherwise become. The
-    /// first catch deliberately re-throws `AppError`s (e.g. the empty-content
-    /// and `SummaryJSON.parse` failures) so they aren't re-wrapped by the
+    /// Markdown contract (`SummaryMarkdown`) into a `SummaryResult`. Centralizes
+    /// the decode→parse→error flow every provider's `summarize` shares.
+    /// `isTruncated` inspects the vendor's finish/stop reason: a generation cut
+    /// off by the output-token cap still parses as Markdown, so the finish
+    /// reason is the only thing that keeps a half summary from being saved as
+    /// a whole one. The first catch deliberately re-throws `AppError`s (e.g.
+    /// the empty-content and parse failures) so they aren't re-wrapped by the
     /// generic `decodingError` catch.
     static func summaryResult<T: Decodable>(
         from data: Data,
@@ -31,8 +31,7 @@ extension LLMHTTP {
             guard let content = extractContent(decoded), !content.isEmpty else {
                 throw AppError.decodingError(emptyMessage)
             }
-            let json = try SummaryJSON.parse(content)
-            return SummaryResult(sections: json.summarySections)
+            return SummaryResult(sections: try SummaryMarkdown.sections(from: content))
         } catch let error as AppError {
             throw error
         } catch {
@@ -52,8 +51,7 @@ extension LLMHTTP {
         guard !truncated else { throw AppError.summaryTruncated }
         guard !text.isEmpty else { throw AppError.decodingError(emptyMessage) }
         do {
-            let json = try SummaryJSON.parse(text)
-            return SummaryResult(sections: json.summarySections)
+            return SummaryResult(sections: try SummaryMarkdown.sections(from: text))
         } catch let error as AppError {
             throw error
         } catch {
@@ -62,7 +60,7 @@ extension LLMHTTP {
     }
 
     /// Decode a chat response and extract its plain-text content. The
-    /// text sibling of `summaryResult`: no JSON-section parsing, just the
+    /// text sibling of `summaryResult`: no section parsing, just the
     /// model's reply. Re-throws `AppError`s (e.g. the empty-content failure) so
     /// they aren't re-wrapped by the generic decode catch.
     static func textResult<T: Decodable>(
@@ -114,9 +112,10 @@ struct ChatResponse: Decodable {
     let choices: [Choice]
 
     /// True when generation stopped because it hit the output-token cap, which
-    /// leaves the JSON payload cut off mid-structure.
+    /// leaves the reply cut off mid-sentence.
     var isTruncated: Bool { choices.first?.finishReason == "length" }
 }
 
-// `SummaryJSON` and `ModelJSON` live in KurnCore so their decoding contracts
-// remain reusable without depending on the provider transport layer.
+// `SummaryMarkdown`, `SummaryJSON` and `ModelJSON` live in KurnCore so their
+// decoding contracts remain reusable without depending on the provider
+// transport layer.

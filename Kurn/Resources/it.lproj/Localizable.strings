@@ -557,24 +557,23 @@
 "settings.templates_sync" = "Sincronizza i Modelli tramite iCloud";
 "settings.templates_sync_footer" = "I modelli personalizzati che crei vengono sincronizzati tramite iCloud, così sono disponibili dopo il cambio di dispositivo. I modelli predefiniti restano sempre aggiornati autonomamente.";
 "settings.template_name" = "Nome";
+"settings.template_description" = "Descrizione";
+"settings.template_description_placeholder" = "Una riga mostrata nell'elenco dei modelli";
+"settings.template_description_footer" = "Appare sotto il nome per distinguere i modelli. Lascia vuoto per usare la prima frase delle istruzioni.";
 "settings.template_instructions" = "Istruzioni";
-"settings.template_instructions_footer" = "Descrivi il focus e il tono del riassunto. Il modello risponde sempre nella lingua della trascrizione.";
-"settings.template_sections" = "Sezioni";
-"settings.template_section" = "Titolo sezione";
-"settings.template_add_section" = "Aggiungi Sezione";
-"settings.template_sections_footer" = "Titoli di sezione suggeriti per guidare la struttura. Il modello può adattarli.";
+"settings.template_instructions_footer" = "Descrivi il focus e il tono del riassunto e le sezioni che desideri (ad esempio: Fatto, Prossimi passi, Blocchi). Il modello risponde sempre nella lingua della trascrizione.";
 "settings.template.builtin" = "Predefinito";
 "settings.template.custom" = "Personalizzato";
 "settings.delete_template" = "Elimina Modello";
 "settings.delete_template.confirm" = "Eliminare questo modello?";
 "template.general.name" = "Riunione Generale";
-"template.general.desc" = "Panoramica, punti chiave, decisioni e azioni.";
+"template.general.desc" = "Un riepilogo per chi non c'era: cosa si è discusso, cosa si è deciso e chi fa cosa.";
 "template.standup.name" = "Standup Giornaliero";
-"template.standup.desc" = "Cosa è stato fatto, prossimi passi e blocchi.";
+"template.standup.desc" = "Avanzamento, prossimi passi e blocchi di ciascuno, a colpo d'occhio.";
 "template.interview.name" = "Colloquio";
-"template.interview.desc" = "Domande, risposte, punti di forza e valutazione.";
+"template.interview.desc" = "Com'è andato il candidato: risposte chiave, punti di forza, dubbi e giudizio.";
 "template.outline.name" = "Struttura della Riunione";
-"template.outline.desc" = "Breve sintesi e struttura cronologica e gerarchica degli argomenti trattati.";
+"template.outline.desc" = "Una breve sintesi, poi gli argomenti nell'ordine in cui sono emersi.";
 
 /* Impostazioni */
 "settings.title" = "Impostazioni";

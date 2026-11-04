@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  Create/edit screens for summary templates, plus the settings list row. Mirrors
-//  the provider editor pattern: built-in presets can be tuned (instructions and
-//  sections) but not renamed or deleted; custom templates are fully editable.
+//  the provider editor pattern: built-in presets can be tuned (instructions) but
+//  not renamed or deleted; custom templates are fully editable.
 //
 
 import SwiftUI
@@ -24,10 +24,14 @@ struct TemplateRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(template.displayName).font(Theme.subheadlineEmphasized)
+                Text(template.summaryDescription)
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
                 Text(template.isBuiltIn
                      ? NSLocalizedString("settings.template.builtin", comment: "Preset")
                      : NSLocalizedString("settings.template.custom", comment: "Custom"))
-                    .font(Theme.caption)
+                    .font(Theme.caption2)
                     .foregroundStyle(Theme.textSecondary)
             }
         }
@@ -44,7 +48,7 @@ struct TemplateEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var instructions = ""
-    @State private var sections: [String] = []
+    @State private var details = ""
     @State private var showingDeleteConfirm = false
 
     private var canSave: Bool {
@@ -57,7 +61,8 @@ struct TemplateEditor: View {
             TemplateFields(
                 name: $name,
                 instructions: $instructions,
-                sections: $sections,
+                details: $details,
+                detailsPlaceholder: template.isBuiltIn ? template.summaryDescription : nil,
                 nameEditable: !template.isBuiltIn
             )
 
@@ -81,7 +86,7 @@ struct TemplateEditor: View {
                         updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                     updated.instructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
-                    updated.sections = TemplateFields.cleanedSections(sections)
+                    updated.details = details.trimmingCharacters(in: .whitespacesAndNewlines)
                     onSave(updated)
                     dismiss()
                 }
@@ -91,7 +96,7 @@ struct TemplateEditor: View {
         .onAppear {
             name = template.displayName
             instructions = template.instructions
-            sections = template.sections
+            details = template.details
         }
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
@@ -117,7 +122,7 @@ struct AddTemplateView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var instructions = ""
-    @State private var sections: [String] = [""]
+    @State private var details = ""
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -129,7 +134,8 @@ struct AddTemplateView: View {
             TemplateFields(
                 name: $name,
                 instructions: $instructions,
-                sections: $sections,
+                details: $details,
+                detailsPlaceholder: nil,
                 nameEditable: true
             )
         }
@@ -144,7 +150,7 @@ struct AddTemplateView: View {
                     let template = SummaryTemplate.custom(
                         name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                         instructions: instructions.trimmingCharacters(in: .whitespacesAndNewlines),
-                        sections: TemplateFields.cleanedSections(sections)
+                        details: details.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
                     onAdd(template)
                 }
@@ -158,13 +164,10 @@ struct AddTemplateView: View {
 private struct TemplateFields: View {
     @Binding var name: String
     @Binding var instructions: String
-    @Binding var sections: [String]
+    @Binding var details: String
+    /// A built-in's current description, shown while its own is left empty.
+    let detailsPlaceholder: String?
     let nameEditable: Bool
-
-    static func cleanedSections(_ raw: [String]) -> [String] {
-        raw.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
 
     var body: some View {
         Section {
@@ -175,31 +178,25 @@ private struct TemplateFields: View {
         }
 
         Section {
+            TextField(
+                detailsPlaceholder ?? NSLocalizedString("settings.template_description_placeholder", comment: "Description placeholder"),
+                text: $details,
+                axis: .vertical
+            )
+            .lineLimit(1...3)
+        } header: {
+            Text(NSLocalizedString("settings.template_description", comment: "Description"))
+        } footer: {
+            Text(NSLocalizedString("settings.template_description_footer", comment: "Description footer"))
+        }
+
+        Section {
             TextEditor(text: $instructions)
                 .frame(minHeight: 120)
         } header: {
             Text(NSLocalizedString("settings.template_instructions", comment: "Instructions"))
         } footer: {
             Text(NSLocalizedString("settings.template_instructions_footer", comment: "Instructions footer"))
-        }
-
-        Section {
-            ForEach(sections.indices, id: \.self) { index in
-                TextField(
-                    NSLocalizedString("settings.template_section", comment: "Section"),
-                    text: $sections[index]
-                )
-            }
-            .onDelete { sections.remove(atOffsets: $0) }
-            Button {
-                sections.append("")
-            } label: {
-                Label(NSLocalizedString("settings.template_add_section", comment: "Add Section"), systemImage: "plus")
-            }
-        } header: {
-            Text(NSLocalizedString("settings.template_sections", comment: "Sections"))
-        } footer: {
-            Text(NSLocalizedString("settings.template_sections_footer", comment: "Sections footer"))
         }
     }
 }

@@ -161,7 +161,7 @@ final class StreamingAccumulator: @unchecked Sendable {
 /// vendors report in a final chunk or event (`finish_reason`,
 /// `stop_reason`, `finishReason`) separate from the text itself. A
 /// streamed summary reads it once the stream ends to tell a generation cut
-/// off by the output-token cap — broken JSON — from a complete one.
+/// off by the output-token cap — a half summary — from a complete one.
 final class FinishReasonRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var reason: String?

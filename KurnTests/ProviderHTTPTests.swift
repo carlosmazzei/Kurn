@@ -226,8 +226,9 @@ struct ProviderHTTPTests {
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         let generationConfig = body?["generationConfig"] as? [String: Any]
-        #expect(generationConfig?["responseMimeType"] as? String == "application/json")
-        #expect(generationConfig?["responseJsonSchema"] != nil)
+        // The reply is Markdown, so no JSON mode or schema is requested.
+        #expect(generationConfig?["responseMimeType"] == nil)
+        #expect(generationConfig?["responseJsonSchema"] == nil)
     }
 
     @Test func googleTruncatedSummaryThrowsSummaryTruncated() async {

@@ -222,7 +222,7 @@ struct SummaryService {
     }
 
     /// Internal template for the map stage. Runs through the same
-    /// `LLMProvider.summarize` JSON contract as user-facing summaries, so no
+    /// `LLMProvider.summarize` Markdown contract as user-facing summaries, so no
     /// provider changes are needed; its sections are rendered back to markdown
     /// and fed to the reduce stage. Never shown in the template picker.
     static let notesTemplate = SummaryTemplate(
@@ -243,9 +243,9 @@ struct SummaryService {
         final summary. Text under an "Attached documents" header comes from \
         files attached to the meeting, not from speech: carry its relevant \
         facts into the notes attributed to the document by name, without \
-        timestamps. Do not editorialize and do not drop topics.
-        """,
-        sections: ["Discussion", "Decisions", "Action Items", "Open Questions"]
+        timestamps. Do not editorialize and do not drop topics. Use the \
+        sections Discussion, Decisions, Action Items and Open Questions.
+        """
     )
 
     /// Split a transcript into blocks of at most `maxChars`, breaking only on
@@ -299,13 +299,20 @@ struct SummaryService {
         return blocks
     }
 
-    /// Render summary sections back into markdown text for the reduce prompt.
-    static func markdownText(from sections: [SummarySection]) -> String {
+    /// Render summary sections back into markdown text — the inverse of
+    /// `SummaryMarkdown.sections(from:)`. Photo references are written back
+    /// only when asked (translation, so they survive the round trip); the
+    /// reduce prompt, the wiki and the chat context have no use for them.
+    static func markdownText(from sections: [SummarySection], includingPhotoReferences: Bool = false) -> String {
         sections.map { section in
             var lines: [String] = []
             if !section.title.isEmpty { lines.append("## \(section.title)") }
             if !section.body.isEmpty { lines.append(section.body) }
             lines.append(contentsOf: section.items.map { "- \($0)" })
+            if includingPhotoReferences, !section.photoTimestamps.isEmpty {
+                let stamps = section.photoTimestamps.map { "[\($0.clockDisplay)]" }
+                lines.append(([SummaryMarkdown.photoMarker] + stamps).joined(separator: " "))
+            }
             return lines.joined(separator: "\n")
         }
         .joined(separator: "\n\n")
@@ -313,7 +320,7 @@ struct SummaryService {
 
     /// Generate a short 5–7 word meeting title from the transcript. Uses the
     /// same provider as the full summary but sends only a small excerpt and
-    /// expects a one-line JSON reply, so it's fast and cheap. Best-effort:
+    /// expects a single heading line back, so it's fast and cheap. Best-effort:
     /// callers should catch and ignore errors rather than surfacing them.
     func generateTitle(
         transcriptText: String,
@@ -323,21 +330,30 @@ struct SummaryService {
         let llm = try resolveProvider(provider, model)
         let excerpt = String(transcriptText.prefix(2_000))
         let system = """
-        You generate short meeting titles. \
-        Return ONLY valid JSON in this exact format with no other text: \
-        {"sections":[{"title":"5 to 7 word title here","body":""}]}
+        You generate short meeting titles. Reply with ONLY a 5 to 7 word title \
+        on one line, as a Markdown heading: "## <title>". Nothing else.
         The title must be written in the same language as the transcript.
         """
         let result = try await llm.summarize(
             systemPrompt: system,
             userPrompt: "Transcript:\n\(excerpt)"
         )
-        let title = result.sections.first?.title
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let title = Self.title(from: result)
         guard !title.isEmpty else {
             throw AppError.decodingError("empty title in response")
         }
         return title
+    }
+
+    /// The title in a `generateTitle` reply: its heading, or — from a model
+    /// that answered with the bare title — the first line of its text.
+    static func title(from result: SummaryResult) -> String {
+        guard let first = result.sections.first else { return "" }
+        let heading = first.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !heading.isEmpty { return heading }
+        let firstLine = first.body.split(separator: "\n").first.map(String.init) ?? ""
+        return firstLine
+            .trimmingCharacters(in: CharacterSet(charactersIn: "*_\"'").union(.whitespaces))
     }
 
     /// Translate an already-generated summary's sections into another
@@ -361,17 +377,15 @@ struct SummaryService {
         inside each section's body and bullet items (bold/italic, headings, \
         lists, task checkboxes, blockquotes, tables, code fences). Do not add, \
         remove, merge, or reorder sections. Translate only the text content — \
-        section titles, body prose, and item text.
+        section titles and body text.
         Each "## " line starts a new section title; everything until the next \
-        "## " line (or the end) is that section's body, with "- " lines as its \
-        bullet items.
-        Output valid JSON with this shape:
-        {"sections":[{"title":"...","body":"...","items":["..."]}]}
-        Use real line breaks inside "body" — never write the two characters \
-        backslash-n.
-        Output ONLY the JSON object itself — no markdown fences around it.
+        "## " line (or the end) is that section's body. Keep every "## " \
+        heading, translated, and any line made only of 📷 and [mm:ss] stamps \
+        exactly as it is.
+        Output ONLY the translated Markdown — no preamble and no code fence \
+        around it.
         """
-        let userPrompt = "Summary:\n\(Self.markdownText(from: sections))"
+        let userPrompt = "Summary:\n\(Self.markdownText(from: sections, includingPhotoReferences: true))"
         let result = try await llm.summarize(systemPrompt: system, userPrompt: userPrompt)
         guard !result.sections.isEmpty else {
             throw AppError.summaryTranslationFailed(NSLocalizedString(

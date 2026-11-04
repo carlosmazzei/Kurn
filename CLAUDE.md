@@ -1012,7 +1012,7 @@ transcript.
   leave the original untouched — which is what makes the "can't drop, merge or
   reorder" guarantee structural rather than a prompt instruction.
 - **It fails open at every level.** `parseCorrections` reuses `ModelJSON`'s
-  tolerant fence/prose stripping (the same parser behind `SummaryJSON.parse`);
+  tolerant fence/prose stripping (the same parser the auto-tagger uses);
   any JSON failure yields an empty map, so that whole batch silently leaves its
   segments unchanged rather than failing the transcription.
 
@@ -1603,14 +1603,35 @@ backs the model picker in Settings and is distinct from the
 completion-calling `LLMProvider` clients above.
 
 Summaries are template-driven: `SummaryPrompt.system(for:)` builds the system prompt
-from the chosen `SummaryTemplate` (`Models/SummaryTemplate.swift` — persona/
-instructions plus suggested sections; built-ins are `.general`, `.standup`,
-`.interview`, and `.outline`, collected in `defaultTemplates`), and the model
-returns a flexible
-`{ "sections": [...] }` shape decoded into `[SummarySection]`
-(`Models/SummarySection.swift` — title, Markdown body, bullet items) rather than
-a fixed set of fields. `SummaryJSON.parse` tolerantly strips
-markdown fences and extracts the outermost `{...}` since models add prose. Templates
+from the chosen `SummaryTemplate` (`Models/SummaryTemplate.swift` — a name and
+instructions, which also name the sections the template wants; built-ins are
+`.general`, `.standup`, `.interview`, and `.outline`, collected in
+`defaultTemplates`). **The reply is plain Markdown in which each `## ` heading
+opens a section**, parsed by KurnCore's `SummaryMarkdown` into
+`[SummarySection]` (title, Markdown body, plus bullet items and photo
+timestamps) — the stored, rendered, exported, translated and read-aloud shape is
+unchanged. It replaced a `{ "sections": [...] }` JSON contract: prose inside JSON
+strings was where models failed (double-escaped `\n`, fences, prose around the
+braces) and needed per-vendor JSON modes, so no vendor is asked for JSON mode or
+a response schema any more, and the on-device model generates text rather than
+a guided struct. The parser is tolerant: `#### ` stays inside a section, headings
+inside code fences never split, a lone `# ` document title is dropped, `# `
+headings serve as sections when there are no `## ` ones, a reply with no heading
+becomes one untitled section, a fence around the whole reply is removed, and a
+reply in the old JSON shape is still accepted (`SummaryJSON`). A line made only
+of `📷` and `[mm:ss]` stamps lists the photos a section drew on
+(`photoTimestamps`) and leaves the body; translation writes those lines back
+(`SummaryService.markdownText(from:includingPhotoReferences:)`) so they survive.
+A truncated Markdown reply still parses, so the vendor's finish/stop reason is
+what raises `AppError.summaryTruncated`. Templates used to carry a separate list
+of suggested section headings; it was folded into the instructions, and a stored
+or iCloud-synced template that still has one is migrated on decode
+(`SummaryTemplate.instructions(_:foldingIn:)`), while encoding always writes an
+empty `sections` key so an older app version can still decode a synced
+template. The line under a template's name in the picker and in Settings is
+`summaryDescription`: the one-line `details` the user wrote, else a built-in's
+localized purpose (`template.<id>.desc`), else the first sentence of the
+instructions — never a list of sections. Templates
 (built-in presets + user-defined, created/edited via `Views/TemplateEditorView.swift`
 — built-ins can't be renamed or deleted) live in `AppSettings.summaryTemplates`; the user
 picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` holds the
@@ -1672,7 +1693,7 @@ documents, each of which takes a `ContextBudget.Resolver` at construction so
 tests can force either path.
 
 **Summary requests stream.** `SummaryService` calls `LLMProvider.streamSummary`
-for the single pass, every map block and the reduce: the same JSON contract
+for the single pass, every map block and the reduce: the same Markdown contract
 as `summarize`, received over SSE (OpenAI and Anthropic `"stream": true`,
 Gemini `streamGenerateContent?alt=sse`). That swaps the buffered request's
 fixed 300 s total timeout for `HTTPPolicy.streamingSummary` — 300 s of
@@ -1687,10 +1708,11 @@ in. While it streams, the Summary tab shows a live, unformatted draft the way
 the chat shows its reply: a "thinking for Ns" row (`ThinkingRow`, shared with
 the chat in `Views/StreamingIndicators.swift`) until the first fragment, then
 the text growing in a bounded window with a trailing cursor, replaced by the
-formatted summary when generation finishes. The raw stream is JSON, so it is
-never shown as is: KurnCore's `SummaryDraftPreview` walks it incrementally and
-emits only section titles, bodies and items (keys, nested objects, photo
-references and any prose around the JSON are dropped), plus a word count
+formatted summary when generation finishes. The raw stream is Markdown, and
+KurnCore's `SummaryDraftPreview` passes it through character by character with
+the syntax a reader should not see removed — `#` markers (the title stays, after
+a blank line), photo-reference lines and fence lines — holding back only the
+start of a line while it could still be one of those; plus a word count
 (`StreamedWordCount`). `SummaryService` reports it as numbered
 `SummaryDraftSnapshot`s — empty at the start of every map block and the
 reduce — and `SummaryViewModel.recordSummaryDraft` ignores one that lands
@@ -1983,7 +2005,7 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   vectors). `MeetingsListView` runs a debounced hybrid pass: instant substring
   matching plus semantically-relevant meetings the substring pass missed.
 - **Chat.** `LLMProvider` gained a plain-text `chat(systemPrompt:messages:)`
-  (implemented for OpenAI/Anthropic/Google; no JSON-mode forcing) alongside
+  (implemented for OpenAI/Anthropic/Google) alongside
   `summarize`. `MeetingChatService` has two grounding strategies: **per-meeting**
   (`answerAboutMeeting`) sends the **whole transcript** as context — a single
   meeting almost always fits the single-pass budget (the model's `ContextBudget`),

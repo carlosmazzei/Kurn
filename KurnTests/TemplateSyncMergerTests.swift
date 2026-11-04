@@ -22,7 +22,6 @@ struct TemplateSyncMergerTests {
             name: name,
             iconName: "doc.text",
             instructions: "Instructions",
-            sections: ["Section"],
             isBuiltIn: false,
             createdAt: createdAt,
             updatedAt: updatedAt
