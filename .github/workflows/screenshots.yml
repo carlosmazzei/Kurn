@@ -14,9 +14,12 @@ on:
         type: boolean
         default: false
 
+# A release tag never cancels its own capture: re-running failed jobs on a tag
+# used to cancel the slices still running (swift.yml's concurrency already
+# exempts tags for the same reason). Branch dispatches still supersede.
 concurrency:
   group: ${{ github.workflow }}-screenshots-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
   validate-upload-ref:
@@ -29,19 +32,22 @@ jobs:
           echo "::error::upload requires dispatching this workflow against a vX.Y.Z release tag"
           exit 1
 
-  # One macOS job per UI language. The capture for en-US alone took ~59 min
-  # (iPhone + iPad + Watch, with snapshot's retries on top), so the seven
-  # languages cannot share one job; parallel jobs also keep the release
-  # pipeline's wall-clock time where it was.
+  # One macOS job per UI language *and device*. A snapshot retry re-runs the
+  # whole device, and "re-run failed jobs" re-runs the whole job, so with one
+  # job per language a single iPad launch flake repeated the ~20 min iPhone
+  # pass as well (en-US alone took ~2 h). Per-device slices keep a retry or a
+  # rerun to the slice that failed, and each slice uploads its own artifact
+  # only after its completeness check, so slices that passed are never
+  # captured again.
   screenshots:
     if: ${{ !inputs.upload || startsWith(github.ref, 'refs/tags/v') }}
-    name: screenshots (${{ matrix.language }})
+    name: screenshots (${{ matrix.language }}, ${{ matrix.device }})
     runs-on: macos-26
-    # Widened for fastlane/Snapfile's `number_of_retries(3)`: a snapshot
-    # retry re-runs the entire device, so a flaky iPhone session can repeat
-    # up to four times (~19 min each observed) before the iPad and Watch
-    # passes start.
-    timeout-minutes: 150
+    # Worst case is four attempts (`number_of_retries(3)`) of ~20 min for one
+    # device. A hung simulator used to hold a job silent for the whole former
+    # 150 min limit (fr-FR on v1.11.0); the capture step has its own, tighter
+    # limit below so that fails early.
+    timeout-minutes: 100
     # No `environment:` here on purpose. Capture never touches App Store
     # Connect and also supports ad-hoc dispatches on arbitrary branches. The
     # environment gate belongs only on the tag-only `upload` job below, which
@@ -50,6 +56,7 @@ jobs:
       fail-fast: false
       matrix:
         language: [en-US, pt-BR, es-ES, fr-FR, it, de-DE, zh-Hans]
+        device: [iphone, ipad, watch]
 
     steps:
       - name: Checkout
@@ -66,34 +73,43 @@ jobs:
       - uses: ./.github/actions/prepare-simulator
 
       - name: Generate screenshots
+        # Far above a healthy slice (~8-20 min, ~40 min with one retry) and
+        # far below a hung simulator, which prints nothing until the job limit.
+        timeout-minutes: 70
         env:
           SCREENSHOT_LANGUAGE: ${{ matrix.language }}
-        run: bundle exec fastlane screenshots "languages:$SCREENSHOT_LANGUAGE"
+          SCREENSHOT_DEVICE: ${{ matrix.device }}
+        run: bundle exec fastlane screenshots "languages:$SCREENSHOT_LANGUAGE" "device:$SCREENSHOT_DEVICE"
 
       # Fail here rather than ship a locale with a hole in it: snapshot can
       # report success after its retries gave up on one device.
       - name: Check every screen was captured
         env:
           SCREENSHOT_LANGUAGE: ${{ matrix.language }}
+          SCREENSHOT_DEVICE: ${{ matrix.device }}
         run: |
           set -euo pipefail
           dir="fastlane/screenshots/$SCREENSHOT_LANGUAGE"
-          for device in "iPhone 17 Pro Max" "iPad Pro 13-inch (M5)"; do
-            count=$(find "$dir" -maxdepth 1 -name "$device-*.png" | wc -l | tr -d ' ')
-            if [ "$count" -lt 5 ]; then
-              echo "::error::$SCREENSHOT_LANGUAGE has $count/5 screenshots for $device"
-              exit 1
-            fi
-          done
+          case "$SCREENSHOT_DEVICE" in
+            iphone) prefix="iPhone 17 Pro Max"; expected=5 ;;
+            ipad)   prefix="iPad Pro 13-inch (M5)"; expected=5 ;;
+            watch)  prefix="Apple Watch Series 11 (46mm)"; expected=1 ;;
+            *) echo "::error::unknown device $SCREENSHOT_DEVICE"; exit 1 ;;
+          esac
+          count=$(find "$dir" -maxdepth 1 -name "$prefix-*.png" | wc -l | tr -d ' ')
+          if [ "$count" -lt "$expected" ]; then
+            echo "::error::$SCREENSHOT_LANGUAGE has $count/$expected screenshots for $prefix"
+            exit 1
+          fi
 
       - name: Upload screenshots artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: screenshots-${{ matrix.language }}
+          name: capture-${{ matrix.language }}-${{ matrix.device }}
           path: fastlane/screenshots/${{ matrix.language }}
           if-no-files-found: error
 
-  # Recombines the per-language captures into the one "screenshots" artifact
+  # Recombines the per-language, per-device captures into the one "screenshots" artifact
   # (screenshots/<locale>/<device>-<screen>.png) that marketing-screenshots.yml
   # and the upload job below have always read.
   collect-screenshots:
@@ -101,19 +117,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download per-language captures
+      - name: Download per-slice captures
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: screenshots-*
+          pattern: capture-*
           path: per-language
 
       - name: Arrange by locale
         run: |
           set -euo pipefail
           mkdir -p screenshots
-          for dir in per-language/screenshots-*/; do
+          # capture-<locale>-<device>; locales contain hyphens, devices do not.
+          for dir in per-language/capture-*/; do
             locale="$(basename "$dir")"
-            locale="${locale#screenshots-}"
+            locale="${locale#capture-}"
+            locale="${locale%-*}"
             mkdir -p "screenshots/$locale"
             cp -v "$dir"*.png "screenshots/$locale/"
           done

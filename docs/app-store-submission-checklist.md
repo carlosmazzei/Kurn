@@ -21,8 +21,8 @@ This is what's still needed to take a tagged build public, split by who does it.
       through the reusable `App Store Screenshots` workflow, and always uploaded
       as the `screenshots` artifact before their protected upload job starts.
       The workflow can still be dispatched manually for ad-hoc captures.
-      Captured in all **7 UI languages**, one macOS job per language
-      (`screenshots.yml`'s matrix, merged back into one artifact); the seeded
+      Captured in all **7 UI languages**, one macOS job per language and
+      device (`screenshots.yml`'s matrix, merged back into one artifact); the seeded
       meetings follow the launch language (`ScreenshotSeedText`), and
       `render.js` frames every store language with its own captions over the
       capture of its language (es-MX over es-ES, en-GB over en-US, …).

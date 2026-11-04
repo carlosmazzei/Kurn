@@ -229,7 +229,20 @@ end
 lane :screenshots do |options|
   languages = options[:languages].to_s.split(",").map(&:strip).reject(&:empty?)
   language_options = languages.empty? ? {} : { languages: languages }
-  capture_screenshots(**language_options)
+  # `device:` (iphone | ipad | watch) captures one device only, which is how CI
+  # slices the work; omitted, every device runs as before.
+  device = options[:device].to_s.strip.downcase
+  UI.user_error!("device must be iphone, ipad or watch") unless ["", "iphone", "ipad", "watch"].include?(device)
+
+  phone_devices = {
+    "iphone" => ["iPhone 17 Pro Max"],
+    "ipad" => ["iPad Pro 13-inch (M5)"]
+  }.fetch(device, nil)
+  if device != "watch"
+    device_options = phone_devices ? { devices: phone_devices } : {}
+    capture_screenshots(**language_options, **device_options)
+  end
+  next if device == "iphone" || device == "ipad"
   next if options[:watch].to_s == "false"
 
   capture_screenshots(
