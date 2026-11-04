@@ -2,17 +2,18 @@
 //  SummaryJSON.swift
 //  KurnCore
 //
-//  The tolerant JSON contract every cloud vendor is instructed to return for
-//  summaries, plus the fence/prose-stripping parser shared by every provider's
-//  `summarize` call. Split out of `Kurn/Providers/LLMProvider.swift`, which
-//  keeps the network-facing `LLMProvider` protocol and `LLMHTTP` helpers —
-//  this half has no URLSession dependency at all.
+//  The section shape summaries used to be requested in as JSON. Cloud vendors
+//  are now asked for Markdown (`SummaryMarkdown`), which still accepts a reply
+//  in this shape; the on-device model's guided generation produces it
+//  directly. `ModelJSON` is the fence/prose-stripping extractor shared with
+//  the other JSON-returning prompts (auto-tagging, transcript correction).
+//  No URLSession dependency at all.
 //
 
 import Foundation
 
-/// The JSON contract all vendors are instructed to return for summaries: an
-/// ordered list of titled sections, each with optional prose and/or bullets.
+/// The legacy JSON summary shape: an ordered list of titled sections, each
+/// with optional prose and/or bullets.
 public struct SummaryJSON: Decodable {
     public struct Section: Decodable {
         public let title: String
@@ -33,10 +34,8 @@ public struct SummaryJSON: Decodable {
     }
     public let sections: [Section]
 
-    /// Not just a `Decodable` conformance: `FoundationModelsProvider`'s guided
-    /// generation produces a `Section` list directly (no free-text JSON to
-    /// parse), and reuses this initializer to get `summarySections`'s
-    /// trimming/filtering rather than duplicating it.
+    /// Memberwise, for tests and any caller holding sections already; the
+    /// usual path is `parse`.
     public init(sections: [Section]) {
         self.sections = sections
     }
@@ -61,7 +60,7 @@ public struct SummaryJSON: Decodable {
     /// (dropping that one reference, not the whole section) for anything
     /// that doesn't parse, since this reads a model's copy-and-pasted text
     /// rather than a value it computed.
-    private static func parseClockDisplay(_ raw: String) -> TimeInterval? {
+    static func parseClockDisplay(_ raw: String) -> TimeInterval? {
         let trimmed = raw.trimmingCharacters(in: CharacterSet(charactersIn: "[] \t"))
         let parts = trimmed.split(separator: ":").map(String.init)
         guard (2...3).contains(parts.count), parts.allSatisfy({ !$0.isEmpty }) else { return nil }

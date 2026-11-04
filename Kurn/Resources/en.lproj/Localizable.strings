@@ -558,11 +558,7 @@
 "settings.templates_sync_footer" = "Custom templates you create sync via iCloud, so they're available after switching devices. Built-in templates always stay up to date on their own.";
 "settings.template_name" = "Name";
 "settings.template_instructions" = "Instructions";
-"settings.template_instructions_footer" = "Describe the focus and tone for the summary. The model always replies in the transcript's language.";
-"settings.template_sections" = "Sections";
-"settings.template_section" = "Section title";
-"settings.template_add_section" = "Add Section";
-"settings.template_sections_footer" = "Suggested section headings to guide the structure. The model may adapt them.";
+"settings.template_instructions_footer" = "Describe the focus and tone for the summary, and the sections you want (for example: Done, Next, Blockers). The model always replies in the transcript's language.";
 "settings.template.builtin" = "Preset";
 "settings.template.custom" = "Custom";
 "settings.delete_template" = "Delete Template";

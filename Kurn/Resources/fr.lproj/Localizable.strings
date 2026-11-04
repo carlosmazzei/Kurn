@@ -558,11 +558,7 @@
 "settings.templates_sync_footer" = "Les modèles personnalisés que vous créez sont synchronisés via iCloud, afin d'être disponibles après un changement d'appareil. Les modèles intégrés restent toujours à jour d'eux-mêmes.";
 "settings.template_name" = "Nom";
 "settings.template_instructions" = "Instructions";
-"settings.template_instructions_footer" = "Décrivez l'objectif et le ton du résumé. Le modèle répond toujours dans la langue de la transcription.";
-"settings.template_sections" = "Sections";
-"settings.template_section" = "Titre de la section";
-"settings.template_add_section" = "Ajouter une section";
-"settings.template_sections_footer" = "Titres de section suggérés pour guider la structure. Le modèle peut les adapter.";
+"settings.template_instructions_footer" = "Décrivez l'objectif et le ton du résumé, ainsi que les sections souhaitées (par exemple : Fait, À venir, Blocages). Le modèle répond toujours dans la langue de la transcription.";
 "settings.template.builtin" = "Prédéfini";
 "settings.template.custom" = "Personnalisé";
 "settings.delete_template" = "Supprimer le modèle";

@@ -252,11 +252,12 @@ and do not mean live in
 ## AI Summaries
 
 Kurn can generate a structured meeting summary from existing transcripts.
-Summaries are template-driven and render Markdown in section titles, body text,
-and bullet items, so provider output can use emphasis, links, inline code,
-headings, and ordered or unordered lists where helpful. Built-in templates
-cover General, Stand-up, Interview, and Outline; users can also create,
-edit, and delete their own custom templates in Settings.
+Summaries are template-driven: a template is a set of instructions, including
+the sections it wants, and the model replies in Markdown with one `##` heading
+per section. Sections render with emphasis, inline code, tables, task
+checkboxes, quotes and lists where helpful. Built-in templates cover General,
+Stand-up, Interview, and Outline; users can also create, edit, and delete
+their own custom templates in Settings.
 
 PDFs can be attached to a meeting as reference material — an agenda, a slide
 deck, a report — either with **Add PDF** in the meeting's Recordings tab or by

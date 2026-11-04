@@ -193,19 +193,19 @@ struct SummaryServiceGenerationTests {
     // MARK: - Streamed draft
 
     @Test func streamedFragmentsBuildAReadableDraft() async throws {
-        let llm = ScriptedLLMProvider(summaryDeltas: [#"{"sections":[{"title":"Deci"#, #"sions","body":"we ship"}]}"#])
+        let llm = ScriptedLLMProvider(summaryDeltas: ["## Deci", "sions\nwe ship"])
         let drafts = Recorded<SummaryDraftSnapshot>()
         _ = try await service(llm).generate(
             transcriptText: "[00:01] Ana: vamos", meetingTitle: "t", provider: .openAI, model: "m", template: .general,
             onDraft: { drafts.append($0) }
         )
-        #expect(drafts.values.map(\.text) == ["", "Deci", "Decisions\nwe ship\n"])
+        #expect(drafts.values.map(\.text) == ["", "Deci", "Decisions\nwe ship"])
         #expect(drafts.values.map(\.words) == [0, 1, 3])
         #expect(drafts.values.map(\.sequence) == [1, 2, 3])
     }
 
     @Test func eachStagedRequestStartsAnEmptyDraftWithARisingSequence() async throws {
-        let llm = ScriptedLLMProvider(provider: .appleOnDevice, summaryDeltas: [#"{"sections":[{"title":"T"}]}"#])
+        let llm = ScriptedLLMProvider(provider: .appleOnDevice, summaryDeltas: ["## T\n"])
         let drafts = Recorded<SummaryDraftSnapshot>()
         _ = try await service(llm).generate(
             transcriptText: longTranscript(), meetingTitle: "Longa", provider: .appleOnDevice, model: "on-device",
@@ -237,6 +237,14 @@ struct SummaryServiceGenerationTests {
         #expect(prompt.count == "Transcript:\n".count + 2_000)
     }
 
+    @Test func aBareTitleWithoutAHeadingIsStillUsed() async throws {
+        let llm = ScriptedLLMProvider { _, _ in
+            SummaryResult(sections: [SummarySection(title: "", body: "**Revisão do orçamento**\nextra")])
+        }
+        let title = try await service(llm).generateTitle(transcriptText: "texto", provider: .openAI, model: "m")
+        #expect(title == "Revisão do orçamento")
+    }
+
     @Test func emptyTitleIsADecodingError() async {
         let llm = ScriptedLLMProvider { _, _ in SummaryResult(sections: [SummarySection(title: "   ")]) }
         await #expect(throws: AppError.self) {
@@ -266,6 +274,16 @@ struct SummaryServiceGenerationTests {
         let call = try #require(llm.summarizeCalls.first)
         #expect(call.systemPrompt.contains(MeetingLanguage.portuguese.displayName))
         #expect(call.userPrompt == "Summary:\n\(SummaryService.markdownText(from: sections))")
+    }
+
+    @Test func translationSendsPhotoReferencesSoTheySurvive() async throws {
+        let llm = ScriptedLLMProvider { _, _ in SummaryResult(sections: [SummarySection(title: "Quadro")]) }
+        _ = try await service(llm).translate(
+            sections: [SummarySection(title: "Whiteboard", body: "Targets", photoTimestamps: [75])],
+            to: .portuguese, provider: .openAI, model: "m"
+        )
+        let call = try #require(llm.summarizeCalls.first)
+        #expect(call.userPrompt == "Summary:\n## Whiteboard\nTargets\n📷 [1:15]")
     }
 
     @Test func translationWithNoSectionsFails() async {

@@ -72,39 +72,20 @@ struct FoundationModelsProvider: LLMProvider {
         self.provider = provider
     }
 
-    // MARK: - Summary (guided generation)
+    // MARK: - Summary (Markdown)
 
-    /// Mirrors `SummaryJSON`'s shape so a generated result can reuse
-    /// `SummaryJSON.summarySections`'s trimming/filtering instead of duplicating
-    /// it. Guided generation means there is no free-text JSON to parse here —
-    /// `SummaryJSON.parse`'s fence-stripping and `AppError.summaryTruncated`
-    /// are both unreachable on this path. Not `private`: the `@Generable`
-    /// macro emits a conformance extension that can't see a private type.
-    @Generable
-    struct GeneratedSummary: Sendable {
-        @Generable
-        struct Section: Sendable {
-            let title: String
-            let body: String?
-            let items: [String]?
-            let photoReferences: [String]?
-        }
-        let sections: [Section]
-    }
-
+    /// Plain text through the same Markdown contract as every cloud vendor
+    /// (`SummaryMarkdown`). This used to be guided generation of a section
+    /// struct, which matched the old JSON prompt; with a Markdown prompt the
+    /// schema and the instructions would contradict each other. A reply with
+    /// no "## " headings still parses, as one untitled section.
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult {
         let session = LanguageModelSession(instructions: systemPrompt)
         let options = GenerationOptions(maximumResponseTokens: Self.clampedOutputTokens(LLMHTTP.summaryMaxOutputTokens))
-        // Extract `.content` inside the task rather than returning the whole
-        // `Response`, which doesn't conform to `Sendable` and can't cross the
-        // `withTimeout` task-group boundary as-is.
         let generated = try await Self.withTimeout(seconds: LLMHTTP.summaryTimeout) {
-            try await session.respond(to: userPrompt, generating: GeneratedSummary.self, options: options).content
+            try await session.respond(to: userPrompt, options: options).content
         }
-        let asSummaryJSON = SummaryJSON(sections: generated.sections.map {
-            SummaryJSON.Section(title: $0.title, body: $0.body, items: $0.items, photoReferences: $0.photoReferences)
-        })
-        return SummaryResult(sections: asSummaryJSON.summarySections)
+        return SummaryResult(sections: try SummaryMarkdown.sections(from: generated))
     }
 
     // MARK: - Chat (plain text)

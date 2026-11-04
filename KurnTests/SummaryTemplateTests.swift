@@ -2,10 +2,11 @@
 //  SummaryTemplateTests.swift
 //  KurnTests
 //
-//  Covers the template-driven summary prompt and the Summary model's section
-//  storage.
+//  Covers the template-driven summary prompt, the migration of legacy section
+//  lists, and the Summary model's section storage.
 //
 
+import Foundation
 import KurnCore
 import Testing
 @testable import Kurn
@@ -14,18 +15,17 @@ struct SummaryTemplateTests {
 
     // MARK: - Prompt
 
-    @Test func systemPromptInjectsInstructionsAndSections() {
+    @Test func systemPromptInjectsInstructionsAndTheMarkdownContract() {
         let template = SummaryTemplate.custom(
             name: "QA Review",
-            instructions: "Focus on defects and test coverage.",
-            sections: ["Bugs", "Coverage"]
+            instructions: "Focus on defects and test coverage, in sections Bugs and Coverage."
         )
         let prompt = SummaryPrompt.system(for: template)
-        #expect(prompt.contains("Focus on defects and test coverage."))
-        #expect(prompt.contains("- Bugs"))
-        #expect(prompt.contains("- Coverage"))
-        #expect(prompt.contains("\"sections\""))
+        #expect(prompt.contains("Focus on defects and test coverage, in sections Bugs and Coverage."))
         #expect(prompt.contains("SAME LANGUAGE"))
+        #expect(prompt.contains("\"## \" heading"))
+        #expect(prompt.contains("📷 [12:34]"))
+        #expect(!prompt.contains("JSON"))
     }
 
     @Test func systemPromptDescribesMarkdownCapabilities() {
@@ -34,23 +34,41 @@ struct SummaryTemplateTests {
         // models actually emit them.
         #expect(prompt.contains("- [ ]"))
         #expect(prompt.contains("- [x]"))
-        #expect(prompt.contains("blockquotes"))
-        #expect(prompt.contains("|---|"))
-        #expect(prompt.contains("fenced code blocks"))
-        #expect(prompt.contains("start an entry with \"[ ] \" or \"[x] \""))
-        // The JSON-only instruction must not contradict fenced code inside "body".
-        #expect(prompt.contains("no markdown fences around it"))
+        #expect(prompt.contains("table"))
+        #expect(prompt.contains("\"> \""))
+        #expect(prompt.contains("no code fence around it"))
     }
 
-    @Test func systemPromptOmitsSectionListWhenNoSections() {
-        let template = SummaryTemplate.custom(
-            name: "Freeform",
-            instructions: "Summarize however fits best.",
-            sections: []
-        )
-        let prompt = SummaryPrompt.system(for: template)
-        #expect(prompt.contains("Summarize however fits best."))
-        #expect(!prompt.contains("Organize the summary into sections"))
+    @Test func builtInsNameTheirSectionsInTheInstructions() {
+        #expect(SummaryTemplate.standup.instructions.contains("Done, Next and Blockers"))
+        #expect(SummaryTemplate.outline.instructions.contains("Summary and Outline"))
+    }
+
+    // MARK: - Legacy section lists
+
+    @Test func aStoredTemplateWithSectionsFoldsThemIntoTheInstructions() throws {
+        let json = #"""
+        {"id":"template-1","name":"QA","iconName":"doc.text","instructions":"Focus on defects.",
+         "sections":["Bugs"," ","Coverage"],"isBuiltIn":false,"createdAt":0}
+        """#
+        let template = try JSONDecoder().decode(SummaryTemplate.self, from: Data(json.utf8))
+        #expect(template.instructions.hasPrefix("Focus on defects.\n\n"))
+        #expect(template.instructions.hasSuffix("Bugs; Coverage."))
+        #expect(template.updatedAt == template.createdAt)
+    }
+
+    @Test func aTemplateWithoutSectionsDecodesUnchanged() throws {
+        let json = #"{"id":"t","name":"n","iconName":"i","instructions":"Keep it short.","isBuiltIn":false,"createdAt":0}"#
+        let template = try JSONDecoder().decode(SummaryTemplate.self, from: Data(json.utf8))
+        #expect(template.instructions == "Keep it short.")
+    }
+
+    @Test func encodingKeepsAnEmptySectionListForOlderVersions() throws {
+        let template = SummaryTemplate.custom(name: "n", instructions: "Keep it short.")
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(template)) as? [String: Any]
+        #expect((object?["sections"] as? [String]) == [])
+        let decoded = try JSONDecoder().decode(SummaryTemplate.self, from: JSONEncoder().encode(template))
+        #expect(decoded == template)
     }
 
     @Test func defaultTemplatesIncludeGeneralStandupInterview() throws {
@@ -64,11 +82,7 @@ struct SummaryTemplateTests {
     }
 
     @Test func customTemplateIsNotBuiltInAndUsesGivenName() {
-        let template = SummaryTemplate.custom(
-            name: "My Template",
-            instructions: "x",
-            sections: []
-        )
+        let template = SummaryTemplate.custom(name: "My Template", instructions: "x")
         #expect(!template.isBuiltIn)
         #expect(template.displayName == "My Template")
         #expect(template.id.hasPrefix("template-"))

@@ -48,7 +48,8 @@ extension ProviderHTTPTests {
         #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["stream"] as? Bool == true)
-        #expect((body?["response_format"] as? [String: String])?["type"] == "json_object")
+        // The reply is Markdown: no JSON mode.
+        #expect(body?["response_format"] == nil)
     }
 
     @Test func openAIStreamSummaryCutOffByTheTokenCapIsTruncation() async {
@@ -102,7 +103,7 @@ extension ProviderHTTPTests {
         }
     }
 
-    @Test func googleStreamSummaryUsesTheSSERouteAndTheSummarySchema() async throws {
+    @Test func googleStreamSummaryUsesTheSSERouteWithoutAResponseSchema() async throws {
         MockURLProtocol.enqueue([
             .success(status: 200, body: sseBody([
                 #"{"candidates":[{"content":{"parts":[{"text":"\#(Self.escapedHalves.0)"}]}}]}"#,
@@ -119,8 +120,8 @@ extension ProviderHTTPTests {
         #expect(request.url?.query?.contains("alt=sse") == true)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         let config = body?["generationConfig"] as? [String: Any]
-        #expect(config?["responseMimeType"] as? String == "application/json")
-        #expect(config?["responseJsonSchema"] != nil)
+        #expect(config?["responseMimeType"] == nil)
+        #expect(config?["responseJsonSchema"] == nil)
     }
 
     @Test func googleStreamSummaryFinishedAtMaxTokensIsTruncation() async {

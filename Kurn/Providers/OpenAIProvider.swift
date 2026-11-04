@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  OpenAI implementation: Whisper for transcription (multipart upload,
-//  verbose_json for segment timestamps) and Chat Completions (gpt-4o, JSON mode)
-//  for summaries. All requests use URLSession with async/await.
+//  verbose_json for segment timestamps) and Chat Completions (gpt-4o) for
+//  summaries. All requests use URLSession with async/await.
 //
 
 import Foundation
@@ -251,7 +251,6 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
             body: [
                 "model": chatModel,
                 "max_completion_tokens": LLMHTTP.summaryMaxOutputTokens,
-                "response_format": ["type": "json_object"],
                 "messages": [
                     ["role": "system", "content": systemPrompt],
                     ["role": "user", "content": userPrompt]
@@ -274,7 +273,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         )
     }
 
-    /// Streamed `summarize`: the same JSON-mode request with `"stream": true`.
+    /// Streamed `summarize`: the same request with `"stream": true`.
     func streamSummary(
         systemPrompt: String,
         userPrompt: String,
@@ -287,7 +286,6 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
             body: [
                 "model": chatModel,
                 "max_completion_tokens": LLMHTTP.summaryMaxOutputTokens,
-                "response_format": ["type": "json_object"],
                 "messages": [
                     ["role": "system", "content": systemPrompt],
                     ["role": "user", "content": userPrompt]
@@ -331,7 +329,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
 
         var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
         wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
-        // No `response_format` here: chat replies are prose, not the summary JSON.
+        // No `response_format`: chat replies are prose, like summaries.
         var body: [String: Any] = [
             "model": chatModel,
             "max_completion_tokens": options.maxOutputTokens,

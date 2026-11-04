@@ -558,11 +558,7 @@
 "settings.templates_sync_footer" = "Von Ihnen erstellte, benutzerdefinierte Vorlagen werden über iCloud synchronisiert und sind so nach einem Gerätewechsel verfügbar. Integrierte Vorlagen bleiben ohnehin stets aktuell.";
 "settings.template_name" = "Name";
 "settings.template_instructions" = "Anweisungen";
-"settings.template_instructions_footer" = "Beschreiben Sie Schwerpunkt und Ton der Zusammenfassung. Das Modell antwortet immer in der Sprache des Transkripts.";
-"settings.template_sections" = "Abschnitte";
-"settings.template_section" = "Abschnittstitel";
-"settings.template_add_section" = "Abschnitt hinzufügen";
-"settings.template_sections_footer" = "Vorgeschlagene Abschnittsüberschriften als Leitfaden für die Struktur. Das Modell kann sie anpassen.";
+"settings.template_instructions_footer" = "Beschreiben Sie Schwerpunkt und Ton der Zusammenfassung sowie die gewünschten Abschnitte (zum Beispiel: Erledigt, Als Nächstes, Hindernisse). Das Modell antwortet immer in der Sprache des Transkripts.";
 "settings.template.builtin" = "Voreinstellung";
 "settings.template.custom" = "Eigene";
 "settings.delete_template" = "Vorlage löschen";

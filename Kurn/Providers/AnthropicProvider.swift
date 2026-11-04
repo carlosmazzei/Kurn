@@ -214,7 +214,7 @@ struct AnthropicProvider: LLMProvider {
         )
     }
 
-    /// Concatenate all text blocks (there is normally one for JSON output).
+    /// Concatenate all text blocks (there is normally one).
     private static func text(from response: MessagesResponse) -> String {
         response.content
             .filter { $0.type == "text" }

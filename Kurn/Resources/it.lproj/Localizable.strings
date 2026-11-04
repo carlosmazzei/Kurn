@@ -558,11 +558,7 @@
 "settings.templates_sync_footer" = "I modelli personalizzati che crei vengono sincronizzati tramite iCloud, così sono disponibili dopo il cambio di dispositivo. I modelli predefiniti restano sempre aggiornati autonomamente.";
 "settings.template_name" = "Nome";
 "settings.template_instructions" = "Istruzioni";
-"settings.template_instructions_footer" = "Descrivi il focus e il tono del riassunto. Il modello risponde sempre nella lingua della trascrizione.";
-"settings.template_sections" = "Sezioni";
-"settings.template_section" = "Titolo sezione";
-"settings.template_add_section" = "Aggiungi Sezione";
-"settings.template_sections_footer" = "Titoli di sezione suggeriti per guidare la struttura. Il modello può adattarli.";
+"settings.template_instructions_footer" = "Descrivi il focus e il tono del riassunto e le sezioni che desideri (ad esempio: Fatto, Prossimi passi, Blocchi). Il modello risponde sempre nella lingua della trascrizione.";
 "settings.template.builtin" = "Predefinito";
 "settings.template.custom" = "Personalizzato";
 "settings.delete_template" = "Elimina Modello";

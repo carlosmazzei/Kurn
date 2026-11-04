@@ -20,8 +20,9 @@
 import Foundation
 import KurnCore
 
-/// Structured summary returned by a chat/messages completion. The shape is
-/// template-driven, so it is just an ordered list of titled sections.
+/// Structured summary returned by a chat/messages completion: the reply's
+/// "## " sections (`SummaryMarkdown`), an ordered list whose titles the
+/// template decides.
 struct SummaryResult: Sendable {
     var sections: [SummarySection]
 }
@@ -87,11 +88,11 @@ protocol LLMProvider: Sendable {
     /// Produce a structured meeting summary from a fully built prompt.
     func summarize(systemPrompt: String, userPrompt: String) async throws -> SummaryResult
 
-    /// Streaming variant of `summarize`: the same JSON contract and the same
+    /// Streaming variant of `summarize`: the same Markdown contract and the same
     /// result, but received incrementally so a long generation is bounded by
     /// silence rather than by a fixed total timeout, and so the caller can
     /// show that text is arriving. `onDelta` gets the raw generated text (the
-    /// JSON being written) as it arrives — progress, never content to
+    /// Markdown being written) as it arrives — progress, never content to
     /// display. A failure before the first fragment is retried like a
     /// buffered request; once text has arrived the call never retries. A
     /// conformer without a streaming route uses the extension default, which
@@ -103,7 +104,7 @@ protocol LLMProvider: Sendable {
     ) async throws -> SummaryResult
 
     /// Free-form multi-turn chat completion. Unlike `summarize`, this returns
-    /// plain text (no JSON-section contract), so it backs the "chat with your
+    /// plain text (no section contract), so it backs the "chat with your
     /// meetings" feature. `systemPrompt` carries the grounding instructions;
     /// `messages` are the user/assistant turns in order.
     func chat(

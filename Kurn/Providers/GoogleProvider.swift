@@ -43,7 +43,7 @@ struct GoogleProvider: LLMProvider {
         )
     }
 
-    /// Streamed `summarize`: the same schema-constrained request against
+    /// Streamed `summarize`: the same request against
     /// `streamGenerateContent`.
     func streamSummary(
         systemPrompt: String,
@@ -82,34 +82,12 @@ struct GoogleProvider: LLMProvider {
 
     /// The summary request body shared by the buffered and streamed routes.
     /// Gemini has no dedicated system role here, so the system prompt is
-    /// folded into the user turn; the response schema pins the JSON contract.
+    /// folded into the user turn. No response schema: the reply is Markdown
+    /// (`SummaryMarkdown`), like every other vendor's.
     private static func summaryBody(systemPrompt: String, userPrompt: String) -> [String: Any] {
-        let summarySchema: [String: Any] = [
-            "type": "object",
-            "properties": [
-                "sections": [
-                    "type": "array",
-                    "items": [
-                        "type": "object",
-                        "properties": [
-                            "title": ["type": "string"],
-                            "body": ["type": "string"],
-                            "items": [
-                                "type": "array",
-                                "items": ["type": "string"]
-                            ]
-                        ],
-                        "required": ["title"]
-                    ]
-                ]
-            ],
-            "required": ["sections"]
-        ]
-        return [
+        [
             "contents": [["role": "user", "parts": [["text": "\(systemPrompt)\n\n\(userPrompt)"]]]],
             "generationConfig": [
-                "responseMimeType": "application/json",
-                "responseJsonSchema": summarySchema,
                 "maxOutputTokens": LLMHTTP.summaryMaxOutputTokens
             ]
         ]
@@ -138,7 +116,6 @@ struct GoogleProvider: LLMProvider {
         if contents.isEmpty {
             contents = [["role": "user", "parts": [["text": systemPrompt]]]]
         }
-        // No `responseMimeType: application/json`: chat replies are prose.
         let request = try makeRequest(
             timeout: options.timeout,
             body: [

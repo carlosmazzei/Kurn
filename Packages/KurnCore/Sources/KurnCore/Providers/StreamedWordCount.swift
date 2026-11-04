@@ -5,10 +5,9 @@
 //  A running word count over text that arrives in fragments — the progress
 //  a streamed summary reports while the model is still writing. A word is a
 //  run of letters or digits, so a word split across two fragments ("summ" +
-//  "ary") counts once, and the JSON punctuation a summary is wrapped in
-//  counts as nothing. Approximate by design: the JSON keys ("title",
-//  "body") are counted too, and a script written without spaces counts a
-//  whole run as one word. It only has to show that text is arriving and
+//  "ary") counts once, and Markdown punctuation counts as nothing.
+//  Approximate by design: a script written without spaces counts a whole run
+//  as one word. It only has to show that text is arriving and
 //  roughly how much.
 //
 

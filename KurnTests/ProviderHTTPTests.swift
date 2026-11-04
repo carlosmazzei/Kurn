@@ -180,6 +180,20 @@ struct ProviderHTTPTests {
         #expect(request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01")
     }
 
+    @Test func aMarkdownSummaryReplyIsSplitIntoSections() async throws {
+        MockURLProtocol.enqueue([
+            MockURLProtocol.json([
+                "content": [["type": "text", "text": "## Decisions\n- [ ] Ship it\n📷 [00:12]\n\n## Risks\nNone"]]
+            ])
+        ])
+        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
+
+        let result = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
+        #expect(result.sections.map(\.title) == ["Decisions", "Risks"])
+        #expect(result.sections.first?.body == "- [ ] Ship it")
+        #expect(result.sections.first?.photoTimestamps == [12])
+    }
+
     @Test func anthropicTruncatedSummaryThrowsSummaryTruncated() async {
         MockURLProtocol.enqueue([
             MockURLProtocol.json([
@@ -226,8 +240,9 @@ struct ProviderHTTPTests {
         #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "gk")
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         let generationConfig = body?["generationConfig"] as? [String: Any]
-        #expect(generationConfig?["responseMimeType"] as? String == "application/json")
-        #expect(generationConfig?["responseJsonSchema"] != nil)
+        // The reply is Markdown, so no JSON mode or schema is requested.
+        #expect(generationConfig?["responseMimeType"] == nil)
+        #expect(generationConfig?["responseJsonSchema"] == nil)
     }
 
     @Test func googleTruncatedSummaryThrowsSummaryTruncated() async {
