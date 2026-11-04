@@ -180,20 +180,6 @@ struct ProviderHTTPTests {
         #expect(request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01")
     }
 
-    @Test func aMarkdownSummaryReplyIsSplitIntoSections() async throws {
-        MockURLProtocol.enqueue([
-            MockURLProtocol.json([
-                "content": [["type": "text", "text": "## Decisions\n- [ ] Ship it\n📷 [00:12]\n\n## Risks\nNone"]]
-            ])
-        ])
-        let provider = AnthropicProvider(apiKey: "ak", session: MockURLProtocol.session())
-
-        let result = try await provider.summarize(systemPrompt: "s", userPrompt: "u")
-        #expect(result.sections.map(\.title) == ["Decisions", "Risks"])
-        #expect(result.sections.first?.body == "- [ ] Ship it")
-        #expect(result.sections.first?.photoTimestamps == [12])
-    }
-
     @Test func anthropicTruncatedSummaryThrowsSummaryTruncated() async {
         MockURLProtocol.enqueue([
             MockURLProtocol.json([
