@@ -1450,9 +1450,10 @@ opens the bundled offline copies in `Kurn/Resources/FluidAudioModelLicenses.txt`
 
 KurnCore tests cover the pure catalog, timeline, timing, and cache/PLDA
 validation policies without model inference. The iOS 26 floor makes the APIs
-available; it does not validate physical-device ANE behavior, fp16 memory,
-real-audio quality, or speed. Those remain to be measured for the new models;
-upstream Mac/M5 benchmarks are not iPhone results.
+available; it does not validate physical-device ANE behavior, fp16 memory or
+speed. Accuracy on public audio has been measured since (2026-11-01,
+`docs/pipeline-evaluation.md`); device speed and memory remain to be measured,
+and upstream Mac/M5 benchmarks are not iPhone results.
 
 #### Resumable transcription
 

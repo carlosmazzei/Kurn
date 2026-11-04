@@ -70,8 +70,11 @@ establish Brazilian Portuguese accuracy. In Auto, Unified does not populate a
 detected-language code. Bark, Bark Clean, Phonon-2, and Transcribe Lite do not
 support Portuguese. They require the meeting language to be **English**;
 Auto is unsupported even if the recording happens to be in English.
-The existing Parakeet measurements in [pipeline evaluation](pipeline-evaluation.md)
-are not evidence of accuracy for the additional models.
+Measured accuracy for every model is in
+[pipeline evaluation](pipeline-evaluation.md). On the public Portuguese corpora
+(CAMOES interviews and CORAA's Brazilian spontaneous speech), Nemotron Unified is the
+most accurate on-device model measured (2026-11-01); neither corpus is a
+substitute for testing on your own meetings.
 
 Live preview has an independent model choice and download:
 
