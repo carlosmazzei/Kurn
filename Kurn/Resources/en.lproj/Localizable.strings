@@ -557,6 +557,9 @@
 "settings.templates_sync" = "Sync Templates via iCloud";
 "settings.templates_sync_footer" = "Custom templates you create sync via iCloud, so they're available after switching devices. Built-in templates always stay up to date on their own.";
 "settings.template_name" = "Name";
+"settings.template_description" = "Description";
+"settings.template_description_placeholder" = "One line shown in the template list";
+"settings.template_description_footer" = "Shown under the name so you can tell templates apart. Leave it empty to use the first sentence of the instructions.";
 "settings.template_instructions" = "Instructions";
 "settings.template_instructions_footer" = "Describe the focus and tone for the summary, and the sections you want (for example: Done, Next, Blockers). The model always replies in the transcript's language.";
 "settings.template.builtin" = "Preset";
@@ -564,13 +567,13 @@
 "settings.delete_template" = "Delete Template";
 "settings.delete_template.confirm" = "Delete this template?";
 "template.general.name" = "General Meeting";
-"template.general.desc" = "Overview, key points, decisions, and action items.";
+"template.general.desc" = "A recap for anyone who missed the meeting: what was discussed, decided and assigned.";
 "template.standup.name" = "Daily Standup";
-"template.standup.desc" = "What was done, what's next, and blockers.";
+"template.standup.desc" = "Each person's progress, plans and blockers, at a glance.";
 "template.interview.name" = "Interview";
-"template.interview.desc" = "Questions, answers, strengths, and assessment.";
+"template.interview.desc" = "How the candidate did: key answers, strengths, concerns and a verdict.";
 "template.outline.name" = "Meeting Outline";
-"template.outline.desc" = "Brief summary plus a chronological, nested outline of the topics discussed.";
+"template.outline.desc" = "A short summary, then the topics in the order they came up.";
 
 /* Settings */
 "settings.title" = "Settings";

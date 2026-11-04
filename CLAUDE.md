@@ -1628,7 +1628,10 @@ of suggested section headings; it was folded into the instructions, and a stored
 or iCloud-synced template that still has one is migrated on decode
 (`SummaryTemplate.instructions(_:foldingIn:)`), while encoding always writes an
 empty `sections` key so an older app version can still decode a synced
-template. Templates
+template. The line under a template's name in the picker and in Settings is
+`summaryDescription`: the one-line `details` the user wrote, else a built-in's
+localized purpose (`template.<id>.desc`), else the first sentence of the
+instructions — never a list of sections. Templates
 (built-in presets + user-defined, created/edited via `Views/TemplateEditorView.swift`
 — built-ins can't be renamed or deleted) live in `AppSettings.summaryTemplates`; the user
 picks one per summarization via `SummaryTemplatePicker`. `Summary.sections` holds the

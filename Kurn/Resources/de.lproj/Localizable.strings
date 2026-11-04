@@ -557,6 +557,9 @@
 "settings.templates_sync" = "Vorlagen über iCloud synchronisieren";
 "settings.templates_sync_footer" = "Von Ihnen erstellte, benutzerdefinierte Vorlagen werden über iCloud synchronisiert und sind so nach einem Gerätewechsel verfügbar. Integrierte Vorlagen bleiben ohnehin stets aktuell.";
 "settings.template_name" = "Name";
+"settings.template_description" = "Beschreibung";
+"settings.template_description_placeholder" = "Eine Zeile in der Vorlagenliste";
+"settings.template_description_footer" = "Erscheint unter dem Namen, damit Sie Vorlagen unterscheiden können. Leer lassen, um den ersten Satz der Anweisungen zu verwenden.";
 "settings.template_instructions" = "Anweisungen";
 "settings.template_instructions_footer" = "Beschreiben Sie Schwerpunkt und Ton der Zusammenfassung sowie die gewünschten Abschnitte (zum Beispiel: Erledigt, Als Nächstes, Hindernisse). Das Modell antwortet immer in der Sprache des Transkripts.";
 "settings.template.builtin" = "Voreinstellung";
@@ -564,13 +567,13 @@
 "settings.delete_template" = "Vorlage löschen";
 "settings.delete_template.confirm" = "Diese Vorlage löschen?";
 "template.general.name" = "Allgemeines Meeting";
-"template.general.desc" = "Überblick, wichtige Punkte, Entscheidungen und Aufgaben.";
+"template.general.desc" = "Ein Rückblick für alle, die nicht dabei waren: was besprochen, entschieden und verteilt wurde.";
 "template.standup.name" = "Daily Standup";
-"template.standup.desc" = "Was erledigt wurde, was als Nächstes ansteht, und Blockaden.";
+"template.standup.desc" = "Fortschritt, nächste Schritte und Hindernisse jeder Person auf einen Blick.";
 "template.interview.name" = "Interview";
-"template.interview.desc" = "Fragen, Antworten, Stärken und Bewertung.";
+"template.interview.desc" = "Wie die Person abgeschnitten hat: Kernantworten, Stärken, Bedenken und ein Fazit.";
 "template.outline.name" = "Besprechungsgliederung";
-"template.outline.desc" = "Kurze Zusammenfassung und chronologische, hierarchische Gliederung der Themen.";
+"template.outline.desc" = "Eine kurze Zusammenfassung, danach die Themen in der Reihenfolge, in der sie aufkamen.";
 
 /* Einstellungen */
 "settings.title" = "Einstellungen";

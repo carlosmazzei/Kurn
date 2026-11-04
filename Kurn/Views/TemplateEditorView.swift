@@ -24,10 +24,14 @@ struct TemplateRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(template.displayName).font(Theme.subheadlineEmphasized)
+                Text(template.summaryDescription)
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
                 Text(template.isBuiltIn
                      ? NSLocalizedString("settings.template.builtin", comment: "Preset")
                      : NSLocalizedString("settings.template.custom", comment: "Custom"))
-                    .font(Theme.caption)
+                    .font(Theme.caption2)
                     .foregroundStyle(Theme.textSecondary)
             }
         }
@@ -44,6 +48,7 @@ struct TemplateEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var instructions = ""
+    @State private var details = ""
     @State private var showingDeleteConfirm = false
 
     private var canSave: Bool {
@@ -56,6 +61,8 @@ struct TemplateEditor: View {
             TemplateFields(
                 name: $name,
                 instructions: $instructions,
+                details: $details,
+                detailsPlaceholder: template.isBuiltIn ? template.summaryDescription : nil,
                 nameEditable: !template.isBuiltIn
             )
 
@@ -79,6 +86,7 @@ struct TemplateEditor: View {
                         updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                     updated.instructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
+                    updated.details = details.trimmingCharacters(in: .whitespacesAndNewlines)
                     onSave(updated)
                     dismiss()
                 }
@@ -88,6 +96,7 @@ struct TemplateEditor: View {
         .onAppear {
             name = template.displayName
             instructions = template.instructions
+            details = template.details
         }
         .kurnDialog(
             isPresented: $showingDeleteConfirm,
@@ -113,6 +122,7 @@ struct AddTemplateView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var instructions = ""
+    @State private var details = ""
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -124,6 +134,8 @@ struct AddTemplateView: View {
             TemplateFields(
                 name: $name,
                 instructions: $instructions,
+                details: $details,
+                detailsPlaceholder: nil,
                 nameEditable: true
             )
         }
@@ -137,7 +149,8 @@ struct AddTemplateView: View {
                 Button(NSLocalizedString("common.save", comment: "Save")) {
                     let template = SummaryTemplate.custom(
                         name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                        instructions: instructions.trimmingCharacters(in: .whitespacesAndNewlines)
+                        instructions: instructions.trimmingCharacters(in: .whitespacesAndNewlines),
+                        details: details.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
                     onAdd(template)
                 }
@@ -151,6 +164,9 @@ struct AddTemplateView: View {
 private struct TemplateFields: View {
     @Binding var name: String
     @Binding var instructions: String
+    @Binding var details: String
+    /// A built-in's current description, shown while its own is left empty.
+    let detailsPlaceholder: String?
     let nameEditable: Bool
 
     var body: some View {
@@ -159,6 +175,19 @@ private struct TemplateFields: View {
                 .disabled(!nameEditable)
         } header: {
             Text(NSLocalizedString("settings.template_name", comment: "Template name"))
+        }
+
+        Section {
+            TextField(
+                detailsPlaceholder ?? NSLocalizedString("settings.template_description_placeholder", comment: "Description placeholder"),
+                text: $details,
+                axis: .vertical
+            )
+            .lineLimit(1...3)
+        } header: {
+            Text(NSLocalizedString("settings.template_description", comment: "Description"))
+        } footer: {
+            Text(NSLocalizedString("settings.template_description_footer", comment: "Description footer"))
         }
 
         Section {

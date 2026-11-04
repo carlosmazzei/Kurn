@@ -26,6 +26,11 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
     /// Persona/focus instructions injected into the system prompt, naming the
     /// sections the summary should have when the template wants particular ones.
     var instructions: String
+    /// One line saying what the template is for, shown under its name in the
+    /// template lists. Empty means "not written": built-ins then show their
+    /// localized description and custom templates the start of their
+    /// instructions (`summaryDescription`).
+    var details: String
     var isBuiltIn: Bool
     var createdAt: Date
     /// Last edit time. Drives `TemplateSyncMerger`'s last-write-wins resolution
@@ -37,13 +42,31 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         isBuiltIn ? NSLocalizedString("template.\(id).name", comment: "Template name") : name
     }
 
-    /// Short subtitle for the picker. Built-ins are localized; custom templates
-    /// show their instructions (the picker limits the lines).
+    /// The line under the template's name in the picker and in Settings: the
+    /// description the user wrote, else a built-in's localized one, else the
+    /// first sentence of the instructions.
     var summaryDescription: String {
+        let written = details.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !written.isEmpty { return written }
         if isBuiltIn {
             return NSLocalizedString("template.\(id).desc", comment: "Template description")
         }
-        return instructions
+        return Self.firstSentence(of: instructions)
+    }
+
+    /// The first sentence (or line) of `text`, for a description nobody wrote.
+    static func firstSentence(of text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstLine = trimmed.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let terminators: Set<Character> = [".", "!", "?", "。", "！", "？"]
+        var sentence = ""
+        for (index, character) in zip(firstLine.indices, firstLine) {
+            sentence.append(character)
+            guard terminators.contains(character) else { continue }
+            let next = firstLine.index(after: index)
+            if next == firstLine.endIndex || firstLine[next].isWhitespace || !character.isASCII { break }
+        }
+        return sentence.trimmingCharacters(in: .whitespaces)
     }
 
     init(
@@ -51,6 +74,7 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         name: String,
         iconName: String,
         instructions: String,
+        details: String = "",
         isBuiltIn: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date? = nil
@@ -59,19 +83,20 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         self.name = name
         self.iconName = iconName
         self.instructions = instructions
+        self.details = details
         self.isBuiltIn = isBuiltIn
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, iconName, instructions, sections, isBuiltIn, createdAt, updatedAt
+        case id, name, iconName, instructions, details, sections, isBuiltIn, createdAt, updatedAt
     }
 
     /// Custom decode: `updatedAt` didn't exist before iCloud sync, so templates
     /// already persisted in `UserDefaults` have no such key; and a template
     /// written before sections were folded into the instructions still carries
-    /// them separately.
+    /// them separately (and no `details`).
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -80,6 +105,7 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         let storedInstructions = try container.decode(String.self, forKey: .instructions)
         let legacySections = try container.decodeIfPresent([String].self, forKey: .sections) ?? []
         instructions = Self.instructions(storedInstructions, foldingIn: legacySections)
+        details = try container.decodeIfPresent(String.self, forKey: .details) ?? ""
         isBuiltIn = try container.decode(Bool.self, forKey: .isBuiltIn)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
@@ -94,6 +120,7 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
         try container.encode(name, forKey: .name)
         try container.encode(iconName, forKey: .iconName)
         try container.encode(instructions, forKey: .instructions)
+        try container.encode(details, forKey: .details)
         try container.encode([String](), forKey: .sections)
         try container.encode(isBuiltIn, forKey: .isBuiltIn)
         try container.encode(createdAt, forKey: .createdAt)
@@ -116,13 +143,15 @@ struct SummaryTemplate: Codable, Sendable, Identifiable, Hashable {
     static func custom(
         name: String,
         iconName: String = "doc.text",
-        instructions: String
+        instructions: String,
+        details: String = ""
     ) -> SummaryTemplate {
         SummaryTemplate(
             id: "template-\(UUID().uuidString)",
             name: name,
             iconName: iconName,
             instructions: instructions,
+            details: details,
             isBuiltIn: false
         )
     }

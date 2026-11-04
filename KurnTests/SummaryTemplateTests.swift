@@ -71,6 +71,38 @@ struct SummaryTemplateTests {
         #expect(decoded == template)
     }
 
+    // MARK: - Description
+
+    @Test func aWrittenDescriptionIsWhatTheListShows() {
+        let template = SummaryTemplate.custom(
+            name: "QA", instructions: "Focus on defects. Then coverage.", details: "  Bugs found and what is untested  "
+        )
+        #expect(template.summaryDescription == "Bugs found and what is untested")
+    }
+
+    @Test func withoutADescriptionACustomTemplateShowsItsFirstSentence() {
+        let template = SummaryTemplate.custom(name: "QA", instructions: "Focus on defects. Then coverage.\nMore.")
+        #expect(template.summaryDescription == "Focus on defects.")
+        #expect(SummaryTemplate.firstSentence(of: "Line one\nLine two") == "Line one")
+        #expect(SummaryTemplate.firstSentence(of: "总结会议。然后列出任务。") == "总结会议。")
+        #expect(SummaryTemplate.firstSentence(of: "v1.2 rollout plan") == "v1.2 rollout plan")
+    }
+
+    @Test func aBuiltInDescribesItsPurposeUnlessTheUserWroteOne() {
+        #expect(!SummaryTemplate.general.summaryDescription.isEmpty)
+        var edited = SummaryTemplate.general
+        edited.details = "Mine"
+        #expect(edited.summaryDescription == "Mine")
+    }
+
+    @Test func theDescriptionSurvivesEncodingAndIsOptionalOnDecode() throws {
+        let template = SummaryTemplate.custom(name: "n", instructions: "i", details: "d")
+        let decoded = try JSONDecoder().decode(SummaryTemplate.self, from: JSONEncoder().encode(template))
+        #expect(decoded.details == "d")
+        let legacy = #"{"id":"t","name":"n","iconName":"i","instructions":"x","isBuiltIn":false,"createdAt":0}"#
+        #expect(try JSONDecoder().decode(SummaryTemplate.self, from: Data(legacy.utf8)).details.isEmpty)
+    }
+
     @Test func defaultTemplatesIncludeGeneralStandupInterview() throws {
         let ids = SummaryTemplate.defaultTemplates.map(\.id)
         #expect(ids.contains("general"))

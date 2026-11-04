@@ -557,6 +557,9 @@
 "settings.templates_sync" = "Sincronizar Modelos via iCloud";
 "settings.templates_sync_footer" = "Os modelos personalizados que você criar são sincronizados via iCloud, ficando disponíveis ao trocar de aparelho. Os modelos padrão do app já ficam sempre atualizados por conta própria.";
 "settings.template_name" = "Nome";
+"settings.template_description" = "Descrição";
+"settings.template_description_placeholder" = "Uma linha exibida na lista de templates";
+"settings.template_description_footer" = "Aparece abaixo do nome para você distinguir os templates. Deixe em branco para usar a primeira frase das instruções.";
 "settings.template_instructions" = "Instruções";
 "settings.template_instructions_footer" = "Descreva o foco e o tom do resumo e as seções que você quer (por exemplo: Feito, Próximos passos, Bloqueios). O modelo sempre responde no idioma da transcrição.";
 "settings.template.builtin" = "Predefinido";
@@ -564,13 +567,13 @@
 "settings.delete_template" = "Excluir Modelo";
 "settings.delete_template.confirm" = "Excluir este modelo?";
 "template.general.name" = "Reunião Geral";
-"template.general.desc" = "Visão geral, pontos principais, decisões e ações.";
+"template.general.desc" = "Um resumo para quem não estava na reunião: o que se discutiu, decidiu e quem faz o quê.";
 "template.standup.name" = "Daily / Standup";
-"template.standup.desc" = "O que foi feito, próximos passos e impedimentos.";
+"template.standup.desc" = "Progresso, próximos passos e impedimentos de cada pessoa, de relance.";
 "template.interview.name" = "Entrevista";
-"template.interview.desc" = "Perguntas, respostas, pontos fortes e avaliação.";
+"template.interview.desc" = "Como foi o candidato: respostas-chave, pontos fortes, preocupações e um parecer.";
 "template.outline.name" = "Outline da Reunião";
-"template.outline.desc" = "Sumário breve e estrutura cronológica e hierárquica dos tópicos discutidos.";
+"template.outline.desc" = "Um resumo curto e, depois, os temas na ordem em que surgiram.";
 
 /* Ajustes */
 "settings.title" = "Ajustes";
