@@ -12,6 +12,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 import Testing
 @testable import Kurn
 
@@ -129,6 +130,55 @@ struct CaptureJournalTests {
         let file = try CaptureOutputFile.openJournaled(at: url, bitRate: 48_000, journalDirectory: { throw NoDirectory() })
 
         #expect(file is AVAudioFile)
+    }
+
+    @Test func aFailedJournalOpenRecordsDegradationWithoutLosingTheRecording() throws {
+        let capture = ReliabilityEventCapture()
+        let primary = RecordingWriter()
+        let file = try CaptureOutputFile.openJournaled(
+            at: URL(fileURLWithPath: "/private/recording.m4a"), bitRate: 48_000,
+            make: { _, _ in primary },
+            journalDirectory: { throw WriteFailed() },
+            recordEvent: capture.record
+        )
+        try file.write(from: Self.buffer())
+        #expect(primary.writes == 1)
+        #expect(capture.recorded.count == 1)
+        let event = try #require(capture.recorded.first)
+        #expect(event.operation == "capture_journal")
+        #expect(event.stage == "open")
+        #expect(event.outcome == .failed)
+        #expect(event.code == "journal_open_failed")
+        #expect(HealthRecoveryAggregation.recentFailures(in: capture.recorded).count == 1)
+        #expect(!event.logLine.contains("recording.m4a"))
+        #expect(!event.logLine.contains("/private"))
+    }
+
+    @Test func aFailedJournalWriteRecordsDegradationOnlyOnce() throws {
+        let capture = ReliabilityEventCapture()
+        let primary = RecordingWriter()
+        let journal = RecordingWriter()
+        let file = try CaptureOutputFile.openJournaled(
+            at: URL(fileURLWithPath: "/private/recording.m4a"), bitRate: 48_000,
+            make: { url, _ in url.pathExtension == "aac" ? journal : primary },
+            journalDirectory: { URL(fileURLWithPath: "/private") },
+            recordEvent: capture.record
+        )
+        try file.write(from: Self.buffer())
+        #expect(capture.recorded.isEmpty)
+        journal.failing = true
+        try file.write(from: Self.buffer())
+        try file.write(from: Self.buffer())
+        #expect(primary.writes == 3)
+        #expect(journal.writes == 1)
+        #expect(capture.recorded.count == 1)
+        let event = try #require(capture.recorded.first)
+        #expect(event.operation == "capture_journal")
+        #expect(event.stage == "write")
+        #expect(event.outcome == .failed)
+        #expect(event.code == "journal_write_failed")
+        #expect(HealthRecoveryAggregation.recentFailures(in: capture.recorded).count == 1)
+        #expect(!event.logLine.contains("recording.m4a"))
     }
 
     @Test func aRejectedJournalBitRateIsRetriedWithoutOne() throws {

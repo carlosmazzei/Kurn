@@ -42,10 +42,16 @@ struct MeetingAttachmentImporter {
 
     private let library: MeetingLibrary
     private let extract: Extract
+    private let recordEvent: @Sendable (ReliabilityEvent) -> Void
 
-    init(library: MeetingLibrary, extract: @escaping Extract = MeetingAttachmentImporter.liveExtract) {
+    init(
+        library: MeetingLibrary,
+        extract: @escaping Extract = MeetingAttachmentImporter.liveExtract,
+        recordEvent: @escaping @Sendable (ReliabilityEvent) -> Void = ReliabilityLog.record
+    ) {
         self.library = library
         self.extract = extract
+        self.recordEvent = recordEvent
     }
 
     init(context: ModelContext, extract: @escaping Extract = MeetingAttachmentImporter.liveExtract) {
@@ -77,7 +83,8 @@ struct MeetingAttachmentImporter {
     /// Imports `sources` into a meeting created for them and named after the
     /// first file. The meeting is deleted again when none of the files made
     /// it in, so a failed share leaves no empty meeting behind; it is `nil`
-    /// in the result then.
+    /// in the result then. A failed deletion returns the retained meeting and
+    /// reports the compensation failure instead.
     func importPDFsIntoNewMeeting(from sources: [URL]) async -> (meeting: Meeting?, report: Report) {
         let title = sources.first.map { $0.deletingPathExtension().lastPathComponent } ?? ""
         let meeting: Meeting
@@ -86,10 +93,16 @@ struct MeetingAttachmentImporter {
         } catch {
             return (nil, Report(firstFailure: error))
         }
-        let report = await importPDFs(from: sources, into: meeting)
+        var report = await importPDFs(from: sources, into: meeting)
         guard report.importedCount == 0 else { return (meeting, report) }
-        try? library.deleteMeeting(meeting)
-        return (nil, report)
+        do throws(AppError) {
+            try library.discardNewMeeting(meeting)
+            return (nil, report)
+        } catch {
+            record(OperationID(), stage: "rollback", outcome: .failed, startedAt: Date(), code: "rollback_failed")
+            report.firstFailure = error
+            return (meeting, report)
+        }
     }
 
     @discardableResult
@@ -109,8 +122,14 @@ struct MeetingAttachmentImporter {
         let outcome: Result<PDFTextExtraction, PDFTextExtractor.Failure>
         do {
             outcome = try await withResourceReservation(.photoTextRecognition) {
-                await Task.detached(priority: .userInitiated) { extract(url) }.value
+                let work = Task.detached(priority: .userInitiated) { extract(url) }
+                return await withTaskCancellationHandler {
+                    await work.value
+                } onCancel: {
+                    work.cancel()
+                }
             }
+            try Task.checkCancellation()
         } catch {
             AttachmentFileStore.delete(fileName: fileName)
             record(operationID, stage: "extract", outcome: .cancelled, startedAt: startedAt, code: "cancelled")
@@ -185,7 +204,7 @@ struct MeetingAttachmentImporter {
         startedAt: Date,
         code: String?
     ) {
-        ReliabilityLog.record(ReliabilityEvent(
+        recordEvent(ReliabilityEvent(
             operationID: operationID, operation: "attachment_import", stage: stage,
             outcome: outcome, elapsedSeconds: Date().timeIntervalSince(startedAt), code: code
         ))
