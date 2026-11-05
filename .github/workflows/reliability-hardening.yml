@@ -16,7 +16,9 @@ name: Reliability hardening lane
 # the summary job writes counts to the job summary for a maintainer to read
 # and, if useful, record by hand -- the same "recording a run is a human
 # step" philosophy `pipeline-eval.yml`/`docs/pipeline-evaluation.md` already
-# established, not a pass/fail gate with an invented threshold.
+# established, not a gate with an invented numeric threshold. The run as a
+# whole still fails when any attempt fails, so a regression is visible as a
+# red run rather than only as a lower count.
 
 on:
   workflow_dispatch: {}
