@@ -75,6 +75,35 @@ struct RecordingSinkFaultTests {
         #expect(atDeadline)
     }
 
+    @Test(arguments: ["poll", "pause", "close"])
+    @MainActor func journalDegradationIsFlushedOutsideTheSinkLock(action: String) throws {
+        let buffer = try Self.makeBuffer()
+        let converter = try #require(AVAudioConverter(from: buffer.format, to: buffer.format))
+        let sink = RecordingSink()
+        let recorder = AudioRecorderService(sink: sink)
+        let primary = ScriptedAudioFileWriter()
+        let journal = ScriptedAudioFileWriter(failFromWrite: 1)
+        var reports = 0
+        let file = JournaledCaptureFile(primary: primary, journal: journal) {
+            #expect(sink.snapshot.firstFailure == nil)
+            reports += 1
+        }
+        sink.open(file, converter: converter, targetFormat: buffer.format, onBuffer: nil)
+        #expect(sink.write(buffer))
+        #expect(primary.writeCount == 1)
+        #expect(reports == 0)
+
+        switch action {
+        case "poll": #expect(!recorder.pollSinkStatus())
+        case "pause": sink.setPaused(true)
+        default: sink.close()
+        }
+        #expect(reports == 1)
+        sink.flushReliabilityEvents()
+        sink.close()
+        #expect(reports == 1)
+    }
+
     @Test func captureWatchdogResetsItsDeadlineAfterProgress() {
         var watchdog = CaptureProgressWatchdog(stallInterval: 2)
 

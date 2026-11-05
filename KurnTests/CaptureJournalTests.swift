@@ -88,6 +88,9 @@ struct CaptureJournalTests {
         #expect(primary.writes == 2)
         #expect(journal.writes == 0)
         #expect(!file.hasJournal)
+        #expect(reported == 0)
+        file.flushReliabilityEvents()
+        file.flushReliabilityEvents()
         #expect(reported == 1)
     }
 
@@ -154,23 +157,15 @@ struct CaptureJournalTests {
         #expect(!event.logLine.contains("/private"))
     }
 
-    @Test func aFailedJournalWriteRecordsDegradationOnlyOnceOffTheCapturePath() async throws {
+    @Test func aFailedJournalWriteRecordsDegradationOnlyOnceOffTheCapturePath() throws {
         let capture = ReliabilityEventCapture()
-        let gate = BlockingWorkGate()
-        defer { gate.resume() }
-        let completion = AsyncStream<Void>.makeStream()
         let primary = RecordingWriter()
         let journal = RecordingWriter()
         let file = try CaptureOutputFile.openJournaled(
             at: URL(fileURLWithPath: "/private/recording.m4a"), bitRate: 48_000,
             make: { url, _ in url.pathExtension == "aac" ? journal : primary },
             journalDirectory: { URL(fileURLWithPath: "/private") },
-            recordEvent: { event in
-                #expect(!Thread.isMainThread)
-                gate.block()
-                capture.record(event)
-                completion.continuation.yield(())
-            }
+            recordEvent: capture.record
         )
         try file.write(from: Self.buffer())
         #expect(capture.recorded.isEmpty)
@@ -179,10 +174,9 @@ struct CaptureJournalTests {
         try file.write(from: Self.buffer())
         #expect(primary.writes == 3)
         #expect(journal.writes == 1)
-        await gate.waitUntilStarted()
         #expect(capture.recorded.isEmpty)
-        gate.resume()
-        for await _ in completion.stream { break }
+        file.flushReliabilityEvents()
+        file.flushReliabilityEvents()
         #expect(capture.recorded.count == 1)
         let event = try #require(capture.recorded.first)
         #expect(event.operation == "capture_journal")
