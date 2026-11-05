@@ -13,6 +13,7 @@ import KurnCore
 import Testing
 @testable import Kurn
 
+#if DEBUG
 struct ScreenshotSeedTextTests {
     @Test func everyLanguageHasTheEnglishShape() {
         let english = ScreenshotSeedText.english
@@ -40,3 +41,4 @@ struct ScreenshotSeedTextTests {
         #expect(ScreenshotSeedText.current(preferredLanguages: []).language == .english)
     }
 }
+#endif

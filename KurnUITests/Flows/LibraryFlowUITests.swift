@@ -16,15 +16,13 @@ final class LibraryFlowUITests: FlowUITestCase {
     // MARK: - Tags
 
     func testCreateAndDeleteATag() {
-        openSettingsScreen("settings.link.tags")
+        openSettingsScreen("settings.link.tags", until: "settings.tags.manage")
 
         let manage = app.buttons["settings.tags.manage"]
         XCTAssertTrue(manage.waitForExistence(timeout: 10))
-        manage.tap()
-
         let name = "UITest-\(UUID().uuidString.prefix(6))"
         let field = app.textFields["tags.new_name"]
-        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertTrue(tap(manage, until: field, timeout: 10))
         field.tap()
         field.typeText(name)
 
@@ -51,11 +49,10 @@ final class LibraryFlowUITests: FlowUITestCase {
     }
 
     func testAddIsDisabledForABlankTagName() {
-        openSettingsScreen("settings.link.tags")
-        app.buttons["settings.tags.manage"].tap()
+        openSettingsScreen("settings.link.tags", until: "settings.tags.manage")
 
         let add = app.buttons["tags.add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 10))
+        XCTAssertTrue(tap(app.buttons["settings.tags.manage"], until: add, timeout: 10))
         XCTAssertFalse(add.isEnabled)
     }
 

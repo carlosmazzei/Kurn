@@ -8,8 +8,8 @@ name: Reliability hardening lane
 #
 # No blanket retries here turn a real failure green: each repeated attempt
 # is its own job/matrix leg and is reported individually. A failing attempt
-# stays failed; the summary job below only counts and reports, it never
-# reruns anything to make a number look better.
+# stays failed; the summary job below preserves those failures and reports
+# counts without rerunning anything to make a number look better.
 #
 # "Record baseline counts... without inventing a numeric reliability SLO"
 # (the resilience track's H10 contract, CLAUDE.md "Durability & recovery"):
@@ -240,9 +240,7 @@ jobs:
           path: ${{ runner.temp }}/result/ui-flake-attempt-${{ matrix.attempt }}.txt
           retention-days: 14
 
-  # Counts and reports; never retries anything to change the count. See this
-  # file's own header for why the output is a summary a maintainer reads and
-  # optionally records, not a pass/fail gate with an invented threshold.
+  # Counts and reports without retrying; preserves failures from every job.
   hardening-summary:
     needs: [thread-sanitizer, release-configuration-tests, ui-flake-rate]
     if: always()
@@ -257,6 +255,7 @@ jobs:
           merge-multiple: true
 
       - name: Summarize
+        if: always()
         run: |
           count_status() {
             # $1: glob prefix, e.g. thread-sanitizer-attempt / ui-flake-attempt
@@ -288,3 +287,15 @@ jobs:
             echo "worth tracking over time by hand, the same way \`docs/pipeline-evaluation.md\` records"
             echo "pipeline-eval runs."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require successful hardening jobs
+        if: always()
+        env:
+          TSAN_RESULT: ${{ needs.thread-sanitizer.result }}
+          RELEASE_RESULT: ${{ needs.release-configuration-tests.result }}
+          UI_RESULT: ${{ needs.ui-flake-rate.result }}
+        run: |
+          if [ "$TSAN_RESULT" != "success" ] || [ "$RELEASE_RESULT" != "success" ] || [ "$UI_RESULT" != "success" ]; then
+            echo "::error::Hardening jobs did not all succeed: TSan=$TSAN_RESULT Release=$RELEASE_RESULT UI=$UI_RESULT"
+            exit 1
+          fi

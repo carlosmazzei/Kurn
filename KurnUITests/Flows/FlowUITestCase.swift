@@ -46,7 +46,7 @@ class FlowUITestCase: XCTestCase {
     }
 
     /// Pushes one Settings destination by its hub-row identifier.
-    func openSettingsScreen(_ identifier: String) {
+    func openSettingsScreen(_ identifier: String, until destinationIdentifier: String? = nil) {
         openSettings()
         // The hub is a lazy `Form`: a row below the fold is not in the
         // hierarchy at all until scrolled to, so wait for the hub itself, then
@@ -58,7 +58,11 @@ class FlowUITestCase: XCTestCase {
         }
         XCTAssertTrue(row.waitForExistence(timeout: 5), "Settings row \(identifier) missing")
         scrollIntoSafeArea(row)
-        XCTAssertTrue(tapUntilCovered(row), "Settings row \(identifier) did not open its screen")
+        if let destinationIdentifier {
+            XCTAssertTrue(tap(row, until: app.buttons[destinationIdentifier]), "Settings row \(identifier) did not open its screen")
+        } else {
+            XCTAssertTrue(tapUntilCovered(row), "Settings row \(identifier) did not open its screen")
+        }
     }
 
     /// Waits up to `timeout` for `predicate` to hold for `element`.
@@ -86,6 +90,7 @@ class FlowUITestCase: XCTestCase {
     @discardableResult
     func tap(_ element: XCUIElement, until outcome: XCUIElement, timeout: TimeInterval = 5) -> Bool {
         for _ in 0..<2 {
+            if outcome.exists { return true }
             element.tap()
             if outcome.waitForExistence(timeout: timeout) { return true }
             guard element.exists, element.isHittable else { break }
