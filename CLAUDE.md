@@ -645,7 +645,8 @@ shared offline manual-rendering loop behind `AudioPreprocessor`,
 **must** go through an `AVAudioEngine` player-node render — `AVAudioFile.read`
 and `AVAudioConverter` both fail on them with a generic "erro 0" on device.
 `VADAudioLoader.monoSamples` keeps its own copy of the loop because it is
-synchronous; keep the two in sync.
+synchronous; keep the two in sync. `VADAudioChunkReader` shares that synchronous
+render loop but delivers bounded sample chunks instead of accumulating the file.
 
 ### Secure local storage for recordings
 
@@ -1166,6 +1167,12 @@ at most eight speakers, and has no exact-count constraint or compatible
 speaker voiceprints. Its probabilities are accumulated by KurnCore's
 `NemotronDiarizationTimeline` into bounded source-timeline turns. Do not infer
 that its "fast32" profile is an iPhone speed benchmark.
+
+Nemotron reads through `VADAudioChunkReader`, keeping decoded audio to one model
+chunk plus the 4096-frame render buffer and the engine's converter buffers.
+One continuous mono render at the model's sample rate preserves resampling state
+and sample order across chunks; cancellation and the processing budget are checked
+per chunk. Timeline/model state is separate from this decoded-audio bound.
 
 Pyannote alone honors `fluidAudioSpeakerCount` as before. Its segmentation batch
 size is user-selectable as 4/8/16/32 via `fluidAudioSegmentationBatchSize`;
