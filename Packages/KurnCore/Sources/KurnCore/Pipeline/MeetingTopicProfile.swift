@@ -2,8 +2,8 @@
 //  MeetingTopicProfile.swift
 //  KurnCore
 //
-//  What the topic-aware correction mode (`CorrectionEngine.llmTopicAware`)
-//  learns about a meeting before correcting it: the subject, the domain, the
+//  What the correction stage (`LLMTranscriptCorrector`) learns about a meeting
+//  before correcting it: the subject, the domain, the
 //  vocabulary that domain uses, and the mishearings an ASR engine is likely to
 //  have produced for it. `MeetingVocabularyExtractor` can only recover a term
 //  the ASR got right *somewhere* in the same recording; a profile inferred from

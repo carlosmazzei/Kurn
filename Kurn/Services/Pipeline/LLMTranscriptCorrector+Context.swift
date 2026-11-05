@@ -1,9 +1,10 @@
 //
-//  LLMTranscriptCorrector+Topic.swift
+//  LLMTranscriptCorrector+Context.swift
 //  Kurn
 //
-//  What the topic-aware mode (`CorrectionEngine.llmTopicAware`) adds to the
-//  correction loop, kept apart from the original mode it extends:
+//  How the correction loop combines the ASR's confidence, the critic's topic
+//  profile (`TranscriptTopicAnalyzer`) and the surrounding speech, and how it
+//  keeps a correction faithful to what was said:
 //
 //  - which segments are sent: low or unknown ASR confidence (as before) **or**
 //    a segment containing a form the critic flagged — a confident decode of
@@ -42,11 +43,12 @@ extension LLMTranscriptCorrector {
         }
     }
 
-    /// Pure. The segments the topic-aware mode sends, in transcript order:
-    /// every segment `isEligible` would send, plus any segment — however
-    /// confident — that contains one of `profile`'s flagged forms.
-    static func candidates(in segments: [TranscriptSegment], flaggedBy profile: MeetingTopicProfile) -> [TranscriptSegment] {
-        let flagged = profile.mishearings.map { $0.heard.lowercased() }
+    /// Pure. The segments sent for correction, in transcript order: every
+    /// segment `isEligible` (low or unknown confidence), plus any segment —
+    /// however confident — that contains one of `profile`'s flagged forms.
+    /// Without a profile it is exactly the low-confidence set.
+    static func candidates(in segments: [TranscriptSegment], flaggedBy profile: MeetingTopicProfile?) -> [TranscriptSegment] {
+        let flagged = (profile?.mishearings ?? []).map { $0.heard.lowercased() }
         return segments.filter { segment in
             guard hasText(segment) else { return false }
             if isEligible(segment) { return true }
@@ -73,11 +75,11 @@ extension LLMTranscriptCorrector {
         return result
     }
 
-    /// Pure. The terms a topic-aware correction may introduce without them
-    /// sounding like anything the ASR wrote: the merged vocabulary and the
-    /// intended side of every grounded finding.
-    static func allowedTerms(vocabulary: [String], profile: MeetingTopicProfile) -> [String] {
-        vocabulary + profile.mishearings.map(\.intended)
+    /// Pure. The terms a correction may introduce without them sounding like
+    /// anything the ASR wrote: the merged vocabulary and the intended side of
+    /// every grounded finding.
+    static func allowedTerms(vocabulary: [String], profile: MeetingTopicProfile?) -> [String] {
+        vocabulary + (profile?.mishearings ?? []).map(\.intended)
     }
 
     /// Confidence rounded to two decimals — precision beyond that is noise to
@@ -98,30 +100,32 @@ extension LLMTranscriptCorrector {
         return trimmed.count <= limit ? trimmed : "…" + String(trimmed.suffix(limit))
     }
 
-    /// Appended to the system prompt in the topic-aware mode. The findings are
-    /// a reviewer's hypotheses, so the prompt asks for them to be applied only
-    /// where the segment actually sounds like them — and
-    /// `CorrectionFaithfulness` enforces the same thing in code, so a
-    /// correction the prompt fails to restrain is still rejected.
+    /// Always part of the system prompt: what the per-segment context fields
+    /// mean, and the faithfulness rule `CorrectionFaithfulness` enforces in
+    /// code — so a correction the prompt fails to restrain is still rejected.
+    static let contextGuidance = """
+        Segments may carry "confidence" (the ASR's own, 0–1: the lower it is, the \
+        more likely the text is misheard; a high value means change it only for a \
+        clear error) and "before"/"after" (the neighbouring speech, for context only \
+        — never correct or return it). Read each segment in that context and stay \
+        faithful to what was said: every word you change must sound like what the \
+        ASR wrote. Never add a word that was not spoken — corrections that do are \
+        discarded.
+        """
+
+    /// Appended when the critic produced a profile. Its findings are a
+    /// reviewer's hypotheses, so the prompt asks for them to be applied only
+    /// where the segment actually sounds like them.
     static let topicGuidance = """
         The request also has a "topic" object, written by a reviewer who read the \
         whole meeting: "summary" says what it is about, "domain" the field it \
         belongs to, and "likelyMishearings" lists places where the reviewer thinks \
         the ASR wrote something that sounds like a term of this topic but makes no \
         sense in it ("heard" → "intended"); "vocabulary" also includes the terms \
-        this topic makes likely. Segments may carry "confidence" (the ASR's own, \
-        0–1: the lower it is, the more likely the text is misheard; a high value \
-        means change it only for a clear finding) and "before"/"after" (the \
-        neighbouring speech, for context only — never correct or return it).
-
-        Use the topic and the surrounding speech to read ambiguous words the way \
-        a participant in this meeting would, and stay faithful to what was said:
-        - Apply a finding only where a segment contains its "heard" form (or \
-        something that sounds the same) and the intended term fits the sentence; \
-        the reviewer can be wrong, and a word that is plausible as written must \
-        stay as written.
-        - Every word you change must sound like what the ASR wrote. Never add a \
-        word that was not spoken, even one the topic makes likely — corrections \
-        that do are discarded.
+        this topic makes likely. Use the topic to read ambiguous words the way a \
+        participant in this meeting would. Apply a finding only where a segment \
+        contains its "heard" form (or something that sounds the same) and the \
+        intended term fits the sentence; the reviewer can be wrong, and a word \
+        that is plausible as written must stay as written.
         """
 }

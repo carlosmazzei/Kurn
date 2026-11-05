@@ -54,7 +54,7 @@ that matter most in a meeting: a participant's name, a product name, an
 internal acronym — mis-heard consistently, in all fourteen occurrences, with
 nothing correct to copy from.
 
-The topic-aware correction mode (`CorrectionEngine.llmTopicAware`) now covers
+The correction stage's topic critique (`TranscriptTopicAnalyzer`) now covers
 the part of this that inference can: a critic pass names domain terms the ASR
 garbled every time, grounded in the transcript. It cannot know a name that
 nothing in the meeting implies, and it acts only after ASR — so a
@@ -261,11 +261,11 @@ is listed so it is not rediscovered.
 
 ### Topic-aware correction
 
-- Not yet measured. Dispatch `pipeline-eval.yml` with `correction: only`,
-  `correction_engine: topic` and again with `llm` on the same corpus, record
-  both in `docs/pipeline-evaluation.md`, and only then describe an effect on
-  WER (insertions are the number to watch: the faithfulness check exists to
-  keep them flat).
+- Not yet measured. Dispatch `pipeline-eval.yml` with `correction: only` on a
+  corpus whose earlier `corr=llm` row (the frequency-list corrector it
+  replaced) is in `docs/pipeline-evaluation.md`, record the new row, and only
+  then describe an effect on WER (insertions are the number to watch: the
+  faithfulness check exists to keep them flat).
 - `CorrectionFaithfulness` uses spelling closeness as its only proxy for
   "sounds like"; a homophone spelled very differently ("sequel" → "SQL") is
   accepted only through the grounded vocabulary. A per-language phonetic key

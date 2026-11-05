@@ -177,8 +177,8 @@ struct PipelineConfiguration: Sendable, Equatable {
 
     /// The correction engine that will actually run.
     var effectiveCorrection: CorrectionEngine {
-        guard correction != .none, correctionConsented else { return .none }
-        return correction
+        guard correction == .llm, correctionConsented else { return .none }
+        return .llm
     }
 
     /// The diarizer that will actually run.

@@ -357,21 +357,11 @@ struct TranscriptionSettingsView: View {
                 )
             )
             .disabled(!hasSummaryProviderKey)
-            Toggle(
-                NSLocalizedString("settings.correction_topic", comment: "Topic-aware AI correction toggle"),
-                isOn: Binding(
-                    get: { settings.correctionTopicAwareEnabled && settings.correctionEnabled && hasSummaryProviderKey },
-                    set: { settings.correctionTopicAwareEnabled = $0 }
-                )
-            )
-            .disabled(!(settings.correctionEnabled && hasSummaryProviderKey))
-            .accessibilityIdentifier("settings.transcription.correctionTopic")
         } header: {
             Text(NSLocalizedString("settings.correction_title", comment: "AI transcription correction section title"))
         } footer: {
             Text(hasSummaryProviderKey
                 ? NSLocalizedString("settings.correction_footer", comment: "AI transcription correction footer")
-                    + "\n\n" + NSLocalizedString("settings.correction_topic_footer", comment: "Topic-aware AI correction footer")
                 : correctionUnavailableFooter)
         }
     }

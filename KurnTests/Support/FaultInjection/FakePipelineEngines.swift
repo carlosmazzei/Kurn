@@ -47,7 +47,7 @@ struct FakeEngines {
                 corrector.record(engine)
                 switch engine {
                 case .none: return NoOpTranscriptCorrector()
-                case .llm, .llmTopicAware: return corrector
+                case .llm: return corrector
                 }
             },
             diarizationPreprocessor: FakeDiarizationPreprocessor(),

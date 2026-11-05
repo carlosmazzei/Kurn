@@ -1,12 +1,13 @@
 //
-//  LLMTranscriptCorrectorTopicTests.swift
+//  LLMTranscriptCorrectorCritiqueTests.swift
 //  KurnTests
 //
-//  The topic-aware correction mode (`CorrectionEngine.llmTopicAware`) over a
-//  scripted provider: the critic pass runs first, its grounded findings and
-//  the inferred domain terms ride with every batch, a failed critique still
-//  corrects but reports itself as degraded, and the original mode's request
-//  is left exactly as it was.
+//  The topic critique, confidence and context inside `LLMTranscriptCorrector`
+//  over a scripted provider: the critic pass runs first, its grounded
+//  findings and the inferred domain terms ride with every batch, a confident
+//  segment it flags is sent too, a correction adding unspoken words is
+//  rejected, and a failed critique still corrects but reports itself as
+//  degraded.
 //
 
 import Foundation
@@ -14,7 +15,7 @@ import KurnCore
 import Testing
 @testable import Kurn
 
-struct LLMTranscriptCorrectorTopicTests {
+struct LLMTranscriptCorrectorCritiqueTests {
 
     private struct ProviderDown: Error {}
 
@@ -31,13 +32,9 @@ struct LLMTranscriptCorrectorTopicTests {
 
     private static func correct(
         _ segments: [TranscriptSegment],
-        topicAware: Bool,
         with llm: ScriptedLLMProvider
     ) async -> TranscriptCorrectionResult {
-        let corrector = LLMTranscriptCorrector(
-            topicAnalyzer: topicAware ? TranscriptTopicAnalyzer() : nil,
-            resolveProvider: { _, _ in llm }
-        )
+        let corrector = LLMTranscriptCorrector(resolveProvider: { _, _ in llm })
         return await corrector.correct(
             segments: segments, language: .english, provider: .openAI, model: "gpt-4o",
             onProgress: { _ in }
@@ -50,7 +47,7 @@ struct LLMTranscriptCorrectorTopicTests {
         let fixed = #"{"segments":[{"id":"\#(uncertain.id.uuidString)","text":"we move billing to Kubernetes"}]}"#
         let llm = ScriptedLLMProvider(chat: { _, index in index == 0 ? Self.critique : fixed })
 
-        let result = await Self.correct([uncertain, confident], topicAware: true, with: llm)
+        let result = await Self.correct([uncertain, confident], with: llm)
 
         #expect(result.outcome == .succeeded)
         #expect(result.segments.map(\.text) == ["we move billing to Kubernetes", "the Helm chart is ready"])
@@ -64,6 +61,7 @@ struct LLMTranscriptCorrectorTopicTests {
         let batch = llm.chatCalls[1]
         #expect(batch.systemPrompt == LLMTranscriptCorrector.systemPrompt(language: .english, topicAware: true))
         #expect(batch.systemPrompt.contains(LLMTranscriptCorrector.topicGuidance))
+        #expect(batch.systemPrompt.contains(LLMTranscriptCorrector.contextGuidance))
         let sent = batch.messages.first?.content ?? ""
         #expect(sent.contains("Moving the billing service to Kubernetes"))
         #expect(sent.contains("software engineering"))
@@ -80,7 +78,7 @@ struct LLMTranscriptCorrectorTopicTests {
         let closing = Self.segment("any questions so far", confidence: 0.97, at: 4)
         let llm = ScriptedLLMProvider(chat: { _, index in index == 0 ? Self.critique : #"{"segments":[]}"# })
 
-        let result = await Self.correct([opening, flagged, closing], topicAware: true, with: llm)
+        let result = await Self.correct([opening, flagged, closing], with: llm)
 
         #expect(result.outcome == .succeeded)
         try #require(llm.chatCalls.count == 2)
@@ -93,7 +91,7 @@ struct LLMTranscriptCorrectorTopicTests {
         #expect(sent.contains(#""after":"any questions so far""#))
     }
 
-    @Test func aCorrectionThatAddsUnspokenWordsIsRejectedInTheTopicMode() async {
+    @Test func aCorrectionThatAddsUnspokenWordsIsRejected() async {
         // Small enough for the magnitude guardrail (3 of 14 words), so only
         // the faithfulness check stands between "by Friday" and the transcript.
         let original = "so the plan is that we move the billing service to cuber netes soon"
@@ -103,15 +101,13 @@ struct LLMTranscriptCorrectorTopicTests {
         let invented = #"{"segments":[{"id":"\#(uncertain.id.uuidString)","text":"\#(corrected)"}]}"#
         let llm = ScriptedLLMProvider(chat: { _, index in index == 0 ? Self.critique : invented })
 
-        let result = await Self.correct([uncertain], topicAware: true, with: llm)
+        let result = await Self.correct([uncertain], with: llm)
 
         #expect(result.outcome == .succeeded)
         #expect(result.segments.map(\.text) == [original])
-        // The same reply is applied when the topic mode is off: the check is
-        // what the topic mode adds, not a change to the original mode.
-        let plain = ScriptedLLMProvider(chat: { _, _ in invented })
-        let unguarded = await Self.correct([uncertain], topicAware: false, with: plain)
-        #expect(unguarded.segments.map(\.text) == [corrected])
+        // The magnitude guardrail alone would have let it through.
+        let unguarded = LLMTranscriptCorrector.apply(corrections: [uncertain.id: corrected], to: [uncertain])
+        #expect(unguarded.map(\.text) == [corrected])
     }
 
     @Test func neighbourContextIsTrimmedAndAbsentAtTheEdges() {
@@ -137,13 +133,14 @@ struct LLMTranscriptCorrectorTopicTests {
             return fixed
         })
 
-        let result = await Self.correct([uncertain], topicAware: true, with: llm)
+        let result = await Self.correct([uncertain], with: llm)
 
         #expect(result.outcome == .degraded)
         #expect(result.reason == .topicAnalysisFailed)
         #expect(result.segments.map(\.text) == ["we need it"])
         #expect(llm.chatCalls.count == 2)
         #expect(llm.chatCalls[1].systemPrompt == LLMTranscriptCorrector.systemPrompt(language: .english))
+        #expect(!llm.chatCalls[1].systemPrompt.contains(LLMTranscriptCorrector.topicGuidance))
         #expect(llm.chatCalls[1].messages.first?.content.contains("\"topic\"") == false)
     }
 
@@ -151,25 +148,16 @@ struct LLMTranscriptCorrectorTopicTests {
         let llm = ScriptedLLMProvider(chat: { _, index in
             index == 0 ? "This meeting is about many things." : #"{"segments":[]}"#
         })
-        let result = await Self.correct([Self.segment("we ned it")], topicAware: true, with: llm)
+        let result = await Self.correct([Self.segment("we ned it")], with: llm)
         #expect(result.outcome == .degraded)
         #expect(result.reason == .topicAnalysisFailed)
     }
 
     @Test func failingBatchesOutrankAFailedCritique() async {
         let llm = ScriptedLLMProvider(chat: { _, _ in throw ProviderDown() })
-        let result = await Self.correct([Self.segment("we ned it")], topicAware: true, with: llm)
+        let result = await Self.correct([Self.segment("we ned it")], with: llm)
         #expect(result.outcome == .failed)
         #expect(result.reason == .engineFailed)
-    }
-
-    @Test func theOriginalModeMakesNoCritiqueAndSendsNoTopic() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in #"{"segments":[]}"# })
-        let result = await Self.correct([Self.segment("we ned it")], topicAware: false, with: llm)
-        #expect(result.outcome == .succeeded)
-        #expect(llm.chatCalls.count == 1)
-        #expect(llm.chatCalls[0].messages.first?.content.contains("\"topic\"") == false)
-        #expect(!LLMTranscriptCorrector.systemPrompt(language: .english).contains(LLMTranscriptCorrector.topicGuidance))
     }
 
     @Test func anEmptyTranscriptIsNeverSentToTheCritic() async {
@@ -185,33 +173,5 @@ struct LLMTranscriptCorrectorTopicTests {
         let prompt = TranscriptTopicAnalyzer.userPrompt(excerpt: "hello", meetingTerms: ["Ana", "KPI"])
         #expect(prompt.contains("Ana, KPI"))
         #expect(TranscriptTopicAnalyzer.userPrompt(excerpt: "hello", meetingTerms: []).contains("(none)"))
-    }
-
-    // MARK: - Feature flag
-
-    @Test func theTogglesSelectTheEngine() {
-        #expect(CorrectionEngine.selected(enabled: false, topicAware: true) == .none)
-        #expect(CorrectionEngine.selected(enabled: true, topicAware: false) == .llm)
-        #expect(CorrectionEngine.selected(enabled: true, topicAware: true) == .llmTopicAware)
-    }
-
-    @Test func theTopicAwareEngineStillNeedsAUsableProvider() {
-        var config = PipelineConfiguration()
-        config.correction = .llmTopicAware
-        #expect(config.effectiveCorrection == .none)
-        config.correctionConsented = true
-        #expect(config.effectiveCorrection == .llmTopicAware)
-    }
-
-    @MainActor
-    @Test func theFlagIsOffByDefaultAndPersists() throws {
-        let suite = "LLMTranscriptCorrectorTopicTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-
-        let settings = AppSettings(defaults: defaults)
-        #expect(settings.correctionTopicAwareEnabled == false)
-        settings.correctionTopicAwareEnabled = true
-        #expect(AppSettings(defaults: defaults).correctionTopicAwareEnabled)
     }
 }

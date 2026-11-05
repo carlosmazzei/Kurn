@@ -66,7 +66,6 @@
 /* Correction engines */
 "correction.none" = "Off";
 "correction.llm" = "AI Correction";
-"correction.llm_topic" = "AI Correction (topic-aware)";
 
 /* Recognition pipeline engines */
 "transcription.apple_speech" = "Apple Speech";
@@ -884,10 +883,8 @@
 "settings.wiki_needs_key" = "Add an API key for your summary provider to build the meeting wiki.";
 "settings.correction_title" = "AI Correction";
 "settings.correction" = "Correct transcription errors";
-"settings.correction_footer" = "Uses your summary AI provider to fix spelling, punctuation, and misheard words on uncertain parts of the transcript after transcription. Off by default — it makes cloud calls and can take longer to finish.";
+"settings.correction_footer" = "Uses your summary AI provider after transcription. It first reviews the transcript to identify the meeting's topic and the words that don't fit it, then fixes spelling, punctuation and misheard words in uncertain or flagged passages, keeping only changes that sound like what was said. Off by default — it makes cloud calls and can take longer to finish.";
 "settings.correction_needs_key" = "Add an API key for your summary provider to enable AI correction.";
-"settings.correction_topic" = "Detect meeting topic";
-"settings.correction_topic_footer" = "Before correcting, the AI reviews the transcript, identifies the meeting's topic and points out words that don't fit it (for example, a technical term heard as common words). Those findings guide the correction. Adds one AI call per transcription.";
 "detail.wiki.view" = "View wiki";
 "detail.wiki.generate" = "Generate Wiki";
 "detail.wiki.regenerate" = "Regenerate Wiki";

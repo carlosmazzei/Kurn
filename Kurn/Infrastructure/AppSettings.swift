@@ -71,7 +71,6 @@ final class AppSettings {
         static let semanticSearchEnabled = "settings.semanticSearchEnabled"
         static let wikiEnabled = "settings.wikiEnabled"
         static let correctionEnabled = "settings.correctionEnabled"
-        static let correctionTopicAwareEnabled = "settings.correctionTopicAwareEnabled"
         static let aiTitleCloudEnabled = "settings.aiTitleCloudEnabled"
         static let templatesSyncEnabled = "settings.templatesSyncEnabled"
         static let readAloud = "settings.readAloud"
@@ -191,15 +190,6 @@ final class AppSettings {
     /// explicit opt-in. See `LLMTranscriptCorrector`.
     var correctionEnabled: Bool {
         didSet { defaults.set(correctionEnabled, forKey: Keys.correctionEnabled) }
-    }
-
-    /// Feature flag for topic-aware correction: before correcting, a critic
-    /// LLM pass infers the meeting's topic and criticizes its vocabulary, and
-    /// every correction batch carries its findings
-    /// (`CorrectionEngine.llmTopicAware`). Off by default — one more cloud call
-    /// per transcription — and only meaningful while `correctionEnabled` is on.
-    var correctionTopicAwareEnabled: Bool {
-        didSet { defaults.set(correctionTopicAwareEnabled, forKey: Keys.correctionTopicAwareEnabled) }
     }
 
     /// Whether a meeting's title is generated automatically after
@@ -363,7 +353,7 @@ final class AppSettings {
             fluidAudioASRConsented: selectedFluidAudioASRModelsConsented,
             fluidAudioDiarizationModel: fluidAudioDiarizationModel,
             fluidAudioSegmentationBatchSize: fluidAudioSegmentationBatchSize,
-            correction: CorrectionEngine.selected(enabled: correctionEnabled, topicAware: correctionTopicAwareEnabled),
+            correction: correctionEnabled ? .llm : .none,
             correctionProvider: aiProvider,
             correctionModel: correctionEnabled ? summaryModel(for: aiProvider) : "",
             correctionConsented: correctionEnabled && aiProvider.isUsable
@@ -658,7 +648,6 @@ final class AppSettings {
         // Off by default: transcription correction makes paid cloud LLM calls,
         // so it is an explicit opt-in, same as wiki generation.
         correctionEnabled = defaults.bool(forKey: Keys.correctionEnabled, default: false)
-        correctionTopicAwareEnabled = defaults.bool(forKey: Keys.correctionTopicAwareEnabled, default: false)
         aiTitleCloudEnabled = defaults.bool(forKey: Keys.aiTitleCloudEnabled, default: false)
         // Screenshot automation (fastlane `snapshot`) always forces this off so
         // the recordings lock screen never blocks an unattended UI test run;

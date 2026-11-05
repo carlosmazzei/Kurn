@@ -66,7 +66,6 @@
 /* Correction engines */
 "correction.none" = "Desativado";
 "correction.llm" = "Correção por IA";
-"correction.llm_topic" = "Correção por IA (com tema)";
 
 /* Motores do pipeline de reconhecimento */
 "transcription.apple_speech" = "Apple Speech";
@@ -884,10 +883,8 @@
 "settings.wiki_needs_key" = "Adicione uma chave de API para o seu provedor de resumo para montar a wiki das reuniões.";
 "settings.correction_title" = "Correção por IA";
 "settings.correction" = "Corrigir erros de transcrição";
-"settings.correction_footer" = "Usa seu provedor de IA de resumo para corrigir erros de ortografia, pontuação e palavras mal compreendidas nos trechos incertos da transcrição, após a transcrição. Desativado por padrão — ele faz chamadas na nuvem e pode levar mais tempo para concluir.";
+"settings.correction_footer" = "Usa seu provedor de IA de resumo após a transcrição. Primeiro revisa a transcrição para identificar o tema da reunião e as palavras que não combinam com ele; depois corrige ortografia, pontuação e palavras mal compreendidas nos trechos incertos ou apontados, mantendo só mudanças que soam como o que foi dito. Desativado por padrão — ele faz chamadas na nuvem e pode levar mais tempo para concluir.";
 "settings.correction_needs_key" = "Adicione uma chave de API para o seu provedor de resumo para ativar a correção por IA.";
-"settings.correction_topic" = "Detectar o tema da reunião";
-"settings.correction_topic_footer" = "Antes de corrigir, a IA revisa a transcrição, identifica o tema da reunião e aponta as palavras que não combinam com ele (por exemplo, um termo técnico ouvido como palavras comuns). Esses apontamentos orientam a correção. Adiciona uma chamada de IA por transcrição.";
 "detail.wiki.view" = "Visualizar wiki";
 "detail.wiki.generate" = "Gerar Wiki";
 "detail.wiki.regenerate" = "Regenerar Wiki";

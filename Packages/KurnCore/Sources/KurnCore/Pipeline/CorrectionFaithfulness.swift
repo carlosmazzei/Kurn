@@ -2,7 +2,7 @@
 //  CorrectionFaithfulness.swift
 //  KurnCore
 //
-//  The topic-aware correction mode lets a critic's inferred vocabulary steer
+//  The correction stage lets a critic's inferred vocabulary steer
 //  the corrector, which is exactly the situation in which a model starts
 //  writing what the meeting *should* have said instead of what was said.
 //  `TranscriptCorrectionGuardrail` bounds how *much* a segment may change;

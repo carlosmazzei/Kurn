@@ -104,9 +104,9 @@ public enum PipelineStageReason: String, Codable, Sendable {
     /// segments) — its result was discarded and the pre-correction segments
     /// were kept instead (H5 PR 12, `TranscriptIntegrityGate`).
     case correctionContractViolated
-    /// Topic-aware correction was requested, but the critic pass that infers
-    /// the meeting's topic and vocabulary produced nothing usable, so the
-    /// segments were corrected with the meeting's own recurring terms only.
+    /// The correction stage's critic pass, which infers the meeting's topic
+    /// and criticizes its vocabulary, produced nothing usable, so the segments
+    /// were corrected with the meeting's own recurring terms only.
     case topicAnalysisFailed
 }
 

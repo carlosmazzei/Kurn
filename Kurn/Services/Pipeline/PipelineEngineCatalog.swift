@@ -117,7 +117,6 @@ struct PipelineEngineCatalog: Sendable {
         let sherpaOnnxDiarizer = SherpaOnnxDiarizer()
         let noOpCorrector = NoOpTranscriptCorrector()
         let llmCorrector = LLMTranscriptCorrector()
-        let topicAwareCorrector = LLMTranscriptCorrector(topicAnalyzer: TranscriptTopicAnalyzer())
         return PipelineEngineCatalog(
             preprocessor: { engine in
                 switch engine {
@@ -163,7 +162,6 @@ struct PipelineEngineCatalog: Sendable {
                 switch engine {
                 case .none: return noOpCorrector
                 case .llm: return llmCorrector
-                case .llmTopicAware: return topicAwareCorrector
                 }
             },
             diarizationPreprocessor: DiarizationPreprocessor(),

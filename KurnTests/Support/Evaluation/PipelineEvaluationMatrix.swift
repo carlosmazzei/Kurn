@@ -469,33 +469,22 @@ enum PipelineEvaluationMatrix {
         }
     }
 
-    /// Which LLM correction mode the corrected variants run, decided by
-    /// `KURN_PUBLIC_EVAL_CORRECTION_ENGINE`: `topic` → `.llmTopicAware` (the
-    /// critic pass first), anything else → `.llm`.
-    static func correctionEngineFromEnvironment() -> CorrectionEngine {
-        ProcessInfo.processInfo.environment["KURN_PUBLIC_EVAL_CORRECTION_ENGINE"]?.lowercased() == "topic"
-            ? .llmTopicAware
-            : .llm
-    }
-
     /// Applies `correctionModeFromEnvironment()` to `entries`: pairs each
     /// with a corrected twin (`.pair`), replaces each with its corrected
     /// version (`.only`), or leaves `entries` unchanged (`.off`, or no
     /// provider key present). Twin/replacement labels are suffixed
-    /// `|corr=<engine>:<providerID>` (`llm` or `llmTopicAware`), mirroring the `|asr=...` suffix convention.
+    /// `|corr=llm:<providerID>`, mirroring the `|asr=...` suffix convention.
     static func withCorrectionVariants(of entries: [Entry]) -> [Entry] {
         let mode = correctionModeFromEnvironment()
         guard mode != .off, let provider = correctionProviderFromEnvironment() else { return entries }
 
-        let engine = correctionEngineFromEnvironment()
-
         func corrected(_ entry: Entry) -> Entry {
             var configuration = entry.configuration
-            configuration.correction = engine
+            configuration.correction = .llm
             configuration.correctionConsented = true
             configuration.correctionProvider = provider
             configuration.correctionModel = provider.defaultModel
-            return Entry(label: entry.label + "|corr=\(engine.rawValue):\(provider.id)", configuration: configuration)
+            return Entry(label: entry.label + "|corr=llm:\(provider.id)", configuration: configuration)
         }
 
         switch mode {

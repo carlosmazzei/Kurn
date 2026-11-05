@@ -2,7 +2,7 @@
 //  TranscriptTopicAnalyzer.swift
 //  Kurn
 //
-//  The first step of topic-aware correction (`CorrectionEngine.llmTopicAware`):
+//  The first step of transcript correction (`LLMTranscriptCorrector`):
 //  an LLM acting as a critic reads a sample of the ASR result, infers what the
 //  meeting is about, and then criticizes the transcript's vocabulary against
 //  that topic — the words that make no sense for the subject, paired with the
