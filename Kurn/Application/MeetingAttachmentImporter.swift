@@ -76,6 +76,7 @@ struct MeetingAttachmentImporter {
             } catch {
                 if report.firstFailure == nil { report.firstFailure = error }
             }
+            if Task.isCancelled { break }
         }
         return report
     }
@@ -109,6 +110,10 @@ struct MeetingAttachmentImporter {
     func importPDF(from source: URL, into meeting: Meeting) async throws(AppError) -> MeetingAttachment {
         let operationID = OperationID()
         let startedAt = Date()
+        if Task.isCancelled {
+            record(operationID, stage: "copy", outcome: .cancelled, startedAt: startedAt, code: "cancelled")
+            throw AppError.attachmentImportFailed(CancellationError().localizedDescription)
+        }
         let fileName: String
         do {
             fileName = try AttachmentFileStore.importCopy(of: source, meetingID: meeting.id)

@@ -202,7 +202,8 @@ struct MeetingAttachmentImporterTests {
         #expect(meeting.attachments.isEmpty)
     }
 
-    @Test func cancellationDuringExtractionRemovesTheCopyAndRecordsCancellation() async throws {
+    @Test(arguments: [false, true])
+    func cancellationDuringExtractionRemovesTheCopyAndRecordsCancellation(batch: Bool) async throws {
         let (meeting, context) = try makeMeeting()
         defer { cleanUp(meeting) }
         let source = try PDFFixtures.makePDF(pages: ["Agenda"])
@@ -220,6 +221,11 @@ struct MeetingAttachmentImporterTests {
             recordEvent: capture.record
         )
         let task = Task { () -> AppError? in
+            if batch {
+                let report = await importer.importPDFs(from: [source, URL(fileURLWithPath: "/missing-next-attachment.pdf")], into: meeting)
+                #expect(report.importedCount == 0)
+                return report.firstFailure
+            }
             do throws(AppError) {
                 try await importer.importPDF(from: source, into: meeting)
                 return nil
@@ -234,6 +240,22 @@ struct MeetingAttachmentImporterTests {
         #expect(meeting.attachments.isEmpty)
         #expect(try context.fetchCount(FetchDescriptor<MeetingAttachment>()) == 0)
         #expect(capture.recorded.map(\.outcome) == [.cancelled])
+        #expect(capture.recorded.first?.code == "cancelled")
+    }
+
+    @Test func aCancelledBatchDoesNotAttemptItsFirstCopy() async throws {
+        let (meeting, context) = try makeMeeting()
+        let capture = ReliabilityEventCapture()
+        let importer = MeetingAttachmentImporter(library: MeetingLibrary(context: context), recordEvent: capture.record)
+        let task = Task {
+            await importer.importPDFs(from: [URL(fileURLWithPath: "/missing-first-attachment.pdf")], into: meeting)
+        }
+        task.cancel()
+        let report = await task.value
+        #expect(report.importedCount == 0)
+        #expect(report.firstFailure != nil)
+        #expect(capture.recorded.map(\.outcome) == [.cancelled])
+        #expect(capture.recorded.first?.stage == "copy")
         #expect(capture.recorded.first?.code == "cancelled")
     }
 

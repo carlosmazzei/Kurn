@@ -22,6 +22,7 @@
 //
 
 import AVFoundation
+import Dispatch
 import Foundation
 import KurnCore
 
@@ -189,12 +190,16 @@ extension CaptureOutputFile {
             )
             return primary
         }
-        return JournaledCaptureFile(primary: primary, journal: journal) {
+        let reportingQueue = DispatchQueue.global(qos: .utility)
+        let reportFailure = DispatchWorkItem {
             recordEvent(ReliabilityEvent(
                 operationID: operationID, operation: "capture_journal", stage: "write",
                 outcome: .failed, code: "journal_write_failed"
             ))
             AppLog.recorder.atError.error("capture journal write failed; detached for the rest of this recording file=\(fileName, privacy: .public)")
+        }
+        return JournaledCaptureFile(primary: primary, journal: journal) {
+            reportingQueue.async(execute: reportFailure)
         }
     }
 }

@@ -154,15 +154,23 @@ struct CaptureJournalTests {
         #expect(!event.logLine.contains("/private"))
     }
 
-    @Test func aFailedJournalWriteRecordsDegradationOnlyOnce() throws {
+    @Test func aFailedJournalWriteRecordsDegradationOnlyOnceOffTheCapturePath() async throws {
         let capture = ReliabilityEventCapture()
+        let gate = BlockingWorkGate()
+        defer { gate.resume() }
+        let completion = AsyncStream<Void>.makeStream()
         let primary = RecordingWriter()
         let journal = RecordingWriter()
         let file = try CaptureOutputFile.openJournaled(
             at: URL(fileURLWithPath: "/private/recording.m4a"), bitRate: 48_000,
             make: { url, _ in url.pathExtension == "aac" ? journal : primary },
             journalDirectory: { URL(fileURLWithPath: "/private") },
-            recordEvent: capture.record
+            recordEvent: { event in
+                #expect(!Thread.isMainThread)
+                gate.block()
+                capture.record(event)
+                completion.continuation.yield(())
+            }
         )
         try file.write(from: Self.buffer())
         #expect(capture.recorded.isEmpty)
@@ -171,6 +179,10 @@ struct CaptureJournalTests {
         try file.write(from: Self.buffer())
         #expect(primary.writes == 3)
         #expect(journal.writes == 1)
+        await gate.waitUntilStarted()
+        #expect(capture.recorded.isEmpty)
+        gate.resume()
+        for await _ in completion.stream { break }
         #expect(capture.recorded.count == 1)
         let event = try #require(capture.recorded.first)
         #expect(event.operation == "capture_journal")
