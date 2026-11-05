@@ -883,7 +883,7 @@
 "settings.wiki_needs_key" = "请为你的摘要提供方添加 API 密钥以构建会议维基。";
 "settings.correction_title" = "AI 校正";
 "settings.correction" = "校正转录错误";
-"settings.correction_footer" = "转录完成后，使用你的摘要 AI 提供方修正转录中不确定部分的拼写、标点和听错的词语。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
+"settings.correction_footer" = "转录完成后使用你的摘要 AI 提供方。它会先审阅转录内容，识别会议主题以及与主题不符的词语，再修正不确定或被指出部分的拼写、标点和听错的词语，只保留听起来与原话一致的修改。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
 "settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
 "detail.wiki.view" = "查看维基";
 "detail.wiki.generate" = "生成维基";

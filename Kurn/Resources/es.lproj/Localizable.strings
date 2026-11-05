@@ -883,7 +883,7 @@
 "settings.wiki_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para crear la wiki de reuniones.";
 "settings.correction_title" = "Corrección con IA";
 "settings.correction" = "Corregir errores de transcripción";
-"settings.correction_footer" = "Usa tu proveedor de IA de resúmenes para corregir errores de ortografía, puntuación y palabras mal entendidas en las partes inciertas de la transcripción, después de transcribir. Desactivado de forma predeterminada: realiza llamadas en la nube y puede tardar más en finalizar.";
+"settings.correction_footer" = "Usa tu proveedor de IA de resúmenes después de transcribir. Primero revisa la transcripción para identificar el tema de la reunión y las palabras que no encajan con él; luego corrige ortografía, puntuación y palabras mal entendidas en los pasajes inciertos o señalados, conservando solo los cambios que suenan como lo que se dijo. Desactivado de forma predeterminada: realiza llamadas en la nube y puede tardar más en finalizar.";
 "settings.correction_needs_key" = "Añade una clave de API para tu proveedor de resúmenes para activar la corrección con IA.";
 "detail.wiki.view" = "Ver wiki";
 "detail.wiki.generate" = "Generar Wiki";

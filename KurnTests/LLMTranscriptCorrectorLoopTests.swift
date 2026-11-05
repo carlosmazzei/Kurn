@@ -3,7 +3,7 @@
 //  KurnTests
 //
 //  `LLMTranscriptCorrector.correct` end to end over a scripted provider: the
-//  eligible segments are batched, each reply is applied by id, progress
+//  critic runs first, the eligible segments are batched, each reply is applied by id, progress
 //  reaches the end, and every way the stage can come up short — nothing to
 //  send, no provider, a failed or unparseable batch — is reported as its own
 //  outcome rather than as a clean pass.
@@ -49,29 +49,46 @@ struct LLMTranscriptCorrectorLoopTests {
         )
     }
 
-    @Test func eligibleSegmentsAreCorrectedByIdAndConfidentOnesAreNotSent() async {
+    /// The critic's reply when a test is about the batches, not the critique:
+    /// a profile with a topic and nothing flagged.
+    static let plainCritique = #"{"topic":"Shipping a feature","domain":"software"}"#
+
+    private static func isCritique(_ call: ScriptedLLMProvider.ChatCall) -> Bool {
+        call.systemPrompt == TranscriptTopicAnalyzer.systemPrompt(language: .english)
+    }
+
+    @Test func eligibleSegmentsAreCorrectedByIdAndConfidentOnesAreNotSent() async throws {
         let uncertain = Self.segment("we ned to ship this fetur", confidence: 0.3)
         let confident = Self.segment("already right", confidence: 0.99, at: 2)
         let reply = Self.reply([(uncertain.id, "we need to ship this feature")])
-        let llm = ScriptedLLMProvider(chat: { _, _ in reply })
+        let llm = ScriptedLLMProvider(chat: { call, _ in Self.isCritique(call) ? Self.plainCritique : reply })
         let progress = ProgressLog()
 
         let result = await Self.correct([uncertain, confident], with: llm, progress: progress)
 
         #expect(result.outcome == .succeeded)
         #expect(result.segments.map(\.text) == ["we need to ship this feature", "already right"])
-        #expect(llm.chatCalls.count == 1)
-        let sent = llm.chatCalls.first?.messages.first?.content ?? ""
+        try #require(llm.chatCalls.count == 2)
+        #expect(Self.isCritique(llm.chatCalls[0]))
+        let sent = llm.chatCalls[1].messages.first?.content ?? ""
         #expect(sent.contains(uncertain.id.uuidString))
         #expect(!sent.contains(confident.id.uuidString))
-        #expect(llm.chatCalls.first?.systemPrompt == LLMTranscriptCorrector.systemPrompt(language: .english))
+        #expect(llm.chatCalls[1].systemPrompt == LLMTranscriptCorrector.systemPrompt(language: .english, topicAware: true))
         #expect(progress.all.last == 1)
     }
 
-    @Test func nothingEligibleIsSkippedWithoutResolvingAProvider() async {
-        let result = await Self.correct([Self.segment("confident", confidence: 0.99), Self.segment("  ")], with: nil)
+    @Test func noTextIsSkippedWithoutResolvingAProvider() async {
+        let result = await Self.correct([Self.segment("  ")], with: nil)
         #expect(result.outcome == .skipped)
         #expect(result.reason == .noInput)
+    }
+
+    @Test func aConfidentTranscriptIsStillCritiquedAndSkippedWhenNothingIsFlagged() async {
+        let llm = ScriptedLLMProvider(chat: { _, _ in Self.plainCritique })
+        let result = await Self.correct([Self.segment("confident", confidence: 0.99)], with: llm)
+        #expect(result.outcome == .skipped)
+        #expect(result.reason == .noInput)
+        #expect(llm.chatCalls.count == 1)
     }
 
     @Test func noUsableProviderDegradesAndKeepsTheText() async {
@@ -100,15 +117,16 @@ struct LLMTranscriptCorrectorLoopTests {
         let segments = (0..<(LLMTranscriptCorrector.maxSegmentsPerBatch + 1)).map {
             Self.segment("segment \($0)", at: TimeInterval($0) * 2)
         }
-        let llm = ScriptedLLMProvider(chat: { _, index in
-            if index == 0 { throw ProviderDown() }
+        let llm = ScriptedLLMProvider(chat: { call, index in
+            if Self.isCritique(call) { return Self.plainCritique }
+            if index == 1 { throw ProviderDown() }
             return #"{"segments":[]}"#
         })
         let progress = ProgressLog()
 
         let result = await Self.correct(segments, with: llm, progress: progress)
 
-        #expect(llm.chatCalls.count == 2)
+        #expect(llm.chatCalls.count == 3)
         #expect(result.outcome == .degraded)
         #expect(result.reason == .engineFailed)
         #expect(result.segments.count == segments.count)

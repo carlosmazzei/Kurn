@@ -883,7 +883,7 @@
 "settings.wiki_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um das Meeting-Wiki zu erstellen.";
 "settings.correction_title" = "KI-Korrektur";
 "settings.correction" = "Transkriptionsfehler korrigieren";
-"settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter, um Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren Teilen des Transkripts nach der Transkription zu korrigieren. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
+"settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter nach der Transkription. Zuerst prüft er das Transkript, um das Thema des Meetings und unpassende Wörter zu erkennen; dann korrigiert er Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren oder markierten Passagen und behält nur Änderungen, die wie das Gesagte klingen. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
 "settings.correction_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um die KI-Korrektur zu aktivieren.";
 "detail.wiki.view" = "Wiki anzeigen";
 "detail.wiki.generate" = "Wiki Erstellen";

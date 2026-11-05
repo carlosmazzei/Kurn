@@ -104,6 +104,10 @@ public enum PipelineStageReason: String, Codable, Sendable {
     /// segments) — its result was discarded and the pre-correction segments
     /// were kept instead (H5 PR 12, `TranscriptIntegrityGate`).
     case correctionContractViolated
+    /// The correction stage's critic pass, which infers the meeting's topic
+    /// and criticizes its vocabulary, produced nothing usable, so the segments
+    /// were corrected with the meeting's own recurring terms only.
+    case topicAnalysisFailed
 }
 
 /// The outcome of one stage, including which engine was asked for versus which

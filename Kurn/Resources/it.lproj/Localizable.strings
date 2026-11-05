@@ -883,7 +883,7 @@
 "settings.wiki_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per creare la wiki delle riunioni.";
 "settings.correction_title" = "Correzione IA";
 "settings.correction" = "Correggi errori di trascrizione";
-"settings.correction_footer" = "Utilizza il tuo provider IA dei riassunti per correggere ortografia, punteggiatura e parole fraintese nelle parti incerte della trascrizione, dopo la trascrizione. Disattivata per impostazione predefinita: effettua chiamate al cloud e può richiedere più tempo per completarsi.";
+"settings.correction_footer" = "Utilizza il tuo provider IA dei riassunti dopo la trascrizione. Prima rilegge la trascrizione per individuare l'argomento della riunione e le parole che non vi si adattano, poi corregge ortografia, punteggiatura e parole fraintese nei passaggi incerti o segnalati, mantenendo solo le modifiche che suonano come ciò che è stato detto. Disattivata per impostazione predefinita: effettua chiamate al cloud e può richiedere più tempo per completarsi.";
 "settings.correction_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per attivare la correzione IA.";
 "detail.wiki.view" = "Visualizza wiki";
 "detail.wiki.generate" = "Genera Wiki";
