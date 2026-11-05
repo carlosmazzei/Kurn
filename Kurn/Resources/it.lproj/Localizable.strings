@@ -66,6 +66,7 @@
 /* Correction engines */
 "correction.none" = "Disattivata";
 "correction.llm" = "Correzione IA";
+"correction.llm_topic" = "Correzione IA (in base all'argomento)";
 
 /* Motori della pipeline di riconoscimento */
 "transcription.apple_speech" = "Apple Speech";
@@ -885,6 +886,8 @@
 "settings.correction" = "Correggi errori di trascrizione";
 "settings.correction_footer" = "Utilizza il tuo provider IA dei riassunti per correggere ortografia, punteggiatura e parole fraintese nelle parti incerte della trascrizione, dopo la trascrizione. Disattivata per impostazione predefinita: effettua chiamate al cloud e può richiedere più tempo per completarsi.";
 "settings.correction_needs_key" = "Aggiungi una chiave API per il tuo provider dei riassunti per attivare la correzione IA.";
+"settings.correction_topic" = "Rileva l'argomento della riunione";
+"settings.correction_topic_footer" = "Prima di correggere, l'IA rilegge la trascrizione, individua l'argomento della riunione e segnala le parole che non vi si adattano (ad esempio un termine tecnico sentito come parole comuni). Queste osservazioni guidano la correzione. Aggiunge una chiamata IA per trascrizione.";
 "detail.wiki.view" = "Visualizza wiki";
 "detail.wiki.generate" = "Genera Wiki";
 "detail.wiki.regenerate" = "Rigenera Wiki";

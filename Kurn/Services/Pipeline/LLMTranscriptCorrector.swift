@@ -31,8 +31,18 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     /// How the correction provider is built; tests pass a scripted one so the
     /// batch loop runs with no Keychain or network.
     private let resolveProvider: ProviderFactory.LLMResolver
+    /// When set, the topic-aware mode (`CorrectionEngine.llmTopicAware`): a
+    /// critic pass infers the meeting's topic and criticizes its vocabulary
+    /// before any batch is corrected, and every batch carries its findings.
+    /// `nil` is the original mode, guided only by the meeting's own recurring
+    /// terms.
+    private let topicAnalyzer: TranscriptTopicAnalyzer?
 
-    init(resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM) {
+    init(
+        topicAnalyzer: TranscriptTopicAnalyzer? = nil,
+        resolveProvider: @escaping ProviderFactory.LLMResolver = ProviderFactory.liveLLM
+    ) {
+        self.topicAnalyzer = topicAnalyzer
         self.resolveProvider = resolveProvider
     }
 
@@ -46,28 +56,41 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     static let lowConfidenceThreshold: Float = 0.85
 
     private struct CorrectionRequestJSON: Encodable {
-        struct Item: Encodable { let id: String; let text: String }
+        struct Item: Encodable {
+            let id: String
+            let text: String
+            /// Topic-aware mode only (nil fields are omitted from the JSON):
+            /// the ASR's own confidence, so the model can tell a marginal
+            /// decode from a confident one, and the neighbouring segments'
+            /// text, read-only, so a word is judged by what was said around it.
+            var confidence: Double?
+            var before: String?
+            var after: String?
+        }
         /// Vocabulary hint built from this same meeting — see
         /// `MeetingVocabularyExtractor`. Sent once per request, not counted
         /// against `maxBatchChars` (a small fixed list, not per-segment
         /// content).
         let vocabulary: [String]
+        /// Present only in the topic-aware mode; omitted from the JSON
+        /// otherwise, so the original mode's request is unchanged.
+        let topic: TopicJSON?
         let segments: [Item]
     }
 
-    private struct CorrectionResponseJSON: Decodable {
-        struct Item: Decodable { let id: String; let text: String }
-        let segments: [Item]
-    }
 
     /// Whether `segment` is worth sending for correction: non-empty text, and
     /// either no confidence signal (Apple Speech, FluidAudio Parakeet — no
     /// per-token probability to read, so "can't rule it out" rather than
     /// "assume it's fine") or a Whisper confidence below the threshold.
     static func isEligible(_ segment: TranscriptSegment) -> Bool {
-        guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard hasText(segment) else { return false }
         guard let confidence = segment.confidence else { return true }
         return confidence < lowConfidenceThreshold
+    }
+
+    static func hasText(_ segment: TranscriptSegment) -> Bool {
+        !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Greedily packs whole segments into batches bounded by both a character
@@ -125,11 +148,24 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     /// segment, all leave that segment's original text untouched. This is
     /// what makes "can't drop, merge, or reorder a segment" a structural
     /// guarantee rather than a prompt instruction.
-    static func apply(corrections: [UUID: String], to segments: [TranscriptSegment]) -> [TranscriptSegment] {
+    ///
+    /// `faithfulTo`, when given (the topic-aware mode), additionally requires
+    /// every word a correction introduces to be connected to what was said or
+    /// to those grounded terms — see `CorrectionFaithfulness`.
+    static func apply(
+        corrections: [UUID: String],
+        to segments: [TranscriptSegment],
+        faithfulTo allowedTerms: [String]? = nil
+    ) -> [TranscriptSegment] {
         var result = segments
         for index in segments.indices {
+            let original = segments[index].text
             guard let corrected = corrections[segments[index].id],
-                  TranscriptCorrectionGuardrail.accepts(original: segments[index].text, corrected: corrected) else {
+                  TranscriptCorrectionGuardrail.accepts(original: original, corrected: corrected) else {
+                continue
+            }
+            if let allowedTerms,
+               !CorrectionFaithfulness.accepts(original: original, corrected: corrected, allowedTerms: allowedTerms) {
                 continue
             }
             result[index].text = corrected
@@ -144,12 +180,16 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         model: String,
         onProgress: @escaping @Sendable (Double) -> Void
     ) async -> TranscriptCorrectionResult {
-        let candidates = segments.filter(Self.isEligible)
-        guard !candidates.isEmpty else {
+        let lowConfidence = segments.filter(Self.isEligible)
+        // The topic-aware mode can also send a confident segment the critic
+        // flags, so it only needs some text to read; the original mode needs
+        // a low-confidence segment.
+        let hasWork = topicAnalyzer == nil ? !lowConfidence.isEmpty : segments.contains(where: Self.hasText)
+        guard hasWork else {
             return TranscriptCorrectionResult(segments: segments, outcome: .skipped, reason: .noInput)
         }
 
-        let vocabulary = MeetingVocabularyExtractor.extract(from: segments)
+        let meetingTerms = MeetingVocabularyExtractor.extract(from: segments)
 
         let llm: LLMProvider
         do {
@@ -163,6 +203,22 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
             )
         }
 
+        // The critic reads the whole transcript, confident segments included —
+        // they are the best evidence of what the meeting is about.
+        let profile = await topicAnalyzer?.analyze(
+            segments: segments, meetingTerms: meetingTerms, language: language, llm: llm
+        )
+        let vocabulary = CorrectionVocabulary.merge(meetingTerms: meetingTerms, profile: profile)
+        let critiqueFailed = topicAnalyzer != nil && profile == nil
+        let candidates = profile.map { Self.candidates(in: segments, flaggedBy: $0) } ?? lowConfidence
+        guard !candidates.isEmpty else {
+            return critiqueFailed
+                ? TranscriptCorrectionResult(segments: segments, outcome: .degraded, reason: .topicAnalysisFailed)
+                : TranscriptCorrectionResult(segments: segments, outcome: .skipped, reason: .noInput)
+        }
+        let context = profile == nil ? [:] : Self.neighbourContext(of: segments)
+        let allowedTerms = profile.map { Self.allowedTerms(vocabulary: vocabulary, profile: $0) }
+
         var result = segments
         var done = 0
         // A batch that failed still leaves the original text in place, which is
@@ -173,9 +229,11 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         for batch in Self.batches(candidates, maxChars: Self.maxBatchChars, maxCount: Self.maxSegmentsPerBatch) {
             guard !Task.isCancelled else { break }
             batchCount += 1
-            let outcome = await requestBatch(for: batch, vocabulary: vocabulary, language: language, llm: llm)
+            let outcome = await requestBatch(
+                for: batch, vocabulary: vocabulary, profile: profile, context: context, language: language, llm: llm
+            )
             if outcome.failed { failedBatches += 1 }
-            result = Self.apply(corrections: outcome.corrections, to: result)
+            result = Self.apply(corrections: outcome.corrections, to: result, faithfulTo: allowedTerms)
             done += batch.count
             onProgress(Double(done) / Double(candidates.count))
         }
@@ -186,6 +244,11 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         }
         if failedBatches > 0 {
             return TranscriptCorrectionResult(segments: result, outcome: .degraded, reason: .engineFailed)
+        }
+        // Corrected with the meeting's own vocabulary only: useful, but not
+        // the topic-aware pass that was asked for (H-I4).
+        if critiqueFailed && !Task.isCancelled {
+            return TranscriptCorrectionResult(segments: result, outcome: .degraded, reason: .topicAnalysisFailed)
         }
         return TranscriptCorrectionResult(segments: result)
     }
@@ -212,12 +275,24 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
     func requestBatch(
         for batch: [TranscriptSegment],
         vocabulary: [String],
+        profile: MeetingTopicProfile? = nil,
+        context: [UUID: NeighbourContext] = [:],
         language: MeetingLanguage,
         llm: LLMProvider
     ) async -> BatchOutcome {
+        let topicAware = profile != nil
         let payload = CorrectionRequestJSON(
             vocabulary: vocabulary,
-            segments: batch.map { .init(id: $0.id.uuidString, text: $0.text) }
+            topic: profile.map(TopicJSON.init),
+            segments: batch.map { segment in
+                CorrectionRequestJSON.Item(
+                    id: segment.id.uuidString,
+                    text: segment.text,
+                    confidence: topicAware ? segment.confidence.map(Self.roundedConfidence) : nil,
+                    before: context[segment.id]?.before,
+                    after: context[segment.id]?.after
+                )
+            }
         )
         guard let bodyData = try? JSONEncoder().encode(payload),
               let bodyText = String(data: bodyData, encoding: .utf8) else {
@@ -225,7 +300,7 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         }
         do {
             let reply = try await llm.chat(
-                systemPrompt: Self.systemPrompt(language: language),
+                systemPrompt: Self.systemPrompt(language: language, topicAware: topicAware),
                 messages: [ChatMessage(role: .user, content: "Segments JSON:\n\(bodyText)")],
                 options: .document
             )
@@ -240,7 +315,11 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         }
     }
 
-    static func systemPrompt(language: MeetingLanguage) -> String {
+    static func systemPrompt(language: MeetingLanguage, topicAware: Bool = false) -> String {
+        topicAware ? basePrompt(language: language) + "\n\n" + topicGuidance : basePrompt(language: language)
+    }
+
+    private static func basePrompt(language: MeetingLanguage) -> String {
         """
         You are a meticulous transcription proofreader correcting automatic speech \
         recognition (ASR) output. You will receive a JSON object with a "vocabulary" \

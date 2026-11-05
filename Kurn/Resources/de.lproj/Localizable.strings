@@ -66,6 +66,7 @@
 /* Correction engines */
 "correction.none" = "Aus";
 "correction.llm" = "KI-Korrektur";
+"correction.llm_topic" = "KI-Korrektur (themenbezogen)";
 
 /* Engines der Erkennungspipeline */
 "transcription.apple_speech" = "Apple Speech";
@@ -885,6 +886,8 @@
 "settings.correction" = "Transkriptionsfehler korrigieren";
 "settings.correction_footer" = "Nutzt deinen Zusammenfassungs-KI-Anbieter, um Rechtschreibung, Zeichensetzung und falsch verstandene Wörter in unsicheren Teilen des Transkripts nach der Transkription zu korrigieren. Standardmäßig deaktiviert — es werden Cloud-Aufrufe getätigt und der Vorgang kann länger dauern.";
 "settings.correction_needs_key" = "Füge einen API-Schlüssel für deinen Zusammenfassungs-Anbieter hinzu, um die KI-Korrektur zu aktivieren.";
+"settings.correction_topic" = "Thema des Meetings erkennen";
+"settings.correction_topic_footer" = "Vor der Korrektur prüft die KI das Transkript, erkennt das Thema des Meetings und markiert Wörter, die nicht dazu passen (zum Beispiel einen Fachbegriff, der als Alltagswörter verstanden wurde). Diese Hinweise steuern die Korrektur. Fügt pro Transkription einen KI-Aufruf hinzu.";
 "detail.wiki.view" = "Wiki anzeigen";
 "detail.wiki.generate" = "Wiki Erstellen";
 "detail.wiki.regenerate" = "Wiki Neu Erstellen";

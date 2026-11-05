@@ -872,7 +872,7 @@ stage (enums in `Models/PipelineEngines.swift`; `TranscriptionEngine` in KurnCor
 | Language detection | `languageDetectionEngine` | `.byTranscriber` (no-op, defers to the transcriber)                                                                                                                              | `.fluidAudioLID` (`Pipeline/LanguageDetectors.swift`'s `FluidAudioLanguageDetector`, transcribes a 60s prefix with FluidAudio Parakeet and classifies it with `NLLanguageRecognizer`)                    |
 | Diarization        | `diarizationEngine`       | **`.fluidAudio`** (`FluidAudioDiarizationRouter`; default `.pyannote` uses `FluidAudioDiarizer` / `OfflineDiarizerManager`) — the one stage whose default *does* need a download; see "Choosing the diarizer" below | `.heuristic` (`SpeakerDiarizer`, pitch/timbre clustering) or `.transcriptionProviderNative` (speaker turns from the `.whisperAPI` provider's own response, e.g. ElevenLabs Scribe) are the no-download alternatives; `.sherpaOnnx` downloads its own model pair (`SherpaOnnxModelDownloader`, gated by `sherpaOnnxModelsConsented`) |
 | Transcription      | `transcriptionEngine`     | `.appleSpeech` (`OnDeviceTranscriber`, fixed device locale)                                                                                                                      | `.fluidAudioParakeet` (the stored engine ID for all six FluidAudio ASR choices; default Parakeet v3), `.whisperCpp` (`Pipeline/WhisperCppTranscriber.swift`, Whisper on device via whisper.cpp) or `.whisperAPI` (cloud, any provider whose `AIProvider.supportsTranscription` is true — OpenAI's `whisper-1`/`gpt-4o-transcribe`/`gpt-4o-mini-transcribe`, Groq, ElevenLabs Scribe, or a custom OpenAI-compatible endpoint) |
-| Correction         | `correctionEnabled`       | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work)                                                                                       | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below)                                                          |
+| Correction         | `correctionEnabled` (+ `correctionTopicAwareEnabled`) | `.none` (`NoOpTranscriptCorrector` — returns the input with no allocation or network work)                                                                                       | `.llm` (`Pipeline/LLMTranscriptCorrector.swift`, cloud LLM pass over the fused segments; off by default, see "LLM transcript correction" below) or `.llmTopicAware` (the same pass preceded by a topic/vocabulary critique, `Pipeline/TranscriptTopicAnalyzer.swift`)                                                          |
 
 **FluidAudio has a model axis, not new engine IDs.** The KurnCore catalogs
 `FluidAudioASRModel`, `FluidAudioLiveModel`, `FluidAudioDiarizationModel`, and
@@ -998,6 +998,44 @@ transcript.
   request and deliberately not counted against `maxBatchChars`. Note the
   premise and its limit: this can only fix a term the ASR got right *somewhere*,
   so it does nothing for a name mis-heard consistently throughout.
+- **Topic-aware mode** (`CorrectionEngine.llmTopicAware`, feature flag
+  `AppSettings.correctionTopicAwareEnabled`, off by default and meaningful
+  only while `correctionEnabled` is on; `CorrectionEngine.selected` maps the
+  two toggles) closes that gap. Before any batch, `TranscriptTopicAnalyzer`
+  makes one LLM call acting as a **critic**: it reads a sample of the ASR
+  result (KurnCore's `TopicAnalysisExcerpt` — whole segments from the start,
+  middle and end, ≤ 8,000 characters, so cost does not scale with length),
+  infers the topic and domain, and criticizes the vocabulary against them —
+  domain `key_terms` spelled correctly, and `likely_mishearings`
+  (`heard` → `intended`) for words that make no sense for the subject.
+  KurnCore's `MeetingTopicProfile` bounds the reply (over-long strings dropped,
+  not cut; lists deduplicated and capped) and **grounds** it: a finding whose
+  `heard` form does not occur in the transcript is discarded as invented.
+  `CorrectionVocabulary.merge` puts the meeting's own recurring terms ahead of
+  the inferred ones, and every batch carries the profile as a `topic` object
+  with `topicGuidance` appended to the prompt, which tells the model the
+  findings are a reviewer's hypotheses to apply only where a segment sounds
+  like them. Confidence and the critique are combined, not chosen between:
+  the mode sends every low/unknown-confidence segment **and** any confident
+  one containing a flagged form (`candidates(in:flaggedBy:)`, in
+  `LLMTranscriptCorrector+Topic.swift`) — a confident decode of the wrong word
+  is what confidence alone cannot catch — each with its rounded confidence and
+  ≤ 160 characters of the neighbouring segments' text (`before`/`after`,
+  read-only), so a word is judged in the conversation it was said in.
+  Faithfulness is then enforced in code, not left to the prompt: on top of the
+  unchanged magnitude guardrail and id-based application,
+  KurnCore's `CorrectionFaithfulness` accepts a correction only if every word
+  it introduces is a respelling of a word the ASR wrote (normalized edit
+  distance ≤ 0.45, near-exact for words of ≤ 3 letters), of two adjacent
+  words joined ("cuber netes" → "Kubernetes"), part of a word split apart, or
+  one of the grounded terms. "by Friday" appended to a sentence is rejected
+  even when the guardrail's 35% budget would allow it. The original `.llm`
+  mode does not run this check, so its behaviour is unchanged. A
+  failed critique still corrects with the meeting's own vocabulary and reports
+  the stage `.degraded` / `.topicAnalysisFailed`; failing batches outrank it.
+  The pipeline-eval workflow's `correction_engine: topic` measures it against
+  `llm` (labels `|corr=llmTopicAware:<provider>`); no accuracy claim is made
+  for it until such a run is recorded in `docs/pipeline-evaluation.md`.
 - **`TranscriptCorrectionGuardrail`** bounds how far a proposed correction may
   drift before it is rejected: `maxWordChangeRatio` 0.35, `maxLengthRatio` 1.5,
   `minLengthRatio` 0.6 — a plausible spelling fix, not a paraphrase, invention,

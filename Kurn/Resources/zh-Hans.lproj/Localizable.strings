@@ -66,6 +66,7 @@
 /* Correction engines */
 "correction.none" = "关闭";
 "correction.llm" = "AI 校正";
+"correction.llm_topic" = "AI 校正（按主题）";
 
 /* 识别流水线引擎 */
 "transcription.apple_speech" = "Apple Speech";
@@ -885,6 +886,8 @@
 "settings.correction" = "校正转录错误";
 "settings.correction_footer" = "转录完成后，使用你的摘要 AI 提供方修正转录中不确定部分的拼写、标点和听错的词语。默认关闭——它会发起云端调用，且可能需要更长时间完成。";
 "settings.correction_needs_key" = "请为你的摘要提供方添加 API 密钥以启用 AI 校正。";
+"settings.correction_topic" = "识别会议主题";
+"settings.correction_topic_footer" = "校正前，AI 会审阅转写内容，识别会议主题，并指出与主题不符的词语（例如被听成普通词语的专业术语）。这些发现会指导校正。每次转写会多进行一次 AI 调用。";
 "detail.wiki.view" = "查看维基";
 "detail.wiki.generate" = "生成维基";
 "detail.wiki.regenerate" = "重新生成维基";

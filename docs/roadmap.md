@@ -54,6 +54,12 @@ that matter most in a meeting: a participant's name, a product name, an
 internal acronym — mis-heard consistently, in all fourteen occurrences, with
 nothing correct to copy from.
 
+The topic-aware correction mode (`CorrectionEngine.llmTopicAware`) now covers
+the part of this that inference can: a critic pass names domain terms the ASR
+garbled every time, grounded in the transcript. It cannot know a name that
+nothing in the meeting implies, and it acts only after ASR — so a
+user-maintained list remains the way to reach both, and to feed the decoder.
+
 **Two application points, with uneven engine support.**
 
 - *Before ASR, as a decoding hint.* whisper.cpp accepts `initial_prompt` in
@@ -252,6 +258,21 @@ Connect or a decision the repository cannot make:
 
 Gaps each shipped track recorded about itself. None blocks feature work; each
 is listed so it is not rediscovered.
+
+### Topic-aware correction
+
+- Not yet measured. Dispatch `pipeline-eval.yml` with `correction: only`,
+  `correction_engine: topic` and again with `llm` on the same corpus, record
+  both in `docs/pipeline-evaluation.md`, and only then describe an effect on
+  WER (insertions are the number to watch: the faithfulness check exists to
+  keep them flat).
+- `CorrectionFaithfulness` uses spelling closeness as its only proxy for
+  "sounds like"; a homophone spelled very differently ("sequel" → "SQL") is
+  accepted only through the grounded vocabulary. A per-language phonetic key
+  would widen what it can verify.
+- The critic sees a ≤ 8,000-character sample, not the whole meeting; a term
+  that occurs only outside the sampled windows is found only by the batch
+  that contains it.
 
 ### On-device LLM (`FoundationModelsProvider`)
 

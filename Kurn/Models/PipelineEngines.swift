@@ -65,12 +65,27 @@ enum DiarizationEngine: String, Codable, Sendable, CaseIterable, Identifiable {
 }
 
 /// Opt-in LLM post-processing that corrects transcription errors (spelling,
-/// punctuation, homophones, obvious ASR mistakes) after fusion. Cloud-only —
-/// there is no on-device model for this stage, so unlike the other stage
-/// enums it has no `requiredModelSet`.
+/// punctuation, homophones, obvious ASR mistakes) after fusion. It needs no
+/// model download, so unlike the other stage enums it has no
+/// `requiredModelSet`. Never persisted: `AppSettings` derives it from two
+/// toggles (`selected(enabled:topicAware:)`); its `rawValue` is recorded in
+/// the transcript's `PipelineReport`.
 enum CorrectionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
     case none
+    /// Batches guided by the meeting's own recurring terms
+    /// (`MeetingVocabularyExtractor`).
     case llm
+    /// As `.llm`, preceded by a critic pass (`TranscriptTopicAnalyzer`) that
+    /// infers the meeting's topic and criticizes its vocabulary; every batch
+    /// carries its findings.
+    case llmTopicAware
+
+    /// The engine the Settings toggles select. Topic awareness is a refinement
+    /// of correction, so it means nothing while correction itself is off.
+    static func selected(enabled: Bool, topicAware: Bool) -> CorrectionEngine {
+        guard enabled else { return .none }
+        return topicAware ? .llmTopicAware : .llm
+    }
 
     var id: String { rawValue }
 
@@ -78,6 +93,7 @@ enum CorrectionEngine: String, Codable, Sendable, CaseIterable, Identifiable {
         switch self {
         case .none: return NSLocalizedString("correction.none", comment: "No correction")
         case .llm: return NSLocalizedString("correction.llm", comment: "AI correction")
+        case .llmTopicAware: return NSLocalizedString("correction.llm_topic", comment: "Topic-aware AI correction")
         }
     }
 }
