@@ -76,6 +76,10 @@ struct LLMTranscriptCorrector: TranscriptCorrecting {
         let segments: [Item]
     }
 
+    private struct CorrectionResponseJSON: Decodable {
+        struct Item: Decodable { let id: String; let text: String }
+        let segments: [Item]
+    }
 
     /// Whether `segment` is worth sending for correction: non-empty text, and
     /// either no confidence signal (Apple Speech, FluidAudio Parakeet — no
