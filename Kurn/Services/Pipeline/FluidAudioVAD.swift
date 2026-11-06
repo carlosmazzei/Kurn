@@ -23,17 +23,8 @@ actor FluidAudioVAD: VoiceActivityDetecting {
 
     /// Lazily loaded and reused across recordings — model load is expensive.
     private var manager: VadManager?
-    /// Processing budget — reported, not enforced (H8 PR 18). FluidAudio's
-    /// `VadManager` checks no cancellation anywhere in its per-chunk loop and
-    /// its CoreML call is synchronous, so there is no engine hook to abort
-    /// an in-flight call. This used to be raced against `segment(url:)` in a
-    /// `TaskGroup` and called a "timeout" — but a `TaskGroup` cannot return
-    /// until every child task finishes, cancelled or not, so that race never
-    /// actually bounded wall-clock time: it blocked for `segment`'s full
-    /// real duration and then discarded a valid, just-slow result for a
-    /// fabricated timeout error. Calling `segment` directly has identical
-    /// real-world latency but keeps the result and reports slowness
-    /// truthfully instead of pretending to have aborted anything.
+    /// Reported, not enforced: cancellation is checked between chunks, but
+    /// FluidAudio exposes no abort hook for an in-flight CoreML call.
     private let budget: TimeInterval = 120
 
     func detectSpeech(url: URL) async -> [SpeechRegion] {
@@ -63,10 +54,18 @@ actor FluidAudioVAD: VoiceActivityDetecting {
     /// Isolated so the non-`Sendable` `VadManager` never crosses out of the actor.
     private func segment(url: URL) async throws -> [SpeechRegion] {
         let manager = try await loadedManager()
-        let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: Double(VadManager.sampleRate))
-        guard !samples.isEmpty else { return [AudioFileDuration.wholeClipRegion(for: url)] }
-
-        let segments = try await manager.segmentSpeech(samples)
+        var state = await manager.makeStreamState()
+        let analysis = try await VADProbabilityReader.read(url: url, sampleRate: Double(VadManager.sampleRate)) { samples in
+            let result = try await manager.processStreamingChunk(samples, state: state)
+            state = result.state
+            return result.probability
+        }
+        let unusedState = VadState.initial()
+        // Offline segmentation consumes only probabilities, not streaming events.
+        let results = analysis.probabilities.map {
+            VadResult(probability: $0, isVoiceActive: false, processingTime: 0, outputState: unusedState)
+        }
+        let segments = await manager.segmentSpeech(from: results, totalSamples: analysis.sampleCount)
         AppLog.transcription.atInfo.info("FluidAudioVAD: segments=\(segments.count, privacy: .public)")
         // No detected speech → the whole clip as one region rather than
         // nothing, so downstream consumers stay well-defined.

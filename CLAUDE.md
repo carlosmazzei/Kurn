@@ -644,9 +644,20 @@ shared offline manual-rendering loop behind `AudioPreprocessor`,
 `DiarizationPreprocessor` and the compactor. Reading the app's own AAC files
 **must** go through an `AVAudioEngine` player-node render — `AVAudioFile.read`
 and `AVAudioConverter` both fail on them with a generic "erro 0" on device.
-`VADAudioLoader.monoSamples` keeps its own copy of the loop because it is
-synchronous; keep the two in sync. `VADAudioChunkReader` shares that synchronous
-render loop but delivers bounded sample chunks instead of accumulating the file.
+`VADAudioBufferReader` owns the synchronous pull-render loop; keep it in sync
+with `OfflineAudioRenderer`. `VADAudioLoader.monoSamples` accumulates its output
+for callers that still need an array; `VADAudioChunkReader` instead delivers
+bounded sample chunks. The heuristic `SpeakerDiarizer` retains only per-100ms
+features, not the decoded recording, preserving its frame boundaries and
+strictly-greater-than-one-third trailing-frame threshold.
+
+Silero `FluidAudioVAD` uses `VADProbabilityReader` to await inference between
+4096-sample chunks from the same continuous mono render. It carries the SDK's
+recurrent model state across chunks and retains one probability per chunk.
+It ignores streaming start/end events and applies the SDK's original offline
+segmentation to those probabilities, preserving padding, maximum-duration splits
+and end-of-file handling. Raw decoded audio is bounded to chunk/render buffers;
+probabilities, heuristic features and output regions still grow with duration.
 
 ### Secure local storage for recordings
 
