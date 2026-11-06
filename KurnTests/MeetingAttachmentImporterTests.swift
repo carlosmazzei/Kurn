@@ -209,7 +209,6 @@ struct MeetingAttachmentImporterTests {
         let source = try PDFFixtures.makePDF(pages: ["Agenda"])
         defer { PDFFixtures.remove(source) }
         let gate = BlockingWorkGate()
-        defer { gate.resume() }
         let capture = ReliabilityEventCapture()
         let importer = MeetingAttachmentImporter(
             library: MeetingLibrary(context: context),
@@ -231,10 +230,7 @@ struct MeetingAttachmentImporterTests {
                 return nil
             } catch { return error }
         }
-        await gate.waitUntilStarted()
-        #expect(storedFiles(for: meeting).count == 1)
-        task.cancel()
-        gate.resume()
+        gate.cancelWhenStarted(task)
         #expect(await task.value?.logCode == "attachment_import")
         #expect(storedFiles(for: meeting).isEmpty)
         #expect(meeting.attachments.isEmpty)

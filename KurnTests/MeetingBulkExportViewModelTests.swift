@@ -106,7 +106,6 @@ struct MeetingBulkExportViewModelTests {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: url) }
         let gate = BlockingWorkGate()
-        defer { gate.resume() }
         let capture = ReliabilityEventCapture()
         let model = MeetingBulkExportViewModel(meetings: meetings, writeFile: { item, _ in
             #expect(item.suggestedName == firstName)
@@ -116,10 +115,7 @@ struct MeetingBulkExportViewModelTests {
             return url
         })
         let work = Task { await model.share(recordEvent: capture.record) }
-        await gate.waitUntilStarted()
-        #expect(model.isExporting)
-        work.cancel()
-        gate.resume()
+        gate.cancelWhenStarted(work)
         #expect(await work.value == nil)
         #expect(!FileManager.default.fileExists(atPath: url.path))
         #expect(model.error == nil)

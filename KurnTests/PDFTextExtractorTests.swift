@@ -70,7 +70,6 @@ struct PDFTextExtractorTests {
         let url = try PDFFixtures.makePDF(pages: ["", "", ""])
         defer { PDFFixtures.remove(url) }
         let gate = BlockingWorkGate()
-        defer { gate.resume() }
         let work = Task.detached {
             var calls = 0
             let result = try PDFTextExtractor.extract(from: url) { _ in
@@ -80,9 +79,7 @@ struct PDFTextExtractorTests {
             }
             return (calls, result)
         }
-        await gate.waitUntilStarted()
-        work.cancel()
-        gate.resume()
+        gate.cancelWhenStarted(work)
         let (calls, result) = try await work.value
         #expect(calls == 1)
         #expect(result.text == "page")
