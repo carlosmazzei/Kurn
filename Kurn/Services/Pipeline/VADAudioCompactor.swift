@@ -56,69 +56,10 @@ enum VADAudioLoader {
         sampleRate: Double,
         onBuffer: (UnsafeBufferPointer<Float>, Int) throws -> Void
     ) throws {
-        let inputFile = try AVAudioFile(forReading: url)
-        let inputFormat = inputFile.processingFormat
-        let totalInputFrames = inputFile.length
-        let inputDuration = Double(totalInputFrames) / inputFormat.sampleRate
-        AppLog.transcription.atDebug.debug("vadLoader: decoding \(url.lastPathComponent, privacy: .public) sampleRate=\(inputFormat.sampleRate, privacy: .public) channels=\(inputFormat.channelCount, privacy: .public) frames=\(totalInputFrames, privacy: .public) duration=\(String(format: "%.1f", inputDuration), privacy: .public)s")
-        guard totalInputFrames > 0, inputFormat.sampleRate > 0 else { return }
-
-        guard let outputFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false
-        ) else {
-            throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
+        let reader = try VADAudioBufferReader(url: url, sampleRate: sampleRate)
+        while let samples = try reader.next() {
+            try samples.withUnsafeBufferPointer { try onBuffer($0, reader.expectedFrames) }
         }
-
-        let engine = AVAudioEngine()
-        let player = AVAudioPlayerNode()
-        engine.attach(player)
-        // The mixer/output path resamples and downmixes to the manual-rendering
-        // format (mono @ `sampleRate`), so connect with the source's own format.
-        engine.connect(player, to: engine.mainMixerNode, format: inputFormat)
-
-        let maxFrames: AVAudioFrameCount = 4096
-        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
-        try engine.start()
-        defer {
-            player.stop()
-            engine.stop()
-        }
-        // Completion-handler overload (not the `async` one): in offline rendering
-        // the file is consumed by the render loop below, so awaiting playback
-        // completion would deadlock. Matches `AudioPreprocessor`.
-        player.scheduleFile(inputFile, at: nil, completionHandler: nil)
-        player.play()
-
-        guard let renderBuffer = AVAudioPCMBuffer(
-            pcmFormat: engine.manualRenderingFormat, frameCapacity: maxFrames
-        ) else {
-            throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
-        }
-
-        let ratio = sampleRate / inputFormat.sampleRate
-        let expectedOutFrames = AVAudioFramePosition(Double(totalInputFrames) * ratio)
-        var renderedFrames = 0
-
-        renderLoop: while engine.manualRenderingSampleTime < expectedOutFrames {
-            let remaining = expectedOutFrames - engine.manualRenderingSampleTime
-            let framesToRender = AVAudioFrameCount(min(Int64(maxFrames), remaining))
-            let status = try engine.renderOffline(framesToRender, to: renderBuffer)
-            switch status {
-            case .success:
-                if let channel = renderBuffer.floatChannelData, renderBuffer.frameLength > 0 {
-                    let samples = UnsafeBufferPointer(start: channel[0], count: Int(renderBuffer.frameLength))
-                    try onBuffer(samples, Int(max(0, expectedOutFrames)))
-                    renderedFrames += samples.count
-                }
-            case .insufficientDataFromInputNode, .cannotDoInCurrentContext, .error:
-                break renderLoop
-            @unknown default:
-                break renderLoop
-            }
-        }
-
-        let outputDuration = Double(renderedFrames) / sampleRate
-        AppLog.transcription.atDebug.debug("vadLoader: decoded \(renderedFrames, privacy: .public) samples (\(String(format: "%.1f", outputDuration), privacy: .public)s) from \(url.lastPathComponent, privacy: .public)")
     }
 }
 
