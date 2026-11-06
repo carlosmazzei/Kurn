@@ -129,10 +129,22 @@ final class JournaledCaptureFile: AudioFileWriting {
     private var journal: (any AudioFileWriting)?
     private let reporter: CaptureJournalFailureReporter
 
+    convenience init(
+        primary: any AudioFileWriting,
+        journal: any AudioFileWriting,
+        onJournalFailure: @escaping @Sendable () -> Void = {}
+    ) {
+        self.init(
+            primary: primary, journal: journal,
+            startThread: CaptureJournalFailureReporter.startThread,
+            onJournalFailure: onJournalFailure
+        )
+    }
+
     init(
         primary: any AudioFileWriting,
         journal: any AudioFileWriting,
-        startThread: CaptureJournalFailureReporter.ThreadStart = CaptureJournalFailureReporter.startThread,
+        startThread: CaptureJournalFailureReporter.ThreadStart,
         onJournalFailure: @escaping @Sendable () -> Void = {}
     ) {
         self.primary = primary
