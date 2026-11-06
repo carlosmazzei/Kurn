@@ -27,7 +27,7 @@ import KurnCore
 
 actor SpeakerDiarizer: Diarizing {
 
-    private struct Frame {
+    struct Frame: Equatable, Sendable {
         let time: TimeInterval
         let rms: Float
         let dbfs: Float
@@ -146,45 +146,20 @@ actor SpeakerDiarizer: Diarizing {
     /// keeps pitch/feature behaviour identical regardless of the source format.
     private let analysisSampleRate: Double = 16_000
 
-    private func readFrames(url: URL) throws -> [Frame] {
-        // Decode through `VADAudioLoader.monoSamples` (offline AVAudioEngine
-        // render) instead of reading raw PCM buffers directly: both
-        // `AVAudioFile.read(into:)` and `AVAudioConverter` fail on device for the
-        // app's compressed AAC `.m4a` files (recordings and cleaned copy alike)
-        // with a generic `erro 0`, which silently collapsed diarization to a
-        // single speaker. See `VADAudioLoader.monoSamples`.
-        let decodeStart = Date()
-        let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: analysisSampleRate)
-        let decodeDuration = Date().timeIntervalSince(decodeStart)
-        let memoryBytes = samples.count * MemoryLayout<Float>.size
-        let audioDuration = Double(samples.count) / analysisSampleRate
-        AppLog.transcription.atInfo.info("SpeakerDiarizer: decoded \(url.lastPathComponent, privacy: .public) frames=\(samples.count, privacy: .public) audioDuration=\(String(format: "%.1f", audioDuration), privacy: .public)s memory=\(memoryBytes, privacy: .public) bytes in \(decodeDuration, privacy: .public)s")
-        guard !samples.isEmpty else { return [] }
-
-        let sampleRate = analysisSampleRate
-        let samplesPerFrame = max(1, Int(sampleRate * frameDuration))
+    func readFrames(url: URL) throws -> [Frame] {
+        let samplesPerFrame = max(1, Int(analysisSampleRate * frameDuration))
         var frames: [Frame] = []
-        frames.reserveCapacity(samples.count / samplesPerFrame + 1)
-
-        var index = 0
-        while index + samplesPerFrame <= samples.count {
-            let slice = Array(samples[index..<index + samplesPerFrame])
-            let time = Double(index) / sampleRate
-            frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
-            index += samplesPerFrame
+        var sampleOffset = 0
+        try VADAudioChunkReader.read(url: url, sampleRate: analysisSampleRate, chunkSize: samplesPerFrame) { samples in
+            if samples.count > samplesPerFrame / 3 {
+                frames.append(makeFrame(samples, time: Double(sampleOffset) / analysisSampleRate, sampleRate: analysisSampleRate))
+            }
+            sampleOffset += samples.count
         }
-        // Keep a trailing partial frame only if it carries enough samples to be
-        // meaningful (matches the previous reader's >1/3-frame threshold).
-        if samples.count - index > samplesPerFrame / 3 {
-            let slice = Array(samples[index..<samples.count])
-            let time = Double(index) / sampleRate
-            frames.append(makeFrame(slice, time: time, sampleRate: sampleRate))
-        }
-
         return frames
     }
 
-    private func makeFrame(_ samples: [Float], time: TimeInterval, sampleRate: Double) -> Frame {
+    func makeFrame(_ samples: [Float], time: TimeInterval, sampleRate: Double) -> Frame {
         var sumSquares: Float = 0
         var crossings = 0
         var previous: Float = 0
