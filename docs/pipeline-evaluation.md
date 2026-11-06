@@ -88,6 +88,7 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
+| 2026-11-05 | `3a81c91` / `21c414a` | LLM correction before and after the topic-critique rewrite (#312): the same Nemotron Unified matrix (prep × VAD, Pyannote, 4 configs) with `correction: on` (baseline + corrected twin, OpenAI) on the old corrector (`main`) and the new one (branch) | AMI (4, WER+DER), LibriSpeech (6), CAMOES (40), CORAA (40) | [old corrector](https://github.com/carlosmazzei/Kurn/actions/runs/42097203848), [new corrector](https://github.com/carlosmazzei/Kurn/actions/runs/42097769947) |
 | 2026-11-03 | `5cfc919` | Six dispatches to fill the gaps the 2026-11-01 runs left: Parakeet v3 + whisper.cpp `largeTurbo` (8 configs); Parakeet v3 in Portuguese (4); Nemotron 3 diarization × Parakeet v3 / Phonon-2 (8); ElevenLabs `scribe_v1` + `scribe_v2` × `fluidAudio` / native diarization (16); whisper.cpp `small` (4); Groq `whisper-large-v3` + turbo (8). All four AMI meetings fetched in every English run | AMI (4, WER+DER), LibriSpeech (6), CAMOES (40), CORAA (40) | [Parakeet + largeTurbo](https://github.com/carlosmazzei/Kurn/actions/runs/41693244971), [Parakeet pt](https://github.com/carlosmazzei/Kurn/actions/runs/41693250571), [Nemotron 3 AMI](https://github.com/carlosmazzei/Kurn/actions/runs/41694750856), [ElevenLabs](https://github.com/carlosmazzei/Kurn/actions/runs/41699659363), [whisper.cpp small](https://github.com/carlosmazzei/Kurn/actions/runs/41699664893), [Groq](https://github.com/carlosmazzei/Kurn/actions/runs/41702642987) |
 | 2026-11-01 | `aebf04e` | Nemotron 3 against Pyannote diarization, Parakeet ASR, 8 configs (prep × VAD × diarization model) | VoxConverse (4, DER) | [41339676563](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563) |
 | 2026-11-01 | `f6745bb` | Five dispatches on the new FluidAudio model axes: Nemotron Unified, Bark 3.0/Clean, Phonon-2 and Transcribe Lite in English (20 configs) and Nemotron Unified in Portuguese (4); whisper.cpp `base` + `largeTurbo` in English and Portuguese (8 each); Groq `whisper-large-v3-turbo` (4). AMI's mirror throttled the runners, so AMI coverage differs per dispatch | AMI (4 with WER for the FluidAudio models; 3 DER-only for whisper.cpp; 1 for Groq), LibriSpeech (6), CAMOES (40), CORAA (40) | [FluidAudio en](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736), [Unified pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336076180), [whisper.cpp en](https://github.com/carlosmazzei/Kurn/actions/runs/41336081989), [whisper.cpp pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871), [Groq turbo](https://github.com/carlosmazzei/Kurn/actions/runs/41336088010) |
@@ -336,7 +337,93 @@ The measured consequence: the gated path produced the only real improvements
 **every** configuration measured (up to +0.73pp). "Correct everything" and
 "correct what the decoder is unsure about" are not the same feature.
 
+The 2026-11-05 pair reproduced it on Nemotron Unified (no confidence, so every
+segment is sent): the old corrector was worse in English in all four
+configurations (+0.36 to +0.86pp) and the topic-critique corrector that
+replaced it was too (+0.50 to +0.61pp), while both gained a little in
+Portuguese. Neither the critique, the neighbouring context nor the
+faithfulness check (which blocks *added* words, not removed ones) changes
+that the ungated path corrects speech that was already right.
+
 ## Runs
+
+### 2026-11-05 — `3a81c91` vs `21c414a`: LLM correction before and after the topic critique
+
+[Old corrector, `main` @ `3a81c91`](https://github.com/carlosmazzei/Kurn/actions/runs/42097203848) ·
+[new corrector, branch @ `21c414a`](https://github.com/carlosmazzei/Kurn/actions/runs/42097769947)
+
+**The question:** does the rewrite in #312 — a critic pass that infers the
+meeting's topic and flags misheard terms, neighbouring speech and confidence
+sent with each segment, and `CorrectionFaithfulness` rejecting corrections
+that introduce unspoken words — move WER where the frequency-list corrector
+did not? Two dispatches with identical inputs, one per corrector, each with
+`correction: on`, so every configuration has an uncorrected row and a
+corrected twin scored on the same transcription.
+
+**Why the cross-run comparison holds:** the uncorrected rows are identical to
+the hundredth in both runs (every language and corpus, all four
+configurations, WER and DER), so ASR, diarization and scoring were
+deterministic and the two runs differ only in the corrector. The corrected
+rows are not deterministic — they depend on LLM replies, whose run-to-run
+spread was **not** measured here — so differences of ~0.5pp between the two
+correctors are within what a second dispatch could move.
+
+**Answer: no measurable improvement.**
+
+- **English is still made worse by correction**, slightly less than before:
+  +0.54pp on average across the four configurations (old: +0.63pp), AMI
+  +0.58pp (old +0.67pp), AMI cpWER +0.35pp (old +0.45pp). The one regression
+  the old corrector introduced on LibriSpeech (0.53% → 1.05%) is gone.
+- **Portuguese gains less**: −0.38pp on average (old −0.68pp). CAMOES keeps
+  its gain (−0.91pp, old −1.00pp); CORAA loses it (0.00pp, old −0.45pp) and
+  goes up 0.51pp in one configuration.
+- DER is unchanged by either corrector, as it must be (text only).
+- Not measured: aggregate substitution/insertion/deletion counts (the job log
+  prints them per item only and the artifact is unreachable from here), so
+  the cause of the English regression — most likely the LLM tidying
+  disfluencies AMI's verbatim reference keeps, which `CorrectionFaithfulness`
+  does not block because it removes words rather than adding them — is a
+  hypothesis, not a measurement.
+
+Setup, both runs: matrix `full` filtered to `fluidAudioParakeet@nemotronUnified`
+(prep `none`/`standardDSP` × VAD `energyThreshold`/`fluidAudio`),
+diarization `fluidAudio@pyannote`, no cloud ASR, correction `on` with
+OpenAI's default model, 720 scored rows each; reference-tool re-score matched
+each CSV to 0.0000pp.
+
+Configurations: **A** none + energyThreshold · **B** none + fluidAudio ·
+**C** standardDSP + energyThreshold · **D** standardDSP + fluidAudio. Each
+cell is *no correction / old corrector / new corrector*.
+
+#### By language
+
+| Language | A | B | C | D |
+| --- | --- | --- | --- | --- |
+| English (10 items) | 26.20 / 27.06 / 26.70 | 26.70 / 27.38 / 27.24 | 26.95 / 27.56 / 27.56 | 27.49 / 27.85 / 27.99 |
+| Portuguese (80 items) | 23.87 / 23.27 / 23.57 | 24.62 / 24.62 / 24.17 | 24.02 / 23.12 / 23.42 | 24.17 / 22.97 / 24.02 |
+
+#### By corpus
+
+| Corpus | A | B | C | D |
+| --- | --- | --- | --- | --- |
+| AMI WER | 28.07 / 28.96 / 28.61 | 28.61 / 29.34 / 29.19 | 28.88 / 29.53 / 29.53 | 29.45 / 29.84 / 29.99 |
+| AMI WER (standard) | 26.06 / 26.74 / 26.38 | 26.70 / 27.30 / 27.26 | 25.93 / 26.50 / 26.58 | 26.62 / 26.98 / 27.14 |
+| AMI cpWER | 33.32 / 33.84 / 33.48 | 34.73 / 35.21 / 35.13 | 34.32 / 34.73 / 34.81 | 34.52 / 34.89 / 34.89 |
+| AMI DER fused / raw (±0.25 s) | 29.68 / 18.11 | 34.15 / 18.11 | 31.49 / 18.11 | 39.83 / 18.11 |
+| LibriSpeech | 0.53 / 1.05 / 0.53 | 0.53 / 0.53 / 0.53 | 0.53 / 0.53 / 0.53 | 0.53 / 0.53 / 0.53 |
+| CAMOES | 35.04 / 33.94 / 34.67 | 35.40 / 35.77 / 34.31 | 37.59 / 36.13 / 36.50 | 37.59 / 35.77 / 36.50 |
+| CORAA | 16.07 / 15.82 / 15.82 | 17.09 / 16.84 / 17.09 | 14.54 / 14.03 / 14.29 | 14.80 / 14.03 / 15.31 |
+
+#### Change versus no correction (pp, mean of A–D)
+
+| | Old corrector | New corrector |
+| --- | --- | --- |
+| English | +0.63 | +0.54 |
+| Portuguese | −0.68 | −0.38 |
+| AMI WER | +0.67 | +0.58 |
+| AMI cpWER | +0.45 | +0.35 |
+| CAMOES | −1.00 | −0.91 |
+| CORAA | −0.45 | 0.00 |
 
 > The tables in the entries for 2026-11-01 and 2026-11-03 below were rebuilt from the job logs,
 > because the `pipeline-eval-report` artifacts live on blob storage this

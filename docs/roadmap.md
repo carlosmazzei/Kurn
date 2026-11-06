@@ -261,11 +261,17 @@ is listed so it is not rediscovered.
 
 ### Topic-aware correction
 
-- Not yet measured. Dispatch `pipeline-eval.yml` with `correction: only` on a
-  corpus whose earlier `corr=llm` row (the frequency-list corrector it
-  replaced) is in `docs/pipeline-evaluation.md`, record the new row, and only
-  then describe an effect on WER (insertions are the number to watch: the
-  faithfulness check exists to keep them flat).
+- Measured on 2026-11-05 (`docs/pipeline-evaluation.md`), on Nemotron Unified:
+  no measurable improvement over the corrector it replaced — English still
+  +0.54pp worse than no correction (old +0.63pp), Portuguese −0.38pp (old
+  −0.68pp). Nemotron reports no confidence, so every segment is sent. Next:
+  for engines without confidence, send only segments the critic flagged, and
+  re-run the same pair; optionally also reject corrections that delete more
+  than a few words, since `CorrectionFaithfulness` only blocks additions.
+- Measure the LLM's own run-to-run spread (two identical `correction: only`
+  dispatches) before reading a sub-1pp difference between correctors.
+- Aggregate substitution/insertion/deletion counts are not printed by the
+  harness, only per item; print them so a regression's kind is measurable.
 - `CorrectionFaithfulness` uses spelling closeness as its only proxy for
   "sounds like"; a homophone spelled very differently ("sequel" → "SQL") is
   accepted only through the grounded vocabulary. A per-language phonetic key

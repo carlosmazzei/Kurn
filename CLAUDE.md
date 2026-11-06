@@ -1029,9 +1029,11 @@ transcript.
   ≤ 0.45, near-exact for words of ≤ 3 letters), of two adjacent words joined
   ("cuber netes" → "Kubernetes"), part of a word split apart, or one of the
   grounded terms. "by Friday" appended to a sentence is rejected even when the
-  guardrail's 35% budget would allow it. No accuracy claim is made for the
-  stage until a `correction: only` pipeline-eval run is recorded in
-  `docs/pipeline-evaluation.md`.
+  guardrail's 35% budget would allow it. Measured on 2026-11-05
+  (`docs/pipeline-evaluation.md`) on Nemotron Unified, where no confidence
+  means every segment is sent: no measurable gain over the corrector it
+  replaced (English still +0.54pp worse than no correction, Portuguese
+  −0.38pp), so make no accuracy claim for the stage.
 - **`TranscriptCorrectionGuardrail`** bounds how far a proposed correction may
   drift before it is rejected: `maxWordChangeRatio` 0.35, `maxLengthRatio` 1.5,
   `minLengthRatio` 0.6 — a plausible spelling fix, not a paraphrase, invention,
