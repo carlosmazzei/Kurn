@@ -59,11 +59,16 @@ enum ReliabilityEventStore {
         return decoder
     }()
 
-    private static func directory() throws -> URL {
-        let parent = try FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-        )
-        let url = parent.appendingPathComponent(directoryName, isDirectory: true)
+    private static func directory(at location: URL?) throws -> URL {
+        let url: URL
+        if let location {
+            url = location
+        } else {
+            let parent = try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+            )
+            url = parent.appendingPathComponent(directoryName, isDirectory: true)
+        }
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             try fm.createDirectory(
@@ -75,20 +80,20 @@ enum ReliabilityEventStore {
         return url
     }
 
-    private static func fileURL() throws -> URL {
-        try directory().appendingPathComponent(fileName)
+    private static func fileURL(directory: URL?) throws -> URL {
+        try self.directory(at: directory).appendingPathComponent(fileName)
     }
 
     /// Append one event. Best-effort: a store failure here must never break
     /// the operation being reported on, so this only logs — matching
     /// `ReliabilityLog.handler`'s own os_log path, which keeps working even
     /// if this one fails.
-    static func record(_ event: ReliabilityEvent) {
+    static func record(_ event: ReliabilityEvent, directory: URL? = nil) {
         lock.lock()
         defer { lock.unlock() }
         do {
             guard let data = try? encoder.encode(event) else { return }
-            let url = try fileURL()
+            let url = try fileURL(directory: directory)
             var line = data
             line.append(0x0A) // newline
             if let handle = FileHandle(forWritingAtPath: url.path) {
@@ -99,26 +104,26 @@ enum ReliabilityEventStore {
                 try line.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
                 RecordingProtection.apply(to: url)
             }
-            pruneIfNeeded()
+            pruneIfNeeded(directory: directory)
         } catch {
             AppLog.reliability.atError.error("ReliabilityEventStore: append failed code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)")
         }
     }
 
     /// Most recent events first.
-    static func recentEvents(limit: Int = maxEvents) -> [ReliabilityEvent] {
+    static func recentEvents(limit: Int = maxEvents, directory: URL? = nil) -> [ReliabilityEvent] {
         lock.lock()
         defer { lock.unlock() }
-        guard let url = try? fileURL(),
+        guard let url = try? fileURL(directory: directory),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         let events = decodeLines(text)
         return Array(events.reversed().prefix(limit))
     }
 
-    static func clear() {
+    static func clear(directory: URL? = nil) {
         lock.lock()
         defer { lock.unlock() }
-        guard let url = try? fileURL() else { return }
+        guard let url = try? fileURL(directory: directory) else { return }
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -132,8 +137,8 @@ enum ReliabilityEventStore {
         }
     }
 
-    private static func pruneIfNeeded() {
-        guard let url = try? fileURL(),
+    private static func pruneIfNeeded(directory: URL?) {
+        guard let url = try? fileURL(directory: directory),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
         guard lines.count > maxEvents + pruneMargin else { return }

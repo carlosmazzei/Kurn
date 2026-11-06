@@ -501,7 +501,9 @@ rather than on every PR. It re-runs the concurrency-sensitive suites
 the reliability-event store, model downloads, the SwiftData store boot) under
 Thread Sanitizer, runs the unit-test selection in the Release configuration,
 and measures the UI-test flake rate over five attempts, reporting a
-`passed/total` count without a pass/fail threshold.
+`passed/total` count. There is no numeric flake-rate SLO, but the run itself
+fails whenever any attempt fails, so a regression shows as a red run instead
+of hiding in the summary.
 
 A second workflow, `.github/workflows/pipeline-eval.yml`, is a measurement run
 rather than a merge gate: it is dispatched on demand to score the recognition
