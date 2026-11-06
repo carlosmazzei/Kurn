@@ -60,11 +60,7 @@ actor FluidAudioVAD: VoiceActivityDetecting {
             state = result.state
             return result.probability
         }
-        let unusedState = VadState.initial()
-        // Offline segmentation consumes only probabilities, not streaming events.
-        let results = analysis.probabilities.map {
-            VadResult(probability: $0, isVoiceActive: false, processingTime: 0, outputState: unusedState)
-        }
+        let results = VADProbabilityReader.segmentationResults(probabilities: analysis.probabilities)
         let segments = await manager.segmentSpeech(from: results, totalSamples: analysis.sampleCount)
         AppLog.transcription.atInfo.info("FluidAudioVAD: segments=\(segments.count, privacy: .public)")
         // No detected speech → the whole clip as one region rather than

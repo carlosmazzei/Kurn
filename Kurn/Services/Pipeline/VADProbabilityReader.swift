@@ -1,6 +1,19 @@
 import Foundation
 
+#if canImport(FluidAudio)
+import FluidAudio
+#endif
+
 enum VADProbabilityReader {
+    #if canImport(FluidAudio)
+    static func segmentationResults(probabilities: [Float]) -> [VadResult] {
+        let unusedState = VadState.initial()
+        return probabilities.map {
+            VadResult(probability: $0, isVoiceActive: false, processingTime: 0, outputState: unusedState)
+        }
+    }
+    #endif
+
     static func read(
         url: URL,
         sampleRate: Double,

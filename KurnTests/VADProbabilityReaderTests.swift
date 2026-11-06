@@ -10,6 +10,25 @@ struct VADProbabilityReaderTests {
     private struct ConsumerFailure: Error {}
 
     #if canImport(FluidAudio)
+    @Test func segmentationResultsPreserveProbabilityOrderAndUseSyntheticFields() {
+        let probabilities: [Float] = [0.75, 0, 1, 0.125, 0.75]
+        let results = VADProbabilityReader.segmentationResults(probabilities: probabilities)
+        let initial = VadState.initial()
+
+        #expect(results.map(\.probability) == probabilities)
+        for result in results {
+            #expect(!result.isVoiceActive)
+            #expect(result.processingTime == 0)
+            #expect(result.outputState.hiddenState == initial.hiddenState)
+            #expect(result.outputState.cellState == initial.cellState)
+            #expect(result.outputState.context == initial.context)
+        }
+    }
+
+    @Test func emptyProbabilitiesProduceNoSegmentationResults() {
+        #expect(VADProbabilityReader.segmentationResults(probabilities: []).isEmpty)
+    }
+
     @Test func bufferSizeMatchesThePinnedSDKModelWindow() {
         #expect(VadManager.chunkSize == VADAudioBufferReader.bufferSize)
     }
