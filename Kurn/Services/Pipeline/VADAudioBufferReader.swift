@@ -6,7 +6,7 @@ final class VADAudioBufferReader {
     static let bufferSize = 4096
     let expectedFrames: Int
     private let input: AVAudioFile
-    private let engine = AVAudioEngine()
+    private let engine: AVAudioEngine
     private let player = AVAudioPlayerNode()
     private var buffer: AVAudioPCMBuffer?
     private var finished = false
@@ -17,18 +17,18 @@ final class VADAudioBufferReader {
         }
         input = try AVAudioFile(forReading: url)
         let format = input.processingFormat
+        guard let output = OfflineAudioRenderer.monoFormat(sampleRate: sampleRate) else {
+            throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
+        }
+        engine = try OfflineAudioEngine.make(outputFormat: output, maxFrames: AVAudioFrameCount(Self.bufferSize))
         guard input.length > 0, format.sampleRate > 0 else {
             expectedFrames = 0
             return
         }
         expectedFrames = Int(Double(input.length) * (sampleRate / format.sampleRate))
-        guard let output = OfflineAudioRenderer.monoFormat(sampleRate: sampleRate) else {
-            throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
-        }
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
         do {
-            try engine.enableManualRenderingMode(.offline, format: output, maximumFrameCount: AVAudioFrameCount(Self.bufferSize))
             try engine.start()
             buffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat, frameCapacity: AVAudioFrameCount(Self.bufferSize))
             guard buffer != nil else {

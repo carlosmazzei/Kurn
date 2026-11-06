@@ -90,12 +90,11 @@ struct OfflineAudioRenderer {
             throw failure
         }
 
-        let engine = AVAudioEngine()
+        let engine = try OfflineAudioEngine.make(outputFormat: outputFormat, maxFrames: maxFrames)
         let player = AVAudioPlayerNode()
         engine.attach(player)
         buildChain(engine, player, inputFormat)
 
-        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
         try engine.start()
         afterStart?(engine)
         Self.scheduleForOfflineRender(inputFile, on: player)

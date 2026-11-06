@@ -659,6 +659,12 @@ segmentation to those probabilities, preserving padding, maximum-duration splits
 and end-of-file handling. Raw decoded audio is bounded to chunk/render buffers;
 probabilities, heuristic features and output regions still grow with duration.
 
+Both loops create engines through `OfflineAudioEngine`, enabling offline manual
+rendering on the stopped engine before attaching nodes or accessing the mixer.
+`AVAudioEngine.h` recommends this order: early mixer/I/O-node access can configure
+device rendering. This keeps offline setup off the device-rendering path implicated
+by a RemoteIO teardown RPC that aborted a test host at the manual-mode switch.
+
 ### Secure local storage for recordings
 
 Audio files live in `Documents/Recordings/` (not `Documents/` itself) with
