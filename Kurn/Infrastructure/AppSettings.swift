@@ -12,7 +12,7 @@ import KurnCore
 import Observation
 
 /// UserDefaults key for diagnostic-reports consent, hoisted out of `AppSettings.Keys`
-/// (which is `private`) so `DiagnosticsSubscriber` can read it directly without
+/// so `DiagnosticsSubscriber` can read it directly without
 /// holding an `AppSettings` reference — see that type for why.
 enum AppSettingsKeys {
     static let diagnosticReportsConsented = "settings.diagnosticReportsConsented"
@@ -21,61 +21,6 @@ enum AppSettingsKeys {
 @MainActor
 @Observable
 final class AppSettings {
-    private enum Keys {
-        static let provider = "settings.aiProvider"
-        static let providers = "settings.aiProviders"
-        static let transcriptionProvider = "settings.transcriptionProviderID"
-        static let transcriptionModels = "settings.transcriptionModels"
-        static let defaultMode = "settings.defaultTranscriptionMode"
-        static let defaultLanguage = "settings.defaultLanguage"
-        static let micPickup = "settings.micPickup"
-        static let audioQuality = "settings.audioQuality"
-        static let alwaysUseBuiltInMic = "settings.alwaysUseBuiltInMic"
-        static let summaryModels = "settings.summaryModels"
-        static let summaryTemplates = "settings.summaryTemplates"
-        static let lastSummaryTemplate = "settings.lastSummaryTemplate"
-        static let liveTranscriptionEnabled = "settings.liveTranscriptionEnabled"
-        static let diarizationEngine = "settings.diarizationEngine"
-        static let fluidAudioSpeakerCount = "settings.fluidAudioSpeakerCount"
-        /// Superseded by `fluidAudioSpeakerCount`; read once at init to migrate.
-        static let legacyFluidAudioMinSpeakers = "settings.fluidAudioMinSpeakers"
-        static let diarizationPreprocessingEnabled = "settings.diarizationPreprocessingEnabled"
-        static let playbackEnhancementEnabled = "settings.playbackEnhancementEnabled"
-        static let transcriptionEngine = "settings.transcriptionEngine"
-        static let preprocessingEngine = "settings.preprocessingEngine"
-        static let vadEngine = "settings.vadEngine"
-        static let languageDetectionEngine = "settings.languageDetectionEngine"
-        static let fluidAudioASRModelsConsented = "settings.fluidAudioASRModelsConsented"
-        static let fluidAudioBatchASRModelsConsented = "settings.fluidAudioBatchASRModelsConsented"
-        static let fluidAudioDiarizationModelsConsented = "settings.fluidAudioDiarizationModelsConsented"
-        static let fluidAudioVADModelsConsented = "settings.fluidAudioVADModelsConsented"
-        static let whisperCppModel = "settings.whisperCppModel"
-        static let fluidAudioASRModel = "settings.fluidAudioASRModel"
-        static let fluidAudioLiveModel = "settings.fluidAudioLiveModel"
-        static let fluidAudioDiarizationModel = "settings.fluidAudioDiarizationModel"
-        static let fluidAudioSegmentationBatchSize = "settings.fluidAudioSegmentationBatchSize"
-        static let fluidAudioASRModelConsents = "settings.fluidAudioASRModelConsents"
-        static let fluidAudioNemotronModelsConsented = "settings.fluidAudioNemotronModelsConsented"
-        static let fluidAudioUnifiedStreamingConsented = "settings.fluidAudioUnifiedStreamingConsented"
-        static let whisperCppModelsConsented = "settings.whisperCppModelsConsented"
-        static let sherpaOnnxModelsConsented = "settings.sherpaOnnxModelsConsented"
-        static let allowsExpensiveNetworkTransfers = "settings.allowsExpensiveNetworkTransfers"
-        static let allowsConstrainedNetworkTransfers = "settings.allowsConstrainedNetworkTransfers"
-        static let cloudTranscriptionConsentKeys = "settings.cloudTranscriptionConsentKeys"
-        static let logLevel = "settings.logLevel"
-        static let requireAuthForRecordings = "settings.requireAuthForRecordings"
-        static let hideLiveActivityMeetingTitle = "settings.hideLiveActivityMeetingTitle"
-        static let meetingsSortOrder = "settings.meetingsSortOrder"
-        static let autoTaggingEnabled = "settings.autoTaggingEnabled"
-        static let usageStats = "settings.usageStats"
-        static let semanticSearchEnabled = "settings.semanticSearchEnabled"
-        static let wikiEnabled = "settings.wikiEnabled"
-        static let correctionEnabled = "settings.correctionEnabled"
-        static let aiTitleCloudEnabled = "settings.aiTitleCloudEnabled"
-        static let templatesSyncEnabled = "settings.templatesSyncEnabled"
-        static let readAloud = "settings.readAloud"
-    }
-
     /// iCloud key-value storage key for the synced custom-template payload.
     /// Not in `Keys` (that enum is `UserDefaults` keys) — this one lives in
     /// `CloudKeyValueStore` instead.
@@ -96,26 +41,11 @@ final class AppSettings {
         didSet { defaults.set(aiProviderID, forKey: Keys.provider) }
     }
 
-    var aiProvider: AIProvider {
-        providers.first(where: { $0.id == aiProviderID }) ?? providers.first ?? .openAI
-    }
-
     /// Provider used for cloud (Whisper) transcription, chosen independently of
     /// the summary `aiProvider`. Only meaningful when `transcriptionEngine` is
     /// `.whisperAPI`. Defaults to OpenAI to preserve the previous behavior.
     var transcriptionProviderID: String {
         didSet { defaults.set(transcriptionProviderID, forKey: Keys.transcriptionProvider) }
-    }
-
-    /// Resolve `transcriptionProviderID` to a configured provider, falling back
-    /// to the first transcription-capable provider (or OpenAI) if it's stale or
-    /// points at a provider that can't transcribe.
-    var transcriptionProvider: AIProvider {
-        if let provider = providers.first(where: { $0.id == transcriptionProviderID }),
-           provider.supportsTranscription {
-            return provider
-        }
-        return providers.first(where: { $0.supportsTranscription }) ?? .openAI
     }
 
     var defaultMode: TranscriptionMode {
@@ -331,46 +261,6 @@ final class AppSettings {
         didSet { defaults.set(languageDetectionEngine.rawValue, forKey: Keys.languageDetectionEngine) }
     }
 
-    /// The full per-stage pipeline configuration assembled from the individual
-    /// engine preferences, passed to `TranscriptionService`.
-    var pipelineConfiguration: PipelineConfiguration {
-        PipelineConfiguration(
-            preprocessing: preprocessingEngine,
-            vad: vadEngine,
-            languageDetection: languageDetectionEngine,
-            diarization: diarizationEngine,
-            diarizationConsented: selectedFluidDiarizationConsented,
-            sherpaOnnxConsented: sherpaOnnxModelsConsented,
-            transcription: transcriptionEngine,
-            transcriptionProvider: transcriptionProvider,
-            transcriptionModel: transcriptionModel(for: transcriptionProvider),
-            cloudTranscriptionConsented: hasCloudTranscriptionConsent(for: transcriptionProvider),
-            largeTransferPolicy: largeTransferPolicy,
-            fluidAudioSpeakerCount: fluidAudioSpeakerCount,
-            diarizationPreprocessingEnabled: diarizationPreprocessingEnabled,
-            whisperCppModel: whisperCppModel,
-            fluidAudioASRModel: fluidAudioASRModel,
-            fluidAudioASRConsented: selectedFluidAudioASRModelsConsented,
-            fluidAudioDiarizationModel: fluidAudioDiarizationModel,
-            fluidAudioSegmentationBatchSize: fluidAudioSegmentationBatchSize,
-            correction: correctionEnabled ? .llm : .none,
-            correctionProvider: aiProvider,
-            correctionModel: correctionEnabled ? summaryModel(for: aiProvider) : "",
-            correctionConsented: correctionEnabled && aiProvider.isUsable
-        )
-    }
-
-    /// Whether the selected pipeline relies on the FluidAudio on-device ASR model
-    /// (as the Parakeet transcriber or the auto-language detector) *and* the user
-    /// has consented to downloading it. Gates foreground pre-warming so the model
-    /// is only loaded for users who will actually use it, and never downloaded
-    /// without consent. See `FluidAudioModelStore.prewarm()`.
-    var usesFluidAudioModel: Bool {
-        let needsOnDeviceASR = (transcriptionEngine == .fluidAudioParakeet && fluidAudioASRModel == .parakeetV3)
-            || languageDetectionEngine.requiredModelSet == .onDeviceASR
-        return needsOnDeviceASR && fluidAudioBatchASRModelsConsented
-    }
-
     /// Whether the user has consented to downloading FluidAudio's streaming ASR
     /// models (independent of the diarization model consent below).
     var fluidAudioASRModelsConsented: Bool {
@@ -429,13 +319,6 @@ final class AppSettings {
         }
     }
 
-    var largeTransferPolicy: LargeTransferPolicy {
-        LargeTransferPolicy(
-            allowsExpensiveAccess: allowsExpensiveNetworkTransfers,
-            allowsConstrainedAccess: allowsConstrainedNetworkTransfers
-        )
-    }
-
     func hasCloudTranscriptionConsent(for provider: AIProvider) -> Bool {
         cloudTranscriptionConsentKeys.contains(cloudTranscriptionConsentKey(for: provider))
     }
@@ -491,13 +374,6 @@ final class AppSettings {
         }
     }
 
-    /// The provider that reads aloud: the stored choice while it still exists
-    /// and has its key, otherwise the always-available on-device voice — so
-    /// removing a key never leaves reading aloud pointing at a dead provider.
-    var speechProvider: AIProvider {
-        providers.first { $0.id == readAloud.providerID && $0.isUsableForSpeech } ?? .appleOnDevice
-    }
-
     /// Read-only snapshot for the "My Data" screen.
     var usageStatsSnapshot: UsageStats { usageStats }
 
@@ -520,7 +396,7 @@ final class AppSettings {
     }
 
     /// Per-provider chosen summary model (rawValue → model id).
-    private var summaryModels: [String: String] {
+    var summaryModels: [String: String] {
         didSet {
             if let data = try? JSONEncoder().encode(summaryModels) {
                 defaults.set(data, forKey: Keys.summaryModels)
@@ -528,36 +404,13 @@ final class AppSettings {
         }
     }
 
-    /// Selected summary model for a provider, falling back to its default.
-    func summaryModel(for provider: AIProvider) -> String {
-        let stored = summaryModels[provider.rawValue]
-        if let stored, !stored.isEmpty { return stored }
-        return provider.defaultModel
-    }
-
-    func setSummaryModel(_ model: String, for provider: AIProvider) {
-        summaryModels[provider.rawValue] = model
-    }
-
     /// Per-provider chosen transcription (Whisper) model (rawValue → model id).
-    private var transcriptionModels: [String: String] {
+    var transcriptionModels: [String: String] {
         didSet {
             if let data = try? JSONEncoder().encode(transcriptionModels) {
                 defaults.set(data, forKey: Keys.transcriptionModels)
             }
         }
-    }
-
-    /// Selected transcription model for a provider, falling back to its default
-    /// Whisper model (`whisper-1`, or `whisper-large-v3` for Groq).
-    func transcriptionModel(for provider: AIProvider) -> String {
-        let stored = transcriptionModels[provider.rawValue]
-        if let stored, !stored.isEmpty { return stored }
-        return provider.defaultTranscriptionModel
-    }
-
-    func setTranscriptionModel(_ model: String, for provider: AIProvider) {
-        transcriptionModels[provider.rawValue] = model
     }
 
     /// Summary templates (built-in presets + user-defined). Built-ins are seeded
@@ -570,34 +423,6 @@ final class AppSettings {
     /// the picker. Falls back to the first available template.
     var lastSummaryTemplateID: String {
         didSet { defaults.set(lastSummaryTemplateID, forKey: Keys.lastSummaryTemplate) }
-    }
-
-    func addProvider(_ provider: AIProvider) {
-        providers.append(provider)
-        aiProviderID = provider.id
-    }
-
-    func updateProvider(_ provider: AIProvider) {
-        guard let index = providers.firstIndex(where: { $0.id == provider.id }) else { return }
-        providers[index] = provider
-        // An edited kind can change what the provider supports, so the
-        // selections are re-checked like after a key change.
-        credentials.invalidate()
-    }
-
-    func removeProvider(_ provider: AIProvider) {
-        guard !provider.isBuiltIn else { return }
-        providers.removeAll { $0.id == provider.id }
-        summaryModels[provider.id] = nil
-        transcriptionModels[provider.id] = nil
-        if aiProviderID == provider.id {
-            aiProviderID = providers.first?.id ?? AIProvider.openAI.id
-        }
-        if transcriptionProviderID == provider.id {
-            transcriptionProviderID = providers.first(where: { $0.supportsTranscription })?.id
-                ?? AIProvider.openAI.id
-        }
-        credentials.saveKey("", for: provider)
     }
 
     init(
