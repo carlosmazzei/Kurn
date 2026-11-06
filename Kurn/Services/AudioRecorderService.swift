@@ -227,9 +227,6 @@ final class AudioRecorderService: NSObject {
         AppLog.recorder.atNotice.notice("start: engine running, state=recording")
     }
 
-    /// Configure the audio session and start the engine. `nonisolated` + `async`
-    /// so the (synchronously blocking) AVFoundation setup runs off the main
-    /// actor instead of stalling the UI.
     private func cleanUpFailedStart(fileName: String) {
         teardownEngine()
         AudioFileStore.delete(fileName: fileName)

@@ -9,6 +9,9 @@ import KurnCore
 import os
 
 extension AudioRecorderService {
+    /// Configure the audio session and start the engine. `nonisolated` + `async`
+    /// so the (synchronously blocking) AVFoundation setup runs off the main
+    /// actor instead of stalling the UI.
     nonisolated func setUpEngine(
         writingTo url: URL,
         pickup: MicPickup,
