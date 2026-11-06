@@ -200,7 +200,7 @@ extension AudioRecorderService {
     /// Re-point the tap and the sink's converter at a new input format, keeping
     /// the open output file. Returns false if either could not be rebuilt, in
     /// which case the caller pauses rather than capturing nothing.
-    private func rebuildTapForCurrentInput(_ format: AVAudioFormat) -> Bool {
+    func rebuildTapForCurrentInput(_ format: AVAudioFormat) -> Bool {
         guard let targetFormat = sink.currentTargetFormat,
               let converter = AudioRecorderEngineSupport.makeConverter(from: format, to: targetFormat) else {
             AppLog.recorder.atError.error("rebuildTap: could not build a converter for the new input format")
