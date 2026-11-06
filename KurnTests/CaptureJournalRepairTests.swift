@@ -14,6 +14,7 @@
 
 import AVFoundation
 import Foundation
+import KurnCore
 import SwiftData
 import Testing
 @testable import Kurn
@@ -239,6 +240,38 @@ struct CaptureJournalRepairTests {
 
         #expect(recording.captureState == .recording)
         #expect(CaptureJournal.exists(for: fileName))
+    }
+
+    @Test func aFailedFinalizationAfterRebuildIsReportedAndRemainsRecoverable() async throws {
+        let container = TestModelContainer.make()
+        let fileName = try Self.makeKilledCapture()
+        defer { AudioFileStore.delete(fileName: fileName) }
+        let recording = try Self.insertRecording(
+            fileName: fileName, state: .recoveryNeeded, reason: .unreadableFile, in: container.mainContext
+        )
+        let capture = ReliabilityEventCapture()
+        capture.install()
+        defer { capture.uninstall() }
+
+        await RecordingRecovery.repairFromCaptureJournals(
+            modelContainer: container,
+            finalizer: StubRecordingFileFinalizer(failure: RecordingFileFinalizationError.protectionFailed)
+        )
+
+        #expect(CaptureJournalRepair.isReadable(Self.recordingURL(fileName)))
+        #expect(CaptureJournal.exists(for: fileName))
+        #expect(recording.captureState == .recoveryNeeded)
+        #expect(recording.captureRecoveryReason == .unreadableFile)
+        #expect(recording.duration == 0)
+        let events = capture.recorded.filter {
+            $0.operationID == OperationID(String(fileName.prefix(8))) && $0.stage == "journal_rebuild"
+        }
+        #expect(events.count == 1)
+        #expect(events.first?.operation == CaptureReliability.operation)
+        #expect(events.first?.outcome == .failed)
+        #expect(events.first?.code == "finalization_failed")
+        let encoded = String(decoding: try JSONEncoder().encode(events), as: UTF8.self)
+        #expect(!encoded.contains(fileName))
     }
 
     @Test func aFailedRebuildLeavesTheRowAsItWas() async throws {

@@ -235,6 +235,65 @@ struct MeetingLibraryTests {
 
     // MARK: - Tags
 
+    @Test(arguments: ["lookup", "create", "attach", "apply"])
+    func tagFetchFailureDoesNotCreateDuplicatesOrMutateTheMeeting(operation: String) throws {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = Meeting(title: "Standup")
+        let tag = Kurn.Tag(name: "Roadmap")
+        context.insert(meeting)
+        context.insert(tag)
+        try context.save()
+        var saves = 0
+        let library = MeetingLibrary(
+            context: context,
+            persist: { _ in saves += 1; return nil },
+            fetchTags: { _ in throw CocoaError(.fileReadUnknown) }
+        )
+
+        do throws(AppError) {
+            switch operation {
+            case "lookup": _ = try library.existingTag(named: "Roadmap")
+            case "create": _ = try library.createTag(named: "ROADMAP")
+            case "attach": try library.attachTag(named: "ROADMAP", to: meeting)
+            default: try library.applyTags(ids: [tag.id], newNames: ["ROADMAP"], to: meeting)
+            }
+            Issue.record("A tag fetch failure must propagate")
+        } catch {
+            guard case .persistenceFailed = error else {
+                Issue.record("Expected a persistence failure, got \(error)")
+                return
+            }
+        }
+
+        #expect(saves == 0)
+        #expect(!context.hasChanges)
+        #expect(meeting.tags.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Kurn.Tag>()).map(\.id) == [tag.id])
+    }
+
+    @Test func applyTagsPropagatesFailureWhileResolvingNewNames() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = Meeting(title: "Standup")
+        let tag = Kurn.Tag(name: "Roadmap")
+        context.insert(meeting)
+        context.insert(tag)
+        try context.save()
+        var fetches = 0
+        let library = MeetingLibrary(context: context, fetchTags: { _ in
+            fetches += 1
+            throw CocoaError(.fileReadUnknown)
+        })
+
+        #expect(throws: AppError.self) {
+            try library.applyTags(ids: [tag.id], newNames: ["Budget", "ROADMAP"], to: meeting)
+        }
+
+        #expect(fetches == 1)
+        #expect(meeting.tags.isEmpty)
+        #expect(!context.hasChanges)
+        #expect(try context.fetch(FetchDescriptor<Kurn.Tag>()).map(\.id) == [tag.id])
+    }
+
     @Test func createTagTrimsAndIgnoresBlankNames() throws {
         let (library, context) = makeLibrary()
         #expect(try library.createTag(named: "   ") == nil)
@@ -309,8 +368,8 @@ struct MeetingLibraryTests {
         try library.attachTag(named: "Plan", to: first)
         try library.attachTag(named: "Plan", to: second)
         try library.attachTag(named: "Roadmap", to: second)
-        let source = try #require(library.existingTag(named: "Plan"))
-        let target = try #require(library.existingTag(named: "Roadmap"))
+        let source = try #require(try library.existingTag(named: "Plan"))
+        let target = try #require(try library.existingTag(named: "Roadmap"))
 
         try library.mergeTag(source, into: target)
 
