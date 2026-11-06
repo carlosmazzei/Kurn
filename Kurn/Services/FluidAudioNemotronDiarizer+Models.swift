@@ -28,17 +28,16 @@ extension FluidAudioNemotronDiarizer {
         let duration = AudioFileDuration.seconds(of: url)
         let started = ContinuousClock.now
         try Task.checkCancellation()
-        let samples = try VADAudioLoader.monoSamples(url: url, sampleRate: Double(config.sampleRate))
         var timeline = NemotronDiarizationTimeline()
         let samplesPerChunk = config.chunkLen * config.subsamplingFactor * config.sampleRate / 100
-        for offset in stride(from: 0, to: samples.count, by: samplesPerChunk) {
+        try VADAudioChunkReader.read(
+            url: url, sampleRate: Double(config.sampleRate), chunkSize: samplesPerChunk, onProgress: onProgress
+        ) { samples in
             try checkBudget(started: started, audioDuration: duration)
-            let end = min(offset + samplesPerChunk, samples.count)
-            diarizer.appendAudio(Array(samples[offset..<end]))
+            diarizer.appendAudio(samples)
             for chunk in try diarizer.processBufferedAudio() {
                 try timeline.append(probabilities: chunk.probabilities, frameCount: chunk.frameCount)
             }
-            onProgress?(Double(end) / Double(samples.count))
         }
         try checkBudget(started: started, audioDuration: duration)
         for chunk in try diarizer.finishStream() {
