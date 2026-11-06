@@ -69,6 +69,16 @@ struct MeetingLibrary {
         return meeting
     }
 
+    /// Compensates a newly created meeting whose attachment import failed.
+    /// There are no owned files; a failed save must also undo the pending delete.
+    func discardNewMeeting(_ meeting: Meeting) throws(AppError) {
+        context.delete(meeting)
+        if let failure = persist(context) {
+            context.insert(meeting)
+            throw failure
+        }
+    }
+
     /// Deletes a meeting (its recordings, transcripts, summaries, chats,
     /// photos and attachments cascade with it) and every audio, photo and
     /// attachment file it owns.

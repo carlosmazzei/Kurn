@@ -68,6 +68,11 @@ struct CaptureProgressWatchdog: Sendable {
 
 protocol AudioFileWriting: AnyObject {
     func write(from buffer: AVAudioPCMBuffer) throws
+    func flushReliabilityEvents()
+}
+
+extension AudioFileWriting {
+    func flushReliabilityEvents() {}
 }
 
 extension AVAudioFile: AudioFileWriting {}
@@ -88,9 +93,14 @@ protocol AudioSinkWriting: Sendable {
     var currentTargetFormat: AVAudioFormat? { get }
     func setPaused(_ value: Bool)
     func close()
+    func flushReliabilityEvents()
     var currentLevel: Float { get }
     var snapshot: AudioSinkSnapshot { get }
     @discardableResult func write(_ buffer: AVAudioPCMBuffer) -> Bool
+}
+
+extension AudioSinkWriting {
+    func flushReliabilityEvents() {}
 }
 
 /// Thread-safe owner of the recording file and the latest input level. The audio
@@ -148,13 +158,17 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
     }
 
     func setPaused(_ value: Bool) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
         paused = value
         if value { level = 0 }
+        let file = self.file
+        lock.unlock()
+        if value { file?.flushReliabilityEvents() }
     }
 
     func close() {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        let closingFile = file
         // Drain whatever the resampler is still holding (well under a
         // millisecond) so the tail of the recording isn't clipped.
         if let file, let converter, let targetFormat {
@@ -179,6 +193,15 @@ final class RecordingSink: AudioSinkWriting, @unchecked Sendable {
         onBuffer = nil
         paused = true
         level = 0
+        lock.unlock()
+        closingFile?.flushReliabilityEvents()
+    }
+
+    func flushReliabilityEvents() {
+        lock.lock()
+        let file = self.file
+        lock.unlock()
+        file?.flushReliabilityEvents()
     }
 
     var currentLevel: Float {

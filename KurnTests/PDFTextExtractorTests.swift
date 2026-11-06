@@ -66,6 +66,26 @@ struct PDFTextExtractorTests {
         #expect(renderedPages == 1)
     }
 
+    @Test func cancellationStopsBeforeRecognizingAnotherPage() async throws {
+        let url = try PDFFixtures.makePDF(pages: ["", "", ""])
+        defer { PDFFixtures.remove(url) }
+        let gate = BlockingWorkGate()
+        let work = Task.detached {
+            var calls = 0
+            let result = try PDFTextExtractor.extract(from: url) { _ in
+                calls += 1
+                if calls == 1 { gate.block() }
+                return "page"
+            }
+            return (calls, result)
+        }
+        gate.cancelWhenStarted(work)
+        let (calls, result) = try await work.value
+        #expect(calls == 1)
+        #expect(result.text == "page")
+        #expect(result.isTruncated)
+    }
+
     @Test func ocrStopsAtItsPageBudget() throws {
         let url = try PDFFixtures.makePDF(pages: ["", "", ""])
         defer { PDFFixtures.remove(url) }

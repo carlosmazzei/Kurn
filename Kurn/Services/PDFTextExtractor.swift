@@ -83,6 +83,10 @@ enum PDFTextExtractor {
         let readablePages = min(document.pageCount, max(maxPages, 0))
         var isTruncated = readablePages < document.pageCount
         for index in 0..<readablePages {
+            if Task.isCancelled {
+                isTruncated = true
+                break
+            }
             guard let page = document.page(at: index),
                   let text = pageText(of: page, ocrBudget: &ocrBudget, recognize: recognize) else { continue }
             let gap = pages.isEmpty ? 0 : separator.count

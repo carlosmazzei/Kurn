@@ -24,6 +24,7 @@
 import AVFoundation
 import Foundation
 import KurnCore
+import Synchronization
 
 enum CaptureJournal {
     static let fileExtension = "aac"
@@ -128,6 +129,7 @@ final class JournaledCaptureFile: AudioFileWriting {
     private let primary: any AudioFileWriting
     private var journal: (any AudioFileWriting)?
     private let onJournalFailure: () -> Void
+    private let failurePending = Atomic(false)
 
     init(
         primary: any AudioFileWriting,
@@ -149,10 +151,16 @@ final class JournaledCaptureFile: AudioFileWriting {
                 try journal.write(from: buffer)
             } catch {
                 self.journal = nil
-                onJournalFailure()
+                failurePending.store(true, ordering: .releasing)
             }
         }
         try primary.write(from: buffer)
+    }
+
+    func flushReliabilityEvents() {
+        if failurePending.exchange(false, ordering: .acquiringAndReleasing) {
+            onJournalFailure()
+        }
     }
 }
 
@@ -164,8 +172,10 @@ extension CaptureOutputFile {
         at url: URL,
         bitRate: Int,
         make: (URL, [String: Any]) throws -> any AudioFileWriting = { try AVAudioFile(forWriting: $0, settings: $1) },
-        journalDirectory: () throws -> URL = { try CaptureJournal.ensureDirectory() }
+        journalDirectory: () throws -> URL = { try CaptureJournal.ensureDirectory() },
+        recordEvent: @escaping @Sendable (ReliabilityEvent) -> Void = ReliabilityLog.record
     ) throws -> any AudioFileWriting {
+        let operationID = OperationID()
         let primary = try open(at: url, bitRate: bitRate, make: make)
         let fileName = url.lastPathComponent
         let journal: any AudioFileWriting
@@ -178,12 +188,20 @@ extension CaptureOutputFile {
                 journal = try make(journalURL, CaptureJournal.settings(bitRate: nil))
             }
         } catch {
+            recordEvent(ReliabilityEvent(
+                operationID: operationID, operation: "capture_journal", stage: "open",
+                outcome: .failed, code: "journal_open_failed"
+            ))
             AppLog.recorder.atError.error(
                 "capture journal could not be opened; recording without it code=\(error.publicLogCode, privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
             return primary
         }
         return JournaledCaptureFile(primary: primary, journal: journal) {
+            recordEvent(ReliabilityEvent(
+                operationID: operationID, operation: "capture_journal", stage: "write",
+                outcome: .failed, code: "journal_write_failed"
+            ))
             AppLog.recorder.atError.error("capture journal write failed; detached for the rest of this recording file=\(fileName, privacy: .public)")
         }
     }

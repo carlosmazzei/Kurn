@@ -58,7 +58,7 @@ final class AttachToMeetingViewModel {
         isImporting = true
         let (meeting, report) = await importer.importPDFsIntoNewMeeting(from: files)
         isImporting = false
-        finish(meetingTitle: meeting?.title, failure: report.firstFailure)
+        finish(meetingTitle: report.importedCount > 0 ? meeting?.title : nil, failure: report.firstFailure)
     }
 
     private func finish(meetingTitle: String?, failure: AppError?) {

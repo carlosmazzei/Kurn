@@ -202,6 +202,91 @@ struct MeetingAttachmentImporterTests {
         #expect(meeting.attachments.isEmpty)
     }
 
+    @Test(arguments: [false, true])
+    func cancellationDuringExtractionRemovesTheCopyAndRecordsCancellation(batch: Bool) async throws {
+        let (meeting, context) = try makeMeeting()
+        defer { cleanUp(meeting) }
+        let source = try PDFFixtures.makePDF(pages: ["Agenda"])
+        defer { PDFFixtures.remove(source) }
+        let gate = BlockingWorkGate()
+        let capture = ReliabilityEventCapture()
+        let importer = MeetingAttachmentImporter(
+            library: MeetingLibrary(context: context),
+            extract: { _ in
+                gate.block()
+                #expect(Task.isCancelled)
+                return .success(PDFTextExtraction(pageCount: 1, text: "Agenda"))
+            },
+            recordEvent: capture.record
+        )
+        let task = Task { () -> AppError? in
+            if batch {
+                let report = await importer.importPDFs(from: [source, URL(fileURLWithPath: "/missing-next-attachment.pdf")], into: meeting)
+                #expect(report.importedCount == 0)
+                return report.firstFailure
+            }
+            do throws(AppError) {
+                try await importer.importPDF(from: source, into: meeting)
+                return nil
+            } catch { return error }
+        }
+        gate.cancelWhenStarted(task)
+        #expect(await task.value?.logCode == "attachment_import")
+        #expect(storedFiles(for: meeting).isEmpty)
+        #expect(meeting.attachments.isEmpty)
+        #expect(try context.fetchCount(FetchDescriptor<MeetingAttachment>()) == 0)
+        #expect(capture.recorded.map(\.outcome) == [.cancelled])
+        #expect(capture.recorded.first?.code == "cancelled")
+    }
+
+    @Test func aCancelledBatchDoesNotAttemptItsFirstCopy() async throws {
+        let (meeting, context) = try makeMeeting()
+        let capture = ReliabilityEventCapture()
+        let importer = MeetingAttachmentImporter(library: MeetingLibrary(context: context), recordEvent: capture.record)
+        let task = Task {
+            await importer.importPDFs(from: [URL(fileURLWithPath: "/missing-first-attachment.pdf")], into: meeting)
+        }
+        task.cancel()
+        let report = await task.value
+        #expect(report.importedCount == 0)
+        #expect(report.firstFailure != nil)
+        #expect(capture.recorded.map(\.outcome) == [.cancelled])
+        #expect(capture.recorded.first?.stage == "copy")
+        #expect(capture.recorded.first?.code == "cancelled")
+    }
+
+    @Test func failedCompensationReturnsTheRetainedMeetingAndDoesNotFinishTheShare() async throws {
+        let container = TestModelContainer.make()
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        var saves = 0
+        let library = MeetingLibrary(context: context, persist: { context in
+            saves += 1
+            return saves == 2 ? .persistenceFailed("injected") : context.saveOrError()
+        })
+        let capture = ReliabilityEventCapture()
+        let importer = MeetingAttachmentImporter(library: library, recordEvent: capture.record)
+        let source = try PDFFixtures.makeNonPDF()
+        defer { PDFFixtures.remove(source) }
+        let (meeting, report) = await importer.importPDFsIntoNewMeeting(from: [source])
+        let retained = try #require(meeting)
+        #expect(report.importedCount == 0)
+        #expect(report.firstFailure?.logCode == AppError.persistenceFailed("").logCode)
+        let rollback = capture.recorded.filter { $0.stage == "rollback" }
+        #expect(rollback.count == 1)
+        #expect(rollback.first?.code == "rollback_failed")
+        #expect(rollback.first?.outcome == .failed)
+        try context.save()
+        let reader = ModelContext(container)
+        #expect(try reader.fetch(FetchDescriptor<Meeting>()).map(\.id) == [retained.id])
+
+        saves = 0
+        let viewModel = AttachToMeetingViewModel(files: [source], importer: importer)
+        await viewModel.attachToNewMeeting()
+        #expect(!viewModel.isFinished)
+        #expect(viewModel.error?.logCode == AppError.persistenceFailed("").logCode)
+    }
+
     @Test func aSaveFailureRemovesTheCopyAndReportsIt() async throws {
         let (meeting, context) = try makeMeeting()
         defer { cleanUp(meeting) }

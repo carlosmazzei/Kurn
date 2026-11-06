@@ -81,6 +81,78 @@ struct MeetingBulkExportViewModelTests {
         #expect(!model.isExporting)
     }
 
+    @Test func aPartialWriteFailureRemovesTheWrittenFilesAndRecordsFailure() async throws {
+        let meetings = [summarizedMeeting("First"), summarizedMeeting("Second")]
+        let firstName = try #require(MeetingBulkExport(meetings: meetings).exportItems().first?.suggestedName)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let capture = ReliabilityEventCapture()
+        let model = MeetingBulkExportViewModel(meetings: meetings, writeFile: { item, _ in
+            guard item.suggestedName == firstName else { throw WriteFailure() }
+            try Data("fixture".utf8).write(to: url)
+            return url
+        })
+        #expect(await model.share(recordEvent: capture.record) == nil)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        #expect(model.error != nil)
+        #expect(!model.isExporting)
+        #expect(capture.recorded.map(\.outcome) == [.failed])
+        #expect(capture.recorded.first?.code == "write_failed")
+    }
+
+    @Test func cancellationDuringAWriteRemovesItsFileAndStopsTheBatch() async throws {
+        let meetings = [summarizedMeeting("First"), summarizedMeeting("Second")]
+        let firstName = try #require(MeetingBulkExport(meetings: meetings).exportItems().first?.suggestedName)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let gate = BlockingWorkGate()
+        let capture = ReliabilityEventCapture()
+        let model = MeetingBulkExportViewModel(meetings: meetings, writeFile: { item, _ in
+            #expect(item.suggestedName == firstName)
+            try Data("fixture".utf8).write(to: url)
+            if item.suggestedName == firstName { gate.block() }
+            #expect(Task.isCancelled)
+            return url
+        })
+        let work = Task { await model.share(recordEvent: capture.record) }
+        gate.cancelWhenStarted(work)
+        #expect(await work.value == nil)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        #expect(model.error == nil)
+        #expect(!model.isExporting)
+        #expect(capture.recorded.map(\.outcome) == [.cancelled])
+    }
+
+    @Test func cancellationBeforeSharingWritesNothing() async {
+        let capture = ReliabilityEventCapture()
+        let model = MeetingBulkExportViewModel(meetings: [summarizedMeeting("First")], writeFile: { _, _ in
+            Issue.record("cancelled exports must not write")
+            throw WriteFailure()
+        })
+        let work = Task { await model.share(recordEvent: capture.record) }
+        work.cancel()
+        #expect(await work.value == nil)
+        #expect(model.error == nil)
+        #expect(capture.recorded.map(\.outcome) == [.cancelled])
+    }
+
+    @Test func aCleanupFailureIsRecordedSeparatelyFromTheWriteFailure() async throws {
+        let meetings = [summarizedMeeting("First"), summarizedMeeting("Second")]
+        let firstName = try #require(MeetingBulkExport(meetings: meetings).exportItems().first?.suggestedName)
+        let url = URL(fileURLWithPath: "/fixture/export.md")
+        let fileSystem = FakeFileSystem()
+        fileSystem.failRemoval(of: url)
+        let capture = ReliabilityEventCapture()
+        let model = MeetingBulkExportViewModel(meetings: meetings, writeFile: { item, _ in
+            guard item.suggestedName == firstName else { throw WriteFailure() }
+            return url
+        })
+        #expect(await model.share(fileSystem: fileSystem, recordEvent: capture.record) == nil)
+        #expect(fileSystem.removalAttempts == [url])
+        #expect(capture.recorded.map(\.code) == ["cleanup_failed", "write_failed"])
+        #expect(Set(capture.recorded.map(\.operationID)).count == 1)
+    }
+
     @Test func nothingExportableWritesNothing() async {
         let empty = Meeting(title: "Empty")
         context.insert(empty)

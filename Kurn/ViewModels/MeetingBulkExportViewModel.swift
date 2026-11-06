@@ -62,22 +62,81 @@ final class MeetingBulkExportViewModel {
     /// files to hand the share sheet, or `nil` when there was nothing to
     /// write, an export is already running, or writing failed (`error` says
     /// why).
-    func share() async -> [URL]? {
+    func share(
+        fileSystem: any FileSystem = SystemFileSystem(),
+        recordEvent: @escaping @Sendable (ReliabilityEvent) -> Void = ReliabilityLog.record
+    ) async -> [URL]? {
         let items = export.exportItems()
         guard !items.isEmpty, !isExporting else { return nil }
         isExporting = true
+        error = nil
         defer { isExporting = false }
         let writeFile = writeFile
         let pageSize = pageSize
-        let result = await Task.detached(priority: .userInitiated) {
-            Result { try items.map { try writeFile($0, pageSize) } }
-        }.value
+        let operationID = OperationID()
+        if Task.isCancelled {
+            recordEvent(ReliabilityEvent(
+                operationID: operationID, operation: "bulk_export", outcome: .cancelled, code: "cancelled"
+            ))
+            return nil
+        }
+        let work = Task.detached(priority: .userInitiated) {
+            var urls: [URL] = []
+            return Result {
+                do {
+                    for item in items {
+                        try Task.checkCancellation()
+                        urls.append(try writeFile(item, pageSize))
+                    }
+                    try Task.checkCancellation()
+                    return urls
+                } catch {
+                    Self.removeExports(urls, fileSystem: fileSystem, operationID: operationID, recordEvent: recordEvent)
+                    throw error
+                }
+            }
+        }
+        let result = await withTaskCancellationHandler {
+            await work.value
+        } onCancel: {
+            work.cancel()
+        }
         switch result {
         case .success(let urls):
+            if Task.isCancelled {
+                Self.removeExports(urls, fileSystem: fileSystem, operationID: operationID, recordEvent: recordEvent)
+                recordEvent(ReliabilityEvent(
+                    operationID: operationID, operation: "bulk_export", outcome: .cancelled, code: "cancelled"
+                ))
+                return nil
+            }
             return urls
         case .failure(let failure):
-            error = .audioError(failure.localizedDescription)
+            let cancelled = Task.isCancelled || failure is CancellationError
+            recordEvent(ReliabilityEvent(
+                operationID: operationID, operation: "bulk_export", stage: "write",
+                outcome: cancelled ? .cancelled : .failed, code: cancelled ? "cancelled" : "write_failed"
+            ))
+            if !cancelled { error = .audioError(failure.localizedDescription) }
             return nil
+        }
+    }
+
+    private nonisolated static func removeExports(
+        _ urls: [URL],
+        fileSystem: any FileSystem,
+        operationID: OperationID,
+        recordEvent: @Sendable (ReliabilityEvent) -> Void
+    ) {
+        for url in urls {
+            do {
+                try fileSystem.removeItem(at: url)
+            } catch {
+                recordEvent(ReliabilityEvent(
+                    operationID: operationID, operation: "bulk_export", stage: "rollback",
+                    outcome: .failed, code: "cleanup_failed"
+                ))
+            }
         }
     }
 }

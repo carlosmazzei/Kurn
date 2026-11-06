@@ -573,6 +573,7 @@ final class AudioRecorderService: NSObject {
 
     @discardableResult
     func pollSinkStatus(snapshot: AudioSinkSnapshot? = nil) -> Bool {
+        sink.flushReliabilityEvents()
         let snapshot = snapshot ?? sink.snapshot
         guard let failure = snapshot.firstFailure, activeCaptureFailure == nil else { return false }
         if captureFailure == nil {
