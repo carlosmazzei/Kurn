@@ -223,14 +223,30 @@ struct MeetingLibrary {
     func applyTags(ids: [UUID], newNames: [String], to meeting: Meeting) throws(AppError) {
         let tags = try fetchTags()
         let byID = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var resolved = meeting.tags
+        var namesToCreate: [String] = []
         for id in ids {
-            if let tag = byID[id], !meeting.tags.contains(where: { $0.id == id }) {
-                meeting.tags.append(tag)
+            if let tag = byID[id], !resolved.contains(where: { $0.id == id }) {
+                resolved.append(tag)
             }
         }
         for name in newNames {
-            try attach(named: name, to: meeting)
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            if let existing = tags.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+                if !resolved.contains(where: { $0.id == existing.id }) {
+                    resolved.append(existing)
+                }
+            } else if !namesToCreate.contains(where: { $0.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+                namesToCreate.append(trimmed)
+            }
         }
+        for name in namesToCreate {
+            let tag = Tag(name: name)
+            context.insert(tag)
+            resolved.append(tag)
+        }
+        meeting.tags = resolved
         try save()
     }
 

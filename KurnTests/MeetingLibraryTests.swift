@@ -279,17 +279,16 @@ struct MeetingLibraryTests {
         context.insert(tag)
         try context.save()
         var fetches = 0
-        let library = MeetingLibrary(context: context, fetchTags: { context in
+        let library = MeetingLibrary(context: context, fetchTags: { _ in
             fetches += 1
-            if fetches == 2 { throw CocoaError(.fileReadUnknown) }
-            return try context.fetch(FetchDescriptor<Kurn.Tag>())
+            throw CocoaError(.fileReadUnknown)
         })
 
         #expect(throws: AppError.self) {
-            try library.applyTags(ids: [], newNames: ["ROADMAP"], to: meeting)
+            try library.applyTags(ids: [tag.id], newNames: ["Budget", "ROADMAP"], to: meeting)
         }
 
-        #expect(fetches == 2)
+        #expect(fetches == 1)
         #expect(meeting.tags.isEmpty)
         #expect(!context.hasChanges)
         #expect(try context.fetch(FetchDescriptor<Kurn.Tag>()).map(\.id) == [tag.id])
