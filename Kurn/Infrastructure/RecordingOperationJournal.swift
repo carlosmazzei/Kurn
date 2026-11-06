@@ -139,14 +139,14 @@ enum RecordingOperationJournal {
     /// recorded state; the sweep only ever sees pre-journal leftovers.
     /// Idempotent: every step is a move/remove that tolerates already-done.
     @MainActor
-    static func replay(context: ModelContext) {
+    static func replay(context: ModelContext, references: RecordingFileReferences = .init()) {
         let records = pendingRecords()
         guard !records.isEmpty else { return }
 
         for record in records {
             switch record.kind {
             case .delete:
-                replayDelete(record, context: context)
+                replayDelete(record, context: context, references: references)
             case .replace:
                 // `replaceItemAt` is atomic, so the file holds either the old
                 // or the new bytes — both valid. The only thing a death can
@@ -170,7 +170,7 @@ enum RecordingOperationJournal {
     }
 
     @MainActor
-    private static func replayDelete(_ record: Record, context: ModelContext) {
+    private static func replayDelete(_ record: Record, context: ModelContext, references: RecordingFileReferences) {
         switch record.state {
         case .intent:
             // The model commit provably never ran: roll back whatever subset
@@ -180,7 +180,7 @@ enum RecordingOperationJournal {
             // In-doubt: the death fell between the model save and the
             // `.committed` marker. The store is the authority — scoped to the
             // file names this record owns, not a global inference.
-            if anyRowExists(for: record.fileNames, context: context) {
+            if anyRowExists(for: record.fileNames, operationID: record.id, context: context, references: references) {
                 RecordingTrash.restore(operationID: record.id)
             } else {
                 RecordingTrash.purge(operationID: record.id)
@@ -191,21 +191,19 @@ enum RecordingOperationJournal {
     }
 
     @MainActor
-    private static func anyRowExists(for fileNames: [String], context: ModelContext) -> Bool {
-        guard let recordings = try? context.fetch(FetchDescriptor<Recording>()) else {
+    private static func anyRowExists(
+        for fileNames: [String], operationID: UUID, context: ModelContext, references: RecordingFileReferences
+    ) -> Bool {
+        do {
+            let known = try references.fileNames(context: context)
+            return fileNames.contains(where: known.contains)
+        } catch {
             // If the store cannot be read, restoring is the safe direction:
             // a restored file is at worst an orphan the recovery sweep can
             // re-adopt, a purged one is gone.
+            reportFailure(operationID: operationID, stage: "replay", code: "reference_fetch_failed")
             return true
         }
-        // A lone photo or attachment delete owns no recording's file name, so
-        // checking recordings alone would purge one whose row survived.
-        let photos = (try? context.fetch(FetchDescriptor<MeetingPhoto>())) ?? []
-        let attachments = (try? context.fetch(FetchDescriptor<MeetingAttachment>())) ?? []
-        let known = Set(recordings.map(\.fileName))
-            .union(photos.map(\.fileName))
-            .union(attachments.map(\.fileName))
-        return fileNames.contains(where: known.contains)
     }
 
     // MARK: - Record storage

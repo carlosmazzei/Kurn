@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 
 extension RecordingRecovery {
@@ -29,6 +30,7 @@ extension RecordingRecovery {
     @MainActor
     static func repairFromCaptureJournals(
         modelContainer: ModelContainer,
+        finalizer: any RecordingFileFinalizing = RecordingFileFinalizer(),
         export: CaptureJournalRepair.Exporter = CaptureJournalRepair.exportToM4A
     ) async {
         let journaled = Set(CaptureJournal.recordingFileNamesWithJournal())
@@ -43,8 +45,21 @@ extension RecordingRecovery {
         for recording in candidates {
             let fileName = recording.fileName
             guard await CaptureJournalRepair.rebuild(fileName: fileName, export: export) == .rebuilt,
-                  !recording.isDeleted,
-                  let metadata = try? RecordingFileFinalizer().finalize(fileName: fileName) else { continue }
+                  !recording.isDeleted else { continue }
+            let metadata: FinalizedRecordingFile
+            do {
+                metadata = try finalizer.finalize(fileName: fileName)
+            } catch {
+                AppLog.recorder.atError.error("journal rebuild: finalization failed code=\(error.publicLogCode, privacy: .public)")
+                ReliabilityLog.record(ReliabilityEvent(
+                    operationID: OperationID(String(fileName.prefix(8))),
+                    operation: CaptureReliability.operation,
+                    stage: "journal_rebuild",
+                    outcome: .failed,
+                    code: "finalization_failed"
+                ))
+                continue
+            }
             recording.duration = metadata.duration
             recording.fileSize = metadata.fileSize
             recording.captureRecoveryReason = .interruptedDuringCapture
