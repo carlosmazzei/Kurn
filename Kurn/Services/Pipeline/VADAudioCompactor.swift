@@ -69,15 +69,14 @@ enum VADAudioLoader {
             throw AppError.audioError(NSLocalizedString("error.audio_cleanup", comment: "Audio loading failed"))
         }
 
-        let engine = AVAudioEngine()
+        let maxFrames: AVAudioFrameCount = 4096
+        let engine = try OfflineAudioEngine.make(outputFormat: outputFormat, maxFrames: maxFrames)
         let player = AVAudioPlayerNode()
         engine.attach(player)
         // The mixer/output path resamples and downmixes to the manual-rendering
         // format (mono @ `sampleRate`), so connect with the source's own format.
         engine.connect(player, to: engine.mainMixerNode, format: inputFormat)
 
-        let maxFrames: AVAudioFrameCount = 4096
-        try engine.enableManualRenderingMode(.offline, format: outputFormat, maximumFrameCount: maxFrames)
         try engine.start()
         defer {
             player.stop()

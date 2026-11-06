@@ -647,6 +647,11 @@ and `AVAudioConverter` both fail on them with a generic "erro 0" on device.
 `VADAudioLoader.monoSamples` keeps its own copy of the loop because it is
 synchronous; keep the two in sync. `VADAudioChunkReader` shares that synchronous
 render loop but delivers bounded sample chunks instead of accumulating the file.
+Both loops create engines through `OfflineAudioEngine`, enabling offline manual
+rendering on the stopped engine before attaching nodes or accessing the mixer.
+`AVAudioEngine.h` recommends this order: early mixer/I/O-node access can configure
+device rendering. This keeps offline setup off the device-rendering path implicated
+by a RemoteIO teardown RPC that aborted a test host at the manual-mode switch.
 
 ### Secure local storage for recordings
 
