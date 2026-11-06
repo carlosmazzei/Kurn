@@ -35,13 +35,16 @@ struct MeetingLibrary {
     /// commit to reach the rollback paths, which a real store will not fail on
     /// demand.
     private let persist: @MainActor (ModelContext) -> AppError?
+    private let loadTags: @MainActor (ModelContext) throws -> [Tag]
 
     init(
         context: ModelContext,
-        persist: @escaping @MainActor (ModelContext) -> AppError? = { $0.saveOrError() }
+        persist: @escaping @MainActor (ModelContext) -> AppError? = { $0.saveOrError() },
+        fetchTags: @escaping @MainActor (ModelContext) throws -> [Tag] = { try $0.fetch(FetchDescriptor<Tag>()) }
     ) {
         self.context = context
         self.persist = persist
+        self.loadTags = fetchTags
     }
 
     // MARK: - Meetings
@@ -188,9 +191,9 @@ struct MeetingLibrary {
 
     /// The existing tag whose name matches `name` case-insensitively, if any.
     /// Tag names are unique in that sense everywhere a user can create one.
-    func existingTag(named name: String) -> Tag? {
+    func existingTag(named name: String) throws(AppError) -> Tag? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let tags = (try? context.fetch(FetchDescriptor<Tag>())) ?? []
+        let tags = try fetchTags()
         return tags.first { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }
     }
 
@@ -199,7 +202,7 @@ struct MeetingLibrary {
     @discardableResult
     func createTag(named name: String) throws(AppError) -> Tag? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, existingTag(named: trimmed) == nil else { return nil }
+        guard !trimmed.isEmpty, try existingTag(named: trimmed) == nil else { return nil }
         let tag = Tag(name: trimmed)
         context.insert(tag)
         try save()
@@ -210,7 +213,7 @@ struct MeetingLibrary {
     /// that name or creating one. A no-op for a blank name or a tag the
     /// meeting already carries.
     func attachTag(named name: String, to meeting: Meeting) throws(AppError) {
-        guard attach(named: name, to: meeting) else { return }
+        guard try attach(named: name, to: meeting) else { return }
         try save()
     }
 
@@ -218,16 +221,32 @@ struct MeetingLibrary {
     /// (reused when a tag of that name already exists), skipping any the
     /// meeting already carries. Saves once for the whole suggestion.
     func applyTags(ids: [UUID], newNames: [String], to meeting: Meeting) throws(AppError) {
-        let tags = (try? context.fetch(FetchDescriptor<Tag>())) ?? []
+        let tags = try fetchTags()
         let byID = Dictionary(tags.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var resolved = meeting.tags
+        var namesToCreate: [String] = []
         for id in ids {
-            if let tag = byID[id], !meeting.tags.contains(where: { $0.id == id }) {
-                meeting.tags.append(tag)
+            if let tag = byID[id], !resolved.contains(where: { $0.id == id }) {
+                resolved.append(tag)
             }
         }
         for name in newNames {
-            attach(named: name, to: meeting)
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            if let existing = tags.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+                if !resolved.contains(where: { $0.id == existing.id }) {
+                    resolved.append(existing)
+                }
+            } else if !namesToCreate.contains(where: { $0.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+                namesToCreate.append(trimmed)
+            }
         }
+        for name in namesToCreate {
+            let tag = Tag(name: name)
+            context.insert(tag)
+            resolved.append(tag)
+        }
+        meeting.tags = resolved
         try save()
     }
 
@@ -300,10 +319,10 @@ struct MeetingLibrary {
     /// Attaches (creating if needed) the tag named `name` without saving.
     /// Returns whether the meeting changed.
     @discardableResult
-    private func attach(named name: String, to meeting: Meeting) -> Bool {
+    private func attach(named name: String, to meeting: Meeting) throws(AppError) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        if let existing = existingTag(named: trimmed) {
+        if let existing = try existingTag(named: trimmed) {
             guard !meeting.tags.contains(where: { $0.id == existing.id }) else { return false }
             meeting.tags.append(existing)
         } else {
@@ -316,6 +335,15 @@ struct MeetingLibrary {
 
     private func save() throws(AppError) {
         if let failure = persist(context) { throw failure }
+    }
+
+    private func fetchTags() throws(AppError) -> [Tag] {
+        do {
+            return try loadTags(context)
+        } catch {
+            AppLog.persistence.atError.error("Failed to fetch tags code=\(error.publicLogCode, privacy: .public)")
+            throw .persistenceFailed(error.localizedDescription)
+        }
     }
 
     private func journaledDelete(fileNames: [String], mutation: () -> Void) throws(AppError) {

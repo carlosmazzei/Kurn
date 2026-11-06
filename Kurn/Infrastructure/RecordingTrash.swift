@@ -25,6 +25,7 @@
 //
 
 import Foundation
+import KurnCore
 import SwiftData
 
 enum RecordingTrash {
@@ -131,14 +132,12 @@ enum RecordingTrash {
     /// Launch/foreground reconciliation for trash folders left over by a
     /// process that died between `trash(fileNames:operationID:)` and this
     /// operation's `purge`/`restore`. Safe to call unconditionally.
-    static func sweep(context: ModelContext) {
+    static func sweep(context: ModelContext, references: RecordingFileReferences = .init()) {
         let fm = FileManager.default
         guard let operationFolders = try? fm.contentsOfDirectory(
             at: trashRootURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
         ) else { return }
         guard !operationFolders.isEmpty else { return }
-        guard let existingRecordings = try? context.fetch(FetchDescriptor<Recording>()) else { return }
-        let existingPhotos = (try? context.fetch(FetchDescriptor<MeetingPhoto>())) ?? []
         // A trash folder from a lone `deletePhoto(_:)` operation carries only
         // a photo file name, never a recording's — checking recordings alone
         // would read every such folder as "already committed" and purge it
@@ -146,10 +145,20 @@ enum RecordingTrash {
         // mutation actually ran, permanently losing a photo whose row still
         // exists and now points at nothing.
         // Same for a lone `deleteAttachment(_:)`.
-        let existingAttachments = (try? context.fetch(FetchDescriptor<MeetingAttachment>())) ?? []
-        let knownFileNames = Set(existingRecordings.map(\.fileName))
-            .union(existingPhotos.map(\.fileName))
-            .union(existingAttachments.map(\.fileName))
+        let knownFileNames: Set<String>
+        do {
+            knownFileNames = try references.fileNames(context: context)
+        } catch {
+            AppLog.recorder.atError.error("trash: reference fetch failed code=\(error.publicLogCode, privacy: .public)")
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: OperationID(),
+                operation: "recording_trash",
+                stage: "sweep",
+                outcome: .failed,
+                code: "reference_fetch_failed"
+            ))
+            return
+        }
 
         for folder in operationFolders {
             guard let operationID = UUID(uuidString: folder.lastPathComponent) else { continue }
