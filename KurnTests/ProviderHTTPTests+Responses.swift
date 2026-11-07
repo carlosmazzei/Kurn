@@ -26,14 +26,16 @@ extension ProviderHTTPTests {
                                            tools: tools, maxOutputTokens: 300)
         let response = try await provider.streamTurn(firstRequest) { _ in }
         let request = try #require(MockURLProtocol.lastRequest)
-        let body = try JSONValue.parse(String(decoding: MockURLProtocol.body(of: request), as: UTF8.self))
+        let json = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request))
+        let body = try #require(json as? [String: Any])
         #expect(request.url?.absoluteString == "https://api.openai.com/v1/responses")
-        #expect(body["store"] == .bool(false))
-        #expect(body["include"] == .array([.string("reasoning.encrypted_content")]))
-        #expect(body["reasoning_effort"] == .null)
-        #expect(body["reasoning"] == (model.hasPrefix("gpt-5") ? .object(["effort": .string("low")]) : .null))
-        #expect(body["tools"].array.first?["type"] == .string("function"))
-        #expect(body["tools"].array.first?["parameters"]["type"] == .string("object"))
+        #expect(body["store"] as? Bool == false)
+        #expect(body["include"] as? [String] == ["reasoning.encrypted_content"])
+        #expect(body["reasoning_effort"] == nil)
+        #expect(body["reasoning"] as? [String: String] == (model.hasPrefix("gpt-5") ? ["effort": "low"] : nil))
+        let specs = body["tools"] as? [[String: Any]]
+        #expect(specs?.first?["type"] as? String == "function")
+        #expect((specs?.first?["parameters"] as? [String: String])?["type"] == "object")
         #expect(response.toolCalls.first?.id == "call-1")
         let nextRequest = AgentTurnRequest(systemPrompt: "Ground answers", messages: firstRequest.messages + [
             .assistant(text: response.text, toolCalls: response.toolCalls, providerMetadata: response.providerMetadata),
@@ -43,15 +45,15 @@ extension ProviderHTTPTests {
         #expect(final.text == "Found Alice")
         #expect(final.usage == AgentUsage(inputTokens: 10, outputTokens: 2))
         let followup = try #require(MockURLProtocol.lastRequest)
-        let replay = try JSONValue.parse(String(decoding: MockURLProtocol.body(of: followup), as: UTF8.self))["input"].array
-        #expect(replay[1]["type"] == .string("reasoning"))
-        #expect(replay[1]["encrypted_content"] == .string("encrypted"))
-        #expect(replay[2]["type"] == .string("function_call"))
-        #expect(replay[2]["call_id"] == .string("call-1"))
-        #expect(replay[2]["arguments"] == .string("{}"))
-        #expect(replay[2]["id"] == .null)
-        #expect(replay[3] == .object(["type": .string("function_call_output"), "call_id": .string("call-1"),
-                                    "output": .string("Alice in meeting A")]))
+        let followupJSON = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: followup)) as? [String: Any]
+        let replay = try #require(followupJSON?["input"] as? [[String: Any]])
+        #expect(replay[1]["type"] as? String == "reasoning")
+        #expect(replay[1]["encrypted_content"] as? String == "encrypted")
+        #expect(replay[2]["type"] as? String == "function_call")
+        #expect(replay[2]["call_id"] as? String == "call-1")
+        #expect(replay[2]["arguments"] as? String == "{}")
+        #expect(replay[2]["id"] == nil)
+        #expect(replay[3] as? [String: String] == ["type": "function_call_output", "call_id": "call-1", "output": "Alice in meeting A"])
     }
 
     @Test(arguments: ["id", "host"])
