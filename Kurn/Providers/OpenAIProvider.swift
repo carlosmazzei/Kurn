@@ -3,8 +3,8 @@
 //  Kurn
 //
 //  OpenAI implementation: Whisper for transcription (multipart upload,
-//  verbose_json for segment timestamps) and Chat Completions (gpt-4o) for
-//  summaries. All requests use URLSession with async/await.
+//  verbose_json for segment timestamps) and Responses for official OpenAI text
+//  generation. Compatible vendors retain Chat Completions.
 //
 
 import AgentHarness
@@ -13,6 +13,10 @@ import KurnCore
 
 struct OpenAIProvider: LLMProvider, TranscriptionProvider {
     let provider: AIProvider
+
+    private var usesResponses: Bool {
+        OpenAIResponsesText.isOfficial(providerID: provider.id, baseURL: provider.baseURLString)
+    }
 
     private let apiKey: String
     private let session: URLSession
@@ -266,7 +270,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         )
 
         return try LLMHTTP.summaryResult(
-            from: data,
+            from: usesResponses ? try LLMHTTP.responsesTextData(data) : data,
             as: ChatResponse.self,
             emptyMessage: "empty chat response",
             isTruncated: { $0.isTruncated },
@@ -295,6 +299,12 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
             ]
         )
 
+        if usesResponses {
+            let response = try await LLMHTTP.streamResponsesText(request, session: session,
+                policy: .streamingSummary, retriesBeforeFirstPayload: true, onDelta: onDelta)
+            return try LLMHTTP.summaryResult(streamedText: response.text, truncated: response.stopReason == .maxTokens,
+                                            emptyMessage: "empty chat response")
+        }
         let accumulator = StreamingAccumulator()
         let finish = FinishReasonRecorder()
         try await LLMHTTP.streamSSE(
@@ -354,7 +364,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         )
 
         return try LLMHTTP.textResult(
-            from: data,
+            from: usesResponses ? try LLMHTTP.responsesTextData(data) : data,
             as: ChatResponse.self,
             emptyMessage: "empty chat response",
             isTruncated: { $0.isTruncated },
@@ -396,6 +406,12 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         }
         let request = try makeRequest(timeout: options.timeout, body: body)
 
+        if usesResponses {
+            let response = try await LLMHTTP.streamResponsesText(request, session: session,
+                policy: .interactive(totalDeadline: options.timeout), onDelta: onDelta)
+            guard !response.text.isEmpty else { throw AppError.decodingError("empty chat response") }
+            return response.usage.map { TokenUsage(promptTokens: $0.inputTokens, completionTokens: $0.outputTokens) }
+        }
         let accumulator = StreamingAccumulator()
         let usage = UsageAccumulator()
         try await LLMHTTP.streamSSE(
@@ -424,7 +440,7 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
     private func httpContext(for request: URLRequest) -> HTTPExecutionContext {
         let inferred = HTTPRequestSemantics.inferred(for: request)
         let supportsCorrelationHeader = provider.id == AIProvider.openAI.id
-            && request.url?.path.hasSuffix("/chat/completions") == true
+            && (request.url?.path.hasSuffix("/chat/completions") == true || request.url?.path.hasSuffix("/responses") == true)
         let headerName = supportsCorrelationHeader ? "X-Client-Request-Id" : nil
         return HTTPExecutionContext(
             semantics: HTTPRequestSemantics(
@@ -434,16 +450,16 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         )
     }
 
-    /// A Chat Completions request with OpenAI's bearer auth. The transcription
+    /// A text-generation request with OpenAI's bearer auth. The transcription
     /// route builds its own multipart request and uses the bounded foreground
     /// transport with the long-running operation policy.
     private func makeRequest(timeout: TimeInterval, body: [String: Any]) throws -> URLRequest {
         try LLMHTTP.jsonRequest(
             provider: provider,
-            path: "chat/completions",
+            path: usesResponses ? "responses" : "chat/completions",
             timeout: timeout,
             headers: ["Authorization": "Bearer \(apiKey)"],
-            body: body
+            body: usesResponses ? OpenAIResponsesText.requestBody(body) : body
         )
     }
 
@@ -482,10 +498,7 @@ extension OpenAIProvider: AgentModel {
     ) async throws -> AgentTurnResponse {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
         let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
-        let baseURL = URLComponents(string: provider.baseURLString)
-        let official = provider.id == AIProvider.openAI.id
-            && baseURL?.scheme?.lowercased() == "https" && baseURL?.host?.lowercased() == "api.openai.com"
-            && (baseURL?.port == nil || baseURL?.port == 443)
+        let official = usesResponses
         let format: AgentWireFormat = official ? .openAIResponses : .openAI
         let body = format.requestBody(request, model: chatModel, reasoningEffort: reasoningEffort)
         var httpRequest = try LLMHTTP.jsonRequest(provider: provider, path: official ? "responses" : "chat/completions",

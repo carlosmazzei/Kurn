@@ -108,10 +108,15 @@ GenerateContent requests and accumulates their SSE data payloads. The app's thre
 cloud text providers conform to `AgentModel` through the existing bounded SSE
 transport, with chat timeouts and no retry after streaming starts. OpenAI-compatible
 custom endpoints follow the existing chat request shape.
-Official OpenAI agent turns use `/v1/responses` with `store: false` only when the
+All official OpenAI text calls use `/v1/responses` with `store: false` only when the
 built-in provider ID and HTTPS `api.openai.com` origin (default/443 port) both match;
-compatible endpoints and legacy summary/chat stay on Chat Completions. GPT-5 agent
-models retain low reasoning effort via `reasoning.effort`; other models omit it.
+compatible endpoints stay on Chat Completions. `OpenAIResponsesText` (KurnCore)
+shares that selection check and maps buffered text/summary requests and responses,
+including JSON-schema/JSON-object formats to `text.format`; streaming reuses the
+harness accumulator. Summary/wiki, legacy chat, correction, topic analysis and
+auto-tagging all follow this route. Existing GPT-5 chat/agent low reasoning effort
+maps to `reasoning.effort`; summary effort remains unspecified. Audio, speech and
+model-list APIs are unchanged. Transport timeouts/retry policy remain per route.
 Gemini call IDs are synthesized when absent; optional call metadata retains wire IDs and thought
 signatures for replay. `ProviderFactory.agentModel(for:model:)` returns nil for
 on-device and transcription-only providers, so callers can retain the chat fallback.

@@ -19,7 +19,7 @@ extension ProviderHTTPTests {
                 body: Data(#"{"error":{"message":"slow down"}}"#.utf8),
                 headers: ["Retry-After": "0.05"]
             ),
-            MockURLProtocol.json(["choices": [["message": ["content": sectionsBody]]]])
+            MockURLProtocol.json(responseJSON(sectionsBody))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
