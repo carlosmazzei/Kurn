@@ -115,8 +115,11 @@ public struct NativeHarness: Sendable {
     private func execute(_ calls: [AgentToolCall], tools: [AgentTool], state: inout RunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentRunStopReason? {
         var stop: AgentRunStopReason?
-        for call in calls {
+        for originalCall in calls {
             try Task.checkCancellation()
+            let arguments = try? JSONValue.parse(originalCall.rawArguments)
+            var call = originalCall
+            call.arguments = arguments ?? .null
             if costLimitReached(state) { stop = .costLimit }
             else if state.toolCalls >= limits.maxToolCalls { stop = .toolCallLimit }
             events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
@@ -128,7 +131,7 @@ public struct NativeHarness: Sendable {
                 isError = true
             } else {
                 state.toolCalls += 1
-                (output, isError) = try await executeOne(call, tools: tools)
+                (output, isError) = try await executeOne(call, arguments: arguments, tools: tools)
             }
             let result = AgentMessage.toolResult(callID: call.id, toolName: call.name,
                                                  content: output.content, isError: isError)
@@ -139,12 +142,13 @@ public struct NativeHarness: Sendable {
         return stop
     }
 
-    private func executeOne(_ call: AgentToolCall, tools: [AgentTool]) async throws -> (AgentToolOutput, Bool) {
+    private func executeOne(_ call: AgentToolCall, arguments: JSONValue?,
+                            tools: [AgentTool]) async throws -> (AgentToolOutput, Bool) {
         do {
             guard let tool = tools.first(where: { $0.spec.name == call.name }) else {
                 return toolError("Unknown tool: \(call.name).")
             }
-            guard let arguments = try? JSONValue.parse(call.rawArguments) else {
+            guard let arguments else {
                 return toolError("Invalid JSON arguments for \(call.name): \(call.rawArguments)")
             }
             if tool.requiresConfirmation {

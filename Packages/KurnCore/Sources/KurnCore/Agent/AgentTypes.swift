@@ -15,7 +15,7 @@ public struct AgentToolSpec: Codable, Sendable, Equatable {
 public struct AgentToolCall: Codable, Sendable, Equatable {
     public let id: String
     public let name: String
-    public let arguments: JSONValue
+    public internal(set) var arguments: JSONValue
     public let rawArguments: String
 
     public init(id: String, name: String, arguments: JSONValue, rawArguments: String) {
