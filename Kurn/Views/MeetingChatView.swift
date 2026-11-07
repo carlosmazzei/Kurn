@@ -479,12 +479,16 @@ struct MeetingChatView: View {
         guard !usesHarness || sourceValidation == nil else { return }
         let provider = settings.aiProvider
         let model = settings.summaryModel(for: provider)
+        let sources = ChatLegacySources.prepare(for: provider.kind) {
+            ChatLegacySources(transcriptText: meetingTranscriptText(), candidates: candidates(),
+                              summariesByMeeting: summariesByMeeting(), articlesByMeeting: articlesByMeeting())
+        }
         vm.send(
             question: question,
-            transcriptText: meetingTranscriptText(),
-            candidates: candidates(),
-            summariesByMeeting: summariesByMeeting(),
-            articlesByMeeting: articlesByMeeting(),
+            transcriptText: sources.transcriptText,
+            candidates: sources.candidates,
+            summariesByMeeting: sources.summariesByMeeting,
+            articlesByMeeting: sources.articlesByMeeting,
             provider: provider,
             model: model
         )
