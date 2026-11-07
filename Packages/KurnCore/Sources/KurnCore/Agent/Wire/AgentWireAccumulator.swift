@@ -56,9 +56,10 @@ private struct AgentWireState {
     }
 
     func response() throws -> AgentTurnResponse {
-        guard !text.isEmpty || !calls.isEmpty else { throw AgentWireError.emptyResponse }
+        guard !text.isEmpty || !calls.isEmpty || stopReason == .maxTokens else { throw AgentWireError.emptyResponse }
         guard receivedTerminal else { throw AgentWireError.incompleteStream }
-        let toolCalls = try calls.keys.sorted().map { index in
+        let callIndices = stopReason == .maxTokens ? [] : calls.keys.sorted()
+        let toolCalls = try callIndices.map { index in
             let call = calls[index] ?? PartialCall()
             guard !call.id.isEmpty, !call.name.isEmpty else { throw AgentWireError.incompleteToolCall }
             let raw = call.raw.isEmpty ? try call.initial.encodedString() : call.raw

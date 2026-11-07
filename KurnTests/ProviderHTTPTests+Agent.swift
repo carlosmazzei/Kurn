@@ -99,9 +99,19 @@ extension ProviderHTTPTests {
         }
     }
 
-    @Test(arguments: AgentTestVendor.allCases)
-    private func agentTextDeltasAreForwarded(vendor: AgentTestVendor) async throws {
-        MockURLProtocol.enqueue([.success(status: 200, body: sseBody(["malformed", vendor.textPayload]), headers: [:])])
+    @Test(arguments: AgentTestVendor.allCases, [false, true])
+    private func agentTextDeltasAreForwarded(vendor: AgentTestVendor, outputLimited: Bool) async throws {
+        var payload = vendor.textPayload
+        if outputLimited {
+            payload = payload.replacingOccurrences(of: "\"stop\"", with: "\"length\"")
+                .replacingOccurrences(of: "\"STOP\"", with: "\"MAX_TOKENS\"")
+        }
+        var payloads = ["malformed", payload]
+        if vendor == .anthropic {
+            let reason = outputLimited ? "max_tokens" : "end_turn"
+            payloads.append(#"{"type":"message_delta","delta":{"stop_reason":"\#(reason)"}}"#)
+        }
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
         let text = StreamingAccumulator()
         let response = try await vendor.model().streamTurn(agentRequest) { event in
             if case .textDelta(let delta) = event { text.append(delta) }
@@ -109,6 +119,7 @@ extension ProviderHTTPTests {
         #expect(text.value == "Hello")
         #expect(response.text == "Hello")
         #expect(response.toolCalls.isEmpty)
+        #expect(response.stopReason == (outputLimited ? .maxTokens : .endTurn))
     }
 
     @Test(arguments: ["empty", "remote", "incomplete", "interrupted", "http", "transport"])
