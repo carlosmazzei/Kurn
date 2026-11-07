@@ -136,6 +136,12 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
                                               isError: parsed == nil)))
         let outcome = try agentOutcome(events)
         #expect(outcome.finalText == "Done")
+        var expectedCall = call
+        expectedCall.arguments = parsed ?? .null
+        let expectedAssistant = AgentMessage.assistant(text: "", toolCalls: [expectedCall])
+        #expect(outcome.messages[1] == expectedAssistant)
+        let replay = try #require(await model.requests.last)
+        #expect(replay.messages[1] == expectedAssistant)
     }
 
     @Test func turnLimit() async throws {
