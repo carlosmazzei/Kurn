@@ -24,6 +24,16 @@ struct ChatArtifactSourcesTests {
         let fallback = selected.retaining(legacy)
         #expect(fallback.kind == .transcripts)
         #expect(fallback.names == [first.id.uuidString, "Selected meeting"])
+        let artifact = ChatDocumentArtifact(title: "Mixed", markdown: "Body")
+        let session = ChatSession(meeting: nil, title: "Chat")
+        context.insert(session)
+        session.artifactsData = JSONStorage.encodeAuthoritative([artifact])
+        var turn = MeetingChatViewModel.Turn(role: .assistant, text: "Done")
+        turn.artifactOrigins = [artifact.id: ChatArtifactOrigin(question: "Report", modelIdentifier: "model", sources: mixed)]
+        session.turns = [PersistedChatTurn(turn)]
+        let document = try #require(ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
+        #expect(document.sourceKind == .transcripts)
+        #expect(document.sourceNames == ["Tagged meeting", "Selected meeting"])
     }
 
     @Test func sourceSnapshotSurvivesScopeChangesDeletionAndRevision() throws {
