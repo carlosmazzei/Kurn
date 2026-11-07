@@ -148,7 +148,10 @@ struct MeetingChatHarnessTests {
         #expect(vm.turns.last?.usage == TokenUsage(promptTokens: 7, completionTokens: 3))
         #expect((vm.turns.last?.costUSD ?? 0) > 0)
         #expect(try vm.pastSessions().first?.harnessSnapshot().artifacts == vm.artifacts)
-        #expect(vm.pastSessions().first?.turns.isEmpty == true)
+        let pending = try #require(vm.pastSessions().first)
+        #expect(pending.turns.map(\.role) == [.user])
+        #expect(pending.turns.first?.text == "Create minutes")
+        #expect(pending.turns.first?.artifacts == vm.artifacts.map(ChatArtifactReference.init))
         let scope = vm.scope
         vm.updateScope(ChatSourceScope(kind: .library, parts: []))
         #expect(vm.scope == scope)

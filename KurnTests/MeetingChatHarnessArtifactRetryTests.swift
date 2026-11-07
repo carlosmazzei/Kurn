@@ -20,7 +20,7 @@ struct MeetingChatHarnessArtifactRetryTests {
         vm.cancel()
         #expect(vm.turns.flatMap(\.artifacts) == [ChatArtifactReference(artifact)])
         let session = try #require(vm.pastSessions().first)
-        #expect(ChatArtifactStore.origin(artifactID: artifact.id, in: session.turns).modelIdentifier == "openai:gpt-4o")
+        #expect(ChatArtifactStore.origin(artifactID: artifact.id, in: session.turns).modelIdentifier == "\(AIProvider.openAI.id):gpt-4o")
         vm.load(session: session)
         #expect(vm.turns.flatMap(\.artifacts) == [ChatArtifactReference(artifact)])
     }
@@ -73,7 +73,7 @@ struct MeetingChatHarnessArtifactRetryTests {
         let session = try #require(vm.pastSessions().first)
         #expect(session.turns.flatMap { $0.artifacts ?? [] } == [ChatArtifactReference(artifact)])
         #expect(ChatArtifactStore.origin(artifactID: artifact.id, in: session.turns).question == "Write minutes")
-        #expect(ChatArtifactStore.origin(artifactID: artifact.id, in: session.turns).modelIdentifier == "openai:gpt-4o")
+        #expect(ChatArtifactStore.origin(artifactID: artifact.id, in: session.turns).modelIdentifier == "\(AIProvider.openAI.id):gpt-4o")
         vm.load(session: session)
         #expect(vm.artifacts == [artifact])
         #expect(vm.turns.flatMap(\.artifacts) == [ChatArtifactReference(artifact)])
