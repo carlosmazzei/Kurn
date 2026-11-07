@@ -149,4 +149,21 @@ extension ProviderHTTPTests {
             Issue.record("Unexpected error: \(error)")
         }
     }
+
+    @Test(arguments: ["streamSummary", "streamChat"])
+    func textStreamFallsBackToCompletedOutput(route: String) async throws {
+        let text = "## Recap\nHello"
+        let event: [String: Any] = ["type": "response.completed", "response": responseJSON(text)]
+        let payload = String(decoding: try JSONSerialization.data(withJSONObject: event), as: UTF8.self)
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody([payload]), headers: [:])])
+        let provider = OpenAIProvider(apiKey: "test", session: MockURLProtocol.session())
+        let received = StreamingAccumulator()
+        if route == "streamSummary" {
+            let result = try await provider.streamSummary(systemPrompt: "s", userPrompt: "u") { received.append($0) }
+            #expect(result.sections.first?.title == "Recap")
+        } else {
+            _ = try await provider.streamChat(systemPrompt: "s", messages: []) { received.append($0) }
+        }
+        #expect(received.value == text)
+    }
 }
