@@ -31,7 +31,7 @@ struct ChatArtifactSourcesTests {
         var turn = MeetingChatViewModel.Turn(role: .assistant, text: "Done")
         turn.artifactOrigins = [artifact.id: ChatArtifactOrigin(question: "Report", modelIdentifier: "model", sources: mixed)]
         session.turns = [PersistedChatTurn(turn)]
-        let document = try #require(ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
+        let document = try #require(try ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
         #expect(document.sourceKind == .transcripts)
         #expect(document.sourceNames == ["Tagged meeting", "Selected meeting"])
     }
@@ -54,7 +54,7 @@ struct ChatArtifactSourcesTests {
         context.delete(first)
         try context.save()
         let store = ChatArtifactStore(context: context)
-        let document = try #require(store.save(artifactID: artifact.id, session: session))
+        let document = try #require(try store.save(artifactID: artifact.id, session: session))
         #expect(document.sourceMeetingIDs == [firstID])
         #expect(document.sourceNames == ["Original"])
         let revised = ChatDocumentArtifact(id: artifact.id, title: artifact.title, markdown: "Revision", version: 2)
