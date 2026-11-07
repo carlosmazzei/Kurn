@@ -8,6 +8,7 @@
 //  leak state into other tests or the app itself.
 //
 
+import AgentHarness
 import Testing
 import KurnCore
 @testable import Kurn

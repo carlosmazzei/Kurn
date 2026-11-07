@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import KurnCore
+@testable import AgentHarness
 
 @Suite struct AgentWireStreamTests {
     func consume(_ payloads: [String], format: AgentWireFormat) throws -> (AgentTurnResponse, [AgentModelEvent]) {

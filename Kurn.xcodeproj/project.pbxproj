@@ -13,6 +13,8 @@
 		2AC0000000000000000000A2 /* Kurn/Resources/Models/gtcrn.json in Resources */ = {isa = PBXBuildFile; fileRef = 2AC0000000000000000000B2 /* Kurn/Resources/Models/gtcrn.json */; };
 		2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */ = {isa = PBXBuildFile; productRef = 2AD0000000000000000000A2 /* sherpa-onnx */; };
 		2AE0000000000000000000A1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000A2 /* KurnCore */; };
+		2AF0000000000000000000A1 /* AgentHarness in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF0000000000000000000A2 /* AgentHarness */; };
+		2AF0000000000000000000B1 /* AgentHarness in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF0000000000000000000B2 /* AgentHarness */; };
 		2AE0000000000000000000B1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000B2 /* KurnCore */; };
 		2AE0000000000000000000C1 /* KurnCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2AE0000000000000000000C2 /* KurnCore */; };
 		AA1000000000000000000131 /* KurnLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* KurnLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -168,6 +170,7 @@
 				2AB0000000000000000000A1 /* whisper in Frameworks */,
 				2AD0000000000000000000A1 /* sherpa-onnx in Frameworks */,
 				2AE0000000000000000000A1 /* KurnCore in Frameworks */,
+				2AF0000000000000000000A1 /* AgentHarness in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -183,6 +186,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2AE0000000000000000000B1 /* KurnCore in Frameworks */,
+				2AF0000000000000000000B1 /* AgentHarness in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -302,6 +306,7 @@
 			name = Kurn;
 			packageProductDependencies = (
 				2AE0000000000000000000A2 /* KurnCore */,
+				2AF0000000000000000000A2 /* AgentHarness */,
 			);
 			productName = Kurn;
 			productReference = AA00000000000000000000A1 /* Kurn.app */;
@@ -346,6 +351,7 @@
 			name = KurnTests;
 			packageProductDependencies = (
 				2AE0000000000000000000B2 /* KurnCore */,
+				2AF0000000000000000000B2 /* AgentHarness */,
 			);
 			productName = KurnTests;
 			productReference = AA20000000000000000000A1 /* KurnTests.xctest */;
@@ -475,6 +481,7 @@
 				2AB0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/WhisperCpp" */,
 				2AD0000000000000000000A3 /* XCRemoteSwiftPackageReference "sherpa-onnx" */,
 				2AE0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/KurnCore" */,
+				2AF0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/AgentHarness" */,
 			);
 			productRefGroup = AA0000000000000000000002 /* Products */;
 			projectDirPath = "";
@@ -1156,6 +1163,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		2AF0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/AgentHarness" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AgentHarness;
+		};
 		2AB0000000000000000000A3 /* XCLocalSwiftPackageReference "Packages/WhisperCpp" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/WhisperCpp;
@@ -1191,6 +1202,14 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2AF0000000000000000000A2 /* AgentHarness */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentHarness;
+		};
+		2AF0000000000000000000B2 /* AgentHarness */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentHarness;
+		};
 		2AA9E4B62FECAAE50067BF88 /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 2AA9E3262FE940ED0067BF88 /* XCRemoteSwiftPackageReference "FluidAudio" */;

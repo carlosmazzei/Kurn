@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import KurnCore
+@testable import AgentHarness
 
 @Suite struct AgentContextTests {
     let longText = String(repeating: "meeting facts [12:34] Alice 42 meeting-id-7 ", count: 200)
@@ -36,7 +36,7 @@ import Testing
         let requests = await model.requests
         #expect(requests.count == 2)
         #expect(requests[0].tools.isEmpty)
-        #expect(requests[0].systemPrompt.contains("[mm:ss] citations and meeting IDs"))
+        #expect(requests[0].systemPrompt.contains("[mm:ss] citations and source identifiers"))
         #expect(requests[1].messages == [.user("[Summary of earlier conversation]\nAlice chose 42 [12:34] meeting-id-7"),
                                          .user("Question")])
         #expect(requests[1].tools == [agentTool().spec])
@@ -69,8 +69,8 @@ import Testing
     }
 
     @Test func emptyAndNonReducingSummary() {
-        let compactor = AgentContextCompactor(policy: AgentContextPolicy(budget: .onDevice))
-        #expect(compactor.policy.inputTokenBudget == ContextBudget.onDevice.inputTokens)
+        let compactor = AgentContextCompactor(policy: AgentContextPolicy(inputTokenBudget: 1_700))
+        #expect(compactor.policy.inputTokenBudget == 1_700)
         #expect(compactor.summaryRequest(for: [], maxOutputTokens: 10) == nil)
         #expect(compactor.elidingOldResults(in: []).isEmpty)
         let small = AgentContextCompactor(policy: AgentContextPolicy(inputTokenBudget: 1, keepRecentMessages: 1))
@@ -78,7 +78,7 @@ import Testing
         #expect(small.replacingOlderPrefix(in: messages, summary: " ") == messages)
         #expect(small.replacingOlderPrefix(in: messages, summary: longText) == messages)
         #expect(small.estimateTokens(systemPrompt: longText, messages: [], tools: [agentTool().spec])
-            > TokenEstimate.tokens(in: longText))
+            > (longText.count + 3) / 4)
     }
 
     @Test func summaryFailurePropagates() async {

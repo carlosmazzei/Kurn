@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 import KurnCore
 

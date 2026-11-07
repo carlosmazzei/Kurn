@@ -15,9 +15,8 @@ coverage:
       default:
         informational: true
 
-# Three flags, one per CI job that uploads coverage (unit-tests, and the
-# ui-tests shards behind ui-accessibility-tests, in .github/workflows/swift.yml; kurncore-linux for
-# the KurnCore Swift package) — kept separate rather than merged into one
+# Separate flags for app unit/UI tests and each Swift package uploaded by
+# the kurncore-linux matrix in .github/workflows/swift.yml — rather than one
 # number, since a UI-test run and a unit-test run cover very different code
 # and conflating them would make neither figure meaningful.
 flags:
@@ -30,6 +29,9 @@ flags:
   kurncore:
     paths:
       - Packages/KurnCore/
+  agentharness:
+    paths:
+      - Packages/AgentHarness/
 
 comment:
   layout: "reach, diff, flags, components, files"
@@ -70,6 +72,9 @@ component_management:
     - component_id: kurncore
       name: KurnCore
       paths: [Packages/KurnCore/Sources/**]
+    - component_id: agentharness
+      name: AgentHarness
+      paths: [Packages/AgentHarness/Sources/**]
 
 # The watch app, the Live Activity extension and the App Intents are built
 # for the iOS test run but no test executes them, so they sit at 0% and can
