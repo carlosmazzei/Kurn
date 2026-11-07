@@ -12,6 +12,7 @@ struct AgentResponsesAccumulator {
     var text = ""
     var calls: [Int: Call] = [:]
     var reasoning: [Int: JSONValue] = [:]
+    var refusals: [String: String] = [:]
     var terminal = false
     var limited = false
     var usage: AgentUsage?
@@ -24,6 +25,9 @@ struct AgentResponsesAccumulator {
             guard let delta = value["delta"].string, !delta.isEmpty else { return [] }
             text += delta
             return [.textDelta(delta)]
+        case "response.refusal.delta":
+            let key = "\(value["output_index"].int ?? 0):\(value["content_index"].int ?? 0)"
+            return appendRefusal(value["delta"].string ?? "", key: key)
         case "response.output_item.added", "response.output_item.done":
             if let index = value["output_index"].int {
                 record(value["item"], index: index, complete: value["type"].string == "response.output_item.done")
@@ -41,7 +45,7 @@ struct AgentResponsesAccumulator {
                 calls[index] = call
             }
         case "response.completed", "response.incomplete":
-            try finish(value)
+            return try finish(value)
         case "response.failed":
             try fail(value["response"]["error"]["message"].string ?? "Response failed")
         case "error":
@@ -51,7 +55,7 @@ struct AgentResponsesAccumulator {
         return []
     }
 
-    mutating func finish(_ value: JSONValue) throws {
+    mutating func finish(_ value: JSONValue) throws -> [AgentModelEvent] {
         let response = value["response"]
         terminal = true
         if value["type"].string == "response.incomplete" {
@@ -67,6 +71,25 @@ struct AgentResponsesAccumulator {
         if reported["input_tokens"].int != nil || reported["output_tokens"].int != nil {
             usage = AgentUsage(inputTokens: reported["input_tokens"].int ?? 0, outputTokens: reported["output_tokens"].int ?? 0)
         }
+        var events: [AgentModelEvent] = []
+        for (index, item) in response["output"].array.enumerated() where item["type"].string == "message" {
+            for (contentIndex, content) in item["content"].array.enumerated() where content["type"].string == "refusal" {
+                let key = "\(index):\(contentIndex)"
+                let full = content["refusal"].string ?? ""
+                let streamed = refusals[key] ?? ""
+                if full.hasPrefix(streamed) {
+                    events += appendRefusal(String(full.dropFirst(streamed.count)), key: key)
+                }
+            }
+        }
+        return events
+    }
+
+    mutating func appendRefusal(_ delta: String, key: String) -> [AgentModelEvent] {
+        guard !delta.isEmpty else { return [] }
+        refusals[key, default: ""] += delta
+        text += delta
+        return [.textDelta(delta)]
     }
 
     mutating func record(_ item: JSONValue, index: Int, complete: Bool) {

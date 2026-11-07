@@ -87,4 +87,24 @@ extension ProviderHTTPTests {
             #expect(statusCode == 0)
         }
     }
+
+    @Test(arguments: [false, true])
+    func responsesRefusalIsAnAssistantReply(streamed: Bool) async throws {
+        var payloads: [String] = []
+        if streamed { payloads.append(#"{"type":"response.refusal.delta","delta":"I cannot help."}"#) }
+        payloads.append(#"""
+            {"type":"response.completed","response":{"output":[{"type":"message","content":[
+            {"type":"refusal","refusal":"I cannot help."}]}]}}
+            """#)
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
+        let provider = OpenAIProvider(apiKey: "test", session: MockURLProtocol.session())
+        let request = AgentTurnRequest(systemPrompt: "sys", messages: [.user("Hi")], tools: [], maxOutputTokens: 10)
+        let text = StreamingAccumulator()
+        let response = try await provider.streamTurn(request) { event in
+            if case .textDelta(let delta) = event { text.append(delta) }
+        }
+        #expect(text.value == "I cannot help.")
+        #expect(response.text == "I cannot help.")
+        #expect(response.stopReason == .endTurn)
+    }
 }
