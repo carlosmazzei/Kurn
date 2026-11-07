@@ -25,7 +25,7 @@ struct ChatArtifactStoreTests {
         let session = session(context: context, artifact: artifact)
         let store = ChatArtifactStore(context: context)
         #expect(ChatArtifactStore.action(artifact: artifact, saved: nil) == .save)
-        let document = try #require(store.save(artifactID: artifact.id, session: session))
+        let document = try #require(try store.save(artifactID: artifact.id, session: session))
         let originalID = document.id
         let createdAt = document.createdAt
         #expect(document.sourceChatSessionID == session.id)
@@ -57,7 +57,7 @@ struct ChatArtifactStoreTests {
         context.delete(document)
         try context.save()
         #expect(try store.savedDocument(artifactID: artifact.id, sessionID: session.id) == nil)
-        let replacement = try #require(store.save(artifactID: artifact.id, session: session))
+        let replacement = try #require(try store.save(artifactID: artifact.id, session: session))
         #expect(replacement.id != originalID)
         #expect(replacement.sourceArtifactVersion == 2)
     }
@@ -83,7 +83,7 @@ struct ChatArtifactStoreTests {
         #expect(throws: AppError.self) { try failing.save(artifactID: artifact.id, session: session) }
         try context.save()
         #expect(try context.fetch(FetchDescriptor<GeneratedDocument>()).isEmpty)
-        let document = try #require(ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
+        let document = try #require(try ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
         let revised = ChatDocumentArtifact(id: artifact.id, title: "Revised", markdown: "Changed", version: 2)
         session.artifactsData = JSONStorage.encodeAuthoritative([revised])
         #expect(throws: AppError.self) { try failing.save(artifactID: artifact.id, session: session) }
@@ -102,7 +102,7 @@ struct ChatArtifactStoreTests {
         session.turns = [turn]
         for kind in [ChatSourceScope.Kind.tags, .folders, .library] {
             session.scopeData = JSONStorage.encodeAuthoritative(ChatSourceScope(kind: kind))
-            let document = try #require(ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
+            let document = try #require(try ChatArtifactStore(context: context).save(artifactID: artifact.id, session: session))
             #expect(document.userPrompt == "Write minutes")
             #expect(document.generatorModelIdentifier.isEmpty)
             #expect(document.sourceKind == (kind == .tags ? .tags : kind == .folders ? .folders : .transcripts))
