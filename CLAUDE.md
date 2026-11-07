@@ -39,6 +39,22 @@ is a `.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework
 release asset (see "On-device Whisper (whisper.cpp)" below). The only remote
 package is FluidAudio.
 
+### Agent harness (`KurnCore/Agent/`)
+
+`NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
+supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
+confirmation and execution. `AgentEvent` exposes turns, text, tools, compaction,
+usage and the final outcome. Tool failures become error results for model recovery;
+provider failures throw, and stream termination cancels in-flight work. Turn, tool
+and optional estimated-cost limits finish with an explicit stop reason. Cost is
+accounted from reported usage through the caller's estimator, including summary calls.
+Context uses `TokenEstimate`: old tool results are elided first, then an older
+prefix is summarized with a tool-less model request, preserving assistant/result
+groups and recent messages. Compaction changes only model context; outcomes retain
+full history. These estimates and limits do not guarantee a provider's hard context
+or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
+There are no app provider adapters, meeting tools or UI in this module.
+
 ### Where documentation lives
 
 This file is the architecture and conventions reference; `README.md` describes
