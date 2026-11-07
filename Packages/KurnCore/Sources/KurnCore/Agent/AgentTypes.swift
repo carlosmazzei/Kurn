@@ -95,10 +95,12 @@ public protocol AgentModel: Sendable {
 public struct AgentToolOutput: Sendable, Equatable {
     public let content: String
     public let summary: String
+    public let isError: Bool
 
-    public init(content: String, summary: String) {
+    public init(content: String, summary: String, isError: Bool = false) {
         self.content = content
         self.summary = summary
+        self.isError = isError
     }
 }
 
