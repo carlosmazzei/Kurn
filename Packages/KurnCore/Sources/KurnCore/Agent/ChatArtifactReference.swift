@@ -17,10 +17,16 @@ public struct ChatArtifactReference: Codable, Sendable, Equatable, Identifiable 
 
     public static func updating(_ references: [Self], from previous: [ChatDocumentArtifact],
                                 to current: [ChatDocumentArtifact]) -> [Self] {
+        let changed = current.filter { artifact in
+            !previous.contains(where: { $0.id == artifact.id && $0.version == artifact.version })
+        }.map(Self.init)
+        return merging(references, with: changed)
+    }
+
+    public static func merging(_ references: [Self], with updated: [Self]) -> [Self] {
         var result = references
-        for artifact in current where !previous.contains(where: { $0.id == artifact.id && $0.version == artifact.version }) {
-            let reference = Self(artifact)
-            if let index = result.firstIndex(where: { $0.id == artifact.id }) { result[index] = reference }
+        for reference in updated {
+            if let index = result.firstIndex(where: { $0.id == reference.id }) { result[index] = reference }
             else { result.append(reference) }
         }
         return result

@@ -17,6 +17,7 @@ struct ChatArtifactReferenceTests {
         #expect(!String(decoding: encoded, as: UTF8.self).contains("body"))
         #expect(try JSONDecoder().decode([ChatArtifactReference].self, from: encoded) == updated)
         #expect(updated[0].label { _ in "Document: %@ v%d" } == "Document: Renamed v2")
+        #expect(ChatArtifactReference.merging(created, with: [ChatArtifactReference(revised)]) == updated)
     }
 
     @Test func noChangesAndRemovedDocumentsKeepHistoricalReferences() {

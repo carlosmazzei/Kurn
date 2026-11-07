@@ -33,6 +33,7 @@ final class MeetingChatViewModel {
     private(set) var artifacts: [ChatDocumentArtifact] = []
     @ObservationIgnored private var workspace = ChatDocumentWorkspace()
     @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var retryArtifacts: [ChatArtifactReference] = []
     private let agentModelFactory: HarnessChatService.ModelFactory
     private let harnessService: HarnessChatService
     /// The saved conversation backing `turns`, or `nil` for a not-yet-saved
@@ -127,6 +128,8 @@ final class MeetingChatViewModel {
         let generation = self.generation
 
         turns.append(Turn(role: .user, text: trimmed))
+        turns[turns.count - 1].artifacts = retryArtifacts
+        retryArtifacts = []
         isResponding = true
         currentPhase = nil
         currentPhaseDetail = nil
@@ -336,7 +339,7 @@ final class MeetingChatViewModel {
     /// `retryableQuestion` is non-nil.
     func dropRetryableQuestion() {
         guard retryableQuestion != nil else { return }
-        turns.removeLast()
+        retryArtifacts = turns.removeLast().artifacts
     }
 
     /// Prior turns as chat history. Turns are plain text to keep token cost
@@ -379,6 +382,7 @@ final class MeetingChatViewModel {
         cancel()
         generation = UUID()
         turns.removeAll()
+        retryArtifacts = []
         error = nil
         session = nil
         artifacts = []
@@ -428,6 +432,7 @@ final class MeetingChatViewModel {
             artifacts = restored.artifacts
             scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
             turns = session.turns.map(Turn.init)
+            retryArtifacts = []
             error = nil
         } catch {
             self.error = .apiError(statusCode: 0, message: error.localizedDescription)
@@ -496,7 +501,7 @@ final class MeetingChatViewModel {
         if ChatRunNotice.needsRetry(steps: timeline.steps, answer: turns[index].text) {
             let stopped = turns.removeLast()
             turns[index - 1].steps = stopped.steps
-            turns[index - 1].artifacts = stopped.artifacts
+            turns[index - 1].artifacts = ChatArtifactReference.merging(turns[index - 1].artifacts, with: stopped.artifacts)
             turns[index - 1].usage = stopped.usage
             turns[index - 1].costUSD = stopped.costUSD
             turns[index - 1].elapsedSeconds = stopped.elapsedSeconds
