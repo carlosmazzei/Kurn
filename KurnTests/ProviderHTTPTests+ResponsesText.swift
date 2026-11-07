@@ -79,6 +79,30 @@ extension ProviderHTTPTests {
         }
     }
 
+    @Test(arguments: ["summary", "streamSummary", "chat", "streamChat"])
+    func responseWithoutProviderErrorUsesLocalizedDecodingError(route: String) async throws {
+        let failed: [String: Any] = ["status": "failed"]
+        if route.hasPrefix("stream") {
+            let event: [String: Any] = ["type": "response.failed", "response": failed]
+            let payload = String(decoding: try JSONSerialization.data(withJSONObject: event), as: UTF8.self)
+            MockURLProtocol.enqueue([.success(status: 200, body: sseBody([payload]), headers: [:])])
+        } else {
+            MockURLProtocol.enqueue([MockURLProtocol.json(failed)])
+        }
+        let provider = OpenAIProvider(apiKey: "test", session: MockURLProtocol.session())
+        do {
+            switch route {
+            case "summary": _ = try await provider.summarize(systemPrompt: "sys", userPrompt: "usr")
+            case "streamSummary": _ = try await provider.streamSummary(systemPrompt: "sys", userPrompt: "usr") { _ in }
+            case "chat": _ = try await provider.chat(systemPrompt: "sys", messages: [])
+            default: _ = try await provider.streamChat(systemPrompt: "sys", messages: []) { _ in }
+            }
+            Issue.record("Expected localized failure")
+        } catch AppError.decodingError(let detail) {
+            #expect(detail == NSLocalizedString("error.provider_response_invalid", comment: ""))
+        }
+    }
+
     @Test(arguments: ["interrupted", "incompleteTool"])
     func officialTextStreamRequiresCompleteTerminalOutput(kind: String) async throws {
         let payloads = kind == "interrupted"

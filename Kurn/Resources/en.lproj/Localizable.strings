@@ -1,3 +1,7 @@
+"error.provider_response_invalid" = "The provider returned an invalid or unfinished response.";
+"error.provider_response_empty" = "The provider returned an empty response.";
+"error.provider_tool_call_incomplete" = "The provider returned an incomplete tool call.";
+
 /* Kurn — English (base) */
 
 /* Errors */

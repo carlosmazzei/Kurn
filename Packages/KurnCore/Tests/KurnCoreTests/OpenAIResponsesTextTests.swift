@@ -75,7 +75,7 @@ import Testing
     @Test(arguments: ["content_filter", "unknown"])
     func incompleteOtherReasonsFail(reason: String) {
         let data = Data(#"{"status":"incomplete","incomplete_details":{"reason":"\#(reason)"}}"#.utf8)
-        #expect(throws: OpenAIResponsesTextError.remote("Incomplete response: \(reason)")) {
+        #expect(throws: OpenAIResponsesTextError.invalidResponse) {
             try OpenAIResponsesText.chatCompletionResponse(from: data)
         }
     }
@@ -87,7 +87,7 @@ import Testing
         }
     }
 
-    @Test(arguments: ["[]", "{}", #"{"status":"in_progress"}"#])
+    @Test(arguments: ["[]", "{}", #"{"status":"in_progress"}"#, #"{"status":"failed"}"#, #"{"error":{}}"#])
     func invalidResponseFails(json: String) {
         #expect(throws: OpenAIResponsesTextError.invalidResponse) {
             try OpenAIResponsesText.chatCompletionResponse(from: Data(json.utf8))

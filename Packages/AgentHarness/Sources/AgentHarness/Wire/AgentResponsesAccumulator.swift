@@ -47,9 +47,9 @@ struct AgentResponsesAccumulator {
         case "response.completed", "response.incomplete":
             return try finish(value)
         case "response.failed":
-            try fail(value["response"]["error"]["message"].string ?? "Response failed")
+            try fail(value["response"]["error"]["message"].string.map(AgentWireError.remote) ?? .invalidResponse)
         case "error":
-            try fail(value["message"].string ?? "Stream error")
+            try fail(value["message"].string.map(AgentWireError.remote) ?? .invalidResponse)
         default: break
         }
         return []
@@ -60,7 +60,7 @@ struct AgentResponsesAccumulator {
         terminal = true
         if value["type"].string == "response.incomplete" {
             let reason = response["incomplete_details"]["reason"].string ?? "unknown"
-            guard reason == "max_output_tokens" else { try fail("Incomplete response: \(reason)") }
+            guard reason == "max_output_tokens" else { try fail(.invalidResponse) }
             limited = true
         } else {
             for (index, item) in response["output"].array.enumerated() {
@@ -107,9 +107,8 @@ struct AgentResponsesAccumulator {
         calls[index] = call
     }
 
-    mutating func fail(_ message: String) throws -> Never {
+    mutating func fail(_ error: AgentWireError) throws -> Never {
         terminal = true
-        let error = AgentWireError.remote(message)
         failure = error
         throw error
     }

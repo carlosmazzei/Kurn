@@ -409,7 +409,9 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         if usesResponses {
             let response = try await LLMHTTP.streamResponsesText(request, session: session,
                 policy: .interactive(totalDeadline: options.timeout), onDelta: onDelta)
-            guard !response.text.isEmpty else { throw AppError.decodingError("empty chat response") }
+            guard !response.text.isEmpty else {
+                throw AppError.decodingError(NSLocalizedString("error.provider_response_empty", comment: "Empty provider response"))
+            }
             return response.usage.map { TokenUsage(promptTokens: $0.inputTokens, completionTokens: $0.outputTokens) }
         }
         let accumulator = StreamingAccumulator()

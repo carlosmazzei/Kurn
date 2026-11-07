@@ -44,14 +44,15 @@ public enum OpenAIResponsesText {
             throw OpenAIResponsesTextError.invalidResponse
         }
         if let error = response["error"] as? [String: Any] {
-            throw OpenAIResponsesTextError.remote(error["message"] as? String ?? "Response failed")
+            guard let message = error["message"] as? String else { throw OpenAIResponsesTextError.invalidResponse }
+            throw OpenAIResponsesTextError.remote(message)
         }
         let status = response["status"] as? String
         let details = response["incomplete_details"] as? [String: Any]
         let truncated = status == "incomplete" && details?["reason"] as? String == "max_output_tokens"
-        if status == "failed" { throw OpenAIResponsesTextError.remote("Response failed") }
+        if status == "failed" { throw OpenAIResponsesTextError.invalidResponse }
         if status == "incomplete", !truncated {
-            throw OpenAIResponsesTextError.remote("Incomplete response: \(details?["reason"] as? String ?? "unknown")")
+            throw OpenAIResponsesTextError.invalidResponse
         }
         guard status == "completed" || truncated else { throw OpenAIResponsesTextError.invalidResponse }
         let output = response["output"] as? [[String: Any]] ?? []

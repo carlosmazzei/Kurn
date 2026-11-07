@@ -9,7 +9,7 @@ extension LLMHTTP {
         } catch let OpenAIResponsesTextError.remote(message) {
             throw AppError.apiError(statusCode: 0, message: message)
         } catch {
-            throw AppError.decodingError(error.localizedDescription)
+            throw AppError.decodingError(NSLocalizedString("error.provider_response_invalid", comment: "Invalid provider response"))
         }
     }
 
@@ -33,9 +33,13 @@ extension LLMHTTP {
         } catch let error as AgentWireError {
             switch error {
             case .remote(let message): throw AppError.apiError(statusCode: 0, message: message)
+            case .invalidResponse:
+                throw AppError.decodingError(NSLocalizedString("error.provider_response_invalid", comment: "Invalid provider response"))
             case .incompleteStream: throw AppError.networkError(URLError(.networkConnectionLost))
-            case .emptyResponse: throw AppError.decodingError("empty chat response")
-            case .incompleteToolCall: throw AppError.decodingError("unexpected text tool call")
+            case .emptyResponse:
+                throw AppError.decodingError(NSLocalizedString("error.provider_response_empty", comment: "Empty provider response"))
+            case .incompleteToolCall:
+                throw AppError.decodingError(NSLocalizedString("error.provider_tool_call_incomplete", comment: "Incomplete tool call"))
             }
         }
     }
