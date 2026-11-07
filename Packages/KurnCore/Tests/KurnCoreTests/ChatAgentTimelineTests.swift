@@ -8,13 +8,28 @@ struct ChatAgentTimelineTests {
         var timeline = ChatAgentTimeline()
         #expect(timeline.steps.isEmpty)
         #expect(timeline.usage == AgentUsage())
+        #expect(!timeline.hasUsage)
         timeline.apply(.textDelta("hello"))
         #expect(timeline.steps.isEmpty)
         timeline.apply(.turnStarted(index: 0))
         timeline.apply(.usage(AgentUsage(inputTokens: 5)))
+        #expect(timeline.hasUsage)
         timeline.apply(.runStarted)
         #expect(timeline.steps.isEmpty)
         #expect(timeline.usage == AgentUsage())
+        #expect(!timeline.hasUsage)
+    }
+
+    @Test func missingUsageIsDistinctFromExplicitZeroAndFinalNonzeroUsage() {
+        var timeline = ChatAgentTimeline()
+        timeline.apply(.runFinished(AgentRunOutcome(messages: [], finalText: "Answer", stopReason: .completed, totalUsage: AgentUsage())))
+        #expect(!timeline.hasUsage)
+        timeline.apply(.usage(AgentUsage()))
+        #expect(timeline.hasUsage)
+        timeline.apply(.runStarted)
+        timeline.apply(.runFinished(AgentRunOutcome(messages: [], finalText: "Answer", stopReason: .completed,
+                                                   totalUsage: AgentUsage(outputTokens: 2))))
+        #expect(timeline.hasUsage)
     }
 
     @Test func toolLifecycleKeepsCanonicalArgumentsAndSummary() throws {

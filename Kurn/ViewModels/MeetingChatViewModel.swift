@@ -466,7 +466,8 @@ final class MeetingChatViewModel {
                 try Task.checkCancellation()
                 timeline.apply(event)
                 turns[index].steps = timeline.steps
-                turns[index].usage = TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens)
+                turns[index].usage = timeline.hasUsage
+                    ? TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens) : nil
                 turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
                 switch event {
                 case .textDelta(let text): turns[index].text += text

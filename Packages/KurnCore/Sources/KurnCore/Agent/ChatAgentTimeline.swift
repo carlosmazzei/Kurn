@@ -28,6 +28,7 @@ public struct ChatAgentStep: Codable, Sendable, Equatable, Identifiable {
 public struct ChatAgentTimeline: Sendable, Equatable {
     public private(set) var steps: [ChatAgentStep] = []
     public private(set) var usage = AgentUsage()
+    public private(set) var hasUsage = false
 
     public init() {}
 
@@ -36,6 +37,7 @@ public struct ChatAgentTimeline: Sendable, Equatable {
         case .runStarted:
             steps = []
             usage = AgentUsage()
+            hasUsage = false
         case .turnStarted(let index):
             finishTurn()
             var step = ChatAgentStep(kind: .turn)
@@ -65,11 +67,13 @@ public struct ChatAgentTimeline: Sendable, Equatable {
             step.afterTokens = after
             steps.append(step)
         case .usage(let usage):
+            hasUsage = true
             self.usage = AgentUsage(inputTokens: self.usage.inputTokens + usage.inputTokens,
                                     outputTokens: self.usage.outputTokens + usage.outputTokens)
         case .runFinished(let outcome):
             finishTurn()
             usage = outcome.totalUsage
+            hasUsage = hasUsage || usage.inputTokens != 0 || usage.outputTokens != 0
             var step = ChatAgentStep(kind: .stop, status: .finished)
             step.stopReason = outcome.stopReason
             steps.append(step)
