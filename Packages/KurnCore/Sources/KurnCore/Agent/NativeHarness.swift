@@ -176,7 +176,7 @@ public struct NativeHarness: Sendable {
             }
             let output = try await tool.execute(call.arguments)
             try Task.checkCancellation()
-            return (output, false)
+            return (output, output.isError)
         } catch {
             try Task.checkCancellation()
             return toolError("Tool \(call.name) failed: \(error.localizedDescription)")

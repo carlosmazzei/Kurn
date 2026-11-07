@@ -41,6 +41,15 @@ package is FluidAudio.
 
 ### Agent harness (`KurnCore/Agent/`)
 
+`ChatSourceScope` persists meeting/tag/folder/library selection and wiki opt-in.
+`ChatSourceTools` exposes bounded, paginated read-only source tools, validating
+arguments and enforcing a fixed allowed-meeting set on reads and search results.
+Explicit `AgentToolOutput.isError` results let tools report recoverable failures
+without throwing. `SourceScopeResolver` shares transcribed-only selection with
+the document composer; `LibraryChatSourceReader` snapshots SwiftData sources and
+uses existing hybrid search, summary rendering and stored attachment text. Wiki
+reads require opt-in. These tools are not wired into the existing chat UI.
+
 `NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
 supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
 confirmation and execution. `AgentEvent` exposes turns, text, tools, compaction,
