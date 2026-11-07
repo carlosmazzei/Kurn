@@ -13,6 +13,7 @@
 import AVFoundation
 import Foundation
 import KurnCore
+import Synchronization
 import Testing
 @testable import Kurn
 
@@ -77,8 +78,10 @@ struct CaptureJournalTests {
     @Test func aJournalFailureDetachesItAndKeepsRecording() throws {
         let primary = RecordingWriter()
         let journal = RecordingWriter()
-        var reported = 0
-        let file = JournaledCaptureFile(primary: primary, journal: journal) { reported += 1 }
+        let reported = Mutex(0)
+        let file = JournaledCaptureFile(primary: primary, journal: journal, startThread: { _ in }) {
+            reported.withLock { $0 += 1 }
+        }
 
         journal.failing = true
         try file.write(from: Self.buffer())
@@ -88,10 +91,10 @@ struct CaptureJournalTests {
         #expect(primary.writes == 2)
         #expect(journal.writes == 0)
         #expect(!file.hasJournal)
-        #expect(reported == 0)
+        #expect(reported.withLock { $0 } == 0)
         file.flushReliabilityEvents()
         file.flushReliabilityEvents()
-        #expect(reported == 1)
+        #expect(reported.withLock { $0 } == 1)
     }
 
     @Test func aRecordingFailureIsThrownAfterTheJournalKeptTheBuffer() throws {
@@ -159,13 +162,17 @@ struct CaptureJournalTests {
 
     @Test func aFailedJournalWriteRecordsDegradationOnlyOnceOffTheCapturePath() throws {
         let capture = ReliabilityEventCapture()
+        let delivered = DispatchSemaphore(value: 0)
         let primary = RecordingWriter()
         let journal = RecordingWriter()
         let file = try CaptureOutputFile.openJournaled(
             at: URL(fileURLWithPath: "/private/recording.m4a"), bitRate: 48_000,
             make: { url, _ in url.pathExtension == "aac" ? journal : primary },
             journalDirectory: { URL(fileURLWithPath: "/private") },
-            recordEvent: capture.record
+            recordEvent: { event in
+                capture.record(event)
+                delivered.signal()
+            }
         )
         try file.write(from: Self.buffer())
         #expect(capture.recorded.isEmpty)
@@ -174,9 +181,7 @@ struct CaptureJournalTests {
         try file.write(from: Self.buffer())
         #expect(primary.writes == 3)
         #expect(journal.writes == 1)
-        #expect(capture.recorded.isEmpty)
-        file.flushReliabilityEvents()
-        file.flushReliabilityEvents()
+        #expect(delivered.wait(timeout: .now() + 5) == .success)
         #expect(capture.recorded.count == 1)
         let event = try #require(capture.recorded.first)
         #expect(event.operation == "capture_journal")
@@ -185,6 +190,31 @@ struct CaptureJournalTests {
         #expect(event.code == "journal_write_failed")
         #expect(HealthRecoveryAggregation.recentFailures(in: capture.recorded).count == 1)
         #expect(!event.logLine.contains("recording.m4a"))
+    }
+
+    @Test func releasingTheFileStopsItsWorkerAndFlushesAPendingFailure() throws {
+        let work = Mutex<(@Sendable () -> Void)?>(nil)
+        let reported = Mutex(0)
+        weak var releasedFile: JournaledCaptureFile?
+        try autoreleasepool {
+            let primary = RecordingWriter()
+            let journal = RecordingWriter()
+            journal.failing = true
+            let file = JournaledCaptureFile(
+                primary: primary, journal: journal,
+                startThread: { body in work.withLock { $0 = body } }
+            ) {
+                reported.withLock { $0 += 1 }
+            }
+            releasedFile = file
+            try file.write(from: Self.buffer())
+        }
+
+        try #require(releasedFile == nil)
+        let body = try #require(work.withLock { $0 })
+        body()
+        #expect(reported.withLock { $0 } == 1)
+        work.withLock { $0 = nil }
     }
 
     @Test func aRejectedJournalBitRateIsRetriedWithoutOne() throws {

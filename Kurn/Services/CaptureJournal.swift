@@ -24,7 +24,6 @@
 import AVFoundation
 import Foundation
 import KurnCore
-import Synchronization
 
 enum CaptureJournal {
     static let fileExtension = "aac"
@@ -128,18 +127,32 @@ enum CaptureJournal {
 final class JournaledCaptureFile: AudioFileWriting {
     private let primary: any AudioFileWriting
     private var journal: (any AudioFileWriting)?
-    private let onJournalFailure: () -> Void
-    private let failurePending = Atomic(false)
+    private let reporter: CaptureJournalFailureReporter
+
+    convenience init(
+        primary: any AudioFileWriting,
+        journal: any AudioFileWriting,
+        onJournalFailure: @escaping @Sendable () -> Void = {}
+    ) {
+        self.init(
+            primary: primary, journal: journal,
+            startThread: CaptureJournalFailureReporter.startThread,
+            onJournalFailure: onJournalFailure
+        )
+    }
 
     init(
         primary: any AudioFileWriting,
         journal: any AudioFileWriting,
-        onJournalFailure: @escaping () -> Void = {}
+        startThread: CaptureJournalFailureReporter.ThreadStart,
+        onJournalFailure: @escaping @Sendable () -> Void = {}
     ) {
         self.primary = primary
         self.journal = journal
-        self.onJournalFailure = onJournalFailure
+        reporter = CaptureJournalFailureReporter(startThread: startThread, onFailure: onJournalFailure)
     }
+
+    deinit { reporter.stop() }
 
     var hasJournal: Bool { journal != nil }
 
@@ -151,16 +164,14 @@ final class JournaledCaptureFile: AudioFileWriting {
                 try journal.write(from: buffer)
             } catch {
                 self.journal = nil
-                failurePending.store(true, ordering: .releasing)
+                reporter.signal()
             }
         }
         try primary.write(from: buffer)
     }
 
     func flushReliabilityEvents() {
-        if failurePending.exchange(false, ordering: .acquiringAndReleasing) {
-            onJournalFailure()
-        }
+        reporter.flush()
     }
 }
 

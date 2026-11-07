@@ -10,6 +10,7 @@
 
 import AVFoundation
 import Foundation
+import Synchronization
 import Testing
 @testable import Kurn
 
@@ -83,25 +84,25 @@ struct RecordingSinkFaultTests {
         let recorder = AudioRecorderService(sink: sink)
         let primary = ScriptedAudioFileWriter()
         let journal = ScriptedAudioFileWriter(failFromWrite: 1)
-        var reports = 0
-        let file = JournaledCaptureFile(primary: primary, journal: journal) {
+        let reports = Mutex(0)
+        let file = JournaledCaptureFile(primary: primary, journal: journal, startThread: { _ in }) {
             #expect(sink.snapshot.firstFailure == nil)
-            reports += 1
+            reports.withLock { $0 += 1 }
         }
         sink.open(file, converter: converter, targetFormat: buffer.format, onBuffer: nil)
         #expect(sink.write(buffer))
         #expect(primary.writeCount == 1)
-        #expect(reports == 0)
+        #expect(reports.withLock { $0 } == 0)
 
         switch action {
         case "poll": #expect(!recorder.pollSinkStatus())
         case "pause": sink.setPaused(true)
         default: sink.close()
         }
-        #expect(reports == 1)
+        #expect(reports.withLock { $0 } == 1)
         sink.flushReliabilityEvents()
         sink.close()
-        #expect(reports == 1)
+        #expect(reports.withLock { $0 } == 1)
     }
 
     @Test func captureWatchdogResetsItsDeadlineAfterProgress() {

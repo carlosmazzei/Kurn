@@ -611,6 +611,15 @@ and no trailer, so it is decodable up to its last whole frame wherever it was
 cut. The journal is a safety net, never a reason to lose the recording — one
 that fails to open or write is detached and the recording carries on — and
 the storage runway counts it (`CaptureJournal.storageMultiplier`).
+Write-failure reporting uses a dedicated utility thread owned by
+`CaptureJournalFailureReporter`, independent of the main-runloop meter timer.
+The render thread only stores an atomic pending flag and signals a semaphore:
+no reporting I/O, allocation or lock. The worker records `journal_write_failed`
+once per file; poll, pause and close flushes remain idempotent backups. File
+deinitialization signals the worker to flush pending failure before exiting;
+the worker retains the reporter, not the file. An immediate process kill can
+still beat worker scheduling or persistence, but a hung main thread no longer
+prevents reporting.
 `RecordingFileFinalizer` discards it once the `.m4a` is accepted and never on
 a failure. After a kill, `CaptureJournalRepair` remuxes it (passthrough
 export, no second lossy generation) into a verified temporary `.m4a` that

@@ -56,6 +56,16 @@ struct AppSettingsTests {
         body(AppSettings())
     }
 
+    @Test func logLevelUpdatesTheLoggingThresholdWithoutChangingItsValue() {
+        withScopedDefaults { settings in
+            for level in LogLevel.allCases {
+                settings.logLevel = level
+                #expect(AppLog.minimumLevel == level)
+                #expect(AppLog.isEnabled == (level != .off))
+            }
+        }
+    }
+
     @Test func pipelineConfigurationReflectsIndividualEngineChoices() {
         withScopedDefaults { settings in
             settings.preprocessingEngine = .none

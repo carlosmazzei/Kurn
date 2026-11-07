@@ -18,6 +18,7 @@
 //
 
 import Foundation
+import Synchronization
 import os
 
 /// User-facing logging verbosity. Cases are ordered from least to most verbose;
@@ -69,7 +70,12 @@ enum AppLog {
 
     /// Minimum severity that is actually emitted. Defaults from the environment
     /// at launch; `AppSettings` overrides it with the user's stored preference.
-    nonisolated(unsafe) static var minimumLevel: LogLevel = Self.environmentDefaultLevel()
+    private static let storedMinimumLevel = Mutex(Self.environmentDefaultLevel())
+
+    static var minimumLevel: LogLevel {
+        get { storedMinimumLevel.withLock { $0 } }
+        set { storedMinimumLevel.withLock { $0 = newValue } }
+    }
 
     /// Whether logging is on at all. Kept for call sites that want to skip
     /// expensive work before building a log message.
@@ -78,7 +84,8 @@ enum AppLog {
     /// True when a message at `level` should be emitted under the current
     /// `minimumLevel`.
     fileprivate static func allows(_ level: LogLevel) -> Bool {
-        level.rank <= minimumLevel.rank && minimumLevel != .off
+        let threshold = minimumLevel
+        return level.rank <= threshold.rank && threshold != .off
     }
 
     private static func environmentDefaultLevel() -> LogLevel {
