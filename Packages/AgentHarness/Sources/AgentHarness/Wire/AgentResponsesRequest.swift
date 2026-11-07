@@ -8,10 +8,10 @@ extension AgentWireFormat {
             case .user(let text):
                 input.append(.object(["role": .string("user"), "content": .string(text)]))
             case .assistant(let text, let calls, let metadata):
+                input += (metadata?["openAIResponses"]["reasoning"].array ?? []).filter { $0["type"].string == "reasoning" }
                 if !text.isEmpty {
                     input.append(.object(["role": .string("assistant"), "content": .string(text)]))
                 }
-                input += (metadata?["openAIResponses"]["reasoning"].array ?? []).filter { $0["type"].string == "reasoning" }
                 input += calls.map { call in
                     .object(["type": .string("function_call"), "call_id": .string(call.id),
                              "name": .string(call.name), "arguments": .string(call.rawArguments)])

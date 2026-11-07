@@ -78,4 +78,14 @@ import Testing
         #expect(input == [.object(["type": .string("function_call"), "call_id": .string("call-1"),
                                   "name": .string("search"), "arguments": .string("{}")])])
     }
+
+    @Test func reasoningPrecedesAssistantTextAndCalls() {
+        let request = AgentTurnRequest(systemPrompt: "sys", messages: [
+            .assistant(text: "Searching", toolCalls: [agentCall()], providerMetadata: metadata)
+        ], tools: [], maxOutputTokens: 10)
+        let input = AgentWireFormat.openAIResponses.requestBody(request, model: "test")["input"].array
+        #expect(input == [reasoning, .object(["role": .string("assistant"), "content": .string("Searching")]),
+            .object(["type": .string("function_call"), "call_id": .string("1"),
+                     "name": .string("lookup"), "arguments": .string("{}")])])
+    }
 }
