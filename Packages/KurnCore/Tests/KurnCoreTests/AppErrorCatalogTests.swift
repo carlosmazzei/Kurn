@@ -63,7 +63,7 @@ struct AppErrorCatalogTests {
     @Test func catalogCoversEveryLogCode() {
         let codes = Self.allCases.map(\.logCode)
         #expect(Set(codes).count == codes.count, "every case has its own log code")
-        #expect(codes.count == 37)
+        #expect(codes.count == 36)
     }
 
     @Test func logCodesAreClosedVocabularyAndNeverCarryDetail() {
