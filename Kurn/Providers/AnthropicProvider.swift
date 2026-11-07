@@ -223,6 +223,19 @@ struct AnthropicProvider: LLMProvider {
     }
 }
 
+extension AnthropicProvider: AgentModel {
+    func streamTurn(
+        _ request: AgentTurnRequest,
+        onEvent: @escaping @Sendable (AgentModelEvent) -> Void
+    ) async throws -> AgentTurnResponse {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+        let body = AgentWireFormat.anthropic.requestBody(request, model: model)
+        httpRequest.httpBody = Data(try body.encodedString().utf8)
+        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: .anthropic, onEvent: onEvent)
+    }
+}
+
 // MARK: - Response shapes
 
 private struct MessagesResponse: Decodable {

@@ -237,6 +237,19 @@ struct GoogleProvider: LLMProvider {
     }
 }
 
+extension GoogleProvider: AgentModel {
+    func streamTurn(
+        _ request: AgentTurnRequest,
+        onEvent: @escaping @Sendable (AgentModelEvent) -> Void
+    ) async throws -> AgentTurnResponse {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        var httpRequest = try makeStreamRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+        let body = AgentWireFormat.gemini.requestBody(request, model: model)
+        httpRequest.httpBody = Data(try body.encodedString().utf8)
+        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: .gemini, onEvent: onEvent)
+    }
+}
+
 private struct GeminiResponse: Decodable {
     let candidates: [GeminiCandidate]?
     let usageMetadata: GeminiUsageMetadata?

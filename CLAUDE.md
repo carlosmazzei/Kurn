@@ -53,7 +53,18 @@ prefix is summarized with a tool-less model request, preserving assistant/result
 groups and recent messages. Compaction changes only model context; outcomes retain
 full history. These estimates and limits do not guarantee a provider's hard context
 or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
-There are no app provider adapters, meeting tools or UI in this module.
+Output-token truncation finishes with `.outputLimit` and discards tool calls;
+truncated compaction summaries never replace the elided context. Vendor streams
+must include a terminal event before a turn response can be used.
+`Agent/Wire/` builds Anthropic Messages, OpenAI Chat Completions and Gemini
+GenerateContent requests and accumulates their SSE data payloads. The app's three
+cloud text providers conform to `AgentModel` through the existing bounded SSE
+transport, with chat timeouts and no retry after streaming starts. OpenAI-compatible
+custom endpoints follow the existing chat request shape. Gemini call IDs are
+synthesized when absent; optional call metadata retains wire IDs and thought
+signatures for replay. `ProviderFactory.agentModel(for:model:)` returns nil for
+on-device and transcription-only providers, so callers can retain the chat fallback.
+Apple's provider does not conform. There are no meeting tools or agent UI yet.
 
 ### Where documentation lives
 

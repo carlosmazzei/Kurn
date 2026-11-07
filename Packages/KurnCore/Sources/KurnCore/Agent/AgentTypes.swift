@@ -17,12 +17,15 @@ public struct AgentToolCall: Codable, Sendable, Equatable {
     public let name: String
     public internal(set) var arguments: JSONValue
     public let rawArguments: String
+    /// Opaque wire metadata needed when replaying a call, such as a Gemini thought signature.
+    public let providerMetadata: JSONValue?
 
-    public init(id: String, name: String, arguments: JSONValue, rawArguments: String) {
+    public init(id: String, name: String, arguments: JSONValue, rawArguments: String, providerMetadata: JSONValue? = nil) {
         self.id = id
         self.name = name
         self.arguments = arguments
         self.rawArguments = rawArguments
+        self.providerMetadata = providerMetadata
     }
 }
 
@@ -125,7 +128,7 @@ public struct AgentLimits: Sendable, Equatable {
 }
 
 public enum AgentRunStopReason: String, Codable, Sendable {
-    case completed, turnLimit, toolCallLimit, costLimit
+    case completed, turnLimit, toolCallLimit, costLimit, outputLimit
 }
 
 public struct AgentRunOutcome: Sendable, Equatable {

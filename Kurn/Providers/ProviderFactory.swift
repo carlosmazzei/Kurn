@@ -20,6 +20,12 @@ enum ProviderFactory {
     /// Keychain and builds the vendor's client.
     static let liveLLM: LLMResolver = { try summaryProvider(for: $0, model: $1) }
 
+    /// Nil means callers should keep using the existing chat pipeline.
+    static func agentModel(for provider: AIProvider, model: String) throws -> (any AgentModel)? {
+        guard provider.kind != .appleOnDevice, provider.kind != .elevenLabs else { return nil }
+        return try summaryProvider(for: provider, model: model) as? any AgentModel
+    }
+
     /// Whether a provider can be used right now (a stored key, or the
     /// on-device model available). Coordinators that skip work for an
     /// unusable provider take one, so a test can decide without a Keychain;

@@ -474,6 +474,20 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
 
 // MARK: - Response shapes
 
+extension OpenAIProvider: AgentModel {
+    func streamTurn(
+        _ request: AgentTurnRequest,
+        onEvent: @escaping @Sendable (AgentModelEvent) -> Void
+    ) async throws -> AgentTurnResponse {
+        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+        let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
+        let body = AgentWireFormat.openAI.requestBody(request, model: chatModel, reasoningEffort: reasoningEffort)
+        var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+        httpRequest.httpBody = Data(try body.encodedString().utf8)
+        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: .openAI, onEvent: onEvent)
+    }
+}
+
 private struct MultipartFile {
     let field: String
     let name: String
