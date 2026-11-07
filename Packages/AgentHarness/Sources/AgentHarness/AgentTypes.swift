@@ -31,7 +31,7 @@ public struct AgentToolCall: Codable, Sendable, Equatable {
 
 public enum AgentMessage: Codable, Sendable, Equatable {
     case user(String)
-    case assistant(text: String, toolCalls: [AgentToolCall])
+    case assistant(text: String, toolCalls: [AgentToolCall], providerMetadata: JSONValue? = nil)
     case toolResult(callID: String, toolName: String, content: String, isError: Bool)
 }
 
@@ -77,13 +77,15 @@ public struct AgentTurnResponse: Sendable, Equatable {
     public let toolCalls: [AgentToolCall]
     public let usage: AgentUsage?
     public let stopReason: AgentModelStopReason
+    public let providerMetadata: JSONValue?
 
     public init(text: String, toolCalls: [AgentToolCall] = [], usage: AgentUsage? = nil,
-                stopReason: AgentModelStopReason = .endTurn) {
+                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil) {
         self.text = text
         self.toolCalls = toolCalls
         self.usage = usage
         self.stopReason = stopReason
+        self.providerMetadata = providerMetadata
     }
 }
 

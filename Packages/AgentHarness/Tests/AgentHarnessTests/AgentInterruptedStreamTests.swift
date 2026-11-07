@@ -16,6 +16,10 @@ import Testing
             payload = tool
                 ? #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a","function":{"name":"read","arguments":"{}"}}]}}]}"#
                 : #"{"choices":[{"delta":{"content":"Partial"}}]}"#
+        case .openAIResponses:
+            payload = tool
+                ? #"{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"a","name":"read","arguments":"{}"}}"#
+                : #"{"type":"response.output_text.delta","delta":"Partial"}"#
         case .gemini:
             payload = tool
                 ? #"{"candidates":[{"content":{"parts":[{"functionCall":{"name":"read","args":{}}}]}}]}"#

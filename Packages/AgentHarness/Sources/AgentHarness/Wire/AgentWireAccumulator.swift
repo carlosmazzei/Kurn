@@ -42,6 +42,7 @@ private struct AgentWireState {
     var outputTokens: Int?
     var stopReason: AgentModelStopReason = .other("unknown")
     var receivedTerminal = false
+    var responses = AgentResponsesAccumulator()
 
     mutating func consume(_ payload: String) throws -> [AgentModelEvent] {
         guard let value = try? JSONValue.parse(payload), case .object = value else { return [] }
@@ -52,10 +53,12 @@ private struct AgentWireState {
         case .anthropic: return try anthropic(value)
         case .openAI: return openAI(value)
         case .gemini: return gemini(value)
+        case .openAIResponses: return try responses.consume(value)
         }
     }
 
     func response() throws -> AgentTurnResponse {
+        if format == .openAIResponses { return try responses.response() }
         guard !text.isEmpty || !calls.isEmpty || stopReason == .maxTokens else { throw AgentWireError.emptyResponse }
         guard receivedTerminal else { throw AgentWireError.incompleteStream }
         let callIndices = stopReason == .maxTokens ? [] : calls.keys.sorted()

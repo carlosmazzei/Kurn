@@ -57,6 +57,8 @@ import Testing
         switch format {
         case .anthropic: terminal = #"{"type":"message_delta","delta":{"stop_reason":"max_tokens"}}"#
         case .openAI: terminal = #"{"choices":[{"delta":{},"finish_reason":"length"}]}"#
+        case .openAIResponses:
+            terminal = #"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}"#
         case .gemini: terminal = #"{"candidates":[{"finishReason":"MAX_TOKENS"}]}"#
         }
         let accumulator = AgentWireAccumulator(format: format)
@@ -78,6 +80,11 @@ import Testing
             ]
         case .openAI:
             payloads = [#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{"}}]},"finish_reason":"length"}]}"#]
+        case .openAIResponses:
+            payloads = [
+                #"{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","arguments":"{"}}"#,
+                #"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}"#
+            ]
         case .gemini:
             payloads = [#"{"candidates":[{"content":{"parts":[{"functionCall":{"name":"read","args":{}}}]},"finishReason":"MAX_TOKENS"}]}"#]
         }
