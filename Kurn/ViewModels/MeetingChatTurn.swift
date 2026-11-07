@@ -19,10 +19,13 @@ extension MeetingChatViewModel {
         var artifacts: [ChatArtifactReference] = []
         var artifactOrigins: [UUID: ChatArtifactOrigin] = [:]
 
-        mutating func recordArtifacts(from previous: [ChatDocumentArtifact], to current: [ChatDocumentArtifact], origin: ChatArtifactOrigin) {
+        mutating func recordArtifacts(from previous: [ChatDocumentArtifact], to current: [ChatDocumentArtifact], origin: ChatArtifactOrigin,
+                                      priorOrigins: [UUID: ChatArtifactOrigin] = [:]) {
             artifacts = ChatArtifactReference.updating(artifacts, from: previous, to: current)
             for reference in artifacts where previous.first(where: { $0.id == reference.id })?.version != reference.version {
-                artifactOrigins[reference.id] = origin
+                var revised = origin
+                revised.sources = origin.sources?.retaining(artifactOrigins[reference.id]?.sources ?? priorOrigins[reference.id]?.sources)
+                artifactOrigins[reference.id] = revised
             }
         }
 

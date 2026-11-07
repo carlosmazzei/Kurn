@@ -459,6 +459,11 @@ final class MeetingChatViewModel {
         let generation = self.generation
         let completedTurns = Array(turns.dropLast())
         let initialArtifacts = await workspace.snapshot()
+        let origin = ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)",
+                                        sources: try ChatArtifactSources.capture(scope: scope, context: modelContext))
+        let priorOrigins = Dictionary(uniqueKeysWithValues: initialArtifacts.map {
+            ($0.id, ChatArtifactStore.origin(artifactID: $0.id, in: turns.map(PersistedChatTurn.init)))
+        })
         try Task.checkCancellation()
         if initialArtifacts != artifacts {
             artifacts = initialArtifacts
@@ -487,7 +492,7 @@ final class MeetingChatViewModel {
                         let snapshot = await workspace.snapshot()
                         try Task.checkCancellation()
                         turns[index].recordArtifacts(from: artifacts, to: snapshot,
-                                                    origin: ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)"))
+                                                    origin: origin, priorOrigins: priorOrigins)
                         artifacts = snapshot
                         var pending = turns[index - 1]
                         pending.inheritArtifacts(from: turns[index])
@@ -501,7 +506,7 @@ final class MeetingChatViewModel {
             let snapshot = await workspace.snapshot()
             if self.generation == generation, snapshot != artifacts {
                 turns[index - 1].recordArtifacts(from: artifacts, to: snapshot,
-                                                origin: ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)"))
+                                                origin: origin, priorOrigins: priorOrigins)
                 artifacts = snapshot
                 persist(turns: completedTurns + [turns[index - 1]])
             }

@@ -31,22 +31,20 @@ struct ChatArtifactStore {
         let existing = try savedDocument(artifactID: artifactID, sessionID: session.id)
         if Self.action(artifact: artifact, saved: existing) == .saved { return existing }
         let scope = snapshot.scope ?? ChatSourceScope(kind: .meetings, selectedIDs: Set([session.meeting?.id].compactMap { $0 }))
-        let sources = SourceScopeResolver.resolve(scope, meetings: try context.fetch(FetchDescriptor<Meeting>()),
-                                                 tags: try context.fetch(FetchDescriptor<Tag>()),
-                                                 folders: try context.fetch(FetchDescriptor<Folder>()))
         let origin = Self.origin(artifactID: artifactID, in: session.turns)
-        let kind: DocumentSourceKind = scope.kind == .tags ? .tags : scope.kind == .folders ? .folders : .transcripts
+        let previousSources = existing.map { ChatArtifactSources(kind: $0.sourceKind, meetingIDs: $0.sourceMeetingIDs, names: $0.sourceNames) }
+        let sources = try (origin.sources ?? ChatArtifactSources.capture(scope: scope, context: context)).retaining(previousSources)
         let document = existing ?? GeneratedDocument(title: artifact.title, bodyMarkdown: artifact.markdown,
-            userPrompt: origin.question, sourceKind: kind, sourceNames: sources.sourceNames,
-            sourceMeetingIDs: sources.meetings.map(\.id), generatorModelIdentifier: origin.modelIdentifier)
+            userPrompt: origin.question, sourceKind: sources.kind, sourceNames: sources.names,
+            sourceMeetingIDs: sources.meetingIDs, generatorModelIdentifier: origin.modelIdentifier)
         let previous = existing.map { DocumentSnapshot($0) }
         document.title = artifact.title
         document.bodyMarkdown = artifact.markdown
         document.userPrompt = origin.question
         document.generatorModelIdentifier = origin.modelIdentifier
-        document.sourceKind = kind
-        document.sourceNames = sources.sourceNames
-        document.sourceMeetingIDs = sources.meetings.map(\.id)
+        document.sourceKind = sources.kind
+        document.sourceNames = sources.names
+        document.sourceMeetingIDs = sources.meetingIDs
         document.sourceChatSessionID = session.id
         document.sourceArtifactID = artifact.id
         document.sourceArtifactVersion = artifact.version
