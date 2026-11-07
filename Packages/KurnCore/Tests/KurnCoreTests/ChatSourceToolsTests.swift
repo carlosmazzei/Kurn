@@ -42,12 +42,13 @@ private struct FakeSourceReader: ChatSourceReader {
     private let id = UUID()
 
     private func run(_ name: String, _ arguments: JSONValue, reader: FakeSourceReader? = nil) async throws -> AgentToolOutput {
-        let tools = ChatSourceTools.make(reader: reader ?? FakeSourceReader(id: id), allowedMeetingIDs: [id], includeWikis: true)
+        let tools = ChatSourceTools.make(reader: reader ?? FakeSourceReader(id: id), allowedMeetingIDs: [id],
+                                        scope: ChatSourceScope(kind: .library, parts: Set(ChatSourcePart.allCases)))
         return try await #require(tools.first { $0.spec.name == name }).execute(arguments)
     }
 
     @Test func scopeRoundTripAndWikiSwitch() throws {
-        let scope = ChatSourceScope(kind: .folders, selectedIDs: [id], includeWikis: true)
+        let scope = ChatSourceScope(kind: .folders, selectedIDs: [id], parts: Set(ChatSourcePart.allCases))
         #expect(try JSONDecoder().decode(ChatSourceScope.self, from: JSONEncoder().encode(scope)) == scope)
         let tools = ChatSourceTools.make(reader: FakeSourceReader(id: id), allowedMeetingIDs: [], includeWikis: false)
         #expect(!tools.contains { $0.spec.name == "read_wiki" })
@@ -103,7 +104,8 @@ private struct FakeSourceReader: ChatSourceReader {
         let calls = [agentCall("1", name: "read_summary", raw: "{\"meetingID\":\"\(UUID())\"}"),
                      agentCall("2", name: "read_wiki", raw: "{\"meetingID\":\"\(id)\"}")]
         let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: calls), AgentTurnResponse(text: "Grounded")])
-        let tools = ChatSourceTools.make(reader: FakeSourceReader(id: id), allowedMeetingIDs: [id], includeWikis: true)
+        let tools = ChatSourceTools.make(reader: FakeSourceReader(id: id), allowedMeetingIDs: [id],
+                                        scope: ChatSourceScope(kind: .library, parts: Set(ChatSourcePart.allCases)))
         let outcome = try agentOutcome(await agentEvents(NativeHarness(model: model), tools: tools))
         #expect(outcome.finalText == "Grounded")
         #expect(outcome.messages.contains { message in

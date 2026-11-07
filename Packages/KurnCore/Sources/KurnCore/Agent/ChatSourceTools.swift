@@ -5,14 +5,23 @@ import Foundation
 public enum ChatSourceTools {
     public static func make(reader: any ChatSourceReader, allowedMeetingIDs: Set<UUID>,
                             includeWikis: Bool) -> [AgentTool] {
-        let names = ["list_sources", "search", "read_transcript", "read_summary", "read_attachment"]
-            + (includeWikis ? ["read_wiki"] : [])
+        make(reader: reader, allowedMeetingIDs: allowedMeetingIDs,
+             scope: ChatSourceScope(kind: .library, includeWikis: includeWikis))
+    }
+
+    public static func make(reader: any ChatSourceReader, allowedMeetingIDs: Set<UUID>,
+                            scope: ChatSourceScope) -> [AgentTool] {
+        let parts = Dictionary(uniqueKeysWithValues: allowedMeetingIDs.map { ($0, scope.parts(for: $0)) })
+        let names = ["list_sources", "search", "read_transcript", "read_summary", "read_attachment", "read_wiki"]
+            .filter { name in
+                guard let part = part(for: name) else { return true }
+                return parts.values.contains { $0.contains(part) }
+            }
         return names.map { name in
             AgentTool(spec: spec(name)) { arguments in
                 do {
                     let params = try Parameters(arguments, name: name)
-                    return try await execute(name, params: params, reader: reader, allowed: allowedMeetingIDs,
-                                             includeWikis: includeWikis)
+                    return try await execute(name, params: params, reader: reader, parts: parts)
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
@@ -22,6 +31,16 @@ public enum ChatSourceTools {
                                            summary: "Source unavailable or invalid arguments", isError: true)
                 }
             }
+        }
+    }
+
+    private static func part(for name: String) -> ChatSourcePart? {
+        switch name {
+        case "search", "read_transcript": .transcript
+        case "read_summary": .summary
+        case "read_wiki": .wiki
+        case "read_attachment": .attachments
+        default: nil
         }
     }
 
@@ -95,8 +114,8 @@ public enum ChatSourceTools {
     }
 
     private static func execute(_ name: String, params: Parameters, reader: any ChatSourceReader,
-                                allowed: Set<UUID>, includeWikis: Bool) async throws -> AgentToolOutput {
-        let sources = try await reader.listSources().filter { allowed.contains($0.id) }.sorted { $0.id.uuidString < $1.id.uuidString }
+                                parts: [UUID: Set<ChatSourcePart>]) async throws -> AgentToolOutput {
+        let sources = try await reader.listSources().filter { parts[$0.id] != nil }.sorted { $0.id.uuidString < $1.id.uuidString }
         if name == "list_sources" {
             let values = sources.map { source in
                 JSONValue.object([
@@ -105,20 +124,28 @@ public enum ChatSourceTools {
                     "tags": .array(source.tags.prefix(10).map { clipped($0, limit: 100) }),
                     "tagsTruncated": .bool(source.tags.count > 10),
                     "folder": source.folder.map { clipped($0) } ?? .null,
-                    "hasSummary": .bool(source.hasSummary), "hasWiki": .bool(includeWikis && source.hasWiki),
-                    "hasAttachments": .bool(source.hasAttachments)
+                    "allowedParts": .array((parts[source.id] ?? []).map(\.rawValue).sorted().map(JSONValue.string)),
+                    "hasTranscript": .bool(parts[source.id]?.contains(.transcript) == true),
+                    "hasSummary": .bool(source.hasSummary && parts[source.id]?.contains(.summary) == true),
+                    "hasWiki": .bool(source.hasWiki && parts[source.id]?.contains(.wiki) == true),
+                    "hasAttachments": .bool(source.hasAttachments && parts[source.id]?.contains(.attachments) == true)
                 ])
             }
             return try page(values, offset: params.offset, limit: min(params.limit, 10))
         }
         let existing = Set(sources.map(\.id))
         if name == "search" {
-            let hits = try await reader.search(query: params.string("query"), meetingIDs: existing, limit: 100)
-            return try page(hits.filter { existing.contains($0.meetingID) }.prefix(100).map(passage),
+            let query = try params.string("query")
+            let searchable = existing.filter { parts[$0]?.contains(.transcript) == true }
+            let hits = searchable.isEmpty ? [] : try await reader.search(query: query, meetingIDs: searchable, limit: 100)
+            return try page(hits.filter { searchable.contains($0.meetingID) }.prefix(100).map(passage),
                             offset: params.offset, limit: min(params.limit, 10))
         }
         let id = try params.uuid("meetingID")
         guard existing.contains(id) else { throw Invalid("Unknown or out-of-scope meetingID.") }
+        guard let requiredPart = part(for: name), parts[id]?.contains(requiredPart) == true else {
+            throw Invalid("This source part is not allowed for this meeting.")
+        }
         switch name {
         case "read_transcript":
             let result = try await reader.readTranscript(meetingID: id, offset: params.offset, limit: min(params.limit, 10))

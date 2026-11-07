@@ -1,18 +1,5 @@
 import Foundation
 
-public struct ChatSourceScope: Codable, Sendable, Equatable {
-    public enum Kind: String, Codable, Sendable { case meetings, tags, folders, library }
-    public var kind: Kind
-    public var selectedIDs: Set<UUID>
-    public var includeWikis: Bool
-
-    public init(kind: Kind, selectedIDs: Set<UUID> = [], includeWikis: Bool = false) {
-        self.kind = kind
-        self.selectedIDs = selectedIDs
-        self.includeWikis = includeWikis
-    }
-}
-
 public struct ChatSourceAvailability: Codable, Sendable, Equatable {
     public let summary: Bool
     public let wiki: Bool

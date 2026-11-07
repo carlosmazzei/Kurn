@@ -44,14 +44,25 @@ package is FluidAudio.
 ### Agent harness (`Packages/AgentHarness/`)
 
 Kurn-specific source types remain in `KurnCore/Agent/`, which depends on
-`AgentHarness`. `ChatSourceScope` persists meeting/tag/folder/library selection and wiki opt-in.
+`AgentHarness`. `ChatSourceScope` persists meeting/tag/folder/library selection,
+global transcript/summary/wiki/attachment parts and optional per-meeting overrides
+(including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
-arguments and enforcing a fixed allowed-meeting set on reads and search results.
+arguments and enforcing a fixed allowed-meeting/part snapshot on reads and search results.
+Search uses transcript-enabled meetings only; listing masks disallowed availability,
+and tools with no eligible meeting are omitted.
 Explicit `AgentToolOutput.isError` results let tools report recoverable failures
 without throwing. `SourceScopeResolver` shares transcribed-only selection with
 the document composer; `LibraryChatSourceReader` snapshots SwiftData sources and
 uses existing hybrid search, summary rendering and stored attachment text. Wiki
 reads require opt-in. These tools are not wired into the existing chat UI.
+
+`ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
+from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,
+replaces, appends sections and reads paginated markdown (8000 scalars per page;
+200000 per document). Mutations return ID/version and a human-readable summary,
+not document bodies. Models are instructed to use artifacts for documents/reports/minutes
+rather than paste them in chat. Saving artifacts into the document library is an app concern.
 
 `NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
 supplies streaming text and turn responses; `AgentTool` supplies schemas, optional

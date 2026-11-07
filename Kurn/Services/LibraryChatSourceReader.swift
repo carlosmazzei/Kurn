@@ -29,17 +29,19 @@ final class LibraryChatSourceReader: ChatSourceReader {
     }
 
     func listSources() async throws -> [ChatSource] {
-        try meetings().map {
-            ChatSource(id: $0.id, title: $0.title, date: $0.createdAt, duration: $0.totalDuration,
-                       tags: $0.tags.map(\.name), folder: $0.folder?.name,
-                       availability: ChatSourceAvailability(summary: $0.latestSummary != nil,
-                                                            wiki: scope.includeWikis && $0.wikiArticle != nil,
-                                                            attachments: !$0.attachments.isEmpty))
+        try meetings().map { meeting in
+            let parts = scope.parts(for: meeting.id)
+            return ChatSource(id: meeting.id, title: meeting.title, date: meeting.createdAt, duration: meeting.totalDuration,
+                              tags: meeting.tags.map(\.name), folder: meeting.folder?.name,
+                              availability: ChatSourceAvailability(summary: parts.contains(.summary) && meeting.latestSummary != nil,
+                                                                   wiki: parts.contains(.wiki) && meeting.wikiArticle != nil,
+                                                                   attachments: parts.contains(.attachments) && !meeting.attachments.isEmpty))
         }
     }
 
     func search(query: String, meetingIDs: Set<UUID>, limit: Int) async throws -> [ChatSourcePassage] {
-        let selected = try meetings().filter { meetingIDs.contains($0.id) }
+        let selected = try meetings().filter { meetingIDs.contains($0.id) && scope.parts(for: $0.id).contains(.transcript) }
+        guard !selected.isEmpty else { return [] }
         let ids = Set(selected.map(\.id))
         let candidates = selected.flatMap { $0.semanticChunks.map(\.searchCandidate) }
         return try await retrieve(query, candidates, min(max(limit, 1), 100))
@@ -49,7 +51,9 @@ final class LibraryChatSourceReader: ChatSourceReader {
     }
 
     func readTranscript(meetingID: UUID, offset: Int, limit: Int) async throws -> ChatTranscriptPage {
-        guard let meeting = try meeting(meetingID) else { return ChatTranscriptPage(passages: [], total: 0) }
+        guard scope.parts(for: meetingID).contains(.transcript), let meeting = try meeting(meetingID) else {
+            return ChatTranscriptPage(passages: [], total: 0)
+        }
         let passages = meeting.recordings.sorted { $0.recordedAt < $1.recordedAt }.flatMap { recording in
             (recording.transcript?.segments ?? []).map {
                 ChatSourcePassage(meetingID: meetingID, timestamp: meeting.startOffset(of: recording) + $0.startTime,
@@ -61,20 +65,22 @@ final class LibraryChatSourceReader: ChatSourceReader {
     }
 
     func readSummary(meetingID: UUID) async throws -> String? {
-        guard let summary = try meeting(meetingID)?.latestSummary else { return nil }
+        guard scope.parts(for: meetingID).contains(.summary), let summary = try meeting(meetingID)?.latestSummary else { return nil }
         return SummaryService.markdownText(from: summary.sections)
     }
 
     func readWiki(meetingID: UUID) async throws -> String? {
-        guard scope.includeWikis else { return nil }
+        guard scope.parts(for: meetingID).contains(.wiki) else { return nil }
         return try meeting(meetingID)?.wikiArticle?.bodyMarkdown
     }
 
     func listAttachments(meetingID: UUID) async throws -> [ChatSourceAttachment] {
-        try meeting(meetingID)?.sortedAttachments.map { ChatSourceAttachment(id: $0.id, name: $0.displayName) } ?? []
+        guard scope.parts(for: meetingID).contains(.attachments) else { return [] }
+        return try meeting(meetingID)?.sortedAttachments.map { ChatSourceAttachment(id: $0.id, name: $0.displayName) } ?? []
     }
 
     func readAttachment(meetingID: UUID, attachmentID: UUID) async throws -> String? {
-        try meeting(meetingID)?.attachments.first { $0.id == attachmentID }?.extractedText
+        guard scope.parts(for: meetingID).contains(.attachments) else { return nil }
+        return try meeting(meetingID)?.attachments.first { $0.id == attachmentID }?.extractedText
     }
 }
