@@ -130,7 +130,7 @@ public struct AgentLimits: Sendable, Equatable {
 }
 
 public enum AgentRunStopReason: String, Codable, Sendable {
-    case completed, turnLimit, toolCallLimit, costLimit
+    case completed, turnLimit, toolCallLimit, costLimit, outputLimit
 }
 
 public struct AgentRunOutcome: Sendable, Equatable {

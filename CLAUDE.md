@@ -62,6 +62,9 @@ prefix is summarized with a tool-less model request, preserving assistant/result
 groups and recent messages. Compaction changes only model context; outcomes retain
 full history. These estimates and limits do not guarantee a provider's hard context
 or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
+Output-token truncation finishes with `.outputLimit` and discards tool calls;
+truncated compaction summaries never replace the elided context. Vendor streams
+must include a terminal event before a turn response can be used.
 `Agent/Wire/` builds Anthropic Messages, OpenAI Chat Completions and Gemini
 GenerateContent requests and accumulates their SSE data payloads. The app's three
 cloud text providers conform to `AgentModel` through the existing bounded SSE

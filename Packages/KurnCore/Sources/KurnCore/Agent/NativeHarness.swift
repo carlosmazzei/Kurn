@@ -67,9 +67,14 @@ public struct NativeHarness: Sendable {
             try Task.checkCancellation()
             record(response.usage, state: &state, events: events)
             state.finalText = response.text
-            let assistant = AgentMessage.assistant(text: response.text, toolCalls: response.toolCalls)
+            let assistant = AgentMessage.assistant(text: response.text,
+                                                   toolCalls: response.stopReason == .maxTokens ? [] : response.toolCalls)
             state.history.append(assistant)
             state.context.append(assistant)
+            if response.stopReason == .maxTokens {
+                reason = .outputLimit
+                break
+            }
             if response.toolCalls.isEmpty {
                 reason = costLimitReached(state) ? .costLimit : .completed
                 break
@@ -106,7 +111,9 @@ public struct NativeHarness: Sendable {
             let summary = try await model.streamTurn(request) { _ in }
             try Task.checkCancellation()
             record(summary.usage, state: &state, events: events)
-            state.context = compactor.replacingOlderPrefix(in: state.context, summary: summary.text)
+            if summary.stopReason != .maxTokens {
+                state.context = compactor.replacingOlderPrefix(in: state.context, summary: summary.text)
+            }
         }
         let after = compactor.estimateTokens(systemPrompt: systemPrompt, messages: state.context, tools: tools)
         if after != before { events.yield(.contextCompacted(beforeTokens: before, afterTokens: after)) }

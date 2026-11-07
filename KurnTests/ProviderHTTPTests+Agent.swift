@@ -99,9 +99,19 @@ extension ProviderHTTPTests {
         }
     }
 
-    @Test(arguments: AgentTestVendor.allCases)
-    private func agentTextDeltasAreForwarded(vendor: AgentTestVendor) async throws {
-        MockURLProtocol.enqueue([.success(status: 200, body: sseBody(["malformed", vendor.textPayload]), headers: [:])])
+    @Test(arguments: AgentTestVendor.allCases, [false, true])
+    private func agentTextDeltasAreForwarded(vendor: AgentTestVendor, outputLimited: Bool) async throws {
+        var payload = vendor.textPayload
+        if outputLimited {
+            payload = payload.replacingOccurrences(of: "\"stop\"", with: "\"length\"")
+                .replacingOccurrences(of: "\"STOP\"", with: "\"MAX_TOKENS\"")
+        }
+        var payloads = ["malformed", payload]
+        if vendor == .anthropic {
+            let reason = outputLimited ? "max_tokens" : "end_turn"
+            payloads.append(#"{"type":"message_delta","delta":{"stop_reason":"\#(reason)"}}"#)
+        }
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
         let text = StreamingAccumulator()
         let response = try await vendor.model().streamTurn(agentRequest) { event in
             if case .textDelta(let delta) = event { text.append(delta) }
@@ -109,9 +119,10 @@ extension ProviderHTTPTests {
         #expect(text.value == "Hello")
         #expect(response.text == "Hello")
         #expect(response.toolCalls.isEmpty)
+        #expect(response.stopReason == (outputLimited ? .maxTokens : .endTurn))
     }
 
-    @Test(arguments: ["empty", "remote", "incomplete", "http", "transport"])
+    @Test(arguments: ["empty", "remote", "incomplete", "interrupted", "http", "transport"])
     func agentStreamErrorsAreMappedAndNeverRetried(kind: String) async {
         let stub: MockURLProtocol.Stub
         switch kind {
@@ -119,7 +130,11 @@ extension ProviderHTTPTests {
         case "remote": stub = .success(status: 200, body: sseBody([#"{"error":{"message":"Overloaded"}}"#]), headers: [:])
         case "incomplete":
             stub = .success(status: 200, body: sseBody([
-                #"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"search"}}]}}]}"#
+                #"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"search"}}]},"finish_reason":"tool_calls"}]}"#
+            ]), headers: [:])
+        case "interrupted":
+            stub = .success(status: 200, body: sseBody([
+                #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a","function":{"name":"search","arguments":"{}"}}]}}]}"#
             ]), headers: [:])
         case "http": stub = .success(status: 503, body: Data("Unavailable".utf8), headers: [:])
         default: stub = .failure(URLError(.timedOut))
@@ -131,6 +146,9 @@ extension ProviderHTTPTests {
         } catch {
             if kind == "empty" || kind == "incomplete" {
                 guard case AppError.decodingError = error else { Issue.record("Expected decoding error"); return }
+            } else if kind == "interrupted" {
+                guard case AppError.networkError(let urlError) = error else { Issue.record("Expected transport error"); return }
+                #expect(urlError.code == .networkConnectionLost)
             } else if kind != "transport" {
                 guard case AppError.apiError = error else { Issue.record("Expected API error"); return }
             }

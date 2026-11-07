@@ -134,12 +134,13 @@ import Testing
 
     @Test func invalidArgumentsRetainRawText() throws {
         let (response, _) = try consume([
-            #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a","function":{"name":"read","arguments":"{bad"}}]}}]}"#
+            #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a","function":{"name":"read","arguments":"{bad"}}]},"finish_reason":"tool_calls"}]}"#
         ], format: .openAI)
         #expect(response.toolCalls[0].arguments == .null)
         #expect(response.toolCalls[0].rawArguments == "{bad")
         let accumulator = AgentWireAccumulator(format: .openAI)
         _ = try accumulator.consume(#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"read"}}]}}]}"#)
+        _ = try accumulator.consume(#"{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}"#)
         #expect(throws: AgentWireError.incompleteToolCall) { try accumulator.response() }
     }
 
