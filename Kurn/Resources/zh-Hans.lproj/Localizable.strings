@@ -1107,3 +1107,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d（当前 v%d）";
 "documents.chat.provenance" = "在聊天中生成 · v%d";
+"chat.artifact.cloud_required" = "创建文档需要在设置中配置并选择云端 AI 提供商。云端请求会将所选来源发送给该提供商。";
+"chat.artifact.configure_provider" = "在设置中配置提供商";

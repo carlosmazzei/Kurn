@@ -46,6 +46,11 @@ struct MeetingChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !settings.aiProvider.kind.supportsAgentChat {
+                ChatArtifactProviderNotice()
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+            }
             if !settings.semanticSearchEnabled {
                 disabledState
             } else if !canChat {

@@ -1107,3 +1107,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (current v%d)";
 "documents.chat.provenance" = "Created in chat · v%d";
+"chat.artifact.cloud_required" = "Creating documents requires a cloud AI provider configured and selected in Settings. Cloud requests send the selected sources to that provider.";
+"chat.artifact.configure_provider" = "Configure provider in Settings";

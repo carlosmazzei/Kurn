@@ -1107,3 +1107,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (atual v%d)";
 "documents.chat.provenance" = "Gerado no chat · v%d";
+"chat.artifact.cloud_required" = "Criar documentos requer um provedor de IA na nuvem configurado e selecionado nos Ajustes. As solicitações na nuvem enviam as fontes selecionadas a esse provedor.";
+"chat.artifact.configure_provider" = "Configurar provedor nos Ajustes";

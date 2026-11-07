@@ -1107,3 +1107,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (aktuell v%d)";
 "documents.chat.provenance" = "Im Chat erstellt · v%d";
+"chat.artifact.cloud_required" = "Zum Erstellen von Dokumenten muss in den Einstellungen ein Cloud-KI-Anbieter eingerichtet und ausgewählt sein. Cloud-Anfragen senden die ausgewählten Quellen an diesen Anbieter.";
+"chat.artifact.configure_provider" = "Anbieter in den Einstellungen konfigurieren";
