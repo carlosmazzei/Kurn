@@ -88,6 +88,7 @@ everything.
 
 | Date | Commit | Scope | Corpora | Workflow run(s) |
 | --- | --- | --- | --- | --- |
+| 2026-11-06 | `b8d6db1` | sherpa-onnx 2.0.1 regression check: `sherpaOnnx` × `fluidAudioParakeet`, `matrix: full` (4 configs, prep × VAD) | AMI (4, WER+DER) | [42229034531](https://github.com/carlosmazzei/Kurn/actions/runs/42229034531) |
 | 2026-11-03 | `5cfc919` | Six dispatches to fill the gaps the 2026-11-01 runs left: Parakeet v3 + whisper.cpp `largeTurbo` (8 configs); Parakeet v3 in Portuguese (4); Nemotron 3 diarization × Parakeet v3 / Phonon-2 (8); ElevenLabs `scribe_v1` + `scribe_v2` × `fluidAudio` / native diarization (16); whisper.cpp `small` (4); Groq `whisper-large-v3` + turbo (8). All four AMI meetings fetched in every English run | AMI (4, WER+DER), LibriSpeech (6), CAMOES (40), CORAA (40) | [Parakeet + largeTurbo](https://github.com/carlosmazzei/Kurn/actions/runs/41693244971), [Parakeet pt](https://github.com/carlosmazzei/Kurn/actions/runs/41693250571), [Nemotron 3 AMI](https://github.com/carlosmazzei/Kurn/actions/runs/41694750856), [ElevenLabs](https://github.com/carlosmazzei/Kurn/actions/runs/41699659363), [whisper.cpp small](https://github.com/carlosmazzei/Kurn/actions/runs/41699664893), [Groq](https://github.com/carlosmazzei/Kurn/actions/runs/41702642987) |
 | 2026-11-01 | `aebf04e` | Nemotron 3 against Pyannote diarization, Parakeet ASR, 8 configs (prep × VAD × diarization model) | VoxConverse (4, DER) | [41339676563](https://github.com/carlosmazzei/Kurn/actions/runs/41339676563) |
 | 2026-11-01 | `f6745bb` | Five dispatches on the new FluidAudio model axes: Nemotron Unified, Bark 3.0/Clean, Phonon-2 and Transcribe Lite in English (20 configs) and Nemotron Unified in Portuguese (4); whisper.cpp `base` + `largeTurbo` in English and Portuguese (8 each); Groq `whisper-large-v3-turbo` (4). AMI's mirror throttled the runners, so AMI coverage differs per dispatch | AMI (4 with WER for the FluidAudio models; 3 DER-only for whisper.cpp; 1 for Groq), LibriSpeech (6), CAMOES (40), CORAA (40) | [FluidAudio en](https://github.com/carlosmazzei/Kurn/actions/runs/41336072736), [Unified pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336076180), [whisper.cpp en](https://github.com/carlosmazzei/Kurn/actions/runs/41336081989), [whisper.cpp pt](https://github.com/carlosmazzei/Kurn/actions/runs/41336084871), [Groq turbo](https://github.com/carlosmazzei/Kurn/actions/runs/41336088010) |
@@ -344,6 +345,37 @@ The measured consequence: the gated path produced the only real improvements
 > to 0.1 s, so a DER here can differ from the harness's by up to ~0.05pp. Each
 > run's reference-tool re-score matched its own CSV to 0.0000pp.
 
+
+### 2026-11-06 — `b8d6db1` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/42229034531))
+
+**sherpa-onnx 2.x produces real multi-speaker turns; raw DER has not
+regressed against 1.x.** This successful dispatch ran on `origin/main` HEAD,
+with sherpa-onnx **2.0.1** (bumped from 1.13.8 in `3c86aeb`, 2026-10-31),
+`sherpaOnnx` diarization and `fluidAudioParakeet` ASR on all four AMI meetings.
+`matrix: full` swept `none` / `standardDSP` preprocessing ×
+`energyThreshold` / `fluidAudio` VAD.
+
+The job log reports the same raw DER in every configuration (±0.25 s collar):
+
+| File | Raw DER | Output turns | Output speakers |
+| --- | --- | --- | --- |
+| EN2002a | 45.4% | 42 | 16 |
+| ES2004a | 28.1% | 17 | 5 |
+| IS1009a | 24.0% | 24 | 10 |
+| TS3003a | 42.4% | 29 | 7 |
+
+The unweighted mean of those displayed per-file rates is **≈34.98%**.
+This is not the corpus metric: the harness reports micro-averaged raw DER
+of **37.41%** across the four meetings in all four configurations, exactly
+matching **37.41%** on sherpa-onnx **1.13.8** in the 2026-09-26 Parakeet run.
+The per-file rates also exactly reproduce the existing D4 per-file table
+above (its sherpa-onnx column is the 2026-09-26 baseline; the Nemotron column
+was added from the November runs). Raw DER scores the diarizer's own turns
+before ASR fusion and is ASR-independent.
+
+The logged turn and speaker counts establish that the 2.x C API executed
+real diarization, not the single-speaker fallback. They do not establish
+accurate speaker counts: sherpa-onnx still oversegments these meetings.
 
 ### 2026-11-03 — `5cfc919` ([workflow run](https://github.com/carlosmazzei/Kurn/actions/runs/41702642987))
 

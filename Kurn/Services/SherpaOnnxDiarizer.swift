@@ -26,12 +26,12 @@
 //  `Kurn/Services/SherpaOnnx/SherpaOnnx-Bridging-Header.h`
 //  (`SWIFT_OBJC_BRIDGING_HEADER` on the `Kurn` target) plus that compilation
 //  condition (`SWIFT_ACTIVE_COMPILATION_CONDITIONS`, Debug and Release) —
-//  both verified locally in Xcode and set on the `Kurn` target only, not
-//  `KurnTests`'s, matching the existing "KurnTests doesn't link the optional
-//  package" convention documented on `WhisperCppModelDownloader`. Confirmed
-//  reachable in CI by the 2026-08-27 pipeline-eval dispatch
-//  (`docs/pipeline-evaluation.md`) — the log shows real per-item processing
-//  times, not the `#else` stub's instant fallback.
+//  both set on the `Kurn` target. Hosted `KurnTests` import that compiled
+//  implementation with `@testable import Kurn`; they do not need their own
+//  compilation condition to exercise it. Without downloaded models, the
+//  real implementation takes the single-speaker fallback. With models,
+//  the 2026-11-06 pipeline-eval dispatch confirms the 2.x C API returns
+//  real multi-speaker turns (`docs/pipeline-evaluation.md`).
 //
 
 import AVFoundation

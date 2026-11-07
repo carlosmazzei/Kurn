@@ -2,13 +2,12 @@
 //  SherpaOnnxDiarizerTests.swift
 //  KurnTests
 //
-//  `SherpaOnnxDiarizer`'s real, ONNX-backed implementation is guarded by
-//  `SHERPA_ONNX_ENABLED`, which nothing in the Xcode project sets yet (see
-//  the file's own header comment) — so in every CI configuration today this
-//  exercises the `#else` stub, exactly like `KurnTests` never linking
-//  FluidAudio or whisper.cpp would exercise theirs. What that stub has to
-//  guarantee is the same contract every `Diarizing` conformer promises: never
-//  throw, never return nothing, fall back to a single whole-clip turn.
+//  The Kurn app target sets `SHERPA_ONNX_ENABLED` in Debug and Release.
+//  Hosted KurnTests import that compiled implementation through
+//  `@testable import Kurn`, so these tests exercise the real sherpa-onnx 2.x
+//  path, not the `#else` stub. Without downloaded models, it takes the
+//  documented single-speaker fallback: never throw, never return nothing,
+//  and cover the whole clip with one turn.
 //
 
 import Foundation
