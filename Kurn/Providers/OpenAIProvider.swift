@@ -482,10 +482,16 @@ extension OpenAIProvider: AgentModel {
     ) async throws -> AgentTurnResponse {
         try LLMHTTP.requireAPIKey(apiKey, provider: provider)
         let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
-        let body = AgentWireFormat.openAI.requestBody(request, model: chatModel, reasoningEffort: reasoningEffort)
-        var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+        let baseURL = URLComponents(string: provider.baseURLString)
+        let official = provider.id == AIProvider.openAI.id
+            && baseURL?.scheme?.lowercased() == "https" && baseURL?.host?.lowercased() == "api.openai.com"
+            && (baseURL?.port == nil || baseURL?.port == 443)
+        let format: AgentWireFormat = official ? .openAIResponses : .openAI
+        let body = format.requestBody(request, model: chatModel, reasoningEffort: reasoningEffort)
+        var httpRequest = try LLMHTTP.jsonRequest(provider: provider, path: official ? "responses" : "chat/completions",
+            timeout: LLMHTTP.chatTimeout, headers: ["Authorization": "Bearer \(apiKey)"], body: [:])
         httpRequest.httpBody = Data(try body.encodedString().utf8)
-        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: .openAI, onEvent: onEvent)
+        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: format, onEvent: onEvent)
     }
 }
 

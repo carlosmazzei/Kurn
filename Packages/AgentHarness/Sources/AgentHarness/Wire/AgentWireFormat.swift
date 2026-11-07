@@ -1,7 +1,7 @@
 import Foundation
 
 public enum AgentWireFormat: Sendable, CaseIterable {
-    case anthropic, openAI, gemini
+    case anthropic, openAI, openAIResponses, gemini
 
     /// Gemini streams through its URL route, not a `stream` body field.
     public func requestBody(_ request: AgentTurnRequest, model: String,
@@ -12,6 +12,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         case .openAI:
             return openAIBody(request, model: model, tokenField: openAITokenField, reasoningEffort: reasoningEffort)
         case .gemini: return geminiBody(request)
+        case .openAIResponses: return responsesBody(request, model: model, reasoningEffort: reasoningEffort)
         }
     }
 

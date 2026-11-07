@@ -103,12 +103,16 @@ or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistenc
 Output-token truncation finishes with `.outputLimit` and discards tool calls;
 truncated compaction summaries never replace the elided context. Vendor streams
 must include a terminal event before a turn response can be used.
-`AgentHarness/Wire/` builds Anthropic Messages, OpenAI Chat Completions and Gemini
+`AgentHarness/Wire/` builds Anthropic Messages, OpenAI Responses/Chat Completions and Gemini
 GenerateContent requests and accumulates their SSE data payloads. The app's three
 cloud text providers conform to `AgentModel` through the existing bounded SSE
 transport, with chat timeouts and no retry after streaming starts. OpenAI-compatible
-custom endpoints follow the existing chat request shape. Gemini call IDs are
-synthesized when absent; optional call metadata retains wire IDs and thought
+custom endpoints follow the existing chat request shape.
+Official OpenAI agent turns use `/v1/responses` with `store: false` only when the
+built-in provider ID and HTTPS `api.openai.com` origin (default/443 port) both match;
+compatible endpoints and legacy summary/chat stay on Chat Completions. GPT-5 agent
+models retain low reasoning effort via `reasoning.effort`; other models omit it.
+Gemini call IDs are synthesized when absent; optional call metadata retains wire IDs and thought
 signatures for replay. `ProviderFactory.agentModel(for:model:)` returns nil for
 on-device and transcription-only providers, so callers can retain the chat fallback.
 Apple's provider does not conform. App adapters import `AgentHarness` explicitly;
