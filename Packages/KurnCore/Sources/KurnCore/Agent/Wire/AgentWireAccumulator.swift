@@ -4,6 +4,7 @@ public enum AgentWireError: Error, Sendable, Equatable {
     case remote(String)
     case emptyResponse
     case incompleteToolCall
+    case incompleteStream
 }
 
 /// Consumes SSE data payloads, not SSE framing. State is protected by `lock`.
@@ -40,6 +41,7 @@ private struct AgentWireState {
     var inputTokens: Int?
     var outputTokens: Int?
     var stopReason: AgentModelStopReason = .other("unknown")
+    var receivedTerminal = false
 
     mutating func consume(_ payload: String) throws -> [AgentModelEvent] {
         guard let value = try? JSONValue.parse(payload), case .object = value else { return [] }
@@ -54,6 +56,8 @@ private struct AgentWireState {
     }
 
     func response() throws -> AgentTurnResponse {
+        guard !text.isEmpty || !calls.isEmpty else { throw AgentWireError.emptyResponse }
+        guard receivedTerminal else { throw AgentWireError.incompleteStream }
         let toolCalls = try calls.keys.sorted().map { index in
             let call = calls[index] ?? PartialCall()
             guard !call.id.isEmpty, !call.name.isEmpty else { throw AgentWireError.incompleteToolCall }
@@ -61,7 +65,6 @@ private struct AgentWireState {
             return AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(raw)) ?? .null,
                                  rawArguments: raw, providerMetadata: call.metadata)
         }
-        guard !text.isEmpty || !toolCalls.isEmpty else { throw AgentWireError.emptyResponse }
         let usage = inputTokens == nil && outputTokens == nil ? nil
             : AgentUsage(inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0)
         return AgentTurnResponse(text: text, toolCalls: toolCalls, usage: usage, stopReason: stopReason)
@@ -91,6 +94,9 @@ private struct AgentWireState {
             return anthropicDelta(value)
         case "message_delta":
             anthropicFinish(value)
+        case "message_stop":
+            if !receivedTerminal { stopReason = calls.isEmpty ? .endTurn : .toolUse }
+            receivedTerminal = true
         default: break
         }
         return []
@@ -109,6 +115,7 @@ private struct AgentWireState {
         if let input = value["usage"]["input_tokens"].int { inputTokens = input }
         if let output = value["usage"]["output_tokens"].int { outputTokens = output }
         guard let reason = value["delta"]["stop_reason"].string else { return }
+        receivedTerminal = true
         switch reason {
         case "end_turn", "stop_sequence": stopReason = .endTurn
         case "tool_use": stopReason = .toolUse
@@ -132,6 +139,7 @@ private struct AgentWireState {
             calls[index] = call
         }
         if let reason = choice["finish_reason"].string {
+            receivedTerminal = true
             switch reason {
             case "stop": stopReason = .endTurn
             case "tool_calls", "function_call": stopReason = .toolUse
@@ -164,6 +172,7 @@ private struct AgentWireState {
                                       metadata: metadata.isEmpty ? nil : .object(metadata))
         }
         if let reason = candidate["finishReason"].string {
+            receivedTerminal = true
             switch reason {
             case "STOP": stopReason = calls.isEmpty ? .endTurn : .toolUse
             case "MAX_TOKENS": stopReason = .maxTokens

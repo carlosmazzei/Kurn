@@ -21,6 +21,7 @@ extension LLMHTTP {
             case .remote(let message): throw AppError.apiError(statusCode: 0, message: message)
             case .emptyResponse: throw AppError.decodingError("empty agent response")
             case .incompleteToolCall: throw AppError.decodingError("incomplete agent tool call")
+            case .incompleteStream: throw AppError.networkError(URLError(.networkConnectionLost))
             }
         }
     }
