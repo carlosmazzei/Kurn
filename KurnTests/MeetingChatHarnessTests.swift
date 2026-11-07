@@ -48,9 +48,11 @@ struct MeetingChatHarnessTests {
         let artifact = try #require(vm.artifacts.first)
         #expect(artifact.title == "Minutes")
         #expect(artifact.version == 1)
+        #expect(vm.turns.last?.artifacts == [ChatArtifactReference(artifact)])
         let session = try #require(vm.pastSessions().first)
         #expect(session.id == vm.currentSessionID)
         #expect(session.turns.last?.steps == steps)
+        #expect(session.turns.last?.artifacts == [ChatArtifactReference(artifact)])
         #expect(try session.harnessSnapshot().artifacts == [artifact])
         let requests = await model.requests
         #expect(!requests[0].tools.contains { $0.name == "read_wiki" })
@@ -67,11 +69,14 @@ struct MeetingChatHarnessTests {
         restored.load(session: session)
         #expect(restored.artifacts == [artifact])
         #expect(restored.turns.last?.steps == steps)
+        #expect(restored.turns.last?.artifacts.first?.version == 1)
         #expect(restored.scope == vm.scope)
         ask(restored, "Append follow-up")
         await waitUntil { !restored.isResponding }
         #expect(restored.error == nil)
         #expect(restored.artifacts.first?.version == 2)
+        #expect(restored.turns.last?.artifacts.first?.version == 2)
+        #expect(restored.turns.first { $0.role == .assistant }?.artifacts.first?.version == 1)
         #expect(restored.artifacts.first?.markdown == "# Decisions\n\n## Follow-up")
         let revisionRequests = await revision.requests
         #expect(revisionRequests[0].systemPrompt.contains(artifact.id.uuidString))

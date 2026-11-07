@@ -85,6 +85,7 @@ struct PersistedChatTurn: Codable {
     var costUSD: Double?
     var elapsedSeconds: TimeInterval?
     var steps: [ChatAgentStep]? = nil
+    var artifacts: [ChatArtifactReference]? = nil
 }
 
 /// A citation snapshot rather than a live `SemanticSearchService.Hit` —

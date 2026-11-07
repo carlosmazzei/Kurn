@@ -61,7 +61,19 @@ with an `AgentModel`; nil (including Apple on-device) keeps `MeetingChatService`
 editing. `ChatAgentTimeline` reduces events to Codable structured steps and live usage.
 The adapter removes wiki from global and override parts when `wikiEnabled` is off.
 Harness replies cite meeting titles/timestamps in text; legacy `Hit` citation snapshots
-remain on the legacy path. No new SwiftUI scope/timeline surface is added yet.
+remain on the legacy path. `ChatSourceSheet` edits meeting-locked parts or library
+selections/global parts/per-meeting overrides; scope edits persist for the next message.
+`ChatSourcePresentation` shares wiki gating and validation with the adapter; invalid
+scopes disable Send/Retry and show inline guidance. The adapter retains a localized,
+defensive validation error for sources removed after UI validation. The selector is
+hidden for Apple on-device and other non-agent providers: legacy library retrieval
+cannot honor the new scope/part restrictions.
+`ChatStepTimelineView` shows live steps, then collapses them behind a step count.
+`ChatStepPresentation` maps structured tool/stop data to localization keys outside
+Views; expandable arguments/output previews cap at 2000 scalars. The chat shows live
+usage/cost and compact per-turn `ChatArtifactReference` title/version rows (no duplicate
+document bodies in turn JSON). Optional references preserve old turn decoding; full
+artifact cards and saving into the document library are separate work.
 
 `ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
 from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,

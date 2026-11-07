@@ -70,14 +70,16 @@ struct MeetingChatHarnessFailureTests {
         vm.configure(meeting: nil, modelContext: context)
         ask(vm)
         await waitUntilDone(vm)
-        #expect(vm.error != nil)
+        guard case .apiError(_, let sourceMessage) = vm.error else { Issue.record("Expected source validation error"); return }
+        #expect(sourceMessage == NSLocalizedString("chat.sources.validation.meetings", comment: "No meetings"))
         #expect(await model.requests.isEmpty)
         let meeting = MeetingFixtures.transcribed("Planning", in: context)
         vm.reset()
         vm.updateScope(ChatSourceScope(kind: .meetings, selectedIDs: [meeting.id], parts: []))
         ask(vm)
         await waitUntilDone(vm)
-        #expect(vm.error != nil)
+        guard case .apiError(_, let partsMessage) = vm.error else { Issue.record("Expected part validation error"); return }
+        #expect(partsMessage == NSLocalizedString("chat.sources.validation.parts", comment: "No parts"))
         #expect(await model.requests.isEmpty)
         vm.reset()
         vm.updateScope(ChatSourceScope(kind: .meetings, selectedIDs: [meeting.id], parts: [.transcript]))

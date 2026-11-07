@@ -16,6 +16,7 @@ extension MeetingChatViewModel {
         /// finishes.
         var elapsedSeconds: TimeInterval?
         var steps: [ChatAgentStep] = []
+        var artifacts: [ChatArtifactReference] = []
 
         /// `id` defaults to a fresh `UUID` for a brand-new turn; restoring a
         /// saved one (`Turn.init(_ persisted:)` below) passes its stored id
@@ -54,7 +55,8 @@ extension PersistedChatTurn {
             usage: turn.usage,
             costUSD: turn.costUSD,
             elapsedSeconds: turn.elapsedSeconds,
-            steps: turn.steps.isEmpty ? nil : turn.steps
+            steps: turn.steps.isEmpty ? nil : turn.steps,
+            artifacts: turn.artifacts.isEmpty ? nil : turn.artifacts
         )
     }
 }
@@ -100,5 +102,6 @@ extension MeetingChatViewModel.Turn {
             elapsedSeconds: persisted.elapsedSeconds,
             steps: persisted.steps ?? []
         )
+        artifacts = persisted.artifacts ?? []
     }
 }

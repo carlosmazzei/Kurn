@@ -472,6 +472,7 @@ final class MeetingChatViewModel {
                     if !isError && ["create_document", "update_document", "append_to_document"].contains(name) {
                         let snapshot = await workspace.snapshot()
                         try Task.checkCancellation()
+                        turns[index].artifacts = ChatArtifactReference.updating(turns[index].artifacts, from: artifacts, to: snapshot)
                         artifacts = snapshot
                         persist(turns: completedTurns)
                     }

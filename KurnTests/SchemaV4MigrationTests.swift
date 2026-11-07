@@ -211,5 +211,6 @@ struct SchemaV4MigrationTests {
         #expect(turns.first?.id == id)
         #expect(turns.first?.text == "Old reply")
         #expect(turns.first?.steps == nil)
+        #expect(turns.first?.artifacts == nil)
     }
 }

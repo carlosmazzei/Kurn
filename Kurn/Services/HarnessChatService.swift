@@ -17,7 +17,8 @@ struct HarnessChatService {
         let reader = LibraryChatSourceReader(context: context, scope: effective)
         let ids = Set(try await reader.listSources().map(\.id))
         if let validation = ChatSourceScopeEditor(scope: effective).validation(resolvedMeetingIDs: ids) {
-            throw AppError.apiError(statusCode: 0, message: validation.rawValue)
+            let message = NSLocalizedString(ChatSourcePresentation.validationKey(validation), comment: "Invalid sources")
+            throw AppError.apiError(statusCode: 0, message: message)
         }
         let tools = ChatSourceTools.make(reader: reader, allowedMeetingIDs: ids, scope: effective)
             + ChatDocumentTools.make(workspace: workspace)
@@ -34,11 +35,7 @@ struct HarnessChatService {
     }
 
     func effectiveScope(_ scope: ChatSourceScope) -> ChatSourceScope {
-        guard !isWikiEnabled() else { return scope }
-        var effective = scope
-        effective.parts.remove(.wiki)
-        effective.partOverrides = effective.partOverrides.mapValues { $0.subtracting([.wiki]) }
-        return effective
+        ChatSourcePresentation.effectiveScope(scope, wikiEnabled: isWikiEnabled())
     }
 
     static func systemPrompt(artifacts: [ChatDocumentArtifact]) throws -> String {
