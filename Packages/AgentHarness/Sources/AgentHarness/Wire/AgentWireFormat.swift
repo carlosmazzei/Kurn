@@ -22,7 +22,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             + request.messages.map { message in
                 switch message {
                 case .user(let text): return .object(["role": .string("user"), "content": .string(text)])
-                case .assistant(let text, let calls):
+                case .assistant(let text, let calls, _):
                     var value: [String: JSONValue] = ["role": .string("assistant"), "content": .string(text)]
                     if !calls.isEmpty {
                         value["tool_calls"] = .array(calls.map { call in
@@ -56,7 +56,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             case .user(let text):
                 append(role: "user", parts: [.object(["type": .string("text"), "text": .string(text)])],
                        to: &messages, field: "content")
-            case .assistant(let text, let calls):
+            case .assistant(let text, let calls, _):
                 var blocks: [JSONValue] = text.isEmpty ? [] : [.object(["type": .string("text"), "text": .string(text)])]
                 blocks += calls.map { call in
                     .object(["type": .string("tool_use"), "id": .string(call.id),
@@ -85,7 +85,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             switch message {
             case .user(let text):
                 append(role: "user", parts: [.object(["text": .string(text)])], to: &contents, field: "parts")
-            case .assistant(let text, let calls):
+            case .assistant(let text, let calls, _):
                 var parts: [JSONValue] = text.isEmpty ? [] : [.object(["text": .string(text)])]
                 for call in calls {
                     callsByID[call.id] = call

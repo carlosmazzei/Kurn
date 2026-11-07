@@ -11,6 +11,7 @@ struct AgentResponsesAccumulator {
 
     var text = ""
     var calls: [Int: Call] = [:]
+    var reasoning: [Int: JSONValue] = [:]
     var terminal = false
     var limited = false
     var usage: AgentUsage?
@@ -69,6 +70,10 @@ struct AgentResponsesAccumulator {
     }
 
     mutating func record(_ item: JSONValue, index: Int, complete: Bool) {
+        if item["type"].string == "reasoning" {
+            reasoning[index] = item
+            return
+        }
         guard item["type"].string == "function_call" else { return }
         var call = calls[index] ?? Call()
         call.itemID = item["id"].string ?? call.itemID
@@ -100,7 +105,11 @@ struct AgentResponsesAccumulator {
             return AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(call.raw)) ?? .null, rawArguments: call.raw)
         }
         guard !text.isEmpty || !toolCalls.isEmpty || limited else { throw AgentWireError.emptyResponse }
+        let metadata: JSONValue? = reasoning.isEmpty ? nil : .object([
+            "openAIResponses": .object(["reasoning": .array(reasoning.keys.sorted().compactMap { reasoning[$0] })])
+        ])
         return AgentTurnResponse(text: text, toolCalls: toolCalls, usage: usage,
-                                 stopReason: limited ? .maxTokens : toolCalls.isEmpty ? .endTurn : .toolUse)
+                                 stopReason: limited ? .maxTokens : toolCalls.isEmpty ? .endTurn : .toolUse,
+                                 providerMetadata: metadata)
     }
 }

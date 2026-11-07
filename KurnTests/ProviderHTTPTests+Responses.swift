@@ -11,9 +11,13 @@ extension ProviderHTTPTests {
         let arguments = #"{"type":"response.function_call_arguments.delta","output_index":0,"delta":"{}"}"#
         let done = #"{"type":"response.function_call_arguments.done","output_index":0,"arguments":"{}"}"#
         let terminal = #"{"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":2}}}"#
+        let reasoning = #"""
+            {"type":"response.output_item.done","output_index":1,"item":{"type":"reasoning","id":"rs_1",
+            "summary":[],"encrypted_content":"encrypted"}}
+            """#
         let answer = #"{"type":"response.output_text.delta","delta":"Found Alice"}"#
         MockURLProtocol.enqueue([
-            .success(status: 200, body: sseBody([first, arguments, done, terminal]), headers: [:]),
+            .success(status: 200, body: sseBody([reasoning, first, arguments, done, terminal]), headers: [:]),
             .success(status: 200, body: sseBody([answer, terminal]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "test-key", model: model, session: MockURLProtocol.session())
@@ -25,13 +29,14 @@ extension ProviderHTTPTests {
         let body = try JSONValue.parse(String(decoding: MockURLProtocol.body(of: request), as: UTF8.self))
         #expect(request.url?.absoluteString == "https://api.openai.com/v1/responses")
         #expect(body["store"] == .bool(false))
+        #expect(body["include"] == .array([.string("reasoning.encrypted_content")]))
         #expect(body["reasoning_effort"] == .null)
         #expect(body["reasoning"] == (model.hasPrefix("gpt-5") ? .object(["effort": .string("low")]) : .null))
         #expect(body["tools"].array.first?["type"] == .string("function"))
         #expect(body["tools"].array.first?["parameters"]["type"] == .string("object"))
         #expect(response.toolCalls.first?.id == "call-1")
         let nextRequest = AgentTurnRequest(systemPrompt: "Ground answers", messages: firstRequest.messages + [
-            .assistant(text: response.text, toolCalls: response.toolCalls),
+            .assistant(text: response.text, toolCalls: response.toolCalls, providerMetadata: response.providerMetadata),
             .toolResult(callID: "call-1", toolName: "search", content: "Alice in meeting A", isError: false)
         ], tools: tools, maxOutputTokens: 300)
         let final = try await provider.streamTurn(nextRequest) { _ in }
@@ -39,10 +44,13 @@ extension ProviderHTTPTests {
         #expect(final.usage == AgentUsage(inputTokens: 10, outputTokens: 2))
         let followup = try #require(MockURLProtocol.lastRequest)
         let replay = try JSONValue.parse(String(decoding: MockURLProtocol.body(of: followup), as: UTF8.self))["input"].array
-        #expect(replay[1]["type"] == .string("function_call"))
-        #expect(replay[1]["call_id"] == .string("call-1"))
-        #expect(replay[1]["arguments"] == .string("{}"))
-        #expect(replay[2] == .object(["type": .string("function_call_output"), "call_id": .string("call-1"),
+        #expect(replay[1]["type"] == .string("reasoning"))
+        #expect(replay[1]["encrypted_content"] == .string("encrypted"))
+        #expect(replay[2]["type"] == .string("function_call"))
+        #expect(replay[2]["call_id"] == .string("call-1"))
+        #expect(replay[2]["arguments"] == .string("{}"))
+        #expect(replay[2]["id"] == .null)
+        #expect(replay[3] == .object(["type": .string("function_call_output"), "call_id": .string("call-1"),
                                     "output": .string("Alice in meeting A")]))
     }
 

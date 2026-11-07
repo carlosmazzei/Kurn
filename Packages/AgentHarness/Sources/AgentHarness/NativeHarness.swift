@@ -82,7 +82,8 @@ public struct NativeHarness: Sendable {
             record(response.usage, state: &state, events: events)
             state.finalText = response.text
             let calls = response.stopReason == .maxTokens ? [] : response.toolCalls.map(NormalizedToolCall.init)
-            let assistant = AgentMessage.assistant(text: response.text, toolCalls: calls.map(\.call))
+            let assistant = AgentMessage.assistant(text: response.text, toolCalls: calls.map(\.call),
+                                                   providerMetadata: response.providerMetadata)
             state.history.append(assistant)
             state.context.append(assistant)
             if response.stopReason == .maxTokens {

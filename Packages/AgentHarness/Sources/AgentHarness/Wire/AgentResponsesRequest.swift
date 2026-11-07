@@ -7,10 +7,11 @@ extension AgentWireFormat {
             switch message {
             case .user(let text):
                 input.append(.object(["role": .string("user"), "content": .string(text)]))
-            case .assistant(let text, let calls):
+            case .assistant(let text, let calls, let metadata):
                 if !text.isEmpty {
                     input.append(.object(["role": .string("assistant"), "content": .string(text)]))
                 }
+                input += (metadata?["openAIResponses"]["reasoning"].array ?? []).filter { $0["type"].string == "reasoning" }
                 input += calls.map { call in
                     .object(["type": .string("function_call"), "call_id": .string(call.id),
                              "name": .string(call.name), "arguments": .string(call.rawArguments)])
@@ -21,7 +22,8 @@ extension AgentWireFormat {
         }
         var body: [String: JSONValue] = [
             "model": .string(model), "instructions": .string(request.systemPrompt), "input": .array(input),
-            "stream": .bool(true), "store": .bool(false), "max_output_tokens": .number(Double(request.maxOutputTokens))
+            "stream": .bool(true), "store": .bool(false), "max_output_tokens": .number(Double(request.maxOutputTokens)),
+            "include": .array([.string("reasoning.encrypted_content")])
         ]
         if !request.tools.isEmpty {
             body["tools"] = .array(request.tools.map { spec in
