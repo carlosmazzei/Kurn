@@ -6,12 +6,17 @@ struct ChatSourcePresentationTests {
     @Test func harnessReadinessDoesNotReadTheIndexWhileLegacyStillRequiresIt() {
         var reads = 0
         func index(_ value: Bool) -> Bool { reads += 1; return value }
-        #expect(ChatSourcePresentation.canChat(enabled: true, usesHarness: true, hasIndex: index(false)))
-        #expect(!ChatSourcePresentation.canChat(enabled: false, usesHarness: true, hasIndex: index(true)))
-        #expect(!ChatSourcePresentation.canChat(enabled: false, usesHarness: false, hasIndex: index(true)))
+        let harness = ChatSourcePresentation.canChat(enabled: true, usesHarness: true, hasIndex: index(false))
+        let disabledHarness = ChatSourcePresentation.canChat(enabled: false, usesHarness: true, hasIndex: index(true))
+        let disabledLegacy = ChatSourcePresentation.canChat(enabled: false, usesHarness: false, hasIndex: index(true))
+        #expect(harness)
+        #expect(!disabledHarness)
+        #expect(!disabledLegacy)
         #expect(reads == 0)
-        #expect(!ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(false)))
-        #expect(ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(true)))
+        let emptyLegacy = ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(false))
+        let indexedLegacy = ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(true))
+        #expect(!emptyLegacy)
+        #expect(indexedLegacy)
         #expect(reads == 2)
     }
 
