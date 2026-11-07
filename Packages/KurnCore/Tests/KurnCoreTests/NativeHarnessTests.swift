@@ -113,6 +113,31 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         #expect(events.contains(.toolFinished(callID: "1", name: "lookup", summary: "Found facts", isError: false)))
     }
 
+    @Test(arguments: [#"{"destination":"actual"}"#, "null", "{bad"])
+    func confirmationAndEventsUseExecutedArguments(raw: String) async throws {
+        let parsed = try? JSONValue.parse(raw)
+        let call = AgentToolCall(id: "1", name: "lookup", arguments: .string("misleading"), rawArguments: raw)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [call]), AgentTurnResponse(text: "Done")])
+        let tool = AgentTool(spec: agentTool().spec, requiresConfirmation: true) { arguments in
+            #expect(parsed != nil)
+            #expect(arguments == parsed)
+            return AgentToolOutput(content: try arguments.encodedString(), summary: "Executed")
+        }
+        let harness = NativeHarness(model: model, confirm: { approved in
+            #expect(parsed != nil)
+            #expect(approved.arguments == parsed)
+            #expect(approved.rawArguments == raw)
+            return true
+        })
+        let events = try await agentEvents(harness, tools: [tool])
+        #expect(events.contains(.toolStarted(callID: "1", name: "lookup", arguments: parsed ?? .null)))
+        #expect(events.contains(.toolFinished(callID: "1", name: "lookup",
+                                              summary: parsed == nil ? "Invalid JSON arguments for lookup: {bad" : "Executed",
+                                              isError: parsed == nil)))
+        let outcome = try agentOutcome(events)
+        #expect(outcome.finalText == "Done")
+    }
+
     @Test func turnLimit() async throws {
         let model = ScriptedAgentModel([AgentTurnResponse(text: "Working", toolCalls: [agentCall()])])
         let events = try await agentEvents(NativeHarness(model: model, limits: AgentLimits(maxTurns: 1)), tools: [agentTool()])

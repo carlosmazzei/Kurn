@@ -15,7 +15,7 @@ public struct AgentToolSpec: Codable, Sendable, Equatable {
 public struct AgentToolCall: Codable, Sendable, Equatable {
     public let id: String
     public let name: String
-    public let arguments: JSONValue
+    public internal(set) var arguments: JSONValue
     public let rawArguments: String
     /// Opaque wire metadata needed when replaying a call, such as a Gemini thought signature.
     public let providerMetadata: JSONValue?
