@@ -32,7 +32,11 @@ extension ProviderHTTPTests {
         #expect(body["store"] as? Bool == false)
         #expect(body["include"] as? [String] == ["reasoning.encrypted_content"])
         #expect(body["reasoning_effort"] == nil)
-        #expect(body["reasoning"] as? [String: String] == (model.hasPrefix("gpt-5") ? ["effort": "low"] : nil))
+        if model.hasPrefix("gpt-5") {
+            #expect(body["reasoning"] as? [String: String] == ["effort": "low"])
+        } else {
+            #expect(body["reasoning"] == nil)
+        }
         let specs = body["tools"] as? [[String: Any]]
         #expect(specs?.first?["type"] as? String == "function")
         #expect((specs?.first?["parameters"] as? [String: String])?["type"] == "object")
