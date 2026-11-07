@@ -11,10 +11,10 @@ extension ProviderHTTPTests {
         let arguments = #"{"type":"response.function_call_arguments.delta","output_index":0,"delta":"{}"}"#
         let done = #"{"type":"response.function_call_arguments.done","output_index":0,"arguments":"{}"}"#
         let terminal = #"{"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":2}}}"#
-        let reasoning = #"""
+        let reasoning = try JSONValue.parse(#"""
             {"type":"response.output_item.done","output_index":1,"item":{"type":"reasoning","id":"rs_1",
             "summary":[],"encrypted_content":"encrypted"}}
-            """#
+            """#).encodedString()
         let answer = #"{"type":"response.output_text.delta","delta":"Found Alice"}"#
         MockURLProtocol.enqueue([
             .success(status: 200, body: sseBody([reasoning, first, arguments, done, terminal]), headers: [:]),
@@ -51,6 +51,7 @@ extension ProviderHTTPTests {
         let followup = try #require(MockURLProtocol.lastRequest)
         let followupJSON = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: followup)) as? [String: Any]
         let replay = try #require(followupJSON?["input"] as? [[String: Any]])
+        try #require(replay.count == 4)
         #expect(replay[1]["type"] as? String == "reasoning")
         #expect(replay[1]["encrypted_content"] as? String == "encrypted")
         #expect(replay[2]["type"] as? String == "function_call")
@@ -98,10 +99,10 @@ extension ProviderHTTPTests {
     func responsesRefusalIsAnAssistantReply(streamed: Bool) async throws {
         var payloads: [String] = []
         if streamed { payloads.append(#"{"type":"response.refusal.delta","delta":"I cannot help."}"#) }
-        payloads.append(#"""
+        payloads.append(try JSONValue.parse(#"""
             {"type":"response.completed","response":{"output":[{"type":"message","content":[
             {"type":"refusal","refusal":"I cannot help."}]}]}}
-            """#)
+            """#).encodedString())
         MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
         let provider = OpenAIProvider(apiKey: "test", session: MockURLProtocol.session())
         let request = AgentTurnRequest(systemPrompt: "sys", messages: [.user("Hi")], tools: [], maxOutputTokens: 10)
