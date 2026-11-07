@@ -62,7 +62,7 @@ struct LibraryChatSourceReaderTests {
         context.insert(attachment)
         try context.save()
         let reader = LibraryChatSourceReader(context: context, scope: ChatSourceScope(kind: .meetings,
-                                             selectedIDs: [selected.id], includeWikis: true), search: { _, _, _ in [] })
+                                             selectedIDs: [selected.id], parts: Set(ChatSourcePart.allCases)), search: { _, _, _ in [] })
         let sources = try await reader.listSources()
         #expect(sources.count == 1)
         #expect(sources.first?.hasSummary == true)
@@ -134,5 +134,45 @@ struct LibraryChatSourceReaderTests {
         await #expect(throws: Failure.self) {
             try await failing.search(query: "Decision", meetingIDs: [selectedID], limit: 1)
         }
+    }
+
+    @Test func partOverridesGateStoredReadsAndRetrieval() async throws {
+        let context = ModelContext(TestModelContainer.make())
+        let denied = meeting(context)
+        let allowed = meeting(context)
+        for source in [denied, allowed] {
+            context.insert(Summary(meeting: source, sections: [], provider: .openAI))
+            context.insert(WikiArticle(meeting: source, bodyMarkdown: "Wiki", meetingTitleSnapshot: "Meeting",
+                                       meetingDate: .now, sourceContentHash: "hash", generatorModelIdentifier: "test"))
+            context.insert(MeetingAttachment(meeting: source, fileName: "unused.pdf", displayName: "Reference", extractedText: "Text"))
+            context.insert(SemanticChunk(meeting: source, recordingID: UUID(), text: "Decision", startTime: 2,
+                                         endTime: 3, speakerLabel: "Pat", vector: [1], modelIdentifier: "test"))
+        }
+        try context.save()
+        let allowedID = allowed.id
+        let scope = ChatSourceScope(kind: .library, parts: [], partOverrides: [allowedID: Set(ChatSourcePart.allCases)])
+        let reader = LibraryChatSourceReader(context: context, scope: scope, search: { _, candidates, _ in
+            #expect(candidates.map(\.meetingID) == [allowedID])
+            return []
+        })
+        let sources = try await reader.listSources()
+        #expect(sources.first { $0.id == denied.id }?.hasSummary == false)
+        #expect(sources.first { $0.id == denied.id }?.hasWiki == false)
+        #expect(sources.first { $0.id == denied.id }?.hasAttachments == false)
+        #expect(sources.first { $0.id == allowedID }?.hasWiki == true)
+        let transcript = try await reader.readTranscript(meetingID: denied.id, offset: 0, limit: 10)
+        #expect(transcript.total == 0)
+        let summary = try await reader.readSummary(meetingID: denied.id)
+        #expect(summary == nil)
+        let wiki = try await reader.readWiki(meetingID: denied.id)
+        #expect(wiki == nil)
+        let attachments = try await reader.listAttachments(meetingID: denied.id)
+        #expect(attachments.isEmpty)
+        let text = try await reader.readAttachment(meetingID: denied.id, attachmentID: UUID())
+        #expect(text == nil)
+        let search = try await reader.search(query: "Decision", meetingIDs: [denied.id, allowedID], limit: 10)
+        #expect(search.isEmpty)
+        let deniedSearch = try await reader.search(query: "Decision", meetingIDs: [denied.id], limit: 10)
+        #expect(deniedSearch.isEmpty)
     }
 }
