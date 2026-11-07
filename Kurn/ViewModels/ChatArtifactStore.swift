@@ -11,7 +11,7 @@ struct ChatArtifactStore {
     }
 
     let context: ModelContext
-    var saveChanges: (ModelContext) -> AppError? = { $0.saveOrError() }
+    var saveChanges: @MainActor (ModelContext) -> AppError? = { $0.saveOrError() }
 
     static func action(artifact: ChatDocumentArtifact, saved: GeneratedDocument?) -> ArtifactSaveAction {
         guard let saved else { return .save }
