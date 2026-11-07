@@ -130,7 +130,7 @@ final class MeetingChatViewModel {
         isResponding = true
         currentPhase = nil
         currentPhaseDetail = nil
-        let history = Self.buildHistory(from: Array(turns.dropLast()))
+        let priorTurns = Array(turns.dropLast())
         // Streaming can append a partial assistant turn before cancellation is
         // observed (unlike the old atomic-answer flow, which only appended on
         // success). Remember where the reply would start so a cancel can drop
@@ -168,19 +168,20 @@ final class MeetingChatViewModel {
                 try Task.checkCancellation()
                 let answer: MeetingChatService.Answer
                 if let agentModel = try agentModelFactory(provider, model) {
+                    let history = Self.buildHistory(from: priorTurns, includeCitationContext: false)
                     try await self.runHarness(agentModel, question: trimmed, history: history,
                                               provider: provider, model: model, startedAt: startedAt)
                     answer = MeetingChatService.Answer(text: self.turns.last?.text ?? "", citations: [],
                                                       usage: self.turns.last?.usage)
                 } else if let transcriptText {
                     answer = try await chatService.answerAboutMeeting(
-                        question: trimmed, history: history, transcriptText: transcriptText,
+                        question: trimmed, history: Self.buildHistory(from: priorTurns), transcriptText: transcriptText,
                         candidates: candidates, provider: provider, model: model,
                         runID: runID, onEvent: onEvent
                     )
                 } else {
                     answer = try await chatService.answerAcrossLibrary(
-                        question: trimmed, history: history, candidates: candidates,
+                        question: trimmed, history: Self.buildHistory(from: priorTurns), candidates: candidates,
                         summariesByMeeting: summariesByMeeting, articlesByMeeting: articlesByMeeting,
                         provider: provider, model: model, runID: runID, onEvent: onEvent
                     )
@@ -341,9 +342,9 @@ final class MeetingChatViewModel {
     /// compact context block so follow-up questions stay grounded in what the
     /// previous answer was based on. (Full per-turn context is intentionally not
     /// kept — that is the synthesis path's job, not the lookup path's.)
-    static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
+    static func buildHistory(from prior: [Turn], includeCitationContext: Bool = true) -> [ChatMessage] {
         var history = prior.map { ChatMessage(role: $0.role, content: $0.text) }
-        if let lastAnswer = prior.last(where: { $0.role == .assistant }),
+        if includeCitationContext, let lastAnswer = prior.last(where: { $0.role == .assistant }),
            !lastAnswer.citations.isEmpty {
             history.append(ChatMessage(role: .user, content: contextBlock(from: lastAnswer.citations)))
         }
