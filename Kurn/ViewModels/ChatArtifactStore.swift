@@ -34,26 +34,8 @@ struct ChatArtifactStore {
         let origin = Self.origin(artifactID: artifactID, in: session.turns)
         let previousSources = existing.map { ChatArtifactSources(kind: $0.sourceKind, meetingIDs: $0.sourceMeetingIDs, names: $0.sourceNames) }
         let sources = try (origin.sources ?? ChatArtifactSources.capture(scope: scope, context: context)).retaining(previousSources)
-        let document = existing ?? GeneratedDocument(title: artifact.title, bodyMarkdown: artifact.markdown,
-            userPrompt: origin.question, sourceKind: sources.kind, sourceNames: sources.names,
-            sourceMeetingIDs: sources.meetingIDs, generatorModelIdentifier: origin.modelIdentifier)
-        let previous = existing.map { DocumentSnapshot($0) }
-        document.title = artifact.title
-        document.bodyMarkdown = artifact.markdown
-        document.userPrompt = origin.question
-        document.generatorModelIdentifier = origin.modelIdentifier
-        document.sourceKind = sources.kind
-        document.sourceNames = sources.names
-        document.sourceMeetingIDs = sources.meetingIDs
-        document.sourceChatSessionID = session.id
-        document.sourceArtifactID = artifact.id
-        document.sourceArtifactVersion = artifact.version
-        if existing == nil { context.insert(document) }
-        if let error = saveChanges(context) {
-            if let previous { previous.restore(document) } else { context.delete(document) }
-            throw error
-        }
-        return document
+        return try MeetingLibrary(context: context, persist: saveChanges).saveDocument(
+            artifact: artifact, origin: origin, sources: sources, sessionID: session.id, updating: existing)
     }
 
     static func origin(artifactID: UUID, in turns: [PersistedChatTurn]) -> ChatArtifactOrigin {
@@ -69,35 +51,4 @@ struct ChatArtifactStore {
         return result
     }
 
-    private struct DocumentSnapshot {
-        let title: String, body: String, prompt: String, model: String, kind: String
-        let names: Data, ids: Data
-        let sessionID: UUID?, artifactID: UUID?, version: Int?
-
-        init(_ document: GeneratedDocument) {
-            title = document.title
-            body = document.bodyMarkdown
-            prompt = document.userPrompt
-            model = document.generatorModelIdentifier
-            kind = document.sourceKindRaw
-            names = document.sourceNamesData
-            ids = document.sourceMeetingIDsData
-            sessionID = document.sourceChatSessionID
-            artifactID = document.sourceArtifactID
-            version = document.sourceArtifactVersion
-        }
-
-        func restore(_ document: GeneratedDocument) {
-            document.title = title
-            document.bodyMarkdown = body
-            document.userPrompt = prompt
-            document.generatorModelIdentifier = model
-            document.sourceKindRaw = kind
-            document.sourceNamesData = names
-            document.sourceMeetingIDsData = ids
-            document.sourceChatSessionID = sessionID
-            document.sourceArtifactID = artifactID
-            document.sourceArtifactVersion = version
-        }
-    }
 }
