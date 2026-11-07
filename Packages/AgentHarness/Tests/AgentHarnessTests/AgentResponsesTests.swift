@@ -30,7 +30,7 @@ import Testing
         #expect(input[5]["output"] == .string("Not found"))
         #expect(input[6]["content"] == .string("Done"))
         #expect(body["tools"].array == [.object(["type": .string("function"), "name": .string("search"),
-            "description": .string("Search meetings"), "parameters": AgentWireRequestTests().schema])])
+            "description": .string("Search meetings"), "parameters": AgentWireRequestTests().schema, "strict": .bool(false)])])
         let noReasoning = AgentWireFormat.openAIResponses.requestBody(request, model: "new-model")
         #expect(noReasoning["reasoning"] == .null)
         let onlyCall = AgentTurnRequest(systemPrompt: "", messages: [.assistant(text: "", toolCalls: [agentCall()])],

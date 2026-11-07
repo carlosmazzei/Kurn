@@ -28,7 +28,7 @@ extension AgentWireFormat {
         if !request.tools.isEmpty {
             body["tools"] = .array(request.tools.map { spec in
                 .object(["type": .string("function"), "name": .string(spec.name),
-                         "description": .string(spec.description), "parameters": spec.inputSchema])
+                         "description": .string(spec.description), "parameters": spec.inputSchema, "strict": .bool(false)])
             })
         }
         if let reasoningEffort { body["reasoning"] = .object(["effort": .string(reasoningEffort)]) }
