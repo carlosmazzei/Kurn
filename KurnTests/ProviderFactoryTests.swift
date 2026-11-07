@@ -54,13 +54,16 @@ struct ProviderFactoryTests {
 
     @Test func agentFactoryBuildsCloudModelsAndKeepsKeyValidation() throws {
         try withKey(.openAI, value: "test-key") {
-            #expect(try ProviderFactory.agentModel(for: .openAI, model: "") is OpenAIProvider)
+            let model = try ProviderFactory.agentModel(for: .openAI, model: "")
+            #expect(model is OpenAIProvider)
         }
         try withKey(.anthropic, value: "test-key") {
-            #expect(try ProviderFactory.agentModel(for: .anthropic, model: "") is AnthropicProvider)
+            let model = try ProviderFactory.agentModel(for: .anthropic, model: "")
+            #expect(model is AnthropicProvider)
         }
         try withKey(.google, value: "test-key") {
-            #expect(try ProviderFactory.agentModel(for: .google, model: "") is GoogleProvider)
+            let model = try ProviderFactory.agentModel(for: .google, model: "")
+            #expect(model is GoogleProvider)
         }
         withClearedKey(.openAI) {
             #expect(throws: AppError.self) { try ProviderFactory.agentModel(for: .openAI, model: "gpt-test") }
