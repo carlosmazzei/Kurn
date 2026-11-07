@@ -7,6 +7,7 @@
 //  summaries. All requests use URLSession with async/await.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 

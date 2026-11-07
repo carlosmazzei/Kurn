@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 
 /// Read-only tools with a fixed authorization snapshot and bounded JSON responses.

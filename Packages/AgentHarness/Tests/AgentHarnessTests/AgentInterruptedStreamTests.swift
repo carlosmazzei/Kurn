@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import KurnCore
+@testable import AgentHarness
 
 @Suite struct AgentInterruptedStreamTests {
     @Test(arguments: AgentWireFormat.allCases, [false, true])

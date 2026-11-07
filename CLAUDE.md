@@ -30,18 +30,21 @@ The project is an Xcode project (`Kurn.xcodeproj`) with three app targets: `Kurn
 `KurnSwiftDataTests` (SwiftData store boot/salvage and concurrency-sensitive
 suites, split into their own target for process isolation), `KurnUITests`
 (accessibility audit and fastlane screenshots) and `KurnWatchUITests`.
-There is no root `Package.swift`; two local packages live under `Packages/`:
+There is no root `Package.swift`; three local packages live under `Packages/`:
 `Packages/KurnCore` (pure-Foundation logic — `AppError`, `ReliabilityEvent`,
 the filesystem/clock seams, the transcript pipeline value types — compiled and
 tested with `swift test` on Linux, no Xcode needed; see
-`Packages/KurnCore/Package.swift`) and `Packages/WhisperCpp`, whose only target
+`Packages/KurnCore/Package.swift`), `Packages/AgentHarness` (standalone Foundation-only
+agent loop, context compaction and vendor wire formats, with no dependencies),
+and `Packages/WhisperCpp`, whose only target
 is a `.binaryTarget` pointing at whisper.cpp's official prebuilt XCFramework
 release asset (see "On-device Whisper (whisper.cpp)" below). The only remote
 package is FluidAudio.
 
-### Agent harness (`KurnCore/Agent/`)
+### Agent harness (`Packages/AgentHarness/`)
 
-`ChatSourceScope` persists meeting/tag/folder/library selection and wiki opt-in.
+Kurn-specific source types remain in `KurnCore/Agent/`, which depends on
+`AgentHarness`. `ChatSourceScope` persists meeting/tag/folder/library selection and wiki opt-in.
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
 arguments and enforcing a fixed allowed-meeting set on reads and search results.
 Explicit `AgentToolOutput.isError` results let tools report recoverable failures
@@ -57,7 +60,10 @@ usage and the final outcome. Tool failures become error results for model recove
 provider failures throw, and stream termination cancels in-flight work. Turn, tool
 and optional estimated-cost limits finish with an explicit stop reason. Cost is
 accounted from reported usage through the caller's estimator, including summary calls.
-Context uses `TokenEstimate`: old tool results are elided first, then an older
+Context accepts an injected Sendable token estimator (default: rounded-up
+characters/4) and an input-token budget. KurnCore's `AgentContextAdapter` supplies
+`ContextBudget` and script-aware `TokenEstimate` through the `contextBudget:`
+initializer. Old tool results are elided first, then an older
 prefix is summarized with a tool-less model request, preserving assistant/result
 groups and recent messages. Compaction changes only model context; outcomes retain
 full history. These estimates and limits do not guarantee a provider's hard context
@@ -65,7 +71,7 @@ or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistenc
 Output-token truncation finishes with `.outputLimit` and discards tool calls;
 truncated compaction summaries never replace the elided context. Vendor streams
 must include a terminal event before a turn response can be used.
-`Agent/Wire/` builds Anthropic Messages, OpenAI Chat Completions and Gemini
+`AgentHarness/Wire/` builds Anthropic Messages, OpenAI Chat Completions and Gemini
 GenerateContent requests and accumulates their SSE data payloads. The app's three
 cloud text providers conform to `AgentModel` through the existing bounded SSE
 transport, with chat timeouts and no retry after streaming starts. OpenAI-compatible
@@ -73,7 +79,9 @@ custom endpoints follow the existing chat request shape. Gemini call IDs are
 synthesized when absent; optional call metadata retains wire IDs and thought
 signatures for replay. `ProviderFactory.agentModel(for:model:)` returns nil for
 on-device and transcription-only providers, so callers can retain the chat fallback.
-Apple's provider does not conform. There are no meeting tools or agent UI yet.
+Apple's provider does not conform. App adapters import `AgentHarness` explicitly;
+there is no re-export through KurnCore and no agent UI yet. The loop is inspired
+by pi-agent-core's design only; no third-party implementation code was copied.
 
 ### Where documentation lives
 
@@ -115,6 +123,7 @@ swiftlint lint --config .swiftlint.yml
 # Xcode-free checks that also run in CI (work on Linux)
 python3 Tools/check_static_policy.py
 (cd Packages/KurnCore && swift test)
+(cd Packages/AgentHarness && swift test)
 ```
 
 If `xcodebuild`/SwiftLint can't find SourceKit, point the toolchain at Xcode:
@@ -188,11 +197,12 @@ store-metadata checks), `static-policy` (`Tools/check_static_policy.py`, Linux),
 `unit-tests` (`KurnTests` + `KurnSwiftDataTests` on a macOS simulator),
 `ui-accessibility-tests` (`KurnUITests` minus the screenshot suite, run as two
 `ui-tests` shards — `main` and `flows` — on separate runners and reported as
-this one check) and `kurncore-linux` (`swift test` for `Packages/KurnCore`). The `release` job
+this one check) and `kurncore-linux` (a matrix running `swift test` and exporting
+coverage separately for `Packages/KurnCore` and `Packages/AgentHarness`). The `release` job
 needs all six. The weekly/on-demand `reliability-hardening.yml` adds a Thread
 Sanitizer run over the concurrency-sensitive suites, a Release-configuration
-test run and a UI-test flake measurement. The three test jobs also upload
-lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`, via
+test run and a UI-test flake measurement. The test jobs also upload
+lcov coverage to Codecov (flags `unittests`/`uitests`/`kurncore`/`agentharness`, via
 `.github/actions/upload-xcode-coverage`, which converts the `.xcresult`
 coverage archive with `Tools/xccov_to_lcov.py`, and `llvm-cov export` on
 Linux; the README
@@ -201,17 +211,18 @@ badge reads the `main` total). Codecov itself stays informational
 the Codecov upload fatal — the gate below is ours, so a Codecov outage never
 blocks a merge. `codecov.yml` declares one component per
 layer (`Kurn/Infrastructure`, `Providers`, `Models`, `Services`, `Application`, `ViewModels`,
-`Views`, KurnCore) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
+`Views`, KurnCore, AgentHarness) and ignores `KurnWatch`, `KurnLiveActivityExtension`,
 `Kurn/AppIntents` and `Kurn/DebugSupport` until a job executes them;
 `Tools/coverage_report.py` renders the per-layer table into the job summary.
 Every in-scope layer is above the 80% target; the remaining file-level gaps
 are listed in `docs/roadmap.md`.
 
-**Coverage gate (target: 80%).** `coverage-gate` unions the three lcov
-reports with `Tools/coverage_gate.py` and fails a PR on either of two checks,
+**Coverage gate (target: 80%).** `coverage-gate` unions the lcov reports
+(app unit tests, both UI shards and both Swift packages) with
+`Tools/coverage_gate.py` and fails a PR on either of two checks,
 both restricted to the files `Tools/coverage_scope.json` puts in scope — app
 logic (`Kurn/` minus `Views/`, `ContentView.swift`, `DebugSupport/`,
-`AppIntents/`) and KurnCore's sources:
+`AppIntents/`) and both Foundation-only packages' sources:
 
 - **Patch:** the executable in-scope lines a PR adds must be ≥ 80% covered.
   Untested new logic is the failure this exists to catch; write the test in
@@ -250,6 +261,7 @@ How coverage was raised to target, and how to keep it there:
   model or the microphone.
 - **A test that only touches KurnCore types lives in `Packages/KurnCore/Tests`**,
   not `KurnTests`, so it runs on Linux next to the code it tests.
+  Harness-only tests similarly live in `Packages/AgentHarness/Tests`.
 - **Never construct `AVSpeechSynthesizer` or `AVAudioPlayer` in a test**: on the
   CI simulator they hang and take the whole test process down
   (`ReadAloudEngineTests` records why).

@@ -69,6 +69,7 @@ EXCLUDED_DIR_PARTS = {
     "KurnSwiftDataTests",
     "KurnWatchUITests",
     "KurnCoreTests",
+    "AgentHarnessTests",
     "DebugSupport",
     ".build",
     "DerivedData",
@@ -79,6 +80,7 @@ SOURCE_ROOTS = [
     ROOT / "KurnWatch",
     ROOT / "KurnLiveActivityExtension",
     ROOT / "Packages" / "KurnCore" / "Sources",
+    ROOT / "Packages" / "AgentHarness" / "Sources",
 ]
 
 ALLOW_COMMENT_RE = re.compile(r"static-policy:allow\s+([A-Za-z0-9_-]+)")

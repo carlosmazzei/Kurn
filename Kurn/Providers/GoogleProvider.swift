@@ -7,6 +7,7 @@
 //  wired here, so cloud transcription continues to route through OpenAI Whisper.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 

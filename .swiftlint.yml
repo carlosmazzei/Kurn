@@ -5,6 +5,8 @@ included:
   - KurnLiveActivityExtension
   - Packages/KurnCore/Sources
   - Packages/KurnCore/Tests
+  - Packages/AgentHarness/Sources
+  - Packages/AgentHarness/Tests
 
 opt_in_rules:
   - accessibility_label_for_image

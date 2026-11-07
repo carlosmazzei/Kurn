@@ -279,14 +279,22 @@ jobs:
           echo "ui-tests shards: $SHARDS_RESULT"
           [ "$SHARDS_RESULT" = "success" ]
 
-  # Fast, Xcode-free signal for the KurnCore package (see CLAUDE.md,
+  # Fast, Xcode-free signal for both Foundation-only packages (see CLAUDE.md,
   # "Overview"): runs in seconds on
   # Linux, well before the macOS jobs' simulator boot finishes, and proves
-  # the package's pure logic actually passes its tests rather than just
+  # each package's pure logic actually passes its tests rather than just
   # compiling under Xcode. Deliberately no `needs:` on the other jobs so all
   # of them run in parallel.
   kurncore-linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: KurnCore
+            coverage: kurncore
+          - package: AgentHarness
+            coverage: agentharness
 
     steps:
       - name: Checkout
@@ -298,7 +306,7 @@ jobs:
         run: swift --version
 
       - name: swift test
-        working-directory: Packages/KurnCore
+        working-directory: Packages/${{ matrix.package }}
         run: swift test --enable-code-coverage
 
       # SwiftPM's coverage output is raw LLVM profile data, not a report.
@@ -306,19 +314,19 @@ jobs:
       # it, and `llvm-cov` is looked up through the toolchain's own resource
       # path, since the resolved `swift` on PATH may be a version-manager
       # proxy with no `llvm-cov` beside it. This step used to warn and exit 0
-      # when an input was missing, which left Codecov with no KurnCore report
+      # when an input was missing, which left Codecov with no package report
       # on every run without anyone noticing; it now fails, because
       # coverage-gate needs the report.
       - name: Export coverage report
-        working-directory: Packages/KurnCore
+        working-directory: Packages/${{ matrix.package }}
         run: |
           bin_path=$(swift build --show-bin-path)
           profdata="$bin_path/codecov/default.profdata"
           # The test product's name depends on the build system: the legacy
-          # one links `KurnCorePackageTests.xctest`, swift-build links
-          # `KurnCoreTests.so`. Both embed KurnCore's coverage mapping.
+          # one links `${{ matrix.package }}PackageTests.xctest`, swift-build links
+          # `${{ matrix.package }}Tests.so`. Both embed the package's coverage mapping.
           test_binary=""
-          for candidate in "$bin_path/KurnCorePackageTests.xctest" "$bin_path/KurnCoreTests.so"; do
+          for candidate in "$bin_path/${{ matrix.package }}PackageTests.xctest" "$bin_path/${{ matrix.package }}Tests.so"; do
             if [ -f "$candidate" ]; then test_binary="$candidate"; break; fi
           done
           resource_dir=$(swift -print-target-info | python3 -c 'import json,sys; print(json.load(sys.stdin)["paths"]["runtimeResourcePath"])')
@@ -328,17 +336,17 @@ jobs:
           done
           echo "profdata=$profdata binary=$test_binary llvm-cov=$llvm_cov"
           if [ ! -f "$profdata" ] || [ -z "$test_binary" ] || [ -z "$llvm_cov" ]; then
-            echo "::error::KurnCore coverage export could not find its inputs"
+            echo "::error::${{ matrix.package }} coverage export could not find its inputs"
             ls -la "$bin_path" "$bin_path/codecov" || true
             exit 1
           fi
           "$llvm_cov" export -format=lcov "$test_binary" -instr-profile "$profdata" \
             -ignore-filename-regex='(/\.build/|/Tests/)' \
-            > "$RUNNER_TEMP/kurncore-coverage.lcov"
-          files=$(grep -c '^SF:' "$RUNNER_TEMP/kurncore-coverage.lcov" || true)
+            > "$RUNNER_TEMP/${{ matrix.coverage }}-coverage.lcov"
+          files=$(grep -c '^SF:' "$RUNNER_TEMP/${{ matrix.coverage }}-coverage.lcov" || true)
           echo "exported $files source files"
           if [ "${files:-0}" -eq 0 ]; then
-            echo "::error::KurnCore coverage export produced no source files"
+            echo "::error::${{ matrix.package }} coverage export produced no source files"
             exit 1
           fi
 
@@ -347,28 +355,28 @@ jobs:
       - name: Summarize coverage
         run: |
           {
-            echo "### Coverage (kurncore)"
-            python3 Tools/coverage_report.py --top 40 --root "$GITHUB_WORKSPACE" "$RUNNER_TEMP/kurncore-coverage.lcov" \
+            echo "### Coverage (${{ matrix.coverage }})"
+            python3 Tools/coverage_report.py --top 40 --root "$GITHUB_WORKSPACE" "$RUNNER_TEMP/${{ matrix.coverage }}-coverage.lcov" \
               || echo "_coverage summary failed; see the lcov artifact_"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the coverage report as an artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: coverage-kurncore.lcov
-          path: ${{ runner.temp }}/kurncore-coverage.lcov
+          name: coverage-${{ matrix.coverage }}.lcov
+          path: ${{ runner.temp }}/${{ matrix.coverage }}-coverage.lcov
           retention-days: 7
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ${{ runner.temp }}/kurncore-coverage.lcov
-          flags: kurncore
+          files: ${{ runner.temp }}/${{ matrix.coverage }}-coverage.lcov
+          flags: ${{ matrix.coverage }}
           disable_search: true
           fail_ci_if_error: false
 
-  # The coverage gate (CLAUDE.md "Coverage gate"). Unions the three lcov reports and fails when the in-scope code
+  # The coverage gate (CLAUDE.md "Coverage gate"). Unions app and package lcov reports and fails when the in-scope code
   # (Tools/coverage_scope.json) drops below the ratchet in
   # Tools/coverage_floor.json, or when a pull request adds executable
   # in-scope lines that are less than 80% covered. Lives here rather than in
@@ -406,6 +414,7 @@ jobs:
             "$RUNNER_TEMP/coverage/coverage-ui-tests-main.lcov" \
             "$RUNNER_TEMP/coverage/coverage-ui-tests-flows.lcov" \
             "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
+            "$RUNNER_TEMP/coverage/agentharness-coverage.lcov" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Where the uncovered in-scope lines are, file by file, in the log as
@@ -419,6 +428,7 @@ jobs:
             "$RUNNER_TEMP/coverage/coverage-ui-tests-main.lcov" \
             "$RUNNER_TEMP/coverage/coverage-ui-tests-flows.lcov" \
             "$RUNNER_TEMP/coverage/kurncore-coverage.lcov" \
+            "$RUNNER_TEMP/coverage/agentharness-coverage.lcov" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
   release:

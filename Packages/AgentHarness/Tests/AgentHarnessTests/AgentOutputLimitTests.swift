@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import KurnCore
+@testable import AgentHarness
 
 @Suite struct AgentOutputLimitTests {
     @Test(arguments: [false, true], ["", "Partial answer"])
