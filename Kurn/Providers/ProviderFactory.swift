@@ -23,7 +23,7 @@ enum ProviderFactory {
 
     /// Nil means callers should keep using the existing chat pipeline.
     static func agentModel(for provider: AIProvider, model: String) throws -> (any AgentModel)? {
-        guard provider.kind != .appleOnDevice, provider.kind != .elevenLabs else { return nil }
+        guard provider.kind.supportsAgentChat else { return nil }
         return try summaryProvider(for: provider, model: model) as? any AgentModel
     }
 

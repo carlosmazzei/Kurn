@@ -12,7 +12,7 @@
 //  else — the same rule `SemanticChunk`/`WikiArticle` follow.
 //
 //  `MeetingChatViewModel` owns reading and writing it: a conversation is
-//  created lazily, on its first successfully completed exchange, so a chat the
+//  created lazily, on its first completed exchange or document mutation, so a chat the
 //  user opens and abandons without sending anything never leaves an empty row
 //  in the history list.
 //
@@ -43,6 +43,8 @@ final class ChatSession {
     /// meetings, so corruption must read as corruption, never as silently
     /// empty history.
     var turnsData: Data
+    var scopeData: Data?
+    var artifactsData: Data?
 
     init(meeting: Meeting?, title: String, createdAt: Date = Date()) {
         self.id = UUID()
@@ -82,6 +84,8 @@ struct PersistedChatTurn: Codable {
     var usage: TokenUsage?
     var costUSD: Double?
     var elapsedSeconds: TimeInterval?
+    var steps: [ChatAgentStep]? = nil
+    var artifacts: [ChatArtifactReference]? = nil
 }
 
 /// A citation snapshot rather than a live `SemanticSearchService.Hit` —

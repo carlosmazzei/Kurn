@@ -48,6 +48,9 @@ final class GeneratedDocument {
     var sourceMeetingIDsData: Data
     var generatorModelIdentifier: String
     var createdAt: Date
+    var sourceChatSessionID: UUID?
+    var sourceArtifactID: UUID?
+    var sourceArtifactVersion: Int?
 
     init(
         id: UUID = UUID(),
