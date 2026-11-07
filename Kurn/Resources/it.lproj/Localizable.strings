@@ -1107,3 +1107,5 @@
 "chat.step.failed" = "Non riuscito";
 "chat.step.running" = "In corso";
 "chat.artifact.reference" = "Documento: %@ v%d";
+"chat.limit.stopped" = "Interrotto: %@.";
+"chat.limit.retry" = "%@. Puoi riprovare la domanda.";

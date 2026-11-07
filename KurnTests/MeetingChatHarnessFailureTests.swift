@@ -145,6 +145,8 @@ struct MeetingChatHarnessFailureTests {
         ask(vm)
         await waitUntilDone(vm)
         #expect(vm.turns.last?.text == "Cut off")
+        #expect(vm.retryableQuestion == nil)
+        #expect(ChatRunNotice.text(steps: vm.turns.last?.steps ?? [], hasAnswer: true, localize: { $0 }) != nil)
         #expect(vm.turns.last?.steps.last?.stopReason == .outputLimit)
         #expect(vm.pastSessions().first?.turns.last?.steps?.last?.stopReason == .outputLimit)
     }

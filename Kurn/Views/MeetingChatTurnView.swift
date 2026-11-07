@@ -14,13 +14,18 @@ struct MeetingChatTurnView: View {
     var body: some View {
         switch turn.role {
         case .user:
-            HStack {
-                Spacer(minLength: 40)
-                Text(turn.text)
-                    .textSelection(.enabled)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Spacer(minLength: 40)
+                    Text(turn.text)
+                        .textSelection(.enabled)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                ChatStepTimelineView(steps: turn.steps, isRunning: false,
+                                     meetingTitles: meetingTitles, documentTitles: documentTitles)
+                agentFooter
             }
         case .assistant, .system:
             VStack(alignment: .leading, spacing: 8) {
@@ -58,13 +63,7 @@ struct MeetingChatTurnView: View {
                             .stroke(Theme.separator, lineWidth: 1)
                     )
                 }
-                ForEach(turn.artifacts) { artifact in
-                    Label(artifact.label { NSLocalizedString($0, comment: "Document artifact") }, systemImage: "doc.text")
-                        .font(.footnote)
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("chat.artifact.\(turn.id.uuidString).\(artifact.id.uuidString)")
-                }
+                agentFooter
                 if !turn.citations.isEmpty {
                     citations(turn.citations)
                 } else if isMeetingScope {
@@ -73,6 +72,26 @@ struct MeetingChatTurnView: View {
                     timestampChips(MeetingChatService.citedTimestamps(in: turn.text))
                 }
                 usageCaption(turn)
+            }
+        }
+    }
+
+    private var agentFooter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let notice = ChatRunNotice.text(steps: turn.steps, hasAnswer: turn.role == .assistant,
+                                              localize: { NSLocalizedString($0, comment: "Run limit") }) {
+                Label(notice, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("chat.limit.notice")
+            }
+            ForEach(turn.artifacts) { artifact in
+                Label(artifact.label { NSLocalizedString($0, comment: "Document artifact") }, systemImage: "doc.text")
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("chat.artifact.\(turn.id.uuidString).\(artifact.id.uuidString)")
             }
         }
     }

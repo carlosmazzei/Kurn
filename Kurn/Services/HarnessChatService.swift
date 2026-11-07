@@ -7,6 +7,7 @@ import SwiftData
 struct HarnessChatService {
     typealias ModelFactory = @Sendable (AIProvider, String) throws -> (any AgentModel)?
     var isWikiEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.wikiEnabled) }
+    var limits = AgentLimits()
 
     func events(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
@@ -24,7 +25,7 @@ struct HarnessChatService {
             + ChatDocumentTools.make(workspace: workspace)
         let artifacts = await workspace.snapshot()
         try Task.checkCancellation()
-        let harness = NativeHarness(model: model, contextBudget: ContextBudget.live(provider, modelIdentifier))
+        let harness = NativeHarness(model: model, contextBudget: ContextBudget.live(provider, modelIdentifier), limits: limits)
         return harness.run(
             systemPrompt: try Self.systemPrompt(artifacts: artifacts),
             history: history.map {

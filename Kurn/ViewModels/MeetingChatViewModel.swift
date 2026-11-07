@@ -166,13 +166,13 @@ final class MeetingChatViewModel {
             guard let self else { return }
             do {
                 try Task.checkCancellation()
-                let answer: MeetingChatService.Answer
+                let answer: MeetingChatService.Answer?
                 if let agentModel = try agentModelFactory(provider, model) {
                     let history = Self.buildHistory(from: priorTurns, includeCitationContext: false)
-                    try await self.runHarness(agentModel, question: trimmed, history: history,
+                    let hasAnswer = try await self.runHarness(agentModel, question: trimmed, history: history,
                                               provider: provider, model: model, startedAt: startedAt)
-                    answer = MeetingChatService.Answer(text: self.turns.last?.text ?? "", citations: [],
-                                                      usage: self.turns.last?.usage)
+                    answer = hasAnswer ? MeetingChatService.Answer(text: self.turns.last?.text ?? "", citations: [],
+                                                                  usage: self.turns.last?.usage) : nil
                 } else if let transcriptText {
                     answer = try await chatService.answerAboutMeeting(
                         question: trimmed, history: Self.buildHistory(from: priorTurns), transcriptText: transcriptText,
@@ -189,7 +189,8 @@ final class MeetingChatViewModel {
                 await drainEvents()
                 try Task.checkCancellation()
                 guard self.generation == generation else { throw CancellationError() }
-                self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt))
+                if let answer { self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt)) }
+                else { self.persist() }
                 // Reported at "view_model" stage, distinct from the service's
                 // own unstaged success event — the same two-tier shape
                 // `DocumentGenerationViewModel`/`DocumentGenerationService`
@@ -197,7 +198,8 @@ final class MeetingChatViewModel {
                 // the whole user-visible round trip succeed).
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
-                    outcome: .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt)
+                    outcome: answer == nil ? .failed : .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: answer == nil ? "agent_limit" : nil
                 ))
             } catch is CancellationError {
                 // User cancelled; drop whatever streamed in so far, silently.
@@ -439,7 +441,7 @@ final class MeetingChatViewModel {
     }
 
     private func runHarness(_ agentModel: any AgentModel, question: String, history: [ChatMessage],
-                            provider: AIProvider, model: String, startedAt: Date) async throws {
+                            provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
         guard let modelContext else {
             throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
         }
@@ -490,6 +492,16 @@ final class MeetingChatViewModel {
             throw error
         }
         turns[index].elapsedSeconds = Date().timeIntervalSince(startedAt)
+        if ChatRunNotice.needsRetry(steps: timeline.steps, answer: turns[index].text) {
+            let stopped = turns.removeLast()
+            turns[index - 1].steps = stopped.steps
+            turns[index - 1].artifacts = stopped.artifacts
+            turns[index - 1].usage = stopped.usage
+            turns[index - 1].costUSD = stopped.costUSD
+            turns[index - 1].elapsedSeconds = stopped.elapsedSeconds
+            return false
+        }
+        return true
     }
 
     /// Permanently deletes `target`. If it was the open conversation, starts
