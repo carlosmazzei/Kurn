@@ -47,6 +47,26 @@ struct ProviderFactoryTests {
         }
     }
 
+    @Test func agentFactoryFallsBackWithoutConsultingOnDeviceAvailabilityOrKeys() throws {
+        #expect(try ProviderFactory.agentModel(for: .appleOnDevice, model: "") == nil)
+        #expect(try ProviderFactory.agentModel(for: .elevenLabs, model: "") == nil)
+    }
+
+    @Test func agentFactoryBuildsCloudModelsAndKeepsKeyValidation() throws {
+        try withKey(.openAI, value: "test-key") {
+            #expect(try ProviderFactory.agentModel(for: .openAI, model: "") is OpenAIProvider)
+        }
+        try withKey(.anthropic, value: "test-key") {
+            #expect(try ProviderFactory.agentModel(for: .anthropic, model: "") is AnthropicProvider)
+        }
+        try withKey(.google, value: "test-key") {
+            #expect(try ProviderFactory.agentModel(for: .google, model: "") is GoogleProvider)
+        }
+        withClearedKey(.openAI) {
+            #expect(throws: AppError.self) { try ProviderFactory.agentModel(for: .openAI, model: "gpt-test") }
+        }
+    }
+
     @Test func summaryProviderBuildsOpenAIProviderWhenKeyPresent() throws {
         try withKey(.openAI, value: "test-key") {
             let provider = try ProviderFactory.summaryProvider(for: .openAI, model: "gpt-4o")
