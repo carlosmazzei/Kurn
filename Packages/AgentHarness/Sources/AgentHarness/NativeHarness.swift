@@ -10,12 +10,13 @@ public struct NativeHarness: Sendable {
 
     public init(model: any AgentModel, limits: AgentLimits = AgentLimits(),
                 costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
-                contextPolicy: AgentContextPolicy = AgentContextPolicy(budget: .conservative),
+                contextPolicy: AgentContextPolicy = AgentContextPolicy(inputTokenBudget: 23_000),
+                tokenEstimator: @escaping @Sendable (String) -> Int = { ($0.count + 3) / 4 },
                 confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false }) {
         self.model = model
         self.limits = limits
         self.costEstimator = costEstimator
-        self.compactor = AgentContextCompactor(policy: contextPolicy)
+        self.compactor = AgentContextCompactor(policy: contextPolicy, tokenEstimator: tokenEstimator)
         self.confirm = confirm
     }
 

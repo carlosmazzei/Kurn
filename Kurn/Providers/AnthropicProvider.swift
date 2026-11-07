@@ -7,6 +7,7 @@
 //  unsupported and cloud transcription always routes through OpenAI Whisper.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import KurnCore
+@testable import AgentHarness
 
 @Suite struct AgentWireRequestTests {
     let schema: JSONValue = .object(["type": .string("object"), "properties": .object(["query": .object(["type": .string("string")])])])

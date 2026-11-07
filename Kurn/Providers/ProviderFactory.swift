@@ -7,6 +7,7 @@
 //  "do we have a key?" check so call sites get a clear `AppError.noAPIKey`.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 

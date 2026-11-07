@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import KurnCore
+@testable import AgentHarness
 
 actor ScriptedAgentModel: AgentModel {
     enum Failure: Error { case exhausted, provider }
