@@ -6,6 +6,26 @@ import Testing
 
 @MainActor
 struct ChatArtifactSourcesTests {
+    @Test func mixedSourceKindsUseMeetingTitlesNotMislabeledTagOrFolderNames() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let tag = Tag(name: "Project tag")
+        context.insert(tag)
+        let first = MeetingFixtures.transcribed("Tagged meeting", in: context)
+        first.tags = [tag]
+        let second = MeetingFixtures.transcribed("Selected meeting", in: context)
+        let tagged = try ChatArtifactSources.capture(scope: ChatSourceScope(kind: .tags, selectedIDs: [tag.id]), context: context)
+        let selected = try ChatArtifactSources.capture(scope: ChatSourceScope(kind: .meetings, selectedIDs: [second.id]), context: context)
+        let mixed = selected.retaining(tagged)
+        #expect(mixed.kind == .transcripts)
+        #expect(mixed.names == ["Tagged meeting", "Selected meeting"])
+        #expect(tagged.retaining(selected).names == ["Selected meeting", "Tagged meeting"])
+        #expect(mixed.retaining(tagged).names == mixed.names)
+        let legacy = ChatArtifactSources(kind: .folders, meetingIDs: [first.id], names: ["Folder name"])
+        let fallback = selected.retaining(legacy)
+        #expect(fallback.kind == .transcripts)
+        #expect(fallback.names == [first.id.uuidString, "Selected meeting"])
+    }
+
     @Test func sourceSnapshotSurvivesScopeChangesDeletionAndRevision() throws {
         let context = ModelContext(TestModelContainer.make())
         let first = MeetingFixtures.transcribed("Original", in: context)
