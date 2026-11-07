@@ -55,7 +55,13 @@ Explicit `AgentToolOutput.isError` results let tools report recoverable failures
 without throwing. `SourceScopeResolver` shares transcribed-only selection with
 the document composer; `LibraryChatSourceReader` snapshots SwiftData sources and
 uses existing hybrid search, summary rendering and stored attachment text. Wiki
-reads require opt-in. These tools are not wired into the existing chat UI.
+reads require opt-in. `MeetingChatViewModel` uses `HarnessChatService` for providers
+with an `AgentModel`; nil (including Apple on-device) keeps `MeetingChatService`.
+`ChatSourceScopeEditor` locks meeting selection to one ID or allows library scope
+editing. `ChatAgentTimeline` reduces events to Codable structured steps and live usage.
+The adapter removes wiki from global and override parts when `wikiEnabled` is off.
+Harness replies cite meeting titles/timestamps in text; legacy `Hit` citation snapshots
+remain on the legacy path. No new SwiftUI scope/timeline surface is added yet.
 
 `ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
 from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,
@@ -63,6 +69,9 @@ replaces, appends sections and reads paginated markdown (8000 scalars per page;
 200000 per document). Mutations return ID/version and a human-readable summary,
 not document bodies. Models are instructed to use artifacts for documents/reports/minutes
 rather than paste them in chat. Saving artifacts into the document library is an app concern.
+Each session restores its workspace and source scope. Document mutations persist artifacts
+immediately, even if the reply is later cancelled; partial assistant turns are not saved.
+Replayed history contains plain user/assistant turns, not old source-tool payloads.
 
 `NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
 supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
@@ -2170,11 +2179,11 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   `LegacyStoreAdoptionTests` stayed green (its fixture was written with the
   same live classes). `KurnSchemaV3` (1.2.0, adding `MeetingPhoto`) and
   `KurnSchemaV4` (1.3.0, adding `MeetingAttachment`) followed that recipe;
-  V4 is the current version, with V3 frozen in `KurnSchemaV3Models.swift`
-  (whose every entity `SchemaV3MigrationTests` writes and migrates). The next
-  model change therefore means: edit the live class, add `KurnSchemaV5`
-  listing the live classes, demote `KurnSchemaV4` to frozen copies in a
-  `KurnSchemaV4Models.swift`, add the stage, and bump
+  V5 (1.4.0) adds optional session scope/artifacts and generated-document artifact
+  provenance, with V4 frozen in `KurnSchemaV4Models.swift` and
+  `KurnSchemaV4LibraryModels.swift`. `SchemaV4MigrationTests` writes every V4 entity
+  and verifies migration and persisted harness state. The next model change means:
+  edit the live class, add a new schema listing live classes, freeze V5, add the stage, and bump
   `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
   `wikiEnabled` is on, the library-wide path additionally grounds on the
   condensed per-meeting articles — see "Derived artifacts" below for why that

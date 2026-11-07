@@ -3,19 +3,21 @@
 //  Kurn
 //
 //  Drives "chat with your meetings": owns the in-memory conversation, gathers
-//  the pre-embedded passages to search over, and calls `MeetingChatService` for
-//  a grounded answer. All SwiftData reads happen on the main actor; the
+//  the pre-embedded passages to search over, and runs NativeHarness or the
+//  on-device MeetingChatService fallback. All SwiftData reads happen on the main actor; the
 //  retrieval + LLM call run off-main in the service.
 //
 //  A conversation is also the unit of persistence: `configure(meeting:modelContext:)`
 //  wires up the `ChatSession` scope (per-meeting or library-wide), and a
 //  successfully completed exchange is saved into `session` — created lazily on
 //  the first one, so a conversation the user opens and abandons never leaves an
-//  empty row in the history list. Only finished exchanges are persisted; a
+//  empty row in the history list. Document mutations also save the session.
+//  Only finished exchanges are persisted; a
 //  cancelled or failed reply is dropped from `turns` (see `dropPartialReply`)
 //  before `persist()` would ever see it.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 import Observation
@@ -24,47 +26,15 @@ import SwiftData
 @MainActor
 @Observable
 final class MeetingChatViewModel {
-    /// One rendered turn in the conversation.
-    struct Turn: Identifiable {
-        let id: UUID
-        let role: ChatMessage.Role
-        var text: String
-        var citations: [SemanticSearchService.Hit] = []
-        /// Token usage the provider reported for this reply, and its
-        /// estimated USD cost (`ModelPricing`, `nil` for an unrecognized
-        /// model) — both `nil` until the reply finishes, and permanently
-        /// `nil` for a provider/response that never reports usage.
-        var usage: TokenUsage?
-        var costUSD: Double?
-        /// Wall-clock time the reply took to fully generate, set once it
-        /// finishes.
-        var elapsedSeconds: TimeInterval?
-
-        /// `id` defaults to a fresh `UUID` for a brand-new turn; restoring a
-        /// saved one (`Turn.init(_ persisted:)` below) passes its stored id
-        /// through instead, so a turn's identity survives a save/load
-        /// round trip.
-        init(
-            id: UUID = UUID(),
-            role: ChatMessage.Role,
-            text: String,
-            citations: [SemanticSearchService.Hit] = [],
-            usage: TokenUsage? = nil,
-            costUSD: Double? = nil,
-            elapsedSeconds: TimeInterval? = nil
-        ) {
-            self.id = id
-            self.role = role
-            self.text = text
-            self.citations = citations
-            self.usage = usage
-            self.costUSD = costUSD
-            self.elapsedSeconds = elapsedSeconds
-        }
-    }
-
     private(set) var turns: [Turn] = []
     private(set) var isResponding = false
+    private(set) var scopeEditor = ChatSourceScopeEditor()
+    var scope: ChatSourceScope { scopeEditor.scope }
+    private(set) var artifacts: [ChatDocumentArtifact] = []
+    @ObservationIgnored private var workspace = ChatDocumentWorkspace()
+    @ObservationIgnored private var generation = UUID()
+    private let agentModelFactory: HarnessChatService.ModelFactory
+    private let harnessService: HarnessChatService
     /// The saved conversation backing `turns`, or `nil` for a not-yet-saved
     /// one — set by `configure`, `startNewSession`, or `load(session:)`, and
     /// created lazily by `persist()` on the first successful exchange.
@@ -119,8 +89,12 @@ final class MeetingChatViewModel {
 
     /// `chatService` defaults to the live retrieval + provider stack; tests
     /// pass one over a stub embedder and a scripted provider.
-    init(chatService: MeetingChatService = MeetingChatService()) {
+    init(chatService: MeetingChatService = MeetingChatService(),
+         agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
+         harnessService: HarnessChatService = HarnessChatService()) {
         self.chatService = chatService
+        self.agentModelFactory = agentModelFactory
+        self.harnessService = harnessService
     }
 
     /// Send `question`. When `transcriptText` is non-nil the scope is a single
@@ -147,6 +121,10 @@ final class MeetingChatViewModel {
     ) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding else { return }
+        error = nil
+
+        generation = UUID()
+        let generation = self.generation
 
         turns.append(Turn(role: .user, text: trimmed))
         isResponding = true
@@ -171,27 +149,8 @@ final class MeetingChatViewModel {
             continuation.yield(event)
         }
         let consumer = Task { @MainActor [weak self] in
-            var assistantIndex: Int?
-            for await event in stream {
-                guard let self else { return }
-                switch event {
-                case .phase(let phase):
-                    self.currentPhase = phase
-                    self.currentPhaseDetail = nil
-                case .progress(let detail):
-                    self.currentPhaseDetail = detail
-                case .delta(let text):
-                    if assistantIndex == nil {
-                        self.currentPhase = nil
-                        self.currentPhaseDetail = nil
-                        self.turns.append(Turn(role: .assistant, text: ""))
-                        assistantIndex = self.turns.count - 1
-                    }
-                    if let assistantIndex {
-                        self.turns[assistantIndex].text += text
-                    }
-                }
-            }
+            guard let self else { return }
+            await self.consumeLegacy(stream, generation: generation)
         }
 
         // Close the channel and wait for the consumer to apply every pending
@@ -206,8 +165,14 @@ final class MeetingChatViewModel {
         task = Task { [weak self] in
             guard let self else { return }
             do {
+                try Task.checkCancellation()
                 let answer: MeetingChatService.Answer
-                if let transcriptText {
+                if let agentModel = try agentModelFactory(provider, model) {
+                    try await self.runHarness(agentModel, question: trimmed, history: history,
+                                              provider: provider, model: model, startedAt: startedAt)
+                    answer = MeetingChatService.Answer(text: self.turns.last?.text ?? "", citations: [],
+                                                      usage: self.turns.last?.usage)
+                } else if let transcriptText {
                     answer = try await chatService.answerAboutMeeting(
                         question: trimmed, history: history, transcriptText: transcriptText,
                         candidates: candidates, provider: provider, model: model,
@@ -221,6 +186,8 @@ final class MeetingChatViewModel {
                     )
                 }
                 await drainEvents()
+                try Task.checkCancellation()
+                guard self.generation == generation else { throw CancellationError() }
                 self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt))
                 // Reported at "view_model" stage, distinct from the service's
                 // own unstaged success event — the same two-tier shape
@@ -236,7 +203,7 @@ final class MeetingChatViewModel {
                 // Leaving the question turn in place is what makes it
                 // `retryableQuestion` afterward.
                 await drainEvents()
-                self.dropPartialReply(keeping: turnCountBeforeReply)
+                if self.generation == generation { self.dropPartialReply(keeping: turnCountBeforeReply) }
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
@@ -247,8 +214,10 @@ final class MeetingChatViewModel {
                 // question, so `retryableQuestion` needs the turn list back
                 // at just the question for this to be one clean asset.
                 await drainEvents()
-                self.dropPartialReply(keeping: turnCountBeforeReply)
-                self.error = appError
+                if self.generation == generation {
+                    self.dropPartialReply(keeping: turnCountBeforeReply)
+                    self.error = appError
+                }
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
@@ -256,18 +225,42 @@ final class MeetingChatViewModel {
                 ))
             } catch {
                 await drainEvents()
-                self.dropPartialReply(keeping: turnCountBeforeReply)
-                self.error = .apiError(statusCode: 0, message: error.localizedDescription)
+                if self.generation == generation {
+                    self.dropPartialReply(keeping: turnCountBeforeReply)
+                    self.error = .apiError(statusCode: 0, message: error.localizedDescription)
+                }
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
                     code: "unexpected"
                 ))
             }
+            guard self.generation == generation else { return }
             self.isResponding = false
             self.currentPhase = nil
             self.currentPhaseDetail = nil
             self.task = nil
+        }
+    }
+
+    private func consumeLegacy(_ stream: AsyncStream<ChatStreamEvent>, generation: UUID) async {
+        var assistantIndex: Int?
+        for await event in stream {
+            guard self.generation == generation, isResponding else { return }
+            switch event {
+            case .phase(let phase):
+                currentPhase = phase
+                currentPhaseDetail = nil
+            case .progress(let detail): currentPhaseDetail = detail
+            case .delta(let text):
+                if assistantIndex == nil {
+                    currentPhase = nil
+                    currentPhaseDetail = nil
+                    turns.append(Turn(role: .assistant, text: ""))
+                    assistantIndex = turns.count - 1
+                }
+                if let assistantIndex { turns[assistantIndex].text += text }
+            }
         }
     }
 
@@ -296,7 +289,7 @@ final class MeetingChatViewModel {
     /// A save failure is logged and surfaced but leaves the conversation on
     /// screen exactly as it is — the user's answer is not lost, only its
     /// persistence.
-    private func persist() {
+    private func persist(turns savedTurns: [Turn]? = nil) {
         guard let modelContext else { return }
         let target: ChatSession
         if let session {
@@ -307,7 +300,9 @@ final class MeetingChatViewModel {
             modelContext.insert(target)
             session = target
         }
-        target.turns = turns.map(PersistedChatTurn.init)
+        target.turns = (savedTurns ?? turns).map(PersistedChatTurn.init)
+        target.scopeData = JSONStorage.encodeAuthoritative(scope)
+        target.artifactsData = JSONStorage.encodeAuthoritative(artifacts)
         target.updatedAt = Date()
         if let saveError = modelContext.saveOrError() {
             self.error = saveError
@@ -368,7 +363,10 @@ final class MeetingChatViewModel {
     func cancel() {
         task?.cancel()
         task = nil
+        if isResponding, turns.last?.role == .assistant { turns.removeLast() }
         isResponding = false
+        currentPhase = nil
+        currentPhaseDetail = nil
     }
 
     /// Starts a brand-new, unsaved conversation — the "new chat" affordance.
@@ -376,9 +374,13 @@ final class MeetingChatViewModel {
     /// so an abandoned new chat never leaves an empty row in history.
     func reset() {
         cancel()
+        generation = UUID()
         turns.removeAll()
         error = nil
         session = nil
+        artifacts = []
+        workspace = ChatDocumentWorkspace()
+        scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id)
     }
 
     // MARK: - Session history
@@ -388,7 +390,10 @@ final class MeetingChatViewModel {
     /// scopes both the same way it scopes retrieval — `nil` for the
     /// library-wide "Ask".
     func configure(meeting: Meeting?, modelContext: ModelContext) {
+        let changedMeeting = self.meeting?.id != meeting?.id
+        if changedMeeting { reset() }
         self.meeting = meeting
+        if changedMeeting || self.modelContext == nil { scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id) }
         self.modelContext = modelContext
     }
 
@@ -409,10 +414,80 @@ final class MeetingChatViewModel {
 
     /// Loads a previously saved conversation for display and continuation.
     func load(session: ChatSession) {
+        guard session.meeting?.id == meeting?.id else { return }
         cancel()
-        self.session = session
-        turns = session.turns.map(Turn.init)
-        error = nil
+        generation = UUID()
+        do {
+            let restored = try session.harnessSnapshot()
+            let workspace = try ChatDocumentWorkspace(artifacts: restored.artifacts)
+            self.session = session
+            self.workspace = workspace
+            artifacts = restored.artifacts
+            scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
+            turns = session.turns.map(Turn.init)
+            error = nil
+        } catch {
+            self.error = .apiError(statusCode: 0, message: error.localizedDescription)
+        }
+    }
+
+    func updateScope(_ scope: ChatSourceScope) {
+        guard !isResponding else { return }
+        scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: scope)
+        if session != nil { persist() }
+    }
+
+    private func runHarness(_ agentModel: any AgentModel, question: String, history: [ChatMessage],
+                            provider: AIProvider, model: String, startedAt: Date) async throws {
+        guard let modelContext else {
+            throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
+        }
+        let workspace = workspace
+        let generation = self.generation
+        let completedTurns = Array(turns.dropLast())
+        let initialArtifacts = await workspace.snapshot()
+        try Task.checkCancellation()
+        if initialArtifacts != artifacts {
+            artifacts = initialArtifacts
+            persist(turns: completedTurns)
+        }
+        let events = try await harnessService.events(model: agentModel, provider: provider, modelIdentifier: model,
+                                                     context: modelContext, scope: scope, workspace: workspace,
+                                                     history: history, question: question)
+        try Task.checkCancellation()
+        let index = turns.count
+        turns.append(Turn(role: .assistant, text: ""))
+        var timeline = ChatAgentTimeline()
+        do {
+            for try await event in events {
+                try Task.checkCancellation()
+                timeline.apply(event)
+                turns[index].steps = timeline.steps
+                turns[index].usage = TokenUsage(promptTokens: timeline.usage.inputTokens, completionTokens: timeline.usage.outputTokens)
+                turns[index].costUSD = turns[index].usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
+                switch event {
+                case .textDelta(let text): turns[index].text += text
+                case .runFinished(let outcome): turns[index].text = outcome.finalText
+                case .toolFinished(_, let name, _, let isError):
+                    if !isError && ["create_document", "update_document", "append_to_document"].contains(name) {
+                        let snapshot = await workspace.snapshot()
+                        try Task.checkCancellation()
+                        artifacts = snapshot
+                        persist(turns: completedTurns)
+                    }
+                default: break
+                }
+            }
+            try Task.checkCancellation()
+        } catch {
+            let snapshot = await workspace.snapshot()
+            if self.generation == generation, snapshot != artifacts {
+                artifacts = snapshot
+                persist(turns: completedTurns)
+            }
+            throw error
+        }
+        turns[index].elapsedSeconds = Date().timeIntervalSince(startedAt)
     }
 
     /// Permanently deletes `target`. If it was the open conversation, starts
@@ -426,63 +501,5 @@ final class MeetingChatViewModel {
             self.error = saveError
         }
         if wasCurrent { reset() }
-    }
-}
-
-private extension PersistedChatTurn {
-    /// Snapshot of a rendered `Turn` for JSON storage.
-    init(_ turn: MeetingChatViewModel.Turn) {
-        self.init(
-            id: turn.id,
-            role: turn.role,
-            text: turn.text,
-            citations: turn.citations.map(PersistedCitation.init),
-            usage: turn.usage,
-            costUSD: turn.costUSD,
-            elapsedSeconds: turn.elapsedSeconds
-        )
-    }
-}
-
-private extension PersistedCitation {
-    init(_ hit: SemanticSearchService.Hit) {
-        self.init(
-            meetingID: hit.meetingID,
-            recordingID: hit.recordingID,
-            meetingTitle: hit.meetingTitle,
-            start: hit.start,
-            speakerLabel: hit.speakerLabel,
-            text: hit.text
-        )
-    }
-}
-
-private extension MeetingChatViewModel.Turn {
-    /// Restores a rendered `Turn` from a saved session. `end`/`score` have no
-    /// persisted counterpart (unused once retrieval ranking is done), so
-    /// reconstructed citations zero them — display and jump-to-citation only
-    /// ever read `start`/`speakerLabel`/`text`/the two ids.
-    init(_ persisted: PersistedChatTurn) {
-        self.init(
-            id: persisted.id,
-            role: persisted.role,
-            text: persisted.text,
-            citations: persisted.citations.map { citation in
-                SemanticSearchService.Hit(
-                    chunkID: UUID(),
-                    meetingID: citation.meetingID,
-                    recordingID: citation.recordingID,
-                    text: citation.text,
-                    start: citation.start,
-                    end: citation.start,
-                    speakerLabel: citation.speakerLabel,
-                    score: 0,
-                    meetingTitle: citation.meetingTitle
-                )
-            },
-            usage: persisted.usage,
-            costUSD: persisted.costUSD,
-            elapsedSeconds: persisted.elapsedSeconds
-        )
     }
 }

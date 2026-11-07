@@ -29,7 +29,7 @@ struct MeetingChatViewModelSendTests {
         MeetingChatViewModel(chatService: MeetingChatService(
             searchService: SemanticSearchService(embedder: ConstantEmbedder()),
             resolveProvider: { _, _ in llm }
-        ))
+        ), agentModelFactory: { _, _ in nil })
     }
 
     private static func ask(_ viewModel: MeetingChatViewModel, _ question: String, transcript: String? = "[00:42] Ana: we ship on monday") {
