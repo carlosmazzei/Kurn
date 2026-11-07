@@ -5,9 +5,7 @@
 //  Proves the `ReliabilityEvent` seam end to end against `MeetingChatService`'s
 //  two entry points, `answerAboutMeeting` and `answerAcrossLibrary`: the
 //  "validation" stage for an empty question, and the "provider" stage for a
-//  provider that fails to resolve. Mirrors
-//  `DocumentGenerationReliabilityEventTests`/`DocumentGenerationServiceTests`'
-//  explicit-`runID` filtering so this test isn't affected by other suites'
+//  provider that fails to resolve. Uses explicit-`runID` filtering so this test isn't affected by other suites'
 //  concurrently-reported "meeting_chat" events.
 //
 

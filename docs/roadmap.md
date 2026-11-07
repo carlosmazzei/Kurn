@@ -281,8 +281,8 @@ is listed so it is not rediscovered.
   on-device pool sizes are conservative first-cut estimates against Apple's
   documented ~4096-token session window, commented as such in the code — not
   measured against real on-device runs the way the transcription pipeline is.
-- **Exercise the untested paths.** `LLMTranscriptCorrector`, `WikiService` and
-  `DocumentGenerationService` can select the on-device provider through the
+- **Exercise the untested paths.** `LLMTranscriptCorrector` and `WikiService`
+  can select the on-device provider through the
   generic factory path, but that has not been exercised or validated the way
   tagging, chat and summaries were.
 - **Measure availability.** `SystemLanguageModel.default.availability` depends
@@ -318,9 +318,7 @@ The H1–H10 hardening track is closed; its invariants and types are in
   deferred / retryScheduled / permanentFailure with reason codes and
   `nextAttemptAt`) was deferred — the bounded `automaticResumeAttempts` counter
   over `TranscriptionStatus` suffices until a concrete UI need appears (e.g.
-  "retrying in 2 minutes"). `DocumentGenerationService` has no durable map-stage
-  checkpoint, because it spans several meetings and has no single `Meeting` to
-  checkpoint against.
+  "retrying in 2 minutes").
 - **Network.** A dedicated "waiting / rate-limited" UI; FluidAudio's
   mid-transfer network path changes are unobservable (the library exposes no
   session to preflight against); background cloud upload stays off while

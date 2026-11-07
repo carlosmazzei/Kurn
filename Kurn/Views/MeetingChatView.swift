@@ -46,6 +46,11 @@ struct MeetingChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !settings.aiProvider.kind.supportsAgentChat {
+                ChatArtifactProviderNotice()
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+            }
             if !settings.semanticSearchEnabled {
                 disabledState
             } else if !canChat {
@@ -150,6 +155,7 @@ struct MeetingChatView: View {
                         MeetingChatTurnView(turn: turn, isStreaming: isStreaming(turn), isMeetingScope: meeting != nil,
                                             meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
                                             documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
+                                            artifacts: vm.artifacts, artifactSession: vm.artifactSession,
                                             onJump: onJump, onJumpToTime: onJumpToTime)
                             .id(turn.id)
                     }

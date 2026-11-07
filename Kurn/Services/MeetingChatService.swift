@@ -210,8 +210,7 @@ struct MeetingChatService {
     }
 
     /// Resolve the LLM provider, reporting a `"provider"`-stage failure (bad
-    /// key, invalid URL, on-device model unavailable) the same way
-    /// `DocumentGenerationService` reports its own provider-resolution step.
+    /// key, invalid URL, on-device model unavailable).
     private func resolveProvider(
         provider: AIProvider,
         model: String,
@@ -266,8 +265,7 @@ struct MeetingChatService {
     /// Runs the final, user-visible generation call, forwarding each text
     /// delta through `onEvent` as it arrives and returning the concatenated
     /// answer. Reports a `"answer"`-stage reliability event on cancellation or
-    /// failure, the same way `DocumentGenerationService.requestText` reports
-    /// its own per-call LLM failures (final success is reported once, by the
+    /// failure (final success is reported once, by the
     /// entry point, not here). Not `private`: reused by
     /// `MeetingChatSynthesis.swift`.
     func streamAnswer(

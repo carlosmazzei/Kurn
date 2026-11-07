@@ -10,6 +10,7 @@ import KurnCore
 import SwiftUI
 
 struct DocumentsListView: View {
+    @Environment(AppSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \GeneratedDocument.createdAt, order: .reverse)
     private var documents: [GeneratedDocument]
@@ -25,6 +26,10 @@ struct DocumentsListView: View {
     var body: some View {
         List {
             if documents.isEmpty {
+                if !settings.aiProvider.kind.supportsAgentChat {
+                    ChatArtifactProviderNotice()
+                        .clearListRow()
+                }
                 ContentUnavailableView(
                     NSLocalizedString("documents.empty.title", comment: "No documents"),
                     systemImage: "doc.badge.plus",
@@ -62,9 +67,12 @@ struct DocumentsListView: View {
         }
         .sheet(isPresented: $showingCreate) {
             NavigationStack {
-                DocumentCreateView(modelContext: modelContext) { document in
-                    selectedDocument = document
-                }
+                MeetingChatView(meeting: nil)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) { showingCreate = false }
+                        }
+                    }
             }
         }
         .kurnDialog(

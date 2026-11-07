@@ -17,6 +17,22 @@ extension MeetingChatViewModel {
         var elapsedSeconds: TimeInterval?
         var steps: [ChatAgentStep] = []
         var artifacts: [ChatArtifactReference] = []
+        var artifactOrigins: [UUID: ChatArtifactOrigin] = [:]
+
+        mutating func recordArtifacts(from previous: [ChatDocumentArtifact], to current: [ChatDocumentArtifact], origin: ChatArtifactOrigin,
+                                      priorOrigins: [UUID: ChatArtifactOrigin] = [:]) {
+            artifacts = ChatArtifactReference.updating(artifacts, from: previous, to: current)
+            for reference in artifacts where previous.first(where: { $0.id == reference.id })?.version != reference.version {
+                var revised = origin
+                revised.sources = origin.sources?.retaining(artifactOrigins[reference.id]?.sources ?? priorOrigins[reference.id]?.sources)
+                artifactOrigins[reference.id] = revised
+            }
+        }
+
+        mutating func inheritArtifacts(from other: Self) {
+            artifacts = ChatArtifactReference.merging(artifacts, with: other.artifacts)
+            artifactOrigins.merge(other.artifactOrigins) { _, new in new }
+        }
 
         /// `id` defaults to a fresh `UUID` for a brand-new turn; restoring a
         /// saved one (`Turn.init(_ persisted:)` below) passes its stored id
@@ -56,7 +72,8 @@ extension PersistedChatTurn {
             costUSD: turn.costUSD,
             elapsedSeconds: turn.elapsedSeconds,
             steps: turn.steps.isEmpty ? nil : turn.steps,
-            artifacts: turn.artifacts.isEmpty ? nil : turn.artifacts
+            artifacts: turn.artifacts.isEmpty ? nil : turn.artifacts,
+            artifactOrigins: turn.artifactOrigins.isEmpty ? nil : turn.artifactOrigins
         )
     }
 }
@@ -103,5 +120,6 @@ extension MeetingChatViewModel.Turn {
             steps: persisted.steps ?? []
         )
         artifacts = persisted.artifacts ?? []
+        artifactOrigins = persisted.artifactOrigins ?? [:]
     }
 }

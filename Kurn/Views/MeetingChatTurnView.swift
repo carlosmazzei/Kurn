@@ -8,6 +8,8 @@ struct MeetingChatTurnView: View {
     let isMeetingScope: Bool
     let meetingTitles: [UUID: String]
     let documentTitles: [UUID: String]
+    var artifacts: [ChatDocumentArtifact] = []
+    var artifactSession: ChatSession?
     var onJump: ((SemanticSearchService.Hit) -> Void)?
     var onJumpToTime: ((TimeInterval) -> Void)?
 
@@ -86,12 +88,10 @@ struct MeetingChatTurnView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("chat.limit.notice")
             }
-            ForEach(turn.artifacts) { artifact in
-                Label(artifact.label { NSLocalizedString($0, comment: "Document artifact") }, systemImage: "doc.text")
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("chat.artifact.\(turn.id.uuidString).\(artifact.id.uuidString)")
+            ForEach(turn.artifacts) { reference in
+                if let artifact = ChatArtifactPresentation.latest(reference, in: artifacts), let artifactSession {
+                    ChatArtifactCard(reference: reference, artifact: artifact, session: artifactSession)
+                }
             }
         }
     }

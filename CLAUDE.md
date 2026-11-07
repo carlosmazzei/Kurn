@@ -85,13 +85,6 @@ Each session restores its workspace and source scope. Document mutations persist
 immediately, even if the reply is later cancelled; partial assistant turns are not saved.
 Replayed history contains plain user/assistant turns, not old source-tool payloads.
 
-`ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
-from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,
-replaces, appends sections and reads paginated markdown (8000 scalars per page;
-200000 per document). Mutations return ID/version and a human-readable summary,
-not document bodies. Models are instructed to use artifacts for documents/reports/minutes
-rather than paste them in chat. Saving artifacts into the document library is an app concern.
-
 `NativeHarness` is an Apple-free, provider-neutral sequential tool loop. `AgentModel`
 supplies streaming text and turn responses; `AgentTool` supplies schemas, optional
 confirmation and execution. `AgentEvent` exposes turns, text, tools, compaction,
@@ -507,7 +500,7 @@ single app-wide SwiftData `ModelContainer`. The layers (under `Kurn/`):
     runner as much as the UI, which is why it is not a view model.
 - **ViewModels/** — `@MainActor @Observable` state for one kind of screen:
   `SummaryViewModel` (generate/translate summaries), `RecorderViewModel`,
-  `MeetingChatViewModel`, `DocumentGenerationViewModel`, …
+  `MeetingChatViewModel`, …
 - **Views/** — SwiftUI screens, plus the UIKit glue that hosts them
   (`SecurityCoverWindow`).
 - **Infrastructure/** — settings, errors, logging, keychain, export, extensions,
@@ -2247,20 +2240,27 @@ decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
 - Gated by `AppSettings.wikiEnabled`, **off by default** — it makes a paid cloud
   LLM call per transcription.
 
-**`GeneratedDocument`** (`Models/GeneratedDocument.swift`) is free-form Markdown
-synthesized from one or more transcripts against a user's prompt, surfaced by
-`DocumentsListView` / `DocumentCreateView` / `DocumentDetailView`.
+**`GeneratedDocument`** (`Models/GeneratedDocument.swift`) is a saved agent artifact.
+The Documents library's plus button opens library chat. Ask the agent for a
+document, report, or minutes; document tools create versioned workspace artifacts.
+Ordinary assistant replies cannot be saved as documents.
 
-- Sources are chosen by `DocumentSourceKind` — `.transcripts`, `.tags`, or
-  `.folders`. `DocumentSourceResolver` (`Models/`) holds that resolution,
-  including folder traversal, as pure logic so the SwiftUI view never owns the
-  domain rule about which meetings a tag or folder selection stands for.
+- `ChatArtifactCard` previews the latest workspace version, including from older
+  turns, and offers Markdown copy and Markdown/Word/HTML export through the same
+  `DocumentExport` adapter used by `DocumentDetailView`.
+- `ChatArtifactStore` owns save/update decisions and source snapshots resolved
+  through `SourceScopeResolver`. A newer artifact updates the same saved document;
+  an up-to-date artifact is marked saved, and deleting it enables saving again.
+  Provenance records the session, artifact and version. Optional per-artifact turn
+  metadata preserves the generating question/model through retries and reopening;
+  older conversations leave an unknown model empty rather than inventing it.
 - **Source labels and meeting ids are snapshots.** Deleting a meeting, retagging
   it, or moving it between folders must not retroactively damage a document that
   was already generated, so the document keeps its own copy of what it was built
   from rather than a live relationship.
-- `DocumentGenerationService` map/reduces long selections, so picking a folder
-  never silently truncates the meetings that happen to sort last.
+- Chat artifacts persist independently of reply completion. Failed/limited runs
+  retain artifact references and provenance on the pending question, including
+  across retries. There is no separate one-shot document generation flow.
 
 ### Attached documents (PDFs)
 

@@ -61,8 +61,7 @@ final class ChatSession {
     }
 
     /// A short label from a conversation's first question: first line,
-    /// trimmed and capped, mirroring
-    /// `DocumentGenerationService.extractTitle`'s fallback shape so a history
+    /// trimmed and capped, so a history
     /// row reads as a label rather than the whole question.
     static func title(from question: String) -> String {
         let firstLine = question
@@ -86,6 +85,7 @@ struct PersistedChatTurn: Codable {
     var elapsedSeconds: TimeInterval?
     var steps: [ChatAgentStep]? = nil
     var artifacts: [ChatArtifactReference]? = nil
+    var artifactOrigins: [UUID: ChatArtifactOrigin]? = nil
 }
 
 /// A citation snapshot rather than a live `SemanticSearchService.Hit` —
