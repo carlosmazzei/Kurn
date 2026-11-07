@@ -1,6 +1,10 @@
 import Foundation
 
 public enum ChatSourcePresentation {
+    public static func canChat(enabled: Bool, usesHarness: Bool, hasIndex: @autoclosure () -> Bool) -> Bool {
+        enabled && (usesHarness || hasIndex())
+    }
+
     public static func effectiveScope(_ scope: ChatSourceScope, wikiEnabled: Bool) -> ChatSourceScope {
         guard !wikiEnabled else { return scope }
         var effective = scope

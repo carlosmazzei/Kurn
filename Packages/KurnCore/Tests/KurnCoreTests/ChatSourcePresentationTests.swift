@@ -3,6 +3,18 @@ import Testing
 @testable import KurnCore
 
 struct ChatSourcePresentationTests {
+    @Test func harnessReadinessDoesNotReadTheIndexWhileLegacyStillRequiresIt() {
+        var reads = 0
+        func index(_ value: Bool) -> Bool { reads += 1; return value }
+        #expect(ChatSourcePresentation.canChat(enabled: true, usesHarness: true, hasIndex: index(false)))
+        #expect(!ChatSourcePresentation.canChat(enabled: false, usesHarness: true, hasIndex: index(true)))
+        #expect(!ChatSourcePresentation.canChat(enabled: false, usesHarness: false, hasIndex: index(true)))
+        #expect(reads == 0)
+        #expect(!ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(false)))
+        #expect(ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(true)))
+        #expect(reads == 2)
+    }
+
     private func localize(_ key: String) -> String {
         ["chat.sources.summary": "%d meetings · %@", "chat.sources.summary.one": "1 meeting · %@",
          "chat.sources.part.transcript": "Transcript", "chat.sources.part.summary": "Summary",

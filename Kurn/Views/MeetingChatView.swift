@@ -48,7 +48,7 @@ struct MeetingChatView: View {
         VStack(spacing: 0) {
             if !settings.semanticSearchEnabled {
                 disabledState
-            } else if !hasIndex {
+            } else if !canChat {
                 emptyIndexState
             } else {
                 conversation
@@ -421,7 +421,9 @@ struct MeetingChatView: View {
         return (try? modelContext.fetchCount(FetchDescriptor<SemanticChunk>())) ?? 0 > 0
     }
 
-    private var canChat: Bool { settings.semanticSearchEnabled && hasIndex }
+    private var canChat: Bool {
+        ChatSourcePresentation.canChat(enabled: settings.semanticSearchEnabled, usesHarness: usesHarness, hasIndex: hasIndex)
+    }
     private var canSend: Bool {
         canChat && !vm.isResponding && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && (!usesHarness || sourceValidation == nil)
