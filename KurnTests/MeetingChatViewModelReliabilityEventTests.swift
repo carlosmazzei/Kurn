@@ -30,23 +30,19 @@ struct MeetingChatViewModelReliabilityEventTests {
         }
     }
 
-    /// Same defensive shape as
-    /// `MeetingChatReliabilityEventTests.appleOnDeviceProviderResolutionReliabilityMatchesAvailability`,
-    /// and for the same reason that test only asserts its deterministic
-    /// branch: when the device reports itself available, `send` goes on to a
-    /// real on-device generation call whose outcome CI has shown can be a
-    /// `LanguageModelSession.GenerationError` even then — not something this
-    /// test can predict. Only the "unavailable" branch (deterministic:
-    /// resolution fails with `.onDeviceModelUnavailable`, reported as one
-    /// failed "view_model" event) is asserted.
     @Test func sendReportsOneViewModelStageEventMatchingOutcome() async {
-        let reason = OnDeviceModelAvailability.unavailableReason
+        let reason = "Model unavailable in test"
         let capture = ReliabilityEventCapture()
         capture.install()
         defer { capture.uninstall() }
 
         let runID = OperationID()
-        let viewModel = MeetingChatViewModel()
+        let service = MeetingChatService(resolveProvider: { provider, model in
+            #expect(provider == .appleOnDevice)
+            #expect(model.isEmpty)
+            throw AppError.onDeviceModelUnavailable(reason)
+        })
+        let viewModel = MeetingChatViewModel(chatService: service)
         viewModel.send(
             question: "What was decided?",
             transcriptText: nil,
@@ -59,9 +55,14 @@ struct MeetingChatViewModelReliabilityEventTests {
 
         let events = capture.recorded.filter { $0.operationID == runID && $0.stage == "view_model" }
         #expect(events.count == 1)
-        guard reason != nil else { return }
+        #expect(!viewModel.isResponding)
         #expect(events.first?.outcome == .failed)
         #expect(events.first?.code == "on_device_model_unavailable")
         #expect(viewModel.error != nil)
+        if case .onDeviceModelUnavailable(let detail) = viewModel.error {
+            #expect(detail == reason)
+        } else {
+            Issue.record("Expected onDeviceModelUnavailable")
+        }
     }
 }
