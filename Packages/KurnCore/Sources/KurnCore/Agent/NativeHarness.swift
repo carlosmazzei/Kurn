@@ -44,6 +44,19 @@ public struct NativeHarness: Sendable {
         var finalText = ""
     }
 
+    private struct NormalizedToolCall {
+        let call: AgentToolCall
+        let hasValidArguments: Bool
+
+        init(_ original: AgentToolCall) {
+            let arguments = try? JSONValue.parse(original.rawArguments)
+            var call = original
+            call.arguments = arguments ?? .null
+            self.call = call
+            hasValidArguments = arguments != nil
+        }
+    }
+
     private func drive(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
                        maxOutputTokens: Int, events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws {
         let messages = history + [.user(prompt)]
@@ -67,19 +80,19 @@ public struct NativeHarness: Sendable {
             try Task.checkCancellation()
             record(response.usage, state: &state, events: events)
             state.finalText = response.text
-            let assistant = AgentMessage.assistant(text: response.text,
-                                                   toolCalls: response.stopReason == .maxTokens ? [] : response.toolCalls)
+            let calls = response.stopReason == .maxTokens ? [] : response.toolCalls.map(NormalizedToolCall.init)
+            let assistant = AgentMessage.assistant(text: response.text, toolCalls: calls.map(\.call))
             state.history.append(assistant)
             state.context.append(assistant)
             if response.stopReason == .maxTokens {
                 reason = .outputLimit
                 break
             }
-            if response.toolCalls.isEmpty {
+            if calls.isEmpty {
                 reason = costLimitReached(state) ? .costLimit : .completed
                 break
             }
-            let stop = try await execute(response.toolCalls, tools: tools, state: &state, events: events)
+            let stop = try await execute(calls, tools: tools, state: &state, events: events)
             if let stop { reason = stop; break }
         }
         try Task.checkCancellation()
@@ -119,14 +132,12 @@ public struct NativeHarness: Sendable {
         if after != before { events.yield(.contextCompacted(beforeTokens: before, afterTokens: after)) }
     }
 
-    private func execute(_ calls: [AgentToolCall], tools: [AgentTool], state: inout RunState,
+    private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout RunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentRunStopReason? {
         var stop: AgentRunStopReason?
-        for originalCall in calls {
+        for normalized in calls {
             try Task.checkCancellation()
-            let arguments = try? JSONValue.parse(originalCall.rawArguments)
-            var call = originalCall
-            call.arguments = arguments ?? .null
+            let call = normalized.call
             if costLimitReached(state) { stop = .costLimit }
             else if state.toolCalls >= limits.maxToolCalls { stop = .toolCallLimit }
             events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
@@ -138,7 +149,7 @@ public struct NativeHarness: Sendable {
                 isError = true
             } else {
                 state.toolCalls += 1
-                (output, isError) = try await executeOne(call, arguments: arguments, tools: tools)
+                (output, isError) = try await executeOne(normalized, tools: tools)
             }
             let result = AgentMessage.toolResult(callID: call.id, toolName: call.name,
                                                  content: output.content, isError: isError)
@@ -149,13 +160,13 @@ public struct NativeHarness: Sendable {
         return stop
     }
 
-    private func executeOne(_ call: AgentToolCall, arguments: JSONValue?,
-                            tools: [AgentTool]) async throws -> (AgentToolOutput, Bool) {
+    private func executeOne(_ normalized: NormalizedToolCall, tools: [AgentTool]) async throws -> (AgentToolOutput, Bool) {
+        let call = normalized.call
         do {
             guard let tool = tools.first(where: { $0.spec.name == call.name }) else {
                 return toolError("Unknown tool: \(call.name).")
             }
-            guard let arguments else {
+            guard normalized.hasValidArguments else {
                 return toolError("Invalid JSON arguments for \(call.name): \(call.rawArguments)")
             }
             if tool.requiresConfirmation {
@@ -163,7 +174,7 @@ public struct NativeHarness: Sendable {
                 try Task.checkCancellation()
                 if !approved { return toolError("Confirmation declined for \(call.name).") }
             }
-            let output = try await tool.execute(arguments)
+            let output = try await tool.execute(call.arguments)
             try Task.checkCancellation()
             return (output, false)
         } catch {
