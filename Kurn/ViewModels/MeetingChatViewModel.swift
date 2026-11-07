@@ -34,6 +34,7 @@ final class MeetingChatViewModel {
     @ObservationIgnored private var workspace = ChatDocumentWorkspace()
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var retryArtifacts: [ChatArtifactReference] = []
+    @ObservationIgnored private var retryOrigins: [UUID: ChatArtifactOrigin] = [:]
     private let agentModelFactory: HarnessChatService.ModelFactory
     private let harnessService: HarnessChatService
     /// The saved conversation backing `turns`, or `nil` for a not-yet-saved
@@ -48,6 +49,7 @@ final class MeetingChatViewModel {
     /// `session`'s id, exposed for the history list to highlight the
     /// currently open conversation. `nil` for one not yet saved.
     var currentSessionID: UUID? { session?.id }
+    var artifactSession: ChatSession? { session }
     /// The pipeline stage currently reported by `MeetingChatService`, shown as
     /// a "reasoning" row while the assistant's turn has no text yet. Cleared
     /// once the reply starts streaming (the growing text bubble replaces it)
@@ -129,7 +131,9 @@ final class MeetingChatViewModel {
 
         turns.append(Turn(role: .user, text: trimmed))
         turns[turns.count - 1].artifacts = retryArtifacts
+        turns[turns.count - 1].artifactOrigins = retryOrigins
         retryArtifacts = []
+        retryOrigins = [:]
         isResponding = true
         currentPhase = nil
         currentPhaseDetail = nil
@@ -141,9 +145,7 @@ final class MeetingChatViewModel {
         let turnCountBeforeReply = turns.count
         // `runID` correlates every `ReliabilityEvent` this turn produces — the
         // service's own per-stage events (validation, provider, answer) and
-        // this view model's own outcome event below — the same
-        // caller-generates-the-id convention `DocumentGenerationViewModel`
-        // uses for `DocumentGenerationService`. A parameter (defaulted) so a
+        // this view model's own outcome event below. A parameter (defaulted) so a
         // test can pick its own events out of the process-global log.
         let startedAt = Date()
 
@@ -195,9 +197,7 @@ final class MeetingChatViewModel {
                 if let answer { self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt)) }
                 else { self.persist() }
                 // Reported at "view_model" stage, distinct from the service's
-                // own unstaged success event — the same two-tier shape
-                // `DocumentGenerationViewModel`/`DocumentGenerationService`
-                // use (one signal per layer: did the API call succeed, did
+                // own unstaged success event (one signal per layer: did the API call succeed, did
                 // the whole user-visible round trip succeed).
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
@@ -321,6 +321,7 @@ final class MeetingChatViewModel {
     /// sitting next to an error. Leaves the question turn itself untouched.
     private func dropPartialReply(keeping count: Int) {
         guard turns.count > count else { return }
+        for turn in turns.dropFirst(count) { turns[count - 1].inheritArtifacts(from: turn) }
         turns.removeLast(turns.count - count)
     }
 
@@ -339,7 +340,9 @@ final class MeetingChatViewModel {
     /// `retryableQuestion` is non-nil.
     func dropRetryableQuestion() {
         guard retryableQuestion != nil else { return }
-        retryArtifacts = turns.removeLast().artifacts
+        let pending = turns.removeLast()
+        retryArtifacts = pending.artifacts
+        retryOrigins = pending.artifactOrigins
     }
 
     /// Prior turns as chat history. Turns are plain text to keep token cost
@@ -369,7 +372,7 @@ final class MeetingChatViewModel {
     func cancel() {
         task?.cancel()
         task = nil
-        if isResponding, turns.last?.role == .assistant { turns.removeLast() }
+        if isResponding, turns.last?.role == .assistant { dropPartialReply(keeping: turns.count - 1) }
         isResponding = false
         currentPhase = nil
         currentPhaseDetail = nil
@@ -383,6 +386,7 @@ final class MeetingChatViewModel {
         generation = UUID()
         turns.removeAll()
         retryArtifacts = []
+        retryOrigins = [:]
         error = nil
         session = nil
         artifacts = []
@@ -433,6 +437,7 @@ final class MeetingChatViewModel {
             scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
             turns = session.turns.map(Turn.init)
             retryArtifacts = []
+            retryOrigins = [:]
             error = nil
         } catch {
             self.error = .apiError(statusCode: 0, message: error.localizedDescription)
@@ -481,9 +486,12 @@ final class MeetingChatViewModel {
                     if !isError && ["create_document", "update_document", "append_to_document"].contains(name) {
                         let snapshot = await workspace.snapshot()
                         try Task.checkCancellation()
-                        turns[index].artifacts = ChatArtifactReference.updating(turns[index].artifacts, from: artifacts, to: snapshot)
+                        turns[index].recordArtifacts(from: artifacts, to: snapshot,
+                                                    origin: ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)"))
                         artifacts = snapshot
-                        persist(turns: completedTurns)
+                        var pending = turns[index - 1]
+                        pending.inheritArtifacts(from: turns[index])
+                        persist(turns: completedTurns + [pending])
                     }
                 default: break
                 }
@@ -492,8 +500,10 @@ final class MeetingChatViewModel {
         } catch {
             let snapshot = await workspace.snapshot()
             if self.generation == generation, snapshot != artifacts {
+                turns[index - 1].recordArtifacts(from: artifacts, to: snapshot,
+                                                origin: ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(model)"))
                 artifacts = snapshot
-                persist(turns: completedTurns)
+                persist(turns: completedTurns + [turns[index - 1]])
             }
             throw error
         }
@@ -501,7 +511,7 @@ final class MeetingChatViewModel {
         if ChatRunNotice.needsRetry(steps: timeline.steps, answer: turns[index].text) {
             let stopped = turns.removeLast()
             turns[index - 1].steps = stopped.steps
-            turns[index - 1].artifacts = ChatArtifactReference.merging(turns[index - 1].artifacts, with: stopped.artifacts)
+            turns[index - 1].inheritArtifacts(from: stopped)
             turns[index - 1].usage = stopped.usage
             turns[index - 1].costUSD = stopped.costUSD
             turns[index - 1].elapsedSeconds = stopped.elapsedSeconds

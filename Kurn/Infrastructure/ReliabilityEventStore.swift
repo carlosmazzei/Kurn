@@ -29,7 +29,7 @@ enum ReliabilityEventStore {
 
     /// `ReliabilityLog.handler` is a plain synchronous `@Sendable` closure,
     /// callable from any isolation — `TranscriptionCoordinator` calls it from
-    /// the main actor, `DocumentGenerationService` from off it — so two
+    /// the main actor, provider services from off it — so two
     /// events recorded around the same moment from different operations
     /// could otherwise interleave their writes to the same file or race a
     /// concurrent prune. An actor would serialize this naturally but would

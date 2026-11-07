@@ -80,8 +80,11 @@ send data only to the configured provider.
   are embedded with Apple's `NaturalLanguage` framework and retrieval-grounded
   answers come from the selected AI provider.
 - Optional, off-by-default derived artifacts: a per-meeting wiki article,
-  free-form documents synthesized across meetings, and an LLM correction pass
+  free-form documents created as agent artifacts in chat, and an LLM correction pass
   over the transcript with a change-magnitude guardrail.
+- Ask the agent in chat for a document, report, or minutes. Preview versioned
+  artifacts, save them to Documents, update a saved document after a revision,
+  or export Markdown, Word, and HTML. Ordinary chat replies are not documents.
 - Recognize returning voices: when a new speaker's voiceprint closely matches
   a named speaker from another meeting, Kurn suggests the name for
   confirmation — it never renames silently.

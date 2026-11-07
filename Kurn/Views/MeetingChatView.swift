@@ -150,6 +150,7 @@ struct MeetingChatView: View {
                         MeetingChatTurnView(turn: turn, isStreaming: isStreaming(turn), isMeetingScope: meeting != nil,
                                             meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
                                             documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
+                                            artifacts: vm.artifacts, artifactSession: vm.artifactSession,
                                             onJump: onJump, onJumpToTime: onJumpToTime)
                             .id(turn.id)
                     }

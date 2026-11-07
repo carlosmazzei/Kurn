@@ -51,7 +51,6 @@ struct AppErrorCatalogTests {
         .wikiGenerationFailed(detail),
         .wikiUnavailable,
         .titleGenerationFailed(detail),
-        .documentGenerationFailed(detail),
         .summaryTranslationFailed(detail),
         .onDeviceModelUnavailable(detail),
         .transcriptIntegrityFailed("empty_transcript"),

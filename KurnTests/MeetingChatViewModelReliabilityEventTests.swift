@@ -4,9 +4,8 @@
 //
 //  `MeetingChatViewModel.send` reports its own "view_model"-stage
 //  `ReliabilityEvent` once the whole user-visible round trip finishes,
-//  distinct from `MeetingChatService`'s own per-stage events — the same
-//  two-tier shape `DocumentGenerationViewModel`/`DocumentGenerationService`
-//  use. Unlike `MeetingChatReliabilityEventTests` (which calls the service
+//  distinct from `MeetingChatService`'s own per-stage events.
+//  Unlike `MeetingChatReliabilityEventTests` (which calls the service
 //  directly), `task` is private, so this polls `isResponding` for completion
 //  — the same constraint already documented for
 //  `SummaryViewModelStateTests`' `waitUntilLLMCalled()`. It

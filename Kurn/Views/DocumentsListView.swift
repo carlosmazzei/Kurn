@@ -62,9 +62,12 @@ struct DocumentsListView: View {
         }
         .sheet(isPresented: $showingCreate) {
             NavigationStack {
-                DocumentCreateView(modelContext: modelContext) { document in
-                    selectedDocument = document
-                }
+                MeetingChatView(meeting: nil)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(NSLocalizedString("common.done", comment: "Done")) { showingCreate = false }
+                        }
+                    }
             }
         }
         .kurnDialog(

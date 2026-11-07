@@ -275,9 +275,7 @@ final class TranscriptionCoordinator {
 
         let recordingID = recording.id
         // H9 PR 22, item 5: one id correlates every `ReliabilityEvent` this
-        // attempt produces (started through its terminal outcome), the same
-        // "operation run" grouping `DocumentGenerationViewModel` already
-        // established for its own operation.
+        // attempt produces (started through its terminal outcome).
         let runID = OperationID()
         let startedAt = Date()
         AppLog.transcription.atNotice.notice("VM: transcribe requested id=\(recordingID, privacy: .public) engine=\(config.transcription.rawValue, privacy: .public)")

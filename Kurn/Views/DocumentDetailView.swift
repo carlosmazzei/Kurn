@@ -14,6 +14,14 @@ struct DocumentDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 ReadAloudControl(item: .document(document))
 
+                if document.sourceChatSessionID != nil, let version = document.sourceArtifactVersion {
+                    Label(String(format: NSLocalizedString("documents.chat.provenance", comment: "Chat provenance"), version),
+                          systemImage: "bubble.left.and.bubble.right")
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                        .accessibilityIdentifier("documents.chat.provenance")
+                }
+
                 MarkdownText(document.bodyMarkdown)
                     .textSelection(.enabled)
 
@@ -46,7 +54,11 @@ struct DocumentDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { share() } label: {
+                Menu {
+                    ForEach(DocumentExport.formats, id: \.self) { format in
+                        Button(format.title) { share(format) }
+                    }
+                } label: {
                     Label(NSLocalizedString("detail.share", comment: "Share"), systemImage: "square.and.arrow.up")
                 }
             }
@@ -67,11 +79,8 @@ struct DocumentDetailView: View {
         }
     }
 
-    private func share() {
-        guard let url = try? MeetingExport.temporaryFile(
-            markdown: document.bodyMarkdown,
-            suggestedName: document.title
-        ) else { return }
+    private func share(_ format: MeetingExportFormat) {
+        guard let url = try? DocumentExport.file(title: document.title, markdown: document.bodyMarkdown, format: format) else { return }
         shareItem = ShareItem(urls: [url])
     }
 }

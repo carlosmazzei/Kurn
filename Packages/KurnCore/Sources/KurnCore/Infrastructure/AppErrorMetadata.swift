@@ -75,7 +75,7 @@ extension AppError {
         case .modelDownloadRequired, .modelDownloadFailed, .embeddingUnavailable, .onDeviceModelUnavailable:
             return .model
         case .autoTaggingFailed, .summaryTruncated, .generationTruncated, .semanticIndexFailed,
-             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed, .documentGenerationFailed,
+             .wikiGenerationFailed, .wikiUnavailable, .titleGenerationFailed,
              .summaryTranslationFailed:
             return .generation
         case .transcriptIntegrityFailed:
@@ -107,7 +107,7 @@ extension AppError {
         case .networkError, .apiError, .ambiguousProviderResult, .transcriptionFailed,
              .persistenceFailed, .modelDownloadFailed, .resourceUnavailable, .authenticationFailed,
              .autoTaggingFailed, .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed,
-             .titleGenerationFailed, .documentGenerationFailed, .transcriptIntegrityFailed,
+             .titleGenerationFailed, .transcriptIntegrityFailed,
              .keychainAccessFailed, .speechSynthesisFailed:
             return true
         default:
@@ -123,7 +123,7 @@ extension AppError {
         case .networkError, .apiError, .ambiguousProviderResult, .transcriptionFailed,
              .persistenceFailed, .modelDownloadFailed, .authenticationFailed, .autoTaggingFailed,
              .logExportFailed, .semanticIndexFailed, .wikiGenerationFailed, .titleGenerationFailed,
-             .documentGenerationFailed, .transcriptIntegrityFailed, .keychainAccessFailed,
+             .transcriptIntegrityFailed, .keychainAccessFailed,
              .speechSynthesisFailed:
             return .retry
         case .noAPIKey, .invalidProviderURL, .networkPolicyRestricted, .permissionDenied,
@@ -165,7 +165,6 @@ extension AppError {
              .semanticIndexFailed(let detail),
              .wikiGenerationFailed(let detail),
              .titleGenerationFailed(let detail),
-             .documentGenerationFailed(let detail),
              .onDeviceModelUnavailable(let detail),
              .speechSynthesisFailed(let detail),
              .attachmentImportFailed(let detail):
