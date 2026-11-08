@@ -180,9 +180,10 @@ public struct NativeHarness: Sendable {
                            trace: AgentTraceEmitter) async throws -> AgentTurnResponse? {
         events.yield(.turnStarted(index: state.turns))
         state.turns += 1
-        try await compact(settings, state: &state, events: events, trace: trace)
         var retried = false
         while true {
+            if costLimitReached(state) { return nil }
+            try await compact(settings, state: &state, events: events, trace: trace)
             if costLimitReached(state) { return nil }
             let streamed = StreamFlag()
             let started = ContinuousClock.now
@@ -216,7 +217,6 @@ public struct NativeHarness: Sendable {
                     // Previously committed tools remain in context and are not executed again.
                     events.yield(.turnStarted(index: state.turns))
                     state.turns += 1
-                    try await compact(settings, state: &state, events: events, trace: trace)
                     continue
                 }
                 if let usage = response.usage, usage.inputTokens > 0 {

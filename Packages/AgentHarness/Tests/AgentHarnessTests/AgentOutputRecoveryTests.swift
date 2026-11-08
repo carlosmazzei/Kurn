@@ -134,6 +134,24 @@ struct AgentOutputRecoveryTests {
         #expect(diagnostics(events).filter { $0.kind == .limitReached }.map(\.stopReason) == [.toolCallLimit])
     }
 
+    @Test func compactionFailureBeforeALargerRetryDoesNotMislabelTheCompletedRequest() async {
+        let capture = DiagnosticCapture()
+        let model = ResultScriptedAgentModel([
+            .success(AgentTurnResponse(text: "", stopReason: .maxTokens)), .failure(ScriptedAgentModel.Failure.provider)
+        ])
+        let policy = AgentContextPolicy(contextWindow: 200_000, maxOutputTokens: 128_000)
+        let harness = NativeHarness(model: model, contextPolicy: policy, tokenEstimator: { $0.count },
+                                    diagnosticSink: { capture.record($0) })
+        let history: [AgentMessage] = [.user(String(repeating: "a", count: 80_000)),
+                                       .assistant(text: String(repeating: "b", count: 80_000), toolCalls: [])]
+        await #expect(throws: ScriptedAgentModel.Failure.provider) { try await run(harness, history: history) }
+        #expect(capture.events.filter { $0.kind == .requestFinished }.count == 1)
+        #expect(!capture.events.contains { $0.kind == .requestFailed })
+        #expect(capture.events.contains { $0.kind == .summaryFailed })
+        #expect(capture.events.contains { $0.kind == .compactionFailed })
+        #expect(capture.events.last?.kind == .runFailed)
+    }
+
     private func diagnostics(_ events: [AgentEvent]) -> [AgentDiagnostic] {
         events.compactMap { if case .diagnostic(let value) = $0 { return value }; return nil }
     }
