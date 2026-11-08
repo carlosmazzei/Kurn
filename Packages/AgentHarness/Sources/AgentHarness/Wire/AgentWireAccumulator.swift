@@ -2,6 +2,7 @@ import Foundation
 
 public enum AgentWireError: Error, Sendable, Equatable {
     case remote(String)
+    case invalidResponse
     case emptyResponse
     case incompleteToolCall
     case incompleteStream

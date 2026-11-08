@@ -13,6 +13,7 @@ struct AgentResponsesAccumulator {
     var calls: [Int: Call] = [:]
     var reasoning: [Int: JSONValue] = [:]
     var refusals: [String: String] = [:]
+    var outputTexts: [String: String] = [:]
     var terminal = false
     var limited = false
     var usage: AgentUsage?
@@ -22,9 +23,8 @@ struct AgentResponsesAccumulator {
         guard !terminal else { return [] }
         switch value["type"].string {
         case "response.output_text.delta":
-            guard let delta = value["delta"].string, !delta.isEmpty else { return [] }
-            text += delta
-            return [.textDelta(delta)]
+            let key = "\(value["output_index"].int ?? 0):\(value["content_index"].int ?? 0)"
+            return appendOutputText(value["delta"].string ?? "", key: key)
         case "response.refusal.delta":
             let key = "\(value["output_index"].int ?? 0):\(value["content_index"].int ?? 0)"
             return appendRefusal(value["delta"].string ?? "", key: key)
@@ -47,9 +47,9 @@ struct AgentResponsesAccumulator {
         case "response.completed", "response.incomplete":
             return try finish(value)
         case "response.failed":
-            try fail(value["response"]["error"]["message"].string ?? "Response failed")
+            try fail(value["response"]["error"]["message"].string.map(AgentWireError.remote) ?? .invalidResponse)
         case "error":
-            try fail(value["message"].string ?? "Stream error")
+            try fail(value["message"].string.map(AgentWireError.remote) ?? .invalidResponse)
         default: break
         }
         return []
@@ -60,7 +60,7 @@ struct AgentResponsesAccumulator {
         terminal = true
         if value["type"].string == "response.incomplete" {
             let reason = response["incomplete_details"]["reason"].string ?? "unknown"
-            guard reason == "max_output_tokens" else { try fail("Incomplete response: \(reason)") }
+            guard reason == "max_output_tokens" else { try fail(.invalidResponse) }
             limited = true
         } else {
             for (index, item) in response["output"].array.enumerated() {
@@ -73,16 +73,26 @@ struct AgentResponsesAccumulator {
         }
         var events: [AgentModelEvent] = []
         for (index, item) in response["output"].array.enumerated() where item["type"].string == "message" {
-            for (contentIndex, content) in item["content"].array.enumerated() where content["type"].string == "refusal" {
+            for (contentIndex, content) in item["content"].array.enumerated() {
                 let key = "\(index):\(contentIndex)"
-                let full = content["refusal"].string ?? ""
-                let streamed = refusals[key] ?? ""
+                let isRefusal = content["type"].string == "refusal"
+                guard isRefusal || content["type"].string == "output_text" else { continue }
+                let full = content[isRefusal ? "refusal" : "text"].string ?? ""
+                let streamed = (isRefusal ? refusals[key] : outputTexts[key]) ?? ""
                 if full.hasPrefix(streamed) {
-                    events += appendRefusal(String(full.dropFirst(streamed.count)), key: key)
+                    let delta = String(full.dropFirst(streamed.count))
+                    events += isRefusal ? appendRefusal(delta, key: key) : appendOutputText(delta, key: key)
                 }
             }
         }
         return events
+    }
+
+    mutating func appendOutputText(_ delta: String, key: String) -> [AgentModelEvent] {
+        guard !delta.isEmpty else { return [] }
+        outputTexts[key, default: ""] += delta
+        text += delta
+        return [.textDelta(delta)]
     }
 
     mutating func appendRefusal(_ delta: String, key: String) -> [AgentModelEvent] {
@@ -107,9 +117,8 @@ struct AgentResponsesAccumulator {
         calls[index] = call
     }
 
-    mutating func fail(_ message: String) throws -> Never {
+    mutating func fail(_ error: AgentWireError) throws -> Never {
         terminal = true
-        let error = AgentWireError.remote(message)
         failure = error
         throw error
     }

@@ -78,8 +78,17 @@ import Testing
     @Test(arguments: ["content_filter", "unknown"]) func incompleteOtherReasonsFail(reason: String) throws {
         let accumulator = AgentWireAccumulator(format: .openAIResponses)
         let payload = #"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"\#(reason)"}}}"#
-        #expect(throws: AgentWireError.remote("Incomplete response: \(reason)")) { try accumulator.consume(payload) }
+        #expect(throws: AgentWireError.invalidResponse) { try accumulator.consume(payload) }
         #expect(throws: AgentWireError.self) { try accumulator.response() }
+    }
+
+    @Test(arguments: [
+        #"{"type":"response.failed","response":{}}"#,
+        #"{"type":"error"}"#
+    ]) func missingRemoteErrorIsStructured(payload: String) {
+        let accumulator = AgentWireAccumulator(format: .openAIResponses)
+        #expect(throws: AgentWireError.invalidResponse) { try accumulator.consume(payload) }
+        #expect(throws: AgentWireError.invalidResponse) { try accumulator.response() }
     }
 
     @Test(arguments: [

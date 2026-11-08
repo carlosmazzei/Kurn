@@ -25,7 +25,7 @@ extension ProviderHTTPTests {
 
     @Test func proseWithoutHeadingsIsOneUntitledSection() async throws {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": "this is not json"]]]])
+            MockURLProtocol.json(responseJSON("this is not json"))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
@@ -36,7 +36,7 @@ extension ProviderHTTPTests {
 
     @Test func blankSummaryContentThrowsDecodingError() async {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": "  \n  "]]]])
+            MockURLProtocol.json(responseJSON("  \n  "))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 

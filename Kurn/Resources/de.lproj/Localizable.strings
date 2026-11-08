@@ -1,3 +1,7 @@
+"error.provider_response_invalid" = "Der Anbieter hat eine ungültige oder unvollständige Antwort zurückgegeben.";
+"error.provider_response_empty" = "Der Anbieter hat eine leere Antwort zurückgegeben.";
+"error.provider_tool_call_incomplete" = "Der Anbieter hat einen unvollständigen Werkzeugaufruf zurückgegeben.";
+
 /* Kurn — Deutsch */
 
 /* Fehler */

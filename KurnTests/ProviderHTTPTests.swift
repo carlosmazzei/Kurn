@@ -22,7 +22,7 @@ struct ProviderHTTPTests {
 
     @Test func openAISummarizeBuildsChatRequestAndParsesSections() async throws {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": sectionsBody]]]])
+            MockURLProtocol.json(responseJSON(sectionsBody))
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-test", session: MockURLProtocol.session())
 
@@ -32,12 +32,15 @@ struct ProviderHTTPTests {
         #expect(result.sections.first?.body == "We shipped it")
 
         let request = try #require(MockURLProtocol.lastRequest)
-        #expect(request.url?.absoluteString == "https://api.openai.com/v1/chat/completions")
+        #expect(request.url?.absoluteString == "https://api.openai.com/v1/responses")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer secret")
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["model"] as? String == "gpt-test")
-        #expect(body?["messages"] != nil)
-        #expect(body?["max_completion_tokens"] as? Int == LLMHTTP.summaryMaxOutputTokens)
+        #expect(body?["instructions"] as? String == "sys")
+        #expect(body?["input"] as? [[String: String]] == [["role": "user", "content": "usr"]])
+        #expect(body?["store"] as? Bool == false)
+        #expect(body?["text"] == nil)
+        #expect(body?["max_output_tokens"] as? Int == LLMHTTP.summaryMaxOutputTokens)
         #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
     }
 
@@ -45,9 +48,7 @@ struct ProviderHTTPTests {
         // finish_reason "length" means the JSON payload was cut off by the
         // output-token cap; the specific error must surface, not a decode error.
         MockURLProtocol.enqueue([
-            MockURLProtocol.json([
-                "choices": [["message": ["content": #"{"sections":[{"ti"#], "finish_reason": "length"]]
-            ])
+            MockURLProtocol.json(responseJSON(#"{"sections":[{"ti"#, truncated: true))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
@@ -346,7 +347,7 @@ struct ProviderHTTPTests {
 
     @Test func openAIChatSendsMessagesAndReturnsText() async throws {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": "The decision was to ship."]]]])
+            MockURLProtocol.json(responseJSON("The decision was to ship."))
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-test", session: MockURLProtocol.session())
 
@@ -357,20 +358,22 @@ struct ProviderHTTPTests {
         #expect(reply == "The decision was to ship.")
 
         let request = try #require(MockURLProtocol.lastRequest)
-        #expect(request.url?.absoluteString == "https://api.openai.com/v1/chat/completions")
+        #expect(request.url?.absoluteString == "https://api.openai.com/v1/responses")
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         // Chat must NOT force JSON mode (that's the summary path).
         #expect(body?["response_format"] == nil)
-        let messages = body?["messages"] as? [[String: String]]
-        #expect(messages?.first?["role"] == "system")
+        let messages = body?["input"] as? [[String: String]]
+        #expect(body?["instructions"] as? String == "ground")
+        #expect(body?["store"] as? Bool == false)
+        #expect(body?["text"] == nil)
         #expect(messages?.last?["content"] == "What did we decide?")
-        #expect(body?["max_completion_tokens"] as? Int == LLMHTTP.chatMaxOutputTokens)
+        #expect(body?["max_output_tokens"] as? Int == LLMHTTP.chatMaxOutputTokens)
         #expect(body?["reasoning_effort"] == nil)
     }
 
     @Test func openAIGPT5ChatUsesLowReasoningEffort() async throws {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": "Resposta."]]]])
+            MockURLProtocol.json(responseJSON("Resposta."))
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-5.4", session: MockURLProtocol.session())
 
@@ -381,13 +384,14 @@ struct ProviderHTTPTests {
 
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
-        #expect(body?["reasoning_effort"] as? String == "low")
-        #expect(body?["max_completion_tokens"] as? Int == 4096)
+        #expect(body?["reasoning"] as? [String: String] == ["effort": "low"])
+        #expect(body?["reasoning_effort"] == nil)
+        #expect(body?["max_output_tokens"] as? Int == 4096)
     }
 
     @Test func openAIDocumentGenerationUsesLongOutputBudget() async throws {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": "# Document"]]]])
+            MockURLProtocol.json(responseJSON("# Document"))
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-5.4", session: MockURLProtocol.session())
 
@@ -399,18 +403,13 @@ struct ProviderHTTPTests {
 
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
-        #expect(body?["max_completion_tokens"] as? Int == 8192)
+        #expect(body?["max_output_tokens"] as? Int == 8192)
         #expect(request.timeoutInterval == LLMHTTP.summaryTimeout)
     }
 
     @Test func truncatedChatResponseThrowsSpecificError() async {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json([
-                "choices": [[
-                    "message": ["content": NSNull()],
-                    "finish_reason": "length"
-                ]]
-            ])
+            MockURLProtocol.json(responseJSON("", truncated: true))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
@@ -429,9 +428,7 @@ struct ProviderHTTPTests {
 
     @Test func openAIChatReturnsRefusalWhenContentIsNull() async throws {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json([
-                "choices": [["message": ["content": NSNull(), "refusal": "I cannot answer that."]]]
-            ])
+            MockURLProtocol.json(responseJSON("I cannot answer that.", refusal: true))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
@@ -494,7 +491,7 @@ struct ProviderHTTPTests {
 
     @Test func emptyChatResponseThrows() async {
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": ""]]]])
+            MockURLProtocol.json(responseJSON(""))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
         await #expect(throws: AppError.self) {
@@ -512,7 +509,7 @@ struct ProviderHTTPTests {
         {"segments":[{"id":"\(a.id.uuidString)","text":"we need to ship"},{"id":"\(b.id.uuidString)","text":"this is fine"}]}
         """
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": replyJSON]]]])
+            MockURLProtocol.json(responseJSON(replyJSON))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
@@ -525,7 +522,7 @@ struct ProviderHTTPTests {
 
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
-        let messages = body?["messages"] as? [[String: String]]
+        let messages = body?["input"] as? [[String: String]]
         let userMessage = messages?.last?["content"] ?? ""
         #expect(userMessage.contains(a.id.uuidString))
         #expect(userMessage.contains(b.id.uuidString))
@@ -549,8 +546,8 @@ struct ProviderHTTPTests {
     @Test func llmTranscriptCorrectorReportsBatchFailureApartFromEmptyCorrections() async {
         let a = TranscriptSegment(speakerLabel: "Speaker 1", startTime: 0, endTime: 1, text: "this is fine", confidence: 0.3)
         MockURLProtocol.enqueue([
-            MockURLProtocol.json(["choices": [["message": ["content": #"{"segments":[]}"#]]]]),
-            MockURLProtocol.json(["choices": [["message": ["content": "I cannot help with that."]]]]),
+            MockURLProtocol.json(responseJSON(#"{"segments":[]}"#)),
+            MockURLProtocol.json(responseJSON("I cannot help with that.")),
             .failure(URLError(.notConnectedToInternet))
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
@@ -584,8 +581,9 @@ struct ProviderHTTPTests {
     @Test func openAIStreamChatAccumulatesDeltasAndSetsStreamFlag() async throws {
         MockURLProtocol.enqueue([
             .success(status: 200, body: sseBody([
-                #"{"choices":[{"delta":{"content":"Hello"}}]}"#,
-                #"{"choices":[{"delta":{"content":", world."}}]}"#
+                #"{"type":"response.output_text.delta","delta":"Hello"}"#,
+                #"{"type":"response.output_text.delta","delta":", world."}"#,
+                #"{"type":"response.completed","response":{}}"#
             ]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "secret", model: "gpt-test", session: MockURLProtocol.session())
@@ -601,11 +599,14 @@ struct ProviderHTTPTests {
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
         #expect(body?["stream"] as? Bool == true)
+        #expect(request.url?.path == "/v1/responses")
+        #expect(body?["store"] as? Bool == false)
+        #expect(body?["text"] == nil)
     }
 
     @Test func openAIStreamChatEmptyStreamThrows() async {
         MockURLProtocol.enqueue([
-            .success(status: 200, body: sseBody([#"{"choices":[{"delta":{}}]}"#]), headers: [:])
+            .success(status: 200, body: sseBody([#"{"type":"response.completed","response":{}}"#]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
 
@@ -709,8 +710,8 @@ struct ProviderHTTPTests {
     @Test func openAIStreamChatReportsUsageFromTheFinalChoicelessChunk() async throws {
         MockURLProtocol.enqueue([
             .success(status: 200, body: sseBody([
-                #"{"choices":[{"delta":{"content":"Hi."}}]}"#,
-                #"{"choices":[],"usage":{"prompt_tokens":42,"completion_tokens":7,"total_tokens":49}}"#
+                #"{"type":"response.output_text.delta","delta":"Hi."}"#,
+                #"{"type":"response.completed","response":{"usage":{"input_tokens":42,"output_tokens":7}}}"#
             ]), headers: [:])
         ])
         let provider = OpenAIProvider(apiKey: "secret", session: MockURLProtocol.session())
@@ -722,8 +723,7 @@ struct ProviderHTTPTests {
         #expect(usage == TokenUsage(promptTokens: 42, completionTokens: 7))
         let request = try #require(MockURLProtocol.lastRequest)
         let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: request)) as? [String: Any]
-        let streamOptions = body?["stream_options"] as? [String: Any]
-        #expect(streamOptions?["include_usage"] as? Bool == true)
+        #expect(body?["stream_options"] == nil)
     }
 
     @Test func anthropicStreamChatMergesUsageFromMessageStartAndMessageDelta() async throws {

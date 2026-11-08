@@ -1,3 +1,7 @@
+"error.provider_response_invalid" = "Il fornitore ha restituito una risposta non valida o incompleta.";
+"error.provider_response_empty" = "Il fornitore ha restituito una risposta vuota.";
+"error.provider_tool_call_incomplete" = "Il fornitore ha restituito una chiamata a strumento incompleta.";
+
 /* Kurn — Italiano */
 
 /* Errori */

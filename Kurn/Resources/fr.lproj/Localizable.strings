@@ -1,3 +1,7 @@
+"error.provider_response_invalid" = "Le fournisseur a renvoyé une réponse invalide ou inachevée.";
+"error.provider_response_empty" = "Le fournisseur a renvoyé une réponse vide.";
+"error.provider_tool_call_incomplete" = "Le fournisseur a renvoyé un appel d’outil incomplet.";
+
 /* Kurn — Français */
 
 /* Erreurs */

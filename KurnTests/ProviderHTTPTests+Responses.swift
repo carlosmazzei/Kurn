@@ -89,9 +89,13 @@ extension ProviderHTTPTests {
         let request = AgentTurnRequest(systemPrompt: "sys", messages: [.user("Hi")], tools: [], maxOutputTokens: 10)
         do {
             _ = try await provider.streamTurn(request) { _ in }
-            Issue.record("Expected API error")
+            Issue.record("Expected response error")
         } catch let AppError.apiError(statusCode, _) {
             #expect(statusCode == 0)
+            #expect(!payload.contains("content_filter"))
+        } catch let AppError.decodingError(detail) {
+            #expect(payload.contains("content_filter"))
+            #expect(detail == NSLocalizedString("error.provider_response_invalid", comment: ""))
         }
     }
 
