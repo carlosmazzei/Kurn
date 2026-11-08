@@ -40,7 +40,9 @@ struct AgentOutputRecoveryTests {
         #expect(interrupted.metrics[.reasoningTokens] == 32_700)
         #expect(interrupted.metrics[.visibleTextScalars] == 0)
         #expect(interrupted.metrics[.discardedToolCalls] == 1)
-        #expect(facts.contains { $0.kind == .contextCheck && $0.metrics[.thresholdTokens] == 984_464 })
+        #expect(facts.contains {
+            $0.kind == .contextCheck && $0.metrics[.thresholdTokens] == 984_464 && $0.metrics[.contextTokens] == 54_879
+        })
         var trace = AgentRunTrace()
         for event in events { trace.apply(event) }
         #expect(trace.usage == outcome.totalUsage)

@@ -217,6 +217,10 @@ public struct NativeHarness: Sendable {
                     // Previously committed tools remain in context and are not executed again.
                     events.yield(.turnStarted(index: state.turns))
                     state.turns += 1
+                    if let usage = response.usage, usage.inputTokens > 0 {
+                        // The request's input remains in context; its discarded output does not.
+                        state.usageAnchor = (usage.inputTokens, state.context.count)
+                    }
                     continue
                 }
                 if let usage = response.usage, usage.inputTokens > 0 {
