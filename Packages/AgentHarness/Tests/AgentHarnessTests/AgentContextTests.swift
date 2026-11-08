@@ -126,8 +126,10 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         let compactor = AgentContextCompactor(policy: AgentContextPolicy(contextWindow: 8_192))
         #expect(compactor.policy.historySummaryMaxOutputTokens == 2_048)
         #expect(compactor.policy.turnPrefixSummaryMaxOutputTokens == 1_024)
-        let messages: [AgentMessage] = [.user(tokens(3_000)), .assistant(text: tokens(3_000), toolCalls: []),
-            splitTurn ? .assistant(text: tokens(3_000), toolCalls: []) : .user(tokens(3_000)),
+        // 8,000 tokens to summarize either way: more than a 2,048 (history) or 1,024 (prefix) output
+        // budget leaves of the window, so both requests must drop the oldest text.
+        let messages: [AgentMessage] = [.user(tokens(4_000)), .assistant(text: tokens(4_000), toolCalls: []),
+            splitTurn ? .assistant(text: tokens(4_000), toolCalls: []) : .user(tokens(4_000)),
             .assistant(text: tokens(10), toolCalls: [])]
         let plan = try #require(compactor.plan(for: messages))
         #expect(plan.isSplitTurn == splitTurn)
