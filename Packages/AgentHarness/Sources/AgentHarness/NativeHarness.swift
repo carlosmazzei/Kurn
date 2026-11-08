@@ -62,6 +62,7 @@ public struct NativeHarness: Sendable {
         let systemPrompt: String
         let tools: [AgentToolSpec]
         let maxOutputTokens: Int
+        var allowsToolCalls = true
     }
 
     /// Set from the synchronous stream callback; read after the turn to decide whether a retry is safe.
@@ -128,26 +129,32 @@ public struct NativeHarness: Sendable {
         }
         try Task.checkCancellation()
         if limits.wrapUpOnLimit, reason == .turnLimit || reason == .toolCallLimit,
-           case .toolResult? = state.context.last, !costLimitReached(state) {
-            try await wrapUp(settings, state: &state, events: events)
+           case .toolResult? = state.context.last, !costLimitReached(state),
+           try await wrapUp(settings, state: &state, events: events) == .maxTokens {
+            reason = .outputLimit
         }
         try Task.checkCancellation()
         events.yield(.runFinished(AgentRunOutcome(messages: state.history, finalText: state.finalText,
                                                  stopReason: reason, totalUsage: state.usage)))
     }
 
-    /// One tool-less answer from what the run already gathered, instead of ending on tool results.
-    /// Tools stay declared (some vendors reject tool history without them); any calls are dropped.
+    /// One text-only answer from what the run already gathered, instead of ending on tool results.
+    /// Tools stay declared (some vendors reject tool history without them) but tool choice is "none";
+    /// calls a vendor returns anyway are dropped. A reply without text is left as no answer, so the
+    /// limit stays visible with an empty answer. Returns the wrap-up turn's stop reason.
     private func wrapUp(_ settings: TurnSettings, state: inout RunState,
-                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws {
+                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentModelStopReason? {
         let wrapUp = TurnSettings(systemPrompt: settings.systemPrompt + "\n\n" + Self.wrapUpInstruction,
-                                  tools: settings.tools, maxOutputTokens: settings.maxOutputTokens)
-        guard let response = try await modelTurn(wrapUp, state: &state, events: events) else { return }
+                                  tools: settings.tools, maxOutputTokens: settings.maxOutputTokens, allowsToolCalls: false)
+        guard let response = try await modelTurn(wrapUp, state: &state, events: events) else { return nil }
         try Task.checkCancellation()
         state.finalText = response.text
-        let assistant = AgentMessage.assistant(text: response.text, toolCalls: [])
-        state.history.append(assistant)
-        state.context.append(assistant)
+        if !response.text.isEmpty {
+            let assistant = AgentMessage.assistant(text: response.text, toolCalls: [])
+            state.history.append(assistant)
+            state.context.append(assistant)
+        }
+        return response.stopReason
     }
 
     /// Compacts against the calibrated context size, streams one turn and calibrates from its usage.
@@ -166,7 +173,8 @@ public struct NativeHarness: Sendable {
             do {
                 let response = try await model.streamTurn(
                     AgentTurnRequest(systemPrompt: settings.systemPrompt, messages: state.context,
-                                     tools: settings.tools, maxOutputTokens: settings.maxOutputTokens)
+                                     tools: settings.tools, maxOutputTokens: settings.maxOutputTokens,
+                                     allowsToolCalls: settings.allowsToolCalls)
                 ) { event in
                     if case .textDelta(let text) = event {
                         streamed.set()
@@ -185,7 +193,7 @@ public struct NativeHarness: Sendable {
                 retried = true
                 state.calibration.recordOverflow(estimated: estimate, budget: compactor.policy.inputTokenBudget)
                 let previous = state.context
-                estimate = try await compact(settings, state: &state, events: events)
+                estimate = try await compact(settings, state: &state, events: events, force: true)
                 guard state.context != previous else { throw error }
             }
         }
@@ -204,16 +212,23 @@ public struct NativeHarness: Sendable {
     }
 
     /// Returns the raw estimate of the request about to be sent, for calibration against usage.
+    /// `force` (after a provider rejected the request as too long) skips the threshold checks: old
+    /// results are always elided, and the older prefix is summarized when elision changed nothing,
+    /// since the provider's limit may sit far below the configured budget.
     private func compact(_ settings: TurnSettings, state: inout RunState,
-                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> Int {
+                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
+                         force: Bool = false) async throws -> Int {
         func measure() -> Int {
             compactor.estimateTokens(systemPrompt: settings.systemPrompt, messages: state.context, tools: settings.tools)
         }
         let rawBefore = measure()
         let before = state.calibration.tokens(rawBefore)
-        guard compactor.policy.needsCompaction(before) else { return rawBefore }
+        guard force || compactor.policy.needsCompaction(before) else { return rawBefore }
+        let unelided = state.context
         state.context = compactor.elidingOldResults(in: state.context)
-        if compactor.policy.needsCompaction(state.calibration.tokens(measure())),
+        let summarize = force ? state.context == unelided
+            : compactor.policy.needsCompaction(state.calibration.tokens(measure()))
+        if summarize,
            let request = compactor.summaryRequest(for: state.context, maxOutputTokens: settings.maxOutputTokens) {
             let summary = try await model.streamTurn(request) { _ in }
             try Task.checkCancellation()

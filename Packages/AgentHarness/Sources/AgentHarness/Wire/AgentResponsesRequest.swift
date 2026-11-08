@@ -30,6 +30,7 @@ extension AgentWireFormat {
                 .object(["type": .string("function"), "name": .string(spec.name),
                          "description": .string(spec.description), "parameters": spec.inputSchema, "strict": .bool(false)])
             })
+            if !request.allowsToolCalls { body["tool_choice"] = .string("none") }
         }
         if let reasoningEffort { body["reasoning"] = .object(["effort": .string(reasoningEffort)]) }
         return .object(body)

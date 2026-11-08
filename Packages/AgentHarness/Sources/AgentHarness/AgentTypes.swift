@@ -59,12 +59,17 @@ public struct AgentTurnRequest: Sendable, Equatable {
     public let messages: [AgentMessage]
     public let tools: [AgentToolSpec]
     public let maxOutputTokens: Int
+    /// False asks the vendor to answer in text only while tools stay declared (some vendors reject
+    /// tool history without declarations): `tool_choice: none` or Gemini's `NONE` calling mode.
+    public let allowsToolCalls: Bool
 
-    public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int) {
+    public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
+                allowsToolCalls: Bool = true) {
         self.systemPrompt = systemPrompt
         self.messages = messages
         self.tools = tools
         self.maxOutputTokens = maxOutputTokens
+        self.allowsToolCalls = allowsToolCalls
     }
 }
 

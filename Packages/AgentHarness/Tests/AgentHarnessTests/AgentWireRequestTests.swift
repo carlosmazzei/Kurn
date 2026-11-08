@@ -113,4 +113,26 @@ import Testing
         let anthropic = AgentWireFormat.anthropic.requestBody(request, model: "model")["messages"].array
         #expect(anthropic[0]["content"].array.count == 1)
     }
+
+    @Test(arguments: [AgentWireFormat.openAI, .openAIResponses, .anthropic, .gemini])
+    func textOnlyTurnsKeepToolsButDisableCalls(format: AgentWireFormat) {
+        let base = request()
+        let textOnly = AgentTurnRequest(systemPrompt: base.systemPrompt, messages: base.messages, tools: base.tools,
+                                        maxOutputTokens: base.maxOutputTokens, allowsToolCalls: false)
+        let body = format.requestBody(textOnly, model: "model")
+        let normal = format.requestBody(base, model: "model")
+        #expect(body["tools"] == normal["tools"])
+        #expect(!body["tools"].array.isEmpty)
+        switch format {
+        case .openAI, .openAIResponses: #expect(body["tool_choice"] == .string("none"))
+        case .anthropic: #expect(body["tool_choice"] == .object(["type": .string("none")]))
+        case .gemini: #expect(body["toolConfig"]["functionCallingConfig"]["mode"] == .string("NONE"))
+        }
+        #expect(normal["tool_choice"] == .null)
+        #expect(normal["toolConfig"] == .null)
+        let noTools = AgentTurnRequest(systemPrompt: "", messages: [.user("Hi")], tools: [], maxOutputTokens: 1,
+                                       allowsToolCalls: false)
+        #expect(format.requestBody(noTools, model: "model")["tool_choice"] == .null)
+        #expect(format.requestBody(noTools, model: "model")["toolConfig"] == .null)
+    }
 }

@@ -44,6 +44,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
                 .object(["type": .string("function"), "function": .object([
                     "name": .string(spec.name), "description": .string(spec.description), "parameters": spec.inputSchema])])
             })
+            if !request.allowsToolCalls { body["tool_choice"] = .string("none") }
         }
         if let reasoningEffort { body["reasoning_effort"] = .string(reasoningEffort) }
         return .object(body)
@@ -74,6 +75,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             body["tools"] = .array(request.tools.map {
                 .object(["name": .string($0.name), "description": .string($0.description), "input_schema": $0.inputSchema])
             })
+            if !request.allowsToolCalls { body["tool_choice"] = .object(["type": .string("none")]) }
         }
         return .object(body)
     }
@@ -115,6 +117,9 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             body["tools"] = .array([.object(["functionDeclarations": .array(request.tools.map {
                 .object(["name": .string($0.name), "description": .string($0.description), "parameters": $0.inputSchema])
             })])])
+            if !request.allowsToolCalls {
+                body["toolConfig"] = .object(["functionCallingConfig": .object(["mode": .string("NONE")])])
+            }
         }
         return .object(body)
     }

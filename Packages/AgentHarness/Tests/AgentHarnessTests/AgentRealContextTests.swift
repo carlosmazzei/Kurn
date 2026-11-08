@@ -119,6 +119,8 @@ actor ResultScriptedAgentModel: AgentModel {
         #expect(requests.count == 2)
         #expect(requests[1].systemPrompt == "Be helpful\n\n" + NativeHarness.wrapUpInstruction)
         #expect(requests[1].tools == [agentTool().spec])
+        #expect(requests[1].allowsToolCalls == false)
+        #expect(requests[0].allowsToolCalls)
         #expect(events.contains(.turnStarted(index: 1)))
         #expect(!events.contains { if case .toolStarted(let id, _, _) = $0 { return id == "3" }; return false })
     }
@@ -136,5 +138,57 @@ actor ResultScriptedAgentModel: AgentModel {
         #expect(costOutcome.stopReason == .costLimit)
         #expect(await usageModel.requests.count == 1)
         #expect(await model.requests.isEmpty)
+    }
+
+    @Test func wrapUpWithoutTextIsNoAnswer() async throws {
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall("1")]),
+                                       AgentTurnResponse(text: "", toolCalls: [agentCall("2")])])
+        let events = try await agentEvents(
+            NativeHarness(model: model, limits: AgentLimits(maxTurns: 1, wrapUpOnLimit: true)), tools: [agentTool()])
+        let outcome = try agentOutcome(events)
+        #expect(outcome.stopReason == .turnLimit)
+        #expect(outcome.finalText.isEmpty)
+        #expect(outcome.messages.last == .toolResult(callID: "1", toolName: "lookup", content: "{}", isError: false))
+        #expect(await model.requests.count == 2)
+    }
+
+    @Test func truncatedWrapUpReportsOutputLimit() async throws {
+        let truncated = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall("1"), agentCall("2")]),
+                                           AgentTurnResponse(text: "Partial ans", stopReason: .maxTokens)])
+        let limited = try agentOutcome(await agentEvents(
+            NativeHarness(model: truncated, limits: AgentLimits(maxToolCalls: 1, wrapUpOnLimit: true)),
+            tools: [agentTool()]))
+        #expect(limited.stopReason == .outputLimit)
+        #expect(limited.finalText == "Partial ans")
+        #expect(limited.messages.last == .assistant(text: "Partial ans", toolCalls: []))
+    }
+
+    @Test func overflowOnAWindowFarBelowTheBudgetStillElides() async throws {
+        let model = ResultScriptedAgentModel([.failure(ResultScriptedAgentModel.Overflow()),
+                                             .success(AgentTurnResponse(text: "Answer"))])
+        let harness = NativeHarness(model: model,
+                                    contextPolicy: AgentContextPolicy(inputTokenBudget: 23_000, keepRecentMessages: 1),
+                                    isContextOverflow: { _ in true })
+        let outcome = try agentOutcome(await agentEvents(harness, history: history()))
+        #expect(outcome.finalText == "Answer")
+        let requests = await model.requests
+        #expect(requests.count == 2)
+        #expect(requests[1].messages[2] == .toolResult(callID: "0", toolName: "lookup", content: stub, isError: false))
+    }
+
+    @Test func overflowWithNothingToElideSummarizesTheOlderPrefix() async throws {
+        let model = ResultScriptedAgentModel([.failure(ResultScriptedAgentModel.Overflow()),
+                                             .success(AgentTurnResponse(text: "Earlier facts")),
+                                             .success(AgentTurnResponse(text: "Answer"))])
+        let harness = NativeHarness(model: model,
+                                    contextPolicy: AgentContextPolicy(inputTokenBudget: 23_000, keepRecentMessages: 1),
+                                    isContextOverflow: { _ in true })
+        let history: [AgentMessage] = [.user(mediumText), .assistant(text: mediumText, toolCalls: [])]
+        let outcome = try agentOutcome(await agentEvents(harness, history: history))
+        #expect(outcome.finalText == "Answer")
+        let requests = await model.requests
+        #expect(requests.count == 3)
+        #expect(requests[1].tools.isEmpty)
+        #expect(requests[2].messages == [.user("[Summary of earlier conversation]\nEarlier facts"), .user("Question")])
     }
 }
