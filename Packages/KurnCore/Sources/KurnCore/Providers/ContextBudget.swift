@@ -159,7 +159,8 @@ extension AppError {
     public var isContextOverflow: Bool {
         guard case .apiError(let status, let message) = self else { return false }
         if status == 413 { return true }
-        guard [400, 422].contains(status) else { return false }
+        // 0 is an error reported inside an already-open stream (e.g. a Responses `response.failed`).
+        guard [0, 400, 422].contains(status) else { return false }
         let text = message.lowercased()
         return Self.contextOverflowMarkers.contains { text.contains($0) }
     }

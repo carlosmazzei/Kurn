@@ -123,11 +123,15 @@ public struct AgentLimits: Sendable, Equatable {
     public let maxTurns: Int
     public let maxToolCalls: Int
     public let maxCostUSD: Double?
+    /// After a turn or tool-call limit, run one extra tool-less turn so the model answers from what
+    /// it already gathered instead of ending on tool results. Never runs past the cost limit.
+    public let wrapUpOnLimit: Bool
 
-    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil) {
+    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil, wrapUpOnLimit: Bool = false) {
         self.maxTurns = max(0, maxTurns)
         self.maxToolCalls = max(0, maxToolCalls)
         self.maxCostUSD = maxCostUSD.map { max(0, $0) }
+        self.wrapUpOnLimit = wrapUpOnLimit
     }
 }
 

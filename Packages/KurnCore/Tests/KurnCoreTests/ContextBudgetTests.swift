@@ -151,6 +151,9 @@ struct ContextBudgetTests {
 
     @Test func otherFailuresAreNotOverflow() {
         #expect(!AppError.apiError(statusCode: 400, message: "invalid model").isContextOverflow)
+        #expect(AppError.apiError(statusCode: 0, message: "Your input exceeds the context window of this model.")
+            .isContextOverflow)
+        #expect(!AppError.apiError(statusCode: 0, message: "Stream error").isContextOverflow)
         #expect(!AppError.apiError(statusCode: 500, message: "context length").isContextOverflow)
         #expect(!AppError.apiError(statusCode: 429, message: "rate limited").isContextOverflow)
         #expect(!AppError.summaryTruncated.isContextOverflow)

@@ -95,7 +95,20 @@ accounted from reported usage through the caller's estimator, including summary 
 Context accepts an injected Sendable token estimator (default: rounded-up
 characters/4) and an input-token budget. KurnCore's `AgentContextAdapter` supplies
 `ContextBudget` and script-aware `TokenEstimate` through the `contextBudget:`
-initializer. Old tool results are elided first, then an older
+initializer. Requests are estimated per message (text, tool-call arguments, replay
+metadata, a fixed framing overhead) — never by re-encoding already-JSON tool results,
+whose escaping inflated the estimate. `AgentContextCalibration` then scales estimates
+by the input tokens the provider actually reported for the previous turn (ratio clamped
+to 0.25–4), so compaction follows the model's real context use. A provider rejecting a
+turn as too long (`isContextOverflow`; the adapter passes `AppError.isContextOverflow`,
+which also matches in-stream errors) makes that size read as over budget, compacts and
+retries the turn once — only if nothing was streamed and compaction shrank the context.
+`AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
+`NativeHarness.wrapUpInstruction` appended (tools stay declared, calls are dropped), so
+the run ends with an answer from what was gathered; never past the cost limit.
+Chat uses `AgentLimits.chat(sourceCount:)` (10–24 turns, 20–96 tool calls, wrap-up on)
+and its prompt steers multi-meeting questions to listing, search and summaries first.
+Old tool results are elided first, then an older
 prefix is summarized with a tool-less model request, preserving assistant/result
 groups and recent messages. Compaction changes only model context; outcomes retain
 full history. These estimates and limits do not guarantee a provider's hard context

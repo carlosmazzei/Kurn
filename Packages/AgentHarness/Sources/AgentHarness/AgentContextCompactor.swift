@@ -27,12 +27,31 @@ public struct AgentContextCompactor: Sendable {
         self.tokenEstimator = tokenEstimator
     }
 
+    /// Fixed per-message and per-tool-call framing (role markers, call IDs) that vendors add.
+    public static let messageOverheadTokens = 4
+
+    /// Estimates the request as the provider receives it: message text, tool-call arguments and
+    /// replay metadata are counted once, rather than re-encoding already-JSON tool results as JSON
+    /// strings, whose escaping inflated the estimate and compacted context that still fit.
     public func estimateTokens(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec]) -> Int {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        let messageText = (try? encoder.encode(messages)).map { String(decoding: $0, as: UTF8.self) } ?? ""
-        let toolText = (try? encoder.encode(tools)).map { String(decoding: $0, as: UTF8.self) } ?? ""
-        return estimate(systemPrompt) + estimate(messageText) + estimate(toolText)
+        let toolText = tools.isEmpty ? "" : encoded(tools)
+        return estimate(systemPrompt) + messages.reduce(0) { $0 + estimateTokens(of: $1) } + estimate(toolText)
+    }
+
+    public func estimateTokens(of message: AgentMessage) -> Int {
+        let overhead = Self.messageOverheadTokens
+        switch message {
+        case .user(let text):
+            return overhead + estimate(text)
+        case .assistant(let text, let calls, let metadata):
+            let callTokens = calls.reduce(0) { total, call in
+                total + overhead + estimate(call.id) + estimate(call.name) + estimate(call.rawArguments)
+                    + estimate(call.providerMetadata.map { encoded($0) } ?? "")
+            }
+            return overhead + estimate(text) + callTokens + estimate(metadata.map { encoded($0) } ?? "")
+        case .toolResult(let callID, _, let content, _):
+            return overhead + estimate(callID) + estimate(content)
+        }
     }
 
     /// Moves the boundary back to keep every assistant/tool-result group together.
@@ -78,6 +97,44 @@ public struct AgentContextCompactor: Sendable {
     }
 
     private func estimate(_ text: String) -> Int {
-        max(0, tokenEstimator(text))
+        text.isEmpty ? 0 : max(0, tokenEstimator(text))
+    }
+
+    private func encoded<Value: Encodable>(_ value: Value) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return (try? encoder.encode(value)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+    }
+}
+
+/// Scales local estimates by what the provider actually counted. Estimates are deliberately
+/// pessimistic characters-per-token heuristics; once a turn reports its real input tokens, the
+/// harness plans the next request against the model's real context use instead.
+public struct AgentContextCalibration: Sendable, Equatable {
+    public static let ratioRange: ClosedRange<Double> = 0.25...4
+    public private(set) var ratio = 1.0
+
+    public init() {}
+
+    /// Records the provider-reported input tokens for a request whose local estimate was `estimated`.
+    public mutating func record(estimated: Int, reported: Int) {
+        guard estimated > 0, reported > 0 else { return }
+        ratio = Self.clamped(Double(reported) / Double(estimated))
+    }
+
+    /// A provider rejected a request estimated at `estimated` as too long: make that size read as
+    /// over `budget`, so the same context is compacted now and later turns compact earlier.
+    public mutating func recordOverflow(estimated: Int, budget: Int) {
+        guard estimated > 0 else { return }
+        ratio = Self.clamped(max(ratio, Double(budget) / Double(estimated) * 1.1))
+    }
+
+    public func tokens(_ estimate: Int) -> Int {
+        Int((Double(max(0, estimate)) * ratio).rounded(.up))
+    }
+
+    private static func clamped(_ value: Double) -> Double {
+        guard value.isFinite else { return 1 }
+        return min(ratioRange.upperBound, max(ratioRange.lowerBound, value))
     }
 }
