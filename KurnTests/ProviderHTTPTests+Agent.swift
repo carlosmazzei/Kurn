@@ -67,8 +67,8 @@ extension ProviderHTTPTests {
         for await event in events.stream { received.append(event) }
         #expect(received == [.outputBudgetAdjusted(requested: 1, sent: 16), .textDelta("Hello")])
         let http = try #require(MockURLProtocol.lastRequest)
-        let body = try JSONValue.parse(String(decoding: MockURLProtocol.body(of: http), as: UTF8.self))
-        #expect(body["max_output_tokens"].int == 16)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: http)) as? [String: Any]
+        #expect(body?["max_output_tokens"] as? Int == 16)
     }
 
     private var agentRequest: AgentTurnRequest {

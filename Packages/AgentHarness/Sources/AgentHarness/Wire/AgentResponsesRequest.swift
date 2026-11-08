@@ -1,6 +1,8 @@
 import Foundation
 
 extension AgentWireFormat {
+    public static let responsesMinimumOutputTokens = 16
+
     func responsesBody(_ request: AgentTurnRequest, model: String, reasoningEffort: String?) -> JSONValue {
         var input: [JSONValue] = []
         for message in request.messages {
@@ -23,7 +25,8 @@ extension AgentWireFormat {
         var body: [String: JSONValue] = [
             "model": .string(model), "instructions": .string(request.systemPrompt), "input": .array(input),
             // Responses requires at least 16, as in pi's OpenAI adapter (#6265).
-            "stream": .bool(true), "store": .bool(false), "max_output_tokens": .number(Double(max(16, request.maxOutputTokens))),
+            "stream": .bool(true), "store": .bool(false),
+            "max_output_tokens": .number(Double(max(Self.responsesMinimumOutputTokens, request.maxOutputTokens))),
             "include": .array([.string("reasoning.encrypted_content")])
         ]
         if !request.tools.isEmpty {

@@ -444,8 +444,8 @@ extension OpenAIProvider: AgentModel {
         var httpRequest = try LLMHTTP.jsonRequest(provider: provider, path: official ? "responses" : "chat/completions",
             timeout: LLMHTTP.chatTimeout, headers: ["Authorization": "Bearer \(apiKey)"], body: [:])
         httpRequest.httpBody = Data(try body.encodedString().utf8)
-        if official, let sent = body["max_output_tokens"].int, sent != request.maxOutputTokens {
-            onEvent(.outputBudgetAdjusted(requested: request.maxOutputTokens, sent: sent))
+        if official, request.maxOutputTokens < AgentWireFormat.responsesMinimumOutputTokens {
+            onEvent(.outputBudgetAdjusted(requested: request.maxOutputTokens, sent: AgentWireFormat.responsesMinimumOutputTokens))
         }
         return try await LLMHTTP.streamAgent(httpRequest, session: session, format: format, onEvent: onEvent)
     }
