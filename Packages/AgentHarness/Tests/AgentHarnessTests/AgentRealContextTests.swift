@@ -191,4 +191,40 @@ actor ResultScriptedAgentModel: AgentModel {
         #expect(requests[1].tools.isEmpty)
         #expect(requests[2].messages == [.user("[Summary of earlier conversation]\nEarlier facts"), .user("Question")])
     }
+
+    @Test func summaryThatOverflowsDropsTheOlderPrefix() async throws {
+        let overflow = Result<AgentTurnResponse, Error>.failure(ResultScriptedAgentModel.Overflow())
+        let model = ResultScriptedAgentModel([overflow, overflow, .success(AgentTurnResponse(text: "Answer"))])
+        let harness = NativeHarness(model: model,
+                                    contextPolicy: AgentContextPolicy(inputTokenBudget: 23_000, keepRecentMessages: 1),
+                                    isContextOverflow: { $0 is ResultScriptedAgentModel.Overflow })
+        let history: [AgentMessage] = [.user(mediumText), .assistant(text: mediumText, toolCalls: [])]
+        let outcome = try agentOutcome(await agentEvents(harness, history: history))
+        #expect(outcome.finalText == "Answer")
+        #expect(Array(outcome.messages.prefix(2)) == history)
+        let requests = await model.requests
+        #expect(requests.count == 3)
+        #expect(requests[1].tools.isEmpty)
+        #expect(requests[2].messages == [.user(AgentContextCompactor.omittedPrefixNote), .user("Question")])
+    }
+
+    @Test func summaryProviderFailuresStillPropagate() async {
+        let model = ResultScriptedAgentModel([.failure(ResultScriptedAgentModel.Overflow()),
+                                             .failure(ScriptedAgentModel.Failure.provider)])
+        let harness = NativeHarness(model: model,
+                                    contextPolicy: AgentContextPolicy(inputTokenBudget: 23_000, keepRecentMessages: 1),
+                                    isContextOverflow: { $0 is ResultScriptedAgentModel.Overflow })
+        await #expect(throws: ScriptedAgentModel.Failure.provider) {
+            try await agentEvents(harness, history: [.user(mediumText), .assistant(text: mediumText, toolCalls: [])])
+        }
+    }
+
+    @Test func omittingPrefixKeepsRecentGroups() {
+        let compactor = AgentContextCompactor(policy: AgentContextPolicy(inputTokenBudget: 10, keepRecentMessages: 2))
+        let messages: [AgentMessage] = [.user("Old"), .assistant(text: "", toolCalls: [agentCall("1")]),
+            .toolResult(callID: "1", toolName: "lookup", content: "x", isError: false), .user("New")]
+        #expect(compactor.omittingOlderPrefix(in: messages)
+            == [.user(AgentContextCompactor.omittedPrefixNote)] + Array(messages.dropFirst(1)))
+        #expect(compactor.omittingOlderPrefix(in: [.user("Only")]) == [.user("Only")])
+    }
 }

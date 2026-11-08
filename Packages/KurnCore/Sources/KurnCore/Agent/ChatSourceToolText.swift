@@ -2,7 +2,7 @@ import Foundation
 
 /// Compact line-oriented text for source-tool results. The model reads results as plain text, so
 /// per-item JSON keys, quoting and repeated meeting IDs only spent tokens (about 45% of a
-/// transcript page). Times are rendered as the `[mm:ss]` the prompt asks the model to cite.
+/// transcript page). Times use the transcript's own `[m:ss]` form the prompt asks the model to cite.
 /// Every result ends with one `page:` line, the only pagination contract the model needs.
 enum ChatSourceToolText {
     static let truncationMarker = " [truncated]"
@@ -15,12 +15,14 @@ enum ChatSourceToolText {
         return String(String.UnicodeScalarView(flat.unicodeScalars.prefix(limit))) + truncationMarker
     }
 
-    /// `[mm:ss]`, with minutes unbounded so an hour-long meeting cites `[75:12]` as transcripts do.
+    /// `[m:ss]`, or `[h:mm:ss]` past an hour: the exact form the app's transcript, summaries and
+    /// retrieval prompts render (`TimeInterval.clockDisplay`, rounded), so a citation copied from a
+    /// tool result matches the moment the user sees.
     static func timestamp(_ seconds: Double) -> String {
-        let total = wholeSeconds(seconds, rule: .down)
-        return "[\(twoDigits(total / 60)):\(twoDigits(total % 60))]"
+        "[\(duration(seconds))]"
     }
 
+    /// Mirrors `TimeInterval.clockDisplay` in the app target, which KurnCore cannot import.
     static func duration(_ seconds: Double) -> String {
         let total = wholeSeconds(seconds, rule: .toNearestOrAwayFromZero)
         let hours = total / 3600, minutes = total % 3600 / 60, rest = total % 60

@@ -3,7 +3,8 @@ import Testing
 @testable import KurnCore
 
 @Suite struct ChatSourceToolTextTests {
-    @Test(arguments: [(754.9, "[12:34]"), (4_512, "[75:12]"), (0, "[00:00]"), (-3, "[00:00]"), (Double.nan, "[00:00]")]
+    @Test(arguments: [(754.9, "[12:35]"), (754.4, "[12:34]"), (4_512, "[1:15:12]"), (0, "[0:00]"), (-3, "[0:00]"),
+                      (Double.nan, "[0:00]")]
         as [(Double, String)])
     func timestampsMatchCitations(seconds: Double, expected: String) {
         #expect(ChatSourceToolText.timestamp(seconds) == expected)
@@ -35,9 +36,9 @@ import Testing
                         ChatSourcePassage(meetingID: second, timestamp: 5, speaker: "Cy", text: "Three"),
                         ChatSourcePassage(meetingID: first, timestamp: 90, speaker: "Ana", text: "Four")]
         #expect(ChatSourceToolText.passages(passages) == [
-            "meeting \(first.uuidString):", "[01:01] Ana: One", "[01:15] Bo B: Two lines",
-            "meeting \(second.uuidString):", "[00:05] Cy: Three",
-            "meeting \(first.uuidString):", "[01:30] Ana: Four"
+            "meeting \(first.uuidString):", "[1:01] Ana: One", "[1:15] Bo B: Two lines",
+            "meeting \(second.uuidString):", "[0:05] Cy: Three",
+            "meeting \(first.uuidString):", "[1:30] Ana: Four"
         ])
     }
 

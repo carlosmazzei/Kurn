@@ -52,7 +52,8 @@ arguments and enforcing a fixed allowed-meeting/part snapshot on reads and searc
 Search uses transcript-enabled meetings only; listing masks disallowed availability,
 and tools with no eligible meeting are omitted. Tool results are compact plain text
 (`ChatSourceToolText`), not JSON: one `id | title | … | readable: …` line per source,
-passages as `[mm:ss] Speaker: text` under a `meeting <id>:` header written once per run,
+passages as `[m:ss] Speaker: text` (rounded, `h:mm:ss` past an hour — the transcript's own
+`clockDisplay` form) under a `meeting <id>:` header written once per run,
 and a final `page: … of N; next offset: n` (or `end`) line. Per-item JSON keys, quoting and
 a meeting ID on every passage cost ~45% of a transcript page, and seconds made the model
 convert to the `[mm:ss]` it must cite. Tool schemas and arguments stay JSON (vendor wire
@@ -115,7 +116,8 @@ retries the turn once — only if nothing was streamed and compaction shrank the
 calls returned anyway are dropped), so the run ends with an answer from what was gathered.
 A wrap-up without text leaves no answer; one cut off reports `.outputLimit`; it never runs
 past the cost limit. On overflow, compaction is forced past the calibrated threshold:
-old results are elided, or the older prefix summarized when nothing could be elided.
+old results are elided, or the older prefix summarized when nothing could be elided; if that
+summary request itself overflows, the prefix is replaced by a fixed omission note.
 Chat uses `AgentLimits.chat(sourceCount:)` (10–24 turns, 20–96 tool calls, wrap-up on)
 and its prompt steers multi-meeting questions to listing, search and summaries first.
 Old tool results are elided first, then an older

@@ -230,11 +230,19 @@ public struct NativeHarness: Sendable {
             : compactor.policy.needsCompaction(state.calibration.tokens(measure()))
         if summarize,
            let request = compactor.summaryRequest(for: state.context, maxOutputTokens: settings.maxOutputTokens) {
-            let summary = try await model.streamTurn(request) { _ in }
-            try Task.checkCancellation()
-            record(summary.usage, state: &state, events: events)
-            if summary.stopReason != .maxTokens {
-                state.context = compactor.replacingOlderPrefix(in: state.context, summary: summary.text)
+            do {
+                let summary = try await model.streamTurn(request) { _ in }
+                try Task.checkCancellation()
+                record(summary.usage, state: &state, events: events)
+                if summary.stopReason != .maxTokens {
+                    state.context = compactor.replacingOlderPrefix(in: state.context, summary: summary.text)
+                }
+            } catch {
+                // The older prefix alone is too long for the provider to summarize: drop it rather
+                // than abandon recovery; recent messages and the outcome's full history are kept.
+                try Task.checkCancellation()
+                guard isContextOverflow(error) else { throw error }
+                state.context = compactor.omittingOlderPrefix(in: state.context)
             }
         }
         let rawAfter = measure()

@@ -86,6 +86,16 @@ public struct AgentContextCompactor: Sendable {
         )
     }
 
+    /// Last resort when even summarizing the older prefix exceeds the provider's window: replace it
+    /// with a fixed note. Keeps assistant/result groups and recent messages like a summary would.
+    public static let omittedPrefixNote = "[Earlier conversation omitted to fit the model's context window]"
+
+    public func omittingOlderPrefix(in messages: [AgentMessage]) -> [AgentMessage] {
+        let boundary = olderPrefixCount(in: messages)
+        guard boundary > 0 else { return messages }
+        return [.user(Self.omittedPrefixNote)] + messages.dropFirst(boundary)
+    }
+
     public func replacingOlderPrefix(in messages: [AgentMessage], summary: String) -> [AgentMessage] {
         let boundary = olderPrefixCount(in: messages)
         guard boundary > 0, !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return messages }

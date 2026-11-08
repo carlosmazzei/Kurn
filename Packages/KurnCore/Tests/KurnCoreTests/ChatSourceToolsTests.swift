@@ -66,7 +66,7 @@ private struct FakeSourceReader: ChatSourceReader {
         if name == "search" {
             #expect(!result.content.contains("secret"))
             #expect(result.content.contains("truncated"))
-            #expect(result.content.contains("meeting \(id.uuidString):\n[00:12] Pat: "))
+            #expect(result.content.contains("meeting \(id.uuidString):\n[0:12] Pat: "))
             #expect(result.content.hasSuffix("page: items 1–10 of 25; next offset: 10"))
             #expect(!result.content.contains("\"meetingID\""))
         }
