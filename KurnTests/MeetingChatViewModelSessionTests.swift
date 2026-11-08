@@ -77,8 +77,8 @@ struct MeetingChatViewModelSessionTests {
         let context = makeContext()
         let session = ChatSession(meeting: nil, title: "Q1 recap")
         session.turns = [
-            PersistedChatTurn(id: UUID(), role: .user, text: "What shipped?", citations: [], usage: nil, costUSD: nil, elapsedSeconds: nil),
-            PersistedChatTurn(id: UUID(), role: .assistant, text: "The v2 release.", citations: [], usage: nil, costUSD: nil, elapsedSeconds: nil)
+            PersistedChatTurn(id: UUID(), role: .user, text: "What shipped?", usage: nil, costUSD: nil, elapsedSeconds: nil),
+            PersistedChatTurn(id: UUID(), role: .assistant, text: "The v2 release.", usage: nil, costUSD: nil, elapsedSeconds: nil)
         ]
         context.insert(session)
         try context.save()
@@ -95,7 +95,7 @@ struct MeetingChatViewModelSessionTests {
         let context = makeContext()
         let session = ChatSession(meeting: nil, title: "Q1 recap")
         session.turns = [
-            PersistedChatTurn(id: UUID(), role: .user, text: "Hi", citations: [], usage: nil, costUSD: nil, elapsedSeconds: nil)
+            PersistedChatTurn(id: UUID(), role: .user, text: "Hi", usage: nil, costUSD: nil, elapsedSeconds: nil)
         ]
         context.insert(session)
         try context.save()
@@ -134,7 +134,7 @@ struct MeetingChatViewModelSessionTests {
         let context = makeContext()
         let session = ChatSession(meeting: nil, title: "Q1 recap")
         session.turns = [
-            PersistedChatTurn(id: UUID(), role: .user, text: "Hi", citations: [], usage: nil, costUSD: nil, elapsedSeconds: nil)
+            PersistedChatTurn(id: UUID(), role: .user, text: "Hi", usage: nil, costUSD: nil, elapsedSeconds: nil)
         ]
         context.insert(session)
         try context.save()

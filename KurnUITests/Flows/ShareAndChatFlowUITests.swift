@@ -63,20 +63,20 @@ final class ShareAndChatFlowUITests: FlowUITestCase {
 
     // MARK: - Chat
 
-    func testAskWithoutAProviderShowsAnEmptyStateAndDisablesTheComposer() {
+    func testAskWithoutACloudProviderShowsTheNoticeAndDisablesTheComposer() {
         let ask = app.buttons["meetings.ask"]
         XCTAssertTrue(ask.waitForExistence(timeout: 10))
         ask.tap()
 
-        let emptyState = anyElement("chat.empty_state")
+        let notice = anyElement("chat.artifact.provider.notice")
         let disabledState = anyElement("chat.disabled_state")
-        let rendered = NSPredicate { _, _ in emptyState.exists || disabledState.exists }
+        let rendered = NSPredicate { _, _ in notice.exists || disabledState.exists }
         let expectation = XCTNSPredicateExpectation(predicate: rendered, object: nil)
         XCTAssertEqual(XCTWaiter().wait(for: [expectation], timeout: 10), .completed)
 
         let send = app.buttons["chat.send"]
         XCTAssertTrue(send.waitForExistence(timeout: 5))
-        XCTAssertFalse(send.isEnabled, "Composer must be disabled with nothing to chat about")
+        XCTAssertFalse(send.isEnabled, "Composer must be disabled without a cloud provider")
         let input = anyElement("chat.input")
         if input.exists {
             XCTAssertFalse(input.isEnabled)

@@ -827,14 +827,7 @@
 "error.embedding_no_assets" = "Impossibile scaricare il modello linguistico sul dispositivo.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Chiedi";
-"chat.error.empty_question" = "Scrivi una domanda.";
 "chat.thinking" = "Sto pensando…";
-"chat.phase.rewriting_query" = "Riformulazione della domanda…";
-"chat.phase.retrieving" = "Ricerca dei passaggi pertinenti…";
-"chat.phase.reranking" = "Classificazione dei passaggi migliori…";
-"chat.phase.synthesizing" = "Lettura degli appunti delle riunioni…";
-"chat.phase.answering" = "Scrittura della risposta…";
-"chat.untitled_meeting" = "Riunione senza titolo";
 "chat.starter.title" = "Fai una domanda su questa riunione";
 "chat.starter.subtitle" = "Le risposte si basano sulla trascrizione, con timestamp che puoi toccare.";
 "chat.starter.library.title" = "Fai una domanda sulle tue riunioni";
@@ -845,14 +838,11 @@
 "chat.stop" = "Interrompi";
 "chat.disabled.title" = "La ricerca semantica è disattivata";
 "chat.disabled.subtitle" = "Attiva la ricerca semantica in Impostazioni per chattare sulle tue riunioni.";
-"chat.no_index.title" = "Non c'è ancora nulla di cui parlare";
-"chat.no_index.subtitle" = "Trascrivi prima una riunione, poi fai domande su ciò che è stato detto.";
 "chat.ask.title" = "Interroga le tue riunioni";
 "chat.retry" = "Riprova";
 "chat.usage.tokens" = "%d token";
 "chat.usage.cost" = "~$%.4f";
 "chat.usage.duration" = "%.1f s";
-"chat.phase.progress_fraction" = "(%d/%d)";
 "chat.history.title" = "Cronologia chat";
 "chat.history.button" = "Cronologia chat";
 "chat.history.empty.title" = "Nessuna conversazione salvata";
@@ -1111,5 +1101,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (attuale v%d)";
 "documents.chat.provenance" = "Creato nella chat · v%d";
-"chat.artifact.cloud_required" = "Per creare documenti, configura e seleziona un provider IA cloud nelle Impostazioni. Le richieste inviano le fonti selezionate a quel provider.";
+"chat.artifact.cloud_required" = "Per usare la chat e creare documenti, configura e seleziona un provider IA cloud nelle Impostazioni. Le richieste inviano le fonti selezionate a quel provider.";
 "chat.artifact.configure_provider" = "Configura provider nelle Impostazioni";

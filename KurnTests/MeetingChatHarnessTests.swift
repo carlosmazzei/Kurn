@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct MeetingChatHarnessTests {
     private func ask(_ vm: MeetingChatViewModel, _ question: String = "Create minutes") {
-        vm.send(question: question, transcriptText: nil, candidates: [], provider: .openAI, model: "gpt-4o")
+        vm.send(question: question, provider: .openAI, model: "gpt-4o")
     }
 
     private func waitUntil(_ condition: @MainActor () -> Bool) async {

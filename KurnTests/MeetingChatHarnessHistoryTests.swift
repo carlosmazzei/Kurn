@@ -12,20 +12,22 @@ struct MeetingChatHarnessHistoryTests {
         let first = MeetingFixtures.transcribed("Meeting A", in: context)
         let excluded = MeetingFixtures.transcribed("Meeting B", in: context)
         let excerpt = "SECRET EXCERPT FROM EXCLUDED MEETING B"
-        let hit = SemanticSearchService.Hit(chunkID: UUID(), meetingID: excluded.id, recordingID: UUID(), text: excerpt,
-                                            start: 10, end: 20, speakerLabel: "Speaker", score: 1, meetingTitle: excluded.title)
-        let prior = [MeetingChatViewModel.Turn(role: .user, text: "Earlier question"),
-                     MeetingChatViewModel.Turn(role: .assistant, text: "Earlier answer", citations: [hit])]
-        #expect(MeetingChatViewModel.buildHistory(from: prior).contains { $0.content.contains(excerpt) })
+        // A conversation saved by the old chat still carries its retrieval citations.
+        let legacyJSON = """
+        [{"id":"\(UUID().uuidString)","role":"user","text":"Earlier question","citations":[]},
+         {"id":"\(UUID().uuidString)","role":"assistant","text":"Earlier answer","citations":[{"meetingID":"\(excluded.id.uuidString)",
+         "recordingID":"\(UUID().uuidString)","meetingTitle":"Meeting B","start":10,"speakerLabel":"Speaker","text":"\(excerpt)"}]}]
+        """
         let session = ChatSession(meeting: nil, title: "Legacy conversation")
-        session.turns = prior.map(PersistedChatTurn.init)
+        session.turns = try JSONDecoder().decode([PersistedChatTurn].self, from: Data(legacyJSON.utf8))
         context.insert(session)
         let model = ChatAgentModel([AgentTurnResponse(text: "Scoped answer")])
         let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
         vm.configure(meeting: nil, modelContext: context)
         vm.load(session: session)
+        #expect(vm.turns.map(\.text) == ["Earlier question", "Earlier answer"])
         vm.updateScope(ChatSourceScope(kind: .meetings, selectedIDs: [first.id], parts: [.transcript]))
-        vm.send(question: "Question about A", transcriptText: nil, candidates: [], provider: .openAI, model: "gpt-4o")
+        vm.send(question: "Question about A", provider: .openAI, model: "gpt-4o")
         for _ in 0..<2_000 where vm.isResponding { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(!vm.isResponding)
         #expect(vm.error == nil)

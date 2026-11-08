@@ -827,14 +827,7 @@
 "error.embedding_no_assets" = "No se pudo descargar el modelo de lenguaje en el dispositivo.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Preguntar";
-"chat.error.empty_question" = "Escribe una pregunta.";
 "chat.thinking" = "Pensando…";
-"chat.phase.rewriting_query" = "Reformulando tu pregunta…";
-"chat.phase.retrieving" = "Buscando fragmentos relevantes…";
-"chat.phase.reranking" = "Clasificando los mejores fragmentos…";
-"chat.phase.synthesizing" = "Leyendo las notas de las reuniones…";
-"chat.phase.answering" = "Escribiendo la respuesta…";
-"chat.untitled_meeting" = "Reunión sin título";
 "chat.starter.title" = "Pregunta sobre esta reunión";
 "chat.starter.subtitle" = "Las respuestas se basan en la transcripción, con marcas de tiempo que puedes tocar.";
 "chat.starter.library.title" = "Pregunta sobre tus reuniones";
@@ -845,14 +838,11 @@
 "chat.stop" = "Detener";
 "chat.disabled.title" = "La búsqueda semántica está desactivada";
 "chat.disabled.subtitle" = "Activa la búsqueda semántica en Ajustes para chatear sobre tus reuniones.";
-"chat.no_index.title" = "Aún no hay nada de qué hablar";
-"chat.no_index.subtitle" = "Transcribe una reunión primero y luego haz preguntas sobre lo que se dijo.";
 "chat.ask.title" = "Pregunta a tus reuniones";
 "chat.retry" = "Reintentar";
 "chat.usage.tokens" = "%d tokens";
 "chat.usage.cost" = "~US$ %.4f";
 "chat.usage.duration" = "%.1fs";
-"chat.phase.progress_fraction" = "(%d/%d)";
 "chat.history.title" = "Historial de chats";
 "chat.history.button" = "Historial de chats";
 "chat.history.empty.title" = "No hay conversaciones guardadas";
@@ -1111,5 +1101,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (actual v%d)";
 "documents.chat.provenance" = "Generado en el chat · v%d";
-"chat.artifact.cloud_required" = "Para crear documentos, configura y selecciona un proveedor de IA en la nube en Ajustes. Las solicitudes envían las fuentes seleccionadas a ese proveedor.";
+"chat.artifact.cloud_required" = "Para usar el chat y crear documentos, configura y selecciona un proveedor de IA en la nube en Ajustes. Las solicitudes envían las fuentes seleccionadas a ese proveedor.";
 "chat.artifact.configure_provider" = "Configurar proveedor en Ajustes";

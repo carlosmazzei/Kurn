@@ -3,21 +3,9 @@ import Testing
 @testable import KurnCore
 
 struct ChatSourcePresentationTests {
-    @Test func harnessReadinessDoesNotReadTheIndexWhileLegacyStillRequiresIt() {
-        var reads = 0
-        func index(_ value: Bool) -> Bool { reads += 1; return value }
-        let harness = ChatSourcePresentation.canChat(enabled: true, usesHarness: true, hasIndex: index(false))
-        let disabledHarness = ChatSourcePresentation.canChat(enabled: false, usesHarness: true, hasIndex: index(true))
-        let disabledLegacy = ChatSourcePresentation.canChat(enabled: false, usesHarness: false, hasIndex: index(true))
-        #expect(harness)
-        #expect(!disabledHarness)
-        #expect(!disabledLegacy)
-        #expect(reads == 0)
-        let emptyLegacy = ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(false))
-        let indexedLegacy = ChatSourcePresentation.canChat(enabled: true, usesHarness: false, hasIndex: index(true))
-        #expect(!emptyLegacy)
-        #expect(indexedLegacy)
-        #expect(reads == 2)
+    @Test(arguments: [(true, true, true), (false, true, false), (true, false, false), (false, false, false)])
+    func chatNeedsSemanticSearchAndAnAgentProvider(enabled: Bool, usesHarness: Bool, expected: Bool) {
+        #expect(ChatSourcePresentation.canChat(enabled: enabled, usesHarness: usesHarness) == expected)
     }
 
     private func localize(_ key: String) -> String {

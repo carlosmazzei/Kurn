@@ -477,7 +477,7 @@ private struct SummaryDraftView: View {
 
     var body: some View {
         if draft.isEmpty {
-            ThinkingRow(phase: nil, detail: nil, startedAt: startedAt ?? Date())
+            ThinkingRow(startedAt: startedAt ?? Date())
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text(NSLocalizedString("detail.summary.draft.title", comment: "Live unformatted summary draft"))

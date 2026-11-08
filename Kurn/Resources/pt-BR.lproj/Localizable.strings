@@ -827,14 +827,7 @@
 "error.embedding_no_assets" = "Não foi possível baixar o modelo de linguagem no dispositivo.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Perguntar";
-"chat.error.empty_question" = "Digite uma pergunta.";
 "chat.thinking" = "Pensando…";
-"chat.phase.rewriting_query" = "Reformulando sua pergunta…";
-"chat.phase.retrieving" = "Buscando trechos relevantes…";
-"chat.phase.reranking" = "Classificando os melhores trechos…";
-"chat.phase.synthesizing" = "Lendo as notas das reuniões…";
-"chat.phase.answering" = "Escrevendo a resposta…";
-"chat.untitled_meeting" = "Reunião sem título";
 "chat.starter.title" = "Pergunte sobre esta reunião";
 "chat.starter.subtitle" = "As respostas se baseiam na transcrição, com carimbos de tempo que você pode tocar.";
 "chat.starter.library.title" = "Pergunte sobre suas reuniões";
@@ -845,14 +838,11 @@
 "chat.stop" = "Parar";
 "chat.disabled.title" = "A busca semântica está desativada";
 "chat.disabled.subtitle" = "Ative a busca semântica nos Ajustes para conversar sobre suas reuniões.";
-"chat.no_index.title" = "Ainda não há sobre o que conversar";
-"chat.no_index.subtitle" = "Transcreva uma reunião primeiro e depois faça perguntas sobre o que foi dito.";
 "chat.ask.title" = "Pergunte às suas reuniões";
 "chat.retry" = "Tentar novamente";
 "chat.usage.tokens" = "%d tokens";
 "chat.usage.cost" = "~US$ %.4f";
 "chat.usage.duration" = "%.1fs";
-"chat.phase.progress_fraction" = "(%d/%d)";
 "chat.history.title" = "Histórico de conversas";
 "chat.history.button" = "Histórico de conversas";
 "chat.history.empty.title" = "Nenhuma conversa salva";
@@ -1111,5 +1101,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (atual v%d)";
 "documents.chat.provenance" = "Gerado no chat · v%d";
-"chat.artifact.cloud_required" = "Criar documentos requer um provedor de IA na nuvem configurado e selecionado nos Ajustes. As solicitações na nuvem enviam as fontes selecionadas a esse provedor.";
+"chat.artifact.cloud_required" = "O chat e os documentos requerem um provedor de IA na nuvem configurado e selecionado nos Ajustes. As solicitações na nuvem enviam as fontes selecionadas a esse provedor.";
 "chat.artifact.configure_provider" = "Configurar provedor nos Ajustes";

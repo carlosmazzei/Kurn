@@ -1,8 +1,10 @@
 import Foundation
 
 public enum ChatSourcePresentation {
-    public static func canChat(enabled: Bool, usesHarness: Bool, hasIndex: @autoclosure () -> Bool) -> Bool {
-        enabled && (usesHarness || hasIndex())
+    /// Chat needs semantic search enabled (its search tool reads the index) and a provider with
+    /// agent support.
+    public static func canChat(enabled: Bool, usesHarness: Bool) -> Bool {
+        enabled && usesHarness
     }
 
     public static func effectiveScope(_ scope: ChatSourceScope, wikiEnabled: Bool) -> ChatSourceScope {
