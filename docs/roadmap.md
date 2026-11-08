@@ -557,7 +557,9 @@ Before continuing NH01, the architecture prerequisite separates domain from runt
 
 - `AgentHarness` owns model capacity resolution/catalog, script-aware token estimation,
   overflow classification/contracts, the execution/compaction loop and generic
-  `AgentRunTrace`/`AgentRunStep`. It depends on Foundation, with no Kurn imports.
+  `AgentRunTrace`/`AgentRunStep`. Compaction prompts are injectable with domain-neutral
+  defaults; the meeting-specific profile stays in the app. It depends on Foundation,
+  with no Kurn imports.
 - `KurnCore/Chat` owns source scope, source reader/domain values and document workspace
   rules. Its package has no dependency on AgentHarness.
 - `Kurn/Application/Agent` composes the harness and binds source/document tools, host

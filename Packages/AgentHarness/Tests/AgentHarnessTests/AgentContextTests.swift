@@ -86,14 +86,14 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(plan.messagesToSummarize == Array(messages[1...2]))
         let request = try #require(compactor.historySummaryRequest(for: plan))
         #expect(request.tools.isEmpty)
-        #expect(request.systemPrompt == AgentContextCompactor.summarizationSystemPrompt)
+        #expect(request.systemPrompt == AgentCompactionPrompts.standard.system)
         #expect(request.maxOutputTokens == compactor.policy.historySummaryMaxOutputTokens)
         guard case .user(let prompt)? = request.messages.first, request.messages.count == 1 else {
             Issue.record("Expected one serialized user message"); return
         }
         #expect(prompt.hasPrefix("<conversation>\n[User]: "))
         #expect(prompt.contains("<previous-summary>\nOld facts\n</previous-summary>"))
-        #expect(prompt.hasSuffix(AgentContextCompactor.updateSummaryPrompt))
+        #expect(prompt.hasSuffix(AgentCompactionPrompts.standard.updateSummary))
         #expect(compactor.turnPrefixSummaryRequest(for: plan) == nil)
         #expect(compactor.applying(plan, historySummary: "New facts", turnPrefixSummary: nil)
             == [.user(AgentContextCompactor.summaryPrefix + "New facts")] + Array(messages.suffix(2)))
@@ -110,7 +110,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         let request = try #require(compactor.turnPrefixSummaryRequest(for: plan))
         #expect(request.maxOutputTokens == compactor.policy.turnPrefixSummaryMaxOutputTokens)
         guard case .user(let prompt)? = request.messages.first else { Issue.record("Missing prompt"); return }
-        #expect(prompt.hasSuffix(AgentContextCompactor.turnPrefixSummaryPrompt))
+        #expect(prompt.hasSuffix(AgentCompactionPrompts.standard.turnPrefix))
         #expect(!prompt.contains("<previous-summary>"))
         #expect(compactor.applying(plan, historySummary: nil, turnPrefixSummary: "Prefix")
             == [.user(AgentContextCompactor.summaryPrefix
@@ -118,7 +118,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         let first = try #require(compactor.historySummaryRequest(for: AgentCompactionPlan(previousSummary: nil,
             messagesToSummarize: [.user("Q")], turnPrefix: [], kept: [])))
         guard case .user(let initial)? = first.messages.first else { Issue.record("Missing prompt"); return }
-        #expect(initial.hasSuffix(AgentContextCompactor.summaryPrompt))
+        #expect(initial.hasSuffix(AgentCompactionPrompts.standard.historySummary))
     }
 
     @Test(arguments: [false, true])
@@ -152,7 +152,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         let requests = await model.requests
         #expect(requests.count == 2)
         #expect(requests[0].tools.isEmpty)
-        #expect(requests[0].systemPrompt == AgentContextCompactor.summarizationSystemPrompt)
+        #expect(requests[0].systemPrompt == AgentCompactionPrompts.standard.system)
         #expect(requests[1].messages == [.user(AgentContextCompactor.summaryPrefix
             + "No prior history.\n\n---\n\n**Turn context (split turn):**\n\nTurn summary"), history[1], .user("Question")])
         #expect(requests[1].tools == [agentTool().spec])

@@ -55,8 +55,11 @@ rejects imports that cross these boundaries. Do not add runtime convenience
 extensions or tool schemas back to KurnCore. Generation's bounded map/reduce
 `ContextBudget` lives in `Application/Generation/`; it uses the harness estimator
 without imposing its 100k practical cap on agent conversations.
+Compaction prompts are injectable through `AgentContextPolicy.summaryPrompts`: the
+runtime defaults are domain-neutral; `ChatCompactionPrompts.profile` in the app
+preserves the meeting/source/citation instructions used by Kurn.
 
- `ChatSourceScope` persists meeting/tag/folder/library selection,
+`ChatSourceScope` persists meeting/tag/folder/library selection,
 global transcript/summary/wiki/attachment parts and optional per-meeting overrides
 (including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating

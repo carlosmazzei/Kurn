@@ -29,8 +29,10 @@ struct HarnessChatService {
         try Task.checkCancellation()
         let resolution = contextWindows.resolution(for: provider, model: modelIdentifier)
         HarnessDiagnostics.record(resolution)
-        let harness = NativeHarness(model: model, contextWindow: resolution.contextWindowTokens,
-                                    limits: limits ?? .chat(sourceCount: ids.count), diagnosticSink: { HarnessDiagnostics.record($0) })
+        let harness = NativeHarness(model: model, limits: limits ?? .chat(sourceCount: ids.count),
+                                    contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
+                                                                      summaryPrompts: ChatCompactionPrompts.profile),
+                                    diagnosticSink: { HarnessDiagnostics.record($0) })
         return harness.run(
             systemPrompt: try Self.systemPrompt(artifacts: artifacts),
             history: history.map {

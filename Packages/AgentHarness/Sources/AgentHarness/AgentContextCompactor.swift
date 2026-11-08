@@ -13,12 +13,14 @@ public struct AgentContextPolicy: Sendable, Equatable {
     public let reserveTokens: Int
     /// Approximate size of the newest messages a compaction keeps verbatim.
     public let keepRecentTokens: Int
+    public let summaryPrompts: AgentCompactionPrompts
 
     public init(contextWindow: Int, reserveTokens: Int = defaultReserveTokens,
-                keepRecentTokens: Int = defaultKeepRecentTokens) {
+                keepRecentTokens: Int = defaultKeepRecentTokens, summaryPrompts: AgentCompactionPrompts = .standard) {
         self.contextWindow = max(1, contextWindow)
         self.reserveTokens = max(0, reserveTokens)
         self.keepRecentTokens = max(1, keepRecentTokens)
+        self.summaryPrompts = summaryPrompts
     }
 
     /// Context size above which a request is compacted: the window minus the reserve, but never
@@ -137,8 +139,8 @@ public struct AgentContextCompactor: Sendable {
     public func historySummaryRequest(for plan: AgentCompactionPlan) -> AgentTurnRequest? {
         guard !plan.messagesToSummarize.isEmpty else { return nil }
         let instructions = plan.previousSummary.map {
-            "<previous-summary>\n\($0)\n</previous-summary>\n\n" + Self.updateSummaryPrompt
-        } ?? Self.summaryPrompt
+            "<previous-summary>\n\($0)\n</previous-summary>\n\n" + policy.summaryPrompts.updateSummary
+        } ?? policy.summaryPrompts.historySummary
         return summaryRequest(conversation: plan.messagesToSummarize, instructions: instructions,
                               maxOutputTokens: policy.historySummaryMaxOutputTokens)
     }
@@ -146,7 +148,7 @@ public struct AgentContextCompactor: Sendable {
     /// The summary request for a split turn's earlier part; nil when the cut is at a turn start.
     public func turnPrefixSummaryRequest(for plan: AgentCompactionPlan) -> AgentTurnRequest? {
         guard plan.isSplitTurn else { return nil }
-        return summaryRequest(conversation: plan.turnPrefix, instructions: Self.turnPrefixSummaryPrompt,
+        return summaryRequest(conversation: plan.turnPrefix, instructions: policy.summaryPrompts.turnPrefix,
                               maxOutputTokens: policy.turnPrefixSummaryMaxOutputTokens)
     }
 
@@ -161,7 +163,7 @@ public struct AgentContextCompactor: Sendable {
                                 maxOutputTokens: Int) -> AgentTurnRequest {
         let tail = "\n</conversation>\n\n" + instructions
         let budget = policy.contextWindow - maxOutputTokens - Self.summaryRequestMarginTokens
-            - estimate(Self.summarizationSystemPrompt) - estimate("<conversation>\n" + tail)
+            - estimate(policy.summaryPrompts.system) - estimate("<conversation>\n" + tail)
             - Self.messageOverheadTokens
         let serialized = Self.serialize(messages)
         let conversation = fitted(serialized, toTokens: budget)
@@ -171,7 +173,7 @@ public struct AgentContextCompactor: Sendable {
         }
         let omitted = conversation == serialized ? 0
             : max(0, serialized.count - conversation.count + Self.truncatedConversationNote.count + 1)
-        return AgentTurnRequest(systemPrompt: Self.summarizationSystemPrompt,
+        return AgentTurnRequest(systemPrompt: policy.summaryPrompts.system,
                                 messages: [.user("<conversation>\n" + conversation + tail)],
                                 tools: [], maxOutputTokens: maxOutputTokens, contextOmittedCharacters: clipped + omitted)
     }
