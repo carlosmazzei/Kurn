@@ -54,8 +54,10 @@ final class ModelContextWindowStore: @unchecked Sendable {
         origin?.password = nil
         origin?.query = nil
         origin?.fragment = nil
-        origin?.host = origin?.host?.lowercased()
-        origin?.scheme = origin?.scheme?.lowercased()
+        let normalizedHost = origin?.host?.lowercased()
+        let normalizedScheme = origin?.scheme?.lowercased()
+        origin?.host = normalizedHost
+        origin?.scheme = normalizedScheme
         let endpoint = origin?.string?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
         // Encoding the tuple avoids collisions between model IDs containing separators.
         let parts = [provider.id, provider.kind.rawValue, endpoint, model]

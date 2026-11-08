@@ -105,6 +105,16 @@ struct ContextBudgetResolutionTests {
         #expect(store.resolution(for: provider, model: "private-model").source == .fixedFallback)
     }
 
+    @Test func endpointNormalizationIgnoresHostCaseAndTrailingSlash() throws {
+        let store = try isolatedStore()
+        var provider = AIProvider.openAI
+        provider.baseURLString = "https://API.OPENAI.COM/v1/"
+        store.record(["private-model": 64_000], provider: provider)
+        provider.baseURLString = "https://api.openai.com/v1"
+        #expect(store.resolution(for: provider, model: "private-model").contextWindowTokens == 64_000)
+        #expect(store.resolution(for: provider, model: "private-model").source == .api)
+    }
+
     @Test func timestampsExpireAndLegacyValuesDoNotPretendToBeAPIData() throws {
         let suite = "ContextBudgetResolutionTests.freshness.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
