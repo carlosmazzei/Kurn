@@ -114,7 +114,7 @@ struct AgentOutputRecoveryTests {
         let model = ScriptedAgentModel([AgentTurnResponse(text: "", usage: AgentUsage(outputTokens: 20), stopReason: .maxTokens)])
         let events = try await run(NativeHarness(model: model, contextPolicy: capacity))
         #expect(await model.requests.count == 1)
-        #expect(diagnostics(events).contains { $0.kind == .outputRetryDenied })
+        #expect(diagnostics(events).contains { $0.kind == .outputRetryDenied && $0.metrics[.outputRetries] == 1 })
         #expect(try agentOutcome(events).stopReason == .outputLimit)
     }
 

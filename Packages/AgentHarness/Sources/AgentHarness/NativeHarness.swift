@@ -239,14 +239,14 @@ public struct NativeHarness: Sendable {
                                state: inout AgentRunState, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                                trace: AgentTraceEmitter) async throws -> Bool {
         let costReached = costLimitReached(state)
-        let facts = settings.outputBudget.recoveryMetrics(response, streamed: streamed, state: state, costReached: costReached)
+        var facts = settings.outputBudget.recoveryMetrics(response, streamed: streamed, state: state, costReached: costReached)
         guard settings.outputBudget.canRecover(response, streamed: streamed, state: state, costReached: costReached) else {
             trace.record(.outputRetryDenied, metrics: facts, reason: .outputLimit)
             return false
         }
         settings.outputBudget.didRecover()
-        trace.record(.outputRetryStarted, metrics: facts.merging([.outputRetries: settings.outputBudget.retries]) { _, new in new },
-                     reason: .outputLimit)
+        facts[.outputRetries] = settings.outputBudget.retries
+        trace.record(.outputRetryStarted, metrics: facts, reason: .outputLimit)
         if let usage = response.usage, usage.inputTokens > 0 {
             // Preserve reported input size without counting the discarded response or its calls.
             state.usageAnchor = (usage.inputTokens, state.context.count)
@@ -358,6 +358,8 @@ public struct NativeHarness: Sendable {
         var output = AgentOutputBudget(requested: nil, policy: compactor.policy)
         output.fit(inputTokens: compactor.estimateTokens(systemPrompt: request.systemPrompt, messages: request.messages, tools: request.tools))
         var metrics = output.diagnosticMetrics
+        // This is a separate summary request, not the run's output-recovery counter.
+        metrics.removeValue(forKey: .outputRetries)
         metrics.merge([.maxOutputTokens: request.maxOutputTokens, .omittedCharacters: request.contextOmittedCharacters,
                        .serializedToolOmittedCharacters: request.serializedToolOmittedCharacters,
                        .fittedHistoryOmittedCharacters: request.fittedHistoryOmittedCharacters]) { _, current in current }
