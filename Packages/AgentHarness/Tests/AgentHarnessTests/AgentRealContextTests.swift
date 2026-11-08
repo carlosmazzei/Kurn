@@ -70,7 +70,8 @@ actor ResultScriptedAgentModel: AgentModel {
                                                           usage: AgentUsage(inputTokens: 10, outputTokens: 2)),
                                        AgentTurnResponse(text: "Answer")])
         let tool = AgentTool(spec: agentTool().spec) { _ in AgentToolOutput(content: tokens(700), summary: "Read") }
-        let events = try await agentEvents(NativeHarness(model: model, contextPolicy: policy(window: 1_000)),
+        // 718 anchored input + 512 output fits 1,500; the pessimistic full-history estimate does not.
+        let events = try await agentEvents(NativeHarness(model: model, contextPolicy: policy(window: 1_500)),
                                            history: [.user(tokens(400))], tools: [tool])
         #expect(!events.contains { if case .contextCompacted = $0 { return true }; return false })
         #expect(await model.requests.count == 2)

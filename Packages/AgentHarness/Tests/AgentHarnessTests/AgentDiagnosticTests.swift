@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AgentHarness
 
-private final class DiagnosticCapture: @unchecked Sendable {
+final class DiagnosticCapture: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [AgentDiagnostic] = []
     func record(_ value: AgentDiagnostic) { lock.lock(); defer { lock.unlock() }; values.append(value) }

@@ -62,14 +62,14 @@ struct AgentResponsesAccumulator {
             let reason = response["incomplete_details"]["reason"].string ?? "unknown"
             guard reason == "max_output_tokens" else { try fail(.invalidResponse) }
             limited = true
-        } else {
-            for (index, item) in response["output"].array.enumerated() {
-                record(item, index: index, complete: true)
-            }
+        }
+        for (index, item) in response["output"].array.enumerated() {
+            record(item, index: index, complete: !limited)
         }
         let reported = response["usage"]
         if reported["input_tokens"].int != nil || reported["output_tokens"].int != nil {
-            usage = AgentUsage(inputTokens: reported["input_tokens"].int ?? 0, outputTokens: reported["output_tokens"].int ?? 0)
+            usage = AgentUsage(inputTokens: reported["input_tokens"].int ?? 0, outputTokens: reported["output_tokens"].int ?? 0,
+                               reasoningTokens: reported["output_tokens_details"]["reasoning_tokens"].int)
         }
         var events: [AgentModelEvent] = []
         for (index, item) in response["output"].array.enumerated() where item["type"].string == "message" {
@@ -142,6 +142,6 @@ struct AgentResponsesAccumulator {
         ])
         return AgentTurnResponse(text: text, toolCalls: toolCalls, usage: usage,
                                  stopReason: limited ? .maxTokens : toolCalls.isEmpty ? .endTurn : .toolUse,
-                                 providerMetadata: metadata)
+                                 providerMetadata: metadata, discardedToolCalls: limited ? calls.count : 0)
     }
 }

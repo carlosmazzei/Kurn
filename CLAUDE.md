@@ -132,6 +132,24 @@ the current fetch or cache. Optional fields preserve existing cache/trace decodi
 both normal/wrap-up turns and compaction summaries; reserve size must never override
 a smaller provider output limit.
 
+Normal/wrap-up output budgets belong to `AgentHarness`, not the host. With no explicit
+budget, a run starts at up to 32,768 tokens; its ceiling is the minimum of the resolved
+provider output capacity, 65,536 tokens and one quarter of the context window. An unknown
+output capacity retains a conservative 4,096-token ceiling. Explicit caller budgets stay
+fixed (and capped by provider capacity). A response stopped by `maxTokens` may retry once
+per run with twice the allowance, only before any nonempty text was streamed or returned
+and while turn/cost budgets allow it. That attempt consumes a turn; its reported usage
+is counted. The interrupted response, tool calls and replay metadata are discarded;
+previously committed tools remain in context and never execute as part of recovery.
+The larger allowance persists for subsequent turns. Compaction thresholds reserve the
+current output budget as well as the configured margin. Partial visible replies and
+exhausted recovery remain explicit `outputLimit` outcomes.
+Request completion diagnostics record the per-request budget, token usage, visible text
+size, discarded tool-call count and output-limit flag; missing usage remains marked as
+unreported. Responses/Chat Completions reasoning-token details and Gemini thought-token
+counts are logged when reported, never inferred or accompanied by reasoning content.
+Run totals are cumulative over requests and must not be read as current context usage.
+
 
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and
 opaque correlation IDs. The synchronous injected sink records lifecycle,

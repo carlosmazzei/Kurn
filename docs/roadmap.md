@@ -46,8 +46,8 @@ This section proposes implementation work; it does not claim that it has shipped
 
 ### Scope and decisions
 
-- Keep the existing Swift implementation and dependency direction:
-  `Kurn → KurnCore → AgentHarness`. Keep domain logic Foundation-only and
+- Keep the Swift implementation with the app depending on the independent
+  `KurnCore` and `AgentHarness` packages. Keep domain logic Foundation-only and
   Linux-testable. Do not port the TypeScript runtime or replace SwiftData.
 - Interpret app-only as local ownership of loop, tools, sessions, context,
   artifacts and credentials. Existing, explicitly selected cloud models remain
@@ -556,9 +556,20 @@ telemetry and byte-bounded text reads. Workload planning and progress-gated exte
 replace the source-count-only default; every grant/denial and hard ceiling is logged.
 An integration regression reads thirteen synthetic transcripts and summaries (about 33k
 estimated tokens), executes 68 valid calls including a document mutation, and expects no
-premature compaction or canonical clipping on Terra. NH00 still needs the real corpus
-on a physical device, authenticated provider smoke tests and continued catalog review;
-the synthetic workload is not evidence for the user's particular data/device.
+premature compaction or canonical clipping on Terra.
+The supplied device log with 33 sources identifies a separate output failure: every
+request used an app-imposed 4,096-token output budget, then stopped at `outputLimit`
+with 43/192 tool calls and approximately 54,879 context tokens against a correctly
+resolved 1,050,000-token window. No compaction occurred; 147,800 input tokens were a
+cumulative run total. The log does not identify how much output was reasoning versus
+text/tool arguments. A follow-up removes the host's 4k cap, adds bounded capacity-aware
+output budgeting and empty-response recovery inside the harness, and records per-request
+usage, reasoning counts when supplied, visibility, discarded calls and recovery decisions.
+Regression coverage simulates 33 selected sources and 43 successful reads before an
+output-limited turn, then checks a single committed artifact and persisted trace after
+recovery. NH00 still needs the fixed build retested against that corpus on a physical
+device, authenticated provider smoke tests and continued catalog review; synthetic
+regressions are not evidence that the fixed build has passed the user's data/device.
 NH01–NH10 have not started; this is not full harness parity.
 
 Before continuing NH01, the architecture prerequisite separates domain from runtime:

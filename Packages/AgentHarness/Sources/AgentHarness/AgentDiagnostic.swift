@@ -12,6 +12,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case payloadClipped, payloadPaged
         case budgetExtended
         case budgetExtensionDenied
+        case outputBudgetExtended, outputBudgetExtensionDenied
     }
     public enum Metric: String, Codable, Sendable, CodingKeyRepresentable {
         case contextTokens, thresholdTokens, retainedTokens, afterTokens, forced
@@ -25,6 +26,8 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case serializedToolOmittedCharacters, fittedHistoryOmittedCharacters
         case returnedItems, mutationsCommitted
         case hardMaxTurns, hardMaxToolCalls, minimumProgress, idleCalls
+        case hardMaxOutputTokens, previousMaxOutputTokens, outputRetries
+        case visibleTextScalars, streamedText, returnedToolCalls, discardedToolCalls, outputLimited, usageReported, reasoningTokens, costLimitReached
     }
 
     public let runID: UUID

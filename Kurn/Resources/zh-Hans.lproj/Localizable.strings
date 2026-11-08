@@ -1193,3 +1193,18 @@
 "chat.metric.minimumProgress" = "取得进展的最少不同调用";
 "chat.metric.idleCalls" = "自上次不同进展后的调用次数";
 "chat.diagnostic.budgetExtensionDenied" = "预算扩展被拒绝";
+
+/* Output budgets and per-request usage */
+"chat.diagnostic.outputBudgetExtended" = "已增加输出预算；正在重试空回复";
+"chat.diagnostic.outputBudgetExtensionDenied" = "输出预算增加被拒绝";
+"chat.metric.hardMaxOutputTokens" = "输出预算上限";
+"chat.metric.previousMaxOutputTokens" = "先前的输出预算";
+"chat.metric.outputRetries" = "输出重试次数";
+"chat.metric.visibleTextScalars" = "可见文本标量数";
+"chat.metric.streamedText" = "已流式传输文本（1 = 是）";
+"chat.metric.returnedToolCalls" = "返回的工具调用数";
+"chat.metric.discardedToolCalls" = "已丢弃的工具调用数";
+"chat.metric.outputLimited" = "已达到输出限制（1 = 是）";
+"chat.metric.usageReported" = "已报告用量（1 = 是）";
+"chat.metric.reasoningTokens" = "已报告的推理令牌数";
+"chat.metric.costLimitReached" = "已达到费用限制（1 = 是）";

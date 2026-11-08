@@ -93,5 +93,6 @@ import Testing
         let response = try accumulator.response()
         #expect(response.stopReason == .maxTokens)
         #expect(response.toolCalls.isEmpty)
+        #expect(response.discardedToolCalls == 1)
     }
 }

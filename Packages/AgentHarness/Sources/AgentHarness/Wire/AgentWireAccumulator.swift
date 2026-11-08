@@ -41,6 +41,7 @@ private struct AgentWireState {
     var calls: [Int: PartialCall] = [:]
     var inputTokens: Int?
     var outputTokens: Int?
+    var reasoningTokens: Int?
     var stopReason: AgentModelStopReason = .other("unknown")
     var receivedTerminal = false
     var responses = AgentResponsesAccumulator()
@@ -71,8 +72,9 @@ private struct AgentWireState {
                                  rawArguments: raw, providerMetadata: call.metadata)
         }
         let usage = inputTokens == nil && outputTokens == nil ? nil
-            : AgentUsage(inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0)
-        return AgentTurnResponse(text: text, toolCalls: toolCalls, usage: usage, stopReason: stopReason)
+            : AgentUsage(inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0, reasoningTokens: reasoningTokens)
+        return AgentTurnResponse(text: text, toolCalls: toolCalls, usage: usage, stopReason: stopReason,
+                                 discardedToolCalls: stopReason == .maxTokens ? calls.count : 0)
     }
 
     mutating func appendText(_ delta: String?) -> [AgentModelEvent] {
@@ -133,6 +135,7 @@ private struct AgentWireState {
         let usage = value["usage"]
         if let input = usage["prompt_tokens"].int { inputTokens = input }
         if let output = usage["completion_tokens"].int { outputTokens = output }
+        if let reasoning = usage["completion_tokens_details"]["reasoning_tokens"].int { reasoningTokens = reasoning }
         guard let choice = value["choices"].array.first(where: { ($0["index"].int ?? 0) == 0 }) else { return [] }
         let delta = choice["delta"]
         for fragment in delta["tool_calls"].array {
@@ -156,6 +159,7 @@ private struct AgentWireState {
     }
 
     mutating func gemini(_ value: JSONValue) -> [AgentModelEvent] {
+        if let reasoning = value["usageMetadata"]["thoughtsTokenCount"].int { reasoningTokens = reasoning }
         let usage = value["usageMetadata"]
         if let input = usage["promptTokenCount"].int { inputTokens = input }
         if let output = usage["candidatesTokenCount"].int {

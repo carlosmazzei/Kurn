@@ -77,8 +77,7 @@ public struct AgentRunTrace: Sendable, Equatable {
             steps.append(step)
         case .usage(let usage):
             hasUsage = true
-            self.usage = AgentUsage(inputTokens: self.usage.inputTokens + usage.inputTokens,
-                                    outputTokens: self.usage.outputTokens + usage.outputTokens)
+            self.usage = self.usage.adding(usage)
         case .runFinished(let outcome):
             finishTurn()
             usage = outcome.totalUsage

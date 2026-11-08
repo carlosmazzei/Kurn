@@ -1193,3 +1193,18 @@
 "chat.metric.minimumProgress" = "Mindestanzahl unterschiedlicher Fortschrittsaufrufe";
 "chat.metric.idleCalls" = "Aufrufe seit dem letzten neuen Fortschritt";
 "chat.diagnostic.budgetExtensionDenied" = "Budgeterweiterung abgelehnt";
+
+/* Output budgets and per-request usage */
+"chat.diagnostic.outputBudgetExtended" = "Ausgabebudget erhöht; leere Antwort wird erneut versucht";
+"chat.diagnostic.outputBudgetExtensionDenied" = "Erhöhung des Ausgabebudgets abgelehnt";
+"chat.metric.hardMaxOutputTokens" = "Maximales Ausgabebudget";
+"chat.metric.previousMaxOutputTokens" = "Vorheriges Ausgabebudget";
+"chat.metric.outputRetries" = "Ausgabewiederholungen";
+"chat.metric.visibleTextScalars" = "Skalare des sichtbaren Texts";
+"chat.metric.streamedText" = "Text übertragen (1 = ja)";
+"chat.metric.returnedToolCalls" = "Zurückgegebene Werkzeugaufrufe";
+"chat.metric.discardedToolCalls" = "Verworfene Werkzeugaufrufe";
+"chat.metric.outputLimited" = "Ausgabelimit erreicht (1 = ja)";
+"chat.metric.usageReported" = "Nutzung gemeldet (1 = ja)";
+"chat.metric.reasoningTokens" = "Gemeldete Denk-Tokens";
+"chat.metric.costLimitReached" = "Kostenlimit erreicht (1 = ja)";

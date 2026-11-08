@@ -46,7 +46,7 @@ struct HarnessChatService {
             history: history.map {
                 $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
             },
-            prompt: question, tools: tools, maxOutputTokens: min(4_096, resolution.maxOutputTokens ?? 4_096),
+            prompt: question, tools: tools,
             contextResolution: resolution
         )
     }

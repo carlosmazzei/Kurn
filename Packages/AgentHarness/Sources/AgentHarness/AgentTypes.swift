@@ -38,14 +38,20 @@ public enum AgentMessage: Codable, Sendable, Equatable {
 public struct AgentUsage: Codable, Sendable, Equatable {
     public let inputTokens: Int
     public let outputTokens: Int
+    /// Sum of the reasoning-token counts actually reported (nil if none were reported).
+    /// Missing counts are not inferred from output size. Never contains reasoning text.
+    public let reasoningTokens: Int?
 
-    public init(inputTokens: Int = 0, outputTokens: Int = 0) {
+    public init(inputTokens: Int = 0, outputTokens: Int = 0, reasoningTokens: Int? = nil) {
         self.inputTokens = max(0, inputTokens)
         self.outputTokens = max(0, outputTokens)
+        self.reasoningTokens = reasoningTokens.map { max(0, $0) }
     }
 
     func adding(_ other: Self) -> Self {
-        Self(inputTokens: inputTokens + other.inputTokens, outputTokens: outputTokens + other.outputTokens)
+        Self(inputTokens: inputTokens + other.inputTokens, outputTokens: outputTokens + other.outputTokens,
+             reasoningTokens: reasoningTokens == nil && other.reasoningTokens == nil ? nil
+                : (reasoningTokens ?? 0) + (other.reasoningTokens ?? 0))
     }
 }
 
@@ -91,14 +97,17 @@ public struct AgentTurnResponse: Sendable, Equatable {
     public let usage: AgentUsage?
     public let stopReason: AgentModelStopReason
     public let providerMetadata: JSONValue?
+    /// Wire adapters discard every tool call from an output-limited response, even complete-looking ones.
+    public let discardedToolCalls: Int
 
     public init(text: String, toolCalls: [AgentToolCall] = [], usage: AgentUsage? = nil,
-                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil) {
+                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil, discardedToolCalls: Int = 0) {
         self.text = text
         self.toolCalls = toolCalls
         self.usage = usage
         self.stopReason = stopReason
         self.providerMetadata = providerMetadata
+        self.discardedToolCalls = max(0, discardedToolCalls)
     }
 }
 

@@ -81,7 +81,7 @@ import Testing
             #"{"candidates":[{"content":{"parts":[{"text":"!"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":2,"thoughtsTokenCount":4}}"#
         ], format: .gemini)
         #expect(events == [.textDelta("Hi"), .textDelta("!")])
-        #expect(response == AgentTurnResponse(text: "Hi!", usage: AgentUsage(inputTokens: 12, outputTokens: 6)))
+        #expect(response == AgentTurnResponse(text: "Hi!", usage: AgentUsage(inputTokens: 12, outputTokens: 6, reasoningTokens: 4)))
     }
 
     @Test(arguments: [1, 2]) func geminiToolsHaveStableIDs(count: Int) throws {
