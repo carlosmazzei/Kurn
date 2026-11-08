@@ -280,7 +280,8 @@ struct SummaryModelPicker: View {
             selection: Binding(
                 get: { settings.summaryModel(for: provider) },
                 set: { settings.setSummaryModel($0, for: provider) }
-            )
+            ),
+            refreshesContextMetadata: true
         )
     }
 }
@@ -335,6 +336,7 @@ private struct ProviderModelPicker: View {
     let provider: AIProvider
     let credentials: CredentialStore
     let selection: Binding<String>
+    var refreshesContextMetadata = false
     var filter: (@MainActor ([String]) -> [String])?
 
     @State private var models: [String] = []
@@ -359,8 +361,11 @@ private struct ProviderModelPicker: View {
             }
         }
         .disabled(pickerModels.isEmpty)
-        .task(id: "\(provider.id)-\(credentials.revision)") {
+        .task(id: [provider.id, provider.kind.rawValue, provider.baseURLString, String(describing: credentials.revision)]) {
             await loadModels()
+        }
+        .task(id: [provider.id, provider.kind.rawValue, provider.baseURLString, selection.wrappedValue, String(describing: credentials.revision)]) {
+            await refreshSelectedModel()
         }
 
         if isLoading {
@@ -376,7 +381,7 @@ private struct ProviderModelPicker: View {
         }
 
         Button {
-            Task { await loadModels() }
+            Task { await loadModels(forceMetadata: true) }
         } label: {
             Label(NSLocalizedString("settings.refresh_models", comment: "Refresh models"), systemImage: "arrow.clockwise")
         }
@@ -384,7 +389,7 @@ private struct ProviderModelPicker: View {
     }
 
     @MainActor
-    private func loadModels() async {
+    private func loadModels(forceMetadata: Bool = false) async {
         guard credentials.hasKey(for: provider) else {
             models = []
             errorText = NSLocalizedString("settings.models_need_key", comment: "Configure key to load models")
@@ -407,6 +412,13 @@ private struct ProviderModelPicker: View {
             errorText = error.localizedDescription
         }
         isLoading = false
+        if !Task.isCancelled { await refreshSelectedModel(force: forceMetadata) }
+    }
+
+    @MainActor
+    private func refreshSelectedModel(force: Bool = false) async {
+        guard refreshesContextMetadata, credentials.hasKey(for: provider), !selection.wrappedValue.isEmpty else { return }
+        _ = try? await ProviderModelMetadataService().refresh(provider: provider, model: selection.wrappedValue, force: force)
     }
 }
 

@@ -12,25 +12,34 @@ import Foundation
 public enum ModelContextWindows {
     public static let metadataLifetime: TimeInterval = 24 * 60 * 60
 
-    public static func resolve(model: String, reported: AgentModelLimits? = nil, now: Date = Date()) -> AgentContextResolution {
-        let age = reported.map { now.timeIntervalSince($0.fetchedAt) }
-        let fresh = age.map { $0 >= -300 && $0 < metadataLifetime } ?? false
+    public static func isFresh(_ timestamp: Date, now: Date = Date()) -> Bool {
+        let age = now.timeIntervalSince(timestamp)
+        return age >= -300 && age < metadataLifetime
+    }
+
+    public static func resolve(model: String, reported: AgentModelLimits? = nil, now: Date = Date(),
+                               metadataRefresh: AgentMetadataRefresh? = nil) -> AgentContextResolution {
+        let contextFresh = reported.map { isFresh($0.contextTimestamp, now: now) } ?? false
+        let outputFresh = reported.map { isFresh($0.outputTimestamp, now: now) } ?? false
         let catalog = ModelContextCatalog.entry(for: model)
-        if fresh, let reported, let tokens = reported.contextWindowTokens, tokens > 0 {
+        let output = outputFresh ? reported?.maxOutputTokens ?? catalog?.maxOutputTokens : catalog?.maxOutputTokens
+        if contextFresh, let reported, let tokens = reported.contextWindowTokens {
+            let limits = AgentModelLimits(contextWindowTokens: tokens, maxOutputTokens: output,
+                                          limitKind: reported.limitKind, fetchedAt: reported.contextTimestamp)
             return AgentContextResolution(contextWindowTokens: tokens, source: .api, reason: .reported,
-                                          modelLimits: reported, resolvedAt: now, modelID: model)
+                                          modelLimits: limits, resolvedAt: now, modelID: model).recordingMetadataRefresh(metadataRefresh)
         }
-        let reason: AgentContextResolution.Reason = reported != nil && !fresh ? .expiredMetadata : .catalogMatch
+        let reason: AgentContextResolution.Reason = reported != nil && !contextFresh ? .expiredMetadata : .catalogMatch
         if let tokens = knownWindow(forModel: model) {
-            let limits = AgentModelLimits(contextWindowTokens: tokens,
-                                          maxOutputTokens: fresh ? reported?.maxOutputTokens ?? catalog?.maxOutputTokens : catalog?.maxOutputTokens,
-                                          limitKind: catalog?.limitKind ?? .combined)
+            let limits = AgentModelLimits(contextWindowTokens: tokens, maxOutputTokens: output, limitKind: catalog?.limitKind ?? .combined)
             return AgentContextResolution(contextWindowTokens: tokens, source: .fixedTable, reason: reason,
-                                          modelLimits: limits, catalogVersion: ModelContextCatalog.version, resolvedAt: now, modelID: model)
+                                          modelLimits: limits, catalogVersion: ModelContextCatalog.version, resolvedAt: now,
+                                          modelID: model).recordingMetadataRefresh(metadataRefresh)
         }
+        let limits = AgentModelLimits(contextWindowTokens: nil, maxOutputTokens: outputFresh ? reported?.maxOutputTokens : nil)
         return AgentContextResolution(contextWindowTokens: unknownWindow, source: .fixedFallback,
-                                      reason: reported != nil && !fresh ? .expiredMetadata : .unknownModel,
-                                      modelLimits: fresh ? reported : nil, resolvedAt: now, modelID: model)
+                                      reason: reported != nil && !contextFresh ? .expiredMetadata : .unknownModel,
+                                      modelLimits: limits, resolvedAt: now, modelID: model).recordingMetadataRefresh(metadataRefresh)
     }
 
     /// Lowercased id prefix → total context window in tokens. The longest

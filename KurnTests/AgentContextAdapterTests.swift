@@ -33,15 +33,6 @@ import KurnCore
         }
         #expect(await model.requests.count == 1)
     }
-
-    @Test(arguments: [(0, 10, 20), (5, 10, 27), (20, 18, 72), (40, 24, 96), (1_000, 24, 96), (-3, 10, 20)])
-    func chatLimitsScaleWithSources(sources: Int, turns: Int, toolCalls: Int) {
-        let limits = AgentLimits.chat(sourceCount: sources, maxCostUSD: 2)
-        #expect(limits.maxTurns == turns)
-        #expect(limits.maxToolCalls == toolCalls)
-        #expect(limits.maxCostUSD == 2)
-        #expect(limits.wrapUpOnLimit)
-    }
 }
 
 /// Throws one provider error, then answers.

@@ -113,6 +113,26 @@ list pagination is bounded and rejects missing/repeated cursors. The bundled
 `ModelContextCatalog` supplies exact, reviewed current model capacities, including
 GPT-6.1 Terra's 1,050,000 tokens, ahead of conservative legacy-family defaults.
 
+`ProviderModelMetadataService` refreshes the selected model in the settings picker
+and before an agent run. Anthropic/Gemini details resolve aliases and retain both
+the requested and canonical IDs; Groq details include completion limits (vendor/model
+IDs are encoded as one path component). Compatible endpoints refresh their listing
+instead of inventing a detail route. Official OpenAI model details have no documented
+capacity fields, so no detail request is issued for them. Metadata requests use the
+existing transport with an eight-second deadline; a coordinator deduplicates by
+store/provider/API-shape/endpoint/model/credential in memory and permits four concurrent
+lookups. Missing credentials, unsupported metadata and refresh failures do not block
+the model's normal request. Cancellation still propagates to the caller.
+Each field has its own timestamp; partial responses cannot renew or erase an omitted
+field. Cache TTL is 24 hours; failed/incomplete lookups retry after 15 minutes, while a
+manual refresh can force a lookup. Endpoint-scoped older metadata stays stored after
+failure but expired fields cannot win capacity resolution. The immutable conversation
+snapshot records the metadata lookup outcome and whether the selected window came from
+the current fetch or cache. Optional fields preserve existing cache/trace decoding. The resolved output limit caps
+both normal/wrap-up turns and compaction summaries; reserve size must never override
+a smaller provider output limit.
+
+
 `AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and
 opaque correlation IDs. The synchronous injected sink records lifecycle,
 request/summary, compaction decisions, tools, skipped calls, first limit and
@@ -134,6 +154,16 @@ reads no longer go through the 500-scalar field preview. Summary requests report
 the count of characters omitted by per-result clipping and request fitting;
 the source data remains in the app. Compaction that does not reduce the estimated
 context is skipped rather than reported as a successful reduction.
+`AgentTextPage` applies both scalar and byte bounds to canonical summary/wiki/attachment
+and document reads, including room for headers and continuation framing. It never
+silently returns a non-progressing continuation. Tool diagnostics separate preview loss
+(`omittedScalars`/`omittedItems`) from retrievable continuation
+(`deferredScalars`/`deferredItems`). Search reports its ranked top-100 window and whether
+it is full, without claiming a count of undiscovered hits. Transcript counters include
+all fetched passages, even after an early page break. Summary diagnostics distinguish
+per-tool serialization clipping from history fitting. The trace remains content-free;
+tool text, document bodies, credentials and error messages never enter numeric metrics.
+
 
 `ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
 from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,
@@ -189,8 +219,20 @@ outcomes retain full history.
 calls returned anyway are dropped), so the run ends with an answer from what was gathered.
 A wrap-up without text leaves no answer; one cut off reports `.outputLimit`; it never runs
 past the cost limit.
-Chat uses `AgentLimits.chat(sourceCount:)` (10–24 turns, 20–96 tool calls, wrap-up on)
-and its prompt steers multi-meeting questions to listing, search and summaries first.
+Chat plans from `AgentWorkload` through the harness's `AgentBudgetPlanner`, not a
+source-count-only extension in the app. `LibraryChatSourceReader` supplies only the
+frozen authorized IDs and allowed source parts to `ChatWorkloadEstimator`. UTF-8
+volume and the transcript's item limit give a conservative estimated page count.
+Initial budgets range from 10–48 turns and 20–192 tool calls. The harness may add
+eight turns/32 calls only after at least two distinct successful progress calls,
+with progress in the last eight calls. Identical canonical arguments do not count
+again. Read pages, item pages and committed document mutations report numeric
+progress. Absolute ceilings are 64 turns/256 calls; explicit fixed limits keep
+fixed behavior. A configured cost estimator/cost limit still stops the runtime
+before an extension. `budgetExtended`/`budgetExtensionDenied` diagnostics record
+the decision, current/hard limits, distinct progress and idle calls. `AgentRunState`
+owns this bookkeeping; it contains no Kurn domain types. The prompt still steers
+multi-meeting questions to listing, search and summaries first.
 These estimates and limits do not guarantee a provider's hard context
 or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
 Output-token truncation finishes with `.outputLimit` and discards tool calls. Vendor streams

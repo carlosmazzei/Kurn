@@ -12,6 +12,7 @@ import KurnCore
 
 struct ProviderModelsService: Sendable {
     private let session: URLSession
+    private let requestTimeout: TimeInterval
     private let apiKey: String?
     private let contextWindows: ModelContextWindowStore
     private let anthropicVersion = "2023-06-01"
@@ -26,11 +27,13 @@ struct ProviderModelsService: Sendable {
     init(
         session: URLSession = .shared,
         apiKey: String? = nil,
-        contextWindows: ModelContextWindowStore = .shared
+        contextWindows: ModelContextWindowStore = .shared,
+        requestTimeout: TimeInterval = 60
     ) {
         self.session = session
         self.apiKey = apiKey
         self.contextWindows = contextWindows
+        self.requestTimeout = requestTimeout
     }
 
     func models(for provider: AIProvider) async throws -> [String] {
@@ -154,6 +157,7 @@ struct ProviderModelsService: Sendable {
     ) async throws -> [String] {
         var request = URLRequest(url: try LLMHTTP.requireEndpoint(provider: provider, path: "models"))
         request.httpMethod = "GET"
+        request.timeoutInterval = requestTimeout
         configure(&request)
 
         var results: [String] = []

@@ -101,6 +101,9 @@ private struct ChatStepRow: View {
     private func contextDetails(_ resolution: AgentHarness.AgentContextResolution) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(NSLocalizedString(ChatContextPresentation.sourceKey(resolution), comment: "Context origin"))
+            if let refresh = resolution.metadataRefresh {
+                Text(NSLocalizedString("chat.context.refresh.\(refresh.rawValue)", comment: "Metadata refresh outcome"))
+            }
             Text(String(format: NSLocalizedString("chat.context.tokens", comment: "Context capacity"), resolution.contextWindowTokens))
             Text(NSLocalizedString("chat.context.kind.\(resolution.limitKind.rawValue)", comment: "Context limit kind"))
             if let fetchedAt = resolution.fetchedAt {

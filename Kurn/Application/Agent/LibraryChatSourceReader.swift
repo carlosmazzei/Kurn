@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 import KurnCore
 import SwiftData
@@ -26,6 +27,10 @@ final class LibraryChatSourceReader: ChatSourceReader {
 
     private func meeting(_ id: UUID) throws -> Meeting? {
         try meetings().first { $0.id == id }
+    }
+
+    func workload(allowedIDs: Set<UUID>) throws -> AgentWorkload {
+        try ChatWorkloadEstimator.estimate(meetings: meetings().filter { allowedIDs.contains($0.id) }, scope: scope)
     }
 
     func listSources() async throws -> [ChatSource] {

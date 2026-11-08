@@ -12,15 +12,18 @@ enum ChatTranscriptToolPage {
         var body = "transcript:\n"
         var nextPassage = offset
         var nextText = 0
-        var available = 0
+        let available = page.passages.enumerated().reduce(0) {
+            $0 + max(0, $1.element.text.unicodeScalars.count - ($1.offset == 0 ? textOffset : 0))
+        }
+        var omitted = 0
         var returned = 0
         for (index, passage) in page.passages.enumerated() {
             let scalars = passage.text.unicodeScalars
             let start = index == 0 ? textOffset : 0
             guard start <= scalars.count else { throw InvalidOffset() }
-            available += scalars.count - start
+            let speaker = ChatSourceToolText.renderedField(passage.speaker, limit: 100)
             let heading = "meeting \(passage.meetingID.uuidString):\n"
-                + "\(ChatSourceToolText.timestamp(passage.timestamp)) \(ChatSourceToolText.field(passage.speaker, limit: 100)): "
+                + "\(ChatSourceToolText.timestamp(passage.timestamp)) \(speaker.text): "
             let room = maxBytes - body.utf8.count - heading.utf8.count - 200
             if room <= 0 { break }
             var chunk = String.UnicodeScalarView()
@@ -34,6 +37,7 @@ enum ChatTranscriptToolPage {
             guard !chunk.isEmpty || start == scalars.count else { break }
             body += heading + String(chunk) + "\n"
             returned += chunk.count
+            omitted += speaker.omittedScalars
             if start + chunk.count < scalars.count {
                 nextText = start + chunk.count
                 break
@@ -46,6 +50,8 @@ enum ChatTranscriptToolPage {
         let continuation = more ? "next offset: \(nextPassage); textOffset: \(nextText)" : "end"
         body += "page: \(continuation); total passages: \(page.total)"
         return AgentToolOutput(content: body, summary: "Read \(returned) characters",
-                               metrics: [.availableScalars: available, .returnedScalars: returned, .hasMore: more ? 1 : 0])
+                               metrics: [.availableScalars: available, .returnedScalars: returned, .omittedScalars: omitted,
+                                         .deferredScalars: max(0, available - returned), .deferredItems: max(0, page.total - nextPassage),
+                                         .hasMore: more ? 1 : 0])
     }
 }

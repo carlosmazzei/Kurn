@@ -8,6 +8,8 @@ enum HarnessDiagnostics {
         let source = resolution.source.rawValue
         let tokens = resolution.contextWindowTokens
         let reason = resolution.reason.rawValue
+        let refresh = resolution.metadataRefresh?.rawValue ?? "unknown"
+        AppLog.generation.atNotice.notice("model_metadata_checked outcome=\(refresh, privacy: .public) resolution=\(resolution.id.uuidString, privacy: .public)")
         AppLog.generation.atNotice.notice("context_window_resolved source=\(source, privacy: .public) tokens=\(tokens, privacy: .public) cached=\(resolution.isCached, privacy: .public) reason=\(reason, privacy: .public) resolution=\(resolution.id.uuidString, privacy: .public)")
     }
 

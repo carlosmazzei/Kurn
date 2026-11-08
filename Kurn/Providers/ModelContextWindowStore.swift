@@ -29,18 +29,45 @@ final class ModelContextWindowStore: @unchecked Sendable {
             var all = stored()
             for (model, limits) in values where !model.isEmpty {
                 guard limits.contextWindowTokens != nil || limits.maxOutputTokens != nil else { continue }
-                all[Self.entryKey(provider: provider, model: model)] = limits
+                let entry = Self.entryKey(provider: provider, model: model)
+                all[entry] = all[entry]?.merging(limits, now: now()) ?? limits
             }
             if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.key) }
         }
     }
 
-    func resolution(for provider: AIProvider, model: String) -> AgentContextResolution {
-        ModelContextWindows.resolve(model: model, reported: limits(for: provider, model: model), now: now())
+    func resolution(for provider: AIProvider, model: String, metadataRefresh: AgentMetadataRefresh? = nil) -> AgentContextResolution {
+        ModelContextWindows.resolve(model: model, reported: limits(for: provider, model: model), now: now(), metadataRefresh: metadataRefresh)
     }
 
     func agentContextWindow(for provider: AIProvider, model: String) -> Int {
         resolution(for: provider, model: model).contextWindowTokens
+    }
+
+    func hasFreshCompleteLimits(for provider: AIProvider, model: String) -> Bool {
+        guard let value = limits(for: provider, model: model) else { return false }
+        return value.contextWindowTokens != nil && value.maxOutputTokens != nil
+            && ModelContextWindows.isFresh(value.contextTimestamp, now: now())
+            && ModelContextWindows.isFresh(value.outputTimestamp, now: now())
+    }
+
+    func refreshIsDue(for provider: AIProvider, model: String) -> Bool {
+        lock.withLock {
+            let key = Self.entryKey(provider: provider, model: model)
+            let attempts = defaults.dictionary(forKey: "modelContextRefreshAttempts.v1") as? [String: Date] ?? [:]
+            guard let last = attempts[key] else { return true }
+            let age = now().timeIntervalSince(last)
+            return age < 0 || age >= 15 * 60
+        }
+    }
+
+    func recordRefresh(for provider: AIProvider, model: String) {
+        lock.withLock {
+            var attempts = defaults.dictionary(forKey: "modelContextRefreshAttempts.v1") as? [String: Date] ?? [:]
+            attempts = attempts.filter { now().timeIntervalSince($0.value) < 24 * 60 * 60 }
+            attempts[Self.entryKey(provider: provider, model: model)] = now()
+            defaults.set(attempts, forKey: "modelContextRefreshAttempts.v1")
+        }
     }
 
     private func stored() -> [String: AgentModelLimits] {

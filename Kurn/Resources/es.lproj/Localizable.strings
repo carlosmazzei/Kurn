@@ -1159,3 +1159,37 @@
 "chat.context.kind.input" = "Límite de entrada";
 "chat.context.kind.combined" = "Ventana total de contexto";
 "chat.metric.omittedCharacters" = "Caracteres omitidos de la entrada del resumen";
+
+// Selected-model metadata refresh
+"chat.context.refresh.cacheFresh" = "La caché de metadatos está vigente";
+"chat.context.refresh.fetched" = "Metadatos actualizados desde la API";
+"chat.context.refresh.notReported" = "La API no indicó la ventana de contexto";
+"chat.context.refresh.unsupported" = "Esta API no admite actualizar los detalles de contexto";
+"chat.context.refresh.unavailable" = "Credenciales no disponibles para actualizar metadatos";
+"chat.context.refresh.failed" = "Falló la actualización; datos de capacidad disponibles conservados";
+"chat.context.refresh.deferred" = "Intervalo de reintento de metadatos activo";
+
+// Workload and payload diagnostics
+"chat.metric.omittedScalars" = "Escalares omitidos en la vista previa";
+"chat.metric.omittedItems" = "Elementos de metadatos omitidos";
+"chat.metric.deferredScalars" = "Escalares restantes";
+"chat.metric.deferredItems" = "Elementos restantes";
+"chat.metric.searchResultLimit" = "Límite de la ventana de búsqueda";
+"chat.metric.searchWindowFull" = "Ventana de búsqueda llena";
+"chat.metric.selectedSources" = "Fuentes del plan de trabajo";
+"chat.metric.selectedParts" = "Partes de fuentes legibles";
+"chat.metric.estimatedReadPages" = "Páginas de lectura estimadas";
+"chat.metric.progressCalls" = "Llamadas distintas con progreso";
+"chat.metric.serializedToolOmittedCharacters" = "Caracteres de herramientas omitidos en el resumen";
+"chat.metric.fittedHistoryOmittedCharacters" = "Caracteres del historial omitidos para ajustar el resumen";
+"chat.metric.returnedItems" = "Elementos devueltos";
+"chat.metric.mutationsCommitted" = "Cambios de artefactos confirmados";
+"chat.diagnostic.payloadClipped" = "Vista previa recortada";
+"chat.diagnostic.payloadPaged" = "Más contenido disponible";
+"chat.diagnostic.budgetExtended" = "Presupuesto ampliado tras avanzar";
+
+"chat.metric.hardMaxTurns" = "Máximo absoluto de turnos";
+"chat.metric.hardMaxToolCalls" = "Máximo absoluto de llamadas a herramientas";
+"chat.metric.minimumProgress" = "Mínimo de llamadas distintas con progreso";
+"chat.metric.idleCalls" = "Llamadas desde el último progreso distinto";
+"chat.diagnostic.budgetExtensionDenied" = "Ampliación del presupuesto denegada";

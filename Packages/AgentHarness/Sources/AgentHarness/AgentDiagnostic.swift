@@ -9,6 +9,9 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case requestStarted, requestFinished, requestFailed
         case summaryStarted, summaryFinished, summaryFailed
         case limitReached, toolRequested, toolFinished, toolSkipped, wrapUpStarted, wrapUpFinished
+        case payloadClipped, payloadPaged
+        case budgetExtended
+        case budgetExtensionDenied
     }
     public enum Metric: String, Codable, Sendable, CodingKeyRepresentable {
         case contextTokens, thresholdTokens, retainedTokens, afterTokens, forced
@@ -16,6 +19,12 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case inputTokens, outputTokens, maxOutputTokens, messageCount, toolCount, durationMs
         case availableScalars, returnedScalars, hasMore, isError
         case omittedCharacters
+        case omittedScalars, omittedItems, deferredScalars, deferredItems
+        case searchResultLimit, searchWindowFull
+        case selectedSources, selectedParts, estimatedReadPages, progressCalls
+        case serializedToolOmittedCharacters, fittedHistoryOmittedCharacters
+        case returnedItems, mutationsCommitted
+        case hardMaxTurns, hardMaxToolCalls, minimumProgress, idleCalls
     }
 
     public let runID: UUID

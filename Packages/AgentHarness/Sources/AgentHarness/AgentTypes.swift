@@ -64,15 +64,20 @@ public struct AgentTurnRequest: Sendable, Equatable {
     public let allowsToolCalls: Bool
     /// Diagnostic-only loss in a summary request; never serialized as a provider parameter.
     public let contextOmittedCharacters: Int
+    public let serializedToolOmittedCharacters: Int
+    public let fittedHistoryOmittedCharacters: Int
 
     public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
-                allowsToolCalls: Bool = true, contextOmittedCharacters: Int = 0) {
+                allowsToolCalls: Bool = true, contextOmittedCharacters: Int = 0,
+                serializedToolOmittedCharacters: Int = 0, fittedHistoryOmittedCharacters: Int = 0) {
         self.systemPrompt = systemPrompt
         self.messages = messages
         self.tools = tools
         self.maxOutputTokens = maxOutputTokens
         self.allowsToolCalls = allowsToolCalls
         self.contextOmittedCharacters = contextOmittedCharacters
+        self.serializedToolOmittedCharacters = serializedToolOmittedCharacters
+        self.fittedHistoryOmittedCharacters = fittedHistoryOmittedCharacters
     }
 }
 
@@ -136,12 +141,17 @@ public struct AgentLimits: Sendable, Equatable {
     /// After a turn or tool-call limit, run one extra tool-less turn so the model answers from what
     /// it already gathered instead of ending on tool results. Never runs past the cost limit.
     public let wrapUpOnLimit: Bool
+    public let continuation: AgentContinuationBudget?
+    public let workload: AgentWorkload?
 
-    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil, wrapUpOnLimit: Bool = false) {
-        self.maxTurns = max(0, maxTurns)
-        self.maxToolCalls = max(0, maxToolCalls)
+    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil, wrapUpOnLimit: Bool = false,
+                continuation: AgentContinuationBudget? = nil, workload: AgentWorkload? = nil) {
+        self.maxTurns = max(0, min(maxTurns, continuation?.maxTurns ?? maxTurns))
+        self.maxToolCalls = max(0, min(maxToolCalls, continuation?.maxToolCalls ?? maxToolCalls))
         self.maxCostUSD = maxCostUSD.map { max(0, $0) }
         self.wrapUpOnLimit = wrapUpOnLimit
+        self.continuation = continuation
+        self.workload = workload
     }
 }
 

@@ -1159,3 +1159,37 @@
 "chat.context.kind.input" = "输入限制";
 "chat.context.kind.combined" = "合计上下文窗口";
 "chat.metric.omittedCharacters" = "摘要输入中省略的字符数";
+
+// Selected-model metadata refresh
+"chat.context.refresh.cacheFresh" = "元数据缓存有效";
+"chat.context.refresh.fetched" = "已从 API 刷新模型元数据";
+"chat.context.refresh.notReported" = "API 未报告上下文窗口";
+"chat.context.refresh.unsupported" = "此 API 不支持刷新上下文详情";
+"chat.context.refresh.unavailable" = "缺少刷新元数据所需的凭据";
+"chat.context.refresh.failed" = "元数据刷新失败；保留可用的容量数据";
+"chat.context.refresh.deferred" = "元数据重试间隔生效中";
+
+// Workload and payload diagnostics
+"chat.metric.omittedScalars" = "预览中省略的标量";
+"chat.metric.omittedItems" = "省略的元数据项";
+"chat.metric.deferredScalars" = "剩余标量";
+"chat.metric.deferredItems" = "剩余项目";
+"chat.metric.searchResultLimit" = "搜索结果窗口上限";
+"chat.metric.searchWindowFull" = "搜索窗口已满";
+"chat.metric.selectedSources" = "工作计划中的来源";
+"chat.metric.selectedParts" = "可读来源部分";
+"chat.metric.estimatedReadPages" = "预计读取页数";
+"chat.metric.progressCalls" = "取得进展的不同调用";
+"chat.metric.serializedToolOmittedCharacters" = "摘要中省略的工具结果字符";
+"chat.metric.fittedHistoryOmittedCharacters" = "为容纳摘要而省略的历史字符";
+"chat.metric.returnedItems" = "返回的项目";
+"chat.metric.mutationsCommitted" = "已提交的产物更改";
+"chat.diagnostic.payloadClipped" = "预览已截短";
+"chat.diagnostic.payloadPaged" = "还有更多内容";
+"chat.diagnostic.budgetExtended" = "取得进展后扩展执行预算";
+
+"chat.metric.hardMaxTurns" = "轮次绝对上限";
+"chat.metric.hardMaxToolCalls" = "工具调用绝对上限";
+"chat.metric.minimumProgress" = "取得进展的最少不同调用";
+"chat.metric.idleCalls" = "自上次不同进展后的调用次数";
+"chat.diagnostic.budgetExtensionDenied" = "预算扩展被拒绝";

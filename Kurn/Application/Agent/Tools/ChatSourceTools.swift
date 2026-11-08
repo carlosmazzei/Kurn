@@ -67,7 +67,8 @@ public enum ChatSourceTools {
         return AgentToolSpec(name: name,
                              description: """
                              Read authorized sources; results are plain text. offset/limit page items. Text reads
-                             use a Unicode-scalar offset and return up to 8000 scalars. Search pages a top-100 result
+                             use a Unicode-scalar offset and return up to 8000 scalars within 18000 UTF-8 bytes
+                             including framing. Follow the actual returned offset, not offset+limit. Search pages a top-100 result
                              window. Omit attachmentID to list attachments. Each result ends with a "page:" line; pass
                              its "next offset" to continue. Passages are "[m:ss] Speaker: text" ([h:mm:ss] past an
                              hour). A transcript page may end inside a passage: pass BOTH next offset and textOffset
@@ -127,7 +128,7 @@ public enum ChatSourceTools {
         let sources = try await reader.listSources().filter { parts[$0.id] != nil }.sorted { $0.id.uuidString < $1.id.uuidString }
         if name == "list_sources" {
             let lines = sources.map { source in
-                ChatSourceToolText.source(source, readable: readable(source, parts: parts[source.id] ?? []))
+                ChatSourceToolText.renderedSource(source, readable: readable(source, parts: parts[source.id] ?? []))
             }
             let header = "sources (id | title | date | duration | folder | tags | readable parts):"
             return lineOutput(header: header, items: page(lines, params: params, cap: 10), total: lines.count,
@@ -139,8 +140,10 @@ public enum ChatSourceTools {
             let searchable = existing.filter { parts[$0]?.contains(.transcript) == true }
             let hits = searchable.isEmpty ? [] : try await reader.search(query: query, meetingIDs: searchable, limit: 100)
             let ranked = Array(hits.filter { searchable.contains($0.meetingID) }.prefix(100))
-            return lineOutput(header: "search results (best first):", items: page(ranked, params: params, cap: 10),
-                              total: ranked.count, offset: params.offset, render: ChatSourceToolText.passages)
+            let result = lineOutput(header: "search results (best first):", items: page(ranked, params: params, cap: 10),
+                              total: ranked.count, offset: params.offset, render: ChatSourceToolText.renderedPassages)
+            let metrics = result.metrics.merging([.searchResultLimit: 100, .searchWindowFull: ranked.count >= 100 ? 1 : 0]) { _, new in new }
+            return AgentToolOutput(content: result.content, summary: result.summary, metrics: metrics)
         }
         let id = try params.uuid("meetingID")
         guard existing.contains(id) else { throw Invalid("Unknown or out-of-scope meetingID.") }
@@ -161,7 +164,11 @@ public enum ChatSourceTools {
         default:
             let attachments = try await reader.listAttachments(meetingID: id)
             guard params.values["attachmentID"] != nil else {
-                let lines = attachments.map { "- \($0.id.uuidString) | \(ChatSourceToolText.field($0.name))" }
+                let lines = attachments.map {
+                    var rendered = ChatSourceToolText.renderedField($0.name)
+                    rendered.text = "- \($0.id.uuidString) | " + rendered.text
+                    return rendered
+                }
                 return lineOutput(header: "attachments (id | name):", items: page(lines, params: params, cap: 50),
                                   total: lines.count, offset: params.offset) { $0 }
             }
@@ -192,27 +199,33 @@ public enum ChatSourceTools {
 
     /// Renders as many items as fit `maxOutputBytes` (at least one), then the `page:` line.
     private static func lineOutput<Item>(header: String, items: [Item], total: Int, offset: Int,
-                                         unit: String = "items", render: ([Item]) -> [String]) -> AgentToolOutput {
+                                         unit: String = "items", render: ([Item]) -> [ChatSourceToolText.Rendered]) -> AgentToolOutput {
         var count = items.count
         var body = render(items)
-        while count > 1, body.joined(separator: "\n").utf8.count > maxOutputBytes {
+        func bytes() -> Int {
+            let footer = ChatSourceToolText.pageLine(offset: offset, count: count, total: total, unit: unit)
+            return ([header] + body.map(\.text) + [footer]).joined(separator: "\n").utf8.count
+        }
+        while count > 1, bytes() > maxOutputBytes {
             count -= 1
             body = render(Array(items.prefix(count)))
         }
         let pageLine = ChatSourceToolText.pageLine(offset: offset, count: count, total: total, unit: unit)
-        let content = ([header] + body + [pageLine]).joined(separator: "\n")
-        return AgentToolOutput(content: content, summary: "Read \(count) items")
+        let content = ([header] + body.map(\.text) + [pageLine]).joined(separator: "\n")
+        let metrics: [AgentDiagnostic.Metric: Int] = [
+            .omittedScalars: body.reduce(0) { $0 + $1.omittedScalars },
+            .omittedItems: body.reduce(0) { $0 + $1.omittedItems },
+            .returnedItems: count, .deferredItems: max(0, total - offset - count), .hasMore: offset + count < total ? 1 : 0
+        ]
+        return AgentToolOutput(content: content, summary: "Read \(count) items", metrics: metrics)
     }
 
     private static func textPage(_ text: String?, params: Parameters) throws -> AgentToolOutput {
         guard let text else { throw Invalid("No text available.") }
-        let scalars = text.unicodeScalars
-        let chunk = String(String.UnicodeScalarView(scalars.dropFirst(params.offset).prefix(8000)))
-        let count = chunk.unicodeScalars.count
-        let pageLine = ChatSourceToolText.pageLine(offset: params.offset, count: count, total: scalars.count,
+        let page = try AgentTextPage(text, offset: params.offset, maxBytes: maxOutputBytes - 200)
+        let pageLine = ChatSourceToolText.pageLine(offset: params.offset, count: page.returnedScalars, total: page.totalScalars,
                                                    unit: "characters")
-        return AgentToolOutput(content: chunk + "\n" + pageLine, summary: "Read \(count) characters",
-                               metrics: [.availableScalars: scalars.count, .returnedScalars: count,
-                                         .hasMore: params.offset + count < scalars.count ? 1 : 0])
+        return AgentToolOutput(content: page.text + "\n" + pageLine, summary: "Read \(page.returnedScalars) characters",
+                               metrics: page.metrics)
     }
 }

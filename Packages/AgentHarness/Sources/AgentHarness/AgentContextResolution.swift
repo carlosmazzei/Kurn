@@ -15,11 +15,12 @@ public struct AgentContextResolution: Codable, Sendable, Equatable, Identifiable
     public let maxOutputTokens: Int?
     public let limitKind: LimitKind
     public let source: Source
-    public let isCached: Bool
+    public private(set) var isCached: Bool
     public let resolvedAt: Date
     public let fetchedAt: Date?
     public let catalogVersion: String?
     public let reason: Reason
+    public private(set) var metadataRefresh: AgentMetadataRefresh?
 
     public init(contextWindowTokens: Int, source: Source, reason: Reason, modelLimits: AgentModelLimits? = nil,
                 catalogVersion: String? = nil, resolvedAt: Date = Date(), id: UUID = UUID(), modelID: String = "") {
@@ -31,9 +32,17 @@ public struct AgentContextResolution: Codable, Sendable, Equatable, Identifiable
         self.source = source
         self.isCached = source == .api && modelLimits != nil
         self.resolvedAt = resolvedAt
-        self.fetchedAt = source == .api ? modelLimits?.fetchedAt : nil
+        self.fetchedAt = source == .api ? modelLimits?.contextTimestamp : nil
         self.catalogVersion = catalogVersion
         self.reason = reason
+        self.metadataRefresh = nil
+    }
+
+    public func recordingMetadataRefresh(_ status: AgentMetadataRefresh?) -> Self {
+        var result = self
+        result.metadataRefresh = status
+        if source == .api && status == .fetched { result.isCached = false }
+        return result
     }
 }
 
@@ -43,17 +52,52 @@ public struct AgentModelLimits: Codable, Sendable, Equatable {
     public let maxOutputTokens: Int?
     public let limitKind: AgentContextResolution.LimitKind
     public let fetchedAt: Date
+    public let contextFetchedAt: Date?
+    public let outputFetchedAt: Date?
+    public var contextTimestamp: Date { contextFetchedAt ?? fetchedAt }
+    public var outputTimestamp: Date { outputFetchedAt ?? fetchedAt }
 
     public init(contextWindowTokens: Int?, maxOutputTokens: Int? = nil,
-                limitKind: AgentContextResolution.LimitKind = .combined, fetchedAt: Date = Date()) {
+                limitKind: AgentContextResolution.LimitKind = .combined, fetchedAt: Date = Date(),
+                contextFetchedAt: Date? = nil, outputFetchedAt: Date? = nil) {
         self.contextWindowTokens = Self.valid(contextWindowTokens)
         self.maxOutputTokens = Self.valid(maxOutputTokens)
         self.limitKind = limitKind
         self.fetchedAt = fetchedAt
+        self.contextFetchedAt = contextFetchedAt
+        self.outputFetchedAt = outputFetchedAt
     }
 
     private static func valid(_ value: Int?) -> Int? {
         guard let value, value > 0, value <= 100_000_000 else { return nil }
         return value
+    }
+}
+
+/// Metadata lookup outcome; deliberately contains no endpoint, credentials or error text.
+public enum AgentMetadataRefresh: String, Codable, Sendable {
+    case cacheFresh, fetched, notReported, unsupported, unavailable, failed, deferred
+}
+
+public extension AgentModelLimits {
+    /// Merge independent fields without refreshing the age of a value the response omitted.
+    func merging(_ next: AgentModelLimits, now: Date = Date()) -> AgentModelLimits {
+        let contextRecovered = ModelContextWindows.isFresh(next.contextTimestamp, now: now)
+            && !ModelContextWindows.isFresh(contextTimestamp, now: now)
+        let contextComparable = ModelContextWindows.isFresh(next.contextTimestamp, now: now)
+            == ModelContextWindows.isFresh(contextTimestamp, now: now)
+        let outputRecovered = ModelContextWindows.isFresh(next.outputTimestamp, now: now)
+            && !ModelContextWindows.isFresh(outputTimestamp, now: now)
+        let outputComparable = ModelContextWindows.isFresh(next.outputTimestamp, now: now)
+            == ModelContextWindows.isFresh(outputTimestamp, now: now)
+        let newContext = next.contextWindowTokens != nil
+            && (contextWindowTokens == nil || contextRecovered || (contextComparable && next.contextTimestamp >= contextTimestamp))
+        let newOutput = next.maxOutputTokens != nil
+            && (maxOutputTokens == nil || outputRecovered || (outputComparable && next.outputTimestamp >= outputTimestamp))
+        return AgentModelLimits(contextWindowTokens: newContext ? next.contextWindowTokens : contextWindowTokens,
+                                maxOutputTokens: newOutput ? next.maxOutputTokens : maxOutputTokens,
+                                limitKind: newContext ? next.limitKind : limitKind, fetchedAt: max(fetchedAt, next.fetchedAt),
+                                contextFetchedAt: newContext ? next.contextTimestamp : contextTimestamp,
+                                outputFetchedAt: newOutput ? next.outputTimestamp : outputTimestamp)
     }
 }

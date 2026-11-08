@@ -1159,3 +1159,37 @@
 "chat.context.kind.input" = "Input limit";
 "chat.context.kind.combined" = "Combined context window";
 "chat.metric.omittedCharacters" = "Characters omitted from summary input";
+
+// Selected-model metadata refresh
+"chat.context.refresh.cacheFresh" = "Metadata cache is current";
+"chat.context.refresh.fetched" = "Model metadata refreshed from API";
+"chat.context.refresh.notReported" = "API did not report the context window";
+"chat.context.refresh.unsupported" = "Context metadata detail refresh is unsupported by this API";
+"chat.context.refresh.unavailable" = "Credentials unavailable for metadata refresh";
+"chat.context.refresh.failed" = "Metadata refresh failed; retained available capacity data";
+"chat.context.refresh.deferred" = "Metadata retry interval is active";
+
+// Workload and payload diagnostics
+"chat.metric.omittedScalars" = "Preview scalars omitted";
+"chat.metric.omittedItems" = "Metadata items omitted";
+"chat.metric.deferredScalars" = "Scalars remaining";
+"chat.metric.deferredItems" = "Items remaining";
+"chat.metric.searchResultLimit" = "Search result window limit";
+"chat.metric.searchWindowFull" = "Search window at capacity";
+"chat.metric.selectedSources" = "Sources in work plan";
+"chat.metric.selectedParts" = "Readable source parts";
+"chat.metric.estimatedReadPages" = "Estimated read pages";
+"chat.metric.progressCalls" = "Distinct progress calls";
+"chat.metric.serializedToolOmittedCharacters" = "Tool-result characters omitted in summary";
+"chat.metric.fittedHistoryOmittedCharacters" = "History characters omitted to fit summary";
+"chat.metric.returnedItems" = "Items returned";
+"chat.metric.mutationsCommitted" = "Artifact mutations committed";
+"chat.diagnostic.payloadClipped" = "Preview clipped";
+"chat.diagnostic.payloadPaged" = "More content available";
+"chat.diagnostic.budgetExtended" = "Execution budget extended after progress";
+
+"chat.metric.hardMaxTurns" = "Absolute turn ceiling";
+"chat.metric.hardMaxToolCalls" = "Absolute tool-call ceiling";
+"chat.metric.minimumProgress" = "Minimum distinct progress calls";
+"chat.metric.idleCalls" = "Calls since last distinct progress";
+"chat.diagnostic.budgetExtensionDenied" = "Budget extension denied";

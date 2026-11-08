@@ -24,7 +24,7 @@ struct MeetingChatHarnessDiagnosticsTests {
         let suite = "MeetingChatHarnessDiagnosticsTests.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let service = HarnessChatService(contextWindows: ModelContextWindowStore(defaults: defaults))
+        let service = HarnessChatService(limits: AgentLimits(maxTurns: 14, maxToolCalls: 51, wrapUpOnLimit: true), contextWindows: ModelContextWindowStore(defaults: defaults))
         let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, harnessService: service)
         vm.configure(meeting: nil, modelContext: context)
         vm.send(question: "Compare the meetings", provider: .openAI, model: "gpt-6.1-terra")

@@ -1159,3 +1159,37 @@
 "chat.context.kind.input" = "Limite d’entrée";
 "chat.context.kind.combined" = "Fenêtre de contexte totale";
 "chat.metric.omittedCharacters" = "Caractères omis de l’entrée du résumé";
+
+// Selected-model metadata refresh
+"chat.context.refresh.cacheFresh" = "Cache des métadonnées à jour";
+"chat.context.refresh.fetched" = "Métadonnées actualisées depuis l’API";
+"chat.context.refresh.notReported" = "L’API n’a pas indiqué la fenêtre de contexte";
+"chat.context.refresh.unsupported" = "Cette API ne permet pas d’actualiser les détails de contexte";
+"chat.context.refresh.unavailable" = "Identifiants indisponibles pour actualiser les métadonnées";
+"chat.context.refresh.failed" = "Échec de l’actualisation ; données de capacité disponibles conservées";
+"chat.context.refresh.deferred" = "Intervalle de nouvelle tentative des métadonnées actif";
+
+// Workload and payload diagnostics
+"chat.metric.omittedScalars" = "Scalaires omis dans l’aperçu";
+"chat.metric.omittedItems" = "Éléments de métadonnées omis";
+"chat.metric.deferredScalars" = "Scalaires restants";
+"chat.metric.deferredItems" = "Éléments restants";
+"chat.metric.searchResultLimit" = "Limite de la fenêtre de recherche";
+"chat.metric.searchWindowFull" = "Fenêtre de recherche pleine";
+"chat.metric.selectedSources" = "Sources du plan de travail";
+"chat.metric.selectedParts" = "Parties de sources lisibles";
+"chat.metric.estimatedReadPages" = "Pages de lecture estimées";
+"chat.metric.progressCalls" = "Appels distincts avec progression";
+"chat.metric.serializedToolOmittedCharacters" = "Caractères d’outils omis dans le résumé";
+"chat.metric.fittedHistoryOmittedCharacters" = "Caractères d’historique omis pour ajuster le résumé";
+"chat.metric.returnedItems" = "Éléments renvoyés";
+"chat.metric.mutationsCommitted" = "Modifications des artefacts confirmées";
+"chat.diagnostic.payloadClipped" = "Aperçu tronqué";
+"chat.diagnostic.payloadPaged" = "Contenu supplémentaire disponible";
+"chat.diagnostic.budgetExtended" = "Budget d’exécution augmenté après progression";
+
+"chat.metric.hardMaxTurns" = "Plafond absolu de tours";
+"chat.metric.hardMaxToolCalls" = "Plafond absolu d’appels d’outils";
+"chat.metric.minimumProgress" = "Minimum d’appels distincts avec progression";
+"chat.metric.idleCalls" = "Appels depuis la dernière progression distincte";
+"chat.diagnostic.budgetExtensionDenied" = "Extension du budget refusée";

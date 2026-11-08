@@ -548,10 +548,18 @@ The first NH00 implementation increment covers exact-model capacity records,
 endpoint-scoped metadata with freshness, Anthropic/Gemini limit decoding and
 pagination, persisted visible window provenance, content-free run diagnostics
 and export, first-limit versus skipped-call accounting, and lossless transcript
-continuation. Enduring contracts are in `CLAUDE.md`, "Agent harness". The first increment passed iOS CI and remains under draft review; NH00 remains open for selected-model detail
-fetch/refresh, broader catalog maintenance, full truncation-layer telemetry,
-volume/task-aware budget tuning, and physical-device reproduction of the reported
-workload. NH01–NH10 have not started; this is not full harness parity.
+continuation. Enduring contracts are in `CLAUDE.md`, "Agent harness". The first
+increment passed iOS CI and remains under draft review. The next NH00 increment
+adds selected-model detail refresh, independent field freshness,
+canonical-alias caching, bounded/coalesced metadata requests, preview-versus-continuation
+telemetry and byte-bounded text reads. Workload planning and progress-gated extensions
+replace the source-count-only default; every grant/denial and hard ceiling is logged.
+An integration regression reads thirteen synthetic transcripts and summaries (about 33k
+estimated tokens), executes 68 valid calls including a document mutation, and expects no
+premature compaction or canonical clipping on Terra. NH00 still needs the real corpus
+on a physical device, authenticated provider smoke tests and continued catalog review;
+the synthetic workload is not evidence for the user's particular data/device.
+NH01–NH10 have not started; this is not full harness parity.
 
 Before continuing NH01, the architecture prerequisite separates domain from runtime:
 

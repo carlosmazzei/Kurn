@@ -43,8 +43,9 @@ public enum ChatDocumentTools {
             in the chat reply. create_document creates an explicit artifact; update_document fully replaces its body
             and optionally title; append_to_document adds sections separated by two newlines. Each mutation increments
             version. Documents are limited to 200000 Unicode scalars. read_document uses Unicode-scalar offset/limit
-            pagination (default limit 8000); its last "page:" line gives the next offset. Mutation output returns
-            ID/version, not the body.
+            pagination (default limit 8000); its last "page:" line gives the next offset.
+            Payloads also fit 18000 UTF-8 bytes including the header: always use the returned next offset.
+            Mutation output returns ID/version, not the body.
             """, inputSchema: .object(["type": .string("object"), "properties": .object(properties),
                                        "required": .array(required), "additionalProperties": .bool(false)]))
     }
@@ -106,16 +107,18 @@ public enum ChatDocumentTools {
         let header = "\(action) document \(artifact.id.uuidString) | title: \(ChatSourceToolText.field(artifact.title))"
             + " | version: \(artifact.version)"
         var content = header
+        var metrics: [AgentDiagnostic.Metric: Int] = name == "read_document" ? [:] : [.mutationsCommitted: 1]
         if name == "read_document" {
             let offset = try params.integer("offset", fallback: 0, range: 0...ChatDocumentWorkspace.maximumScalars)
             let limit = try params.integer("limit", fallback: 8000, range: 1...8000)
-            let scalars = artifact.markdown.unicodeScalars
-            let chunk = String(String.UnicodeScalarView(scalars.dropFirst(offset).prefix(limit)))
-            let page = ChatSourceToolText.pageLine(offset: offset, count: chunk.unicodeScalars.count,
-                                                   total: scalars.count, unit: "characters")
-            content += "\n" + chunk + "\n" + page
+            let page = try AgentTextPage(artifact.markdown, offset: offset, maxScalars: limit,
+                                     maxBytes: ChatSourceTools.maxOutputBytes - header.utf8.count - 200)
+            let footer = ChatSourceToolText.pageLine(offset: offset, count: page.returnedScalars,
+                                                     total: page.totalScalars, unit: "characters")
+            content += "\n" + page.text + "\n" + footer
+            metrics = page.metrics
         }
         return AgentToolOutput(content: content,
-                               summary: "\(action) “\(artifact.title)” (v\(artifact.version))")
+                               summary: "\(action) “\(artifact.title)” (v\(artifact.version))", metrics: metrics)
     }
 }

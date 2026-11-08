@@ -45,7 +45,7 @@ public struct NativeHarness: Sendable {
                 do {
                     continuation.yield(.runStarted)
                     if let contextResolution { continuation.yield(.contextResolved(contextResolution)) }
-                    trace.record(.runStarted, metrics: [.maxTurns: limits.maxTurns, .maxToolCalls: limits.maxToolCalls])
+                    trace.record(.runStarted, metrics: limits.diagnosticMetrics)
                     try await drive(systemPrompt: systemPrompt, history: history, prompt: prompt,
                                     tools: tools, maxOutputTokens: maxOutputTokens, events: continuation, trace: trace)
                     continuation.finish()
@@ -56,22 +56,6 @@ public struct NativeHarness: Sendable {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
-    }
-
-    private struct RunState {
-        var history: [AgentMessage]
-        var context: [AgentMessage]
-        var usage = AgentUsage()
-        var cost = 0.0
-        var toolCalls = 0
-        var requestedCalls = 0
-        var turns = 0
-        var finalText = ""
-        var firstLimit: AgentRunStopReason?
-        /// Tokens the provider reported for the latest turn (its input plus its reply) and the
-        /// context length once that reply was appended. Later messages are estimated on top of it;
-        /// a compaction clears it, since the reported size no longer describes the context.
-        var usageAnchor: (tokens: Int, contextCount: Int)?
     }
 
     private struct TurnSettings {
@@ -115,13 +99,18 @@ public struct NativeHarness: Sendable {
                        maxOutputTokens: Int, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                        trace: AgentTraceEmitter) async throws {
         let messages = history + [.user(prompt)]
-        var state = RunState(history: messages, context: messages)
+        var state = AgentRunState(history: messages, context: messages)
+        state.allowedTurns = limits.maxTurns
+        state.allowedToolCalls = limits.maxToolCalls
         let specs = tools.map(\.spec)
         var reason = AgentRunStopReason.turnLimit
-        let settings = TurnSettings(systemPrompt: systemPrompt, tools: specs, maxOutputTokens: maxOutputTokens)
-        for _ in 0..<limits.maxTurns {
+        let outputLimit = min(maxOutputTokens, compactor.policy.maxOutputTokens ?? maxOutputTokens)
+        let settings = TurnSettings(systemPrompt: systemPrompt, tools: specs, maxOutputTokens: outputLimit)
+        while true {
             try Task.checkCancellation()
             if costLimitReached(state) { reason = .costLimit; break }
+            if state.turns >= state.allowedTurns,
+               !state.extendBudget(.turnLimit, limits: limits, trace: trace) { reason = .turnLimit; break }
             guard let response = try await modelTurn(settings, state: &state, events: events, trace: trace) else {
                 reason = .costLimit
                 break
@@ -162,7 +151,7 @@ public struct NativeHarness: Sendable {
     /// Tools stay declared (some vendors reject tool history without them) but tool choice is "none";
     /// calls a vendor returns anyway are dropped. A reply without text is left as no answer, so the
     /// limit stays visible with an empty answer. Returns the wrap-up turn's stop reason.
-    private func wrapUp(_ settings: TurnSettings, state: inout RunState,
+    private func wrapUp(_ settings: TurnSettings, state: inout AgentRunState,
                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                         trace: AgentTraceEmitter) async throws -> AgentModelStopReason? {
         trace.record(.wrapUpStarted)
@@ -184,7 +173,7 @@ public struct NativeHarness: Sendable {
     /// to the usage it reports. A context-overflow rejection compacts and retries once, provided
     /// nothing was streamed yet and compaction actually shrank the context. Returns nil when a
     /// compaction summary exhausted the cost limit before the turn could be sent.
-    private func modelTurn(_ settings: TurnSettings, state: inout RunState,
+    private func modelTurn(_ settings: TurnSettings, state: inout AgentRunState,
                            events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                            trace: AgentTraceEmitter) async throws -> AgentTurnResponse? {
         events.yield(.turnStarted(index: state.turns))
@@ -233,18 +222,18 @@ public struct NativeHarness: Sendable {
         return Int(parts.seconds) * 1000 + Int(parts.attoseconds / 1_000_000_000_000_000)
     }
 
-    private func recordLimit(_ reason: AgentRunStopReason, state: inout RunState, trace: AgentTraceEmitter) {
+    private func recordLimit(_ reason: AgentRunStopReason, state: inout AgentRunState, trace: AgentTraceEmitter) {
         guard state.firstLimit == nil else { return }
         state.firstLimit = reason
-        trace.record(.limitReached, metrics: [.toolCalls: state.toolCalls, .maxToolCalls: limits.maxToolCalls,
-                                             .turnIndex: state.turns, .maxTurns: limits.maxTurns], reason: reason)
+        trace.record(.limitReached, metrics: [.toolCalls: state.toolCalls, .maxToolCalls: state.allowedToolCalls,
+                                             .turnIndex: state.turns, .maxTurns: state.allowedTurns], reason: reason)
     }
 
-    private func costLimitReached(_ state: RunState) -> Bool {
+    private func costLimitReached(_ state: AgentRunState) -> Bool {
         limits.maxCostUSD.map { state.cost >= $0 } ?? false
     }
 
-    private func record(_ usage: AgentUsage?, state: inout RunState,
+    private func record(_ usage: AgentUsage?, state: inout AgentRunState,
                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation) {
         guard let usage else { return }
         state.usage = state.usage.adding(usage)
@@ -254,7 +243,7 @@ public struct NativeHarness: Sendable {
 
     /// The context size of the next request: the provider-reported size of the latest turn plus
     /// estimates of the messages appended since, or a full estimate before any usage is known.
-    private func contextTokens(_ settings: TurnSettings, state: RunState) -> Int {
+    private func contextTokens(_ settings: TurnSettings, state: AgentRunState) -> Int {
         if let anchor = state.usageAnchor, anchor.contextCount <= state.context.count {
             return anchor.tokens + compactor.estimateTokens(of: state.context[anchor.contextCount...])
         }
@@ -267,7 +256,7 @@ public struct NativeHarness: Sendable {
     /// and the newest `keepRecentTokens` are kept. A summary cut off by the output limit is not
     /// used; when compaction was forced, or the summary request itself overflows, the older part
     /// is replaced by a fixed omission note instead, so recovery never stalls.
-    private func compact(_ settings: TurnSettings, state: inout RunState,
+    private func compact(_ settings: TurnSettings, state: inout AgentRunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter,
                          force: Bool = false) async throws {
         let before = contextTokens(settings, state: state)
@@ -316,12 +305,14 @@ public struct NativeHarness: Sendable {
         }
     }
 
-    private func summarize(_ request: AgentTurnRequest?, state: inout RunState,
+    private func summarize(_ request: AgentTurnRequest?, state: inout AgentRunState,
                            events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                            trace: AgentTraceEmitter) async throws -> SummaryResult {
         guard let request else { return .skipped }
         trace.record(.summaryStarted, metrics: [.maxOutputTokens: request.maxOutputTokens,
-                                               .omittedCharacters: request.contextOmittedCharacters])
+                                               .omittedCharacters: request.contextOmittedCharacters,
+                                               .serializedToolOmittedCharacters: request.serializedToolOmittedCharacters,
+                                               .fittedHistoryOmittedCharacters: request.fittedHistoryOmittedCharacters])
         let response: AgentTurnResponse
         do { response = try await model.streamTurn(request) { _ in } }
         catch { trace.record(.summaryFailed); throw error }
@@ -332,7 +323,7 @@ public struct NativeHarness: Sendable {
         return response.stopReason == .maxTokens || text.isEmpty ? .unusable : .text(text)
     }
 
-    private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout RunState,
+    private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout AgentRunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                          trace: AgentTraceEmitter) async throws -> AgentRunStopReason? {
         var stop: AgentRunStopReason?
@@ -341,8 +332,11 @@ public struct NativeHarness: Sendable {
             let call = normalized.call
             state.requestedCalls += 1
             trace.record(.toolRequested, metrics: [.callOrdinal: state.requestedCalls, .toolCalls: state.toolCalls])
-            if costLimitReached(state) { stop = .costLimit }
-            else if state.toolCalls >= limits.maxToolCalls { stop = .toolCallLimit }
+            if stop == nil {
+                if costLimitReached(state) { stop = .costLimit }
+                else if state.toolCalls >= state.allowedToolCalls,
+                        !state.extendBudget(.toolCallLimit, limits: limits, trace: trace) { stop = .toolCallLimit }
+            }
             events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
             let output: AgentToolOutput
             let isError: Bool
@@ -355,6 +349,7 @@ public struct NativeHarness: Sendable {
             } else {
                 state.toolCalls += 1
                 (output, isError) = try await executeOne(normalized, tools: tools)
+                if limits.continuation != nil { state.recordProgress(call: call, output: output, isError: isError) }
             }
             let result = AgentMessage.toolResult(callID: call.id, toolName: call.name,
                                                  content: output.content, isError: isError)
@@ -364,6 +359,12 @@ public struct NativeHarness: Sendable {
             metrics[.callOrdinal] = state.requestedCalls
             metrics[.isError] = isError ? 1 : 0
             trace.record(.toolFinished, metrics: metrics)
+            if (metrics[.omittedScalars] ?? 0) > 0 || (metrics[.omittedItems] ?? 0) > 0 {
+                trace.record(.payloadClipped, metrics: metrics)
+            }
+            if (metrics[.deferredScalars] ?? 0) > 0 || (metrics[.deferredItems] ?? 0) > 0 {
+                trace.record(.payloadPaged, metrics: metrics)
+            }
             events.yield(.toolFinished(callID: call.id, name: call.name, summary: output.summary, isError: isError))
         }
         return stop

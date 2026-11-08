@@ -14,13 +14,16 @@ public struct AgentContextPolicy: Sendable, Equatable {
     /// Approximate size of the newest messages a compaction keeps verbatim.
     public let keepRecentTokens: Int
     public let summaryPrompts: AgentCompactionPrompts
+    public let maxOutputTokens: Int?
 
     public init(contextWindow: Int, reserveTokens: Int = defaultReserveTokens,
-                keepRecentTokens: Int = defaultKeepRecentTokens, summaryPrompts: AgentCompactionPrompts = .standard) {
+                keepRecentTokens: Int = defaultKeepRecentTokens, summaryPrompts: AgentCompactionPrompts = .standard,
+                maxOutputTokens: Int? = nil) {
         self.contextWindow = max(1, contextWindow)
         self.reserveTokens = max(0, reserveTokens)
         self.keepRecentTokens = max(1, keepRecentTokens)
         self.summaryPrompts = summaryPrompts
+        self.maxOutputTokens = maxOutputTokens.flatMap { $0 > 0 ? $0 : nil }
     }
 
     /// Context size above which a request is compacted: the window minus the reserve, but never
@@ -34,8 +37,8 @@ public struct AgentContextPolicy: Sendable, Equatable {
     /// Output allowance of the history summary (80% of the reserve, as in pi) and of a split turn's
     /// prefix summary (50%), each capped at a quarter/eighth of the window so the summary request
     /// itself fits a small-window model (an 8k model would otherwise be asked for 13k of output).
-    public var historySummaryMaxOutputTokens: Int { max(64, min(reserveTokens * 4 / 5, contextWindow / 4)) }
-    public var turnPrefixSummaryMaxOutputTokens: Int { max(64, min(reserveTokens / 2, contextWindow / 8)) }
+    public var historySummaryMaxOutputTokens: Int { min(maxOutputTokens ?? .max, max(64, min(reserveTokens * 4 / 5, contextWindow / 4))) }
+    public var turnPrefixSummaryMaxOutputTokens: Int { min(maxOutputTokens ?? .max, max(64, min(reserveTokens / 2, contextWindow / 8))) }
 
     func needsCompaction(_ tokens: Int) -> Bool { tokens > compactionThreshold }
 }
@@ -175,7 +178,8 @@ public struct AgentContextCompactor: Sendable {
             : max(0, serialized.count - conversation.count + Self.truncatedConversationNote.count + 1)
         return AgentTurnRequest(systemPrompt: policy.summaryPrompts.system,
                                 messages: [.user("<conversation>\n" + conversation + tail)],
-                                tools: [], maxOutputTokens: maxOutputTokens, contextOmittedCharacters: clipped + omitted)
+                                tools: [], maxOutputTokens: maxOutputTokens, contextOmittedCharacters: clipped + omitted,
+                                serializedToolOmittedCharacters: clipped, fittedHistoryOmittedCharacters: omitted)
     }
 
     /// Keeps the newest part of `text` that fits `budget` estimated tokens, marked as truncated.
