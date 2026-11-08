@@ -110,8 +110,12 @@ turn as too long (`isContextOverflow`; the adapter passes `AppError.isContextOve
 which also matches in-stream errors) makes that size read as over budget, compacts and
 retries the turn once — only if nothing was streamed and compaction shrank the context.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
-`NativeHarness.wrapUpInstruction` appended (tools stay declared, calls are dropped), so
-the run ends with an answer from what was gathered; never past the cost limit.
+`NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
+(tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and
+calls returned anyway are dropped), so the run ends with an answer from what was gathered.
+A wrap-up without text leaves no answer; one cut off reports `.outputLimit`; it never runs
+past the cost limit. On overflow, compaction is forced past the calibrated threshold:
+old results are elided, or the older prefix summarized when nothing could be elided.
 Chat uses `AgentLimits.chat(sourceCount:)` (10–24 turns, 20–96 tool calls, wrap-up on)
 and its prompt steers multi-meeting questions to listing, search and summaries first.
 Old tool results are elided first, then an older
