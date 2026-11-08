@@ -29,10 +29,11 @@ public struct AgentContextPolicy: Sendable, Equatable {
     /// window always frees room.
     public var effectiveKeepRecentTokens: Int { max(1, min(keepRecentTokens, compactionThreshold / 2)) }
 
-    /// Output allowance of the history summary (80% of the reserve) and of a split turn's prefix
-    /// summary (50%), as in pi.
-    public var historySummaryMaxOutputTokens: Int { max(256, reserveTokens * 4 / 5) }
-    public var turnPrefixSummaryMaxOutputTokens: Int { max(256, reserveTokens / 2) }
+    /// Output allowance of the history summary (80% of the reserve, as in pi) and of a split turn's
+    /// prefix summary (50%), each capped at a quarter/eighth of the window so the summary request
+    /// itself fits a small-window model (an 8k model would otherwise be asked for 13k of output).
+    public var historySummaryMaxOutputTokens: Int { max(64, min(reserveTokens * 4 / 5, contextWindow / 4)) }
+    public var turnPrefixSummaryMaxOutputTokens: Int { max(64, min(reserveTokens / 2, contextWindow / 8)) }
 
     func needsCompaction(_ tokens: Int) -> Bool { tokens > compactionThreshold }
 }
@@ -135,23 +136,52 @@ public struct AgentContextCompactor: Sendable {
     /// the previous compaction's summary when there is one; nil when there is no such history.
     public func historySummaryRequest(for plan: AgentCompactionPlan) -> AgentTurnRequest? {
         guard !plan.messagesToSummarize.isEmpty else { return nil }
-        var prompt = "<conversation>\n\(Self.serialize(plan.messagesToSummarize))\n</conversation>\n\n"
-        if let previous = plan.previousSummary {
-            prompt += "<previous-summary>\n\(previous)\n</previous-summary>\n\n" + Self.updateSummaryPrompt
-        } else {
-            prompt += Self.summaryPrompt
-        }
-        return AgentTurnRequest(systemPrompt: Self.summarizationSystemPrompt, messages: [.user(prompt)],
-                                tools: [], maxOutputTokens: policy.historySummaryMaxOutputTokens)
+        let instructions = plan.previousSummary.map {
+            "<previous-summary>\n\($0)\n</previous-summary>\n\n" + Self.updateSummaryPrompt
+        } ?? Self.summaryPrompt
+        return summaryRequest(conversation: plan.messagesToSummarize, instructions: instructions,
+                              maxOutputTokens: policy.historySummaryMaxOutputTokens)
     }
 
     /// The summary request for a split turn's earlier part; nil when the cut is at a turn start.
     public func turnPrefixSummaryRequest(for plan: AgentCompactionPlan) -> AgentTurnRequest? {
         guard plan.isSplitTurn else { return nil }
-        let prompt = "<conversation>\n\(Self.serialize(plan.turnPrefix))\n</conversation>\n\n"
-            + Self.turnPrefixSummaryPrompt
-        return AgentTurnRequest(systemPrompt: Self.summarizationSystemPrompt, messages: [.user(prompt)],
-                                tools: [], maxOutputTokens: policy.turnPrefixSummaryMaxOutputTokens)
+        return summaryRequest(conversation: plan.turnPrefix, instructions: Self.turnPrefixSummaryPrompt,
+                              maxOutputTokens: policy.turnPrefixSummaryMaxOutputTokens)
+    }
+
+    /// Notes that the oldest part of a summary request's conversation was dropped to fit the window.
+    public static let truncatedConversationNote = "[Earlier part of the conversation omitted to fit the context window]"
+    /// Margin for vendor framing around the summary request.
+    static let summaryRequestMarginTokens = 64
+
+    /// A tool-less summary request whose serialized conversation is trimmed from its oldest end so
+    /// that input and output together fit the context window.
+    private func summaryRequest(conversation messages: [AgentMessage], instructions: String,
+                                maxOutputTokens: Int) -> AgentTurnRequest {
+        let tail = "\n</conversation>\n\n" + instructions
+        let budget = policy.contextWindow - maxOutputTokens - Self.summaryRequestMarginTokens
+            - estimate(Self.summarizationSystemPrompt) - estimate("<conversation>\n" + tail)
+            - Self.messageOverheadTokens
+        let conversation = fitted(Self.serialize(messages), toTokens: budget)
+        return AgentTurnRequest(systemPrompt: Self.summarizationSystemPrompt,
+                                messages: [.user("<conversation>\n" + conversation + tail)],
+                                tools: [], maxOutputTokens: maxOutputTokens)
+    }
+
+    /// Keeps the newest part of `text` that fits `budget` estimated tokens, marked as truncated.
+    private func fitted(_ text: String, toTokens budget: Int) -> String {
+        let total = estimate(text)
+        guard total > budget else { return text }
+        let note = Self.truncatedConversationNote + "\n"
+        // Start from the proportional share, then shrink by 10% until the estimate fits.
+        var keep = Int(Double(text.count) * Double(max(0, budget)) / Double(max(1, total)))
+        while keep > 0 {
+            let candidate = note + String(text.suffix(keep))
+            if estimate(candidate) <= budget { return candidate }
+            keep = min(keep - 1, keep * 9 / 10)
+        }
+        return note
     }
 
     /// The compacted context: one summary message followed by the kept messages.

@@ -121,7 +121,9 @@ prefix summary, so the kept suffix keeps its request. Summary requests are tool-
 the conversation as labelled text (`serialize`, tool results clipped to 2,000 characters) with a
 structured prompt (goal, progress, findings with citations, sources and documents, next steps);
 a later compaction updates the previous summary instead of replacing it. Summary output is
-capped at 80% (history) and 50% (turn prefix) of the reserve. A summary cut off by the output
+capped at 80% (history) and 50% (turn prefix) of the reserve, and at a quarter/eighth of the
+window, and the serialized conversation is trimmed from its oldest end so the summary request's
+input and output fit the window (an 8k model is never asked for 13k of output). A summary cut off by the output
 limit is not used. Compaction runs before a turn when over the threshold, and is forced after a
 provider rejects a turn as too long (`isContextOverflow`; the adapter passes
 `AppError.isContextOverflow`, whose markers follow pi-ai's per-vendor overflow patterns and

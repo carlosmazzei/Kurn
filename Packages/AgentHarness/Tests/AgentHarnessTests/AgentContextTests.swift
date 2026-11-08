@@ -121,6 +121,25 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(initial.hasSuffix(AgentContextCompactor.summaryPrompt))
     }
 
+    @Test(arguments: [false, true])
+    func summaryRequestsFitASmallWindow(splitTurn: Bool) throws {
+        let compactor = AgentContextCompactor(policy: AgentContextPolicy(contextWindow: 8_192))
+        #expect(compactor.policy.historySummaryMaxOutputTokens == 2_048)
+        #expect(compactor.policy.turnPrefixSummaryMaxOutputTokens == 1_024)
+        let messages: [AgentMessage] = [.user(tokens(3_000)), .assistant(text: tokens(3_000), toolCalls: []),
+            splitTurn ? .assistant(text: tokens(3_000), toolCalls: []) : .user(tokens(3_000)),
+            .assistant(text: tokens(10), toolCalls: [])]
+        let plan = try #require(compactor.plan(for: messages))
+        #expect(plan.isSplitTurn == splitTurn)
+        let request = try #require(splitTurn ? compactor.turnPrefixSummaryRequest(for: plan)
+                                             : compactor.historySummaryRequest(for: plan))
+        #expect(request.maxOutputTokens == (splitTurn ? 1_024 : 2_048))
+        let input = compactor.estimateTokens(systemPrompt: request.systemPrompt, messages: request.messages, tools: [])
+        #expect(input + request.maxOutputTokens <= 8_192)
+        guard case .user(let prompt)? = request.messages.first else { Issue.record("Missing prompt"); return }
+        #expect(prompt.hasPrefix("<conversation>\n" + AgentContextCompactor.truncatedConversationNote + "\n"))
+    }
+
     @Test func thresholdCompactionSummarizesAndKeepsTheRecentTail() async throws {
         let usage = AgentUsage(inputTokens: 100, outputTokens: 20)
         let model = ScriptedAgentModel([AgentTurnResponse(text: "Turn summary", usage: usage),
