@@ -7,12 +7,14 @@ public extension NativeHarness {
          limits: AgentLimits = AgentLimits(), costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
          reserveTokens: Int = AgentContextPolicy.defaultReserveTokens,
          keepRecentTokens: Int = AgentContextPolicy.defaultKeepRecentTokens,
-         confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false }) {
+         confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false },
+         diagnosticSink: @escaping @Sendable (AgentDiagnostic) -> Void = { _ in }) {
         self.init(model: model, limits: limits, costEstimator: costEstimator,
                   contextPolicy: AgentContextPolicy(contextWindow: contextWindow, reserveTokens: reserveTokens,
                                                     keepRecentTokens: keepRecentTokens),
                   tokenEstimator: { TokenEstimate.tokens(in: $0) },
-                  isContextOverflow: { ($0 as? AppError)?.isContextOverflow == true }, confirm: confirm)
+                  isContextOverflow: { ($0 as? AppError)?.isContextOverflow == true }, confirm: confirm,
+                  diagnosticSink: diagnosticSink)
     }
 }
 

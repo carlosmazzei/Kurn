@@ -62,14 +62,17 @@ public struct AgentTurnRequest: Sendable, Equatable {
     /// False asks the vendor to answer in text only while tools stay declared (some vendors reject
     /// tool history without declarations): `tool_choice: none` or Gemini's `NONE` calling mode.
     public let allowsToolCalls: Bool
+    /// Diagnostic-only loss in a summary request; never serialized as a provider parameter.
+    public let contextOmittedCharacters: Int
 
     public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
-                allowsToolCalls: Bool = true) {
+                allowsToolCalls: Bool = true, contextOmittedCharacters: Int = 0) {
         self.systemPrompt = systemPrompt
         self.messages = messages
         self.tools = tools
         self.maxOutputTokens = maxOutputTokens
         self.allowsToolCalls = allowsToolCalls
+        self.contextOmittedCharacters = contextOmittedCharacters
     }
 }
 
@@ -103,11 +106,13 @@ public struct AgentToolOutput: Sendable, Equatable {
     public let content: String
     public let summary: String
     public let isError: Bool
+    public let metrics: [AgentDiagnostic.Metric: Int]
 
-    public init(content: String, summary: String, isError: Bool = false) {
+    public init(content: String, summary: String, isError: Bool = false, metrics: [AgentDiagnostic.Metric: Int] = [:]) {
         self.content = content
         self.summary = summary
         self.isError = isError
+        self.metrics = metrics
     }
 }
 
@@ -160,6 +165,8 @@ public struct AgentRunOutcome: Sendable, Equatable {
 
 public enum AgentEvent: Sendable, Equatable {
     case runStarted
+    case contextResolved(AgentContextResolution)
+    case diagnostic(AgentDiagnostic)
     case turnStarted(index: Int)
     case textDelta(String)
     case toolStarted(callID: String, name: String, arguments: JSONValue)

@@ -81,8 +81,44 @@ hidden for Apple on-device and other non-agent providers, which cannot chat.
 `ChatStepPresentation` maps structured tool/stop data to localization keys outside
 Views; expandable arguments/output previews cap at 2000 scalars. The chat shows live
 usage/cost and compact per-turn `ChatArtifactReference` title/version rows (no duplicate
-document bodies in turn JSON). Optional references preserve old turn decoding; full
-artifact cards and saving into the document library are separate work.
+document bodies in turn JSON). Optional references preserve old turn decoding;
+`ChatArtifactCard` previews and saves artifacts into the document library.
+
+`AgentContextResolution` is the immutable capacity snapshot for a run. Its source is
+API (with cache flag and retrieval date), fixed table (with catalog revision), or
+fixed fallback; it records the exact model ID, token value and input/combined
+semantics. `ChatAgentTimeline` persists it as a context step, so reopening a chat
+does not recompute provenance from today's catalog. Older traces show an unknown
+origin. Provider metadata uses an endpoint/API-shape/exact-model keyed V2 cache
+with a 24-hour lifetime; unscoped V1 values are not promoted to API evidence.
+`ProviderModelsService` records Anthropic input/output limits, Gemini input/output
+limits without collapsing versioned IDs, and compatible-server context/output
+limits (bounded by routed OpenRouter limits when supplied). Anthropic and Gemini
+list pagination is bounded and rejects missing/repeated cursors. The bundled
+`ModelContextCatalog` supplies exact, reviewed current model capacities, including
+GPT-6.1 Terra's 1,050,000 tokens, ahead of conservative legacy-family defaults.
+
+`AgentDiagnostic` carries only fixed event/metric vocabulary, numeric counts and
+opaque correlation IDs. The synchronous injected sink records lifecycle,
+request/summary, compaction decisions, tools, skipped calls, first limit and
+wrap-up independently of the UI consumer. `HarnessDiagnostics` mirrors these
+to `AppLog.generation` at notice and records limit summaries in `ReliabilityLog`
+even if wrap-up produces an answer. `HarnessTraceStore` keeps protected JSONL
+per run, up to 512 KiB with an explicit incomplete marker and reserved terminal;
+it retains 20 completed runs, preserves active runs and expires abandoned active
+traces after seven days during pruning. Log export includes this trace independently
+of console verbosity. No prompts, excerpts, bodies, tool arguments or raw errors
+enter diagnostic records. Failed/cancelled partial answer text is removed, while
+its trace and reported usage persist on the retryable question.
+
+Transcript tool pagination preserves full passage text. A page is bounded by
+8,000 Unicode scalars and an 18,000-byte budget including framing; a partial
+passage returns the same passage `offset` plus `textOffset` for its unread suffix.
+Search previews and metadata may still be clipped, but canonical transcript
+reads no longer go through the 500-scalar field preview. Summary requests report
+the count of characters omitted by per-result clipping and request fitting;
+the source data remains in the app. Compaction that does not reduce the estimated
+context is skipped rather than reported as a successful reduction.
 
 `ChatDocumentWorkspace` owns versioned `ChatDocumentArtifact` values, initialized
 from a persisted snapshot when reopening a conversation. `ChatDocumentTools` creates,
@@ -106,8 +142,8 @@ holds the model's real `contextWindow`, a `reserveTokens` kept free for the repl
 `keepRecentTokens` (20,000); a request is compacted once its context exceeds the window minus
 the reserve (never below half the window), with no fraction and no practical cap.
 `HarnessChatService` resolves the window per provider and model through
-`ModelContextWindowStore.agentContextWindow` → KurnCore's `ModelContextWindows.agentWindow`:
-the window the provider's model listing reported, else the model-family table, else
+`ModelContextWindowStore.resolution` → KurnCore's `ModelContextWindows.resolve`:
+fresh capacity metadata reported by the endpoint, else the catalog/legacy table, else
 `unknownWindow` (32,768). Unlike `ContextBudget` (summaries and the wiki) it applies no 100k
 cap: every turn resends the whole context, so a long run on a large window costs more, and
 `AgentLimits.maxCostUSD` is the guard. The context size is the provider-reported usage of the
@@ -355,9 +391,9 @@ How coverage was raised to target, and how to keep it there:
 
 To verify a change through CI:
 
-- Push the change to its branch and open (or update) a PR targeting `main` — the
-  `pull_request` trigger runs the workflow. Pushing to a feature branch alone
-  does **not** trigger CI; only `push` to `main` and PRs to `main` do.
+- Push the change to its branch and open (or update) a PR targeting `main` or
+  the integration branches allowed by `.github/workflows/swift.yml` (including
+  `feature/native-harness`). Pushing to a feature branch alone does not trigger CI.
 - Read the run's outcome with the GitHub Actions tooling/API: fetch the
   `unit-tests` (or `ui-accessibility-tests`) job logs and grep for `error:`
   (compile failures), `recorded an issue` / `** TEST FAILED **` (test

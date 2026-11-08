@@ -24,6 +24,16 @@ public struct ChatStepPresentation: Sendable, Equatable {
             parameter = nil
             parameterKey = nil
             symbol = "checkmark.circle"
+        case .context:
+            key = "chat.step.context"
+            parameter = nil
+            parameterKey = nil
+            symbol = "gauge.with.dots.needle.50percent"
+        case .diagnostic:
+            key = "chat.diagnostic.\(step.diagnostic?.kind.rawValue ?? "unknown")"
+            parameter = nil
+            parameterKey = nil
+            symbol = step.diagnostic?.kind == .limitReached ? "exclamationmark.circle" : "list.bullet.rectangle"
         case .tool:
             let name = step.toolName ?? ""
             key = Self.toolKeys[name] ?? "chat.step.tool"

@@ -11,9 +11,8 @@
 //  successfully completed exchange is saved into `session` — created lazily on
 //  the first one, so a conversation the user opens and abandons never leaves an
 //  empty row in the history list. Document mutations also save the session.
-//  Only finished exchanges are persisted; a
-//  cancelled or failed reply is dropped from `turns` (see `dropPartialReply`)
-//  before `persist()` would ever see it.
+//  A cancelled/failed partial answer is dropped, while its execution trace and
+//  reported usage are retained on the retryable question (see `dropPartialReply`).
 //
 
 import AgentHarness
@@ -190,8 +189,14 @@ final class MeetingChatViewModel {
     /// sitting next to an error. Leaves the question turn itself untouched.
     private func dropPartialReply(keeping count: Int) {
         guard turns.count > count else { return }
-        for turn in turns.dropFirst(count) { turns[count - 1].inheritArtifacts(from: turn) }
+        for turn in turns.dropFirst(count) {
+            turns[count - 1].inheritArtifacts(from: turn)
+            turns[count - 1].steps = turn.steps
+            turns[count - 1].usage = turn.usage
+            turns[count - 1].costUSD = turn.costUSD
+        }
         turns.removeLast(turns.count - count)
+        persist()
     }
 
     /// The question of the most recent turn when it ended without a reply —

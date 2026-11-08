@@ -2,7 +2,7 @@ import AgentHarness
 import Foundation
 
 public struct ChatAgentStep: Codable, Sendable, Equatable, Identifiable {
-    public enum Kind: String, Codable, Sendable { case turn, tool, compaction, stop }
+    public enum Kind: String, Codable, Sendable { case turn, tool, compaction, stop, context, diagnostic }
     public enum Status: String, Codable, Sendable { case running, finished, failed }
 
     public let id: UUID
@@ -16,6 +16,8 @@ public struct ChatAgentStep: Codable, Sendable, Equatable, Identifiable {
     public var beforeTokens: Int?
     public var afterTokens: Int?
     public var stopReason: AgentRunStopReason?
+    public var contextResolution: AgentContextResolution?
+    public var diagnostic: AgentDiagnostic?
     public var argumentsSummary: String? { arguments.flatMap { try? $0.encodedString() } }
 
     public init(kind: Kind, status: Status = .running) {
@@ -42,6 +44,14 @@ public struct ChatAgentTimeline: Sendable, Equatable {
             finishTurn()
             var step = ChatAgentStep(kind: .turn)
             step.turnIndex = index
+            steps.append(step)
+        case .contextResolved(let resolution):
+            var step = ChatAgentStep(kind: .context, status: .finished)
+            step.contextResolution = resolution
+            steps.append(step)
+        case .diagnostic(let diagnostic):
+            var step = ChatAgentStep(kind: .diagnostic, status: .finished)
+            step.diagnostic = diagnostic
             steps.append(step)
         case .toolStarted(let callID, let name, let arguments):
             var step = ChatAgentStep(kind: .tool)

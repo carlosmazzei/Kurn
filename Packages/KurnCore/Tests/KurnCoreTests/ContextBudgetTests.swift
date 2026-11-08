@@ -108,9 +108,9 @@ struct ContextBudgetTests {
     @Test func longestPrefixWins() {
         #expect(ModelContextWindows.knownWindow(forModel: "gpt-4o-2024-08-06") == 128_000)
         #expect(ModelContextWindows.knownWindow(forModel: "gpt-4-0613") == 8_192)
-        #expect(ModelContextWindows.knownWindow(forModel: "gpt-4.1-mini") == 1_000_000)
+        #expect(ModelContextWindows.knownWindow(forModel: "gpt-4.1-mini") == 1_047_576)
         #expect(ModelContextWindows.knownWindow(forModel: "gemini-1.5-pro-002") == 2_000_000)
-        #expect(ModelContextWindows.knownWindow(forModel: "gemini-2.5-flash") == 1_000_000)
+        #expect(ModelContextWindows.knownWindow(forModel: "gemini-2.5-flash") == 1_048_576)
         #expect(ModelContextWindows.knownWindow(forModel: "o1-mini") == 128_000)
     }
 

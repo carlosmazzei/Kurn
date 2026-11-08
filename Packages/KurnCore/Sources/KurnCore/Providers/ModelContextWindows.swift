@@ -3,24 +3,45 @@
 //  KurnCore
 //
 //  Context windows of model families the app's built-in providers serve,
-//  for when the provider's own `/models` listing does not report one
-//  (OpenAI and Anthropic list ids only). A name that matches nothing here
+//  for when an endpoint omits capacity metadata. A name that matches nothing here
 //  gets `ContextBudget.conservative`, and a window that turns out to be
 //  wrong is caught by the provider rejecting the request, which falls back
 //  to the staged path — so this table is an optimisation, never a contract.
 //
 
+import AgentHarness
 import Foundation
 
 public enum ModelContextWindows {
+    public static let metadataLifetime: TimeInterval = 24 * 60 * 60
+
+    public static func resolve(model: String, reported: AgentModelLimits? = nil, now: Date = Date()) -> AgentContextResolution {
+        let age = reported.map { now.timeIntervalSince($0.fetchedAt) }
+        let fresh = age.map { $0 >= -300 && $0 < metadataLifetime } ?? false
+        let catalog = ModelContextCatalog.entry(for: model)
+        if fresh, let reported, let tokens = reported.contextWindowTokens, tokens > 0 {
+            return AgentContextResolution(contextWindowTokens: tokens, source: .api, reason: .reported,
+                                          modelLimits: reported, resolvedAt: now, modelID: model)
+        }
+        let reason: AgentContextResolution.Reason = reported != nil && !fresh ? .expiredMetadata : .catalogMatch
+        if let tokens = knownWindow(forModel: model) {
+            let limits = AgentModelLimits(contextWindowTokens: tokens,
+                                          maxOutputTokens: fresh ? reported?.maxOutputTokens ?? catalog?.maxOutputTokens : catalog?.maxOutputTokens,
+                                          limitKind: catalog?.limitKind ?? .combined)
+            return AgentContextResolution(contextWindowTokens: tokens, source: .fixedTable, reason: reason,
+                                          modelLimits: limits, catalogVersion: ModelContextCatalog.version, resolvedAt: now, modelID: model)
+        }
+        return AgentContextResolution(contextWindowTokens: unknownWindow, source: .fixedFallback,
+                                      reason: reported != nil && !fresh ? .expiredMetadata : .unknownModel,
+                                      modelLimits: fresh ? reported : nil, resolvedAt: now, modelID: model)
+    }
+
     /// Lowercased id prefix → total context window in tokens. The longest
     /// matching prefix wins, so `gpt-4o` beats `gpt-4`. Values are the
     /// published input limits, rounded down where a vendor quotes a total
     /// that includes output.
     static let windowsByPrefix: [(prefix: String, tokens: Int)] = [
         // OpenAI
-        ("gpt-5", 272_000),
-        ("gpt-4.1", 1_000_000),
         ("gpt-4o", 128_000),
         ("chatgpt-4o", 128_000),
         ("gpt-4-turbo", 128_000),
@@ -75,6 +96,9 @@ public enum ModelContextWindows {
             .last
             .map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? ""
         guard !name.isEmpty else { return nil }
+        if let exact = ModelContextCatalog.entry(for: name) { return exact.tokens }
+        // An unknown new GPT variant must not inherit the much smaller GPT-4 fallback.
+        if name.hasPrefix("gpt-5") || name.hasPrefix("gpt-6") || name.hasPrefix("gpt-4.1") { return nil }
         return windowsByPrefix
             .filter { name.hasPrefix($0.prefix) }
             .max { $0.prefix.count < $1.prefix.count }?

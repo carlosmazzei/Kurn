@@ -12,7 +12,7 @@
 //  else — the same rule `SemanticChunk`/`WikiArticle` follow.
 //
 //  `MeetingChatViewModel` owns reading and writing it: a conversation is
-//  created lazily, on its first completed exchange or document mutation, so a chat the
+//  created lazily, on its first completed exchange, document mutation or interrupted-run trace, so a chat the
 //  user opens and abandons without sending anything never leaves an empty row
 //  in the history list.
 //

@@ -9,6 +9,7 @@ struct HarnessChatService {
     var isWikiEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.wikiEnabled) }
     /// nil sizes the limits to the resolved sources (`AgentLimits.chat(sourceCount:)`).
     var limits: AgentLimits?
+    var contextWindows: ModelContextWindowStore = .shared
 
     func events(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
@@ -26,15 +27,17 @@ struct HarnessChatService {
             + ChatDocumentTools.make(workspace: workspace)
         let artifacts = await workspace.snapshot()
         try Task.checkCancellation()
-        let window = ModelContextWindowStore.shared.agentContextWindow(for: provider, model: modelIdentifier)
-        let harness = NativeHarness(model: model, contextWindow: window,
-                                    limits: limits ?? .chat(sourceCount: ids.count))
+        let resolution = contextWindows.resolution(for: provider, model: modelIdentifier)
+        HarnessDiagnostics.record(resolution)
+        let harness = NativeHarness(model: model, contextWindow: resolution.contextWindowTokens,
+                                    limits: limits ?? .chat(sourceCount: ids.count), diagnosticSink: { HarnessDiagnostics.record($0) })
         return harness.run(
             systemPrompt: try Self.systemPrompt(artifacts: artifacts),
             history: history.map {
                 $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
             },
-            prompt: question, tools: tools, maxOutputTokens: 4_096
+            prompt: question, tools: tools, maxOutputTokens: min(4_096, resolution.maxOutputTokens ?? 4_096),
+            contextResolution: resolution
         )
     }
 

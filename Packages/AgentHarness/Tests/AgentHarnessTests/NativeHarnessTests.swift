@@ -59,7 +59,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let usage = AgentUsage(inputTokens: 10, outputTokens: 3)
         let model = ScriptedAgentModel([AgentTurnResponse(text: "Answer", usage: usage)])
         let events = try await agentEvents(NativeHarness(model: model), history: [.user("Earlier")])
-        #expect(events == [.runStarted, .turnStarted(index: 0), .textDelta("Answer"), .usage(usage),
+        #expect(events.filter { if case .diagnostic = $0 { return false }; return true } == [.runStarted, .turnStarted(index: 0), .textDelta("Answer"), .usage(usage),
                            .runFinished(AgentRunOutcome(messages: [.user("Earlier"), .user("Question"),
                                .assistant(text: "Answer", toolCalls: [])], finalText: "Answer",
                                stopReason: .completed, totalUsage: usage))])

@@ -60,13 +60,18 @@ public enum ChatSourceTools {
         if name == "read_attachment" {
             properties["attachmentID"] = .object(["type": .string("string"), "format": .string("uuid")])
         }
+        if name == "read_transcript" {
+            properties["textOffset"] = .object(["type": .string("integer"), "minimum": .number(0), "maximum": .number(1000000)])
+        }
         return AgentToolSpec(name: name,
                              description: """
                              Read authorized sources; results are plain text. offset/limit page items. Text reads
                              use a Unicode-scalar offset and return up to 8000 scalars. Search pages a top-100 result
                              window. Omit attachmentID to list attachments. Each result ends with a "page:" line; pass
                              its "next offset" to continue. Passages are "[m:ss] Speaker: text" ([h:mm:ss] past an
-                             hour) under "meeting <id>:"; clipped fields end with [truncated].
+                             hour). A transcript page may end inside a passage: pass BOTH next offset and textOffset
+                             from its page line to recover the unread suffix. textOffset counts Unicode scalars.
+                             Passages appear under "meeting <id>:"; clipped metadata fields end with [truncated].
                              """,
                              inputSchema: .object(["type": .string("object"), "properties": .object(properties),
                                                    "required": .array(required), "additionalProperties": .bool(false)]))
@@ -87,6 +92,7 @@ public enum ChatSourceTools {
             let permitted: Set<String> = name == "list_sources" ? ["offset", "limit"]
                 : name == "search" ? ["query", "offset", "limit"]
                 : name == "read_attachment" ? ["meetingID", "attachmentID", "offset", "limit"]
+                : name == "read_transcript" ? ["meetingID", "offset", "limit", "textOffset"]
                 : ["meetingID", "offset", "limit"]
             guard Set(values.keys).isSubset(of: permitted) else { throw Invalid("Unknown argument.") }
             self.values = values
@@ -144,8 +150,9 @@ public enum ChatSourceTools {
         case "read_transcript":
             let result = try await reader.readTranscript(meetingID: id, offset: params.offset, limit: min(params.limit, 10))
             let passages = Array(result.passages.prefix(min(params.limit, 10)).filter { $0.meetingID == id })
-            return lineOutput(header: "transcript:", items: passages, total: result.total, offset: params.offset,
-                              unit: "passages", render: ChatSourceToolText.passages)
+            let textOffset = try Parameters.integer(params.values["textOffset"], fallback: 0, range: 0...1_000_000)
+            return try ChatTranscriptToolPage.output(ChatTranscriptPage(passages: passages, total: result.total),
+                                                      offset: params.offset, textOffset: textOffset)
         case "read_summary":
             return try textPage(await reader.readSummary(meetingID: id), params: params)
         case "read_wiki":
@@ -203,6 +210,8 @@ public enum ChatSourceTools {
         let count = chunk.unicodeScalars.count
         let pageLine = ChatSourceToolText.pageLine(offset: params.offset, count: count, total: scalars.count,
                                                    unit: "characters")
-        return AgentToolOutput(content: chunk + "\n" + pageLine, summary: "Read \(count) characters")
+        return AgentToolOutput(content: chunk + "\n" + pageLine, summary: "Read \(count) characters",
+                               metrics: [.availableScalars: scalars.count, .returnedScalars: count,
+                                         .hasMore: params.offset + count < scalars.count ? 1 : 0])
     }
 }

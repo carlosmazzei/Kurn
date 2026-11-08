@@ -6,6 +6,7 @@
 //  ElevenLabs' speech models for Read Aloud.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 
@@ -57,7 +58,7 @@ struct ProviderModelsService: Sendable {
                     request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                 } extract: { decoded in
                     let active = decoded.data.filter { $0.active != false }
-                    recordWindows(active.map { ($0.id, $0.contextWindow) }, provider: provider)
+                    recordLimits(active.map { ($0.id, $0.limits) }, provider: provider)
                     return active.map(\.id)
                 }
             } catch let AppError.apiError(status, _) where status == 403 && !provider.fallbackModels.isEmpty {
@@ -83,7 +84,8 @@ struct ProviderModelsService: Sendable {
                 request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
                 request.setValue(anthropicVersion, forHTTPHeaderField: "anthropic-version")
             } extract: { decoded in
-                decoded.data.map(\.id)
+                recordLimits(decoded.data.map { ($0.id, $0.limits) }, provider: provider)
+                return decoded.data.map(\.id)
             }
             AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
             return models
@@ -93,8 +95,8 @@ struct ProviderModelsService: Sendable {
             } extract: { decoded in
                 let generative = decoded.models
                     .filter { $0.supportedGenerationMethods.contains("generateContent") }
-                    .map { ($0.baseModelId ?? $0.name.replacingOccurrences(of: "models/", with: ""), $0.inputTokenLimit) }
-                recordWindows(generative, provider: provider)
+                    .map { ($0.requestID, $0.limits) }
+                recordLimits(generative, provider: provider)
                 return generative.map { $0.0 }
             }
             AppLog.transcription.atInfo.info("ProviderModelsService: loaded \(models.count, privacy: .public) model(s) from \(provider.displayName, privacy: .public)")
@@ -144,7 +146,7 @@ struct ProviderModelsService: Sendable {
     /// Shared GET-and-decode flow for a provider's `/models` listing: build the
     /// endpoint, apply provider-specific auth via `configure`, send, decode, and
     /// reduce to a unique sorted list via `extract`.
-    private func fetchModels<T: Decodable>(
+    private func fetchModels<T: ProviderModelPage>(
         provider: AIProvider,
         as type: T.Type,
         configure: (inout URLRequest) -> Void,
@@ -154,49 +156,34 @@ struct ProviderModelsService: Sendable {
         request.httpMethod = "GET"
         configure(&request)
 
-        let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
-        return uniqueSorted(extract(try JSONDecoder().decode(type, from: data)))
+        var results: [String] = []
+        var cursors = Set<String>()
+        for _ in 0..<100 {
+            try Task.checkCancellation()
+            let (data, _) = try await LLMHTTP.sendValidated(request, session: session)
+            let page = try JSONDecoder().decode(type, from: data)
+            results += extract(page)
+            guard let next = page.nextPageItem else { return uniqueSorted(results) }
+            guard let value = next.value, !value.isEmpty, cursors.insert(value).inserted,
+                  var url = URLComponents(url: try LLMHTTP.requireEndpoint(provider: provider, path: "models"),
+                                          resolvingAgainstBaseURL: false) else {
+                throw AppError.decodingError("Invalid model-list pagination.")
+            }
+            url.queryItems = [next]
+            request.url = url.url
+        }
+        throw AppError.decodingError("Model-list page limit exceeded.")
     }
 
-    /// Remember the context windows a listing reported, as (model id, window).
-    private func recordWindows(_ models: [(String, Int?)], provider: AIProvider) {
-        var windows: [String: Int] = [:]
-        for (id, window) in models {
-            if let window { windows[id] = window }
-        }
-        contextWindows.record(windows, providerID: provider.id)
+    private func recordLimits(_ models: [(String, AgentModelLimits)], provider: AIProvider) {
+        var values: [String: AgentModelLimits] = [:]
+        for (id, limits) in models { values[id] = limits }
+        contextWindows.recordLimits(values, provider: provider)
     }
 
     private func uniqueSorted(_ values: [String]) -> [String] {
         Array(Set(values.filter { !$0.isEmpty })).sorted()
     }
-}
-
-private struct OpenAIModelListResponse: Decodable {
-    struct Model: Decodable {
-        let id: String
-        let active: Bool?
-        /// Groq names it `context_window`, OpenRouter `context_length`;
-        /// OpenAI itself reports neither. Decoded leniently: a compatible
-        /// server shaping it differently must not fail the whole listing.
-        let contextWindow: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case id, active
-            case contextWindow = "context_window"
-            case contextLength = "context_length"
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            id = try container.decode(String.self, forKey: .id)
-            active = try? container.decodeIfPresent(Bool.self, forKey: .active)
-            contextWindow = (try? container.decodeIfPresent(Int.self, forKey: .contextWindow))
-                ?? (try? container.decodeIfPresent(Int.self, forKey: .contextLength))
-        }
-    }
-
-    let data: [Model]
 }
 
 /// One entry of ElevenLabs' `/models` array. Only the two fields the speech
@@ -216,35 +203,4 @@ private struct ElevenLabsModel: Decodable {
         modelID = (try? container.decode(String.self, forKey: .modelID)) ?? ""
         canDoTextToSpeech = try? container.decodeIfPresent(Bool.self, forKey: .canDoTextToSpeech)
     }
-}
-
-private struct AnthropicModelListResponse: Decodable {
-    struct Model: Decodable {
-        let id: String
-    }
-
-    let data: [Model]
-}
-
-private struct GoogleModelListResponse: Decodable {
-    struct Model: Decodable {
-        let name: String
-        let baseModelId: String?
-        let supportedGenerationMethods: [String]
-        let inputTokenLimit: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case name, baseModelId, supportedGenerationMethods, inputTokenLimit
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            name = try container.decode(String.self, forKey: .name)
-            baseModelId = try container.decodeIfPresent(String.self, forKey: .baseModelId)
-            supportedGenerationMethods = try container.decode([String].self, forKey: .supportedGenerationMethods)
-            inputTokenLimit = try? container.decodeIfPresent(Int.self, forKey: .inputTokenLimit)
-        }
-    }
-
-    let models: [Model]
 }

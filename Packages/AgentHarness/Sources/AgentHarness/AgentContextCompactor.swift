@@ -163,10 +163,17 @@ public struct AgentContextCompactor: Sendable {
         let budget = policy.contextWindow - maxOutputTokens - Self.summaryRequestMarginTokens
             - estimate(Self.summarizationSystemPrompt) - estimate("<conversation>\n" + tail)
             - Self.messageOverheadTokens
-        let conversation = fitted(Self.serialize(messages), toTokens: budget)
+        let serialized = Self.serialize(messages)
+        let conversation = fitted(serialized, toTokens: budget)
+        let clipped = messages.reduce(0) { count, message in
+            guard case .toolResult(_, _, let content, _) = message else { return count }
+            return count + max(0, content.count - Self.serializedToolResultLimit)
+        }
+        let omitted = conversation == serialized ? 0
+            : max(0, serialized.count - conversation.count + Self.truncatedConversationNote.count + 1)
         return AgentTurnRequest(systemPrompt: Self.summarizationSystemPrompt,
                                 messages: [.user("<conversation>\n" + conversation + tail)],
-                                tools: [], maxOutputTokens: maxOutputTokens)
+                                tools: [], maxOutputTokens: maxOutputTokens, contextOmittedCharacters: clipped + omitted)
     }
 
     /// Keeps the newest part of `text` that fits `budget` estimated tokens, marked as truncated.

@@ -541,8 +541,18 @@ provider smoke tests remain opt-in and cannot be claimed from this audit.
 ### Delivery sequence and reviewable increments
 
 Each increment includes its relevant fixtures/tests and leaves the app buildable.
-Use `feature/native-harness` as the integration branch; no runtime replacement,
-commit, push or PR is part of this planning deliverable.
+Use `feature/native-harness` as the integration branch and review implementation
+increments through pull requests against it before the broader session migration.
+
+The first NH00 implementation increment covers exact-model capacity records,
+endpoint-scoped metadata with freshness, Anthropic/Gemini limit decoding and
+pagination, persisted visible window provenance, content-free run diagnostics
+and export, first-limit versus skipped-call accounting, and lossless transcript
+continuation. Enduring contracts are in `CLAUDE.md`, "Agent harness". This
+increment still needs iOS CI/review; NH00 remains open for selected-model detail
+fetch/refresh, broader catalog maintenance, full truncation-layer telemetry,
+volume/task-aware budget tuning, and physical-device reproduction of the reported
+workload. NH01–NH10 have not started; this is not full harness parity.
 
 | Increment | Priority / dependency | Concrete work | Exit condition |
 | --- | --- | --- | --- |
