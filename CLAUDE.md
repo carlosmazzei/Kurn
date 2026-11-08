@@ -99,34 +99,47 @@ usage and the final outcome. Tool failures become error results for model recove
 provider failures throw, and stream termination cancels in-flight work. Turn, tool
 and optional estimated-cost limits finish with an explicit stop reason. Cost is
 accounted from reported usage through the caller's estimator, including summary calls.
-Context accepts an injected Sendable token estimator (default: rounded-up
-characters/4) and an input-token budget. KurnCore's `AgentContextAdapter` supplies
-`ContextBudget` and script-aware `TokenEstimate` through the `contextBudget:`
-initializer. Requests are estimated per message (text, tool-call arguments, replay
-metadata, a fixed framing overhead) — never by re-encoding already-JSON tool results,
-whose escaping inflated the estimate. `AgentContextCalibration` then scales estimates
-by the input tokens the provider actually reported for the previous turn (ratio clamped
-to 0.25–4), so compaction follows the model's real context use. A provider rejecting a
-turn as too long (`isContextOverflow`; the adapter passes `AppError.isContextOverflow`,
-which also matches in-stream errors) makes that size read as over budget, compacts and
-retries the turn once — only if nothing was streamed and compaction shrank the context.
+Context management follows pi-coding-agent's design (no code copied). `AgentContextPolicy`
+holds the model's real `contextWindow`, a `reserveTokens` kept free for the reply (16,384) and
+`keepRecentTokens` (20,000); a request is compacted once its context exceeds the window minus
+the reserve (never below half the window), with no fraction and no practical cap.
+`HarnessChatService` resolves the window per provider and model through
+`ModelContextWindowStore.agentContextWindow` → KurnCore's `ModelContextWindows.agentWindow`:
+the window the provider's model listing reported, else the model-family table, else
+`unknownWindow` (32,768). Unlike `ContextBudget` (summaries, legacy chat) it applies no 100k
+cap: every turn resends the whole context, so a long run on a large window costs more, and
+`AgentLimits.maxCostUSD` is the guard. The context size is the provider-reported usage of the
+latest turn (input + output) plus estimates of only the messages appended since; before any
+usage, or after a compaction, it is a full estimate. Estimates are per message (text,
+tool-call arguments, replay metadata, a fixed framing overhead) through an injected Sendable
+estimator (default characters/4; the KurnCore `contextWindow:` initializer passes the
+script-aware `TokenEstimate`), never by re-encoding already-JSON tool results.
+`AgentContextCompactor.plan` walks back from the newest message until `keepRecentTokens`
+(capped at half the threshold) and cuts at the nearest user or assistant message, never at a
+tool result. A cut inside the current turn is a split turn: the turn's earlier part gets its own
+prefix summary, so the kept suffix keeps its request. Summary requests are tool-less and send
+the conversation as labelled text (`serialize`, tool results clipped to 2,000 characters) with a
+structured prompt (goal, progress, findings with citations, sources and documents, next steps);
+a later compaction updates the previous summary instead of replacing it. Summary output is
+capped at 80% (history) and 50% (turn prefix) of the reserve. A summary cut off by the output
+limit is not used. Compaction runs before a turn when over the threshold, and is forced after a
+provider rejects a turn as too long (`isContextOverflow`; the adapter passes
+`AppError.isContextOverflow`, whose markers follow pi-ai's per-vendor overflow patterns and
+exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
+and the context actually shrank. When a forced summary is unusable or itself overflows, the
+older part is replaced by a fixed omission note. Compaction changes only model context;
+outcomes retain full history.
 `AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
 `NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
 (tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and
 calls returned anyway are dropped), so the run ends with an answer from what was gathered.
 A wrap-up without text leaves no answer; one cut off reports `.outputLimit`; it never runs
-past the cost limit. On overflow, compaction is forced past the calibrated threshold:
-old results are elided, or the older prefix summarized when nothing could be elided; if that
-summary request itself overflows, the prefix is replaced by a fixed omission note.
+past the cost limit.
 Chat uses `AgentLimits.chat(sourceCount:)` (10–24 turns, 20–96 tool calls, wrap-up on)
 and its prompt steers multi-meeting questions to listing, search and summaries first.
-Old tool results are elided first, then an older
-prefix is summarized with a tool-less model request, preserving assistant/result
-groups and recent messages. Compaction changes only model context; outcomes retain
-full history. These estimates and limits do not guarantee a provider's hard context
+These estimates and limits do not guarantee a provider's hard context
 or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
-Output-token truncation finishes with `.outputLimit` and discards tool calls;
-truncated compaction summaries never replace the elided context. Vendor streams
+Output-token truncation finishes with `.outputLimit` and discards tool calls. Vendor streams
 must include a terminal event before a turn response can be used.
 `AgentHarness/Wire/` builds Anthropic Messages, OpenAI Responses/Chat Completions and Gemini
 GenerateContent requests and accumulates their SSE data payloads. The app's three

@@ -26,7 +26,8 @@ struct HarnessChatService {
             + ChatDocumentTools.make(workspace: workspace)
         let artifacts = await workspace.snapshot()
         try Task.checkCancellation()
-        let harness = NativeHarness(model: model, contextBudget: ContextBudget.live(provider, modelIdentifier),
+        let window = ModelContextWindowStore.shared.agentContextWindow(for: provider, model: modelIdentifier)
+        let harness = NativeHarness(model: model, contextWindow: window,
                                     limits: limits ?? .chat(sourceCount: ids.count))
         return harness.run(
             systemPrompt: try Self.systemPrompt(artifacts: artifacts),

@@ -85,4 +85,12 @@ struct ContextBudgetResolutionTests {
     @Test func anEmptyStoreKnowsNothing() throws {
         #expect(try isolatedStore().window(providerID: "p", model: "a") == nil)
     }
+
+    @Test func theAgentPlansAgainstTheRealWindowWithoutACap() throws {
+        let store = try isolatedStore()
+        #expect(store.agentContextWindow(for: .openAI, model: "gpt-5.4") == 272_000)
+        #expect(store.agentContextWindow(for: .openAI, model: "my-fine-tune") == ModelContextWindows.unknownWindow)
+        store.record(["gemini-2.5-pro": 1_048_576], providerID: AIProvider.google.id)
+        #expect(store.agentContextWindow(for: .google, model: "gemini-2.5-pro") == 1_048_576)
+    }
 }

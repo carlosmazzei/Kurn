@@ -50,12 +50,12 @@ import Testing
         let assistant = AgentMessage.assistant(text: "", toolCalls: [agentCall()], providerMetadata: metadata)
         let messages: [AgentMessage] = [.user(String(repeating: "old", count: 1_000)), assistant,
             .toolResult(callID: "1", toolName: "lookup", content: "Found", isError: false), .user("New")]
-        let recent = AgentContextCompactor(policy: AgentContextPolicy(inputTokenBudget: 100, keepRecentMessages: 3))
-        #expect(recent.elidingOldResults(in: messages)[1] == assistant)
-        #expect(recent.replacingOlderPrefix(in: messages, summary: "Short")[1] == assistant)
-        let old = AgentContextCompactor(policy: AgentContextPolicy(inputTokenBudget: 100, keepRecentMessages: 1))
-        #expect(old.summaryRequest(for: messages, maxOutputTokens: 10)?.messages[1] == assistant)
-        #expect(old.replacingOlderPrefix(in: messages, summary: "Short") == [.user("[Summary of earlier conversation]\nShort"), .user("New")])
+        let policy = AgentContextPolicy(contextWindow: 1_000, reserveTokens: 0, keepRecentTokens: 13)
+        let plan = try #require(AgentContextCompactor(policy: policy).plan(for: messages))
+        #expect(plan.isSplitTurn)
+        #expect(plan.turnPrefix == [messages[0]])
+        #expect(plan.kept == Array(messages.suffix(3)))
+        #expect(plan.kept.first == assistant)
         let oldJSON = Data(#"{"assistant":{"text":"Old answer","toolCalls":[]}}"#.utf8)
         #expect(try JSONDecoder().decode(AgentMessage.self, from: oldJSON) == .assistant(text: "Old answer", toolCalls: []))
     }

@@ -130,6 +130,13 @@ struct ContextBudgetTests {
         #expect(ModelContextWindows.knownWindow(forModel: "vendor/") == nil)
     }
 
+    @Test func agentWindowPrefersReportedThenTableThenUnknown() {
+        #expect(ModelContextWindows.agentWindow(reported: 1_048_576, model: "gpt-4o") == 1_048_576)
+        #expect(ModelContextWindows.agentWindow(reported: 0, model: "gpt-4o") == 128_000)
+        #expect(ModelContextWindows.agentWindow(reported: nil, model: "claude-sonnet-4-5") == 200_000)
+        #expect(ModelContextWindows.agentWindow(reported: nil, model: "custom-local") == ModelContextWindows.unknownWindow)
+    }
+
     // MARK: - Context overflow
 
     @Test func vendorOverflowMessagesAreRecognised() {
@@ -137,7 +144,16 @@ struct ContextBudgetTests {
             "This model's maximum context length is 128000 tokens. However, your messages resulted in 130000 tokens.",
             "prompt is too long: 210000 tokens > 200000 maximum",
             "The input token count (1100000) exceeds the maximum number of tokens allowed (1048576).",
-            "Please reduce the length of the messages or completion."
+            "Please reduce the length of the messages or completion.",
+            "request_too_large: Request exceeds the maximum size",
+            "Input is too long for requested model.",
+            "This model's maximum prompt length is 131072 but the request contains 537812 tokens.",
+            "prompt token count of 140000 exceeds the limit of 128000",
+            "the request exceeds the available context size, try increasing it",
+            "tokens to keep from the initial prompt is greater than the context length",
+            "Your request exceeded model token limit: 262144 (requested: 300000)",
+            "prompt too long; exceeded max context length by 500 tokens",
+            "finish_reason: model_context_window_exceeded"
         ]
         for message in messages {
             #expect(AppError.apiError(statusCode: 400, message: message).isContextOverflow)
@@ -157,5 +173,8 @@ struct ContextBudgetTests {
         #expect(!AppError.apiError(statusCode: 500, message: "context length").isContextOverflow)
         #expect(!AppError.apiError(statusCode: 429, message: "rate limited").isContextOverflow)
         #expect(!AppError.summaryTruncated.isContextOverflow)
+        #expect(!AppError.apiError(statusCode: 400, message: "ThrottlingException: Too many tokens, please wait")
+            .isContextOverflow)
+        #expect(!AppError.apiError(statusCode: 413, message: "Rate limit: too many requests").isContextOverflow)
     }
 }

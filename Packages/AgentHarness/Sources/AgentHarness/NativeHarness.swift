@@ -16,10 +16,10 @@ public struct NativeHarness: Sendable {
         """
 
     /// - Parameter isContextOverflow: recognizes a provider rejecting a request as too long; the
-    ///   harness then compacts against the real limit and retries that turn once.
+    ///   harness then compacts and retries that turn once.
     public init(model: any AgentModel, limits: AgentLimits = AgentLimits(),
                 costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
-                contextPolicy: AgentContextPolicy = AgentContextPolicy(inputTokenBudget: 23_000),
+                contextPolicy: AgentContextPolicy = AgentContextPolicy(contextWindow: 128_000),
                 tokenEstimator: @escaping @Sendable (String) -> Int = { ($0.count + 3) / 4 },
                 isContextOverflow: @escaping @Sendable (Error) -> Bool = { _ in false },
                 confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false }) {
@@ -55,7 +55,10 @@ public struct NativeHarness: Sendable {
         var toolCalls = 0
         var turns = 0
         var finalText = ""
-        var calibration = AgentContextCalibration()
+        /// Tokens the provider reported for the latest turn (its input plus its reply) and the
+        /// context length once that reply was appended. Later messages are estimated on top of it;
+        /// a compaction clears it, since the reported size no longer describes the context.
+        var usageAnchor: (tokens: Int, contextCount: Int)?
     }
 
     private struct TurnSettings {
@@ -157,15 +160,15 @@ public struct NativeHarness: Sendable {
         return response.stopReason
     }
 
-    /// Compacts against the calibrated context size, streams one turn and calibrates from its usage.
-    /// A context-overflow rejection compacts against the provider's real limit and retries once,
-    /// provided nothing was streamed yet and compaction actually shrank the context. Returns nil when
-    /// a compaction summary exhausted the cost limit before the turn could be sent.
+    /// Compacts when the context outgrows the window, streams one turn and anchors the context size
+    /// to the usage it reports. A context-overflow rejection compacts and retries once, provided
+    /// nothing was streamed yet and compaction actually shrank the context. Returns nil when a
+    /// compaction summary exhausted the cost limit before the turn could be sent.
     private func modelTurn(_ settings: TurnSettings, state: inout RunState,
                            events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentTurnResponse? {
         events.yield(.turnStarted(index: state.turns))
         state.turns += 1
-        var estimate = try await compact(settings, state: &state, events: events)
+        try await compact(settings, state: &state, events: events)
         var retried = false
         while true {
             if costLimitReached(state) { return nil }
@@ -183,17 +186,17 @@ public struct NativeHarness: Sendable {
                 }
                 try Task.checkCancellation()
                 record(response.usage, state: &state, events: events)
-                if let input = response.usage?.inputTokens {
-                    state.calibration.record(estimated: estimate, reported: input)
+                if let usage = response.usage, usage.inputTokens > 0 {
+                    // The caller appends this reply, so the anchor covers one more message.
+                    state.usageAnchor = (usage.inputTokens + usage.outputTokens, state.context.count + 1)
                 }
                 return response
             } catch {
                 try Task.checkCancellation()
                 guard !retried, !streamed.value, isContextOverflow(error) else { throw error }
                 retried = true
-                state.calibration.recordOverflow(estimated: estimate, budget: compactor.policy.inputTokenBudget)
                 let previous = state.context
-                estimate = try await compact(settings, state: &state, events: events, force: true)
+                try await compact(settings, state: &state, events: events, force: true)
                 guard state.context != previous else { throw error }
             }
         }
@@ -211,44 +214,65 @@ public struct NativeHarness: Sendable {
         events.yield(.usage(usage))
     }
 
-    /// Returns the raw estimate of the request about to be sent, for calibration against usage.
-    /// `force` (after a provider rejected the request as too long) skips the threshold checks: old
-    /// results are always elided, and the older prefix is summarized when elision changed nothing,
-    /// since the provider's limit may sit far below the configured budget.
+    /// The context size of the next request: the provider-reported size of the latest turn plus
+    /// estimates of the messages appended since, or a full estimate before any usage is known.
+    private func contextTokens(_ settings: TurnSettings, state: RunState) -> Int {
+        if let anchor = state.usageAnchor, anchor.contextCount <= state.context.count {
+            return anchor.tokens + compactor.estimateTokens(of: state.context[anchor.contextCount...])
+        }
+        return compactor.estimateTokens(systemPrompt: settings.systemPrompt, messages: state.context,
+                                        tools: settings.tools)
+    }
+
+    /// Compacts once the context exceeds the window minus the reserve, or unconditionally (`force`)
+    /// after a provider rejected the request as too long. Older messages are replaced by a summary
+    /// and the newest `keepRecentTokens` are kept. A summary cut off by the output limit is not
+    /// used; when compaction was forced, or the summary request itself overflows, the older part
+    /// is replaced by a fixed omission note instead, so recovery never stalls.
     private func compact(_ settings: TurnSettings, state: inout RunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
-                         force: Bool = false) async throws -> Int {
-        func measure() -> Int {
-            compactor.estimateTokens(systemPrompt: settings.systemPrompt, messages: state.context, tools: settings.tools)
-        }
-        let rawBefore = measure()
-        let before = state.calibration.tokens(rawBefore)
-        guard force || compactor.policy.needsCompaction(before) else { return rawBefore }
-        let unelided = state.context
-        state.context = compactor.elidingOldResults(in: state.context)
-        let summarize = force ? state.context == unelided
-            : compactor.policy.needsCompaction(state.calibration.tokens(measure()))
-        if summarize,
-           let request = compactor.summaryRequest(for: state.context, maxOutputTokens: settings.maxOutputTokens) {
-            do {
-                let summary = try await model.streamTurn(request) { _ in }
-                try Task.checkCancellation()
-                record(summary.usage, state: &state, events: events)
-                if summary.stopReason != .maxTokens {
-                    state.context = compactor.replacingOlderPrefix(in: state.context, summary: summary.text)
-                }
-            } catch {
-                // The older prefix alone is too long for the provider to summarize: drop it rather
-                // than abandon recovery; recent messages and the outcome's full history are kept.
-                try Task.checkCancellation()
-                guard isContextOverflow(error) else { throw error }
-                state.context = compactor.omittingOlderPrefix(in: state.context)
+                         force: Bool = false) async throws {
+        let before = contextTokens(settings, state: state)
+        guard force || compactor.policy.needsCompaction(before),
+              let plan = compactor.plan(for: state.context) else { return }
+        let replacement: [AgentMessage]?
+        do {
+            let history = try await summarize(compactor.historySummaryRequest(for: plan), state: &state, events: events)
+            let prefix = try await summarize(compactor.turnPrefixSummaryRequest(for: plan), state: &state, events: events)
+            if history != .unusable, prefix != .unusable {
+                replacement = compactor.applying(plan, historySummary: history.text, turnPrefixSummary: prefix.text)
+            } else {
+                replacement = force ? compactor.omitting(plan) : nil
             }
+        } catch {
+            try Task.checkCancellation()
+            guard isContextOverflow(error) else { throw error }
+            replacement = compactor.omitting(plan)
         }
-        let rawAfter = measure()
-        let after = state.calibration.tokens(rawAfter)
-        if after != before { events.yield(.contextCompacted(beforeTokens: before, afterTokens: after)) }
-        return rawAfter
+        guard let compacted = replacement, compacted != state.context else { return }
+        state.context = compacted
+        state.usageAnchor = nil
+        let after = contextTokens(settings, state: state)
+        events.yield(.contextCompacted(beforeTokens: before, afterTokens: after))
+    }
+
+    private enum SummaryResult: Equatable {
+        case skipped, unusable, text(String)
+
+        var text: String? {
+            if case .text(let value) = self { return value }
+            return nil
+        }
+    }
+
+    private func summarize(_ request: AgentTurnRequest?, state: inout RunState,
+                           events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> SummaryResult {
+        guard let request else { return .skipped }
+        let response = try await model.streamTurn(request) { _ in }
+        try Task.checkCancellation()
+        record(response.usage, state: &state, events: events)
+        let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return response.stopReason == .maxTokens || text.isEmpty ? .unusable : .text(text)
     }
 
     private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout RunState,
