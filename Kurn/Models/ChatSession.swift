@@ -17,6 +17,7 @@
 //  in the history list.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 import SwiftData
@@ -82,7 +83,7 @@ struct PersistedChatTurn: Codable {
     var usage: TokenUsage?
     var costUSD: Double?
     var elapsedSeconds: TimeInterval?
-    var steps: [ChatAgentStep]? = nil
+    var steps: [AgentRunStep]? = nil
     var artifacts: [ChatArtifactReference]? = nil
     var artifactOrigins: [UUID: ChatArtifactOrigin]? = nil
 }

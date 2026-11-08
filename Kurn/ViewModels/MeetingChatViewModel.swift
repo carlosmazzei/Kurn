@@ -327,7 +327,7 @@ final class MeetingChatViewModel {
         try Task.checkCancellation()
         let index = turns.count
         turns.append(Turn(role: .assistant, text: ""))
-        var timeline = ChatAgentTimeline()
+        var timeline = AgentRunTrace()
         do {
             for try await event in events {
                 try Task.checkCancellation()

@@ -3,13 +3,13 @@ import KurnCore
 import SwiftUI
 
 struct ChatStepTimelineView: View {
-    let steps: [ChatAgentStep]
+    let steps: [AgentRunStep]
     let isRunning: Bool
     let meetingTitles: [UUID: String]
     let documentTitles: [UUID: String]
     @State private var expanded = false
 
-    private var visibleSteps: [ChatAgentStep] { ChatStepPresentation.visibleSteps(steps) }
+    private var visibleSteps: [AgentRunStep] { ChatStepPresentation.visibleSteps(steps) }
 
     var body: some View {
         if !visibleSteps.isEmpty {
@@ -44,7 +44,7 @@ struct ChatStepTimelineView: View {
 }
 
 private struct ChatStepRow: View {
-    let step: ChatAgentStep
+    let step: AgentRunStep
     let meetingTitles: [UUID: String]
     let documentTitles: [UUID: String]
 

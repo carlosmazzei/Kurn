@@ -6,7 +6,7 @@ import Testing
     func defaultEstimator(text: String) {
         let compactor = AgentContextCompactor(policy: AgentContextPolicy(contextWindow: 100))
         let framing = compactor.estimateTokens(systemPrompt: "", messages: [], tools: [])
-        #expect(compactor.estimateTokens(systemPrompt: text, messages: [], tools: []) - framing == (text.count + 3) / 4)
+        #expect(compactor.estimateTokens(systemPrompt: text, messages: [], tools: []) - framing == TokenEstimate.tokens(in: text))
     }
 
     @Test func customEstimatorAndNegativeEstimates() {
@@ -39,11 +39,12 @@ import Testing
         let json = String(repeating: "{\"text\":\"quoted \\\"value\\\"\"}", count: 50)
         let result = AgentMessage.toolResult(callID: "call", toolName: "read", content: json, isError: false)
         let overhead = AgentContextCompactor.messageOverheadTokens
-        #expect(compactor.estimateTokens(of: result) == overhead + 1 + (json.count + 3) / 4)
+        #expect(compactor.estimateTokens(of: result) == overhead + TokenEstimate.tokens(in: "call") + TokenEstimate.tokens(in: json))
         let call = AgentToolCall(id: "c", name: "read", arguments: .object([:]), rawArguments: "{\"a\":1}")
         let assistant = AgentMessage.assistant(text: "abcd", toolCalls: [call], providerMetadata: .string("sig"))
         let metadata = (try? JSONValue.string("sig").encodedString()) ?? ""
-        #expect(compactor.estimateTokens(of: assistant) == overhead + 1 + overhead + 1 + 1 + 2
-            + (metadata.count + 3) / 4)
+        #expect(compactor.estimateTokens(of: assistant) == overhead + TokenEstimate.tokens(in: "abcd") + overhead
+            + TokenEstimate.tokens(in: "c") + TokenEstimate.tokens(in: "read") + TokenEstimate.tokens(in: "{\"a\":1}")
+            + TokenEstimate.tokens(in: metadata))
     }
 }

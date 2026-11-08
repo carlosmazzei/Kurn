@@ -548,11 +548,26 @@ The first NH00 implementation increment covers exact-model capacity records,
 endpoint-scoped metadata with freshness, Anthropic/Gemini limit decoding and
 pagination, persisted visible window provenance, content-free run diagnostics
 and export, first-limit versus skipped-call accounting, and lossless transcript
-continuation. Enduring contracts are in `CLAUDE.md`, "Agent harness". This
-increment still needs iOS CI/review; NH00 remains open for selected-model detail
+continuation. Enduring contracts are in `CLAUDE.md`, "Agent harness". The first increment passed iOS CI and remains under draft review; NH00 remains open for selected-model detail
 fetch/refresh, broader catalog maintenance, full truncation-layer telemetry,
 volume/task-aware budget tuning, and physical-device reproduction of the reported
 workload. NH01–NH10 have not started; this is not full harness parity.
+
+Before continuing NH01, the architecture prerequisite separates domain from runtime:
+
+- `AgentHarness` owns model capacity resolution/catalog, script-aware token estimation,
+  overflow classification/contracts, the execution/compaction loop and generic
+  `AgentRunTrace`/`AgentRunStep`. It depends on Foundation, with no Kurn imports.
+- `KurnCore/Chat` owns source scope, source reader/domain values and document workspace
+  rules. Its package has no dependency on AgentHarness.
+- `Kurn/Application/Agent` composes the harness and binds source/document tools, host
+  diagnostics and presentation. HTTP/SwiftData remain app adapters; the generation-only
+  `ContextBudget` lives in `Application/Generation` and does not govern agent compaction.
+- Existing serialized step field names and enum values remain compatible; moving the
+  types/modules requires no SwiftData schema migration. Source selection, artifact
+  saving and trace provenance retain their current behavior.
+- Package and integration tests follow the new owners. Static policy rejects cross-imports.
+  This prerequisite changes ownership, not the remaining NH01–NH10 feature scope.
 
 | Increment | Priority / dependency | Concrete work | Exit condition |
 | --- | --- | --- | --- |

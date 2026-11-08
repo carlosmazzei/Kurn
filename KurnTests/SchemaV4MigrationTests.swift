@@ -179,7 +179,7 @@ struct SchemaV4MigrationTests {
         let scope = ChatSourceScope(kind: .meetings, selectedIDs: [meeting.id], parts: [.transcript, .summary])
         session.scopeData = JSONStorage.encodeAuthoritative(scope)
         session.artifactsData = JSONStorage.encodeAuthoritative([artifact])
-        var step = ChatAgentStep(kind: .tool, status: .finished)
+        var step = AgentRunStep(kind: .tool, status: .finished)
         step.toolName = "create_document"
         var turns = session.turns
         turns[0].steps = [step]

@@ -25,9 +25,8 @@ let package = Package(
     products: [
         .library(name: "KurnCore", targets: ["KurnCore"])
     ],
-    dependencies: [.package(path: "../AgentHarness")],
     targets: [
-        .target(name: "KurnCore", dependencies: ["AgentHarness"], path: "Sources/KurnCore"),
-        .testTarget(name: "KurnCoreTests", dependencies: ["KurnCore", "AgentHarness"], path: "Tests/KurnCoreTests")
+        .target(name: "KurnCore", path: "Sources/KurnCore"),
+        .testTarget(name: "KurnCoreTests", dependencies: ["KurnCore"], path: "Tests/KurnCoreTests")
     ]
 )

@@ -57,7 +57,7 @@ public struct AgentContextCompactor: Sendable {
     private let tokenEstimator: @Sendable (String) -> Int
 
     public init(policy: AgentContextPolicy,
-                tokenEstimator: @escaping @Sendable (String) -> Int = { ($0.count + 3) / 4 }) {
+                tokenEstimator: @escaping @Sendable (String) -> Int = { TokenEstimate.tokens(in: $0) }) {
         self.policy = policy
         self.tokenEstimator = tokenEstimator
     }

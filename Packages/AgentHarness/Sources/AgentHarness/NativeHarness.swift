@@ -21,8 +21,10 @@ public struct NativeHarness: Sendable {
     public init(model: any AgentModel, limits: AgentLimits = AgentLimits(),
                 costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
                 contextPolicy: AgentContextPolicy = AgentContextPolicy(contextWindow: 128_000),
-                tokenEstimator: @escaping @Sendable (String) -> Int = { ($0.count + 3) / 4 },
-                isContextOverflow: @escaping @Sendable (Error) -> Bool = { _ in false },
+                tokenEstimator: @escaping @Sendable (String) -> Int = { TokenEstimate.tokens(in: $0) },
+                isContextOverflow: @escaping @Sendable (Error) -> Bool = {
+                    ($0 as? any AgentContextOverflowError)?.isContextOverflow == true
+                },
                 confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false },
                 diagnosticSink: @escaping @Sendable (AgentDiagnostic) -> Void = { _ in }) {
         self.model = model

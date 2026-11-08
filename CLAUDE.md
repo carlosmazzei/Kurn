@@ -43,8 +43,20 @@ package is FluidAudio.
 
 ### Agent harness (`Packages/AgentHarness/`)
 
-Kurn-specific source types remain in `KurnCore/Agent/`, which depends on
-`AgentHarness`. `ChatSourceScope` persists meeting/tag/folder/library selection,
+`AgentHarness` and `KurnCore` are independent Foundation-only packages: neither
+imports or depends on the other. `AgentHarness` owns the generic runtime, tool
+execution, compaction, script-aware `TokenEstimate`, model capacity catalog/resolver,
+overflow classification/contracts and `AgentRunTrace`/`AgentRunStep` reduction.
+`KurnCore/Chat/` contains meeting/source/artifact domain types only. The app's
+`Application/Agent/` composes the runtime, registers Kurn-specific source/document
+tool bindings and translates generic steps into localized presentation. HTTP,
+SwiftData and trace-file persistence remain host adapters. `Tools/check_static_policy.py`
+rejects imports that cross these boundaries. Do not add runtime convenience
+extensions or tool schemas back to KurnCore. Generation's bounded map/reduce
+`ContextBudget` lives in `Application/Generation/`; it uses the harness estimator
+without imposing its 100k practical cap on agent conversations.
+
+ `ChatSourceScope` persists meeting/tag/folder/library selection,
 global transcript/summary/wiki/attachment parts and optional per-meeting overrides
 (including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
@@ -67,7 +79,7 @@ reads require opt-in. `MeetingChatViewModel` runs every question through
 model (or another non-agent provider) the chat shows `ChatArtifactProviderNotice` and the
 composer is disabled. The earlier retrieval chat (`MeetingChatService`) was removed.
 `ChatSourceScopeEditor` locks meeting selection to one ID or allows library scope
-editing. `ChatAgentTimeline` reduces events to Codable structured steps and live usage.
+editing. `AgentRunTrace` reduces events to Codable structured steps and live usage.
 The adapter removes wiki from global and override parts when `wikiEnabled` is off.
 Replies cite meeting titles and `[m:ss]` timestamps in text; KurnCore's
 `ChatTimestampCitations` turns those into tappable chips. Retrieval citations stored by the
@@ -87,7 +99,7 @@ document bodies in turn JSON). Optional references preserve old turn decoding;
 `AgentContextResolution` is the immutable capacity snapshot for a run. Its source is
 API (with cache flag and retrieval date), fixed table (with catalog revision), or
 fixed fallback; it records the exact model ID, token value and input/combined
-semantics. `ChatAgentTimeline` persists it as a context step, so reopening a chat
+semantics. `AgentRunTrace` persists it as a context step, so reopening a chat
 does not recompute provenance from today's catalog. Older traces show an unknown
 origin. Provider metadata uses an endpoint/API-shape/exact-model keyed V2 cache
 with a 24-hour lifetime; unscoped V1 values are not promoted to API evidence.
@@ -142,7 +154,7 @@ holds the model's real `contextWindow`, a `reserveTokens` kept free for the repl
 `keepRecentTokens` (20,000); a request is compacted once its context exceeds the window minus
 the reserve (never below half the window), with no fraction and no practical cap.
 `HarnessChatService` resolves the window per provider and model through
-`ModelContextWindowStore.resolution` → KurnCore's `ModelContextWindows.resolve`:
+`ModelContextWindowStore.resolution` → AgentHarness's `ModelContextWindows.resolve`:
 fresh capacity metadata reported by the endpoint, else the catalog/legacy table, else
 `unknownWindow` (32,768). Unlike `ContextBudget` (summaries and the wiki) it applies no 100k
 cap: every turn resends the whole context, so a long run on a large window costs more, and
@@ -150,8 +162,7 @@ cap: every turn resends the whole context, so a long run on a large window costs
 latest turn (input + output) plus estimates of only the messages appended since; before any
 usage, or after a compaction, it is a full estimate. Estimates are per message (text,
 tool-call arguments, replay metadata, a fixed framing overhead) through an injected Sendable
-estimator (default characters/4; the KurnCore `contextWindow:` initializer passes the
-script-aware `TokenEstimate`), never by re-encoding already-JSON tool results.
+estimator (the standalone default is the script-aware `TokenEstimate`), never by re-encoding already-JSON tool results.
 `AgentContextCompactor.plan` walks back from the newest message until `keepRecentTokens`
 (capped at half the threshold) and cuts at the nearest user or assistant message, never at a
 tool result. A cut inside the current turn is a split turn: the turn's earlier part gets its own
@@ -164,8 +175,8 @@ window, and the serialized conversation is trimmed from its oldest end so the su
 input and output fit the window (an 8k model is never asked for 13k of output). A summary cut off by the output
 limit is not used. Compaction runs before a turn when over the threshold, and is forced after a
 provider rejects a turn as too long (`isContextOverflow`; the adapter passes
-`AppError.isContextOverflow`, whose markers follow pi-ai's per-vendor overflow patterns and
-exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
+`AppError` conformance to `AgentContextOverflowError`, delegating to the harness's
+`AgentContextOverflow` classifier, whose markers exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
 and the context actually shrank. When a forced summary is unusable or itself overflows, the
 older part is replaced by a fixed omission note. Compaction changes only model context;
 outcomes retain full history.
@@ -1904,14 +1915,14 @@ raises the output budget/timeout (8192 tokens, 300s) so long transcripts don't
 truncate mid-JSON or time out; a truncated response surfaces as
 `AppError.summaryTruncated` instead of a confusing decode error.
 
-**The single-pass budget is per model, in tokens** (`ContextBudget`, KurnCore).
+**The single-pass budget is per model, in tokens** (`ContextBudget`, Application/Generation).
 It used to be a fixed 80k characters for every cloud model — sized for the
 smallest window any vendor had, so a two-hour meeting always went through lossy
 staged notes, and wrong by a factor of four for Chinese, where a character is
 about a token. `ContextBudget.resolve(provider:model:)` takes the window the
 provider's `/models` listing reported (Gemini `inputTokenLimit`, Groq
 `context_window`, OpenRouter `context_length`, remembered by
-`ModelContextWindowStore`), else KurnCore's `ModelContextWindows` table by
+`ModelContextWindowStore`), else AgentHarness's `ModelContextWindows` table by
 model family, else `ContextBudget.conservative` (the old thresholds); Apple's
 on-device model always gets `ContextBudget.onDevice`. From a window it reserves
 the output budget, prompt overhead and a 20% margin, and caps any single
