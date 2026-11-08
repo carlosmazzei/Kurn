@@ -1208,3 +1208,13 @@
 "chat.metric.usageReported" = "已报告用量（1 = 是）";
 "chat.metric.reasoningTokens" = "已报告的推理令牌数";
 "chat.metric.costLimitReached" = "已达到费用限制（1 = 是）";
+
+/* Dynamic output headroom */
+"chat.diagnostic.outputRetryStarted" = "已开始输出恢复";
+"chat.diagnostic.outputRetryDenied" = "未应用输出恢复";
+"chat.metric.contextSafetyTokens" = "上下文安全余量";
+"chat.metric.contextSafetyRelaxed" = "已应用低余量规则（1 = 是）";
+"chat.metric.availableOutputTokens" = "扣除安全余量后的输出空间";
+"chat.metric.outputCapacityFallback" = "已使用备用输出容量（1 = 是）";
+"chat.diagnostic.outputBudgetAdjusted" = "输出预算已调整至 API 最小值";
+"chat.metric.sentMaxOutputTokens" = "发送到 API 的输出预算";

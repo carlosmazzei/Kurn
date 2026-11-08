@@ -22,7 +22,7 @@ import Testing
         #expect(response.stopReason == .endTurn)
         #expect(response.usage == AgentUsage(inputTokens: 10, outputTokens: 5))
         let text = events.map { event in
-            switch event { case .textDelta(let text): text }
+            switch event { case .textDelta(let text): text; case .outputBudgetAdjusted: "" }
         }.joined()
         #expect(text == response.text)
     }
@@ -64,6 +64,8 @@ import Testing
             {"type":"output_text","text":"Hello world"},{"type":"output_text","text":"!"},{"type":"refusal","refusal":" No."}]}]}}
             """#)
         #expect(try accumulator.response().text == "Hello world! No.")
-        #expect(events.map { event in switch event { case .textDelta(let text): text } }.joined() == "Hello world! No.")
+        #expect(events.map { event in
+            switch event { case .textDelta(let text): text; case .outputBudgetAdjusted: "" }
+        }.joined() == "Hello world! No.")
     }
 }

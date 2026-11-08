@@ -36,7 +36,7 @@ public struct NativeHarness: Sendable {
         self.diagnosticSink = diagnosticSink
     }
 
-    /// With no explicit output budget, choose a capacity-aware allowance and permit one safe increase.
+    /// Fit the desired output capacity to the actual context before every request, as pi does.
     public func run(systemPrompt: String, history: [AgentMessage], prompt: String,
                     tools: [AgentTool], maxOutputTokens: Int? = nil,
                     contextResolution: AgentContextResolution? = nil) -> AsyncThrowingStream<AgentEvent, Error> {
@@ -185,14 +185,16 @@ public struct NativeHarness: Sendable {
             if costLimitReached(state) { return nil }
             try await compact(settings, state: &state, events: events, trace: trace)
             if costLimitReached(state) { return nil }
+            settings.outputBudget.fit(inputTokens: contextTokens(settings, state: state))
             let streamed = StreamFlag()
             let started = ContinuousClock.now
-            trace.record(.requestStarted, metrics: [.turnIndex: state.turns - 1, .messageCount: state.context.count,
-                                                   .toolCount: settings.tools.count, .maxOutputTokens: settings.maxOutputTokens,
-                                                   .hardMaxOutputTokens: settings.outputBudget.ceiling,
-                                                   .outputRetries: settings.outputBudget.retries])
+            var requestMetrics = settings.outputBudget.diagnosticMetrics
+            requestMetrics.merge([.turnIndex: state.turns - 1, .messageCount: state.context.count,
+                                  .toolCount: settings.tools.count]) { _, current in current }
+            trace.record(.requestStarted, metrics: requestMetrics)
+            let response: AgentTurnResponse
             do {
-                let response = try await model.streamTurn(
+                response = try await model.streamTurn(
                     AgentTurnRequest(systemPrompt: settings.systemPrompt, messages: state.context,
                                      tools: settings.tools, maxOutputTokens: settings.maxOutputTokens,
                                      allowsToolCalls: settings.allowsToolCalls)
@@ -200,34 +202,11 @@ public struct NativeHarness: Sendable {
                     if case .textDelta(let text) = event, !text.isEmpty {
                         streamed.set()
                         events.yield(.textDelta(text))
+                    } else if case .outputBudgetAdjusted(let requested, let sent) = event {
+                        trace.record(.outputBudgetAdjusted, metrics: [.maxOutputTokens: requested, .sentMaxOutputTokens: sent])
                     }
                 }
                 try Task.checkCancellation()
-                var metrics = response.diagnosticMetrics
-                metrics[.durationMs] = Self.milliseconds(since: started)
-                metrics[.maxOutputTokens] = settings.maxOutputTokens
-                metrics[.turnIndex] = state.turns - 1
-                metrics[.streamedText] = streamed.value ? 1 : 0
-                trace.record(.requestFinished, metrics: metrics, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
-                record(response.usage, state: &state, events: events)
-                if response.stopReason == .maxTokens,
-                   settings.outputBudget.recover(response, streamed: streamed.value, state: state,
-                                                  costReached: costLimitReached(state), trace: trace) {
-                    // Discard the interrupted response (including tool calls/opaque replay data).
-                    // Previously committed tools remain in context and are not executed again.
-                    events.yield(.turnStarted(index: state.turns))
-                    state.turns += 1
-                    if let usage = response.usage, usage.inputTokens > 0 {
-                        // The request's input remains in context; its discarded output does not.
-                        state.usageAnchor = (usage.inputTokens, state.context.count)
-                    }
-                    continue
-                }
-                if let usage = response.usage, usage.inputTokens > 0 {
-                    // The caller appends this reply, so the anchor covers one more message.
-                    state.usageAnchor = (usage.inputTokens + usage.outputTokens, state.context.count + 1)
-                }
-                return response
             } catch {
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started)])
                 try Task.checkCancellation()
@@ -236,8 +215,51 @@ public struct NativeHarness: Sendable {
                 let previous = state.context
                 try await compact(settings, state: &state, events: events, trace: trace, force: true)
                 guard state.context != previous else { throw error }
+                continue
             }
+            var metrics = response.diagnosticMetrics
+            metrics[.durationMs] = Self.milliseconds(since: started)
+            metrics[.maxOutputTokens] = settings.maxOutputTokens
+            metrics[.turnIndex] = state.turns - 1
+            metrics[.streamedText] = streamed.value ? 1 : 0
+            trace.record(.requestFinished, metrics: metrics, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
+            record(response.usage, state: &state, events: events)
+            if response.stopReason == .maxTokens,
+               try await recoverOutput(response, streamed: streamed.value, settings: &settings,
+                                       state: &state, events: events, trace: trace) { continue }
+            if let usage = response.usage, usage.inputTokens > 0 {
+                // The caller appends this reply, so the anchor covers one more message.
+                state.usageAnchor = (usage.inputTokens + usage.outputTokens, state.context.count + 1)
+            }
+            return response
         }
+    }
+
+    private func recoverOutput(_ response: AgentTurnResponse, streamed: Bool, settings: inout TurnSettings,
+                               state: inout AgentRunState, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
+                               trace: AgentTraceEmitter) async throws -> Bool {
+        let costReached = costLimitReached(state)
+        let facts = settings.outputBudget.recoveryMetrics(response, streamed: streamed, state: state, costReached: costReached)
+        guard settings.outputBudget.canRecover(response, streamed: streamed, state: state, costReached: costReached) else {
+            trace.record(.outputRetryDenied, metrics: facts, reason: .outputLimit)
+            return false
+        }
+        settings.outputBudget.didRecover()
+        trace.record(.outputRetryStarted, metrics: facts.merging([.outputRetries: settings.outputBudget.retries]) { _, new in new },
+                     reason: .outputLimit)
+        if let usage = response.usage, usage.inputTokens > 0 {
+            // Preserve reported input size without counting the discarded response or its calls.
+            state.usageAnchor = (usage.inputTokens, state.context.count)
+        }
+        let previous = state.context
+        try await compact(settings, state: &state, events: events, trace: trace, force: true)
+        guard state.context != previous else {
+            trace.record(.outputRetryDenied, metrics: facts, reason: .outputLimit)
+            return false
+        }
+        events.yield(.turnStarted(index: state.turns))
+        state.turns += 1
+        return true
     }
 
     private static func milliseconds(since start: ContinuousClock.Instant) -> Int {
@@ -283,8 +305,7 @@ public struct NativeHarness: Sendable {
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter,
                          force: Bool = false) async throws {
         let before = contextTokens(settings, state: state)
-        let threshold = min(compactor.policy.compactionThreshold,
-                            compactor.policy.contextWindow - settings.maxOutputTokens)
+        let threshold = compactor.policy.compactionThreshold
         trace.record(.contextCheck, metrics: [.contextTokens: before, .thresholdTokens: threshold,
                                              .retainedTokens: compactor.policy.effectiveKeepRecentTokens, .forced: force ? 1 : 0])
         guard force || before > threshold,
@@ -334,12 +355,21 @@ public struct NativeHarness: Sendable {
                            events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                            trace: AgentTraceEmitter) async throws -> SummaryResult {
         guard let request else { return .skipped }
-        trace.record(.summaryStarted, metrics: [.maxOutputTokens: request.maxOutputTokens,
-                                               .omittedCharacters: request.contextOmittedCharacters,
-                                               .serializedToolOmittedCharacters: request.serializedToolOmittedCharacters,
-                                               .fittedHistoryOmittedCharacters: request.fittedHistoryOmittedCharacters])
+        var output = AgentOutputBudget(requested: nil, policy: compactor.policy)
+        output.fit(inputTokens: compactor.estimateTokens(systemPrompt: request.systemPrompt, messages: request.messages, tools: request.tools))
+        var metrics = output.diagnosticMetrics
+        metrics.merge([.maxOutputTokens: request.maxOutputTokens, .omittedCharacters: request.contextOmittedCharacters,
+                       .serializedToolOmittedCharacters: request.serializedToolOmittedCharacters,
+                       .fittedHistoryOmittedCharacters: request.fittedHistoryOmittedCharacters]) { _, current in current }
+        trace.record(.summaryStarted, metrics: metrics)
         let response: AgentTurnResponse
-        do { response = try await model.streamTurn(request) { _ in } }
+        do {
+            response = try await model.streamTurn(request) { event in
+                if case .outputBudgetAdjusted(let requested, let sent) = event {
+                    trace.record(.outputBudgetAdjusted, metrics: [.maxOutputTokens: requested, .sentMaxOutputTokens: sent])
+                }
+            }
+        }
         catch { trace.record(.summaryFailed); throw error }
         try Task.checkCancellation()
         record(response.usage, state: &state, events: events)

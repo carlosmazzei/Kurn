@@ -7,6 +7,13 @@ import Testing
     let done = #"{"type":"response.output_item.done","output_index":1,"item":{"id":"item-1","type":"function_call","call_id":"call-1","name":"search","arguments":"{\"query\":\"Alice\"}","status":"completed"}}"#
     let completed = #"{"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":3}}}"#
 
+    @Test(arguments: [1, 8, 15, 16, 32, 128_000])
+    func responsesHonorsItsProtocolMinimum(maximum: Int) {
+        let request = AgentTurnRequest(systemPrompt: "", messages: [], tools: [], maxOutputTokens: maximum)
+        let body = AgentWireFormat.openAIResponses.requestBody(request, model: "test")
+        #expect(body["max_output_tokens"].int == max(16, maximum))
+    }
+
     @Test func requestEncodesHistoryToolsAndPrivacy() throws {
         let request = AgentWireRequestTests().request()
         let body = AgentWireFormat.openAIResponses.requestBody(request, model: "gpt-test", reasoningEffort: "low")

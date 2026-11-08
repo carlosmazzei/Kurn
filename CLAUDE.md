@@ -132,18 +132,35 @@ the current fetch or cache. Optional fields preserve existing cache/trace decodi
 both normal/wrap-up turns and compaction summaries; reserve size must never override
 a smaller provider output limit.
 
-Normal/wrap-up output budgets belong to `AgentHarness`, not the host. With no explicit
-budget, a run starts at up to 32,768 tokens; its ceiling is the minimum of the resolved
-provider output capacity, 65,536 tokens and one quarter of the context window. An unknown
-output capacity retains a conservative 4,096-token ceiling. Explicit caller budgets stay
-fixed (and capped by provider capacity). A response stopped by `maxTokens` may retry once
-per run with twice the allowance, only before any nonempty text was streamed or returned
-and while turn/cost budgets allow it. That attempt consumes a turn; its reported usage
-is counted. The interrupted response, tool calls and replay metadata are discarded;
-previously committed tools remain in context and never execute as part of recovery.
-The larger allowance persists for subsequent turns. Compaction thresholds reserve the
-current output budget as well as the configured margin. Partial visible replies and
-exhausted recovery remain explicit `outputLimit` outcomes.
+Output budgets belong to `AgentHarness`, not the host. Before every normal, wrap-up
+and summary request, `AgentOutputBudget` applies pi's `clampMaxTokensToContext` policy
+(reference revision `f064465d10d6a8e5c19f687bba1b5b5499b51680`,
+`packages/ai/src/api/simple-options.ts`). Desired output is the resolved model capacity,
+or an explicit caller ceiling capped by that capacity. Unknown capacities use an explicit
+4,096-token fallback. Estimate current input from the latest applicable provider usage plus
+subsequent messages, otherwise from the request. Subtract input and a safety margin of
+`max(4096, ceil(input * 0.15))` from the window; cap desired output to that room. If this
+leaves less than 32,768 tokens, use `min(32768, window - input - 4096)` instead. The request
+floor is one token, matching pi; oversized input still needs normal overflow recovery.
+The Responses wire adapter enforces its API minimum of 16 tokens and emits a typed
+budget-adjustment event, persisted in the same trace for normal and summary calls.
+There is no 32k initial ceiling, 64k hard ceiling, or quarter-window output rule.
+
+The compaction reserve remains a separate threshold. Never reserve the full model output
+maximum as a reason to compact an otherwise fitting conversation. Summaries also start
+from model capacity, not fractions of that reserve. Summary input is fitted only when it
+cannot fit with even one output token and the framing margin; actual output is then
+calculated from the fitted request. Serialization/fitting losses remain explicitly logged.
+
+An empty, unseen response stopped below the desired output capacity can attempt forced
+compaction and one retry per run, while turn/cost budgets allow it and only if context is
+actually reduced. Its reported usage is counted. The interrupted response, tool calls and
+replay metadata are discarded; previously committed tools never execute as part of recovery.
+The app retains its visibility guard: partial visible replies are not automatically replayed.
+Unknown usage, actual exhaustion of desired output capacity, explicit caller caps and failed
+recovery remain explicit `outputLimit` outcomes. Retry preparation/denial and each request's
+estimated input, desired/effective output, selected safety margin, available room and fallback
+status are content-free trace facts. Older budget-extension diagnostic cases stay decodable.
 Request completion diagnostics record the per-request budget, token usage, visible text
 size, discarded tool-call count and output-limit flag; missing usage remains marked as
 unreported. Responses/Chat Completions reasoning-token details and Gemini thought-token

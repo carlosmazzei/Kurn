@@ -9,7 +9,7 @@ public struct AgentContextPolicy: Sendable, Equatable {
 
     /// Total tokens the model accepts per request.
     public let contextWindow: Int
-    /// Tokens left free for the reply and estimate error; also sizes the summary requests.
+    /// Reserve used by the compaction trigger; request output allowances are calculated separately.
     public let reserveTokens: Int
     /// Approximate size of the newest messages a compaction keeps verbatim.
     public let keepRecentTokens: Int
@@ -34,11 +34,11 @@ public struct AgentContextPolicy: Sendable, Equatable {
     /// window always frees room.
     public var effectiveKeepRecentTokens: Int { max(1, min(keepRecentTokens, compactionThreshold / 2)) }
 
-    /// Output allowance of the history summary (80% of the reserve, as in pi) and of a split turn's
-    /// prefix summary (50%), each capped at a quarter/eighth of the window so the summary request
-    /// itself fits a small-window model (an 8k model would otherwise be asked for 13k of output).
-    public var historySummaryMaxOutputTokens: Int { min(maxOutputTokens ?? .max, max(64, min(reserveTokens * 4 / 5, contextWindow / 4))) }
-    public var turnPrefixSummaryMaxOutputTokens: Int { min(maxOutputTokens ?? .max, max(64, min(reserveTokens / 2, contextWindow / 8))) }
+    /// Desired capacities before input-dependent clamping. Like pi, summaries use the model's
+    /// output limit, independently of the compaction reserve. Missing metadata uses the same
+    /// explicit 4k fallback as normal requests.
+    public var historySummaryMaxOutputTokens: Int { maxOutputTokens ?? 4_096 }
+    public var turnPrefixSummaryMaxOutputTokens: Int { maxOutputTokens ?? 4_096 }
 
     func needsCompaction(_ tokens: Int) -> Bool { tokens > compactionThreshold }
 }
@@ -165,7 +165,9 @@ public struct AgentContextCompactor: Sendable {
     private func summaryRequest(conversation messages: [AgentMessage], instructions: String,
                                 maxOutputTokens: Int) -> AgentTurnRequest {
         let tail = "\n</conversation>\n\n" + instructions
-        let budget = policy.contextWindow - maxOutputTokens - Self.summaryRequestMarginTokens
+        // Preserve input instead of reserving the entire model output maximum up front.
+        // Only an input that cannot fit with even one output token needs history fitting.
+        let budget = policy.contextWindow - 1 - Self.summaryRequestMarginTokens
             - estimate(policy.summaryPrompts.system) - estimate("<conversation>\n" + tail)
             - Self.messageOverheadTokens
         let serialized = Self.serialize(messages)
@@ -176,9 +178,11 @@ public struct AgentContextCompactor: Sendable {
         }
         let omitted = conversation == serialized ? 0
             : max(0, serialized.count - conversation.count + Self.truncatedConversationNote.count + 1)
-        return AgentTurnRequest(systemPrompt: policy.summaryPrompts.system,
-                                messages: [.user("<conversation>\n" + conversation + tail)],
-                                tools: [], maxOutputTokens: maxOutputTokens, contextOmittedCharacters: clipped + omitted,
+        let messages: [AgentMessage] = [.user("<conversation>\n" + conversation + tail)]
+        var output = AgentOutputBudget(requested: maxOutputTokens, policy: policy)
+        output.fit(inputTokens: estimateTokens(systemPrompt: policy.summaryPrompts.system, messages: messages, tools: []))
+        return AgentTurnRequest(systemPrompt: policy.summaryPrompts.system, messages: messages,
+                                tools: [], maxOutputTokens: output.tokens, contextOmittedCharacters: clipped + omitted,
                                 serializedToolOmittedCharacters: clipped, fittedHistoryOmittedCharacters: omitted)
     }
 

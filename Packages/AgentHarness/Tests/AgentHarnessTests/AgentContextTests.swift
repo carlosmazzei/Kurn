@@ -13,11 +13,11 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
     }
 
     @Test func policyFollowsTheWindowMinusTheReserve() {
-        let large = AgentContextPolicy(contextWindow: 200_000)
+        let large = AgentContextPolicy(contextWindow: 200_000, maxOutputTokens: 128_000)
         #expect(large.compactionThreshold == 200_000 - AgentContextPolicy.defaultReserveTokens)
         #expect(large.effectiveKeepRecentTokens == AgentContextPolicy.defaultKeepRecentTokens)
-        #expect(large.historySummaryMaxOutputTokens == 13_107)
-        #expect(large.turnPrefixSummaryMaxOutputTokens == 8_192)
+        #expect(large.historySummaryMaxOutputTokens == 128_000)
+        #expect(large.turnPrefixSummaryMaxOutputTokens == 128_000)
         let small = AgentContextPolicy(contextWindow: 10_000)
         #expect(small.compactionThreshold == 5_000)
         #expect(small.effectiveKeepRecentTokens == 2_500)
@@ -87,7 +87,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         let request = try #require(compactor.historySummaryRequest(for: plan))
         #expect(request.tools.isEmpty)
         #expect(request.systemPrompt == AgentCompactionPrompts.standard.system)
-        #expect(request.maxOutputTokens == compactor.policy.historySummaryMaxOutputTokens)
+        #expect(request.maxOutputTokens > 0 && request.maxOutputTokens <= compactor.policy.historySummaryMaxOutputTokens)
         guard case .user(let prompt)? = request.messages.first, request.messages.count == 1 else {
             Issue.record("Expected one serialized user message"); return
         }
@@ -108,7 +108,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         let plan = try #require(compactor.plan(for: messages))
         #expect(compactor.historySummaryRequest(for: plan) == nil)
         let request = try #require(compactor.turnPrefixSummaryRequest(for: plan))
-        #expect(request.maxOutputTokens == compactor.policy.turnPrefixSummaryMaxOutputTokens)
+        #expect(request.maxOutputTokens > 0 && request.maxOutputTokens <= compactor.policy.turnPrefixSummaryMaxOutputTokens)
         guard case .user(let prompt)? = request.messages.first else { Issue.record("Missing prompt"); return }
         #expect(prompt.hasSuffix(AgentCompactionPrompts.standard.turnPrefix))
         #expect(!prompt.contains("<previous-summary>"))
@@ -124,10 +124,10 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
     @Test(arguments: [false, true])
     func summaryRequestsFitASmallWindow(splitTurn: Bool) throws {
         let compactor = AgentContextCompactor(policy: AgentContextPolicy(contextWindow: 8_192))
-        #expect(compactor.policy.historySummaryMaxOutputTokens == 2_048)
-        #expect(compactor.policy.turnPrefixSummaryMaxOutputTokens == 1_024)
-        // 8,000 tokens to summarize either way: more than a 2,048 (history) or 1,024 (prefix) output
-        // budget leaves of the window, so both requests must drop the oldest text.
+        #expect(compactor.policy.historySummaryMaxOutputTokens == 4_096)
+        #expect(compactor.policy.turnPrefixSummaryMaxOutputTokens == 4_096)
+        // Serialized input plus instructions exceed the window. Fit the input first,
+        // then derive output from the remaining headroom using the same policy as normal turns.
         let messages: [AgentMessage] = [.user(tokens(4_000)), .assistant(text: tokens(4_000), toolCalls: []),
             splitTurn ? .assistant(text: tokens(4_000), toolCalls: []) : .user(tokens(4_000)),
             .assistant(text: tokens(10), toolCalls: [])]
@@ -135,7 +135,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(plan.isSplitTurn == splitTurn)
         let request = try #require(splitTurn ? compactor.turnPrefixSummaryRequest(for: plan)
                                              : compactor.historySummaryRequest(for: plan))
-        #expect(request.maxOutputTokens == (splitTurn ? 1_024 : 2_048))
+        #expect(request.maxOutputTokens >= 1 && request.maxOutputTokens <= 4_096)
         let input = compactor.estimateTokens(systemPrompt: request.systemPrompt, messages: request.messages, tools: [])
         #expect(input + request.maxOutputTokens <= 8_192)
         guard case .user(let prompt)? = request.messages.first else { Issue.record("Missing prompt"); return }

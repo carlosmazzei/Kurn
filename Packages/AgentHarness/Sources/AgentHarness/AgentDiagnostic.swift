@@ -13,6 +13,8 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case budgetExtended
         case budgetExtensionDenied
         case outputBudgetExtended, outputBudgetExtensionDenied
+        case outputRetryStarted, outputRetryDenied
+        case outputBudgetAdjusted
     }
     public enum Metric: String, Codable, Sendable, CodingKeyRepresentable {
         case contextTokens, thresholdTokens, retainedTokens, afterTokens, forced
@@ -27,6 +29,8 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case returnedItems, mutationsCommitted
         case hardMaxTurns, hardMaxToolCalls, minimumProgress, idleCalls
         case hardMaxOutputTokens, previousMaxOutputTokens, outputRetries
+        case contextSafetyTokens, contextSafetyRelaxed, availableOutputTokens, outputCapacityFallback
+        case sentMaxOutputTokens
         case visibleTextScalars, streamedText, returnedToolCalls, discardedToolCalls, outputLimited, usageReported, reasoningTokens, costLimitReached
     }
 

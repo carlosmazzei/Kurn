@@ -15,8 +15,8 @@ struct MeetingChatOutputBudgetTests {
             calls.append(try chatAgentCall("list_sources", arguments: .object(["offset": .number(Double(offset))])))
         }
         for index in 0..<33 {
-            let meeting = MeetingFixtures.transcribed("Meeting \(index)", in: context)
-            context.insert(Summary(meeting: meeting, sections: [SummarySection(title: "Notes", body: "Decisions")], provider: .openAI))
+            let meeting = MeetingFixtures.transcribed("Meeting \(index)", lines: [String(repeating: "a", count: 4_000)], in: context)
+            context.insert(Summary(meeting: meeting, sections: [SummarySection(title: "Notes", body: String(repeating: "b", count: 2_000))], provider: .openAI))
             meetings.append(meeting)
             calls.append(try chatAgentCall("read_summary", arguments: .object(["meetingID": .string(meeting.id.uuidString)])))
             if index < 6 {
@@ -30,6 +30,7 @@ struct MeetingChatOutputBudgetTests {
             AgentTurnResponse(text: "", toolCalls: calls, usage: AgentUsage(inputTokens: 3_000, outputTokens: 1_000)),
             AgentTurnResponse(text: "", toolCalls: [create], usage: AgentUsage(inputTokens: 54_879, outputTokens: 32_768, reasoningTokens: 32_768),
                               stopReason: .maxTokens),
+            AgentTurnResponse(text: "Checkpoint"),
             AgentTurnResponse(text: "", toolCalls: [create]), AgentTurnResponse(text: "Report created")
         ])
         let suite = "MeetingChatOutputBudgetTests.\(UUID())"
@@ -47,14 +48,15 @@ struct MeetingChatOutputBudgetTests {
         #expect(vm.artifacts.count == 1)
         #expect(vm.artifacts.first?.version == 1)
         let requests = await model.requests
-        #expect(requests.map(\.maxOutputTokens) == [32_768, 32_768, 65_536, 65_536])
-        #expect(requests[1].messages == requests[2].messages)
+        #expect(requests.map(\.maxOutputTokens) == Array(repeating: 128_000, count: 5))
+        #expect(requests[1].messages != requests[3].messages)
         let session = try #require(vm.pastSessions().first)
         let steps = try #require(session.turns.last?.steps)
         let facts = steps.compactMap(\.diagnostic)
         #expect(facts.first?.metrics[.selectedSources] == 33)
-        #expect(facts.filter { $0.kind == .outputBudgetExtended }.count == 1)
-        #expect(!facts.contains { [.compactionStarted, .limitReached, .toolSkipped].contains($0.kind) })
+        #expect(facts.filter { $0.kind == .outputRetryStarted }.count == 1)
+        #expect(!facts.contains { [.limitReached, .toolSkipped].contains($0.kind) })
+        #expect(facts.filter { $0.kind == .compactionStarted && $0.metrics[.forced] == 1 }.count == 1)
         #expect(steps.filter { $0.toolName == "create_document" }.count == 1)
         #expect(steps.last?.stopReason == .completed)
         #expect(try session.harnessSnapshot().artifacts == vm.artifacts)

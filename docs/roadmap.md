@@ -563,11 +563,14 @@ with 43/192 tool calls and approximately 54,879 context tokens against a correct
 resolved 1,050,000-token window. No compaction occurred; 147,800 input tokens were a
 cumulative run total. The log does not identify how much output was reasoning versus
 text/tool arguments. A follow-up removes the host's 4k cap, adds bounded capacity-aware
-output budgeting and empty-response recovery inside the harness, and records per-request
+output budgeting using pi’s input/headroom calculation (including summaries) and bounded
+compact-and-retry recovery for early, empty length stops inside the harness, and records per-request
 usage, reasoning counts when supplied, visibility, discarded calls and recovery decisions.
 Regression coverage simulates 33 selected sources and 43 successful reads before an
 output-limited turn, then checks a single committed artifact and persisted trace after
-recovery. NH00 still needs the fixed build retested against that corpus on a physical
+one forced compaction/retry. Output starts from the actual model capacity; it is reduced
+only by current input and pi’s safety margin, without the previous 32k/64k/quarter-window
+ceilings. The compaction trigger remains independent of desired maximum output. NH00 still needs the fixed build retested against that corpus on a physical
 device, authenticated provider smoke tests and continued catalog review; synthetic
 regressions are not evidence that the fixed build has passed the user's data/device.
 NH01–NH10 have not started; this is not full harness parity.

@@ -89,6 +89,8 @@ public struct AgentTurnRequest: Sendable, Equatable {
 
 public enum AgentModelEvent: Sendable, Equatable {
     case textDelta(String)
+    /// The wire protocol may require a minimum above the logical headroom floor.
+    case outputBudgetAdjusted(requested: Int, sent: Int)
 }
 
 public struct AgentTurnResponse: Sendable, Equatable {

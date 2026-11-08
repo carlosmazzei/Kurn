@@ -55,6 +55,22 @@ private enum AgentTestVendor: String, CaseIterable {
 }
 
 extension ProviderHTTPTests {
+    @Test func agentResponsesMinimumOutputIsReported() async throws {
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody([
+            AgentTestVendor.openAI.textPayload, #"{"type":"response.completed","response":{}}"#
+        ]), headers: [:])])
+        let request = AgentTurnRequest(systemPrompt: "System", messages: [.user("Question")], tools: [], maxOutputTokens: 1)
+        let events = AsyncStream<AgentModelEvent>.makeStream()
+        _ = try await AgentTestVendor.openAI.model().streamTurn(request) { events.continuation.yield($0) }
+        events.continuation.finish()
+        var received: [AgentModelEvent] = []
+        for await event in events.stream { received.append(event) }
+        #expect(received == [.outputBudgetAdjusted(requested: 1, sent: 16), .textDelta("Hello")])
+        let http = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONValue.parse(String(decoding: MockURLProtocol.body(of: http), as: UTF8.self))
+        #expect(body["max_output_tokens"].int == 16)
+    }
+
     private var agentRequest: AgentTurnRequest {
         AgentTurnRequest(systemPrompt: "Ground answers", messages: [.user("Find Alice")],
                          tools: [AgentToolSpec(name: "search", description: "Search meetings", inputSchema: .object([:]))],

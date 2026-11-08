@@ -1208,3 +1208,13 @@
 "chat.metric.usageReported" = "Utilizzo segnalato (1 = sì)";
 "chat.metric.reasoningTokens" = "Token di ragionamento segnalati";
 "chat.metric.costLimitReached" = "Limite di costo raggiunto (1 = sì)";
+
+/* Dynamic output headroom */
+"chat.diagnostic.outputRetryStarted" = "Recupero dell’uscita avviato";
+"chat.diagnostic.outputRetryDenied" = "Recupero dell’uscita non applicato";
+"chat.metric.contextSafetyTokens" = "Margine di sicurezza del contesto";
+"chat.metric.contextSafetyRelaxed" = "Regola per spazio ridotto applicata (1 = sì)";
+"chat.metric.availableOutputTokens" = "Spazio di uscita dopo il margine di sicurezza";
+"chat.metric.outputCapacityFallback" = "Capacità di uscita di riserva utilizzata (1 = sì)";
+"chat.diagnostic.outputBudgetAdjusted" = "Budget di uscita adeguato al minimo dell’API";
+"chat.metric.sentMaxOutputTokens" = "Budget di uscita inviato all’API";

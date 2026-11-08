@@ -1,45 +1,65 @@
 import Foundation
 
-/// Per-run output allowance. Explicit caller budgets stay fixed. Automatic budgets leave at
-/// least three quarters of the context for input and never invent a provider output capacity.
+/// Dynamic output headroom, matching pi's clampMaxTokensToContext at f064465.
+/// Capacities still come from the host's resolver; an unknown capacity uses an explicit fallback.
 struct AgentOutputBudget: Sendable {
     private(set) var tokens: Int
     let ceiling: Int
+    let contextWindow: Int
+    let isFallback: Bool
+    private let allowsRecovery: Bool
     private(set) var retries = 0
+    private(set) var inputTokens = 0
+    private(set) var safetyTokens = 4_096
+    private(set) var availableTokens = 0
+    private(set) var relaxedSafety = false
 
     init(requested: Int?, policy: AgentContextPolicy) {
-        if let requested {
-            tokens = max(1, min(requested, policy.maxOutputTokens ?? requested))
-            ceiling = tokens
-        } else {
-            ceiling = max(1, min(65_536, policy.maxOutputTokens ?? 4_096, policy.contextWindow / 4))
-            tokens = min(32_768, ceiling)
-        }
+        ceiling = max(1, min(requested ?? policy.maxOutputTokens ?? 4_096, policy.maxOutputTokens ?? .max))
+        tokens = ceiling
+        contextWindow = policy.contextWindow
+        isFallback = requested == nil && policy.maxOutputTokens == nil
+        allowsRecovery = requested == nil
     }
 
-    /// A limited response has not executed any tools yet. Only retry an empty, unseen reply;
-    /// never replay partial visible text. One increase per run also bounds extra requests/cost.
-    mutating func recover(_ response: AgentTurnResponse, streamed: Bool, state: AgentRunState,
-                          costReached: Bool, trace: AgentTraceEmitter) -> Bool {
-        let allowed = !costReached && state.turns < state.allowedTurns
-        let metrics: [AgentDiagnostic.Metric: Int] = [
+    mutating func fit(inputTokens: Int) {
+        self.inputTokens = max(0, inputTokens)
+        let proportional = (Double(self.inputTokens) * 0.15).rounded(.up)
+        safetyTokens = proportional >= Double(Int.max) ? .max : max(4_096, Int(proportional))
+        // Saturating subtraction also accepts deliberately adversarial estimator values.
+        let headroom = contextWindow - self.inputTokens
+        relaxedSafety = headroom < safetyTokens || headroom - safetyTokens < 32_768
+        if relaxedSafety { safetyTokens = 4_096 }
+        availableTokens = headroom < Int.min + safetyTokens ? .min : headroom - safetyTokens
+        let room = relaxedSafety ? min(32_768, availableTokens) : availableTokens
+        tokens = min(ceiling, max(1, room))
+    }
+
+    var diagnosticMetrics: [AgentDiagnostic.Metric: Int] {
+        [.contextTokens: inputTokens, .maxOutputTokens: tokens, .hardMaxOutputTokens: ceiling,
+         .contextSafetyTokens: safetyTokens, .contextSafetyRelaxed: relaxedSafety ? 1 : 0,
+         .availableOutputTokens: availableTokens, .outputCapacityFallback: isFallback ? 1 : 0,
+         .outputRetries: retries]
+    }
+
+    /// Keep the app's visibility/turn/cost guards. Retry an early length stop only after one
+    /// successful forced compaction; never double the desired capacity or replay visible text.
+    func canRecover(_ response: AgentTurnResponse, streamed: Bool, state: AgentRunState, costReached: Bool) -> Bool {
+        allowsRecovery && response.text.isEmpty && !streamed && retries == 0
+            && !costReached && state.turns < state.allowedTurns
+            && response.usage.map { $0.outputTokens < ceiling } == true
+    }
+
+    func recoveryMetrics(_ response: AgentTurnResponse, streamed: Bool, state: AgentRunState,
+                         costReached: Bool) -> [AgentDiagnostic.Metric: Int] {
+        diagnosticMetrics.merging([
             .maxOutputTokens: tokens, .hardMaxOutputTokens: ceiling, .outputRetries: retries,
             .visibleTextScalars: response.text.unicodeScalars.count, .streamedText: streamed ? 1 : 0,
             .costLimitReached: costReached ? 1 : 0, .turnIndex: state.turns, .maxTurns: state.allowedTurns
-        ]
-        guard response.text.isEmpty, !streamed, retries == 0, tokens < ceiling, allowed else {
-            trace.record(.outputBudgetExtensionDenied, metrics: metrics, reason: .outputLimit)
-            return false
-        }
-        tokens = min(ceiling, tokens * 2)
-        retries += 1
-        var extended = metrics
-        extended[.previousMaxOutputTokens] = metrics[.maxOutputTokens]
-        extended[.maxOutputTokens] = tokens
-        extended[.outputRetries] = retries
-        trace.record(.outputBudgetExtended, metrics: extended, reason: .outputLimit)
-        return true
+        ]) { _, current in current }
     }
+
+    mutating func didRecover() { retries += 1 }
 }
 
 extension AgentTurnResponse {

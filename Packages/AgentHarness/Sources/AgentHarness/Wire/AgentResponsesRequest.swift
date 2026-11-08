@@ -22,7 +22,8 @@ extension AgentWireFormat {
         }
         var body: [String: JSONValue] = [
             "model": .string(model), "instructions": .string(request.systemPrompt), "input": .array(input),
-            "stream": .bool(true), "store": .bool(false), "max_output_tokens": .number(Double(request.maxOutputTokens)),
+            // Responses requires at least 16, as in pi's OpenAI adapter (#6265).
+            "stream": .bool(true), "store": .bool(false), "max_output_tokens": .number(Double(max(16, request.maxOutputTokens))),
             "include": .array([.string("reasoning.encrypted_content")])
         ]
         if !request.tools.isEmpty {
