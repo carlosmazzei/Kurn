@@ -53,4 +53,16 @@ struct AgentMetadataFreshnessTests {
         #expect(decoded.metadataRefresh == .cacheFresh)
         #expect(decoded == snapshot)
     }
+
+    @Test(arguments: ["-1", "0", "100000001", "2.5", "\"invalid\""])
+    func invalidCachedInputCannotOverrideTheCatalog(input: String) throws {
+        let json = "{\"contextWindowTokens\":\(input),\"maxOutputTokens\":4096,\"fetchedAt\":800000000}"
+        let decoded = try JSONDecoder().decode(AgentModelLimits.self, from: Data(json.utf8))
+        #expect(decoded.contextWindowTokens == nil)
+        #expect(decoded.maxOutputTokens == 4096)
+        let resolution = ModelContextWindows.resolve(model: "gpt-6.1-terra", reported: decoded, now: decoded.fetchedAt)
+        #expect(resolution.source == .fixedTable)
+        #expect(resolution.contextWindowTokens == 1_050_000)
+        #expect(resolution.maxOutputTokens == 4096)
+    }
 }

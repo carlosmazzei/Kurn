@@ -48,6 +48,9 @@ public struct AgentContextResolution: Codable, Sendable, Equatable, Identifiable
 
 /// Metadata obtained from the configured provider. Optional fields are independent.
 public struct AgentModelLimits: Codable, Sendable, Equatable {
+    private enum CodingKeys: String, CodingKey {
+        case contextWindowTokens, maxOutputTokens, limitKind, fetchedAt, contextFetchedAt, outputFetchedAt
+    }
     public let contextWindowTokens: Int?
     public let maxOutputTokens: Int?
     public let limitKind: AgentContextResolution.LimitKind
@@ -66,6 +69,18 @@ public struct AgentModelLimits: Codable, Sendable, Equatable {
         self.fetchedAt = fetchedAt
         self.contextFetchedAt = contextFetchedAt
         self.outputFetchedAt = outputFetchedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        // A cache record without a receipt timestamp is not API evidence.
+        let timestamp = try values.decode(Date.self, forKey: .fetchedAt)
+        self.init(contextWindowTokens: try? values.decodeIfPresent(Int.self, forKey: .contextWindowTokens),
+                  maxOutputTokens: try? values.decodeIfPresent(Int.self, forKey: .maxOutputTokens),
+                  limitKind: (try? values.decodeIfPresent(AgentContextResolution.LimitKind.self, forKey: .limitKind)) ?? .combined,
+                  fetchedAt: timestamp,
+                  contextFetchedAt: try values.decodeIfPresent(Date.self, forKey: .contextFetchedAt),
+                  outputFetchedAt: try values.decodeIfPresent(Date.self, forKey: .outputFetchedAt))
     }
 
     private static func valid(_ value: Int?) -> Int? {
