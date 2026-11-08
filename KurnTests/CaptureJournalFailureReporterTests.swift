@@ -21,17 +21,23 @@ struct CaptureJournalFailureReporterTests {
         }
     }
 
-    @Test func signalReportsWithoutAManualFlush() {
-        let delivered = DispatchSemaphore(value: 0)
+    @Test(.timeLimit(.minutes(1))) func signalReportsWithoutAManualFlush() async {
+        let (delivered, continuation) = AsyncStream<Void>.makeStream()
         let count = Mutex(0)
         let reporter = CaptureJournalFailureReporter {
             count.withLock { $0 += 1 }
-            delivered.signal()
+            continuation.yield(())
+            continuation.finish()
         }
-        defer { reporter.stop() }
+        defer {
+            reporter.stop()
+            continuation.finish()
+        }
 
         reporter.signal()
-        #expect(delivered.wait(timeout: .now() + 5) == .success)
+        // Yield the cooperative executor while the real utility thread delivers the signal.
+        // A missing callback still fails via the test deadline or the delivery-count assertion.
+        for await _ in delivered { break }
         #expect(count.withLock { $0 } == 1)
     }
 
