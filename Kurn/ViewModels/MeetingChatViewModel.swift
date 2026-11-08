@@ -2,10 +2,9 @@
 //  MeetingChatViewModel.swift
 //  Kurn
 //
-//  Drives "chat with your meetings": owns the in-memory conversation, gathers
-//  the pre-embedded passages to search over, and runs NativeHarness or the
-//  on-device MeetingChatService fallback. All SwiftData reads happen on the main actor; the
-//  retrieval + LLM call run off-main in the service.
+//  Drives "chat with your meetings": owns the in-memory conversation and runs each
+//  question through NativeHarness (`HarnessChatService`) with the selected sources.
+//  Chat needs a cloud provider with an `AgentModel`; Apple's on-device model has none.
 //
 //  A conversation is also the unit of persistence: `configure(meeting:modelContext:)`
 //  wires up the `ChatSession` scope (per-meeting or library-wide), and a
@@ -50,18 +49,8 @@ final class MeetingChatViewModel {
     /// currently open conversation. `nil` for one not yet saved.
     var currentSessionID: UUID? { session?.id }
     var artifactSession: ChatSession? { session }
-    /// The pipeline stage currently reported by `MeetingChatService`, shown as
-    /// a "reasoning" row while the assistant's turn has no text yet. Cleared
-    /// once the reply starts streaming (the growing text bubble replaces it)
-    /// and whenever a turn finishes, errors, or is cancelled.
-    private(set) var currentPhase: ChatPhase?
-    /// Supplementary detail for `currentPhase`, e.g. "(2/5)" while a
-    /// large-library "Ask" works through several blocks of meeting notes —
-    /// see `ChatStreamEvent.progress`. Cleared alongside `currentPhase`.
-    private(set) var currentPhaseDetail: String?
     var error: AppError?
 
-    private let chatService: MeetingChatService
     // H8 PR 20: `deinit` is nonisolated even on a `@MainActor` class (Swift
     // gives it no way to hop actors before the object is gone), so cancelling
     // `task` there needs unchecked access — confirmed by CI, which rejected
@@ -90,38 +79,18 @@ final class MeetingChatViewModel {
         task?.cancel()
     }
 
-    /// `chatService` defaults to the live retrieval + provider stack; tests
-    /// pass one over a stub embedder and a scripted provider.
-    init(chatService: MeetingChatService = MeetingChatService(),
-         agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
+    /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
+    init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
          harnessService: HarnessChatService = HarnessChatService()) {
-        self.chatService = chatService
         self.agentModelFactory = agentModelFactory
         self.harnessService = harnessService
     }
 
-    /// Send `question`. When `transcriptText` is non-nil the scope is a single
-    /// meeting (full-transcript grounding, falling back to retrieval over
-    /// `candidates` only for very long meetings); when nil the scope is the whole
-    /// library (retrieval over `candidates`). `provider`/`model` come from the
-    /// summary settings. No-op while a previous reply is still in flight.
-    ///
-    /// The reply streams in: `MeetingChatService` reports `ChatStreamEvent`s
-    /// from off the main actor, so they are bridged through an `AsyncStream`
-    /// into a single `@MainActor` consumer task that applies them in order —
-    /// the same pattern `TranscriptionCoordinator` uses for transcription
-    /// phases. The assistant `Turn` is created lazily, on the first text
-    /// delta, so an error before any text arrives leaves no stray turn behind.
-    func send(
-        question: String,
-        transcriptText: String?,
-        candidates: [SemanticSearchService.Candidate],
-        summariesByMeeting: [UUID: String] = [:],
-        articlesByMeeting: [UUID: WikiArticleSnapshot] = [:],
-        provider: AIProvider,
-        model: String,
-        runID: OperationID = OperationID()
-    ) {
+    /// Send `question` to the agent over the current source scope. `provider`/`model` come from
+    /// the summary settings. No-op while a previous reply is still in flight. A provider without
+    /// an `AgentModel` (Apple's on-device model) fails with the cloud-provider notice; the view
+    /// disables the composer for it before that can happen.
+    func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID()) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding else { return }
         error = nil
@@ -135,91 +104,41 @@ final class MeetingChatViewModel {
         retryArtifacts = []
         retryOrigins = [:]
         isResponding = true
-        currentPhase = nil
-        currentPhaseDetail = nil
         let priorTurns = Array(turns.dropLast())
-        // Streaming can append a partial assistant turn before cancellation is
-        // observed (unlike the old atomic-answer flow, which only appended on
-        // success). Remember where the reply would start so a cancel can drop
-        // it, keeping the "silently drop the pending turn" behavior intact.
+        // A cancel or failure drops whatever reply was appended after the question, so the
+        // question stays as the retryable, unanswered turn.
         let turnCountBeforeReply = turns.count
-        // `runID` correlates every `ReliabilityEvent` this turn produces — the
-        // service's own per-stage events (validation, provider, answer) and
-        // this view model's own outcome event below. A parameter (defaulted) so a
-        // test can pick its own events out of the process-global log.
+        // `runID` correlates the `ReliabilityEvent` this turn produces; a parameter (defaulted) so
+        // a test can pick its own events out of the process-global log.
         let startedAt = Date()
-
-        let (stream, continuation) = AsyncStream<ChatStreamEvent>.makeStream()
-        let onEvent: MeetingChatService.ChatEventHandler = { event in
-            continuation.yield(event)
-        }
-        let consumer = Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.consumeLegacy(stream, generation: generation)
-        }
-
-        // Close the channel and wait for the consumer to apply every pending
-        // event before touching completion/error state, the same
-        // `drainEvents` idiom `TranscriptionCoordinator` uses for its own
-        // off-main phase callbacks.
-        func drainEvents() async {
-            continuation.finish()
-            await consumer.value
-        }
 
         task = Task { [weak self] in
             guard let self else { return }
             do {
                 try Task.checkCancellation()
-                let answer: MeetingChatService.Answer?
-                if let agentModel = try agentModelFactory(provider, model) {
-                    let history = Self.buildHistory(from: priorTurns, includeCitationContext: false)
-                    let hasAnswer = try await self.runHarness(agentModel, question: trimmed, history: history,
-                                              provider: provider, model: model, startedAt: startedAt)
-                    answer = hasAnswer ? MeetingChatService.Answer(text: self.turns.last?.text ?? "", citations: [],
-                                                                  usage: self.turns.last?.usage) : nil
-                } else if let transcriptText {
-                    answer = try await chatService.answerAboutMeeting(
-                        question: trimmed, history: Self.buildHistory(from: priorTurns), transcriptText: transcriptText,
-                        candidates: candidates, provider: provider, model: model,
-                        runID: runID, onEvent: onEvent
-                    )
-                } else {
-                    answer = try await chatService.answerAcrossLibrary(
-                        question: trimmed, history: Self.buildHistory(from: priorTurns), candidates: candidates,
-                        summariesByMeeting: summariesByMeeting, articlesByMeeting: articlesByMeeting,
-                        provider: provider, model: model, runID: runID, onEvent: onEvent
-                    )
+                guard let agentModel = try agentModelFactory(provider, model) else {
+                    throw AppError.apiError(statusCode: 0, message: NSLocalizedString(
+                        "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
-                await drainEvents()
+                let answered = try await self.runHarness(agentModel, question: trimmed,
+                                                         history: Self.buildHistory(from: priorTurns),
+                                                         provider: provider, model: model, startedAt: startedAt)
                 try Task.checkCancellation()
                 guard self.generation == generation else { throw CancellationError() }
-                if let answer { self.applyFinal(answer, model: model, elapsed: Date().timeIntervalSince(startedAt)) }
-                else { self.persist() }
-                // Reported at "view_model" stage, distinct from the service's
-                // own unstaged success event (one signal per layer: did the API call succeed, did
-                // the whole user-visible round trip succeed).
+                self.persist()
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
-                    outcome: answer == nil ? .failed : .succeeded, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: answer == nil ? "agent_limit" : nil
+                    outcome: answered ? .succeeded : .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
+                    code: answered ? nil : "agent_limit"
                 ))
             } catch is CancellationError {
-                // User cancelled; drop whatever streamed in so far, silently.
-                // Leaving the question turn in place is what makes it
-                // `retryableQuestion` afterward.
-                await drainEvents()
                 if self.generation == generation { self.dropPartialReply(keeping: turnCountBeforeReply) }
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
                 ))
-            } catch let appError as AppError {
-                // Same drop as cancellation: a half-streamed answer next to
-                // an error alert reads as a broken reply, not a retryable
-                // question, so `retryableQuestion` needs the turn list back
-                // at just the question for this to be one clean asset.
-                await drainEvents()
+            } catch {
+                let appError = error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
                 if self.generation == generation {
                     self.dropPartialReply(keeping: turnCountBeforeReply)
                     self.error = appError
@@ -227,71 +146,21 @@ final class MeetingChatViewModel {
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: appError.logCode
-                ))
-            } catch {
-                await drainEvents()
-                if self.generation == generation {
-                    self.dropPartialReply(keeping: turnCountBeforeReply)
-                    self.error = .apiError(statusCode: 0, message: error.localizedDescription)
-                }
-                ReliabilityLog.record(ReliabilityEvent(
-                    operationID: runID, operation: "meeting_chat", stage: "view_model",
-                    outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: "unexpected"
+                    code: error is AppError ? appError.logCode : "unexpected"
                 ))
             }
             guard self.generation == generation else { return }
             self.isResponding = false
-            self.currentPhase = nil
-            self.currentPhaseDetail = nil
             self.task = nil
         }
-    }
-
-    private func consumeLegacy(_ stream: AsyncStream<ChatStreamEvent>, generation: UUID) async {
-        var assistantIndex: Int?
-        for await event in stream {
-            guard self.generation == generation, isResponding else { return }
-            switch event {
-            case .phase(let phase):
-                currentPhase = phase
-                currentPhaseDetail = nil
-            case .progress(let detail): currentPhaseDetail = detail
-            case .delta(let text):
-                if assistantIndex == nil {
-                    currentPhase = nil
-                    currentPhaseDetail = nil
-                    turns.append(Turn(role: .assistant, text: ""))
-                    assistantIndex = turns.count - 1
-                }
-                if let assistantIndex { turns[assistantIndex].text += text }
-            }
-        }
-    }
-
-    /// Replace the streamed-in assistant text with the service's final answer
-    /// (they should already match) and attach its citations, which only
-    /// arrive with the completed `Answer` — streaming deltas carry text only.
-    /// Also attaches the provider's token usage (if it reported one), the
-    /// estimated cost that implies under `model`, and how long the reply
-    /// took to generate.
-    private func applyFinal(_ answer: MeetingChatService.Answer, model: String, elapsed: TimeInterval) {
-        guard let index = turns.lastIndex(where: { $0.role == .assistant }) else { return }
-        turns[index].text = answer.text
-        turns[index].citations = answer.citations
-        turns[index].usage = answer.usage
-        turns[index].elapsedSeconds = elapsed
-        turns[index].costUSD = answer.usage.flatMap { ModelPricing.estimatedCostUSD(model: model, usage: $0) }
-        persist()
     }
 
     // MARK: - Persistence
 
     /// Saves the whole conversation so far into `session`, creating it (and
     /// deriving its title from the first question) on the first successful
-    /// exchange. Never called for a cancelled/failed reply — `dropPartialReply`
-    /// removes those turns before `applyFinal`, the only caller, is reached.
+    /// exchange. A cancelled/failed reply never reaches it with its partial turns —
+    /// `dropPartialReply` removes those first.
     /// A save failure is logged and surfaced but leaves the conversation on
     /// screen exactly as it is — the user's answer is not lost, only its
     /// persistence.
@@ -345,27 +214,9 @@ final class MeetingChatViewModel {
         retryOrigins = pending.artifactOrigins
     }
 
-    /// Prior turns as chat history. Turns are plain text to keep token cost
-    /// down, but the most recent answer's retrieved excerpts are re-appended as a
-    /// compact context block so follow-up questions stay grounded in what the
-    /// previous answer was based on. (Full per-turn context is intentionally not
-    /// kept — that is the synthesis path's job, not the lookup path's.)
-    static func buildHistory(from prior: [Turn], includeCitationContext: Bool = true) -> [ChatMessage] {
-        var history = prior.map { ChatMessage(role: $0.role, content: $0.text) }
-        if includeCitationContext, let lastAnswer = prior.last(where: { $0.role == .assistant }),
-           !lastAnswer.citations.isEmpty {
-            history.append(ChatMessage(role: .user, content: contextBlock(from: lastAnswer.citations)))
-        }
-        return history
-    }
-
-    /// A short, bounded reminder of the excerpts the previous answer used.
-    private static func contextBlock(from hits: [SemanticSearchService.Hit]) -> String {
-        let lines = hits.prefix(8).map { hit -> String in
-            let meeting = hit.meetingTitle.isEmpty ? "" : " (\(hit.meetingTitle))"
-            return "[\(hit.start.clockDisplay)]\(meeting) \(hit.speakerLabel): \(hit.text)"
-        }.joined(separator: "\n")
-        return "For reference, my previous answer was grounded on these excerpts:\n\(lines)"
+    /// Prior turns as plain user/assistant history; old tool payloads are never replayed.
+    static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
+        prior.map { ChatMessage(role: $0.role, content: $0.text) }
     }
 
     /// Cancel an in-flight reply.
@@ -374,8 +225,6 @@ final class MeetingChatViewModel {
         task = nil
         if isResponding, turns.last?.role == .assistant { dropPartialReply(keeping: turns.count - 1) }
         isResponding = false
-        currentPhase = nil
-        currentPhaseDetail = nil
     }
 
     /// Starts a brand-new, unsaved conversation — the "new chat" affordance.
@@ -411,9 +260,7 @@ final class MeetingChatViewModel {
     /// Saved conversations in the current scope, most-recently-active first.
     /// Fetches every `ChatSession` and filters in memory rather than a
     /// predicate over the optional `meeting` relationship, the same
-    /// resolve-scope-in-Swift shape `MeetingChatView`'s own
-    /// `summariesByMeeting`/`articlesByMeeting` already use for a fetch this
-    /// infrequent.
+    /// resolve-scope-in-Swift shape, which is cheap for a fetch this infrequent.
     func pastSessions() -> [ChatSession] {
         guard let modelContext else { return [] }
         let all = (try? modelContext.fetch(FetchDescriptor<ChatSession>())) ?? []

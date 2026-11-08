@@ -44,6 +44,13 @@ final class ModelContextWindowStore: @unchecked Sendable {
         }
     }
 
+    /// The window the agent harness plans against for `model` on `provider`: the reported one,
+    /// else the model-family table, else `ModelContextWindows.unknownWindow`. Unlike
+    /// `ContextBudget.resolve`, no output reservation or practical cap is applied here.
+    func agentContextWindow(for provider: AIProvider, model: String) -> Int {
+        ModelContextWindows.agentWindow(reported: window(providerID: provider.id, model: model), model: model)
+    }
+
     private func stored() -> [String: Int] {
         defaults.dictionary(forKey: Self.key) as? [String: Int] ?? [:]
     }

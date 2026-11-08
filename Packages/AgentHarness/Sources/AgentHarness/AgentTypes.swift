@@ -59,12 +59,17 @@ public struct AgentTurnRequest: Sendable, Equatable {
     public let messages: [AgentMessage]
     public let tools: [AgentToolSpec]
     public let maxOutputTokens: Int
+    /// False asks the vendor to answer in text only while tools stay declared (some vendors reject
+    /// tool history without declarations): `tool_choice: none` or Gemini's `NONE` calling mode.
+    public let allowsToolCalls: Bool
 
-    public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int) {
+    public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
+                allowsToolCalls: Bool = true) {
         self.systemPrompt = systemPrompt
         self.messages = messages
         self.tools = tools
         self.maxOutputTokens = maxOutputTokens
+        self.allowsToolCalls = allowsToolCalls
     }
 }
 
@@ -123,11 +128,15 @@ public struct AgentLimits: Sendable, Equatable {
     public let maxTurns: Int
     public let maxToolCalls: Int
     public let maxCostUSD: Double?
+    /// After a turn or tool-call limit, run one extra tool-less turn so the model answers from what
+    /// it already gathered instead of ending on tool results. Never runs past the cost limit.
+    public let wrapUpOnLimit: Bool
 
-    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil) {
+    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil, wrapUpOnLimit: Bool = false) {
         self.maxTurns = max(0, maxTurns)
         self.maxToolCalls = max(0, maxToolCalls)
         self.maxCostUSD = maxCostUSD.map { max(0, $0) }
+        self.wrapUpOnLimit = wrapUpOnLimit
     }
 }
 

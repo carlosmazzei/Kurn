@@ -14,7 +14,7 @@ struct MeetingChatHarnessArtifactRetryTests {
         let model = ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [create]), AgentTurnResponse(text: "Working")], pauseAt: 1)
         let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
         vm.configure(meeting: meeting, modelContext: context)
-        vm.send(question: "Write a report", transcriptText: nil, candidates: [], provider: .openAI, model: "gpt-4o")
+        vm.send(question: "Write a report", provider: .openAI, model: "gpt-4o")
         for _ in 0..<2_000 where vm.artifacts.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
         let artifact = try #require(vm.artifacts.first)
         vm.cancel()
@@ -32,7 +32,7 @@ struct MeetingChatHarnessArtifactRetryTests {
         let model = ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [create])])
         let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
         vm.configure(meeting: meeting, modelContext: context)
-        vm.send(question: "Write a report", transcriptText: nil, candidates: [], provider: .openAI, model: "gpt-4o")
+        vm.send(question: "Write a report", provider: .openAI, model: "gpt-4o")
         for _ in 0..<2_000 where vm.isResponding { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(!vm.isResponding)
         #expect(vm.error != nil)
@@ -54,7 +54,7 @@ struct MeetingChatHarnessArtifactRetryTests {
                                       harnessService: HarnessChatService(limits: AgentLimits(maxTurns: 1)))
         vm.configure(meeting: meeting, modelContext: context)
         func ask(_ question: String = "Write minutes") {
-            vm.send(question: question, transcriptText: nil, candidates: [], provider: .openAI, model: "gpt-4o")
+            vm.send(question: question, provider: .openAI, model: "gpt-4o")
         }
         func waitUntilDone() async {
             for _ in 0..<2_000 where vm.isResponding { try? await Task.sleep(for: .milliseconds(5)) }

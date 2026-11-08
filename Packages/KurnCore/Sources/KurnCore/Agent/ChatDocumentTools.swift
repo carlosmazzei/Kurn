@@ -42,7 +42,8 @@ public enum ChatDocumentTools {
             in the chat reply. create_document creates an explicit artifact; update_document fully replaces its body
             and optionally title; append_to_document adds sections separated by two newlines. Each mutation increments
             version. Documents are limited to 200000 Unicode scalars. read_document uses Unicode-scalar offset/limit
-            pagination (default limit 8000); nextOffset continues. Mutation output returns ID/version, not the body.
+            pagination (default limit 8000); its last "page:" line gives the next offset. Mutation output returns
+            ID/version, not the body.
             """, inputSchema: .object(["type": .string("object"), "properties": .object(properties),
                                        "required": .array(required), "additionalProperties": .bool(false)]))
     }
@@ -101,19 +102,19 @@ public enum ChatDocumentTools {
             artifact = try await workspace.read(params.id())
             action = "Read"
         }
-        var result: [String: JSONValue] = ["id": .string(artifact.id.uuidString), "title": .string(artifact.title),
-                                          "version": .number(Double(artifact.version))]
+        let header = "\(action) document \(artifact.id.uuidString) | title: \(ChatSourceToolText.field(artifact.title))"
+            + " | version: \(artifact.version)"
+        var content = header
         if name == "read_document" {
             let offset = try params.integer("offset", fallback: 0, range: 0...ChatDocumentWorkspace.maximumScalars)
             let limit = try params.integer("limit", fallback: 8000, range: 1...8000)
             let scalars = artifact.markdown.unicodeScalars
             let chunk = String(String.UnicodeScalarView(scalars.dropFirst(offset).prefix(limit)))
-            let next = offset + chunk.unicodeScalars.count
-            result["markdown"] = .string(chunk)
-            result["total"] = .number(Double(scalars.count))
-            result["nextOffset"] = next < scalars.count ? .number(Double(next)) : .null
+            let page = ChatSourceToolText.pageLine(offset: offset, count: chunk.unicodeScalars.count,
+                                                   total: scalars.count, unit: "characters")
+            content += "\n" + chunk + "\n" + page
         }
-        return AgentToolOutput(content: try JSONValue.object(result).encodedString(),
+        return AgentToolOutput(content: content,
                                summary: "\(action) “\(artifact.title)” (v\(artifact.version))")
     }
 }

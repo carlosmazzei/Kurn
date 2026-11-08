@@ -114,7 +114,7 @@ struct SchemaV4MigrationTests {
             title: "Questions",
             createdAt: created,
             updatedAt: nil,
-            turnsData: JSONStorage.encodeAuthoritative([PersistedChatTurn(id: UUID(), role: .user, text: "Legacy question", citations: [], usage: nil, costUSD: nil, elapsedSeconds: nil)]) ?? Data()
+            turnsData: JSONStorage.encodeAuthoritative([PersistedChatTurn(id: UUID(), role: .user, text: "Legacy question", usage: nil, costUSD: nil, elapsedSeconds: nil)]) ?? Data()
         ))
         context.insert(KurnSchemaV4.MeetingAttachment(meeting: meeting, fileName: "v4.pdf", displayName: "Agenda", extractedText: "Budget"))
         try context.save()

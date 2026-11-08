@@ -67,24 +67,4 @@ final class WikiArticle {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
-
-    /// A `Sendable` snapshot of the article, safe to hand to the off-main
-    /// synthesis path. Built on the main actor (it reads the model).
-    var snapshot: WikiArticleSnapshot {
-        WikiArticleSnapshot(
-            meetingID: meeting?.id ?? UUID(),
-            title: meetingTitleSnapshot,
-            date: meetingDate,
-            bodyMarkdown: bodyMarkdown
-        )
-    }
-}
-
-/// A main-actor snapshot of one `WikiArticle`, safe to reason over off-main in
-/// the library-wide chat synthesis path.
-struct WikiArticleSnapshot: Sendable {
-    var meetingID: UUID
-    var title: String
-    var date: Date
-    var bodyMarkdown: String
 }

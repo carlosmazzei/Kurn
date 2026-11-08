@@ -79,27 +79,10 @@ struct PersistedChatTurn: Codable {
     var id: UUID
     var role: ChatMessage.Role
     var text: String
-    var citations: [PersistedCitation]
     var usage: TokenUsage?
     var costUSD: Double?
     var elapsedSeconds: TimeInterval?
     var steps: [ChatAgentStep]? = nil
     var artifacts: [ChatArtifactReference]? = nil
     var artifactOrigins: [UUID: ChatArtifactOrigin]? = nil
-}
-
-/// A citation snapshot rather than a live `SemanticSearchService.Hit` —
-/// reopening a session must keep reading correctly even after the source
-/// chunk is deleted or the meeting re-indexed, the same reasoning
-/// `GeneratedDocument` snapshots its sources for. Keeps `recordingID` (unlike
-/// `Hit`'s `chunkID`/`score`, which only matter during retrieval ranking) so
-/// tapping a citation in a restored conversation can still jump to the
-/// cited moment.
-struct PersistedCitation: Codable {
-    var meetingID: UUID
-    var recordingID: UUID
-    var meetingTitle: String
-    var start: TimeInterval
-    var speakerLabel: String
-    var text: String
 }

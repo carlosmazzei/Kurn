@@ -2,13 +2,13 @@
 //  MeetingChatViewModelSendTests.swift
 //  KurnTests
 //
-//  `MeetingChatViewModel.send` end to end over a `MeetingChatService` with a
-//  stub embedder and a scripted provider: a finished exchange is rendered and
-//  saved into one session, the library scope carries citations, and a
-//  failure or cancellation drops the partial reply and leaves the question
-//  retryable.
+//  `MeetingChatViewModel.send` end to end over a scripted `AgentModel`: a finished exchange
+//  is rendered and saved into one session, a provider without agent support is refused with
+//  the cloud-provider notice, and a failure or cancellation drops the partial reply and leaves
+//  the question retryable.
 //
 
+import AgentHarness
 import Foundation
 import KurnCore
 import SwiftData
@@ -17,29 +17,19 @@ import Testing
 
 @MainActor
 struct MeetingChatViewModelSendTests {
-
-    private struct ProviderDown: Error {}
-
-    private struct ConstantEmbedder: TextEmbedding {
-        let modelIdentifier = "constant-v1"
-        func embed(_ texts: [String]) async throws -> [[Float]] { texts.map { _ in [1, 0, 0] } }
+    private static func viewModel(_ model: (any AgentModel)?) -> MeetingChatViewModel {
+        MeetingChatViewModel(agentModelFactory: { _, _ in model })
     }
 
-    private static func viewModel(_ llm: ScriptedLLMProvider) -> MeetingChatViewModel {
-        MeetingChatViewModel(chatService: MeetingChatService(
-            searchService: SemanticSearchService(embedder: ConstantEmbedder()),
-            resolveProvider: { _, _ in llm }
-        ), agentModelFactory: { _, _ in nil })
+    private static func configured(_ viewModel: MeetingChatViewModel) -> (ModelContext, Meeting) {
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        viewModel.configure(meeting: meeting, modelContext: context)
+        return (context, meeting)
     }
 
-    private static func ask(_ viewModel: MeetingChatViewModel, _ question: String, transcript: String? = "[00:42] Ana: we ship on monday") {
-        viewModel.send(
-            question: question,
-            transcriptText: transcript,
-            candidates: [],
-            provider: .openAI,
-            model: "gpt-4o"
-        )
+    private static func ask(_ viewModel: MeetingChatViewModel, _ question: String) {
+        viewModel.send(question: question, provider: .openAI, model: "gpt-4o")
     }
 
     private static func waitUntilDone(_ viewModel: MeetingChatViewModel) async {
@@ -50,12 +40,9 @@ struct MeetingChatViewModelSendTests {
     }
 
     @Test func aFinishedExchangeIsRenderedAndSavedIntoOneSession() async throws {
-        let llm = ScriptedLLMProvider(chat: { _, index in "Answer \(index) [00:42]." })
-        let viewModel = Self.viewModel(llm)
-        let context = ModelContext(TestModelContainer.make())
-        let meeting = Meeting(title: "Planning")
-        context.insert(meeting)
-        viewModel.configure(meeting: meeting, modelContext: context)
+        let model = ChatAgentModel([AgentTurnResponse(text: "Answer 0 [0:42]."), AgentTurnResponse(text: "Answer 1.")])
+        let viewModel = Self.viewModel(model)
+        let (_, meeting) = Self.configured(viewModel)
 
         Self.ask(viewModel, "  When do we ship?  ")
         #expect(viewModel.isResponding)
@@ -64,9 +51,8 @@ struct MeetingChatViewModelSendTests {
 
         #expect(viewModel.turns.map(\.role) == [.user, .assistant])
         #expect(viewModel.turns.first?.text == "When do we ship?")
-        #expect(viewModel.turns.last?.text == "Answer 0 [00:42].")
+        #expect(viewModel.turns.last?.text == "Answer 0 [0:42].")
         #expect(viewModel.turns.last?.elapsedSeconds != nil)
-        #expect(viewModel.currentPhase == nil)
         #expect(viewModel.error == nil)
         let firstSessionID = try #require(viewModel.currentSessionID)
 
@@ -79,13 +65,16 @@ struct MeetingChatViewModelSendTests {
         #expect(sessions.count == 1)
         #expect(sessions.first?.turns.count == 4)
         #expect(sessions.first?.meeting?.id == meeting.id)
-        // The follow-up carries the first exchange as history.
-        #expect((llm.chatCalls.last?.messages.count ?? 0) >= 3)
+        // The follow-up carries the first exchange as plain history.
+        let requests = await model.requests
+        #expect(requests.last.map { Array($0.messages.prefix(2)) }
+            == [.user("When do we ship?"), .assistant(text: "Answer 0 [0:42].", toolCalls: [])])
     }
 
     @Test func blankOrOverlappingQuestionsAreIgnored() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in "Monday." })
-        let viewModel = Self.viewModel(llm)
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")])
+        let viewModel = Self.viewModel(model)
+        _ = Self.configured(viewModel)
 
         Self.ask(viewModel, "   ")
         #expect(viewModel.turns.isEmpty)
@@ -96,38 +85,28 @@ struct MeetingChatViewModelSendTests {
         await Self.waitUntilDone(viewModel)
 
         #expect(viewModel.turns.map(\.text) == ["When?", "Monday."])
-        #expect(llm.chatCalls.count == 1)
+        #expect(await model.requests.count == 1)
     }
 
-    @Test func aLibraryAnswerCarriesItsCitations() async {
-        let llm = ScriptedLLMProvider(chat: { _, index in index < 2 ? "1" : "We ship on Monday." })
-        let viewModel = Self.viewModel(llm)
-        let candidate = SemanticSearchService.Candidate(
-            chunkID: UUID(), meetingID: UUID(), recordingID: UUID(),
-            text: "we ship on monday", start: 42, end: 47, speakerLabel: "Speaker 1",
-            vector: [1, 0, 0], meetingTitle: "Planning"
-        )
+    @Test func aProviderWithoutAgentSupportIsRefusedWithTheCloudNotice() async {
+        let viewModel = Self.viewModel(nil)
+        _ = Self.configured(viewModel)
 
-        viewModel.send(
-            question: "When do we ship?",
-            transcriptText: nil,
-            candidates: [candidate],
-            provider: .openAI,
-            model: "gpt-4o"
-        )
+        Self.ask(viewModel, "When do we ship?")
         await Self.waitUntilDone(viewModel)
 
-        #expect(viewModel.turns.last?.text == "We ship on Monday.")
-        #expect(viewModel.turns.last?.citations.first?.text == "we ship on monday")
-
-        // A follow-up re-grounds on the previous answer's excerpts.
-        let history = MeetingChatViewModel.buildHistory(from: viewModel.turns)
-        #expect(history.last?.content.contains("we ship on monday") == true)
+        guard case .apiError(_, let message) = viewModel.error else {
+            Issue.record("expected the cloud-provider notice")
+            return
+        }
+        #expect(message == NSLocalizedString("chat.artifact.cloud_required", comment: ""))
+        #expect(viewModel.turns.map(\.role) == [.user])
+        #expect(viewModel.retryableQuestion == "When do we ship?")
     }
 
     @Test func anAppErrorDropsThePartialReplyAndLeavesTheQuestionRetryable() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in throw AppError.noAPIKey(provider: "OpenAI") })
-        let viewModel = Self.viewModel(llm)
+        let viewModel = Self.viewModel(ChatAgentModel(appError: .noAPIKey(provider: "OpenAI")))
+        _ = Self.configured(viewModel)
 
         Self.ask(viewModel, "When do we ship?")
         await Self.waitUntilDone(viewModel)
@@ -146,8 +125,8 @@ struct MeetingChatViewModelSendTests {
     }
 
     @Test func aNonAppErrorIsWrappedAsAnAPIError() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in throw ProviderDown() })
-        let viewModel = Self.viewModel(llm)
+        let viewModel = Self.viewModel(ChatAgentModel(fails: true))
+        _ = Self.configured(viewModel)
 
         Self.ask(viewModel, "When do we ship?")
         await Self.waitUntilDone(viewModel)
@@ -160,38 +139,29 @@ struct MeetingChatViewModelSendTests {
         #expect(viewModel.retryableQuestion == "When do we ship?")
     }
 
-    @Test func cancellationIsSilentAndKeepsTheQuestion() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in throw CancellationError() })
-        let viewModel = Self.viewModel(llm)
-
-        Self.ask(viewModel, "When do we ship?")
-        await Self.waitUntilDone(viewModel)
-
-        #expect(viewModel.error == nil)
-        #expect(viewModel.turns.map(\.role) == [.user])
-        #expect(viewModel.retryableQuestion == "When do we ship?")
-    }
-
     @Test func cancellingAnInFlightReplyClearsTheRunningState() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in "Monday." })
-        let viewModel = Self.viewModel(llm)
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")], pauseAt: 0)
+        let viewModel = Self.viewModel(model)
+        _ = Self.configured(viewModel)
 
         Self.ask(viewModel, "When do we ship?")
+        for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
         viewModel.cancel()
 
         #expect(!viewModel.isResponding)
+        #expect(viewModel.error == nil)
         #expect(viewModel.retryableQuestion == "When do we ship?")
     }
 
-    @Test func withoutAConfiguredStoreNothingIsSaved() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in "Monday." })
-        let viewModel = Self.viewModel(llm)
+    @Test func withoutAConfiguredStoreTheQuestionStaysRetryable() async {
+        let viewModel = Self.viewModel(ChatAgentModel([AgentTurnResponse(text: "Monday.")]))
 
         Self.ask(viewModel, "When do we ship?")
         await Self.waitUntilDone(viewModel)
 
-        #expect(viewModel.turns.count == 2)
+        #expect(viewModel.error != nil)
         #expect(viewModel.currentSessionID == nil)
         #expect(viewModel.pastSessions().isEmpty)
+        #expect(viewModel.retryableQuestion == "When do we ship?")
     }
 }

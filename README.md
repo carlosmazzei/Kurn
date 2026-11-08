@@ -76,9 +76,10 @@ send data only to the configured provider.
   (`StartRecordingControl`), or from a Home Screen, Lock Screen or StandBy
   widget on iPhone and iPad (`StartRecordingWidget`), without unlocking the
   app first.
-- Chat with your meetings and search them semantically, on device: transcripts
-  are embedded with Apple's `NaturalLanguage` framework and retrieval-grounded
-  answers come from the selected AI provider.
+- Search your meetings semantically, on device: transcripts are embedded with
+  Apple's `NaturalLanguage` framework. Chat with your meetings through an agent
+  that reads the sources you select and cites them; chat needs a cloud AI provider
+  (Apple's on-device model can't run the agent).
 - Optional, off-by-default derived artifacts: a per-meeting wiki article,
   free-form documents created as agent artifacts in chat, and an LLM correction pass
   over the transcript with a change-magnitude guardrail.

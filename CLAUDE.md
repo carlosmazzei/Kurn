@@ -50,24 +50,33 @@ global transcript/summary/wiki/attachment parts and optional per-meeting overrid
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
 arguments and enforcing a fixed allowed-meeting/part snapshot on reads and search results.
 Search uses transcript-enabled meetings only; listing masks disallowed availability,
-and tools with no eligible meeting are omitted.
+and tools with no eligible meeting are omitted. Tool results are compact plain text
+(`ChatSourceToolText`), not JSON: one `id | title | … | readable: …` line per source,
+passages as `[m:ss] Speaker: text` (rounded, `h:mm:ss` past an hour — the transcript's own
+`clockDisplay` form) under a `meeting <id>:` header written once per run,
+and a final `page: … of N; next offset: n` (or `end`) line. Per-item JSON keys, quoting and
+a meeting ID on every passage cost ~45% of a transcript page, and seconds made the model
+convert to the `[mm:ss]` it must cite. Tool schemas and arguments stay JSON (vendor wire
+formats require it); document tools use the same header/page-line text.
 Explicit `AgentToolOutput.isError` results let tools report recoverable failures
 without throwing. `SourceScopeResolver` shares transcribed-only selection with
 the document composer; `LibraryChatSourceReader` snapshots SwiftData sources and
 uses existing hybrid search, summary rendering and stored attachment text. Wiki
-reads require opt-in. `MeetingChatViewModel` uses `HarnessChatService` for providers
-with an `AgentModel`; nil (including Apple on-device) keeps `MeetingChatService`.
+reads require opt-in. `MeetingChatViewModel` runs every question through
+`HarnessChatService`; chat needs a provider with an `AgentModel`, so with Apple's on-device
+model (or another non-agent provider) the chat shows `ChatArtifactProviderNotice` and the
+composer is disabled. The earlier retrieval chat (`MeetingChatService`) was removed.
 `ChatSourceScopeEditor` locks meeting selection to one ID or allows library scope
 editing. `ChatAgentTimeline` reduces events to Codable structured steps and live usage.
 The adapter removes wiki from global and override parts when `wikiEnabled` is off.
-Harness replies cite meeting titles/timestamps in text; legacy `Hit` citation snapshots
-remain on the legacy path. `ChatSourceSheet` edits meeting-locked parts or library
+Replies cite meeting titles and `[m:ss]` timestamps in text; KurnCore's
+`ChatTimestampCitations` turns those into tappable chips. Retrieval citations stored by the
+removed chat are ignored when old turns decode. `ChatSourceSheet` edits meeting-locked parts or library
 selections/global parts/per-meeting overrides; scope edits persist for the next message.
 `ChatSourcePresentation` shares wiki gating and validation with the adapter; invalid
 scopes disable Send/Retry and show inline guidance. The adapter retains a localized,
 defensive validation error for sources removed after UI validation. The selector is
-hidden for Apple on-device and other non-agent providers: legacy library retrieval
-cannot honor the new scope/part restrictions.
+hidden for Apple on-device and other non-agent providers, which cannot chat.
 `ChatStepTimelineView` shows live steps, then collapses them behind a step count.
 `ChatStepPresentation` maps structured tool/stop data to localization keys outside
 Views; expandable arguments/output previews cap at 2000 scalars. The chat shows live
@@ -92,16 +101,49 @@ usage and the final outcome. Tool failures become error results for model recove
 provider failures throw, and stream termination cancels in-flight work. Turn, tool
 and optional estimated-cost limits finish with an explicit stop reason. Cost is
 accounted from reported usage through the caller's estimator, including summary calls.
-Context accepts an injected Sendable token estimator (default: rounded-up
-characters/4) and an input-token budget. KurnCore's `AgentContextAdapter` supplies
-`ContextBudget` and script-aware `TokenEstimate` through the `contextBudget:`
-initializer. Old tool results are elided first, then an older
-prefix is summarized with a tool-less model request, preserving assistant/result
-groups and recent messages. Compaction changes only model context; outcomes retain
-full history. These estimates and limits do not guarantee a provider's hard context
+Context management follows pi-coding-agent's design (no code copied). `AgentContextPolicy`
+holds the model's real `contextWindow`, a `reserveTokens` kept free for the reply (16,384) and
+`keepRecentTokens` (20,000); a request is compacted once its context exceeds the window minus
+the reserve (never below half the window), with no fraction and no practical cap.
+`HarnessChatService` resolves the window per provider and model through
+`ModelContextWindowStore.agentContextWindow` → KurnCore's `ModelContextWindows.agentWindow`:
+the window the provider's model listing reported, else the model-family table, else
+`unknownWindow` (32,768). Unlike `ContextBudget` (summaries and the wiki) it applies no 100k
+cap: every turn resends the whole context, so a long run on a large window costs more, and
+`AgentLimits.maxCostUSD` is the guard. The context size is the provider-reported usage of the
+latest turn (input + output) plus estimates of only the messages appended since; before any
+usage, or after a compaction, it is a full estimate. Estimates are per message (text,
+tool-call arguments, replay metadata, a fixed framing overhead) through an injected Sendable
+estimator (default characters/4; the KurnCore `contextWindow:` initializer passes the
+script-aware `TokenEstimate`), never by re-encoding already-JSON tool results.
+`AgentContextCompactor.plan` walks back from the newest message until `keepRecentTokens`
+(capped at half the threshold) and cuts at the nearest user or assistant message, never at a
+tool result. A cut inside the current turn is a split turn: the turn's earlier part gets its own
+prefix summary, so the kept suffix keeps its request. Summary requests are tool-less and send
+the conversation as labelled text (`serialize`, tool results clipped to 2,000 characters) with a
+structured prompt (goal, progress, findings with citations, sources and documents, next steps);
+a later compaction updates the previous summary instead of replacing it. Summary output is
+capped at 80% (history) and 50% (turn prefix) of the reserve, and at a quarter/eighth of the
+window, and the serialized conversation is trimmed from its oldest end so the summary request's
+input and output fit the window (an 8k model is never asked for 13k of output). A summary cut off by the output
+limit is not used. Compaction runs before a turn when over the threshold, and is forced after a
+provider rejects a turn as too long (`isContextOverflow`; the adapter passes
+`AppError.isContextOverflow`, whose markers follow pi-ai's per-vendor overflow patterns and
+exclude rate limiting/throttling); the turn is then retried once, only if nothing was streamed
+and the context actually shrank. When a forced summary is unusable or itself overflows, the
+older part is replaced by a fixed omission note. Compaction changes only model context;
+outcomes retain full history.
+`AgentLimits.wrapUpOnLimit` runs one extra turn after a turn/tool-call limit with
+`NativeHarness.wrapUpInstruction` appended and `AgentTurnRequest.allowsToolCalls` false
+(tools stay declared; the wire formats send `tool_choice: none` / Gemini mode `NONE`, and
+calls returned anyway are dropped), so the run ends with an answer from what was gathered.
+A wrap-up without text leaves no answer; one cut off reports `.outputLimit`; it never runs
+past the cost limit.
+Chat uses `AgentLimits.chat(sourceCount:)` (10–24 turns, 20–96 tool calls, wrap-up on)
+and its prompt steers multi-meeting questions to listing, search and summaries first.
+These estimates and limits do not guarantee a provider's hard context
 or billing cap. `AgentMessage` and `JSONValue` are Codable for future persistence.
-Output-token truncation finishes with `.outputLimit` and discards tool calls;
-truncated compaction summaries never replace the elided context. Vendor streams
+Output-token truncation finishes with `.outputLimit` and discards tool calls. Vendor streams
 must include a terminal event before a turn response can be used.
 `AgentHarness/Wire/` builds Anthropic Messages, OpenAI Responses/Chat Completions and Gemini
 GenerateContent requests and accumulates their SSE data payloads. The app's three
@@ -113,7 +155,7 @@ built-in provider ID and HTTPS `api.openai.com` origin (default/443 port) both m
 compatible endpoints stay on Chat Completions. `OpenAIResponsesText` (KurnCore)
 shares that selection check and maps buffered text/summary requests and responses,
 including JSON-schema/JSON-object formats to `text.format`; streaming reuses the
-harness accumulator. Summary/wiki, legacy chat, correction, topic analysis and
+harness accumulator. Summary/wiki, correction, topic analysis and
 auto-tagging all follow this route. Existing GPT-5 chat/agent low reasoning effort
 maps to `reasoning.effort`; summary effort remains unspecified. Audio, speech and
 model-list APIs are unchanged. Transport timeouts/retry policy remain per route.
@@ -1688,8 +1730,8 @@ is not a durable word-timing transcript.
 
 ### Providers (`Providers/`)
 
-`LLMProvider` (`Sendable`) abstracts text generation — `summarize`, `chat`,
-`streamChat` — for every backend, cloud or local. Cloud speech-to-text is the
+`LLMProvider` (`Sendable`) abstracts text generation — `summarize`, `streamSummary`,
+`chat` — for every backend, cloud or local. Cloud speech-to-text is the
 separate `TranscriptionProvider` (`transcribe`), so each vendor conforms to
 what it actually serves: OpenAI-compatible endpoints to both, ElevenLabs only
 to `TranscriptionProvider`, Anthropic, Gemini and on-device only to
@@ -1843,9 +1885,9 @@ A wrong window is safe by construction: a provider rejecting the input as too
 long (`AppError.isContextOverflow` — 413, or a 400/422 whose message names
 the context) sends the same work down the staged path with the conservative
 budget, or rethrows when that would not split anything. The same budget and
-fallback drive per-meeting chat, the library synthesis and generated
-documents, each of which takes a `ContextBudget.Resolver` at construction so
-tests can force either path.
+fallback drive the wiki (through `SummaryService`); the services take a
+`ContextBudget.Resolver` at construction so tests can force either path. The
+agent chat plans against the model's window instead (see "Agent harness").
 
 **Summary requests stream.** `SummaryService` calls `LLMProvider.streamSummary`
 for the single pass, every map block and the reduce: the same Markdown contract
@@ -2135,13 +2177,13 @@ rules statically, alongside the layer rules described under "Architecture"
 the check), and `DebugSupport/` holds the debug-only fault
 injection hooks the recovery tests use.
 
-### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/MeetingChatService.swift`)
+### Semantic search & chat (`Services/Embedding/`, `Services/SemanticSearchService.swift`, `Services/HarnessChatService.swift`)
 
-On-device semantic search over transcripts plus a retrieval-augmented "chat with
-your meetings", built with **no new external dependency**: embeddings come from
-Apple's `NaturalLanguage` framework (`NLContextualEmbedding`, multilingual,
-loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern as
-`FluidAudioModelStore`), and chat reuses the existing cloud `LLMProvider` stack.
+On-device semantic search over transcripts plus "chat with your meetings", built
+with **no new external dependency**: embeddings come from Apple's `NaturalLanguage`
+framework (`NLContextualEmbedding`, multilingual, loaded once via the
+`EmbeddingModelStore` actor — same coalesced-load pattern as
+`FluidAudioModelStore`), and chat is the agent harness over the cloud providers.
 
 - **Indexing.** After a transcript is persisted, `TranscriptChunker` splits it
   into short passages (absolute meeting timestamps + dominant speaker),
@@ -2159,20 +2201,13 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   chunk vectors by cosine similarity (`vDSP` dot product on unit-normalized
   vectors). `MeetingsListView` runs a debounced hybrid pass: instant substring
   matching plus semantically-relevant meetings the substring pass missed.
-- **Chat.** `LLMProvider` gained a plain-text `chat(systemPrompt:messages:)`
-  (implemented for OpenAI/Anthropic/Google) alongside
-  `summarize`. `MeetingChatService` has two grounding strategies: **per-meeting**
-  (`answerAboutMeeting`) sends the **whole transcript** as context — a single
-  meeting almost always fits the single-pass budget (the model's `ContextBudget`),
-  which is far more accurate than retrieving a few passages; only over-budget
-  meetings fall back to retrieval. **Library-wide** (`answerAcrossLibrary`) and
-  the long-meeting fallback use a retrieval pipeline: LLM query rewrite → hybrid
-  dense (`NLContextualEmbedding` cosine) + lexical (BM25) retrieval fused with
-  Reciprocal Rank Fusion (`SemanticSearchService.hybridSearch`) → LLM rerank →
-  grounded answer. All prompts cite `[mm:ss]` and reply in the transcript
-  language. `MeetingChatViewModel` + `MeetingChatView` drive the conversation,
-  surfaced as a per-meeting Chat tab (`MeetingDetailView`) and a library-wide
-  "Ask" sheet (`MeetingsListView`); cited `[mm:ss]` timestamps are tappable and
+- **Chat.** `MeetingChatViewModel` + `MeetingChatView` drive an agent conversation
+  (`HarnessChatService`, see "Agent harness") whose source tools read transcripts,
+  summaries, wiki articles and attachments and search with
+  `SemanticSearchService.hybridSearch` (dense `NLContextualEmbedding` cosine + BM25,
+  fused with Reciprocal Rank Fusion). Replies cite `[m:ss]` and answer in the
+  question's language. It is surfaced as a per-meeting Chat tab (`MeetingDetailView`)
+  and a library-wide "Ask" sheet (`MeetingsListView`); cited timestamps are tappable and
   seek the transcript. Conversations are saved as `ChatSession`
   (`Models/ChatSession.swift`) — the same "reopen a past chat, start a new one,
   delete one" affordances Claude's own mobile app offers, via the history/new
@@ -2181,7 +2216,7 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   *successfully completed* exchange (`MeetingChatViewModel.persist()`) — a
   cancelled/failed reply never reaches it (`dropPartialReply` removes those
   turns first), and a chat opened and abandoned with nothing sent leaves no
-  row in history. Turns (including citations and token usage/cost) are
+  row in history. Turns (including steps, artifacts and token usage/cost) are
   JSON-encoded into `ChatSession.turnsData`, the same `Transcript.segmentsData`
   pattern; like every other `@Model`, it's encrypted at rest by
   `ModelStoreProtection` with the rest of the store. Scoped like the feature
@@ -2206,9 +2241,8 @@ loaded once via the `EmbeddingModelStore` actor — same coalesced-load pattern 
   and verifies migration and persisted harness state. The next model change means:
   edit the live class, add a new schema listing live classes, freeze V5, add the stage, and bump
   `KurnModelGraph.currentSchemaVersion` (which backup metadata records). When
-  `wikiEnabled` is on, the library-wide path additionally grounds on the
-  condensed per-meeting articles — see "Derived artifacts" below for why that
-  answers synthesis and counting questions retrieval alone cannot.
+  `wikiEnabled` is on, the agent can also read the condensed per-meeting articles
+  (`read_wiki`) — see "Derived artifacts" below.
 
 ### Derived artifacts: wiki and documents
 
@@ -2222,19 +2256,11 @@ meeting: dense, factual, timestamped notes over the whole transcript —
 decisions, action items, numbers, names. `Meeting.wikiArticle` is one-to-one and
 `.cascade`, so it dies with its meeting.
 
-- **Why it exists is `MeetingChatSynthesis`**, not the reading experience. The
-  library-wide chat gives the model *both* groundings in one prompt: the
-  retrieved verbatim excerpts (for exact quotes and tappable `[mm:ss]`
-  citations) and the condensed articles of the meetings in play (for synthesis,
-  comparison and counting). A hybrid question — "what did we decide about X and
-  how did it evolve" — is then answered in a single pass instead of being routed
-  to one strategy or the other. Articles are 1–4 KB, so a handful of them plus
-  the excerpts fit the single-pass budget where whole transcripts never could.
-  Over budget — chiefly a global aggregate over a large library — the articles
-  are packed **whole, never split** into blocks and map-reduced in the same shape
-  as `SummaryService.mapReduce`, with the excerpts carried into the reduce so
-  citations survive. It is also readable from the meeting's detail screen
-  (`MeetingWikiView`) for transparency.
+- **Why it exists is synthesis across meetings.** A 1–4 KB article condenses a
+  whole meeting, so the agent's `read_wiki` tool lets it compare, count and trace a
+  decision across many meetings without reading every transcript, then cite the
+  transcript for exact quotes. It is also readable from the meeting's detail screen
+  (`MeetingWikiView`).
 - **`WikiService` delegates rather than reimplements.** It calls `SummaryService`
   with that service's internal `notesTemplate` — the same "capture every
   decision, action item, number, name, with `[mm:ss]`" format the summary's map

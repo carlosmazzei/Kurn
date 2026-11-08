@@ -23,21 +23,21 @@ import Testing
     }
 
     @Test(arguments: [false, true])
-    func truncatedSummaryKeepsElidedContext(withToolResult: Bool) async throws {
-        let longText = String(repeating: "Important fact [12:34] Alice 42 ", count: 500)
-        let history: [AgentMessage] = [.user(longText)] + (withToolResult ? [
+    func truncatedSummaryLeavesTheContextUnchanged(withToolResult: Bool) async throws {
+        let history: [AgentMessage] = [.user(tokens(600))] + (withToolResult ? [
             .assistant(text: "Lookup", toolCalls: [agentCall()]),
-            .toolResult(callID: "1", toolName: "lookup", content: longText, isError: false)
-        ] : [])
-        let policy = AgentContextPolicy(inputTokenBudget: 100, keepRecentMessages: 1)
+            .toolResult(callID: "1", toolName: "lookup", content: tokens(600), isError: false)
+        ] : [.assistant(text: tokens(600), toolCalls: [])])
+        let policy = AgentContextPolicy(contextWindow: 1_000, reserveTokens: 0, keepRecentTokens: 100)
         let usage = AgentUsage(inputTokens: 100, outputTokens: 20)
         let model = ScriptedAgentModel([AgentTurnResponse(text: "Truncated summary", usage: usage, stopReason: .maxTokens),
                                        AgentTurnResponse(text: "Answer")])
         let events = try await agentEvents(NativeHarness(model: model, contextPolicy: policy), history: history)
         let requests = await model.requests
         #expect(requests.count == 2)
-        let expected = AgentContextCompactor(policy: policy).elidingOldResults(in: history + [.user("Question")])
-        #expect(requests[1].messages == expected)
+        #expect(requests[0].tools.isEmpty)
+        #expect(requests[1].messages == history + [.user("Question")])
+        #expect(!events.contains { if case .contextCompacted = $0 { return true }; return false })
         #expect(Array(try agentOutcome(events).messages.prefix(history.count)) == history)
         #expect(try agentOutcome(events).totalUsage == usage)
         #expect(try agentOutcome(events).stopReason == .completed)

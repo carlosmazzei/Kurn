@@ -827,14 +827,7 @@
 "error.embedding_no_assets" = "Das Sprachmodell konnte nicht auf das Gerät geladen werden.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Fragen";
-"chat.error.empty_question" = "Bitte gib eine Frage ein.";
 "chat.thinking" = "Denkt nach …";
-"chat.phase.rewriting_query" = "Frage wird umformuliert …";
-"chat.phase.retrieving" = "Relevante Passagen werden gesucht …";
-"chat.phase.reranking" = "Beste Passagen werden eingestuft …";
-"chat.phase.synthesizing" = "Besprechungsnotizen werden gelesen …";
-"chat.phase.answering" = "Antwort wird geschrieben …";
-"chat.untitled_meeting" = "Meeting ohne Titel";
 "chat.starter.title" = "Frag zu diesem Meeting";
 "chat.starter.subtitle" = "Antworten basieren auf dem Transkript, mit antippbaren Zeitstempeln.";
 "chat.starter.library.title" = "Frag zu deinen Meetings";
@@ -845,14 +838,11 @@
 "chat.stop" = "Stopp";
 "chat.disabled.title" = "Semantische Suche ist aus";
 "chat.disabled.subtitle" = "Aktiviere die semantische Suche in den Einstellungen, um über deine Meetings zu chatten.";
-"chat.no_index.title" = "Noch nichts zum Chatten";
-"chat.no_index.subtitle" = "Transkribiere zuerst ein Meeting und stelle dann Fragen zum Gesagten.";
 "chat.ask.title" = "Frag deine Meetings";
 "chat.retry" = "Erneut versuchen";
 "chat.usage.tokens" = "%d Token";
 "chat.usage.cost" = "~%.4f $";
 "chat.usage.duration" = "%.1f s";
-"chat.phase.progress_fraction" = "(%d/%d)";
 "chat.history.title" = "Chatverlauf";
 "chat.history.button" = "Chatverlauf";
 "chat.history.empty.title" = "Keine gespeicherten Unterhaltungen";
@@ -1111,5 +1101,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (aktuell v%d)";
 "documents.chat.provenance" = "Im Chat erstellt · v%d";
-"chat.artifact.cloud_required" = "Zum Erstellen von Dokumenten muss in den Einstellungen ein Cloud-KI-Anbieter eingerichtet und ausgewählt sein. Cloud-Anfragen senden die ausgewählten Quellen an diesen Anbieter.";
+"chat.artifact.cloud_required" = "Für den Chat und das Erstellen von Dokumenten muss in den Einstellungen ein Cloud-KI-Anbieter eingerichtet und ausgewählt sein. Cloud-Anfragen senden die ausgewählten Quellen an diesen Anbieter.";
 "chat.artifact.configure_provider" = "Anbieter in den Einstellungen konfigurieren";

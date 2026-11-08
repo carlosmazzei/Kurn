@@ -827,14 +827,7 @@
 "error.embedding_no_assets" = "The on-device language model could not be downloaded.";
 "tab.chat" = "Chat";
 "meetings.ask" = "Ask";
-"chat.error.empty_question" = "Please type a question.";
 "chat.thinking" = "Thinking…";
-"chat.phase.rewriting_query" = "Rewriting your question…";
-"chat.phase.retrieving" = "Searching relevant passages…";
-"chat.phase.reranking" = "Ranking the best passages…";
-"chat.phase.synthesizing" = "Reading meeting notes…";
-"chat.phase.answering" = "Writing the answer…";
-"chat.untitled_meeting" = "Untitled meeting";
 "chat.starter.title" = "Ask about this meeting";
 "chat.starter.subtitle" = "Answers are grounded in the transcript, with timestamps you can tap.";
 "chat.starter.library.title" = "Ask about your meetings";
@@ -845,14 +838,11 @@
 "chat.stop" = "Stop";
 "chat.disabled.title" = "Semantic search is off";
 "chat.disabled.subtitle" = "Turn on semantic search in Settings to chat about your meetings.";
-"chat.no_index.title" = "Nothing to chat about yet";
-"chat.no_index.subtitle" = "Transcribe a meeting first, then ask questions about what was said.";
 "chat.ask.title" = "Ask your meetings";
 "chat.retry" = "Retry";
 "chat.usage.tokens" = "%d tokens";
 "chat.usage.cost" = "~$%.4f";
 "chat.usage.duration" = "%.1fs";
-"chat.phase.progress_fraction" = "(%d/%d)";
 "chat.history.title" = "Chat History";
 "chat.history.button" = "Chat history";
 "chat.history.empty.title" = "No saved conversations";
@@ -1111,5 +1101,5 @@
 "chat.artifact.version" = "v%d";
 "chat.artifact.version.current" = "v%d (current v%d)";
 "documents.chat.provenance" = "Created in chat · v%d";
-"chat.artifact.cloud_required" = "Creating documents requires a cloud AI provider configured and selected in Settings. Cloud requests send the selected sources to that provider.";
+"chat.artifact.cloud_required" = "Chat and documents require a cloud AI provider configured and selected in Settings. Cloud requests send the selected sources to that provider.";
 "chat.artifact.configure_provider" = "Configure provider in Settings";

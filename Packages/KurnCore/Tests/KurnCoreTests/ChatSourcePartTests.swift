@@ -140,18 +140,13 @@ private actor PartSourceReader: ChatSourceReader {
         let tools = ChatSourceTools.make(reader: reader, allowedMeetingIDs: [first, second],
             scope: ChatSourceScope(kind: .library, parts: [.summary], partOverrides: [second: [.wiki, .attachments]]))
         let output = try await tools[0].execute(.object([:]))
-        let json = try JSONValue.parse(output.content)
-        guard case .object(let page) = json, case .array(let items) = page["items"] else { Issue.record("Missing page"); return }
-        #expect(items.count == 2)
-        for item in items {
-            guard case .object(let value) = item else { Issue.record("Missing source"); return }
-            let isFirst = value["id"] == .string(first.uuidString)
-            #expect(value["allowedParts"] == .array(isFirst ? [.string("summary")] : [.string("attachments"), .string("wiki")]))
-            #expect(value["hasSummary"] == .bool(isFirst))
-            #expect(value["hasWiki"] == .bool(!isFirst))
-            #expect(value["hasAttachments"] == .bool(!isFirst))
-            #expect(value["hasTranscript"] == .bool(false))
-        }
+        let lines = output.content.split(separator: "\n").map(String.init)
+        let firstLine = try #require(lines.first { $0.contains(first.uuidString) })
+        let secondLine = try #require(lines.first { $0.contains(second.uuidString) })
+        #expect(firstLine.hasSuffix(" | readable: summary"))
+        #expect(secondLine.hasSuffix(" | readable: wiki, attachments"))
+        #expect(lines.count == 4)
+        #expect(lines.last == "page: items 1–2 of 2; end")
         #expect(!output.content.contains(outsider.uuidString))
     }
 
@@ -170,7 +165,7 @@ private actor PartSourceReader: ChatSourceReader {
                                           scope: ChatSourceScope(kind: .library, parts: [.transcript]))
         let empty = try await #require(missing.first { $0.spec.name == "search" }).execute(.object(["query": .string("Decision")]))
         #expect(!empty.isError)
-        #expect(empty.content.contains("\"items\":[]"))
+        #expect(empty.content.hasSuffix("page: no items of 0; end"))
     }
 
     @Test func harnessRecoversFromPartDenial() async throws {

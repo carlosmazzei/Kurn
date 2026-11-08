@@ -2,11 +2,11 @@
 //  MeetingChatView.swift
 //  Kurn
 //
-//  "Chat with your meetings": a grounded Q&A over transcripts. Used two ways —
-//  as a tab inside a single meeting (`meeting` non-nil), and as a library-wide
-//  "Ask" sheet from the meetings list (`meeting` nil, searching every indexed
-//  chunk). Answers come from the configured summary LLM provider, grounded in
-//  on-device retrieved passages; tapping a citation calls `onJump`.
+//  "Chat with your meetings": an agent that answers from the selected sources with
+//  tools. Used two ways — as a tab inside a single meeting (`meeting` non-nil), and
+//  as a library-wide "Ask" sheet from the meetings list (`meeting` nil). Answers
+//  come from the configured summary provider, which must be a cloud provider with
+//  agent support; tapping a cited timestamp calls `onJumpToTime`.
 //
 
 import Combine
@@ -18,10 +18,8 @@ import UIKit
 struct MeetingChatView: View {
     /// The meeting to chat about, or `nil` to ask across the whole library.
     let meeting: Meeting?
-    /// Invoked when the user taps a retrieval citation (host decides where to jump).
-    var onJump: ((SemanticSearchService.Hit) -> Void)?
-    /// Invoked when the user taps a cited `[mm:ss]` in a full-context answer;
-    /// the host seeks that absolute meeting time. Per-meeting scope only.
+    /// Invoked when the user taps a cited `[m:ss]` in an answer; the host seeks that absolute
+    /// meeting time. Per-meeting scope only.
     var onJumpToTime: ((TimeInterval) -> Void)?
 
     @Environment(AppSettings.self) private var settings
@@ -31,9 +29,6 @@ struct MeetingChatView: View {
     @State private var vm = MeetingChatViewModel()
     @State private var input = ""
     @FocusState private var inputFocused: Bool
-    /// Anchor for the "thinking for Ns" live timer in `respondingRow`, reset
-    /// each time a new reply starts.
-    @State private var respondingStartedAt = Date()
     @State private var showingHistory = false
     @State private var showingSources = false
     @Query(sort: \Meeting.createdAt, order: .reverse) private var sourceMeetings: [Meeting]
@@ -46,15 +41,13 @@ struct MeetingChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !settings.aiProvider.kind.supportsAgentChat {
+            if !usesHarness {
                 ChatArtifactProviderNotice()
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
             }
             if !settings.semanticSearchEnabled {
                 disabledState
-            } else if !canChat {
-                emptyIndexState
             } else {
                 conversation
             }
@@ -156,7 +149,7 @@ struct MeetingChatView: View {
                                             meetingTitles: Dictionary(uniqueKeysWithValues: sourceMeetings.map { ($0.id, $0.title) }),
                                             documentTitles: Dictionary(uniqueKeysWithValues: vm.artifacts.map { ($0.id, $0.title) }),
                                             artifacts: vm.artifacts, artifactSession: vm.artifactSession,
-                                            onJump: onJump, onJumpToTime: onJumpToTime)
+                                            onJumpToTime: onJumpToTime)
                             .id(turn.id)
                     }
                     if vm.isResponding { respondingRow }
@@ -206,9 +199,6 @@ struct MeetingChatView: View {
                     withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
-            .onChange(of: vm.isResponding) { _, isResponding in
-                if isResponding { respondingStartedAt = Date() }
-            }
             // Claude's own composer floats over the transcript instead of
             // pushing it up: the keyboard and the composer read as a layer in
             // front, and the last few rows are simply covered (scrollable
@@ -228,23 +218,13 @@ struct MeetingChatView: View {
         vm.isResponding && turn.role == .assistant && turn.id == vm.turns.last?.id
     }
 
-    /// The "reasoning" row shown before any reply text has arrived. Mirrors
-    /// the current `ChatPhase` reported by `MeetingChatService` — rewriting
-    /// the question, searching, reranking, reading notes — so the wait reads
-    /// as visible work instead of an opaque spinner, the same idea as the
-    /// transcription progress phases. Also carries a Claude-style "breathing"
-    /// shimmer and a live elapsed-time readout, so a long wait still reads as
-    /// active work rather than a stall.
+    /// The running row shown while the agent works, with the turn's live usage once reported.
     private var respondingRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if usesHarness {
-                HStack {
-                    ProgressView().accessibilityHidden(true)
-                    Text(NSLocalizedString("chat.step.running", comment: "Running"))
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-            } else {
-                ThinkingRow(phase: vm.currentPhase, detail: vm.currentPhaseDetail, startedAt: respondingStartedAt)
+            HStack {
+                ProgressView().accessibilityHidden(true)
+                Text(NSLocalizedString("chat.step.running", comment: "Running"))
+                    .font(.footnote).foregroundStyle(.secondary)
             }
             if let turn = vm.turns.last, turn.role == .assistant, let usage = turn.usage {
                 Text(MeetingChatTurnView.usageCaptionText(usage: usage, costUSD: turn.costUSD, elapsedSeconds: nil))
@@ -275,7 +255,7 @@ struct MeetingChatView: View {
             .background(Theme.fill, in: Capsule())
         }
         .buttonStyle(.plain)
-        .disabled(usesHarness && sourceValidation != nil)
+        .disabled(!canChat || sourceValidation != nil)
         .accessibilityIdentifier("chat.retry")
     }
 
@@ -397,15 +377,6 @@ struct MeetingChatView: View {
         .accessibilityIdentifier("chat.disabled_state")
     }
 
-    private var emptyIndexState: some View {
-        infoState(
-            icon: "text.magnifyingglass",
-            title: NSLocalizedString("chat.no_index.title", comment: "Chat no index title"),
-            subtitle: NSLocalizedString("chat.no_index.subtitle", comment: "Chat no index subtitle")
-        )
-        .accessibilityIdentifier("chat.empty_state")
-    }
-
     private func infoState(icon: String, title: String, subtitle: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon).font(.largeTitle).foregroundStyle(Theme.textTertiary)
@@ -421,20 +392,15 @@ struct MeetingChatView: View {
 
     // MARK: - State & actions
 
-    /// Whether any indexed passages exist for the current scope.
-    private var hasIndex: Bool {
-        if let meeting { return !meeting.semanticChunks.isEmpty }
-        return (try? modelContext.fetchCount(FetchDescriptor<SemanticChunk>())) ?? 0 > 0
-    }
-
     private var canChat: Bool {
-        ChatSourcePresentation.canChat(enabled: settings.semanticSearchEnabled, usesHarness: usesHarness, hasIndex: hasIndex)
+        ChatSourcePresentation.canChat(enabled: settings.semanticSearchEnabled, usesHarness: usesHarness)
     }
     private var canSend: Bool {
         canChat && !vm.isResponding && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (!usesHarness || sourceValidation == nil)
+            && sourceValidation == nil
     }
 
+    /// Chat runs only on providers with agent support; on-device shows the cloud-provider notice.
     private var usesHarness: Bool { settings.aiProvider.kind.supportsAgentChat }
 
     private var resolvedMeetingIDs: Set<UUID> {
@@ -450,10 +416,6 @@ struct MeetingChatView: View {
             NSLocalizedString($0, comment: "Chat sources")
         }
     }
-
-    /// Max characters of a meeting's summary passed to the library chat as an
-    /// overview, so overviews stay a connective aid without dominating the prompt.
-    private static let summaryContextLimit = 1_500
 
     private func send() {
         sendQuestion(input)
@@ -482,72 +444,8 @@ struct MeetingChatView: View {
     }
 
     private func sendQuestion(_ question: String) {
-        guard !usesHarness || sourceValidation == nil else { return }
+        guard canChat, sourceValidation == nil else { return }
         let provider = settings.aiProvider
-        let model = settings.summaryModel(for: provider)
-        let sources = ChatLegacySources.prepare(for: provider.kind) {
-            ChatLegacySources(transcriptText: meetingTranscriptText(), candidates: candidates(),
-                              summariesByMeeting: summariesByMeeting(), articlesByMeeting: articlesByMeeting())
-        }
-        vm.send(
-            question: question,
-            transcriptText: sources.transcriptText,
-            candidates: sources.candidates,
-            summariesByMeeting: sources.summariesByMeeting,
-            articlesByMeeting: sources.articlesByMeeting,
-            provider: provider,
-            model: model
-        )
-    }
-
-    /// Condensed wiki articles for the library-wide ask (meetingID → snapshot).
-    /// Empty for single-meeting scope and when the wiki feature is off; the chat
-    /// service grounds on these alongside the retrieved excerpts, and degrades to
-    /// excerpts only when the map is empty. Built here on the main actor.
-    private func articlesByMeeting() -> [UUID: WikiArticleSnapshot] {
-        guard meeting == nil, settings.wikiEnabled else { return [:] }
-        let articles = (try? modelContext.fetch(FetchDescriptor<WikiArticle>())) ?? []
-        var result: [UUID: WikiArticleSnapshot] = [:]
-        for article in articles {
-            guard let meetingID = article.meeting?.id else { continue }
-            result[meetingID] = article.snapshot
-        }
-        return result
-    }
-
-    /// Per-meeting summary overviews for the library-wide ask (meetingID →
-    /// condensed markdown). Empty for single-meeting scope, which grounds on the
-    /// full transcript instead. Built here on the main actor; the service only
-    /// renders the ones whose meeting shows up in the retrieved excerpts.
-    private func summariesByMeeting() -> [UUID: String] {
-        guard meeting == nil else { return [:] }
-        let meetings = (try? modelContext.fetch(FetchDescriptor<Meeting>())) ?? []
-        var result: [UUID: String] = [:]
-        for item in meetings {
-            guard let summary = item.latestSummary else { continue }
-            let markdown = SummaryService.markdownText(from: summary.sections)
-            guard !markdown.isEmpty else { continue }
-            result[item.id] = String(markdown.prefix(Self.summaryContextLimit))
-        }
-        return result
-    }
-
-    /// Snapshot the chunks to search over: this meeting's, or every meeting's
-    /// for a library-wide ask. Built here on the main actor.
-    private func candidates() -> [SemanticSearchService.Candidate] {
-        if let meeting {
-            return meeting.semanticChunks.map(\.searchCandidate)
-        }
-        let all = (try? modelContext.fetch(FetchDescriptor<SemanticChunk>())) ?? []
-        return all.map(\.searchCandidate)
-    }
-
-    /// The whole meeting transcript as `[mm:ss] Speaker: text` lines, plus
-    /// the text of its attached documents, for full-context grounding. Nil
-    /// for the library-wide ask (no single meeting).
-    private func meetingTranscriptText() -> String? {
-        guard let meeting else { return nil }
-        let text = meeting.assembledContextText()
-        return text.isEmpty ? nil : text
+        vm.send(question: question, provider: provider, model: settings.summaryModel(for: provider))
     }
 }

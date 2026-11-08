@@ -52,6 +52,19 @@ public enum ModelContextWindows {
         ("deepseek-r1-distill", 131_072)
     ]
 
+    /// Window assumed for a model whose window nothing reports and the table does not know
+    /// (typically a custom endpoint). Small on purpose: compacting early only costs a summary,
+    /// while a too-large guess is caught only when the provider rejects the request.
+    public static let unknownWindow = 32_768
+
+    /// The context window the agent harness plans against: the window the provider's own model
+    /// listing reported, else the table's, else `unknownWindow`. Unlike `ContextBudget` there is no
+    /// practical cap: the harness compacts against the model's real window, as pi-coding-agent does.
+    public static func agentWindow(reported: Int?, model: String) -> Int {
+        if let reported, reported > 0 { return reported }
+        return knownWindow(forModel: model) ?? unknownWindow
+    }
+
     /// The known context window for `model`, or `nil` when the name matches
     /// no family above. Tolerates vendor-prefixed ids (`models/gemini-…`,
     /// OpenRouter's `anthropic/claude-…`, Groq's `openai/gpt-oss-…`) by

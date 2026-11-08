@@ -375,68 +375,6 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
         )
     }
 
-    // MARK: - Chat (Chat Completions, streaming)
-
-    @discardableResult
-    func streamChat(
-        systemPrompt: String,
-        messages: [ChatMessage],
-        options: TextGenerationOptions,
-        onDelta: @escaping @Sendable (String) -> Void
-    ) async throws -> TokenUsage? {
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-
-        var wire: [[String: String]] = [["role": "system", "content": systemPrompt]]
-        wire += messages.map { ["role": $0.role.rawValue, "content": $0.content] }
-        var body: [String: Any] = [
-            "model": chatModel,
-            "max_completion_tokens": options.maxOutputTokens,
-            "messages": wire,
-            "stream": true,
-            // Asks for one extra, choice-less final chunk carrying the call's
-            // token usage. An OpenAI-compatible endpoint that doesn't
-            // recognize the option simply ignores it (no usage reported,
-            // not a request failure) — same fail-open shape as `chat`'s
-            // `reasoning_effort` below.
-            "stream_options": ["include_usage": true]
-        ]
-        if provider.id == AIProvider.openAI.id,
-           chatModel.lowercased().hasPrefix("gpt-5") {
-            body["reasoning_effort"] = "low"
-        }
-        let request = try makeRequest(timeout: options.timeout, body: body)
-
-        if usesResponses {
-            let response = try await LLMHTTP.streamResponsesText(request, session: session,
-                policy: .interactive(totalDeadline: options.timeout), onDelta: onDelta)
-            guard !response.text.isEmpty else {
-                throw AppError.decodingError(NSLocalizedString("error.provider_response_empty", comment: "Empty provider response"))
-            }
-            return response.usage.map { TokenUsage(promptTokens: $0.inputTokens, completionTokens: $0.outputTokens) }
-        }
-        let accumulator = StreamingAccumulator()
-        let usage = UsageAccumulator()
-        try await LLMHTTP.streamSSE(
-            request,
-            session: session,
-            policy: .interactive(totalDeadline: options.timeout)
-        ) { payload in
-            guard let data = payload.data(using: .utf8),
-                  let chunk = try? JSONDecoder().decode(ChatStreamChunk.self, from: data) else { return }
-            if let delta = chunk.choices.first?.delta.content, !delta.isEmpty {
-                accumulator.append(delta)
-                onDelta(delta)
-            }
-            if let chunkUsage = chunk.usage {
-                usage.set(promptTokens: chunkUsage.promptTokens, completionTokens: chunkUsage.completionTokens)
-            }
-        }
-        guard accumulator.receivedText else {
-            throw AppError.decodingError("empty chat response")
-        }
-        return usage.value
-    }
-
     // MARK: - HTTP helpers
 
     private func httpContext(for request: URLRequest) -> HTTPExecutionContext {
@@ -533,19 +471,7 @@ private struct ChatStreamChunk: Decodable {
             case finishReason = "finish_reason"
         }
     }
-    /// Only present on the final chunk `stream_options.include_usage` asks
-    /// for, which carries no choices of its own.
-    struct Usage: Decodable {
-        let promptTokens: Int
-        let completionTokens: Int
-
-        enum CodingKeys: String, CodingKey {
-            case promptTokens = "prompt_tokens"
-            case completionTokens = "completion_tokens"
-        }
-    }
     let choices: [Choice]
-    let usage: Usage?
 }
 
 struct WhisperVerboseResponse: Decodable {

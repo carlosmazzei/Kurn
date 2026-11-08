@@ -10,7 +10,6 @@ struct MeetingChatTurnView: View {
     let documentTitles: [UUID: String]
     var artifacts: [ChatDocumentArtifact] = []
     var artifactSession: ChatSession?
-    var onJump: ((SemanticSearchService.Hit) -> Void)?
     var onJumpToTime: ((TimeInterval) -> Void)?
 
     var body: some View {
@@ -66,12 +65,9 @@ struct MeetingChatTurnView: View {
                     )
                 }
                 agentFooter
-                if !turn.citations.isEmpty {
-                    citations(turn.citations)
-                } else if isMeetingScope {
-                    // Full-context answer: no retrieval hits, so make the [mm:ss]
-                    // timestamps the model cited tappable.
-                    timestampChips(MeetingChatService.citedTimestamps(in: turn.text))
+                if isMeetingScope {
+                    // Make the [m:ss] timestamps the model cited tappable.
+                    timestampChips(ChatTimestampCitations.times(in: turn.text))
                 }
                 usageCaption(turn)
             }
@@ -138,36 +134,6 @@ struct MeetingChatTurnView: View {
                         .buttonStyle(.plain)
                         .disabled(onJumpToTime == nil)
                     }
-                }
-            }
-        }
-    }
-
-    /// Citation chip text. In the library-wide ask the meeting title is shown so
-    /// a quote can be traced to its source meeting; per-meeting scope omits it.
-    private func citationLabel(for hit: SemanticSearchService.Hit) -> String {
-        let base = "\(hit.start.clockDisplay) · \(hit.speakerLabel)"
-        guard !isMeetingScope, !hit.meetingTitle.isEmpty else { return base }
-        return "\(hit.meetingTitle) · \(base)"
-    }
-
-    private func citations(_ hits: [SemanticSearchService.Hit]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(hits) { hit in
-                    Button { onJump?(hit) } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "quote.opening").font(.caption2)
-                                .accessibilityHidden(true)
-                            Text(citationLabel(for: hit))
-                                .font(.system(.caption, design: .default, weight: .medium))
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Theme.fill, in: Capsule())
-                        .foregroundStyle(Theme.accent)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onJump == nil)
                 }
             }
         }

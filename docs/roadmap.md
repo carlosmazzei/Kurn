@@ -276,9 +276,8 @@ is listed so it is not rediscovered.
 
 ### On-device LLM (`FoundationModelsProvider`)
 
-- **Measure the on-device budgets.** `ContextBudget.onDevice`,
-  `FoundationModelsProvider`'s output-token ceiling and `MeetingChatService`'s
-  on-device pool sizes are conservative first-cut estimates against Apple's
+- **Measure the on-device budgets.** `ContextBudget.onDevice` and
+  `FoundationModelsProvider`'s output-token ceiling are conservative first-cut estimates against Apple's
   documented ~4096-token session window, commented as such in the code — not
   measured against real on-device runs the way the transcription pipeline is.
 - **Exercise the untested paths.** `LLMTranscriptCorrector` and `WikiService`

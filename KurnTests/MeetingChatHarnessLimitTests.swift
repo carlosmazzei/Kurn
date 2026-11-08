@@ -22,7 +22,7 @@ struct MeetingChatHarnessLimitTests {
                                                       stopReason: reason == .outputLimit ? .maxTokens : .endTurn)])
         let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, harnessService: HarnessChatService(limits: limits))
         vm.configure(meeting: meeting, modelContext: context)
-        vm.send(question: "Question", transcriptText: nil, candidates: [], provider: .openAI, model: "gpt-4o")
+        vm.send(question: "Question", provider: .openAI, model: "gpt-4o")
         for _ in 0..<2_000 where vm.isResponding { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(!vm.isResponding)
         #expect(vm.error == nil)

@@ -2,22 +2,12 @@ import Foundation
 import KurnCore
 
 extension AIProviderKind {
+    /// Whether this provider kind can run the agent chat. Chat and documents need a cloud text
+    /// provider; Apple's on-device model and transcription-only vendors cannot.
     var supportsAgentChat: Bool {
         switch self {
         case .openAICompatible, .anthropic, .googleGemini: true
         case .appleOnDevice, .elevenLabs: false
         }
-    }
-}
-
-struct ChatLegacySources {
-    var transcriptText: String?
-    var candidates: [SemanticSearchService.Candidate] = []
-    var summariesByMeeting: [UUID: String] = [:]
-    var articlesByMeeting: [UUID: WikiArticleSnapshot] = [:]
-
-    @MainActor
-    static func prepare(for kind: AIProviderKind, load: () -> Self) -> Self {
-        kind.supportsAgentChat ? Self() : load()
     }
 }

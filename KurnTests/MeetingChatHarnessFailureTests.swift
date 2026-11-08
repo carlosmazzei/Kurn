@@ -8,26 +8,12 @@ import Testing
 @MainActor
 struct MeetingChatHarnessFailureTests {
     private func ask(_ vm: MeetingChatViewModel, question: String = "Question") {
-        vm.send(question: question, transcriptText: "[00:00] Grounding", candidates: [], provider: .openAI, model: "gpt-4o")
+        vm.send(question: question, provider: .openAI, model: "gpt-4o")
     }
 
     private func waitUntilDone(_ vm: MeetingChatViewModel) async {
         for _ in 0..<2_000 where vm.isResponding { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(!vm.isResponding)
-    }
-
-    @Test func nilFactoryUsesTheUnchangedLegacyTranscriptPipeline() async {
-        let llm = ScriptedLLMProvider(chat: { _, _ in "Legacy answer" })
-        let vm = MeetingChatViewModel(chatService: MeetingChatService(resolveProvider: { _, _ in llm }),
-                                      agentModelFactory: { _, _ in nil })
-        ask(vm)
-        await waitUntilDone(vm)
-        #expect(vm.error == nil)
-        #expect(vm.turns.last?.text == "Legacy answer")
-        #expect(vm.turns.last?.steps.isEmpty == true)
-        #expect(vm.artifacts.isEmpty)
-        #expect(llm.chatCalls.count == 1)
-        #expect(llm.chatCalls.first?.messages.last?.content.contains("Grounding") == true)
     }
 
     @Test func factoryErrorsAndUnconfiguredHarnessUseExistingAppErrorMapping() async {
