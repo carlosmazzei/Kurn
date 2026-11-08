@@ -65,8 +65,8 @@ public enum ChatSourceTools {
                              Read authorized sources; results are plain text. offset/limit page items. Text reads
                              use a Unicode-scalar offset and return up to 8000 scalars. Search pages a top-100 result
                              window. Omit attachmentID to list attachments. Each result ends with a "page:" line; pass
-                             its "next offset" to continue. Passages are "[mm:ss] Speaker: text" under "meeting <id>:";
-                             clipped fields end with [truncated].
+                             its "next offset" to continue. Passages are "[m:ss] Speaker: text" ([h:mm:ss] past an
+                             hour) under "meeting <id>:"; clipped fields end with [truncated].
                              """,
                              inputSchema: .object(["type": .string("object"), "properties": .object(properties),
                                                    "required": .array(required), "additionalProperties": .bool(false)]))
