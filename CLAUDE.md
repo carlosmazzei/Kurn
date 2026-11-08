@@ -50,7 +50,13 @@ global transcript/summary/wiki/attachment parts and optional per-meeting overrid
 `ChatSourceTools` exposes bounded, paginated read-only source tools, validating
 arguments and enforcing a fixed allowed-meeting/part snapshot on reads and search results.
 Search uses transcript-enabled meetings only; listing masks disallowed availability,
-and tools with no eligible meeting are omitted.
+and tools with no eligible meeting are omitted. Tool results are compact plain text
+(`ChatSourceToolText`), not JSON: one `id | title | … | readable: …` line per source,
+passages as `[mm:ss] Speaker: text` under a `meeting <id>:` header written once per run,
+and a final `page: … of N; next offset: n` (or `end`) line. Per-item JSON keys, quoting and
+a meeting ID on every passage cost ~45% of a transcript page, and seconds made the model
+convert to the `[mm:ss]` it must cite. Tool schemas and arguments stay JSON (vendor wire
+formats require it); document tools use the same header/page-line text.
 Explicit `AgentToolOutput.isError` results let tools report recoverable failures
 without throwing. `SourceScopeResolver` shares transcribed-only selection with
 the document composer; `LibraryChatSourceReader` snapshots SwiftData sources and

@@ -62,9 +62,11 @@ public enum ChatSourceTools {
         }
         return AgentToolSpec(name: name,
                              description: """
-                             Read authorized sources. offset/limit page items. Text reads use Unicode-scalar offset
-                             and return up to 8000 scalars. Search pages a top-100 result window. Omit attachmentID
-                             to list attachments. nextOffset continues a page; truncated text fields are marked.
+                             Read authorized sources; results are plain text. offset/limit page items. Text reads
+                             use a Unicode-scalar offset and return up to 8000 scalars. Search pages a top-100 result
+                             window. Omit attachmentID to list attachments. Each result ends with a "page:" line; pass
+                             its "next offset" to continue. Passages are "[mm:ss] Speaker: text" under "meeting <id>:";
+                             clipped fields end with [truncated].
                              """,
                              inputSchema: .object(["type": .string("object"), "properties": .object(properties),
                                                    "required": .array(required), "additionalProperties": .bool(false)]))
@@ -117,29 +119,21 @@ public enum ChatSourceTools {
                                 parts: [UUID: Set<ChatSourcePart>]) async throws -> AgentToolOutput {
         let sources = try await reader.listSources().filter { parts[$0.id] != nil }.sorted { $0.id.uuidString < $1.id.uuidString }
         if name == "list_sources" {
-            let values = sources.map { source in
-                JSONValue.object([
-                    "id": .string(source.id.uuidString), "title": clipped(source.title),
-                    "date": .string(ISO8601DateFormatter().string(from: source.date)), "duration": .number(source.duration),
-                    "tags": .array(source.tags.prefix(10).map { clipped($0, limit: 100) }),
-                    "tagsTruncated": .bool(source.tags.count > 10),
-                    "folder": source.folder.map { clipped($0) } ?? .null,
-                    "allowedParts": .array((parts[source.id] ?? []).map(\.rawValue).sorted().map(JSONValue.string)),
-                    "hasTranscript": .bool(parts[source.id]?.contains(.transcript) == true),
-                    "hasSummary": .bool(source.hasSummary && parts[source.id]?.contains(.summary) == true),
-                    "hasWiki": .bool(source.hasWiki && parts[source.id]?.contains(.wiki) == true),
-                    "hasAttachments": .bool(source.hasAttachments && parts[source.id]?.contains(.attachments) == true)
-                ])
+            let lines = sources.map { source in
+                ChatSourceToolText.source(source, readable: readable(source, parts: parts[source.id] ?? []))
             }
-            return try page(values, offset: params.offset, limit: min(params.limit, 10))
+            let header = "sources (id | title | date | duration | folder | tags | readable parts):"
+            return lineOutput(header: header, items: page(lines, params: params, cap: 10), total: lines.count,
+                              offset: params.offset) { $0 }
         }
         let existing = Set(sources.map(\.id))
         if name == "search" {
             let query = try params.string("query")
             let searchable = existing.filter { parts[$0]?.contains(.transcript) == true }
             let hits = searchable.isEmpty ? [] : try await reader.search(query: query, meetingIDs: searchable, limit: 100)
-            return try page(hits.filter { searchable.contains($0.meetingID) }.prefix(100).map(passage),
-                            offset: params.offset, limit: min(params.limit, 10))
+            let ranked = Array(hits.filter { searchable.contains($0.meetingID) }.prefix(100))
+            return lineOutput(header: "search results (best first):", items: page(ranked, params: params, cap: 10),
+                              total: ranked.count, offset: params.offset, render: ChatSourceToolText.passages)
         }
         let id = try params.uuid("meetingID")
         guard existing.contains(id) else { throw Invalid("Unknown or out-of-scope meetingID.") }
@@ -149,8 +143,9 @@ public enum ChatSourceTools {
         switch name {
         case "read_transcript":
             let result = try await reader.readTranscript(meetingID: id, offset: params.offset, limit: min(params.limit, 10))
-            let values = result.passages.prefix(min(params.limit, 10)).filter { $0.meetingID == id }.map(passage)
-            return try output(items: values, total: result.total, offset: params.offset)
+            let passages = Array(result.passages.prefix(min(params.limit, 10)).filter { $0.meetingID == id })
+            return lineOutput(header: "transcript:", items: passages, total: result.total, offset: params.offset,
+                              unit: "passages", render: ChatSourceToolText.passages)
         case "read_summary":
             return try textPage(await reader.readSummary(meetingID: id), params: params)
         case "read_wiki":
@@ -158,8 +153,9 @@ public enum ChatSourceTools {
         default:
             let attachments = try await reader.listAttachments(meetingID: id)
             guard params.values["attachmentID"] != nil else {
-                return try page(attachments.map { .object(["id": .string($0.id.uuidString), "name": clipped($0.name)]) },
-                                offset: params.offset, limit: params.limit)
+                let lines = attachments.map { "- \($0.id.uuidString) | \(ChatSourceToolText.field($0.name))" }
+                return lineOutput(header: "attachments (id | name):", items: page(lines, params: params, cap: 50),
+                                  total: lines.count, offset: params.offset) { $0 }
             }
             let attachmentID = try params.uuid("attachmentID")
             guard attachments.contains(where: { $0.id == attachmentID }) else { throw Invalid("Unknown attachmentID.") }
@@ -167,37 +163,46 @@ public enum ChatSourceTools {
         }
     }
 
-    private static func clipped(_ text: String, limit: Int = 500) -> JSONValue {
-        .string(String(String.UnicodeScalarView(text.unicodeScalars.prefix(limit)))
-            + (text.unicodeScalars.count > limit ? " [truncated]" : ""))
-    }
-
-    private static func passage(_ value: ChatSourcePassage) -> JSONValue {
-        .object(["meetingID": .string(value.meetingID.uuidString), "timestamp": .number(value.timestamp),
-                 "speaker": clipped(value.speaker), "text": clipped(value.text)])
-    }
-
-    private static func page(_ values: [JSONValue], offset: Int, limit: Int) throws -> AgentToolOutput {
-        try output(items: Array(values.dropFirst(offset).prefix(limit)), total: values.count, offset: offset)
-    }
-
-    private static func output(items: [JSONValue], total: Int, offset: Int) throws -> AgentToolOutput {
-        if items.count > 1, try JSONValue.array(items).encodedString().utf8.count > 18000 {
-            return try output(items: Array(items.dropLast()), total: total, offset: offset)
+    /// Parts the model can actually read for a source: allowed by scope and present.
+    private static func readable(_ source: ChatSource, parts: Set<ChatSourcePart>) -> [ChatSourcePart] {
+        ChatSourcePart.allCases.filter { part in
+            guard parts.contains(part) else { return false }
+            switch part {
+            case .transcript: return true
+            case .summary: return source.hasSummary
+            case .wiki: return source.hasWiki
+            case .attachments: return source.hasAttachments
+            }
         }
-        let next = offset + items.count
-        let json = JSONValue.object(["items": .array(items), "total": .number(Double(total)),
-                                     "nextOffset": next < total && !items.isEmpty ? .number(Double(next)) : .null])
-        return AgentToolOutput(content: try json.encodedString(), summary: "Read \(items.count) items")
+    }
+
+    private static func page<Item>(_ items: [Item], params: Parameters, cap: Int) -> [Item] {
+        Array(items.dropFirst(params.offset).prefix(min(params.limit, cap)))
+    }
+
+    static let maxOutputBytes = 18_000
+
+    /// Renders as many items as fit `maxOutputBytes` (at least one), then the `page:` line.
+    private static func lineOutput<Item>(header: String, items: [Item], total: Int, offset: Int,
+                                         unit: String = "items", render: ([Item]) -> [String]) -> AgentToolOutput {
+        var count = items.count
+        var body = render(items)
+        while count > 1, body.joined(separator: "\n").utf8.count > maxOutputBytes {
+            count -= 1
+            body = render(Array(items.prefix(count)))
+        }
+        let pageLine = ChatSourceToolText.pageLine(offset: offset, count: count, total: total, unit: unit)
+        let content = ([header] + body + [pageLine]).joined(separator: "\n")
+        return AgentToolOutput(content: content, summary: "Read \(count) items")
     }
 
     private static func textPage(_ text: String?, params: Parameters) throws -> AgentToolOutput {
         guard let text else { throw Invalid("No text available.") }
         let scalars = text.unicodeScalars
         let chunk = String(String.UnicodeScalarView(scalars.dropFirst(params.offset).prefix(8000)))
-        let next = params.offset + chunk.unicodeScalars.count
-        let json = JSONValue.object(["text": .string(chunk), "total": .number(Double(scalars.count)),
-                                     "nextOffset": next < scalars.count ? .number(Double(next)) : .null])
-        return AgentToolOutput(content: try json.encodedString(), summary: "Read \(chunk.unicodeScalars.count) characters")
+        let count = chunk.unicodeScalars.count
+        let pageLine = ChatSourceToolText.pageLine(offset: params.offset, count: count, total: scalars.count,
+                                                   unit: "characters")
+        return AgentToolOutput(content: chunk + "\n" + pageLine, summary: "Read \(count) characters")
     }
 }

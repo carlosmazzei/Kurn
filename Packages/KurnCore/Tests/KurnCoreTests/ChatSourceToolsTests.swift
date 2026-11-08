@@ -66,7 +66,9 @@ private struct FakeSourceReader: ChatSourceReader {
         if name == "search" {
             #expect(!result.content.contains("secret"))
             #expect(result.content.contains("truncated"))
-            #expect(result.content.contains("nextOffset"))
+            #expect(result.content.contains("meeting \(id.uuidString):\n[00:12] Pat: "))
+            #expect(result.content.hasSuffix("page: items 1–10 of 25; next offset: 10"))
+            #expect(!result.content.contains("\"meetingID\""))
         }
         if name == "read_summary" { #expect(result.content.contains("8000")) }
     }
@@ -94,10 +96,10 @@ private struct FakeSourceReader: ChatSourceReader {
         #expect(try await run("read_attachment", .object(["meetingID": .string(id.uuidString),
                                                          "attachmentID": .string(UUID().uuidString)])).isError)
         #expect(try await run("list_sources", .object([:]), reader: FakeSourceReader(id: id, fails: true)).isError)
-        #expect(try await run("list_sources", .object([:]), reader: FakeSourceReader(id: id, empty: true)).content.contains("\"total\":0"))
-        #expect(try await run("list_sources", .object(["offset": .number(99)])).content.contains("\"items\":[]"))
+        #expect(try await run("list_sources", .object([:]), reader: FakeSourceReader(id: id, empty: true)).content.hasSuffix("page: no items of 0; end"))
+        #expect(try await run("list_sources", .object(["offset": .number(99)])).content.hasSuffix("page: no items of 1; end"))
         #expect(try await run("read_summary", .object(["meetingID": .string(id.uuidString),
-                                                      "offset": .number(8000)])).content.contains("\"nextOffset\":null"))
+                                                      "offset": .number(8000)])).content.hasSuffix("page: characters 8001–9000 of 9000; end"))
     }
 
     @Test func harnessRecoversFromScopeViolation() async throws {

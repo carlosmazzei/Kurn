@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import KurnCore
 
-private struct DocumentReply: Decodable {
+private struct DocumentReply {
     let id: UUID
     let title: String
     let version: Int
@@ -18,9 +18,28 @@ private struct DocumentReply: Decodable {
         return try await tool.execute(arguments)
     }
 
+    /// Parses "<action> document <id> | title: <t> | version: <n>", then for reads the Markdown page
+    /// and a final "page: characters a–b of total; next offset: n" line.
     private func reply(_ output: AgentToolOutput) throws -> DocumentReply {
         #expect(!output.isError)
-        return try JSONDecoder().decode(DocumentReply.self, from: Data(output.content.utf8))
+        let content = output.content
+        let headerEnd = content.firstIndex(of: "\n") ?? content.endIndex
+        let fields = content[..<headerEnd].components(separatedBy: " | ")
+        try #require(fields.count == 3)
+        let id = try #require(UUID(uuidString: fields[0].components(separatedBy: " ").last ?? ""))
+        let title = String(fields[1].dropFirst("title: ".count))
+        let version = try #require(Int(fields[2].dropFirst("version: ".count)))
+        guard headerEnd < content.endIndex else {
+            return DocumentReply(id: id, title: title, version: version, markdown: nil, total: nil, nextOffset: nil)
+        }
+        let body = content[content.index(after: headerEnd)...]
+        let pageBreak = try #require(body.range(of: "\n", options: .backwards))
+        let page = String(body[pageBreak.upperBound...])
+        #expect(page.hasPrefix("page: "))
+        let total = page.components(separatedBy: " of ").last?.components(separatedBy: ";").first.flatMap { Int($0) }
+        let next = page.components(separatedBy: "next offset: ").dropFirst().first.flatMap { Int($0) }
+        return DocumentReply(id: id, title: title, version: version, markdown: String(body[..<pageBreak.lowerBound]),
+                             total: total, nextOffset: next)
     }
 
     @Test func createReplaceAppendReadAndReopen() async throws {
