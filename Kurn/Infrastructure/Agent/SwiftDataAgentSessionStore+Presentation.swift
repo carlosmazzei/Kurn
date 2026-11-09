@@ -108,6 +108,9 @@ extension SwiftDataAgentSessionStore {
     }
 
     private func storageLog(_ stage: String, session: ChatSession) {
+        // The persisted reliability sink is independent of console verbosity.
+        let outcome: ReliabilityEvent.Outcome = stage.hasSuffix("_failed") ? .failed : stage.hasSuffix("_started") ? .started : .succeeded
+        ReliabilityLog.record(ReliabilityEvent(operationID: session.id, operation: "harness_store", stage: stage, outcome: outcome, code: "canonical_v1"))
         // UUID/counts only. Raw decode errors, questions and source/document bodies stay private.
         AppLog.persistence.atInfo.info("harness.store stage=\(stage, privacy: .public) session=\(session.id, privacy: .public) entries=\(session.canonicalOrdinal, privacy: .public) revision=\(session.canonicalRevision, privacy: .public)")
     }
