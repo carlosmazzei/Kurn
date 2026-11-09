@@ -126,7 +126,10 @@ extension SwiftDataAgentSessionStore {
                 context.insert(row)
                 if !target.harnessRevisions.contains(where: { $0.id == row.id }) { target.harnessRevisions.append(row) }
             }
-            if let effect { effect.session = target; context.insert(effect); target.harnessRecords.append(effect) }
+            if let effect {
+                effect.session = target; context.insert(effect)
+                if !target.harnessRecords.contains(where: { $0.id == effect.id }) { target.harnessRecords.append(effect) }
+            }
             if target.canonicalVersion != nil { target.updatedAt = Date() }
             target.turnsData = cache.turns; target.scopeData = cache.scope; target.artifactsData = cache.artifacts
             target.canonicalVersion = 1; target.canonicalLeafID = leaf; target.canonicalOrdinal += rows.count; target.canonicalRevision += 1

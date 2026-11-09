@@ -10,7 +10,7 @@ struct HarnessChatService {
     /// nil plans from the authorized workload; explicit limits retain fixed-budget behavior.
     var limits: AgentLimits?
     var conversationID: UUID?
-    var prepareDocumentSession: @MainActor @Sendable () throws -> Void = {}
+    var prepareDocumentSession: (@MainActor @Sendable () throws -> Void)?
     var documentOrigin: ChatArtifactOrigin?
     var contextWindows: ModelContextWindowStore = .shared
     var refreshMetadata: @Sendable (AIProvider, String, ModelContextWindowStore) async throws -> AgentMetadataRefresh = { provider, model, store in
@@ -29,15 +29,21 @@ struct HarnessChatService {
             let message = NSLocalizedString(ChatSourcePresentation.validationKey(validation), comment: "Invalid sources")
             throw AppError.apiError(statusCode: 0, message: message)
         }
-        let sessionID = (conversationID ?? UUID()).uuidString
+        let session = conversationID ?? UUID()
+        let sessionID = session.uuidString
+        let origin = try documentOrigin ?? ChatArtifactOrigin(question: question, modelIdentifier: "\(provider.id):\(modelIdentifier)",
+            sources: ChatArtifactSources.capture(scope: effective, context: context))
+        let artifacts = await workspace.snapshot()
+        let standalone = HarnessStandaloneSessionPreparation(context: context, sessionID: session, scope: effective,
+            history: history, question: question, artifacts: artifacts)
+        let prepare: @MainActor @Sendable () throws -> Void = prepareDocumentSession ?? { try standalone.prepare() }
         let documents = ChatDocumentEffectExecutor(writer: ChatDocumentEffectWriter(
             store: SwiftDataAgentSessionStore(context: context), sessionID: sessionID,
-            prepareSession: prepareDocumentSession, origin: documentOrigin), workspace: workspace)
+            prepareSession: prepare, origin: origin), workspace: workspace)
         let tools = ChatSourceTools.make(reader: reader, allowedMeetingIDs: ids, scope: effective)
             + ChatDocumentTools.make(workspace: workspace, mutation: { name, arguments, execution in
                 try await documents.execute(name, arguments: arguments, context: execution)
             })
-        let artifacts = await workspace.snapshot()
         try Task.checkCancellation()
         let refresh = try await refreshMetadata(provider, modelIdentifier, contextWindows)
         let resolution = contextWindows.resolution(for: provider, model: modelIdentifier, metadataRefresh: refresh)
