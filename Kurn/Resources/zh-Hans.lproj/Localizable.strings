@@ -1222,3 +1222,10 @@
 "chat.diagnostic.replayPrepared" = "已为 API 准备历史记录";
 
 "chat.storage.invalid" = "无法读取或保存此对话。已保留存储的数据。";
+
+// Native tool pipeline diagnostics.
+"chat.diagnostic.toolValidationFailed" = "工具参数被拒绝";
+"chat.diagnostic.toolPolicyDenied" = "策略已阻止工具";
+"chat.diagnostic.toolProgress" = "工具进度";
+"chat.diagnostic.toolAborted" = "工具已取消";
+"chat.diagnostic.toolRegistryRejected" = "工具注册被拒绝";

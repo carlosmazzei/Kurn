@@ -4,7 +4,7 @@ import Testing
 
 struct AgentAdaptiveBudgetTests {
     private func tool() -> AgentTool {
-        AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object([:]))) { _ in
+        AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object(["type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(true)]))) { _ in
             AgentToolOutput(content: "PRIVATE_SOURCE_TEXT", summary: "Read", metrics: [.returnedScalars: 10, .deferredScalars: 20])
         }
     }

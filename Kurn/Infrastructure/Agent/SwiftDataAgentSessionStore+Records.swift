@@ -32,6 +32,11 @@ extension SwiftDataAgentSessionStore {
         let id = target.id.uuidString + ":" + value.kind.rawValue + ":" + value.id
         let data = try HarnessPresentationCodec.encode(value)
         let existing = target.harnessRecords.first { $0.id == id }
+        // Effect records are append-only; generic metadata updates cannot invalidate a receipt.
+        if value.kind == .effect, let existing {
+            guard existing.payloadData == data else { throw AgentSessionStoreError.conflict }
+            return
+        }
         let oldData = existing?.payloadData
         let row = existing ?? HarnessSessionRecord(session: target, recordID: value.id, kindRaw: value.kind.rawValue, payloadData: data)
         do {

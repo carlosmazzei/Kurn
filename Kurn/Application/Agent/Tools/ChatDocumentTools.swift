@@ -3,12 +3,14 @@ import Foundation
 import KurnCore
 
 public enum ChatDocumentTools {
-    public static func make(workspace: ChatDocumentWorkspace) -> [AgentTool] {
+    public typealias Mutation = @Sendable (String, JSONValue, AgentToolExecutionContext) async throws -> AgentToolOutput
+    public static func make(workspace: ChatDocumentWorkspace, mutation: Mutation? = nil) -> [AgentTool] {
         ["create_document", "update_document", "append_to_document", "read_document"].map { name in
-            AgentTool(spec: spec(name)) { arguments in
+            AgentTool(spec: spec(name), scheduling: name == "read_document" ? .parallelRead : .sequential, executeWithContext: { arguments, context in
                 do {
                     try Task.checkCancellation()
                     let params = try Parameters(arguments, name: name)
+                    if name != "read_document", let mutation { return try await mutation(name, arguments, context) }
                     return try await execute(name, params: params, workspace: workspace)
                 } catch is CancellationError {
                     throw CancellationError()
@@ -16,7 +18,7 @@ public enum ChatDocumentTools {
                     return AgentToolOutput(content: "Document tool error: \((error as? ChatDocumentError)?.errorDescription ?? "Invalid document.")",
                                            summary: "Document unavailable or invalid arguments", isError: true)
                 }
-            }
+            })
         }
     }
 
@@ -120,5 +122,22 @@ public enum ChatDocumentTools {
         }
         return AgentToolOutput(content: content,
                                summary: "\(action) “\(artifact.title)” (v\(artifact.version))", metrics: metrics)
+    }
+
+    static func edit(_ name: String, arguments: JSONValue) throws -> ChatDocumentEdit {
+        let params = try Parameters(arguments, name: name)
+        switch name {
+        case "create_document": return .create(title: try params.string("title"), markdown: try params.string("markdown"))
+        case "update_document": return .update(try params.id(), title: try params.values["title"] == nil ? nil : params.string("title"), markdown: try params.string("markdown"))
+        case "append_to_document": return .append(try params.id(), markdown: try params.string("markdown"))
+        default: throw ChatDocumentError("Unknown document mutation.")
+        }
+    }
+
+    static func mutationOutput(_ name: String, artifact: ChatDocumentArtifact) -> AgentToolOutput {
+        let action = name == "create_document" ? "Created" : name == "update_document" ? "Updated" : "Appended to"
+        return AgentToolOutput(content: "\(action) document \(artifact.id.uuidString) | title: \(ChatSourceToolText.field(artifact.title)) | version: \(artifact.version)",
+            summary: "\(action) “\(artifact.title)” (v\(artifact.version))", metrics: [.mutationsCommitted: 1],
+            structuredContent: .object(["documentID": .string(artifact.id.uuidString), "version": .number(Double(artifact.version))]))
     }
 }

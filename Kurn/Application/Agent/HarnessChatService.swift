@@ -10,6 +10,8 @@ struct HarnessChatService {
     /// nil plans from the authorized workload; explicit limits retain fixed-budget behavior.
     var limits: AgentLimits?
     var conversationID: UUID?
+    var prepareDocumentSession: @MainActor @Sendable () throws -> Void = {}
+    var documentOrigin: ChatArtifactOrigin?
     var contextWindows: ModelContextWindowStore = .shared
     var refreshMetadata: @Sendable (AIProvider, String, ModelContextWindowStore) async throws -> AgentMetadataRefresh = { provider, model, store in
         try await ProviderModelMetadataService(windows: store).refresh(provider: provider, model: model)
@@ -21,14 +23,20 @@ struct HarnessChatService {
         history: [ChatMessage], question: String
     ) async throws -> AsyncThrowingStream<AgentEvent, Error> {
         let effective = effectiveScope(scope)
-        let reader = LibraryChatSourceReader(context: context, scope: effective)
+        let reader = try LibraryChatSourceReader(context: context, scope: effective).authorizedSnapshot()
         let ids = Set(try await reader.listSources().map(\.id))
         if let validation = ChatSourceScopeEditor(scope: effective).validation(resolvedMeetingIDs: ids) {
             let message = NSLocalizedString(ChatSourcePresentation.validationKey(validation), comment: "Invalid sources")
             throw AppError.apiError(statusCode: 0, message: message)
         }
+        let sessionID = (conversationID ?? UUID()).uuidString
+        let documents = ChatDocumentEffectExecutor(writer: ChatDocumentEffectWriter(
+            store: SwiftDataAgentSessionStore(context: context), sessionID: sessionID,
+            prepareSession: prepareDocumentSession, origin: documentOrigin), workspace: workspace)
         let tools = ChatSourceTools.make(reader: reader, allowedMeetingIDs: ids, scope: effective)
-            + ChatDocumentTools.make(workspace: workspace)
+            + ChatDocumentTools.make(workspace: workspace, mutation: { name, arguments, execution in
+                try await documents.execute(name, arguments: arguments, context: execution)
+            })
         let artifacts = await workspace.snapshot()
         try Task.checkCancellation()
         let refresh = try await refreshMetadata(provider, modelIdentifier, contextWindows)
@@ -36,7 +44,7 @@ struct HarnessChatService {
         HarnessDiagnostics.record(resolution)
         let plannedLimits: AgentLimits
         if let limits { plannedLimits = limits }
-        else { plannedLimits = AgentBudgetPlanner.limits(for: try reader.workload(allowedIDs: ids)) }
+        else { plannedLimits = AgentBudgetPlanner.limits(for: reader.workload) }
         let harness = NativeHarness(model: model, limits: plannedLimits,
                                     contextPolicy: AgentContextPolicy(contextWindow: resolution.contextWindowTokens,
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
@@ -48,7 +56,7 @@ struct HarnessChatService {
                 $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
             },
             prompt: question, tools: tools,
-            contextResolution: resolution, context: AgentRunContext(sessionID: conversationID ?? UUID())
+            contextResolution: resolution, context: try AgentRunContext(sessionID: sessionID)
         )
     }
 

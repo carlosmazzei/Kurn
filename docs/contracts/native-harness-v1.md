@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers and tool-history replay remain NH05/NH06; complete pi compatibility is not claimed.
@@ -295,3 +295,53 @@ carry session/run identity with no stale request ID. Summary requests get their 
 Tool diagnostics explicitly reference their invocation's originating request without changing
 the ambient model scope; ending an invocation cannot leak its request into the next check.
 Existing persisted traces are retained as recorded rather than retrospectively relabeled.
+
+
+## NH04 activation boundary
+
+`AgentToolRegistry` accepts only the tools bundled by the host, with unique ASCII identifier
+names (1–64 bytes). Schemas are bounded to depth 32 and 4096 nodes. The non-coercing subset
+supports object/properties/required/boolean additionalProperties, homogeneous arrays/items,
+string Unicode-scalar length and UUID format, finite number/integer bounds, boolean, null,
+description and enum. Object roots and explicit properties/additionalProperties are required.
+Unknown keywords, references, combinators, patterns and other formats fail registration.
+Bundled source/document schemas use additionalProperties=false. Semantic authorization,
+empty text, size, identity and paging checks remain in the host tools.
+
+Every invocation is schema-checked before policy and rechecked after an allowed argument
+transformation. Denial, confirmation refusal, unknown tools, invalid arguments, errors and
+abort all close the tool lifecycle. Generic diagnostics contain numeric facts and opaque
+IDs, never raw arguments or exception descriptions. Progress phases are 0=validation,
+1=authorization, 2=execution, 3=commit, 4=committed, 5=recovered committed receipt. A shared
+terminal fence rejects late callbacks. The UI trace retains progress plus content-free
+validation/policy/abort/registration diagnostics. No after-result replacement hook or
+termination policy is exposed (A23/A24 remain conditional).
+
+Independent read batches use at most four workers (configurable bounded 1–16). Mixed batches
+containing any sequential/unknown tool run sequentially. All started workers settle before
+failure escapes. Progress/end events follow completion; native result messages append in
+original assistant call order. Document mutations are always sequential. Model-visible
+content, host details and structuredContent are separate native output fields; every wire
+adapter projects only explicit content. The existing Unicode-safe pagination remains.
+
+The app captures source metadata, selected parts, passage/attachment bodies, semantic
+candidates and SHA-256 content revisions before model IO. Later selection/content changes
+cannot expand that snapshot; source deletion and attachment deletion fail explicitly. The
+snapshot is per task; persisting authorization entries for later replay is NH05/NH06.
+
+The synchronous MainActor effect transaction reads the current checked session, plans a
+pure domain edit, then saves its immutable artifact revision, selected presentation state,
+artifact reference/provenance and effect receipt together. The receipt identifies the logical
+invocation/request/provider call, arguments digest, artifact version and original result.
+A matching receipt returns that original result while retaining the latest workspace state;
+changed arguments/identity or a corrupt receipt fail without mutation. Receipts are immutable.
+A lease spans the save and workspace publication, including actor suspension. A failed save
+restores only staged entries/revisions/receipt. A cancellation arriving after a successful
+save cannot erase the receipt or change the known committed result into a tool failure.
+
+The new session is still lazy: its accepted user presentation is saved before the first
+document effect if necessary. Other accepted input/message/result barriers, one owner per
+session, crash recovery scheduling and settle semantics remain NH05. Native tool messages
+are still in-memory until that owner persists them; reopen does not automatically execute
+anything. Canonical provider replay and persistent compaction remain NH06. Local durable
+receipt replay is qualified; no remote/unknown-outcome side-effect mechanism is introduced.

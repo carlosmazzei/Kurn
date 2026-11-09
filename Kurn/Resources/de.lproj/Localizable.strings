@@ -1222,3 +1222,10 @@
 "chat.diagnostic.replayPrepared" = "Verlauf für die API vorbereitet";
 
 "chat.storage.invalid" = "Diese Unterhaltung konnte nicht gelesen oder gespeichert werden. Die gespeicherten Daten wurden beibehalten.";
+
+// Native tool pipeline diagnostics.
+"chat.diagnostic.toolValidationFailed" = "Werkzeugargumente abgelehnt";
+"chat.diagnostic.toolPolicyDenied" = "Werkzeug durch Richtlinie blockiert";
+"chat.diagnostic.toolProgress" = "Werkzeugfortschritt";
+"chat.diagnostic.toolAborted" = "Werkzeug abgebrochen";
+"chat.diagnostic.toolRegistryRejected" = "Werkzeugregistrierung abgelehnt";

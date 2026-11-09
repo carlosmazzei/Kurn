@@ -580,8 +580,8 @@ claim target completion. The fixtures cover opaque replay data and four provider
 requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
-store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04–NH10 have not
-started. The next implementation increment is NH04 (native tool pipeline and durable artifacts). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05–NH10 have not
+started. The next implementation increment is NH05 (session owner and lifecycle). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -614,6 +614,23 @@ clean retry. Backups use the centralized V6 graph; salvage includes chats, retai
 messages/revisions, metadata and saved documents; erasure covers cascades and orphan rows.
 This does not activate queue consumption, effect reconciliation or an awaitable session
 owner. Those remain NH04/NH05; native tool-history replay and durable compaction remain NH06.
+
+
+NH04 registers bundled tools through a checked, bounded JSON Schema subset; rejects duplicate
+names and unsupported schemas before model IO; validates invocations before and after the
+typed policy seam; fences terminal progress and logs validation, denial, error and abort.
+Model content, UI details and structured output remain separate. Independent reads use at
+most four workers; a sequential tool serializes its whole batch, with result messages in
+assistant call order and progress/completion events in execution order. Source IDs, parts,
+content revisions and search candidates are captured as immutable values before metadata
+refresh/model IO; deletion fails instead of returning an empty success. Document edits are
+planned as domain values, then the app commits the immutable revision, presentation state,
+provenance and invocation receipt in one SwiftData save. A serialized lease spans commit and
+workspace publication. Matching committed invocations replay the saved result without
+reapplying an edit; changed arguments/request identity conflict. Failed saves publish neither
+revision nor receipt, and cancellation after commit preserves the known success. Opening a
+chat does not resume work. Session-wide ownership, durable model-message/result barriers
+and automatic recovery orchestration remain NH05; canonical model replay remains NH06.
 
 
 The architecture prerequisite separates domain from runtime:

@@ -19,7 +19,7 @@ public enum ChatSourceTools {
                 return parts.values.contains { $0.contains(part) }
             }
         return names.map { name in
-            AgentTool(spec: spec(name)) { arguments in
+            AgentTool(spec: spec(name), scheduling: .parallelRead) { arguments in
                 do {
                     let params = try Parameters(arguments, name: name)
                     return try await execute(name, params: params, reader: reader, parts: parts)

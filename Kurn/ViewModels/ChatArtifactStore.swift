@@ -39,16 +39,7 @@ struct ChatArtifactStore {
     }
 
     static func origin(artifactID: UUID, in turns: [PersistedChatTurn]) -> ChatArtifactOrigin {
-        var question = ""
-        var result = ChatArtifactOrigin(question: "", modelIdentifier: "")
-        for turn in turns {
-            if turn.role == .user { question = turn.text }
-            if let origin = turn.artifactOrigins?[artifactID] { result = origin }
-            else if turn.artifacts?.contains(where: { $0.id == artifactID }) == true {
-                result = ChatArtifactOrigin(question: question, modelIdentifier: "")
-            }
-        }
-        return result
+        ChatArtifactOrigin.recorded(artifactID: artifactID, in: turns)
     }
 
 }

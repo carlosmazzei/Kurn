@@ -342,8 +342,12 @@
           "symbol": "selectedPartsEmptyOverridesAndLegacyDefaultsSurviveRoundTrip"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        }
+      ],
+      "note": "NH04 captures immutable source IDs/parts/content revisions and rejects deleted sources. Durable authorization entries and source-aware replay remain NH05/NH06."
     },
     {
       "id": "C16",
@@ -378,14 +382,24 @@
       "sourceDocument": "03-ferramentas.md",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolSchemaTests.swift"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift"
+        },
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        }
+      ],
+      "note": "NH04 local bundled-tool profile: strict checked schema registry, transformed-argument policy revalidation, terminal progress fences, bounded independent reads and atomic local document receipts. No external extensions or result-replacement/termination hooks."
     },
     {
       "id": "C19",
@@ -393,7 +407,7 @@
       "sourceDocument": "03-ferramentas.md",
       "disposition": "adapted",
       "increment": "NH04",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "KurnTests/ChatTranscriptToolPageTests.swift"
@@ -403,8 +417,18 @@
           "symbol": "artifactBodiesAndHistoricalReferencesKeepIndependentVersions"
         }
       ],
-      "targetEvidence": [],
-      "note": "Kurn source/document tools replace desktop filesystem and shell contracts."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        },
+        {
+          "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        },
+        {
+          "path": "KurnTests/ChatTranscriptToolPageTests.swift"
+        }
+      ],
+      "note": "Kurn source/document equivalents retain Unicode-safe pagination and source selection. Local document mutations commit revisions and receipts before success; saved library documents remain independent."
     },
     {
       "id": "C20",
@@ -674,10 +698,15 @@
       "requirement": "UI segue conclusão; transcript segue ordem do assistant",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "boundedReadsCompleteOutOfOrderButAppendInCallOrderAndFenceLateProgress"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
     },
     {
       "id": "A12",
@@ -685,10 +714,15 @@
       "requirement": "Nenhuma sobreposição de execução do lote",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "oneSequentialToolSerializesWholeBatch"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
     },
     {
       "id": "A13",
@@ -762,14 +796,18 @@
       "requirement": "Erro sem efeito, com execution_end",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/NativeHarnessTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolSchemaTests.swift"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
     },
     {
       "id": "A20",
@@ -806,10 +844,15 @@
       "requirement": "Não executa nem roda tool_result; resultado de erro completo",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "policyDeniesOrRevalidatesTransformedArguments"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
     },
     {
       "id": "A22",
@@ -817,10 +860,15 @@
       "requirement": "Erro ao modelo, dados programáticos preservados",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "structuredDataSurvivesCodecButNeverEntersProviderReplay"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
     },
     {
       "id": "A23",
@@ -850,10 +898,15 @@
       "requirement": "Ignorados",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "boundedReadsCompleteOutOfOrderButAppendInCallOrderAndFenceLateProgress"
+        }
+      ],
+      "note": "NH04 local app-only profile; native session ownership and recovery orchestration remain NH05."
     },
     {
       "id": "A26",
@@ -1371,10 +1424,14 @@
       "requirement": "Não reexecutar automaticamente comando mutante",
       "disposition": "required",
       "increment": "NH04",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Remote effect excluded; durable local artifact receipts remain required."
+      "targetEvidence": [
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        }
+      ],
+      "note": "Remote effects remain excluded. Atomic local artifact revision/receipt saves qualify replay of known committed invocations, save failure and cancellation after commit. Reopen does not execute work."
     }
   ],
   "nativeCases": [
@@ -1514,6 +1571,41 @@
         {
           "path": "KurnTests/ProviderHTTPTests+Agent.swift",
           "symbol": "agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced"
+        }
+      ]
+    },
+    {
+      "id": "K13",
+      "scenario": "Known local artifact effect survives receipt replay and failed saves publish no effect",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift"
+        }
+      ]
+    },
+    {
+      "id": "K14",
+      "scenario": "Source authorization uses fixed parts/content revisions and rejects deletion",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/AuthorizedChatSourceReaderTests.swift"
+        }
+      ]
+    },
+    {
+      "id": "K15",
+      "scenario": "Cancellation after durable commit preserves known success",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentToolPipelineTests.swift",
+          "symbol": "cancellationAfterCommittedEffectAcknowledgesSuccessAndStopsNextRequest"
+        },
+        {
+          "path": "KurnTests/ChatDocumentEffectTests.swift",
+          "symbol": "cancellationAfterSaveStillPublishesCommittedSnapshotAndReceipt"
         }
       ]
     }

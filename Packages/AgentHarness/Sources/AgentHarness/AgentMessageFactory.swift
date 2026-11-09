@@ -62,9 +62,11 @@ enum AgentMessageFactory {
 
     static func result(_ invocation: AgentToolInvocation, output: AgentToolOutput, isError: Bool,
                        syntheticReason: AgentToolBlockReason? = nil) throws -> AgentMessage {
-        let details: JSONValue? = output.metrics.isEmpty ? nil : .object(Dictionary(uniqueKeysWithValues:
+        let metrics: JSONValue? = output.metrics.isEmpty ? nil : .object(Dictionary(uniqueKeysWithValues:
             output.metrics.map { ($0.key.rawValue, JSONValue.number(Double($0.value))) }))
+        let details = output.details.map { JSONValue.object(["ui": $0, "metrics": metrics ?? .object([:])]) } ?? metrics
         return .tool(try AgentToolResultMessage(id: UUID().uuidString, timestampMilliseconds: now, invocation: invocation,
-            blocks: [AgentContentBlock(id: "text", content: .text(output.content))], isError: isError, syntheticReason: syntheticReason, details: details))
+            blocks: [AgentContentBlock(id: "text", content: .text(output.content))], isError: isError, syntheticReason: syntheticReason,
+            details: details, structuredContent: output.structuredContent))
     }
 }

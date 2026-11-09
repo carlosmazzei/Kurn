@@ -150,30 +150,51 @@ public protocol AgentModel: Sendable {
 
 public extension AgentModel { var descriptor: AgentModelDescriptor? { nil } }
 
-public struct AgentToolOutput: Sendable, Equatable {
+public struct AgentToolOutput: Codable, Sendable, Equatable {
     public let content: String
     public let summary: String
     public let isError: Bool
     public let metrics: [AgentDiagnostic.Metric: Int]
+    public let details: JSONValue?
+    public let structuredContent: JSONValue?
 
-    public init(content: String, summary: String, isError: Bool = false, metrics: [AgentDiagnostic.Metric: Int] = [:]) {
+    public init(content: String, summary: String, isError: Bool = false, metrics: [AgentDiagnostic.Metric: Int] = [:],
+                details: JSONValue? = nil, structuredContent: JSONValue? = nil) {
         self.content = content
         self.summary = summary
         self.isError = isError
         self.metrics = metrics
+        self.details = details
+        self.structuredContent = structuredContent
     }
 }
 
 public struct AgentTool: Sendable {
+    public enum Scheduling: Sendable { case sequential, parallelRead }
     public let spec: AgentToolSpec
     public let requiresConfirmation: Bool
     public let execute: @Sendable (JSONValue) async throws -> AgentToolOutput
+    public let executeWithContext: @Sendable (JSONValue, AgentToolExecutionContext) async throws -> AgentToolOutput
+    public let scheduling: Scheduling
 
-    public init(spec: AgentToolSpec, requiresConfirmation: Bool = false,
+    public init(spec: AgentToolSpec, requiresConfirmation: Bool = false, scheduling: Scheduling = .sequential,
                 execute: @escaping @Sendable (JSONValue) async throws -> AgentToolOutput) {
         self.spec = spec
         self.requiresConfirmation = requiresConfirmation
         self.execute = execute
+        executeWithContext = { arguments, _ in try await execute(arguments) }
+        self.scheduling = scheduling
+    }
+
+    public init(spec: AgentToolSpec, requiresConfirmation: Bool = false, scheduling: Scheduling = .sequential,
+                executeWithContext: @escaping @Sendable (JSONValue, AgentToolExecutionContext) async throws -> AgentToolOutput) {
+        self.spec = spec; self.requiresConfirmation = requiresConfirmation; self.scheduling = scheduling
+        self.executeWithContext = executeWithContext
+        execute = { arguments in
+            let invocation = try AgentToolInvocation(id: UUID().uuidString, requestID: UUID().uuidString,
+                callID: UUID().uuidString, toolName: spec.name)
+            return try await executeWithContext(arguments, AgentToolExecutionContext(sessionID: UUID().uuidString, invocation: invocation))
+        }
     }
 }
 
@@ -228,6 +249,7 @@ public enum AgentEvent: Sendable, Equatable {
     case modelContent(AgentContentEvent)
     case toolStarted(callID: String, name: String, arguments: JSONValue)
     case toolFinished(callID: String, name: String, summary: String, isError: Bool)
+    case toolProgress(invocation: AgentToolInvocation, progress: AgentToolProgress)
     case contextCompacted(beforeTokens: Int, afterTokens: Int)
     case usage(AgentUsage)
     case runFinished(AgentRunOutcome)

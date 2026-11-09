@@ -6,6 +6,20 @@ struct ChatArtifactOrigin: Codable, Sendable, Equatable {
     var question: String
     var modelIdentifier: String
     var sources: ChatArtifactSources? = nil
+
+    static func recorded(artifactID: UUID, in turns: [PersistedChatTurn]) -> Self {
+        var question = ""
+        var result = ChatArtifactOrigin(question: "", modelIdentifier: "")
+        for turn in turns {
+            if turn.role == .user { question = turn.text }
+            if let origin = turn.artifactOrigins?[artifactID] { result = origin }
+            else if turn.artifacts?.contains(where: { $0.id == artifactID }) == true {
+                result = ChatArtifactOrigin(question: question, modelIdentifier: "")
+            }
+        }
+        return result
+    }
+
 }
 
 struct ChatArtifactSources: Codable, Sendable, Equatable {

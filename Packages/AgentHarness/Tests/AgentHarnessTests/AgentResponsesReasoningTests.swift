@@ -30,7 +30,7 @@ import Testing
         let response = try accumulator.response()
         #expect(response.providerMetadata == metadata)
         let model = ScriptedAgentModel([response, AgentTurnResponse(text: "Answer")])
-        let tool = AgentTool(spec: AgentToolSpec(name: "search", description: "Search", inputSchema: .object([:]))) { _ in
+        let tool = AgentTool(spec: AgentToolSpec(name: "search", description: "Search", inputSchema: .object(["type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(true)]))) { _ in
             AgentToolOutput(content: "Found Alice", summary: "Found Alice")
         }
         let outcome = try agentOutcome(await agentEvents(NativeHarness(model: model), tools: [tool]))

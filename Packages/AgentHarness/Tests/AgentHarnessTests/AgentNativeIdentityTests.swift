@@ -33,7 +33,7 @@ struct AgentNativeIdentityTests {
             let startIndex = try #require(events[registerIndex...].firstIndex { if case .toolStarted = $0 { return true }; return false })
             #expect(registerIndex < startIndex)
             let facts = capture.events.filter { $0.correlation?.invocationID == invocation.id }
-            #expect(facts.map(\.kind) == [.toolRequested, .toolFinished])
+            #expect(facts.map(\.kind) == [.toolRequested, .toolProgress, .toolProgress, .toolProgress, .toolFinished])
             #expect(facts.allSatisfy { $0.correlation?.requestID == invocation.requestID })
         }
         #expect(capture.events.allSatisfy { $0.runID == context.runID && $0.correlation?.sessionID == context.sessionID })
