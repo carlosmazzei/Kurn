@@ -39,6 +39,7 @@ enum HarnessPresentationCodec {
         return data
     }
     static func message(_ turn: PersistedChatTurn) throws -> AgentMessage {
+        guard turn.role == .user || turn.role == .assistant else { throw AgentSessionStoreError.invalidEntry }
         let usage = turn.usage.map { AgentUsage(inputTokens: $0.promptTokens, outputTokens: $0.completionTokens) }
         return .content(try AgentContentMessage(id: turn.id.uuidString, timestampMilliseconds: nil,
             role: turn.role == .user ? .user : .assistant, blocks: [AgentContentBlock(id: "text", content: .text(turn.text))], usage: usage))

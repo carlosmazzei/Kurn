@@ -175,4 +175,13 @@ struct HarnessSessionStoreTests {
         #expect(row.payloadData == raw && session.canonicalVersion == 1)
     }
 
+    @Test func unsupportedLegacyPresentationRoleCannotBecomeAnInventedAssistant() throws {
+        let context = ModelContext(TestModelContainer.make())
+        let session = seed(context)
+        session.turns = [PersistedChatTurn(id: UUID(), role: .system, text: "Legacy system state", usage: nil, costUSD: nil, elapsedSeconds: nil)]
+        let original = session.turnsData
+        #expect(throws: AgentSessionStoreError.invalidEntry) { try SwiftDataAgentSessionStore(context: context).migrate(session) }
+        #expect(session.canonicalVersion == nil && session.turnsData == original && session.harnessEntries.isEmpty)
+    }
+
 }
