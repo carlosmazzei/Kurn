@@ -15,7 +15,8 @@ struct ChatDocumentEffectWriter {
 
     func commit(_ name: String, arguments: JSONValue, execution: AgentToolExecutionContext) throws
         -> (output: AgentToolOutput, artifacts: [ChatDocumentArtifact]) {
-        guard execution.sessionID == sessionID, execution.invocation.toolName == name else { throw AgentSessionStoreError.conflict }
+        guard execution.sessionID == sessionID, execution.invocation.toolName == name,
+              execution.invocation.namespace == nil else { throw AgentSessionStoreError.conflict }
         let target = try store.session(sessionID)
         _ = try store.snapshot(target)
         let snapshot = try target.harnessSnapshot()
@@ -24,7 +25,7 @@ struct ChatDocumentEffectWriter {
         if let record = records.first(where: { $0.kind == .effect && $0.id == execution.invocation.id }) {
             let receipt = try JSONDecoder().decode(DocumentEffectReceipt.self, from: Data(try record.data.encodedString().utf8))
             guard receipt.version == 1, receipt.invocation == execution.invocation, receipt.argumentsDigest == digest,
-                  let revision = target.harnessRevisions.first(where: { $0.artifactID == receipt.artifactID && $0.version == receipt.artifactVersion }) else {
+                  let revision = target.harnessRevisions.first(where: { $0.artifactID == receipt.artifactID && String($0.version) == receipt.artifactVersion }) else {
                 throw AgentSessionStoreError.conflict
             }
             let artifact = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: revision.payloadData)
@@ -36,7 +37,7 @@ struct ChatDocumentEffectWriter {
         let change = try ChatDocumentTools.edit(name, arguments: arguments).applying(to: snapshot.artifacts)
         let output = ChatDocumentTools.mutationOutput(name, artifact: change.artifact)
         let receipt = DocumentEffectReceipt(version: 1, invocation: execution.invocation, argumentsDigest: digest,
-            artifactID: change.artifact.id, artifactVersion: change.artifact.version, output: output)
+            artifactID: change.artifact.id, artifactVersion: String(change.artifact.version), output: output)
         let record = try AgentRecoveryRecord(id: execution.invocation.id, kind: .effect, data: HarnessPresentationCodec.json(receipt))
         execution.progress(AgentToolProgress(.committing))
         var turns = snapshot.turns
@@ -58,7 +59,8 @@ private struct DocumentEffectReceipt: Codable {
     let invocation: AgentToolInvocation
     let argumentsDigest: String
     let artifactID: UUID
-    let artifactVersion: Int
+    // Recovery record JSONValue uses Double numbers; keep the exact domain Int as decimal text.
+    let artifactVersion: String
     let output: AgentToolOutput
 }
 

@@ -147,4 +147,61 @@ struct ChatDocumentEffectTests {
         #expect(restored.artifacts.count == 2 && restored.turns.last?.artifacts?.count == 2)
         #expect(restored.turns.first?.artifacts == nil)
     }
+
+    @Test func receiptKeepsVersionsAboveJSONDoublePrecisionExact() throws {
+        let (store, session) = try setup()
+        let artifact = ChatDocumentArtifact(title: "Report", markdown: "Initial", version: 9_007_199_254_740_992)
+        try store.writePresentation(session, turns: [], scope: nil, artifacts: [artifact])
+        let writer = ChatDocumentEffectWriter(store: store, sessionID: session.id.uuidString)
+        let context = try execution(session, name: "append_to_document")
+        let arguments = JSONValue.object(["document_id": .string(artifact.id.uuidString), "markdown": .string("Added")])
+        let first = try writer.commit("append_to_document", arguments: arguments, execution: context)
+        let retry = try writer.commit("append_to_document", arguments: arguments, execution: context)
+        #expect(first.output == retry.output && retry.artifacts.first?.version == 9_007_199_254_740_993)
+        #expect(retry.output.structuredContent == .object(["documentID": .string(artifact.id.uuidString), "version": .string("9007199254740993")]))
+    }
+
+    @Test func unknownReceiptCannotBeReexecutedOrOverwritten() throws {
+        let (store, session) = try setup()
+        let context = try execution(session)
+        let unknown = try AgentRecoveryRecord(id: context.invocation.id, kind: .effect, data: .object(["state": .string("unknown")]))
+        try store.put(unknown, in: session, expectedRevision: session.canonicalRevision)
+        let writer = ChatDocumentEffectWriter(store: store, sessionID: session.id.uuidString)
+        #expect(throws: (any Error).self) { try writer.commit("create_document", arguments: create, execution: context) }
+        let changed = try AgentRecoveryRecord(id: context.invocation.id, kind: .effect, data: .object([:]))
+        #expect(throws: AgentSessionStoreError.conflict) { try store.put(changed, in: session, expectedRevision: session.canonicalRevision) }
+        #expect(try session.harnessSnapshot().artifacts.isEmpty && session.harnessRevisions.isEmpty)
+        #expect(try store.records(session) == [unknown])
+    }
+
+    @Test func diskReopenFindsCommittedReceiptAndDoesNotRepeatMutation() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("HarnessEffects-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("effects.store")
+        let sessionID = UUID()
+        let invocation = try AgentToolInvocation(id: UUID().uuidString, requestID: "request", callID: "provider-call", toolName: "create_document")
+        let execution = AgentToolExecutionContext(sessionID: sessionID.uuidString, invocation: invocation)
+        let first = try diskCommit(url, sessionID: sessionID, execution: execution, seed: true)
+        let retry = try diskCommit(url, sessionID: sessionID, execution: execution, seed: false)
+        #expect(first == retry && first.metrics[.mutationsCommitted] == 1)
+    }
+
+    private func diskCommit(_ url: URL, sessionID: UUID, execution: AgentToolExecutionContext, seed: Bool) throws -> AgentToolOutput {
+        let container = try ModelContainer(for: KurnModelGraph.schema, migrationPlan: KurnModelGraph.migrationPlan,
+            configurations: [ModelConfiguration(schema: KurnModelGraph.schema, url: url)])
+        return try withExtendedLifetime(container) {
+            let store = SwiftDataAgentSessionStore(context: container.mainContext)
+            if seed {
+                let session = ChatSession(meeting: nil, title: "Disk receipt")
+                session.id = sessionID; container.mainContext.insert(session)
+                try store.writePresentation(session, turns: [], scope: nil, artifacts: [])
+            }
+            let writer = ChatDocumentEffectWriter(store: store, sessionID: sessionID.uuidString)
+            let result = try writer.commit("create_document", arguments: create, execution: execution)
+            let target = try store.session(sessionID.uuidString)
+            #expect(result.artifacts.count == 1 && target.harnessRecords.count == 1 && target.harnessRevisions.count == 1)
+            return result.output
+        }
+    }
 }

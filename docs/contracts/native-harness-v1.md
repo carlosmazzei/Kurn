@@ -63,13 +63,13 @@ Important current adaptations/gaps:
   same library document for the session/artifact identity. Legacy missing model provenance
   stays unknown; it is not reconstructed from today's selected model.
 - Runtime compaction changes only the current request projection. Reopen/another question
-  does not yet reuse a durable checkpoint. Full branch history, receipts and revision
-  recovery are not implemented.
+  does not yet reuse a durable checkpoint. Retained branches and local effect receipts
+  are stored, but automatic session recovery and canonical replay remain NH05/NH06.
 - Output-limited calls never execute. NH02 retains native call blocks/raw arguments and
   appends synthetic error results in the in-memory audit history. A successful output
-  recovery excludes that interrupted exchange from retry context. The V5 app still saves
-  presentation turns/trace rather than this complete canonical history; durable retention
-  belongs to NH03/NH04.
+  recovery excludes that interrupted exchange from retry context. The V6 app compatibility writer still saves
+  presentation turns/trace rather than this complete native tool history; the awaited
+  model-message/result barriers belong to NH05.
 - The current UI can request cancellation and clear its busy state before the task settles.
   Confirmed termination, durable barriers, queues and late-event fencing belong to NH05.
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
@@ -271,8 +271,8 @@ them behind awaited barriers. Current model replay remains plain history; NH06 a
 qualified source-aware canonical projection.
 
 Recovery records persist versioned run/queue/draft/effect metadata only. Their presence
-never resumes work, consumes a prompt or proves an effect committed. NH04 defines validated
-receipt transitions and document commits; NH05/NH08 define session/queue behavior.
+never resumes work or consumes a prompt. Generic effect metadata alone does not prove
+a commit; the validated NH04 local receipt profile below does. NH05/NH08 define session/queue behavior.
 
 The graph is shared by production, tests and whole-store protected backups. Markdown
 salvage includes conversations, retained native messages/artifact revisions, recovery metadata
@@ -332,7 +332,8 @@ snapshot is per task; persisting authorization entries for later replay is NH05/
 The synchronous MainActor effect transaction reads the current checked session, plans a
 pure domain edit, then saves its immutable artifact revision, selected presentation state,
 artifact reference/provenance and effect receipt together. The receipt identifies the logical
-invocation/request/provider call, arguments digest, artifact version and original result.
+invocation/request/provider call, arguments digest, exact decimal artifact version and original result. The structured output also carries
+its version as decimal text, avoiding the Double precision limit of JSONValue numbers.
 A matching receipt returns that original result while retaining the latest workspace state;
 changed arguments/identity or a corrupt receipt fail without mutation. Receipts are immutable.
 A lease spans the save and workspace publication, including actor suspension. A failed save

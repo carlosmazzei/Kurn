@@ -598,8 +598,9 @@ Namespaced calls retain their wire identity but cannot dispatch to unqualified b
 tools. Supplied private protocol facts remain in native metadata, outside logs/replay.
 Session/run/request/invocation correlation is persisted in the existing diagnostic steps;
 new chats reserve their eventual ChatSession UUID without creating empty saved rows.
-The app still saves V5 presentation turns; indexed entry storage, canonical history
-restoration, effect receipts and migration remain open for NH03/NH04. Session barriers,
+At the NH02 boundary the app still saved V5 presentation turns; indexed storage and
+migration followed in NH03, with local effect receipts in NH04. Canonical model-history
+restoration remains NH05/NH06. Session barriers,
 queues and model-level capability qualification remain in their planned increments.
 Evidence and the exact activation boundary are in `docs/contracts/native-harness-v1.md`.
 

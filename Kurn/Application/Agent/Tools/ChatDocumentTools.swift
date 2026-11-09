@@ -138,6 +138,6 @@ public enum ChatDocumentTools {
         let action = name == "create_document" ? "Created" : name == "update_document" ? "Updated" : "Appended to"
         return AgentToolOutput(content: "\(action) document \(artifact.id.uuidString) | title: \(ChatSourceToolText.field(artifact.title)) | version: \(artifact.version)",
             summary: "\(action) “\(artifact.title)” (v\(artifact.version))", metrics: [.mutationsCommitted: 1],
-            structuredContent: .object(["documentID": .string(artifact.id.uuidString), "version": .number(Double(artifact.version))]))
+            structuredContent: .object(["documentID": .string(artifact.id.uuidString), "version": .string(String(artifact.version))]))
     }
 }
