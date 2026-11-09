@@ -67,7 +67,7 @@ extension SwiftDataAgentSessionStore {
         _ = try AgentEntryGraph(sessionID: target.id.uuidString, entries: existing + additions, leafID: stateEntry.id)
         let rows = try additions.map { entry in
             HarnessSessionEntry(session: target, entryID: entry.id, parentEntryID: entry.parentID,
-                                ordinal: entry.ordinal, payloadData: try HarnessPresentationCodec.encode(entry))
+                                ordinal: entry.ordinal, kindRaw: entry.kind, createdAtUTC: entry.createdAt, payloadData: try HarnessPresentationCodec.encode(entry))
         }
         let cache = try PresentationCache(turns: turns, scope: scope, artifacts: artifacts)
         try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache)

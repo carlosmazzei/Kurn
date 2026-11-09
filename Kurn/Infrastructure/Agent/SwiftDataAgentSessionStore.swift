@@ -23,7 +23,7 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
         let entries = try session.harnessEntries.map { row -> AgentSessionEntry in
             let value = try HarnessPresentationCodec.decode(AgentSessionEntry.self, from: row.payloadData)
             guard row.sessionID == session.id, row.entryID == value.id, row.parentEntryID == value.parentID,
-                  row.ordinal == value.ordinal, row.id == session.id.uuidString + ":" + value.id else { throw AgentSessionStoreError.invalidGraph }
+                  row.ordinal == value.ordinal, row.kindRaw == value.kind, row.createdAtUTC == value.createdAt, row.id == session.id.uuidString + ":" + value.id else { throw AgentSessionStoreError.invalidGraph }
             return value
         }
         guard entries.count == session.canonicalOrdinal, entries.isEmpty == (session.canonicalLeafID == nil), session.canonicalRevision > 0, session.canonicalRevision < Int.max else {
@@ -44,7 +44,7 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
         _ = try AgentEntryGraph(sessionID: group.sessionID, entries: current.entries + group.entries, leafID: group.leafID)
         let rows = try group.entries.map { entry in
             HarnessSessionEntry(session: target, entryID: entry.id, parentEntryID: entry.parentID,
-                ordinal: entry.ordinal, payloadData: try HarnessPresentationCodec.encode(entry))
+                ordinal: entry.ordinal, kindRaw: entry.kind, createdAtUTC: entry.createdAt, payloadData: try HarnessPresentationCodec.encode(entry))
         }
         let oldLeaf = target.canonicalLeafID
         let oldOrdinal = target.canonicalOrdinal

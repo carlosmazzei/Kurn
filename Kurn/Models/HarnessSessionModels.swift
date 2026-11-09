@@ -4,19 +4,22 @@ import SwiftData
 /// Indexed row fields are checked against the checksummed value envelope on every read.
 @Model
 final class HarnessSessionEntry {
-    #Index<HarnessSessionEntry>([\.sessionID, \.ordinal])
+    #Index<HarnessSessionEntry>([\.sessionID, \.ordinal], [\.sessionID, \.kindRaw, \.ordinal])
     @Attribute(.unique) var id: String
     var sessionID: UUID
     var entryID: String
     var parentEntryID: String?
+    var kindRaw: String
+    var createdAtUTC: String
     var ordinal: Int
     var payloadData: Data
     var session: ChatSession?
 
-    init(session: ChatSession, entryID: String, parentEntryID: String?, ordinal: Int, payloadData: Data) {
+    init(session: ChatSession, entryID: String, parentEntryID: String?, ordinal: Int, kindRaw: String, createdAtUTC: String, payloadData: Data) {
         id = session.id.uuidString + ":" + entryID
         sessionID = session.id; self.session = nil; self.entryID = entryID
-        self.parentEntryID = parentEntryID; self.ordinal = ordinal; self.payloadData = payloadData
+        self.parentEntryID = parentEntryID; self.ordinal = ordinal; self.kindRaw = kindRaw
+        self.createdAtUTC = createdAtUTC; self.payloadData = payloadData
     }
 }
 

@@ -20,6 +20,9 @@ public struct AgentSessionEntry: Codable, Sendable, Equatable {
     public let createdAt: String
     public let payload: Payload
     public let metadata: JSONValue?
+    public var kind: String {
+        switch payload { case .message: "message"; case .custom(let type, _): type }
+    }
 
     public init(sessionID: String, id: String, parentID: String?, ordinal: Int, createdAt: String,
                 payload: Payload, metadata: JSONValue? = nil) throws {
