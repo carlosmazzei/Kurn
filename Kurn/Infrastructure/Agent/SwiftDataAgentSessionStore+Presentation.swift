@@ -7,7 +7,17 @@ import SwiftData
 extension SwiftDataAgentSessionStore {
     /// One atomic session is the resumable unit. A failed save leaves no conversion marker.
     func migrate(_ target: ChatSession) throws {
-        if target.canonicalVersion != nil { _ = try snapshot(target); _ = try Self.projection(target); return }
+        if target.canonicalVersion != nil {
+            storageLog("validation_started", session: target)
+            do {
+                _ = try snapshot(target); _ = try Self.projection(target)
+                storageLog("validation_finished", session: target)
+            } catch {
+                storageLog("validation_failed", session: target)
+                throw error
+            }
+            return
+        }
         storageLog("migration_started", session: target)
         do {
             let legacy = try target.harnessSnapshot()
@@ -119,7 +129,7 @@ extension SwiftDataAgentSessionStore {
     private func storageLog(_ stage: String, session: ChatSession) {
         // The persisted reliability sink is independent of console verbosity.
         let outcome: ReliabilityEvent.Outcome = stage.hasSuffix("_failed") ? .failed : stage.hasSuffix("_started") ? .started : .succeeded
-        ReliabilityLog.record(ReliabilityEvent(operationID: session.id, operation: "harness_store", stage: stage, outcome: outcome, code: "canonical_v1"))
+        ReliabilityLog.record(ReliabilityEvent(operationID: OperationID(session.id.uuidString), operation: "harness_store", stage: stage, outcome: outcome, code: "canonical_v1"))
         // UUID/counts only. Raw decode errors, questions and source/document bodies stay private.
         AppLog.persistence.atInfo.info("harness.store stage=\(stage, privacy: .public) session=\(session.id, privacy: .public) entries=\(session.canonicalOrdinal, privacy: .public) revision=\(session.canonicalRevision, privacy: .public)")
     }

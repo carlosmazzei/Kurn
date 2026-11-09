@@ -206,9 +206,10 @@ time. Control characters are escaped in log IDs. Historical identities are never
 
 Stream failures create native terminal audit messages even before the first block. Partial
 raw calls stay in the failure snapshot and get synthetic interrupted results without running
-tools. This audit is in-memory until NH03; existing V5 diagnostic steps remain persistent.
-No V5 schema fields or NH01 fixture bytes change. Durable entry history and app history
-conversion remain NH03; effect receipts and awaited persistence barriers remain NH04/NH05.
+tools. Detailed live protocol audit remains in memory until the NH05 owner writes it;
+NH03 persists the existing presentation/diagnostic projection as canonical entries.
+NH01 fixture bytes stay unchanged. The V5 graph is frozen and V6 adds entry/revision storage;
+effect receipts and awaited persistence barriers remain NH04/NH05.
 
 `AgentMessageReducer` orders interleaved blocks, bounds retained content to 4,096 blocks /
 8 MiB, rejects invalid transitions and replaces all accumulated blocks/usage with the final
