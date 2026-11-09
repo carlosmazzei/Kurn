@@ -1,0 +1,52 @@
+import AgentHarness
+import Foundation
+import KurnCore
+import SwiftData
+
+@MainActor
+extension SwiftDataAgentSessionStore {
+    func validateRevisions(_ target: ChatSession) throws {
+        var ids = Set<String>()
+        for row in target.harnessRevisions {
+            let value = try HarnessPresentationCodec.decode(KurnCore.ChatDocumentArtifact.self, from: row.payloadData)
+            guard ids.insert(row.id).inserted, row.sessionID == target.id, row.artifactID == value.id,
+                  row.version == value.version, row.id == Self.revisionID(session: target, artifact: value) else {
+                throw AgentSessionStoreError.corruptPayload
+            }
+            _ = try KurnCore.ChatDocumentWorkspace(artifacts: [value])
+        }
+    }
+
+    func records(_ target: ChatSession) throws -> [AgentRecoveryRecord] {
+        try target.harnessRecords.map { row in
+            let value = try HarnessPresentationCodec.decode(AgentRecoveryRecord.self, from: row.payloadData)
+            guard row.sessionID == target.id, row.recordID == value.id, row.kindRaw == value.kind.rawValue,
+                  row.id == target.id.uuidString + ":" + value.kind.rawValue + ":" + value.id else { throw AgentSessionStoreError.corruptPayload }
+            return value
+        }
+    }
+
+    func put(_ value: AgentRecoveryRecord, in target: ChatSession, expectedRevision: Int) throws {
+        _ = try snapshot(target)
+        guard expectedRevision == target.canonicalRevision else { throw AgentSessionStoreError.conflict }
+        let id = target.id.uuidString + ":" + value.kind.rawValue + ":" + value.id
+        let data = try HarnessPresentationCodec.encode(value)
+        let existing = target.harnessRecords.first { $0.id == id }
+        let oldData = existing?.payloadData
+        let row = existing ?? HarnessSessionRecord(session: target, recordID: value.id, kindRaw: value.kind.rawValue, payloadData: data)
+        do {
+            if existing == nil {
+                row.session = target
+                context.insert(row)
+                if !target.harnessRecords.contains(where: { $0.id == id }) { target.harnessRecords.append(row) }
+            }
+            row.payloadData = data; target.canonicalRevision += 1
+            try save(context)
+        } catch {
+            target.canonicalRevision = expectedRevision
+            if let oldData { row.payloadData = oldData }
+            else { target.harnessRecords.removeAll { $0.id == id }; context.delete(row) }
+            throw error
+        }
+    }
+}

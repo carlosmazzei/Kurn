@@ -19,6 +19,7 @@ extension NativeHarness {
             settings.outputBudget.fit(inputTokens: contextTokens(settings, state: state))
             let requestIdentity = AgentRequestIdentity(purpose: settings.allowsToolCalls ? .response : .wrapUp)
             trace.beginRequest(requestIdentity)
+            defer { trace.endRequest(requestIdentity) }
             let stream = AgentTurnStream(events: events, trace: trace, request: requestIdentity, descriptor: model.descriptor)
             let started = ContinuousClock.now
             var requestMetrics = settings.outputBudget.diagnosticMetrics
@@ -38,6 +39,7 @@ extension NativeHarness {
                 stream.fail(error)
                 try recordFailure(stream, state: &state, events: events, trace: trace)
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
+                trace.endRequest(requestIdentity)
                 try Task.checkCancellation()
                 guard !retried, !stream.hasVisibleText, isContextOverflow(error) else { throw error }
                 retried = true
@@ -52,6 +54,7 @@ extension NativeHarness {
             metrics[.turnIndex] = state.turns - 1
             metrics[.streamedText] = stream.hasVisibleText ? 1 : 0
             trace.record(.requestFinished, metrics: metrics, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
+            trace.endRequest(requestIdentity)
             record(response.usage, state: &state, events: events)
             if response.stopReason == .maxTokens,
                try await recoverOutput(response, streamed: stream.hasVisibleText, settings: &settings,
@@ -200,6 +203,7 @@ extension NativeHarness {
         let response: AgentTurnResponse
         let requestIdentity = AgentRequestIdentity(purpose: .summary)
         trace.beginRequest(requestIdentity)
+        defer { trace.endRequest(requestIdentity) }
         trace.record(.summaryStarted, metrics: metrics)
         let stream = AgentTurnStream(events: events, trace: trace, request: requestIdentity, descriptor: model.descriptor, forwardsText: false)
         do {

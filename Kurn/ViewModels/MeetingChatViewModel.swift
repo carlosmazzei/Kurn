@@ -176,12 +176,11 @@ final class MeetingChatViewModel {
             modelContext.insert(target)
             session = target
         }
-        target.turns = (savedTurns ?? turns).map(PersistedChatTurn.init)
-        target.scopeData = JSONStorage.encodeAuthoritative(scope)
-        target.artifactsData = JSONStorage.encodeAuthoritative(artifacts)
-        target.updatedAt = Date()
-        if let saveError = modelContext.saveOrError() {
-            self.error = saveError
+        do {
+            try SwiftDataAgentSessionStore(context: modelContext).writePresentation(target,
+                turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts)
+        } catch {
+            self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
         }
     }
 
@@ -284,6 +283,7 @@ final class MeetingChatViewModel {
         cancel()
         generation = UUID()
         do {
+            if let modelContext { try SwiftDataAgentSessionStore(context: modelContext).migrate(session) }
             let restored = try session.harnessSnapshot()
             let workspace = try ChatDocumentWorkspace(artifacts: restored.artifacts)
             self.session = session
@@ -291,12 +291,12 @@ final class MeetingChatViewModel {
             self.workspace = workspace
             artifacts = restored.artifacts
             scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
-            turns = session.turns.map(Turn.init)
+            turns = restored.turns.map(Turn.init)
             retryArtifacts = []
             retryOrigins = [:]
             error = nil
         } catch {
-            self.error = .apiError(statusCode: 0, message: error.localizedDescription)
+            self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
         }
     }
 

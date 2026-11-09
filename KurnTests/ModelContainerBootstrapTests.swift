@@ -112,7 +112,10 @@ struct KurnModelGraphTests {
             ObjectIdentifier(GeneratedDocument.self),
             ObjectIdentifier(ChatSession.self),
             ObjectIdentifier(MeetingPhoto.self),
-            ObjectIdentifier(MeetingAttachment.self)
+            ObjectIdentifier(MeetingAttachment.self),
+            ObjectIdentifier(HarnessSessionEntry.self),
+            ObjectIdentifier(HarnessArtifactRevision.self),
+            ObjectIdentifier(HarnessSessionRecord.self)
         ]))
     }
 
@@ -148,16 +151,17 @@ struct KurnModelGraphTests {
     @Test func migrationPlanDeclaresAllSchemasWithLightweightStages() {
         // KurnSchemaV2 added ChatSession, KurnSchemaV3 MeetingPhoto and
         // KurnSchemaV4 MeetingAttachment, V5 chat scope/artifacts and provenance.
-        // All are additive and use lightweight stages.
+        // V6 adds canonical harness entries, revisions and metadata. All stages are additive.
         #expect(KurnSchemaMigrationPlan.schemas.map { ObjectIdentifier($0) } == [
             ObjectIdentifier(KurnSchemaV1.self), ObjectIdentifier(KurnSchemaV2.self),
-            ObjectIdentifier(KurnSchemaV3.self), ObjectIdentifier(KurnSchemaV4.self), ObjectIdentifier(KurnSchemaV5.self)
+            ObjectIdentifier(KurnSchemaV3.self), ObjectIdentifier(KurnSchemaV4.self),
+            ObjectIdentifier(KurnSchemaV5.self), ObjectIdentifier(KurnSchemaV6.self)
         ])
-        #expect(KurnSchemaMigrationPlan.stages.count == 4)
+        #expect(KurnSchemaMigrationPlan.stages.count == 5)
     }
 
     @Test func versionedSchemaModelsMatchTheCentralizedGraph() {
-        let versionedIdentifiers = Set(KurnSchemaV5.models.map { ObjectIdentifier($0) })
+        let versionedIdentifiers = Set(KurnSchemaV6.models.map { ObjectIdentifier($0) })
         let graphIdentifiers = Set(KurnModelGraph.currentModels.map { ObjectIdentifier($0) })
         #expect(versionedIdentifiers == graphIdentifiers)
     }

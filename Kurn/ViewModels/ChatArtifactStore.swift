@@ -31,7 +31,7 @@ struct ChatArtifactStore {
         let existing = try savedDocument(artifactID: artifactID, sessionID: session.id)
         if Self.action(artifact: artifact, saved: existing) == .saved { return existing }
         let scope = snapshot.scope ?? ChatSourceScope(kind: .meetings, selectedIDs: Set([session.meeting?.id].compactMap { $0 }))
-        let origin = Self.origin(artifactID: artifactID, in: session.turns)
+        let origin = Self.origin(artifactID: artifactID, in: snapshot.turns)
         let previousSources = existing.map { ChatArtifactSources(kind: $0.sourceKind, meetingIDs: $0.sourceMeetingIDs, names: $0.sourceNames) }
         let sources = try (origin.sources ?? ChatArtifactSources.capture(scope: scope, context: context)).retaining(previousSources)
         return try MeetingLibrary(context: context, persist: saveChanges).saveDocument(

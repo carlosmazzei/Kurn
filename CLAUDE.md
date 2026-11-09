@@ -69,8 +69,12 @@ is separate from target conformance. NH02 activates native user/assistant/tool-r
 boundary, with ordered blocks, final reconciliation, replay copies and canonical failure
 snapshots. The harness assigns request and logical invocation IDs before execution;
 provider call IDs may recur. Diagnostics correlate session/run/request/invocation IDs.
-Historical unknown timestamps/API/model remain absent. The app still uses its V5
-presentation store; indexed entries and durable canonical history migration remain NH03. Keep fixture-version,
+Historical unknown timestamps/API/model remain absent. NH03 introduces V6 indexed session entries, immutable artifact revisions and recovery-metadata
+containers. V5's entire graph is frozen. Per-session conversion is atomic/idempotent,
+retains the original bytes and preserves unknown historical values. The UI uses the checked
+active-path projection; presentation caches are rebuildable and cannot override canonical reads.
+The compatibility writer records presentation changes as append-only branches. Detailed runtime
+message production/awaited barriers remain NH05; full canonical tool replay remains NH06. Keep fixture-version,
 contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
 
 `ChatSourceScope` persists meeting/tag/folder/library selection,

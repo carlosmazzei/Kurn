@@ -101,6 +101,18 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeWireTests.swift",
           "symbol": "conflictingProviderFinalBecomesOneFailedAudit"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentLateFailureTests.swift",
+          "symbol": "harnessNeverExecutesCallsWhenTheTransportReportsAnErrorAfterFinish"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
+          "symbol": "nextContextCheckAndRunCompletionDoNotInheritThePreviousRequestOrInvocation"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
+          "symbol": "compactionDecisionsAreRunScopedAndOnlySummaryEventsCarryTheSummaryRequest"
         }
       ],
       "note": "Ordered bounded blocks, final replacement and terminal fencing are implemented. Awaitable session barriers and durable event envelopes remain NH05."
@@ -224,8 +236,25 @@
           "symbol": "legacySessionRestoresScopeTraceArtifactsAndRetryIdentity"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentSessionEntryTests.swift",
+          "symbol": "graphKeepsSiblingsAndSelectsAnOlderLeafIndependentlyOfAppendOrder"
+        },
+        {
+          "path": "KurnTests/SchemaV5MigrationTests.swift",
+          "symbol": "realV5DiskUpgradeConversionAndRepeatedReopenPreserveIdentityScopeArtifactsAndBytes"
+        },
+        {
+          "path": "KurnTests/HarnessSessionStoreTests.swift",
+          "symbol": "saveFailureRollsBackOnlyTheAppendGroupAndCanResumeWithoutDuplicates"
+        },
+        {
+          "path": "KurnTests/HarnessSessionStoreTests.swift",
+          "symbol": "salvageAndErasureIncludeLibraryWideAndOrphanedHarnessData"
+        }
+      ],
+      "note": "NH03 supplies indexed checked entries, an independent active leaf, immutable artifact revisions and recovery metadata containers. Frozen V5 upgrades to additive V6; per-session conversion retains original bytes and historical unknowns. Detailed runtime barriers remain NH05; full active-path model replay remains NH06."
     },
     {
       "id": "C10",

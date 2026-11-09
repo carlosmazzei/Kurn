@@ -1,9 +1,9 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store migration next (NH03)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
-boundary and consumes them in the harness. Indexed session storage, durable canonical
-history and migration remain inactive; complete pi compatibility is not claimed.
+boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
+message persistence barriers and tool-history replay remain NH05/NH06; complete pi compatibility is not claimed.
 
 Baseline: `6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed`. The attached reference documents
 describe pi revision `f064465d10d6a8e5c19f687bba1b5b5499b51680`. Their A/C identifiers
@@ -19,9 +19,9 @@ not establish the full target. Kurn characterization cases are separate from pi 
 | Version | Meaning | Current reader/writer |
 | --- | --- | --- |
 | Fixture v1 | Frozen synthetic test inputs and expected legacy output | Test bundles and catalog validator |
-| Contract v1 | Native canonical message/event/entry rules specified here | Provider boundaries write user/assistant content envelopes; session/entry writer remains inactive |
+| Contract v1 | Native canonical message/event/entry rules specified here | Provider boundaries write user/assistant content envelopes; checked entry writer and presentation compatibility projection are active |
 | JSONStorage envelope v1 | Existing checksum envelope around authoritative app values | Existing app persistence; bare legacy JSON remains readable |
-| SwiftData V5 | Current model graph | Existing app store; V6 migration belongs to NH03 |
+| SwiftData V6 (1.5.0) | Current model graph | Frozen V5 (1.4.0), additive schema migration and atomic per-session conversion |
 | pi JSONL v3 | Qualified future interchange boundary | Not a native store schema; NH10 |
 
 `AgentHarness` owns generic messages, streams, execution, compaction and run contracts.
@@ -206,9 +206,10 @@ time. Control characters are escaped in log IDs. Historical identities are never
 
 Stream failures create native terminal audit messages even before the first block. Partial
 raw calls stay in the failure snapshot and get synthetic interrupted results without running
-tools. This audit is in-memory until NH03; existing V5 diagnostic steps remain persistent.
-No V5 schema fields or NH01 fixture bytes change. Durable entry history and app history
-conversion remain NH03; effect receipts and awaited persistence barriers remain NH04/NH05.
+tools. Detailed live protocol audit remains in memory until the NH05 owner writes it;
+NH03 persists the existing presentation/diagnostic projection as canonical entries.
+NH01 fixture bytes stay unchanged. The V5 graph is frozen and V6 adds entry/revision storage;
+effect receipts and awaited persistence barriers remain NH04/NH05.
 
 `AgentMessageReducer` orders interleaved blocks, bounds retained content to 4,096 blocks /
 8 MiB, rejects invalid transitions and replaces all accumulated blocks/usage with the final
@@ -245,3 +246,52 @@ adds native/thinking block counts, invalid/incomplete call counts and a normaliz
 0 if no typed failure was observed). No content, signatures or raw errors enter these records.
 All returned disabled/length-limited calls receive synthetic tool-error audit results and
 `toolRequested`/`toolSkipped`/`toolFinished` diagnostics without invoking confirmation or tools.
+
+
+## NH03 activation boundary
+
+`AgentSessionEntry` checks native payloads, opaque host metadata, explicit UTC entry time,
+IDs and monotonic append ordinals. `AgentEntryGraph` validates every sibling and selects
+an active ancestor path independently of append order. The MainActor SwiftData adapter
+exchanges Sendable snapshots/commits through `AgentSessionStore`; expected revisions reject
+stale writes. Row indices are checked against checksummed payload envelopes.
+
+V5 models are frozen independently of live V6 classes. Conversion is a single atomic,
+resumable session unit, with a completion version, original turns/scope/artifact bytes and
+no model/tool callbacks. Missing historical timestamps, response identity and stop reasons
+stay absent. Only known artifact versions are migrated. Duplicate IDs, malformed content,
+unsupported versions and mismatched indices fail explicitly.
+
+The app compatibility writer records presentation messages/host metadata and selected
+scope/artifact revision references as append-only entries. A changed/deleted suffix selects
+a new branch; retained siblings stay available. Checked loads derive from the active path,
+not `turnsData`/`scopeData`/`artifactsData` caches. This is the sole production presentation
+writer. Detailed live model/tool messages remain in the runtime until the NH05 owner writes
+them behind awaited barriers. Current model replay remains plain history; NH06 adds the
+qualified source-aware canonical projection.
+
+Recovery records persist versioned run/queue/draft/effect metadata only. Their presence
+never resumes work, consumes a prompt or proves an effect committed. NH04 defines validated
+receipt transitions and document commits; NH05/NH08 define session/queue behavior.
+
+The graph is shared by production, tests and whole-store protected backups. Markdown
+salvage includes conversations, retained native messages/artifact revisions, recovery metadata
+and independent library documents, while leaving live bytes unchanged. Library erasure
+removes all three new entities, including orphans, and per-session deletion cascades.
+
+
+## NH02 review corrections — PRs #337/#338
+
+The wire finish reason closes content, not transport validation. Until SSE EOF, explicit
+provider errors (including Responses typed failure events) invalidate the entire response.
+Failures are sticky and cannot be cleared by later usage updates. Malformed/oversized
+trailers fail explicitly; valid cumulative usage remains accepted and late content stays
+fenced. Tools cannot execute from a response invalidated after its finish reason.
+
+Diagnostic request correlation is scoped to the active model attempt. Request/summary
+terminal events retain that attempt's ID, then close it on success, failure or cancellation.
+Context checks, compaction decisions, retry decisions and run terminals outside requests
+carry session/run identity with no stale request ID. Summary requests get their own scope.
+Tool diagnostics explicitly reference their invocation's originating request without changing
+the ambient model scope; ending an invocation cannot leak its request into the next check.
+Existing persisted traces are retained as recorded rather than retrospectively relabeled.

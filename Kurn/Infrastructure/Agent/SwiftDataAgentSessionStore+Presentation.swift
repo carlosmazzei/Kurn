@@ -1,0 +1,170 @@
+import AgentHarness
+import Foundation
+import KurnCore
+import SwiftData
+
+@MainActor
+extension SwiftDataAgentSessionStore {
+    /// One atomic session is the resumable unit. A failed save leaves no conversion marker.
+    func migrate(_ target: ChatSession) throws {
+        if target.canonicalVersion != nil {
+            storageLog("validation_started", session: target)
+            do {
+                _ = try snapshot(target); _ = try Self.projection(target)
+                storageLog("validation_finished", session: target)
+            } catch {
+                storageLog("validation_failed", session: target)
+                throw error
+            }
+            return
+        }
+        storageLog("migration_started", session: target)
+        do {
+            let legacy = try target.harnessSnapshot()
+            try writePresentation(target, turns: legacy.turns, scope: legacy.scope, artifacts: legacy.artifacts)
+            storageLog("migration_finished", session: target)
+        } catch {
+            storageLog("migration_failed", session: target)
+            throw error
+        }
+    }
+
+    func writePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) throws {
+        storageLog("commit_started", session: target)
+        do {
+            try planAndWritePresentation(target, turns: turns, scope: scope, artifacts: artifacts)
+            storageLog("commit_finished", session: target)
+        } catch {
+            storageLog("commit_failed", session: target)
+            throw error
+        }
+    }
+
+    private func planAndWritePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) throws {
+        guard Set(turns.map(\.id)).count == turns.count else { throw AgentSessionStoreError.invalidEntry }
+        _ = try ChatDocumentWorkspace(artifacts: artifacts)
+        let migrating = target.canonicalVersion == nil
+        if migrating, !target.harnessEntries.isEmpty || !target.harnessRevisions.isEmpty || !target.harnessRecords.isEmpty {
+            throw AgentSessionStoreError.invalidGraph
+        }
+        let existing = migrating ? [] : try snapshot(target).entries
+        let path = try AgentEntryGraph(sessionID: target.id.uuidString, entries: existing, leafID: migrating ? nil : target.canonicalLeafID).activePath
+        let messages = path.filter { if case .message = $0.payload { return true }; return false }
+        let proposed = try turns.map { (try HarnessPresentationCodec.message($0), try HarnessPresentationCodec.json(HarnessTurnMetadata($0))) }
+        var prefix = 0
+        for (old, new) in zip(messages, proposed) {
+            guard old.payload == .message(new.0), old.metadata == new.1 else { break }
+            prefix += 1
+        }
+        let revisionRows = try planRevisions(target, artifacts: artifacts)
+        let state = HarnessPresentationState(scope: scope, artifactRevisionIDs: artifacts.map { Self.revisionID(session: target, artifact: $0) })
+        let stateJSON = try HarnessPresentationCodec.json(state)
+        if !migrating, prefix == messages.count, prefix == proposed.count,
+           path.last?.payload == .custom(type: HarnessPresentationState.type, data: stateJSON) { return }
+        var parent = prefix == messages.count ? path.last?.id : prefix > 0 ? messages[prefix - 1].id : nil
+        var additions: [AgentSessionEntry] = []
+        for index in prefix..<proposed.count {
+            let id = migrating ? turns[index].id.uuidString : UUID().uuidString
+            let entry = try AgentSessionEntry(sessionID: target.id.uuidString, id: id, parentID: parent,
+                ordinal: existing.count + additions.count + 1, createdAt: AgentSessionEntry.time(),
+                payload: .message(proposed[index].0), metadata: proposed[index].1)
+            additions.append(entry); parent = id
+        }
+        let stateEntry = try AgentSessionEntry(sessionID: target.id.uuidString, id: UUID().uuidString, parentID: parent,
+            ordinal: existing.count + additions.count + 1, createdAt: AgentSessionEntry.time(),
+            payload: .custom(type: HarnessPresentationState.type, data: stateJSON))
+        additions.append(stateEntry)
+        _ = try AgentEntryGraph(sessionID: target.id.uuidString, entries: existing + additions, leafID: stateEntry.id)
+        let rows = try additions.map { entry in
+            HarnessSessionEntry(session: target, entryID: entry.id, parentEntryID: entry.parentID,
+                                ordinal: entry.ordinal, kindRaw: entry.kind, createdAtUTC: entry.createdAt, payloadData: try HarnessPresentationCodec.encode(entry))
+        }
+        let cache = try PresentationCache(turns: turns, scope: scope, artifacts: artifacts)
+        try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache)
+    }
+
+    private func planRevisions(_ target: ChatSession, artifacts: [ChatDocumentArtifact]) throws -> [HarnessArtifactRevision] {
+        var rows: [HarnessArtifactRevision] = []
+        for artifact in artifacts {
+            let id = Self.revisionID(session: target, artifact: artifact)
+            if let existing = target.harnessRevisions.first(where: { $0.id == id }) {
+                let saved = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: existing.payloadData)
+                guard saved == artifact else { throw AgentSessionStoreError.conflict }
+            } else {
+                rows.append(HarnessArtifactRevision(session: target, artifactID: artifact.id, version: artifact.version,
+                                                    payloadData: try HarnessPresentationCodec.encode(artifact)))
+            }
+        }
+        return rows
+    }
+
+    private func applyPresentation(_ target: ChatSession, rows: [HarnessSessionEntry], revisions: [HarnessArtifactRevision],
+                                   leaf: String, cache: PresentationCache) throws {
+        let old = PresentationCheckpoint(target)
+        do {
+            if target.canonicalVersion == nil {
+                target.legacyTurnsData = target.turnsData; target.legacyScopeData = target.scopeData; target.legacyArtifactsData = target.artifactsData
+            }
+            for row in rows { insert(row, into: target) }
+            for row in revisions {
+                row.session = target
+                context.insert(row)
+                if !target.harnessRevisions.contains(where: { $0.id == row.id }) { target.harnessRevisions.append(row) }
+            }
+            if target.canonicalVersion != nil { target.updatedAt = Date() }
+            target.turnsData = cache.turns; target.scopeData = cache.scope; target.artifactsData = cache.artifacts
+            target.canonicalVersion = 1; target.canonicalLeafID = leaf; target.canonicalOrdinal += rows.count; target.canonicalRevision += 1
+            try save(context)
+        } catch {
+            let entryIDs = Set(rows.map(\.id)); let revisionIDs = Set(revisions.map(\.id))
+            target.harnessEntries.removeAll { entryIDs.contains($0.id) }
+            target.harnessRevisions.removeAll { revisionIDs.contains($0.id) }
+            for row in rows { context.delete(row) }
+            for row in revisions { context.delete(row) }
+            old.restore(target)
+            throw error
+        }
+    }
+
+    private func storageLog(_ stage: String, session: ChatSession) {
+        // The persisted reliability sink is independent of console verbosity.
+        let outcome: ReliabilityEvent.Outcome = stage.hasSuffix("_failed") ? .failed : stage.hasSuffix("_started") ? .started : .succeeded
+        ReliabilityLog.record(ReliabilityEvent(operationID: OperationID(session.id.uuidString), operation: "harness_store", stage: stage, outcome: outcome, code: "canonical_v1"))
+        // UUID/counts only. Raw decode errors, questions and source/document bodies stay private.
+        AppLog.persistence.atInfo.info("harness.store stage=\(stage, privacy: .public) session=\(session.id, privacy: .public) entries=\(session.canonicalOrdinal, privacy: .public) revision=\(session.canonicalRevision, privacy: .public)")
+    }
+}
+
+private struct PresentationCache {
+    let turns: Data
+    let scope: Data?
+    let artifacts: Data
+    init(turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) throws {
+        self.turns = try HarnessPresentationCodec.encode(turns)
+        self.scope = try scope.map { try HarnessPresentationCodec.encode($0) }
+        self.artifacts = try HarnessPresentationCodec.encode(artifacts)
+    }
+}
+
+@MainActor
+private struct PresentationCheckpoint {
+    let cache: (Data, Data?, Data?)
+    let legacy: (Data?, Data?, Data?)
+    let version: Int?
+    let leaf: String?
+    let ordinal: Int
+    let revision: Int
+    let updatedAt: Date
+    init(_ session: ChatSession) {
+        updatedAt = session.updatedAt
+        cache = (session.turnsData, session.scopeData, session.artifactsData)
+        legacy = (session.legacyTurnsData, session.legacyScopeData, session.legacyArtifactsData)
+        version = session.canonicalVersion; leaf = session.canonicalLeafID; ordinal = session.canonicalOrdinal; revision = session.canonicalRevision
+    }
+    func restore(_ session: ChatSession) {
+        session.updatedAt = updatedAt
+        (session.turnsData, session.scopeData, session.artifactsData) = cache
+        (session.legacyTurnsData, session.legacyScopeData, session.legacyArtifactsData) = legacy
+        session.canonicalVersion = version; session.canonicalLeafID = leaf; session.canonicalOrdinal = ordinal; session.canonicalRevision = revision
+    }
+}
