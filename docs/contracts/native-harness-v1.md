@@ -339,8 +339,9 @@ A lease spans the save and workspace publication, including actor suspension. A 
 restores only staged entries/revisions/receipt. A cancellation arriving after a successful
 save cannot erase the receipt or change the known committed result into a tool failure.
 
-The new session is still lazy: its accepted user presentation is saved before the first
-document effect if necessary. Other accepted input/message/result barriers, one owner per
+New sessions are still lazy. Before the first document effect of each task, the accepted
+user presentation is saved for both new and existing conversations. Preparation runs only
+once per task, so a later mutation cannot rewind earlier committed artifacts. Other accepted input/message/result barriers, one owner per
 session, crash recovery scheduling and settle semantics remain NH05. Native tool messages
 are still in-memory until that owner persists them; reopen does not automatically execute
 anything. Canonical provider replay and persistent compaction remain NH06. Local durable

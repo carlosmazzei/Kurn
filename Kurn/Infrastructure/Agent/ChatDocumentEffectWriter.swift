@@ -16,7 +16,6 @@ struct ChatDocumentEffectWriter {
     func commit(_ name: String, arguments: JSONValue, execution: AgentToolExecutionContext) throws
         -> (output: AgentToolOutput, artifacts: [ChatDocumentArtifact]) {
         guard execution.sessionID == sessionID, execution.invocation.toolName == name else { throw AgentSessionStoreError.conflict }
-        if (try? store.session(sessionID)) == nil { try prepareSession() }
         let target = try store.session(sessionID)
         _ = try store.snapshot(target)
         let snapshot = try target.harnessSnapshot()
@@ -69,6 +68,7 @@ actor ChatDocumentEffectExecutor {
     private let writer: ChatDocumentEffectWriter
     private let workspace: ChatDocumentWorkspace
     private var busy = false
+    private var prepared = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
     init(writer: ChatDocumentEffectWriter, workspace: ChatDocumentWorkspace) { self.writer = writer; self.workspace = workspace }
@@ -81,6 +81,10 @@ actor ChatDocumentEffectExecutor {
             else { waiting.removeFirst().resume() }
         }
         try Task.checkCancellation()
+        if !prepared {
+            try await writer.prepareSession()
+            prepared = true
+        }
         let result = try await writer.commit(name, arguments: arguments, execution: context)
         // Do not check cancellation after a known durable commit: publish and acknowledge it.
         try await workspace.restoreCommitted(result.artifacts)

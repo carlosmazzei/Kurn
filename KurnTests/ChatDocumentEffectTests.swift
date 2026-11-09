@@ -128,4 +128,23 @@ struct ChatDocumentEffectTests {
         #expect(try session.harnessSnapshot().artifacts == published)
         #expect(session.harnessRecords.count == 1)
     }
+
+    @Test func firstMutationPersistsAcceptedQuestionInExistingConversationOnlyOnce() async throws {
+        let (store, session) = try setup()
+        let old = PersistedChatTurn(id: UUID(), role: .assistant, text: "Earlier answer", usage: nil, costUSD: nil, elapsedSeconds: nil)
+        let accepted = PersistedChatTurn(id: UUID(), role: .user, text: "Create two documents", usage: nil, costUSD: nil, elapsedSeconds: nil)
+        try store.writePresentation(session, turns: [old], scope: nil, artifacts: [])
+        let writer = ChatDocumentEffectWriter(store: store, sessionID: session.id.uuidString, prepareSession: {
+            // Repeating this preparation after the first mutation would rewind its artifacts.
+            try store.writePresentation(session, turns: [old, accepted], scope: nil, artifacts: [])
+        }, origin: ChatArtifactOrigin(question: accepted.text, modelIdentifier: "test"))
+        let workspace = ChatDocumentWorkspace()
+        let executor = ChatDocumentEffectExecutor(writer: writer, workspace: workspace)
+        _ = try await executor.execute("create_document", arguments: create, context: execution(session))
+        _ = try await executor.execute("create_document", arguments: create, context: execution(session))
+        let restored = try session.harnessSnapshot()
+        #expect(restored.turns.map(\.id) == [old.id, accepted.id])
+        #expect(restored.artifacts.count == 2 && restored.turns.last?.artifacts?.count == 2)
+        #expect(restored.turns.first?.artifacts == nil)
+    }
 }
