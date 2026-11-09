@@ -20,7 +20,7 @@ extension LLMHTTP {
         } catch let error as AgentWireError {
             switch error {
             case .remote(let message): throw AppError.apiError(statusCode: 0, message: message)
-            case .invalidResponse:
+            case .invalidResponse, .bufferLimit, .deferred:
                 throw AppError.decodingError(NSLocalizedString("error.provider_response_invalid", comment: "Invalid provider response"))
             case .emptyResponse: throw AppError.decodingError("empty agent response")
             case .incompleteToolCall: throw AppError.decodingError("incomplete agent tool call")

@@ -70,7 +70,8 @@ actor ResultScriptedAgentModel: AgentModel {
                                                           usage: AgentUsage(inputTokens: 10, outputTokens: 2)),
                                        AgentTurnResponse(text: "Answer")])
         let tool = AgentTool(spec: agentTool().spec) { _ in AgentToolOutput(content: tokens(700), summary: "Read") }
-        let events = try await agentEvents(NativeHarness(model: model, contextPolicy: policy(window: 1_000)),
+        // 718 anchored input + 512 output fits 1,500; the pessimistic full-history estimate does not.
+        let events = try await agentEvents(NativeHarness(model: model, contextPolicy: policy(window: 1_500)),
                                            history: [.user(tokens(400))], tools: [tool])
         #expect(!events.contains { if case .contextCompacted = $0 { return true }; return false })
         #expect(await model.requests.count == 2)
@@ -151,7 +152,9 @@ actor ResultScriptedAgentModel: AgentModel {
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == reason)
         #expect(outcome.finalText == "Partial answer")
-        #expect(outcome.messages.last == .assistant(text: "Partial answer", toolCalls: []))
+        guard case .content(let wrapUp) = outcome.messages[outcome.messages.count - 2] else { Issue.record("Missing wrap-up audit"); return }
+        #expect(wrapUp.text == "Partial answer" && wrapUp.toolCalls.map(\.id) == ["3"])
+        guard case .toolResult("3", "lookup", _, true) = outcome.messages.last else { Issue.record("Missing blocked wrap-up result"); return }
         let requests = await model.requests
         #expect(requests.count == 2)
         #expect(requests[1].systemPrompt == "Be helpful\n\n" + NativeHarness.wrapUpInstruction)
@@ -185,7 +188,8 @@ actor ResultScriptedAgentModel: AgentModel {
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == .turnLimit)
         #expect(outcome.finalText.isEmpty)
-        #expect(outcome.messages.last == .toolResult(callID: "1", toolName: "lookup", content: "{}", isError: false))
+        #expect(outcome.messages.contains(.toolResult(callID: "1", toolName: "lookup", content: "{}", isError: false)))
+        guard case .toolResult("2", "lookup", _, true) = outcome.messages.last else { Issue.record("Missing blocked result"); return }
         #expect(await model.requests.count == 2)
     }
 
@@ -197,6 +201,7 @@ actor ResultScriptedAgentModel: AgentModel {
             tools: [agentTool()]))
         #expect(limited.stopReason == .outputLimit)
         #expect(limited.finalText == "Partial ans")
-        #expect(limited.messages.last == .assistant(text: "Partial ans", toolCalls: []))
+        guard case .content(let final) = limited.messages.last else { Issue.record("Missing interrupted wrap-up audit"); return }
+        #expect(final.text == "Partial ans" && final.stopReason == .maxTokens && final.toolCalls.isEmpty)
     }
 }

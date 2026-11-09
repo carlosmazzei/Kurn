@@ -137,7 +137,7 @@ struct MeetingChatHarnessFailureTests {
         #expect(vm.pastSessions().first?.turns.last?.steps?.last?.stopReason == .outputLimit)
     }
 
-    @Test func failedDocumentMutationAndProviderFailureDoNotCreateAnEmptySavedChat() async throws {
+    @Test func failedDocumentMutationAndProviderFailurePreserveTheDiagnosticTrace() async throws {
         let context = ModelContext(TestModelContainer.make())
         let meeting = MeetingFixtures.transcribed("Planning", in: context)
         let model = ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("create_document", arguments: .object([
@@ -149,7 +149,10 @@ struct MeetingChatHarnessFailureTests {
         await waitUntilDone(vm)
         #expect(vm.error != nil)
         #expect(vm.artifacts.isEmpty)
-        #expect(vm.pastSessions().isEmpty)
+        let session = try #require(vm.pastSessions().first)
+        #expect(session.turns.map(\.role) == [.user])
+        #expect(session.turns.first?.steps?.contains { $0.contextResolution != nil } == true)
+        #expect(session.turns.first?.steps?.contains { $0.diagnostic?.kind == .runFailed } == true)
         #expect(vm.retryableQuestion == "Question")
     }
 }

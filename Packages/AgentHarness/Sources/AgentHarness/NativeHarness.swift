@@ -2,12 +2,13 @@ import Foundation
 
 /// Sequential provider-neutral agent loop. Tool failures are conversation data.
 public struct NativeHarness: Sendable {
-    private let model: any AgentModel
-    private let limits: AgentLimits
-    private let costEstimator: (@Sendable (AgentUsage) -> Double)?
-    private let compactor: AgentContextCompactor
+    let model: any AgentModel
+    let limits: AgentLimits
+    let costEstimator: (@Sendable (AgentUsage) -> Double)?
+    let compactor: AgentContextCompactor
     private let confirm: @Sendable (AgentToolCall) async -> Bool
-    private let isContextOverflow: @Sendable (Error) -> Bool
+    let isContextOverflow: @Sendable (Error) -> Bool
+    private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
     public static let wrapUpInstruction = """
@@ -20,26 +21,37 @@ public struct NativeHarness: Sendable {
     public init(model: any AgentModel, limits: AgentLimits = AgentLimits(),
                 costEstimator: (@Sendable (AgentUsage) -> Double)? = nil,
                 contextPolicy: AgentContextPolicy = AgentContextPolicy(contextWindow: 128_000),
-                tokenEstimator: @escaping @Sendable (String) -> Int = { ($0.count + 3) / 4 },
-                isContextOverflow: @escaping @Sendable (Error) -> Bool = { _ in false },
-                confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false }) {
+                tokenEstimator: @escaping @Sendable (String) -> Int = { TokenEstimate.tokens(in: $0) },
+                isContextOverflow: @escaping @Sendable (Error) -> Bool = {
+                    ($0 as? any AgentContextOverflowError)?.isContextOverflow == true
+                },
+                confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false },
+                diagnosticSink: @escaping @Sendable (AgentDiagnostic) -> Void = { _ in }) {
         self.model = model
         self.limits = limits
         self.costEstimator = costEstimator
         self.compactor = AgentContextCompactor(policy: contextPolicy, tokenEstimator: tokenEstimator)
         self.isContextOverflow = isContextOverflow
         self.confirm = confirm
+        self.diagnosticSink = diagnosticSink
     }
 
+    /// Fit the desired output capacity to the actual context before every request, as pi does.
     public func run(systemPrompt: String, history: [AgentMessage], prompt: String,
-                    tools: [AgentTool], maxOutputTokens: Int) -> AsyncThrowingStream<AgentEvent, Error> {
+                    tools: [AgentTool], maxOutputTokens: Int? = nil,
+                    contextResolution: AgentContextResolution? = nil) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
+            let trace = AgentTraceEmitter(events: continuation, resolutionID: contextResolution?.id, sink: diagnosticSink)
             let task = Task {
                 do {
+                    continuation.yield(.runStarted)
+                    if let contextResolution { continuation.yield(.contextResolved(contextResolution)) }
+                    trace.record(.runStarted, metrics: limits.diagnosticMetrics)
                     try await drive(systemPrompt: systemPrompt, history: history, prompt: prompt,
-                                    tools: tools, maxOutputTokens: maxOutputTokens, events: continuation)
+                                    tools: tools, maxOutputTokens: maxOutputTokens, events: continuation, trace: trace)
                     continuation.finish()
                 } catch {
+                    trace.record(error is CancellationError ? .runCancelled : .runFailed)
                     continuation.finish(throwing: error)
                 }
             }
@@ -47,42 +59,12 @@ public struct NativeHarness: Sendable {
         }
     }
 
-    private struct RunState {
-        var history: [AgentMessage]
-        var context: [AgentMessage]
-        var usage = AgentUsage()
-        var cost = 0.0
-        var toolCalls = 0
-        var turns = 0
-        var finalText = ""
-        /// Tokens the provider reported for the latest turn (its input plus its reply) and the
-        /// context length once that reply was appended. Later messages are estimated on top of it;
-        /// a compaction clears it, since the reported size no longer describes the context.
-        var usageAnchor: (tokens: Int, contextCount: Int)?
-    }
-
-    private struct TurnSettings {
+    struct TurnSettings {
         let systemPrompt: String
         let tools: [AgentToolSpec]
-        let maxOutputTokens: Int
+        var outputBudget: AgentOutputBudget
+        var maxOutputTokens: Int { outputBudget.tokens }
         var allowsToolCalls = true
-    }
-
-    /// Set from the synchronous stream callback; read after the turn to decide whether a retry is safe.
-    private final class StreamFlag: @unchecked Sendable {
-        private let lock = NSLock()
-        private var streamed = false
-        var value: Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return streamed
-        }
-
-        func set() {
-            lock.lock()
-            streamed = true
-            lock.unlock()
-        }
     }
 
     private struct NormalizedToolCall {
@@ -94,31 +76,43 @@ public struct NativeHarness: Sendable {
             var call = original
             call.arguments = arguments ?? .null
             self.call = call
-            hasValidArguments = arguments != nil
+            hasValidArguments = original.hasValidArguments
         }
     }
 
     private func drive(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
-                       maxOutputTokens: Int, events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws {
+                       maxOutputTokens: Int?, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
+                       trace: AgentTraceEmitter) async throws {
         let messages = history + [.user(prompt)]
-        var state = RunState(history: messages, context: messages)
+        var state = AgentRunState(history: messages, context: messages)
+        state.allowedTurns = limits.maxTurns
+        state.allowedToolCalls = limits.maxToolCalls
         let specs = tools.map(\.spec)
         var reason = AgentRunStopReason.turnLimit
-        events.yield(.runStarted)
-        let settings = TurnSettings(systemPrompt: systemPrompt, tools: specs, maxOutputTokens: maxOutputTokens)
-        for _ in 0..<limits.maxTurns {
+        var settings = TurnSettings(systemPrompt: systemPrompt, tools: specs,
+                                    outputBudget: AgentOutputBudget(requested: maxOutputTokens, policy: compactor.policy))
+        while true {
             try Task.checkCancellation()
             if costLimitReached(state) { reason = .costLimit; break }
-            guard let response = try await modelTurn(settings, state: &state, events: events) else {
+            if state.turns >= state.allowedTurns,
+               !state.extendBudget(.turnLimit, limits: limits, trace: trace) { reason = .turnLimit; break }
+            guard let response = try await modelTurn(&settings, state: &state, events: events, trace: trace) else {
                 reason = .costLimit
                 break
             }
             state.finalText = response.text
             let calls = response.stopReason == .maxTokens ? [] : response.toolCalls.map(NormalizedToolCall.init)
-            let assistant = AgentMessage.assistant(text: response.text, toolCalls: calls.map(\.call),
-                                                   providerMetadata: response.providerMetadata)
-            state.history.append(assistant)
-            state.context.append(assistant)
+            if !state.responseAlreadyAudited {
+                let assistant = try response.auditMessage()
+                state.history.append(assistant)
+                state.context.append(assistant)
+                AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: true)
+            }
+            if response.stopReason == .deferred { throw AgentWireError.deferred }
+            if response.stopReason == .aborted { throw CancellationError() }
+            if response.stopReason == .error || (response.stopReason != .maxTokens && !response.blockedToolCalls.isEmpty) {
+                throw AgentWireError.invalidResponse
+            }
             if response.stopReason == .maxTokens {
                 reason = .outputLimit
                 break
@@ -127,16 +121,20 @@ public struct NativeHarness: Sendable {
                 reason = costLimitReached(state) ? .costLimit : .completed
                 break
             }
-            let stop = try await execute(calls, tools: tools, state: &state, events: events)
+            let stop = try await execute(calls, tools: tools, state: &state, events: events, trace: trace)
             if let stop { reason = stop; break }
         }
+        if reason != .completed { recordLimit(reason, state: &state, trace: trace) }
         try Task.checkCancellation()
         if limits.wrapUpOnLimit, reason == .turnLimit || reason == .toolCallLimit,
            case .toolResult? = state.context.last, !costLimitReached(state),
-           try await wrapUp(settings, state: &state, events: events) == .maxTokens {
+           try await wrapUp(settings, state: &state, events: events, trace: trace) == .maxTokens {
             reason = .outputLimit
         }
         try Task.checkCancellation()
+        trace.record(.runFinished, metrics: [.toolCalls: state.toolCalls, .inputTokens: state.usage.inputTokens,
+                                            .outputTokens: state.usage.outputTokens,
+                                            .blockedCalls: state.requestedCalls - state.toolCalls], reason: reason)
         events.yield(.runFinished(AgentRunOutcome(messages: state.history, finalText: state.finalText,
                                                  stopReason: reason, totalUsage: state.usage)))
     }
@@ -145,159 +143,71 @@ public struct NativeHarness: Sendable {
     /// Tools stay declared (some vendors reject tool history without them) but tool choice is "none";
     /// calls a vendor returns anyway are dropped. A reply without text is left as no answer, so the
     /// limit stays visible with an empty answer. Returns the wrap-up turn's stop reason.
-    private func wrapUp(_ settings: TurnSettings, state: inout RunState,
-                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentModelStopReason? {
-        let wrapUp = TurnSettings(systemPrompt: settings.systemPrompt + "\n\n" + Self.wrapUpInstruction,
-                                  tools: settings.tools, maxOutputTokens: settings.maxOutputTokens, allowsToolCalls: false)
-        guard let response = try await modelTurn(wrapUp, state: &state, events: events) else { return nil }
+    private func wrapUp(_ settings: TurnSettings, state: inout AgentRunState,
+                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
+                        trace: AgentTraceEmitter) async throws -> AgentModelStopReason? {
+        trace.record(.wrapUpStarted)
+        var wrapUp = TurnSettings(systemPrompt: settings.systemPrompt + "\n\n" + Self.wrapUpInstruction,
+                                  tools: settings.tools, outputBudget: settings.outputBudget, allowsToolCalls: false)
+        guard let response = try await modelTurn(&wrapUp, state: &state, events: events, trace: trace) else { return nil }
         try Task.checkCancellation()
         state.finalText = response.text
-        if !response.text.isEmpty {
-            let assistant = AgentMessage.assistant(text: response.text, toolCalls: [])
+        if !state.responseAlreadyAudited, !response.text.isEmpty || !response.toolCalls.isEmpty || !response.blockedToolCalls.isEmpty {
+            let blocked = AgentTurnResponse(text: response.text, toolCalls: response.toolCalls + response.blockedToolCalls,
+                usage: response.usage, stopReason: response.stopReason, providerMetadata: response.providerMetadata,
+                message: response.message, blocksToolExecution: true)
+            let assistant = try blocked.auditMessage()
             state.history.append(assistant)
             state.context.append(assistant)
+            AgentResponseAudit.appendBlocked(blocked, state: &state, events: events, trace: trace, toContext: true,
+                content: "Tool not executed: tool calling was disabled for this request.")
         }
+        trace.record(.wrapUpFinished, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
         return response.stopReason
     }
 
-    /// Compacts when the context outgrows the window, streams one turn and anchors the context size
-    /// to the usage it reports. A context-overflow rejection compacts and retries once, provided
-    /// nothing was streamed yet and compaction actually shrank the context. Returns nil when a
-    /// compaction summary exhausted the cost limit before the turn could be sent.
-    private func modelTurn(_ settings: TurnSettings, state: inout RunState,
-                           events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentTurnResponse? {
-        events.yield(.turnStarted(index: state.turns))
-        state.turns += 1
-        try await compact(settings, state: &state, events: events)
-        var retried = false
-        while true {
-            if costLimitReached(state) { return nil }
-            let streamed = StreamFlag()
-            do {
-                let response = try await model.streamTurn(
-                    AgentTurnRequest(systemPrompt: settings.systemPrompt, messages: state.context,
-                                     tools: settings.tools, maxOutputTokens: settings.maxOutputTokens,
-                                     allowsToolCalls: settings.allowsToolCalls)
-                ) { event in
-                    if case .textDelta(let text) = event {
-                        streamed.set()
-                        events.yield(.textDelta(text))
-                    }
-                }
-                try Task.checkCancellation()
-                record(response.usage, state: &state, events: events)
-                if let usage = response.usage, usage.inputTokens > 0 {
-                    // The caller appends this reply, so the anchor covers one more message.
-                    state.usageAnchor = (usage.inputTokens + usage.outputTokens, state.context.count + 1)
-                }
-                return response
-            } catch {
-                try Task.checkCancellation()
-                guard !retried, !streamed.value, isContextOverflow(error) else { throw error }
-                retried = true
-                let previous = state.context
-                try await compact(settings, state: &state, events: events, force: true)
-                guard state.context != previous else { throw error }
-            }
-        }
-    }
-
-    private func costLimitReached(_ state: RunState) -> Bool {
-        limits.maxCostUSD.map { state.cost >= $0 } ?? false
-    }
-
-    private func record(_ usage: AgentUsage?, state: inout RunState,
-                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation) {
-        guard let usage else { return }
-        state.usage = state.usage.adding(usage)
-        state.cost += max(0, costEstimator?(usage) ?? 0)
-        events.yield(.usage(usage))
-    }
-
-    /// The context size of the next request: the provider-reported size of the latest turn plus
-    /// estimates of the messages appended since, or a full estimate before any usage is known.
-    private func contextTokens(_ settings: TurnSettings, state: RunState) -> Int {
-        if let anchor = state.usageAnchor, anchor.contextCount <= state.context.count {
-            return anchor.tokens + compactor.estimateTokens(of: state.context[anchor.contextCount...])
-        }
-        return compactor.estimateTokens(systemPrompt: settings.systemPrompt, messages: state.context,
-                                        tools: settings.tools)
-    }
-
-    /// Compacts once the context exceeds the window minus the reserve, or unconditionally (`force`)
-    /// after a provider rejected the request as too long. Older messages are replaced by a summary
-    /// and the newest `keepRecentTokens` are kept. A summary cut off by the output limit is not
-    /// used; when compaction was forced, or the summary request itself overflows, the older part
-    /// is replaced by a fixed omission note instead, so recovery never stalls.
-    private func compact(_ settings: TurnSettings, state: inout RunState,
+    private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout AgentRunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
-                         force: Bool = false) async throws {
-        let before = contextTokens(settings, state: state)
-        guard force || compactor.policy.needsCompaction(before),
-              let plan = compactor.plan(for: state.context) else { return }
-        let replacement: [AgentMessage]?
-        do {
-            let history = try await summarize(compactor.historySummaryRequest(for: plan), state: &state, events: events)
-            let prefix = try await summarize(compactor.turnPrefixSummaryRequest(for: plan), state: &state, events: events)
-            if history != .unusable, prefix != .unusable {
-                replacement = compactor.applying(plan, historySummary: history.text, turnPrefixSummary: prefix.text)
-            } else {
-                replacement = force ? compactor.omitting(plan) : nil
-            }
-        } catch {
-            try Task.checkCancellation()
-            guard isContextOverflow(error) else { throw error }
-            replacement = compactor.omitting(plan)
-        }
-        guard let compacted = replacement, compacted != state.context else { return }
-        state.context = compacted
-        state.usageAnchor = nil
-        let after = contextTokens(settings, state: state)
-        events.yield(.contextCompacted(beforeTokens: before, afterTokens: after))
-    }
-
-    private enum SummaryResult: Equatable {
-        case skipped, unusable, text(String)
-
-        var text: String? {
-            if case .text(let value) = self { return value }
-            return nil
-        }
-    }
-
-    private func summarize(_ request: AgentTurnRequest?, state: inout RunState,
-                           events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> SummaryResult {
-        guard let request else { return .skipped }
-        let response = try await model.streamTurn(request) { _ in }
-        try Task.checkCancellation()
-        record(response.usage, state: &state, events: events)
-        let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return response.stopReason == .maxTokens || text.isEmpty ? .unusable : .text(text)
-    }
-
-    private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout RunState,
-                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws -> AgentRunStopReason? {
+                         trace: AgentTraceEmitter) async throws -> AgentRunStopReason? {
         var stop: AgentRunStopReason?
         for normalized in calls {
             try Task.checkCancellation()
             let call = normalized.call
-            if costLimitReached(state) { stop = .costLimit }
-            else if state.toolCalls >= limits.maxToolCalls { stop = .toolCallLimit }
+            state.requestedCalls += 1
+            trace.record(.toolRequested, metrics: [.callOrdinal: state.requestedCalls, .toolCalls: state.toolCalls])
+            if stop == nil {
+                if costLimitReached(state) { stop = .costLimit }
+                else if state.toolCalls >= state.allowedToolCalls,
+                        !state.extendBudget(.toolCallLimit, limits: limits, trace: trace) { stop = .toolCallLimit }
+            }
             events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
             let output: AgentToolOutput
             let isError: Bool
             if let stop {
+                recordLimit(stop, state: &state, trace: trace)
+                trace.record(.toolSkipped, metrics: [.callOrdinal: state.requestedCalls], reason: stop)
                 output = AgentToolOutput(content: "Tool not executed: \(stop.rawValue) reached.",
                                          summary: "Tool not executed: \(stop.rawValue) reached.")
                 isError = true
             } else {
                 state.toolCalls += 1
                 (output, isError) = try await executeOne(normalized, tools: tools)
+                if limits.continuation != nil { state.recordProgress(call: call, output: output, isError: isError) }
             }
             let result = AgentMessage.toolResult(callID: call.id, toolName: call.name,
                                                  content: output.content, isError: isError)
             state.history.append(result)
             state.context.append(result)
+            var metrics = output.metrics
+            metrics[.callOrdinal] = state.requestedCalls
+            metrics[.isError] = isError ? 1 : 0
+            trace.record(.toolFinished, metrics: metrics)
+            if (metrics[.omittedScalars] ?? 0) > 0 || (metrics[.omittedItems] ?? 0) > 0 {
+                trace.record(.payloadClipped, metrics: metrics)
+            }
+            if (metrics[.deferredScalars] ?? 0) > 0 || (metrics[.deferredItems] ?? 0) > 0 {
+                trace.record(.payloadPaged, metrics: metrics)
+            }
             events.yield(.toolFinished(callID: call.id, name: call.name, summary: output.summary, isError: isError))
         }
         return stop

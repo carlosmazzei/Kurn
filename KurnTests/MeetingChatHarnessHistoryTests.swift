@@ -7,6 +7,32 @@ import Testing
 
 @MainActor
 struct MeetingChatHarnessHistoryTests {
+    @Test func applicationSuppliesTheMeetingCompactionProfile() async throws {
+        let context = ModelContext(TestModelContainer.make())
+        _ = MeetingFixtures.transcribed("Meeting", in: context)
+        let suite = "MeetingChatHarnessHistoryTests.profile.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let windows = ModelContextWindowStore(defaults: defaults)
+        windows.record(["profile-test": 16_000], provider: .openAI)
+        let service = HarnessChatService(contextWindows: windows)
+        let model = ChatAgentModel([AgentTurnResponse(text: "Summary"), AgentTurnResponse(text: "Answer")])
+        let history = [ChatMessage(role: .user, content: String(repeating: "中", count: 9_000)),
+                       ChatMessage(role: .assistant, content: "Earlier answer")]
+        let events = try await service.events(model: model, provider: .openAI, modelIdentifier: "profile-test",
+            context: context, scope: ChatSourceScope(kind: .library), workspace: ChatDocumentWorkspace(),
+            history: history, question: String(repeating: "続", count: 4_500))
+        for try await _ in events { }
+        let requests = await model.requests
+        #expect(requests.count == 2)
+        let summary = try #require(requests.first)
+        #expect(summary.systemPrompt == ChatCompactionPrompts.profile.system)
+        #expect(summary.systemPrompt.contains("meeting sources"))
+        #expect(summary.tools.isEmpty)
+        guard case .user(let content)? = summary.messages.first else { Issue.record("Missing summary input"); return }
+        #expect(content.hasSuffix(ChatCompactionPrompts.profile.historySummary))
+    }
+
     @Test func legacyCitationExcerptsAreNotReplayedIntoNarrowedHarnessScope() async throws {
         let context = ModelContext(TestModelContainer.make())
         let first = MeetingFixtures.transcribed("Meeting A", in: context)

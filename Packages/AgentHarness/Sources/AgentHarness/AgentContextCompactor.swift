@@ -9,16 +9,21 @@ public struct AgentContextPolicy: Sendable, Equatable {
 
     /// Total tokens the model accepts per request.
     public let contextWindow: Int
-    /// Tokens left free for the reply and estimate error; also sizes the summary requests.
+    /// Reserve used by the compaction trigger; request output allowances are calculated separately.
     public let reserveTokens: Int
     /// Approximate size of the newest messages a compaction keeps verbatim.
     public let keepRecentTokens: Int
+    public let summaryPrompts: AgentCompactionPrompts
+    public let maxOutputTokens: Int?
 
     public init(contextWindow: Int, reserveTokens: Int = defaultReserveTokens,
-                keepRecentTokens: Int = defaultKeepRecentTokens) {
+                keepRecentTokens: Int = defaultKeepRecentTokens, summaryPrompts: AgentCompactionPrompts = .standard,
+                maxOutputTokens: Int? = nil) {
         self.contextWindow = max(1, contextWindow)
         self.reserveTokens = max(0, reserveTokens)
         self.keepRecentTokens = max(1, keepRecentTokens)
+        self.summaryPrompts = summaryPrompts
+        self.maxOutputTokens = maxOutputTokens.flatMap { $0 > 0 ? $0 : nil }
     }
 
     /// Context size above which a request is compacted: the window minus the reserve, but never
@@ -29,11 +34,11 @@ public struct AgentContextPolicy: Sendable, Equatable {
     /// window always frees room.
     public var effectiveKeepRecentTokens: Int { max(1, min(keepRecentTokens, compactionThreshold / 2)) }
 
-    /// Output allowance of the history summary (80% of the reserve, as in pi) and of a split turn's
-    /// prefix summary (50%), each capped at a quarter/eighth of the window so the summary request
-    /// itself fits a small-window model (an 8k model would otherwise be asked for 13k of output).
-    public var historySummaryMaxOutputTokens: Int { max(64, min(reserveTokens * 4 / 5, contextWindow / 4)) }
-    public var turnPrefixSummaryMaxOutputTokens: Int { max(64, min(reserveTokens / 2, contextWindow / 8)) }
+    /// Desired capacities before input-dependent clamping. Like pi, summaries use the model's
+    /// output limit, independently of the compaction reserve. Missing metadata uses the same
+    /// explicit 4k fallback as normal requests.
+    public var historySummaryMaxOutputTokens: Int { maxOutputTokens ?? 4_096 }
+    public var turnPrefixSummaryMaxOutputTokens: Int { maxOutputTokens ?? 4_096 }
 
     func needsCompaction(_ tokens: Int) -> Bool { tokens > compactionThreshold }
 }
@@ -57,7 +62,7 @@ public struct AgentContextCompactor: Sendable {
     private let tokenEstimator: @Sendable (String) -> Int
 
     public init(policy: AgentContextPolicy,
-                tokenEstimator: @escaping @Sendable (String) -> Int = { ($0.count + 3) / 4 }) {
+                tokenEstimator: @escaping @Sendable (String) -> Int = { TokenEstimate.tokens(in: $0) }) {
         self.policy = policy
         self.tokenEstimator = tokenEstimator
     }
@@ -89,7 +94,21 @@ public struct AgentContextCompactor: Sendable {
 
     public func estimateTokens(of message: AgentMessage) -> Int {
         let overhead = Self.messageOverheadTokens
-        switch message {
+        if case .content(let value) = message {
+            return overhead + value.blocks.reduce(0) { total, block in
+                switch block.content {
+                case .text(let text, let signature): return total + estimate(text) + estimate(signature ?? "")
+                case .thinking(let text, let signature, _, let metadata):
+                    return total + (metadata.map { estimate(encoded($0)) } ?? (estimate(text ?? "") + estimate(signature ?? "")))
+                case .toolCall(let call, _):
+                    return total + overhead + estimate(call.id) + estimate(call.name) + estimate(call.rawArguments)
+                        + estimate(call.providerMetadata.map { encoded($0) } ?? "")
+                case .image(_, let data): return total + estimate(data)
+                }
+            }
+        }
+        switch message.legacyProjection {
+        case .content: return 0 // legacyProjection cannot be native
         case .user(let text):
             return overhead + estimate(text)
         case .assistant(let text, let calls, let metadata):
@@ -137,8 +156,8 @@ public struct AgentContextCompactor: Sendable {
     public func historySummaryRequest(for plan: AgentCompactionPlan) -> AgentTurnRequest? {
         guard !plan.messagesToSummarize.isEmpty else { return nil }
         let instructions = plan.previousSummary.map {
-            "<previous-summary>\n\($0)\n</previous-summary>\n\n" + Self.updateSummaryPrompt
-        } ?? Self.summaryPrompt
+            "<previous-summary>\n\($0)\n</previous-summary>\n\n" + policy.summaryPrompts.updateSummary
+        } ?? policy.summaryPrompts.historySummary
         return summaryRequest(conversation: plan.messagesToSummarize, instructions: instructions,
                               maxOutputTokens: policy.historySummaryMaxOutputTokens)
     }
@@ -146,7 +165,7 @@ public struct AgentContextCompactor: Sendable {
     /// The summary request for a split turn's earlier part; nil when the cut is at a turn start.
     public func turnPrefixSummaryRequest(for plan: AgentCompactionPlan) -> AgentTurnRequest? {
         guard plan.isSplitTurn else { return nil }
-        return summaryRequest(conversation: plan.turnPrefix, instructions: Self.turnPrefixSummaryPrompt,
+        return summaryRequest(conversation: plan.turnPrefix, instructions: policy.summaryPrompts.turnPrefix,
                               maxOutputTokens: policy.turnPrefixSummaryMaxOutputTokens)
     }
 
@@ -160,13 +179,25 @@ public struct AgentContextCompactor: Sendable {
     private func summaryRequest(conversation messages: [AgentMessage], instructions: String,
                                 maxOutputTokens: Int) -> AgentTurnRequest {
         let tail = "\n</conversation>\n\n" + instructions
-        let budget = policy.contextWindow - maxOutputTokens - Self.summaryRequestMarginTokens
-            - estimate(Self.summarizationSystemPrompt) - estimate("<conversation>\n" + tail)
+        // Preserve input instead of reserving the entire model output maximum up front.
+        // Only an input that cannot fit with even one output token needs history fitting.
+        let budget = policy.contextWindow - 1 - Self.summaryRequestMarginTokens
+            - estimate(policy.summaryPrompts.system) - estimate("<conversation>\n" + tail)
             - Self.messageOverheadTokens
-        let conversation = fitted(Self.serialize(messages), toTokens: budget)
-        return AgentTurnRequest(systemPrompt: Self.summarizationSystemPrompt,
-                                messages: [.user("<conversation>\n" + conversation + tail)],
-                                tools: [], maxOutputTokens: maxOutputTokens)
+        let serialized = Self.serialize(messages)
+        let conversation = fitted(serialized, toTokens: budget)
+        let clipped = messages.reduce(0) { count, message in
+            guard case .toolResult(_, _, let content, _) = message.legacyProjection else { return count }
+            return count + max(0, content.count - Self.serializedToolResultLimit)
+        }
+        let omitted = conversation == serialized ? 0
+            : max(0, serialized.count - conversation.count + Self.truncatedConversationNote.count + 1)
+        let messages: [AgentMessage] = [.user("<conversation>\n" + conversation + tail)]
+        var output = AgentOutputBudget(requested: maxOutputTokens, policy: policy)
+        output.fit(inputTokens: estimateTokens(systemPrompt: policy.summaryPrompts.system, messages: messages, tools: []))
+        return AgentTurnRequest(systemPrompt: policy.summaryPrompts.system, messages: messages,
+                                tools: [], maxOutputTokens: output.tokens, contextOmittedCharacters: clipped + omitted,
+                                serializedToolOmittedCharacters: clipped, fittedHistoryOmittedCharacters: omitted)
     }
 
     /// Keeps the newest part of `text` that fits `budget` estimated tokens, marked as truncated.
@@ -207,7 +238,20 @@ public struct AgentContextCompactor: Sendable {
     public static func serialize(_ messages: [AgentMessage]) -> String {
         var parts: [String] = []
         for message in messages {
-            switch message {
+            if case .content(let value) = message {
+                for block in value.blocks {
+                    switch block.content {
+                    case .text(let text, _):
+                        if !text.isEmpty { parts.append("[\(value.role == .user ? "User" : "Assistant")]: \(text)") }
+                    case .toolCall(let call, _): parts.append("[Assistant tool calls]: \(call.name)(\(call.rawArguments))")
+                    case .image: parts.append("[Image omitted from textual summary]")
+                    case .thinking: break
+                    }
+                }
+                continue
+            }
+            switch message.legacyProjection {
+            case .content: break // native content is projected below
             case .user(let text):
                 if !text.isEmpty { parts.append("[User]: \(text)") }
             case .assistant(let text, let calls, _):
@@ -230,17 +274,17 @@ public struct AgentContextCompactor: Sendable {
     }
 
     private static func previousSummary(in messages: [AgentMessage]) -> (String?, Int) {
-        guard case .user(let text)? = messages.first, text.hasPrefix(summaryPrefix) else { return (nil, 0) }
+        guard case .user(let text)? = messages.first?.legacyProjection, text.hasPrefix(summaryPrefix) else { return (nil, 0) }
         return (String(text.dropFirst(summaryPrefix.count)), 1)
     }
 
     private static func isUser(_ message: AgentMessage) -> Bool {
-        if case .user = message { return true }
+        if case .user = message.legacyProjection { return true }
         return false
     }
 
     private static func isToolResult(_ message: AgentMessage) -> Bool {
-        if case .toolResult = message { return true }
+        if case .toolResult = message.legacyProjection { return true }
         return false
     }
 

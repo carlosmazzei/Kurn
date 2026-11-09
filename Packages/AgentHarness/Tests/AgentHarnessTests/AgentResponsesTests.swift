@@ -7,6 +7,13 @@ import Testing
     let done = #"{"type":"response.output_item.done","output_index":1,"item":{"id":"item-1","type":"function_call","call_id":"call-1","name":"search","arguments":"{\"query\":\"Alice\"}","status":"completed"}}"#
     let completed = #"{"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":3}}}"#
 
+    @Test(arguments: [1, 8, 15, 16, 32, 128_000])
+    func responsesHonorsItsProtocolMinimum(maximum: Int) {
+        let request = AgentTurnRequest(systemPrompt: "", messages: [], tools: [], maxOutputTokens: maximum)
+        let body = AgentWireFormat.openAIResponses.requestBody(request, model: "test")
+        #expect(body["max_output_tokens"].int == max(16, maximum))
+    }
+
     @Test func requestEncodesHistoryToolsAndPrivacy() throws {
         let request = AgentWireRequestTests().request()
         let body = AgentWireFormat.openAIResponses.requestBody(request, model: "gpt-test", reasoningEffort: "low")
@@ -40,10 +47,11 @@ import Testing
 
     @Test func textDeltasTerminalAndUsage() throws {
         let accumulator = AgentWireAccumulator(format: .openAIResponses)
-        #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":"Hello"}"#) == [.textDelta("Hello")])
+        #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":"Hello"}"#).filter { if case .content = $0 { return false }; return true } == [.textDelta("Hello")])
         #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":""}"#).isEmpty)
         _ = try accumulator.consume(completed)
-        #expect(try accumulator.response() == AgentTurnResponse(text: "Hello", usage: AgentUsage(inputTokens: 12, outputTokens: 3)))
+        #expect(try accumulator.response().text == "Hello")
+        #expect(try accumulator.response().usage == AgentUsage(inputTokens: 12, outputTokens: 3))
         #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":"ignored"}"#).isEmpty)
     }
 

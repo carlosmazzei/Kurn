@@ -25,7 +25,7 @@ import Testing
             "name": .string("search"), "arguments": .string("{}")
         ])] : []
         _ = try accumulator.consume(JSONValue.object([
-            "type": .string("response.completed"), "response": .object(["output": .array(output)])
+            "type": .string("response.completed"), "response": fromCompleted ? .object(["output": .array(output)]) : .object([:])
         ]).encodedString())
         let response = try accumulator.response()
         #expect(response.providerMetadata == metadata)
@@ -43,7 +43,8 @@ import Testing
         #expect(replay["input"].array[3]["type"] == .string("function_call_output"))
         let persisted = try JSONDecoder().decode([AgentMessage].self, from: JSONEncoder().encode(outcome.messages))
         #expect(persisted == outcome.messages)
-        #expect(persisted[1] == .assistant(text: response.text, toolCalls: response.toolCalls, providerMetadata: metadata))
+        let canonical = try #require(response.message)
+        #expect(persisted[1] == .content(canonical))
     }
 
     @Test func metadataFollowsCompactionGroupAndOldMessagesStillDecode() throws {

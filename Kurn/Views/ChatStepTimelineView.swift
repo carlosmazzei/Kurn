@@ -1,14 +1,15 @@
+import AgentHarness
 import KurnCore
 import SwiftUI
 
 struct ChatStepTimelineView: View {
-    let steps: [ChatAgentStep]
+    let steps: [AgentRunStep]
     let isRunning: Bool
     let meetingTitles: [UUID: String]
     let documentTitles: [UUID: String]
     @State private var expanded = false
 
-    private var visibleSteps: [ChatAgentStep] { ChatStepPresentation.visibleSteps(steps) }
+    private var visibleSteps: [AgentRunStep] { ChatStepPresentation.visibleSteps(steps) }
 
     var body: some View {
         if !visibleSteps.isEmpty {
@@ -30,6 +31,10 @@ struct ChatStepTimelineView: View {
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if !steps.contains(where: { $0.contextResolution != nil }) {
+                Text(NSLocalizedString("chat.context.unknown", comment: "Legacy context origin"))
+                    .font(.caption)
+            }
             ForEach(visibleSteps) { step in
                 ChatStepRow(step: step, meetingTitles: meetingTitles, documentTitles: documentTitles)
             }
@@ -39,7 +44,7 @@ struct ChatStepTimelineView: View {
 }
 
 private struct ChatStepRow: View {
-    let step: ChatAgentStep
+    let step: AgentRunStep
     let meetingTitles: [UUID: String]
     let documentTitles: [UUID: String]
 
@@ -50,6 +55,14 @@ private struct ChatStepRow: View {
     var body: some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 8) {
+                if let resolution = step.contextResolution {
+                    contextDetails(resolution)
+                }
+                if let diagnostic = step.diagnostic {
+                    Text(ChatContextPresentation.diagnosticDetails(diagnostic) { NSLocalizedString($0, comment: "Harness metric") })
+                        .font(.caption)
+                        .textSelection(.enabled)
+                }
                 if let arguments = step.argumentsSummary {
                     detail("chat.steps.arguments", text: arguments)
                 }
@@ -83,6 +96,25 @@ private struct ChatStepRow: View {
             .frame(minHeight: 44, alignment: .leading)
         }
         .accessibilityIdentifier("chat.step.\(step.id.uuidString)")
+    }
+
+    private func contextDetails(_ resolution: AgentHarness.AgentContextResolution) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(NSLocalizedString(ChatContextPresentation.sourceKey(resolution), comment: "Context origin"))
+            if let refresh = resolution.metadataRefresh {
+                Text(NSLocalizedString("chat.context.refresh.\(refresh.rawValue)", comment: "Metadata refresh outcome"))
+            }
+            Text(String(format: NSLocalizedString("chat.context.tokens", comment: "Context capacity"), resolution.contextWindowTokens))
+            Text(NSLocalizedString("chat.context.kind.\(resolution.limitKind.rawValue)", comment: "Context limit kind"))
+            if let fetchedAt = resolution.fetchedAt {
+                Text(fetchedAt, format: .dateTime.year().month().day().hour().minute())
+            }
+            if let version = resolution.catalogVersion {
+                Text(String(format: NSLocalizedString("chat.context.catalog_version", comment: "Catalog version"), version))
+            }
+        }
+        .font(.caption)
+        .textSelection(.enabled)
     }
 
     private func detail(_ key: String, text: String) -> some View {

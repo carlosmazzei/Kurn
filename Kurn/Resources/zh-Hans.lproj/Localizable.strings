@@ -1103,3 +1103,120 @@
 "documents.chat.provenance" = "在聊天中生成 · v%d";
 "chat.artifact.cloud_required" = "聊天和创建文档需要在设置中配置并选择云端 AI 提供商。云端请求会将所选来源发送给该提供商。";
 "chat.artifact.configure_provider" = "在设置中配置提供商";
+
+/* Harness context provenance and execution diagnostics */
+"chat.diagnostic.runStarted" = "执行已开始";
+"chat.diagnostic.runFinished" = "执行已完成";
+"chat.diagnostic.runFailed" = "执行失败";
+"chat.diagnostic.runCancelled" = "执行已取消";
+"chat.diagnostic.contextCheck" = "已检查上下文预算";
+"chat.diagnostic.compactionStarted" = "压缩已开始";
+"chat.diagnostic.compactionFinished" = "压缩已完成";
+"chat.diagnostic.compactionFailed" = "压缩失败";
+"chat.diagnostic.compactionSkipped" = "已跳过压缩";
+"chat.diagnostic.requestStarted" = "模型请求已开始";
+"chat.diagnostic.requestFinished" = "模型请求已完成";
+"chat.diagnostic.requestFailed" = "模型请求失败";
+"chat.diagnostic.summaryStarted" = "摘要已开始";
+"chat.diagnostic.summaryFinished" = "摘要已完成";
+"chat.diagnostic.summaryFailed" = "摘要失败";
+"chat.diagnostic.limitReached" = "已达到执行限制";
+"chat.diagnostic.toolRequested" = "已请求工具";
+"chat.diagnostic.toolFinished" = "工具已完成";
+"chat.diagnostic.toolSkipped" = "已跳过工具";
+"chat.diagnostic.wrapUpStarted" = "最终回答已开始";
+"chat.diagnostic.wrapUpFinished" = "最终回答已完成";
+"chat.diagnostic.unknown" = "执行事件";
+"chat.metric.contextTokens" = "上下文令牌数";
+"chat.metric.thresholdTokens" = "压缩阈值";
+"chat.metric.retainedTokens" = "保留的近期令牌数";
+"chat.metric.afterTokens" = "压缩后令牌数";
+"chat.metric.forced" = "强制恢复";
+"chat.metric.turnIndex" = "轮次索引";
+"chat.metric.toolCalls" = "已使用的工具尝试次数";
+"chat.metric.maxToolCalls" = "工具尝试次数限制";
+"chat.metric.maxTurns" = "轮次限制";
+"chat.metric.blockedCalls" = "已阻止的调用";
+"chat.metric.callOrdinal" = "调用序号";
+"chat.metric.inputTokens" = "输入令牌数";
+"chat.metric.outputTokens" = "输出令牌数";
+"chat.metric.maxOutputTokens" = "输出预算";
+"chat.metric.messageCount" = "消息数";
+"chat.metric.toolCount" = "工具数";
+"chat.metric.durationMs" = "时长（毫秒）";
+"chat.metric.availableScalars" = "可用 Unicode 标量数";
+"chat.metric.returnedScalars" = "返回的 Unicode 标量数";
+"chat.metric.hasMore" = "有更多内容";
+"chat.metric.isError" = "错误";
+"chat.step.context" = "上下文窗口";
+"chat.context.api" = "API";
+"chat.context.api_cached" = "API（缓存）";
+"chat.context.table" = "本地表";
+"chat.context.fallback" = "固定回退值";
+"chat.context.tokens" = "%ld 个令牌";
+"chat.context.catalog_version" = "目录：%@";
+"chat.context.unknown" = "未记录来源";
+"chat.context.kind.input" = "输入限制";
+"chat.context.kind.combined" = "合计上下文窗口";
+"chat.metric.omittedCharacters" = "摘要输入中省略的字符数";
+
+// Selected-model metadata refresh
+"chat.context.refresh.cacheFresh" = "元数据缓存有效";
+"chat.context.refresh.fetched" = "已从 API 刷新模型元数据";
+"chat.context.refresh.notReported" = "API 未报告上下文窗口";
+"chat.context.refresh.unsupported" = "此 API 不支持刷新上下文详情";
+"chat.context.refresh.unavailable" = "缺少刷新元数据所需的凭据";
+"chat.context.refresh.failed" = "元数据刷新失败；保留可用的容量数据";
+"chat.context.refresh.deferred" = "元数据重试间隔生效中";
+
+// Workload and payload diagnostics
+"chat.metric.omittedScalars" = "预览中省略的标量";
+"chat.metric.omittedItems" = "省略的元数据项";
+"chat.metric.deferredScalars" = "剩余标量";
+"chat.metric.deferredItems" = "剩余项目";
+"chat.metric.searchResultLimit" = "搜索结果窗口上限";
+"chat.metric.searchWindowFull" = "搜索窗口已满";
+"chat.metric.selectedSources" = "工作计划中的来源";
+"chat.metric.selectedParts" = "可读来源部分";
+"chat.metric.estimatedReadPages" = "预计读取页数";
+"chat.metric.progressCalls" = "取得进展的不同调用";
+"chat.metric.serializedToolOmittedCharacters" = "摘要中省略的工具结果字符";
+"chat.metric.fittedHistoryOmittedCharacters" = "为容纳摘要而省略的历史字符";
+"chat.metric.returnedItems" = "返回的项目";
+"chat.metric.mutationsCommitted" = "已提交的产物更改";
+"chat.diagnostic.payloadClipped" = "预览已截短";
+"chat.diagnostic.payloadPaged" = "还有更多内容";
+"chat.diagnostic.budgetExtended" = "取得进展后扩展执行预算";
+
+"chat.metric.hardMaxTurns" = "轮次绝对上限";
+"chat.metric.hardMaxToolCalls" = "工具调用绝对上限";
+"chat.metric.minimumProgress" = "取得进展的最少不同调用";
+"chat.metric.idleCalls" = "自上次不同进展后的调用次数";
+"chat.diagnostic.budgetExtensionDenied" = "预算扩展被拒绝";
+
+/* Output budgets and per-request usage */
+"chat.diagnostic.outputBudgetExtended" = "已增加输出预算；正在重试空回复";
+"chat.diagnostic.outputBudgetExtensionDenied" = "输出预算增加被拒绝";
+"chat.metric.hardMaxOutputTokens" = "输出预算上限";
+"chat.metric.previousMaxOutputTokens" = "先前的输出预算";
+"chat.metric.outputRetries" = "输出重试次数";
+"chat.metric.visibleTextScalars" = "可见文本标量数";
+"chat.metric.streamedText" = "已流式传输文本（1 = 是）";
+"chat.metric.returnedToolCalls" = "返回的工具调用数";
+"chat.metric.discardedToolCalls" = "已丢弃的工具调用数";
+"chat.metric.outputLimited" = "已达到输出限制（1 = 是）";
+"chat.metric.usageReported" = "已报告用量（1 = 是）";
+"chat.metric.reasoningTokens" = "已报告的推理令牌数";
+"chat.metric.costLimitReached" = "已达到费用限制（1 = 是）";
+
+/* Dynamic output headroom */
+"chat.diagnostic.outputRetryStarted" = "已开始输出恢复";
+"chat.diagnostic.outputRetryDenied" = "未应用输出恢复";
+"chat.metric.contextSafetyTokens" = "上下文安全余量";
+"chat.metric.contextSafetyRelaxed" = "已应用低余量规则（1 = 是）";
+"chat.metric.availableOutputTokens" = "扣除安全余量后的输出空间";
+"chat.metric.outputCapacityFallback" = "已使用备用输出容量（1 = 是）";
+"chat.diagnostic.outputBudgetAdjusted" = "输出预算已调整至 API 最小值";
+"chat.metric.sentMaxOutputTokens" = "发送到 API 的输出预算";
+
+"chat.diagnostic.replayPrepared" = "已为 API 准备历史记录";

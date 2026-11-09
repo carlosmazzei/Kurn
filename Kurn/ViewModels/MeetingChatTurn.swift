@@ -1,3 +1,4 @@
+import AgentHarness
 import Foundation
 import KurnCore
 
@@ -14,7 +15,7 @@ extension MeetingChatViewModel {
         /// Wall-clock time the reply took to fully generate, set once it
         /// finishes.
         var elapsedSeconds: TimeInterval?
-        var steps: [ChatAgentStep] = []
+        var steps: [AgentRunStep] = []
         var artifacts: [ChatArtifactReference] = []
         var artifactOrigins: [UUID: ChatArtifactOrigin] = [:]
 
@@ -44,7 +45,7 @@ extension MeetingChatViewModel {
             usage: TokenUsage? = nil,
             costUSD: Double? = nil,
             elapsedSeconds: TimeInterval? = nil,
-            steps: [ChatAgentStep] = []
+            steps: [AgentRunStep] = []
         ) {
             self.id = id
             self.role = role

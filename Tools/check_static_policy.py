@@ -123,6 +123,18 @@ STRING_LITERAL_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 RULES = [
     Rule(
+        name="domain-agent-dependency",
+        pattern=re.compile(r"\bimport\s+(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?AgentHarness\b"),
+        description="KurnCore contains domain logic; register agent bindings in Kurn/Application/Agent instead.",
+        scope=("Packages/KurnCore/Sources/",),
+    ),
+    Rule(
+        name="agent-domain-dependency",
+        pattern=re.compile(r"\bimport\s+(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(?:KurnCore|Kurn|SwiftData|SwiftUI)\b"),
+        description="AgentHarness must remain independent of Kurn domain and platform adapters.",
+        scope=("Packages/AgentHarness/Sources/",),
+    ),
+    Rule(
         name="fatal-error",
         pattern=re.compile(r"\b(fatalError|preconditionFailure)\s*\("),
         description=(

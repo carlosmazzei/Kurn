@@ -30,6 +30,8 @@ public struct AgentToolCall: Codable, Sendable, Equatable {
 }
 
 public enum AgentMessage: Codable, Sendable, Equatable {
+    /// Native v1 content. Legacy cases retain their original Codable bytes for migration.
+    case content(AgentContentMessage)
     case user(String)
     case assistant(text: String, toolCalls: [AgentToolCall], providerMetadata: JSONValue? = nil)
     case toolResult(callID: String, toolName: String, content: String, isError: Bool)
@@ -38,19 +40,26 @@ public enum AgentMessage: Codable, Sendable, Equatable {
 public struct AgentUsage: Codable, Sendable, Equatable {
     public let inputTokens: Int
     public let outputTokens: Int
+    /// Sum of the reasoning-token counts actually reported (nil if none were reported).
+    /// Missing counts are not inferred from output size. Never contains reasoning text.
+    public let reasoningTokens: Int?
 
-    public init(inputTokens: Int = 0, outputTokens: Int = 0) {
+    public init(inputTokens: Int = 0, outputTokens: Int = 0, reasoningTokens: Int? = nil) {
         self.inputTokens = max(0, inputTokens)
         self.outputTokens = max(0, outputTokens)
+        self.reasoningTokens = reasoningTokens.map { max(0, $0) }
     }
 
     func adding(_ other: Self) -> Self {
-        Self(inputTokens: inputTokens + other.inputTokens, outputTokens: outputTokens + other.outputTokens)
+        Self(inputTokens: inputTokens + other.inputTokens, outputTokens: outputTokens + other.outputTokens,
+             reasoningTokens: reasoningTokens == nil && other.reasoningTokens == nil ? nil
+                : (reasoningTokens ?? 0) + (other.reasoningTokens ?? 0))
     }
 }
 
 public enum AgentModelStopReason: Codable, Sendable, Equatable {
     case endTurn, toolUse, maxTokens
+    case error, aborted, deferred
     case other(String)
 }
 
@@ -62,19 +71,31 @@ public struct AgentTurnRequest: Sendable, Equatable {
     /// False asks the vendor to answer in text only while tools stay declared (some vendors reject
     /// tool history without declarations): `tool_choice: none` or Gemini's `NONE` calling mode.
     public let allowsToolCalls: Bool
+    /// Diagnostic-only loss in a summary request; never serialized as a provider parameter.
+    public let contextOmittedCharacters: Int
+    public let serializedToolOmittedCharacters: Int
+    public let fittedHistoryOmittedCharacters: Int
 
     public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
-                allowsToolCalls: Bool = true) {
+                allowsToolCalls: Bool = true, contextOmittedCharacters: Int = 0,
+                serializedToolOmittedCharacters: Int = 0, fittedHistoryOmittedCharacters: Int = 0) {
         self.systemPrompt = systemPrompt
         self.messages = messages
         self.tools = tools
         self.maxOutputTokens = maxOutputTokens
         self.allowsToolCalls = allowsToolCalls
+        self.contextOmittedCharacters = contextOmittedCharacters
+        self.serializedToolOmittedCharacters = serializedToolOmittedCharacters
+        self.fittedHistoryOmittedCharacters = fittedHistoryOmittedCharacters
     }
 }
 
 public enum AgentModelEvent: Sendable, Equatable {
     case textDelta(String)
+    case content(AgentContentEvent)
+    case replayAdjusted(AgentReplayAdjustment)
+    /// The wire protocol may require a minimum above the logical headroom floor.
+    case outputBudgetAdjusted(requested: Int, sent: Int)
 }
 
 public struct AgentTurnResponse: Sendable, Equatable {
@@ -83,14 +104,27 @@ public struct AgentTurnResponse: Sendable, Equatable {
     public let usage: AgentUsage?
     public let stopReason: AgentModelStopReason
     public let providerMetadata: JSONValue?
+    /// Wire adapters discard every tool call from an output-limited response, even complete-looking ones.
+    public let discardedToolCalls: Int
+    public let message: AgentContentMessage?
+    /// Includes interrupted calls retained for audit; these must never be sent to tool execution.
+    public let blockedToolCalls: [AgentToolCall]
+    public let toolExecutionBlocked: Bool
 
     public init(text: String, toolCalls: [AgentToolCall] = [], usage: AgentUsage? = nil,
-                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil) {
-        self.text = text
-        self.toolCalls = toolCalls
-        self.usage = usage
+                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil, discardedToolCalls: Int = 0,
+                message: AgentContentMessage? = nil, blocksToolExecution: Bool = false) {
+        let stopReason = message?.stopReason ?? stopReason
+        self.text = message?.text ?? text
+        let blocked = !stopReason.permitsToolExecution || blocksToolExecution
+        toolExecutionBlocked = blocked
+        self.toolCalls = blocked ? [] : (message?.toolCalls ?? toolCalls)
+        self.usage = message?.usage ?? usage
         self.stopReason = stopReason
         self.providerMetadata = providerMetadata
+        blockedToolCalls = blocked ? (message?.toolCalls ?? toolCalls) : []
+        self.discardedToolCalls = max(0, max(discardedToolCalls, blockedToolCalls.count))
+        self.message = message
     }
 }
 
@@ -103,11 +137,13 @@ public struct AgentToolOutput: Sendable, Equatable {
     public let content: String
     public let summary: String
     public let isError: Bool
+    public let metrics: [AgentDiagnostic.Metric: Int]
 
-    public init(content: String, summary: String, isError: Bool = false) {
+    public init(content: String, summary: String, isError: Bool = false, metrics: [AgentDiagnostic.Metric: Int] = [:]) {
         self.content = content
         self.summary = summary
         self.isError = isError
+        self.metrics = metrics
     }
 }
 
@@ -131,12 +167,17 @@ public struct AgentLimits: Sendable, Equatable {
     /// After a turn or tool-call limit, run one extra tool-less turn so the model answers from what
     /// it already gathered instead of ending on tool results. Never runs past the cost limit.
     public let wrapUpOnLimit: Bool
+    public let continuation: AgentContinuationBudget?
+    public let workload: AgentWorkload?
 
-    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil, wrapUpOnLimit: Bool = false) {
-        self.maxTurns = max(0, maxTurns)
-        self.maxToolCalls = max(0, maxToolCalls)
+    public init(maxTurns: Int = 10, maxToolCalls: Int = 20, maxCostUSD: Double? = nil, wrapUpOnLimit: Bool = false,
+                continuation: AgentContinuationBudget? = nil, workload: AgentWorkload? = nil) {
+        self.maxTurns = max(0, min(maxTurns, continuation?.maxTurns ?? maxTurns))
+        self.maxToolCalls = max(0, min(maxToolCalls, continuation?.maxToolCalls ?? maxToolCalls))
         self.maxCostUSD = maxCostUSD.map { max(0, $0) }
         self.wrapUpOnLimit = wrapUpOnLimit
+        self.continuation = continuation
+        self.workload = workload
     }
 }
 
@@ -160,8 +201,11 @@ public struct AgentRunOutcome: Sendable, Equatable {
 
 public enum AgentEvent: Sendable, Equatable {
     case runStarted
+    case contextResolved(AgentContextResolution)
+    case diagnostic(AgentDiagnostic)
     case turnStarted(index: Int)
     case textDelta(String)
+    case modelContent(AgentContentEvent)
     case toolStarted(callID: String, name: String, arguments: JSONValue)
     case toolFinished(callID: String, name: String, summary: String, isError: Bool)
     case contextCompacted(beforeTokens: Int, afterTokens: Int)

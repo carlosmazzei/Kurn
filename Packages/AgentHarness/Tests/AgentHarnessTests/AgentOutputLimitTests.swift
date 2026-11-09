@@ -17,7 +17,12 @@ import Testing
         #expect(outcome.stopReason == .outputLimit)
         #expect(outcome.finalText == text)
         #expect(outcome.totalUsage == usage)
-        #expect(outcome.messages.last == .assistant(text: text, toolCalls: []))
+        guard case .content(let message) = outcome.messages[1] else { Issue.record("Missing interrupted assistant audit"); return }
+        #expect(message.toolCalls == (hasTools ? [agentCall()] : []))
+        #expect(message.text == text && message.stopReason == .maxTokens)
+        if hasTools {
+            guard case .toolResult("1", "lookup", _, true) = outcome.messages.last else { Issue.record("Missing blocked result"); return }
+        } else { #expect(outcome.messages.count == 2) }
         #expect(await model.requests.count == 1)
         #expect(!events.contains { if case .toolStarted = $0 { return true }; return false })
     }
@@ -63,6 +68,7 @@ import Testing
         }
         let accumulator = AgentWireAccumulator(format: format)
         _ = try accumulator.consume(terminal)
+        if format == .anthropic { _ = try accumulator.consume(#"{"type":"message_stop"}"#) }
         let response = try accumulator.response()
         #expect(response.text.isEmpty)
         #expect(response.toolCalls.isEmpty)
@@ -90,8 +96,10 @@ import Testing
         }
         let accumulator = AgentWireAccumulator(format: format)
         for payload in payloads { _ = try accumulator.consume(payload) }
+        if format == .anthropic { _ = try accumulator.consume(#"{"type":"message_stop"}"#) }
         let response = try accumulator.response()
         #expect(response.stopReason == .maxTokens)
         #expect(response.toolCalls.isEmpty)
+        #expect(response.discardedToolCalls == 1)
     }
 }

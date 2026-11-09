@@ -13,6 +13,6 @@ let package = Package(
     products: [.library(name: "AgentHarness", targets: ["AgentHarness"])],
     targets: [
         .target(name: "AgentHarness"),
-        .testTarget(name: "AgentHarnessTests", dependencies: ["AgentHarness"])
+        .testTarget(name: "AgentHarnessTests", dependencies: ["AgentHarness"], resources: [.copy("Fixtures")])
     ]
 )

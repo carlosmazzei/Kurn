@@ -1,85 +1,106 @@
-//
-//  ModelContextWindowStore.swift
-//  Kurn
-//
-//  Context windows a provider's own `/models` listing reported (Gemini's
-//  `inputTokenLimit`, Groq's `context_window`, OpenRouter's
-//  `context_length`), remembered so a later summary can plan against the
-//  real window instead of `ModelContextWindows`' table or the conservative
-//  default. Model ids and token counts only — nothing meeting-derived — so
-//  `UserDefaults` is an appropriate home.
-//
-
+import AgentHarness
 import Foundation
 import KurnCore
 
+/// Non-content provider metadata. V1 values lacked endpoint identity and timestamps,
+/// so they are deliberately not promoted to evidence of an API response.
 final class ModelContextWindowStore: @unchecked Sendable {
     static let shared = ModelContextWindowStore()
-
-    private static let key = "modelContextWindows.v1"
+    private static let key = "modelContextCapabilities.v2"
     private let lock = NSLock()
     private let defaults: UserDefaults
+    private let now: @Sendable () -> Date
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, now: @escaping @Sendable () -> Date = { Date() }) {
         self.defaults = defaults
+        self.now = now
     }
 
-    /// The window last reported for `model` on `providerID`, if any.
-    func window(providerID: String, model: String) -> Int? {
-        lock.withLock { stored()[Self.entryKey(providerID: providerID, model: model)] }
+    func limits(for provider: AIProvider, model: String) -> AgentModelLimits? {
+        lock.withLock { stored()[Self.entryKey(provider: provider, model: model)] }
     }
 
-    /// Merge freshly reported windows for one provider. Non-positive values
-    /// are ignored rather than stored, so a vendor reporting `0` for
-    /// "unknown" can never shrink a budget to nothing.
-    func record(_ windows: [String: Int], providerID: String) {
-        let valid = windows.filter { !$0.key.isEmpty && $0.value > 0 }
-        guard !valid.isEmpty else { return }
+    func record(_ windows: [String: Int], provider: AIProvider) {
+        recordLimits(windows.mapValues { AgentModelLimits(contextWindowTokens: $0, fetchedAt: now()) }, provider: provider)
+    }
+
+    func recordLimits(_ values: [String: AgentModelLimits], provider: AIProvider) {
         lock.withLock {
             var all = stored()
-            for (model, tokens) in valid {
-                all[Self.entryKey(providerID: providerID, model: model)] = tokens
+            for (model, limits) in values where !model.isEmpty {
+                guard limits.contextWindowTokens != nil || limits.maxOutputTokens != nil else { continue }
+                let entry = Self.entryKey(provider: provider, model: model)
+                all[entry] = all[entry]?.merging(limits, now: now()) ?? limits
             }
-            defaults.set(all, forKey: Self.key)
+            if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.key) }
         }
     }
 
-    /// The window the agent harness plans against for `model` on `provider`: the reported one,
-    /// else the model-family table, else `ModelContextWindows.unknownWindow`. Unlike
-    /// `ContextBudget.resolve`, no output reservation or practical cap is applied here.
+    func resolution(for provider: AIProvider, model: String, metadataRefresh: AgentMetadataRefresh? = nil) -> AgentContextResolution {
+        ModelContextWindows.resolve(model: model, reported: limits(for: provider, model: model), now: now(), metadataRefresh: metadataRefresh)
+    }
+
     func agentContextWindow(for provider: AIProvider, model: String) -> Int {
-        ModelContextWindows.agentWindow(reported: window(providerID: provider.id, model: model), model: model)
+        resolution(for: provider, model: model).contextWindowTokens
     }
 
-    private func stored() -> [String: Int] {
-        defaults.dictionary(forKey: Self.key) as? [String: Int] ?? [:]
+    func hasFreshCompleteLimits(for provider: AIProvider, model: String) -> Bool {
+        guard let value = limits(for: provider, model: model) else { return false }
+        return value.contextWindowTokens != nil && value.maxOutputTokens != nil
+            && ModelContextWindows.isFresh(value.contextTimestamp, now: now())
+            && ModelContextWindows.isFresh(value.outputTimestamp, now: now())
     }
 
-    private static func entryKey(providerID: String, model: String) -> String {
-        "\(providerID)|\(model.lowercased())"
+    func refreshIsDue(for provider: AIProvider, model: String) -> Bool {
+        lock.withLock {
+            let key = Self.entryKey(provider: provider, model: model)
+            let attempts = defaults.dictionary(forKey: "modelContextRefreshAttempts.v1") as? [String: Date] ?? [:]
+            guard let last = attempts[key] else { return true }
+            let age = now().timeIntervalSince(last)
+            return age < 0 || age >= 15 * 60
+        }
+    }
+
+    func recordRefresh(for provider: AIProvider, model: String) {
+        lock.withLock {
+            var attempts = defaults.dictionary(forKey: "modelContextRefreshAttempts.v1") as? [String: Date] ?? [:]
+            attempts = attempts.filter { now().timeIntervalSince($0.value) < 24 * 60 * 60 }
+            attempts[Self.entryKey(provider: provider, model: model)] = now()
+            defaults.set(attempts, forKey: "modelContextRefreshAttempts.v1")
+        }
+    }
+
+    private func stored() -> [String: AgentModelLimits] {
+        guard let data = defaults.data(forKey: Self.key) else { return [:] }
+        return (try? JSONDecoder().decode([String: AgentModelLimits].self, from: data)) ?? [:]
+    }
+
+    private static func entryKey(provider: AIProvider, model: String) -> String {
+        var origin = URLComponents(string: provider.baseURLString)
+        origin?.user = nil
+        origin?.password = nil
+        origin?.query = nil
+        origin?.fragment = nil
+        let normalizedHost = origin?.host?.lowercased()
+        let normalizedScheme = origin?.scheme?.lowercased()
+        origin?.host = normalizedHost
+        origin?.scheme = normalizedScheme
+        let endpoint = origin?.string?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
+        // Encoding the tuple avoids collisions between model IDs containing separators.
+        let parts = [provider.id, provider.kind.rawValue, endpoint, model]
+        return (try? JSONEncoder().encode(parts)).map { String(decoding: $0, as: UTF8.self) } ?? ""
     }
 }
 
 extension ContextBudget {
-    /// Decides the budget for a (provider, model) pair. Services take one at
-    /// construction so tests can force either path with a tiny transcript.
     typealias Resolver = @Sendable (AIProvider, String) -> ContextBudget
-
     static let live: Resolver = { resolve(provider: $0, model: $1) }
 
-    /// The single-request budget for `model` on `provider`: the on-device
-    /// budget for Apple's model; otherwise the window the provider reported,
-    /// else the known window for the model's family, else
-    /// `ContextBudget.conservative`.
-    static func resolve(
-        provider: AIProvider,
-        model: String,
-        windows: ModelContextWindowStore = .shared
-    ) -> ContextBudget {
+    static func resolve(provider: AIProvider, model: String,
+                        windows: ModelContextWindowStore = .shared) -> ContextBudget {
         guard provider.kind != .appleOnDevice else { return .onDevice }
-        let window = windows.window(providerID: provider.id, model: model)
-            ?? ModelContextWindows.knownWindow(forModel: model)
-        guard let window else { return .conservative }
-        return .forContextWindow(window, reservedOutputTokens: LLMHTTP.summaryMaxOutputTokens)
+        let resolution = windows.resolution(for: provider, model: model)
+        guard resolution.source != .fixedFallback else { return .conservative }
+        return .forContextWindow(resolution.contextWindowTokens, reservedOutputTokens: LLMHTTP.summaryMaxOutputTokens)
     }
 }

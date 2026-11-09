@@ -55,6 +55,23 @@ private enum AgentTestVendor: String, CaseIterable {
 }
 
 extension ProviderHTTPTests {
+    @Test func agentResponsesMinimumOutputIsReported() async throws {
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody([
+            AgentTestVendor.openAI.textPayload, #"{"type":"response.completed","response":{}}"#
+        ]), headers: [:])])
+        let request = AgentTurnRequest(systemPrompt: "System", messages: [.user("Question")], tools: [], maxOutputTokens: 1)
+        let events = AsyncStream<AgentModelEvent>.makeStream()
+        _ = try await AgentTestVendor.openAI.model().streamTurn(request) { events.continuation.yield($0) }
+        events.continuation.finish()
+        var received: [AgentModelEvent] = []
+        for await event in events.stream { received.append(event) }
+        #expect(received.filter { if case .content = $0 { return false }; return true } == [.outputBudgetAdjusted(requested: 1, sent: 16), .textDelta("Hello")])
+        #expect(received.filter { if case .content(.messageFinished) = $0 { return true }; return false }.count == 1)
+        let http = try #require(MockURLProtocol.lastRequest)
+        let body = try JSONSerialization.jsonObject(with: MockURLProtocol.body(of: http)) as? [String: Any]
+        #expect(body?["max_output_tokens"] as? Int == 16)
+    }
+
     private var agentRequest: AgentTurnRequest {
         AgentTurnRequest(systemPrompt: "Ground answers", messages: [.user("Find Alice")],
                          tools: [AgentToolSpec(name: "search", description: "Search meetings", inputSchema: .object([:]))],
@@ -68,7 +85,9 @@ extension ProviderHTTPTests {
             payloads += [#"{"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":2}}}"#]
         }
         if vendor == .anthropic {
-            payloads += [#"{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":10,"output_tokens":2}}"#]
+            payloads += [#"{"type":"content_block_stop","index":0}"#]
+            payloads += [#"{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":10,"output_tokens":2}}"#,
+                         #"{"type":"message_stop"}"#]
         }
         MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
         let response = try await vendor.model().streamTurn(agentRequest) { _ in }
@@ -125,7 +144,7 @@ extension ProviderHTTPTests {
             payload = payload.replacingOccurrences(of: "\"stop\"", with: "\"length\"")
                 .replacingOccurrences(of: "\"STOP\"", with: "\"MAX_TOKENS\"")
         }
-        var payloads = ["malformed", payload]
+        var payloads = [payload]
         if vendor == .openAI {
             payloads.append(outputLimited
                 ? #"{"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}"#
@@ -134,6 +153,7 @@ extension ProviderHTTPTests {
         if vendor == .anthropic {
             let reason = outputLimited ? "max_tokens" : "end_turn"
             payloads.append(#"{"type":"message_delta","delta":{"stop_reason":"\#(reason)"}}"#)
+            payloads.append(#"{"type":"message_stop"}"#)
         }
         MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
         let text = StreamingAccumulator()
@@ -146,11 +166,12 @@ extension ProviderHTTPTests {
         #expect(response.stopReason == (outputLimited ? .maxTokens : .endTurn))
     }
 
-    @Test(arguments: ["empty", "remote", "incomplete", "interrupted", "http", "transport"])
+    @Test(arguments: ["empty", "malformed", "remote", "incomplete", "interrupted", "http", "transport"])
     func agentStreamErrorsAreMappedAndNeverRetried(kind: String) async {
         let stub: MockURLProtocol.Stub
         switch kind {
-        case "empty": stub = .success(status: 200, body: sseBody(["malformed"]), headers: [:])
+        case "empty": stub = .success(status: 200, body: Data(), headers: [:])
+        case "malformed": stub = .success(status: 200, body: sseBody(["malformed"]), headers: [:])
         case "remote": stub = .success(status: 200, body: sseBody([#"{"error":{"message":"Overloaded"}}"#]), headers: [:])
         case "incomplete":
             stub = .success(status: 200, body: sseBody([
@@ -168,7 +189,7 @@ extension ProviderHTTPTests {
             _ = try await AgentTestVendor.compatible.model().streamTurn(agentRequest) { _ in }
             Issue.record("Expected stream error")
         } catch {
-            if kind == "empty" || kind == "incomplete" {
+            if kind == "empty" || kind == "incomplete" || kind == "malformed" {
                 guard case AppError.decodingError = error else { Issue.record("Expected decoding error"); return }
             } else if kind == "interrupted" {
                 guard case AppError.networkError(let urlError) = error else { Issue.record("Expected transport error"); return }
@@ -182,7 +203,35 @@ extension ProviderHTTPTests {
 
     @Test(arguments: AgentTestVendor.allCases)
     private func agentRejectsMissingKeyAndInvalidURL(vendor: AgentTestVendor) async {
-        await #expect(throws: AppError.self) { try await vendor.model(key: "").streamTurn(agentRequest) { _ in } }
-        await #expect(throws: AppError.self) { try await vendor.model(invalidURL: true).streamTurn(agentRequest) { _ in } }
+        for model in [vendor.model(key: ""), vendor.model(invalidURL: true)] {
+            let events = AsyncStream<AgentModelEvent>.makeStream()
+            await #expect(throws: AppError.self) { try await model.streamTurn(agentRequest) { events.continuation.yield($0) } }
+            events.continuation.finish()
+            var received: [AgentModelEvent] = []
+            for await event in events.stream { received.append(event) }
+            #expect(received == [.content(.failed(.preparation))])
+        }
     }
+    @Test func agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced() async throws {
+        let thought = AgentContentBlock(id: "thought", content: .thinking(text: "private", signature: "opaque", redacted: false))
+        let prior = try AgentContentMessage(id: "prior", timestampMilliseconds: 123, role: .assistant, blocks: [thought],
+            identity: AgentResponseIdentity(api: "anthropic", model: "other", requestID: "prior-request"), stopReason: .endTurn)
+        let request = AgentTurnRequest(systemPrompt: "", messages: [.content(prior), .user("Question")], tools: [], maxOutputTokens: 32)
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody([
+            #"{"type":"response.output_text.delta","delta":"Wrong draft"}"#,
+            #"{"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"Correct final"}]}],"usage":{"input_tokens":12,"output_tokens":3}}}"#
+        ]), headers: [:])])
+        let events = AsyncStream<AgentModelEvent>.makeStream()
+        let response = try await AgentTestVendor.openAI.model().streamTurn(request) { events.continuation.yield($0) }
+        events.continuation.finish()
+        var observed: [AgentModelEvent] = []
+        for await event in events.stream { observed.append(event) }
+        #expect(response.text == "Correct final" && response.message?.usage == AgentUsage(inputTokens: 12, outputTokens: 3))
+        #expect(observed.filter { if case .content(.messageFinished) = $0 { return true }; return false }.count == 1)
+        #expect(observed.contains { if case .replayAdjusted(let facts) = $0 { return facts.omittedThinkingBlocks == 1 }; return false })
+        let http = try #require(MockURLProtocol.lastRequest)
+        let body = String(decoding: MockURLProtocol.body(of: http), as: UTF8.self)
+        #expect(!body.contains("private") && body.contains("Thinking omitted"))
+    }
+
 }

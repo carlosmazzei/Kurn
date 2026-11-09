@@ -1103,3 +1103,120 @@
 "documents.chat.provenance" = "Created in chat · v%d";
 "chat.artifact.cloud_required" = "Chat and documents require a cloud AI provider configured and selected in Settings. Cloud requests send the selected sources to that provider.";
 "chat.artifact.configure_provider" = "Configure provider in Settings";
+
+/* Harness context provenance and execution diagnostics */
+"chat.diagnostic.runStarted" = "Execution started";
+"chat.diagnostic.runFinished" = "Execution finished";
+"chat.diagnostic.runFailed" = "Execution failed";
+"chat.diagnostic.runCancelled" = "Execution cancelled";
+"chat.diagnostic.contextCheck" = "Context budget checked";
+"chat.diagnostic.compactionStarted" = "Compaction started";
+"chat.diagnostic.compactionFinished" = "Compaction finished";
+"chat.diagnostic.compactionFailed" = "Compaction failed";
+"chat.diagnostic.compactionSkipped" = "Compaction skipped";
+"chat.diagnostic.requestStarted" = "Model request started";
+"chat.diagnostic.requestFinished" = "Model request finished";
+"chat.diagnostic.requestFailed" = "Model request failed";
+"chat.diagnostic.summaryStarted" = "Summary started";
+"chat.diagnostic.summaryFinished" = "Summary finished";
+"chat.diagnostic.summaryFailed" = "Summary failed";
+"chat.diagnostic.limitReached" = "Execution limit reached";
+"chat.diagnostic.toolRequested" = "Tool requested";
+"chat.diagnostic.toolFinished" = "Tool finished";
+"chat.diagnostic.toolSkipped" = "Tool skipped";
+"chat.diagnostic.wrapUpStarted" = "Final answer started";
+"chat.diagnostic.wrapUpFinished" = "Final answer finished";
+"chat.diagnostic.unknown" = "Execution event";
+"chat.metric.contextTokens" = "Context tokens";
+"chat.metric.thresholdTokens" = "Compaction threshold";
+"chat.metric.retainedTokens" = "Recent tokens retained";
+"chat.metric.afterTokens" = "Tokens after compaction";
+"chat.metric.forced" = "Forced recovery";
+"chat.metric.turnIndex" = "Turn index";
+"chat.metric.toolCalls" = "Tool attempts used";
+"chat.metric.maxToolCalls" = "Tool attempt limit";
+"chat.metric.maxTurns" = "Turn limit";
+"chat.metric.blockedCalls" = "Blocked calls";
+"chat.metric.callOrdinal" = "Call number";
+"chat.metric.inputTokens" = "Input tokens";
+"chat.metric.outputTokens" = "Output tokens";
+"chat.metric.maxOutputTokens" = "Output budget";
+"chat.metric.messageCount" = "Message count";
+"chat.metric.toolCount" = "Tool count";
+"chat.metric.durationMs" = "Duration (ms)";
+"chat.metric.availableScalars" = "Available Unicode scalars";
+"chat.metric.returnedScalars" = "Returned Unicode scalars";
+"chat.metric.hasMore" = "More content available";
+"chat.metric.isError" = "Error";
+"chat.step.context" = "Context window";
+"chat.context.api" = "API";
+"chat.context.api_cached" = "API (cached)";
+"chat.context.table" = "Local table";
+"chat.context.fallback" = "Fixed fallback";
+"chat.context.tokens" = "%ld tokens";
+"chat.context.catalog_version" = "Catalog: %@";
+"chat.context.unknown" = "Origin not recorded";
+"chat.context.kind.input" = "Input limit";
+"chat.context.kind.combined" = "Combined context window";
+"chat.metric.omittedCharacters" = "Characters omitted from summary input";
+
+// Selected-model metadata refresh
+"chat.context.refresh.cacheFresh" = "Metadata cache is current";
+"chat.context.refresh.fetched" = "Model metadata refreshed from API";
+"chat.context.refresh.notReported" = "API did not report the context window";
+"chat.context.refresh.unsupported" = "Context metadata detail refresh is unsupported by this API";
+"chat.context.refresh.unavailable" = "Credentials unavailable for metadata refresh";
+"chat.context.refresh.failed" = "Metadata refresh failed; retained available capacity data";
+"chat.context.refresh.deferred" = "Metadata retry interval is active";
+
+// Workload and payload diagnostics
+"chat.metric.omittedScalars" = "Preview scalars omitted";
+"chat.metric.omittedItems" = "Metadata items omitted";
+"chat.metric.deferredScalars" = "Scalars remaining";
+"chat.metric.deferredItems" = "Items remaining";
+"chat.metric.searchResultLimit" = "Search result window limit";
+"chat.metric.searchWindowFull" = "Search window at capacity";
+"chat.metric.selectedSources" = "Sources in work plan";
+"chat.metric.selectedParts" = "Readable source parts";
+"chat.metric.estimatedReadPages" = "Estimated read pages";
+"chat.metric.progressCalls" = "Distinct progress calls";
+"chat.metric.serializedToolOmittedCharacters" = "Tool-result characters omitted in summary";
+"chat.metric.fittedHistoryOmittedCharacters" = "History characters omitted to fit summary";
+"chat.metric.returnedItems" = "Items returned";
+"chat.metric.mutationsCommitted" = "Artifact mutations committed";
+"chat.diagnostic.payloadClipped" = "Preview clipped";
+"chat.diagnostic.payloadPaged" = "More content available";
+"chat.diagnostic.budgetExtended" = "Execution budget extended after progress";
+
+"chat.metric.hardMaxTurns" = "Absolute turn ceiling";
+"chat.metric.hardMaxToolCalls" = "Absolute tool-call ceiling";
+"chat.metric.minimumProgress" = "Minimum distinct progress calls";
+"chat.metric.idleCalls" = "Calls since last distinct progress";
+"chat.diagnostic.budgetExtensionDenied" = "Budget extension denied";
+
+/* Output budgets and per-request usage */
+"chat.diagnostic.outputBudgetExtended" = "Output allowance increased; retrying an empty reply";
+"chat.diagnostic.outputBudgetExtensionDenied" = "Output allowance increase denied";
+"chat.metric.hardMaxOutputTokens" = "Maximum output allowance";
+"chat.metric.previousMaxOutputTokens" = "Previous output allowance";
+"chat.metric.outputRetries" = "Output retries";
+"chat.metric.visibleTextScalars" = "Visible text scalars";
+"chat.metric.streamedText" = "Text streamed (1 = yes)";
+"chat.metric.returnedToolCalls" = "Tool calls returned";
+"chat.metric.discardedToolCalls" = "Tool calls discarded";
+"chat.metric.outputLimited" = "Output limit reached (1 = yes)";
+"chat.metric.usageReported" = "Usage reported (1 = yes)";
+"chat.metric.reasoningTokens" = "Reported reasoning tokens";
+"chat.metric.costLimitReached" = "Cost limit reached (1 = yes)";
+
+/* Dynamic output headroom */
+"chat.diagnostic.outputRetryStarted" = "Output recovery started";
+"chat.diagnostic.outputRetryDenied" = "Output recovery not applied";
+"chat.metric.contextSafetyTokens" = "Context safety margin";
+"chat.metric.contextSafetyRelaxed" = "Low-headroom rule used (1 = yes)";
+"chat.metric.availableOutputTokens" = "Output headroom after safety margin";
+"chat.metric.outputCapacityFallback" = "Fallback output capacity used (1 = yes)";
+"chat.diagnostic.outputBudgetAdjusted" = "Output allowance adjusted for the API minimum";
+"chat.metric.sentMaxOutputTokens" = "Output allowance sent to the API";
+
+"chat.diagnostic.replayPrepared" = "History prepared for the API";
