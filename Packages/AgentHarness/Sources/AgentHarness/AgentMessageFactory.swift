@@ -33,6 +33,7 @@ enum AgentMessageFactory {
             guard case .toolCall(let call, let complete) = block.content else { return block }
             var metadata: [String: JSONValue] = [:]
             if case .object(let original) = call.providerMetadata { metadata = original }
+            else if let original = call.providerMetadata { metadata["originalProviderMetadata"] = original }
             let id: String
             if AgentContentMessage.validID(call.id), seen.insert(call.id).inserted { id = call.id }
             else { id = UUID().uuidString; metadata["originalCallID"] = .string(call.id) }

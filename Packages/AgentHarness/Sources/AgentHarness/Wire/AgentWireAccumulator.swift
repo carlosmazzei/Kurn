@@ -110,6 +110,7 @@ struct AgentWireState {
             if !call.id.isEmpty, auditIDs.insert(call.id).inserted { return block }
             var metadata: [String: JSONValue] = [:]
             if case .object(let original) = call.providerMetadata { metadata = original }
+            else if let original = call.providerMetadata { metadata["originalProviderMetadata"] = original }
             metadata["originalCallID"] = .string(call.id)
             let audit = AgentToolCall(id: "\(callIDPrefix)-\(block.id)", name: call.name, arguments: call.arguments,
                 rawArguments: call.rawArguments, providerMetadata: .object(metadata), namespace: call.namespace, invocationID: call.invocationID)

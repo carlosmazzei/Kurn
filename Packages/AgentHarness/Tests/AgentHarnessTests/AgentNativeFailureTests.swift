@@ -22,6 +22,16 @@ struct AgentNativeFailureTests {
         #expect(Set(calls.compactMap(\.invocationID)).count == 2 && !calls.contains { $0.invocationID == "untrusted-local-id" })
     }
 
+    @Test func failureAuditRetainsNonObjectOpaqueCallMetadata() throws {
+        let raw: JSONValue = .array([.string("opaque=="), .object(["future": .bool(true)])])
+        let call = AgentToolCall(id: "call", name: "lookup", arguments: .null, rawArguments: "{private", providerMetadata: raw)
+        let message = try AgentMessageFactory.failure(.transport,
+            blocks: [AgentContentBlock(id: "call", content: .toolCall(call, complete: false))],
+            request: AgentRequestIdentity(), descriptor: nil)
+        #expect(message.toolCalls.first?.providerMetadata?["originalProviderMetadata"] == raw)
+        #expect(message.toolCalls.first?.rawArguments == "{private")
+    }
+
     @Test func oversizedToolOutputStillClosesCorrelatedDiagnostics() async throws {
         let capture = DiagnosticCapture()
         let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()])])
