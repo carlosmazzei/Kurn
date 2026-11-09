@@ -33,7 +33,7 @@ extension AgentWireState {
             if let signature = part["thoughtSignature"].string { metadata["thoughtSignature"] = .string(signature) }
             let args = function["args"] == .null ? JSONValue.object([:]) : function["args"]
             let call = AgentToolCall(id: wireID ?? "\(callIDPrefix)-\(index)", name: name, arguments: args,
-                                    rawArguments: try args.encodedString(), providerMetadata: metadata.isEmpty ? nil : .object(metadata))
+                                    rawArguments: try args.encodedString(), providerMetadata: metadata.isEmpty ? nil : .object(metadata), namespace: function["namespace"].string)
             if function["partialArgs"] != .null || function["willContinue"] == .bool(true) { throw AgentWireError.incompleteToolCall }
             if block(slot) == nil { try start(slot, .toolCall(call, complete: false)) }
             else { try update(slot, .toolCall(call, complete: false)) }

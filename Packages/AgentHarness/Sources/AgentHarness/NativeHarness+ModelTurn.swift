@@ -17,7 +17,9 @@ extension NativeHarness {
             try await compact(settings, state: &state, events: events, trace: trace)
             if costLimitReached(state) { return nil }
             settings.outputBudget.fit(inputTokens: contextTokens(settings, state: state))
-            let stream = AgentTurnStream(events: events, trace: trace)
+            let requestIdentity = AgentRequestIdentity(purpose: settings.allowsToolCalls ? .response : .wrapUp)
+            trace.beginRequest(requestIdentity)
+            let stream = AgentTurnStream(events: events, trace: trace, request: requestIdentity, descriptor: model.descriptor)
             let started = ContinuousClock.now
             var requestMetrics = settings.outputBudget.diagnosticMetrics
             requestMetrics.merge([.turnIndex: state.turns - 1, .messageCount: state.context.count,
@@ -25,15 +27,16 @@ extension NativeHarness {
             trace.record(.requestStarted, metrics: requestMetrics)
             let response: AgentTurnResponse
             do {
-                response = try await model.streamTurn(
+                let raw = try await model.streamTurn(
                     AgentTurnRequest(systemPrompt: settings.systemPrompt, messages: state.context,
                                      tools: settings.tools, maxOutputTokens: settings.maxOutputTokens,
-                                     allowsToolCalls: settings.allowsToolCalls)
+                                     allowsToolCalls: settings.allowsToolCalls).identified(requestIdentity)
                 ) { stream.consume($0) }
-                try stream.complete(response)
+                response = try stream.complete(raw)
                 try Task.checkCancellation()
             } catch {
                 stream.fail(error)
+                try recordFailure(stream, state: &state, events: events, trace: trace)
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
                 try Task.checkCancellation()
                 guard !retried, !stream.hasVisibleText, isContextOverflow(error) else { throw error }
@@ -73,8 +76,10 @@ extension NativeHarness {
         settings.outputBudget.didRecover()
         facts[.outputRetries] = settings.outputBudget.retries
         trace.record(.outputRetryStarted, metrics: facts, reason: .outputLimit)
-        state.history.append(try response.auditMessage())
-        AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
+        let interrupted = try response.auditMessage()
+        events.yield(.messageAppended(interrupted))
+        state.history.append(interrupted)
+        try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
         state.responseAlreadyAudited = true
         if let usage = response.usage, usage.inputTokens > 0 {
             // Preserve reported input size without counting the discarded response or its calls.
@@ -192,23 +197,43 @@ extension NativeHarness {
         metrics.merge([.maxOutputTokens: request.maxOutputTokens, .omittedCharacters: request.contextOmittedCharacters,
                        .serializedToolOmittedCharacters: request.serializedToolOmittedCharacters,
                        .fittedHistoryOmittedCharacters: request.fittedHistoryOmittedCharacters]) { _, current in current }
-        trace.record(.summaryStarted, metrics: metrics)
         let response: AgentTurnResponse
-        let stream = AgentTurnStream(events: events, trace: trace, forwardsText: false)
+        let requestIdentity = AgentRequestIdentity(purpose: .summary)
+        trace.beginRequest(requestIdentity)
+        trace.record(.summaryStarted, metrics: metrics)
+        let stream = AgentTurnStream(events: events, trace: trace, request: requestIdentity, descriptor: model.descriptor, forwardsText: false)
         do {
-            response = try await model.streamTurn(request) { stream.consume($0) }
-            try stream.complete(response)
+            let raw = try await model.streamTurn(request.identified(requestIdentity)) { stream.consume($0) }
+            response = try stream.complete(raw)
         } catch {
             stream.fail(error)
+            // Summary failures are protocol/audit data, never usable compaction checkpoints.
+            try recordFailure(stream, state: &state, events: events, trace: trace)
             trace.record(.summaryFailed, metrics: [.protocolFailure: stream.failureCode])
             throw error
         }
         try Task.checkCancellation()
+        if response.stopReason == .error || response.stopReason == .aborted || response.stopReason == .deferred {
+            let message = try response.auditMessage()
+            events.yield(.messageAppended(message))
+            state.history.append(message)
+            try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
+        }
         record(response.usage, state: &state, events: events)
         trace.record(.summaryFinished, metrics: response.diagnosticMetrics,
                      reason: response.stopReason == .maxTokens ? .outputLimit : nil)
         let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
         return response.stopReason != .endTurn || !response.toolCalls.isEmpty || text.isEmpty ? .unusable : .text(text)
+    }
+
+    private func recordFailure(_ stream: AgentTurnStream, state: inout AgentRunState,
+                               events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter) throws {
+        guard let message = stream.failureMessage else { return }
+        let failure = AgentMessage.content(message)
+        events.yield(.messageAppended(failure))
+        state.history.append(failure)
+        let response = AgentTurnResponse(text: message.text, message: message, blocksToolExecution: true)
+        try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
     }
 
 }

@@ -8,9 +8,10 @@ extension LLMHTTP {
         _ request: URLRequest,
         session: URLSession,
         format: AgentWireFormat,
+        identity: AgentRequestIdentity? = nil,
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
-        let accumulator = AgentWireAccumulator(format: format)
+        let accumulator = AgentWireAccumulator(format: format, requestID: identity?.id ?? UUID().uuidString)
         do {
             try await streamSSE(request, session: session, policy: .interactive(totalDeadline: chatTimeout)) { payload in
                 for event in try accumulator.consume(payload) { onEvent(event) }
@@ -28,4 +29,16 @@ extension LLMHTTP {
             }
         }
     }
+    static func agentStreamFailure(_ error: Error) -> AgentStreamFailure {
+        if error is CancellationError { return .cancelled }
+        if let app = error as? AppError {
+            switch app {
+            case .decodingError: return .invalidStream
+            case .networkError(let urlError): return urlError.code == .cancelled ? .cancelled : .transport
+            default: break
+            }
+        }
+        return AgentStreamFailure.classify(error)
+    }
+
 }

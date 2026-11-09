@@ -65,10 +65,12 @@ resources and in `KurnTests/Fixtures`; they pin legacy message/wire/step codecs,
 source selections and artifact/session restoration before canonical migration.
 `Tools/check_native_harness_contracts.py` validates all 27 components/70 acceptance
 cases, evidence links, profile exclusions and fixture hashes in CI. Legacy evidence
-is separate from target conformance. NH02 activates native user/assistant content
-at the provider/runtime boundary, with ordered blocks, final reconciliation, replay
-copies and terminal preparation failures. The app still uses its V5 presentation store;
-canonical tool-result identities and durable entry/history migration remain future work. Keep fixture-version,
+is separate from target conformance. NH02 activates native user/assistant/tool-result messages at the provider/runtime
+boundary, with ordered blocks, final reconciliation, replay copies and canonical failure
+snapshots. The harness assigns request and logical invocation IDs before execution;
+provider call IDs may recur. Diagnostics correlate session/run/request/invocation IDs.
+Historical unknown timestamps/API/model remain absent. The app still uses its V5
+presentation store; indexed entries and durable canonical history migration remain NH03. Keep fixture-version,
 contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
 
 `ChatSourceScope` persists meeting/tag/folder/library selection,

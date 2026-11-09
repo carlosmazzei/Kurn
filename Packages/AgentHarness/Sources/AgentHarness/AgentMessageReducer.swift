@@ -59,7 +59,7 @@ public struct AgentMessageReducer: Sendable {
             case (.toolCall(let call, false), .toolCall(let id, let name, let arguments)):
                 let raw = call.rawArguments + (arguments ?? "")
                 content = .toolCall(AgentToolCall(id: id ?? call.id, name: call.name + (name ?? ""),
-                    arguments: .null, rawArguments: raw, providerMetadata: call.providerMetadata), complete: false)
+                    arguments: .null, rawArguments: raw, providerMetadata: call.providerMetadata, namespace: call.namespace, invocationID: call.invocationID), complete: false)
                 added = (id?.utf8.count ?? 0) + (name?.utf8.count ?? 0) + (arguments?.utf8.count ?? 0)
             default: throw AgentContentError.invalidTransition
             }

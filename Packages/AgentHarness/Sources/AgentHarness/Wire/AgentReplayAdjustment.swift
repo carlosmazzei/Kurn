@@ -2,14 +2,16 @@ import Foundation
 
 /// Fixed counts only. No reasoning, images, signatures or raw arguments enter diagnostic logs.
 public struct AgentReplayAdjustment: Sendable, Equatable {
+    public internal(set) var omittedMessages = 0
     public internal(set) var omittedThinkingBlocks = 0
     public internal(set) var omittedImages = 0
+    public internal(set) var omittedNamespaces = 0
     public internal(set) var normalizedCallIDs = 0
     public internal(set) var sanitizedArguments = 0
     public internal(set) var strippedSignatures = 0
     public var hasChanges: Bool { diagnosticMetrics.values.contains { $0 > 0 } }
     var diagnosticMetrics: [AgentDiagnostic.Metric: Int] {
-        [.omittedThinkingBlocks: omittedThinkingBlocks, .omittedImages: omittedImages,
+        [.omittedMessages: omittedMessages, .omittedThinkingBlocks: omittedThinkingBlocks, .omittedImages: omittedImages, .omittedNamespaces: omittedNamespaces,
          .normalizedCallIDs: normalizedCallIDs, .sanitizedArguments: sanitizedArguments, .strippedSignatures: strippedSignatures]
     }
 }

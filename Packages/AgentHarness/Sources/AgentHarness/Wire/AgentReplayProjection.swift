@@ -6,24 +6,48 @@ struct AgentReplayProjection {
     let format: AgentWireFormat
     let model: String
     var adjustment = AgentReplayAdjustment()
+    var invocations: [String: String] = [:]
+    var skippedInvocations = Set<String>()
     var ids: [String: String] = [:]
     var used = Set<String>()
 
     mutating func messages(_ messages: [AgentMessage]) -> [AgentMessage] {
-        messages.map { message in
+        messages.compactMap { message in
             switch message {
             case .content(let value):
+                if value.stopReason == .error || value.stopReason == .aborted || value.stopReason == .deferred {
+                    skippedInvocations.formUnion(value.toolCalls.compactMap(\.invocationID))
+                    adjustment.omittedMessages += 1
+                    return nil
+                }
                 recordOmissions(value)
                 let copy = value.projectingToolCalls { original, complete in
                     let id = wireID(original.id, namespace: value.id)
                     ids[original.id] = id
+                    if let invocation = original.invocationID { invocations[invocation] = id }
+                    if original.namespace != nil { adjustment.omittedNamespaces += 1 }
                     if id != original.id { adjustment.normalizedCallIDs += 1 }
                     if !complete || !original.hasValidArguments { adjustment.sanitizedArguments += 1 }
                     let raw = complete && original.hasValidArguments ? original.rawArguments : "{}"
                     return AgentToolCall(id: id, name: original.name, arguments: (try? JSONValue.parse(raw)) ?? .object([:]),
-                        rawArguments: raw, providerMetadata: compatible(value) ? original.providerMetadata : nil)
+                        rawArguments: raw, providerMetadata: compatible(value) ? original.providerMetadata : nil,
+                        namespace: original.namespace, invocationID: original.invocationID)
                 }
                 return .content(copy)
+            case .tool(let result):
+                if skippedInvocations.contains(result.invocation.id) {
+                    adjustment.omittedMessages += 1
+                    return nil
+                }
+                let callID = invocations[result.invocation.id] ?? ids[result.invocation.callID] ?? result.invocation.callID
+                let text = result.blocks.map { block -> String in
+                    switch block.content {
+                    case .text(let text, _): return text
+                    case .image: adjustment.omittedImages += 1; return AgentWireFormat.omittedImage
+                    default: return "" // The checked result codec forbids thinking/tool blocks.
+                    }
+                }.joined()
+                return .toolResult(callID: callID, toolName: result.invocation.toolName, content: text, isError: result.isError)
             case .assistant(_, let calls, _):
                 for call in calls { ids[call.id] = call.id; used.insert(call.id) }
                 return message

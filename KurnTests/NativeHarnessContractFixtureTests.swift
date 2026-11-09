@@ -114,7 +114,7 @@ struct NativeHarnessContractFixtureTests {
         for _ in 0..<2_000 where vm.isResponding { try? await Task.sleep(for: .milliseconds(5)) }
         #expect(!vm.isResponding && vm.error == nil)
         let request = try #require(await model.requests.first)
-        #expect(request.messages == [.user("Pergunta anterior"), .assistant(text: "Resposta anterior [0:12]", toolCalls: []),
+        #expect(request.messages.map(\.legacyProjection) == [.user("Pergunta anterior"), .assistant(text: "Resposta anterior [0:12]", toolCalls: []),
                                       .user("Nova pergunta")])
         let serialized = String(describing: request)
         #expect(!serialized.contains("EXCLUDED LEGACY CITATION"))

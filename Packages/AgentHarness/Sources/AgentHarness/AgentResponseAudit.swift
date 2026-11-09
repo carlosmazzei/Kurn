@@ -19,13 +19,8 @@ extension AgentTurnResponse {
             role: .assistant, blocks: blocks, stopReason: stopReason, usage: usage, providerMetadata: providerMetadata)
     }
 
-    func auditMessage() throws -> AgentMessage {
-        if message != nil || !stopReason.permitsToolExecution || !blockedToolCalls.isEmpty { return .content(try finalizedMessage()) }
-        return .assistant(text: text, toolCalls: toolCalls.map { call in
-            AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(call.rawArguments)) ?? .null,
-                          rawArguments: call.rawArguments, providerMetadata: call.providerMetadata)
-        }, providerMetadata: providerMetadata)
-    }
+    func auditMessage() throws -> AgentMessage { .content(try finalizedMessage()) }
+
 }
 
 enum AgentResponseAudit {
@@ -33,13 +28,21 @@ enum AgentResponseAudit {
     static func appendBlocked(_ response: AgentTurnResponse, state: inout AgentRunState,
                               events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                               trace: AgentTraceEmitter, toContext: Bool,
-                              content: String = "Tool not executed: the model response was interrupted or deferred.") {
+                              syntheticReason: AgentToolBlockReason = .interruptedResponse,
+                              content: String = "Tool not executed: the model response was interrupted or deferred.") throws {
         for call in response.blockedToolCalls {
+            guard let requestID = response.message?.identity?.requestID else { throw AgentWireError.invalidResponse }
+            let invocation = try AgentMessageFactory.invocation(call, requestID: requestID)
+            trace.beginInvocation(invocation)
+            defer { trace.endInvocation() }
             state.requestedCalls += 1
             trace.record(.toolRequested, metrics: [.callOrdinal: state.requestedCalls, .toolCalls: state.toolCalls])
             trace.record(.toolSkipped, metrics: [.callOrdinal: state.requestedCalls, .isError: 1],
                          reason: response.stopReason == .maxTokens ? .outputLimit : nil)
-            let result = AgentMessage.toolResult(callID: call.id, toolName: call.name, content: content, isError: true)
+            let reason: AgentToolBlockReason = response.stopReason == .maxTokens ? .outputLimit : syntheticReason
+            let result = try AgentMessageFactory.result(invocation, output: AgentToolOutput(content: content, summary: content),
+                                                        isError: true, syntheticReason: reason)
+            events.yield(.messageAppended(result))
             state.history.append(result)
             if toContext { state.context.append(result) }
             trace.record(.toolFinished, metrics: [.callOrdinal: state.requestedCalls, .isError: 1])

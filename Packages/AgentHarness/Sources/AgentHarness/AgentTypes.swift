@@ -19,19 +19,25 @@ public struct AgentToolCall: Codable, Sendable, Equatable {
     public let rawArguments: String
     /// Opaque wire metadata needed when replaying a call, such as a Gemini thought signature.
     public let providerMetadata: JSONValue?
+    public let namespace: String?
+    public let invocationID: String?
 
-    public init(id: String, name: String, arguments: JSONValue, rawArguments: String, providerMetadata: JSONValue? = nil) {
+    public init(id: String, name: String, arguments: JSONValue, rawArguments: String, providerMetadata: JSONValue? = nil,
+                namespace: String? = nil, invocationID: String? = nil) {
         self.id = id
         self.name = name
         self.arguments = arguments
         self.rawArguments = rawArguments
         self.providerMetadata = providerMetadata
+        self.namespace = namespace
+        self.invocationID = invocationID
     }
 }
 
 public enum AgentMessage: Codable, Sendable, Equatable {
     /// Native v1 content. Legacy cases retain their original Codable bytes for migration.
     case content(AgentContentMessage)
+    case tool(AgentToolResultMessage)
     case user(String)
     case assistant(text: String, toolCalls: [AgentToolCall], providerMetadata: JSONValue? = nil)
     case toolResult(callID: String, toolName: String, content: String, isError: Bool)
@@ -75,6 +81,7 @@ public struct AgentTurnRequest: Sendable, Equatable {
     public let contextOmittedCharacters: Int
     public let serializedToolOmittedCharacters: Int
     public let fittedHistoryOmittedCharacters: Int
+    public private(set) var identity: AgentRequestIdentity?
 
     public init(systemPrompt: String, messages: [AgentMessage], tools: [AgentToolSpec], maxOutputTokens: Int,
                 allowsToolCalls: Bool = true, contextOmittedCharacters: Int = 0,
@@ -87,6 +94,13 @@ public struct AgentTurnRequest: Sendable, Equatable {
         self.contextOmittedCharacters = contextOmittedCharacters
         self.serializedToolOmittedCharacters = serializedToolOmittedCharacters
         self.fittedHistoryOmittedCharacters = fittedHistoryOmittedCharacters
+        self.identity = nil
+    }
+
+    public func identified(_ identity: AgentRequestIdentity) -> Self {
+        var copy = self
+        copy.identity = identity
+        return copy
     }
 }
 
@@ -129,9 +143,12 @@ public struct AgentTurnResponse: Sendable, Equatable {
 }
 
 public protocol AgentModel: Sendable {
+    var descriptor: AgentModelDescriptor? { get }
     func streamTurn(_ request: AgentTurnRequest,
                     onEvent: @escaping @Sendable (AgentModelEvent) -> Void) async throws -> AgentTurnResponse
 }
+
+public extension AgentModel { var descriptor: AgentModelDescriptor? { nil } }
 
 public struct AgentToolOutput: Sendable, Equatable {
     public let content: String
@@ -201,6 +218,9 @@ public struct AgentRunOutcome: Sendable, Equatable {
 
 public enum AgentEvent: Sendable, Equatable {
     case runStarted
+    case requestStarted(AgentRequestIdentity)
+    case invocationRegistered(AgentToolInvocation)
+    case messageAppended(AgentMessage)
     case contextResolved(AgentContextResolution)
     case diagnostic(AgentDiagnostic)
     case turnStarted(index: Int)

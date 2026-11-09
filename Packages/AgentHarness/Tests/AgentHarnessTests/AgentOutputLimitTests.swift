@@ -18,10 +18,11 @@ import Testing
         #expect(outcome.finalText == text)
         #expect(outcome.totalUsage == usage)
         guard case .content(let message) = outcome.messages[1] else { Issue.record("Missing interrupted assistant audit"); return }
-        #expect(message.toolCalls == (hasTools ? [agentCall()] : []))
+        #expect(outcome.messages[1].legacyProjection == .assistant(text: text, toolCalls: hasTools ? [agentCall()] : []))
+        #expect(message.toolCalls.allSatisfy { $0.invocationID != nil })
         #expect(message.text == text && message.stopReason == .maxTokens)
         if hasTools {
-            guard case .toolResult("1", "lookup", _, true) = outcome.messages.last else { Issue.record("Missing blocked result"); return }
+            guard case .toolResult("1", "lookup", _, true) = outcome.messages.last?.legacyProjection else { Issue.record("Missing blocked result"); return }
         } else { #expect(outcome.messages.count == 2) }
         #expect(await model.requests.count == 1)
         #expect(!events.contains { if case .toolStarted = $0 { return true }; return false })
@@ -41,7 +42,7 @@ import Testing
         let requests = await model.requests
         #expect(requests.count == 2)
         #expect(requests[0].tools.isEmpty)
-        #expect(requests[1].messages == history + [.user("Question")])
+        #expect(requests[1].messages.map(\.legacyProjection) == history + [.user("Question")])
         #expect(!events.contains { if case .contextCompacted = $0 { return true }; return false })
         #expect(Array(try agentOutcome(events).messages.prefix(history.count)) == history)
         #expect(try agentOutcome(events).totalUsage == usage)

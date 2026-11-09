@@ -157,9 +157,12 @@ extension ProviderHTTPTests {
         }
         MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
         let text = StreamingAccumulator()
-        let response = try await vendor.model().streamTurn(agentRequest) { event in
+        let identity = AgentRequestIdentity()
+        let response = try await vendor.model().streamTurn(agentRequest.identified(identity)) { event in
             if case .textDelta(let delta) = event { text.append(delta) }
         }
+        #expect(response.message?.identity?.requestID == identity.id)
+        #expect(vendor.model().descriptor?.api == response.message?.identity?.api)
         #expect(text.value == "Hello")
         #expect(response.text == "Hello")
         #expect(response.toolCalls.isEmpty)
@@ -212,6 +215,14 @@ extension ProviderHTTPTests {
             #expect(received == [.content(.failed(.preparation))])
         }
     }
+    @Test func hostClassifiesProtocolAndCancellationFailures() {
+        #expect(LLMHTTP.agentStreamFailure(AppError.decodingError("private")) == .invalidStream)
+        #expect(LLMHTTP.agentStreamFailure(AppError.networkError(URLError(.cancelled))) == .cancelled)
+        #expect(LLMHTTP.agentStreamFailure(AppError.networkError(URLError(.timedOut))) == .transport)
+        #expect(LLMHTTP.agentStreamFailure(CancellationError()) == .cancelled)
+        #expect(LLMHTTP.agentStreamFailure(AppError.apiError(statusCode: 500, message: "private")) == .transport)
+    }
+
     @Test func agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced() async throws {
         let thought = AgentContentBlock(id: "thought", content: .thinking(text: "private", signature: "opaque", redacted: false))
         let prior = try AgentContentMessage(id: "prior", timestampMilliseconds: 123, role: .assistant, blocks: [thought],

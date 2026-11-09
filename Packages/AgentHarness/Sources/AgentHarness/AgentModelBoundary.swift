@@ -5,6 +5,7 @@ import Foundation
 public enum AgentModelBoundary {
     public static func perform<Prepared: Sendable>(
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void,
+        classifyFailure: @Sendable (Error) -> AgentStreamFailure = { AgentStreamFailure.classify($0) },
         prepare: @Sendable () throws -> Prepared,
         stream: @Sendable (Prepared) async throws -> AgentTurnResponse
     ) async throws -> AgentTurnResponse {
@@ -21,7 +22,7 @@ public enum AgentModelBoundary {
             return AgentTurnResponse(text: response.text, usage: response.usage, stopReason: response.stopReason,
                 providerMetadata: response.providerMetadata, discardedToolCalls: response.discardedToolCalls, message: message, blocksToolExecution: response.toolExecutionBlocked)
         } catch {
-            onEvent(.content(.failed(error is CancellationError ? .cancelled : (error as? AgentWireError) == .deferred ? .deferred : .transport)))
+            onEvent(.content(.failed(classifyFailure(error))))
             throw error
         }
     }

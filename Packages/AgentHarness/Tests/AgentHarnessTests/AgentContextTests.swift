@@ -153,7 +153,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(requests.count == 2)
         #expect(requests[0].tools.isEmpty)
         #expect(requests[0].systemPrompt == AgentCompactionPrompts.standard.system)
-        #expect(requests[1].messages == [.user(AgentContextCompactor.summaryPrefix
+        #expect(requests[1].messages.map(\.legacyProjection) == [.user(AgentContextCompactor.summaryPrefix
             + "No prior history.\n\n---\n\n**Turn context (split turn):**\n\nTurn summary"), history[1], .user("Question")])
         #expect(requests[1].tools == [agentTool().spec])
         #expect(!events.contains(.textDelta("Turn summary")))

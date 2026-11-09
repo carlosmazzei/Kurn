@@ -33,7 +33,7 @@ struct AgentDiagnosticTests {
         #expect(Set(diagnostics.map(\.runID)).count == 1)
         let replay = try #require(await model.requests.last)
         #expect(!replay.allowsToolCalls)
-        #expect(replay.messages.filter { if case .toolResult(_, _, _, false) = $0 { return true }; return false }.count == 51)
+        #expect(replay.messages.filter { if case .toolResult(_, _, _, false) = $0.legacyProjection { return true }; return false }.count == 51)
     }
 
     @Test func capacitySnapshotPrecedesContextCheckAndEveryRequestSharesItsIdentity() async throws {

@@ -182,11 +182,12 @@ struct GoogleProvider: LLMProvider {
 }
 
 extension GoogleProvider: AgentModel {
+    var descriptor: AgentModelDescriptor? { AgentModelDescriptor(api: "gemini", model: model) }
     func streamTurn(
         _ request: AgentTurnRequest,
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
-        try await AgentModelBoundary.perform(onEvent: onEvent, prepare: {
+        try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
             var httpRequest = try makeStreamRequest(timeout: LLMHTTP.chatTimeout, body: [:])
             let projection = AgentWireFormat.gemini.requestProjection(request, model: model)
@@ -194,7 +195,7 @@ extension GoogleProvider: AgentModel {
             httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
             return httpRequest
         }, stream: { prepared in
-            try await LLMHTTP.streamAgent(prepared, session: session, format: .gemini, onEvent: onEvent)
+            try await LLMHTTP.streamAgent(prepared, session: session, format: .gemini, identity: request.identity, onEvent: onEvent)
         })
     }
 }

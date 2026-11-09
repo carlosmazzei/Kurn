@@ -85,7 +85,7 @@ public struct AgentRunTrace: Sendable, Equatable {
             var step = AgentRunStep(kind: .stop, status: .finished)
             step.stopReason = outcome.stopReason
             steps.append(step)
-        case .textDelta, .modelContent: break
+        case .textDelta, .modelContent, .messageAppended, .requestStarted, .invocationRegistered: break
         }
     }
 

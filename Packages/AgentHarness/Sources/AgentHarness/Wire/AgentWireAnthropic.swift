@@ -47,7 +47,7 @@ extension AgentWireState {
             let input = content["input"] == .null ? JSONValue.object([:]) : content["input"]
             let raw = input == .object([:]) ? "" : try input.encodedString()
             try start(index, .toolCall(AgentToolCall(id: content["id"].string ?? "", name: content["name"].string ?? "",
-                arguments: input, rawArguments: raw), complete: false))
+                arguments: input, rawArguments: raw, namespace: content["namespace"].string), complete: false))
         default: throw AgentWireError.invalidResponse
         }
     }
@@ -70,7 +70,8 @@ extension AgentWireState {
         if case .toolCall(let call, _) = current.content {
             let raw = call.rawArguments.isEmpty ? "{}" : call.rawArguments
             try update(index, .toolCall(AgentToolCall(id: call.id, name: call.name,
-                arguments: (try? JSONValue.parse(raw)) ?? .null, rawArguments: raw), complete: true))
+                arguments: (try? JSONValue.parse(raw)) ?? .null, rawArguments: raw, providerMetadata: call.providerMetadata,
+                namespace: call.namespace, invocationID: call.invocationID), complete: true))
         }
     }
 }

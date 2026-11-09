@@ -32,20 +32,22 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case contextSafetyTokens, contextSafetyRelaxed, availableOutputTokens, outputCapacityFallback
         case sentMaxOutputTokens
         case contentBlocks, thinkingBlocks, invalidToolCalls, incompleteToolCalls, protocolFailure, modelStopReason
-        case omittedThinkingBlocks, omittedImages, normalizedCallIDs, sanitizedArguments, strippedSignatures
+        case omittedMessages, omittedThinkingBlocks, omittedImages, omittedNamespaces, normalizedCallIDs, sanitizedArguments, strippedSignatures
         case visibleTextScalars, streamedText, returnedToolCalls, discardedToolCalls, outputLimited, usageReported, reasoningTokens, costLimitReached
     }
 
     public let runID: UUID
     public let sequence: Int
     public let recordedAt: Date
+    public let correlation: AgentDiagnosticCorrelation?
     public let resolutionID: UUID?
     public let kind: Kind
     public let metrics: [Metric: Int]
     public let stopReason: AgentRunStopReason?
 
     public init(runID: UUID, sequence: Int, kind: Kind, metrics: [Metric: Int] = [:],
-                stopReason: AgentRunStopReason? = nil, resolutionID: UUID? = nil, recordedAt: Date = Date()) {
+                stopReason: AgentRunStopReason? = nil, resolutionID: UUID? = nil, recordedAt: Date = Date(),
+                correlation: AgentDiagnosticCorrelation? = nil) {
         self.runID = runID
         self.sequence = sequence
         self.kind = kind
@@ -53,11 +55,13 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         self.stopReason = stopReason
         self.resolutionID = resolutionID
         self.recordedAt = recordedAt
+        self.correlation = correlation
     }
 
     public var logLine: String {
         let numbers = metrics.sorted { $0.key.rawValue < $1.key.rawValue }.map { "\($0.key.rawValue)=\($0.value)" }
         return (["agent.\(kind.rawValue)", "run=\(runID)", "sequence=\(sequence)"]
+                + correlation.map { $0.logFields }.defaultingToEmpty
                 + resolutionID.map { ["resolution=\($0)"] }.defaultingToEmpty
                 + stopReason.map { ["reason=\($0.rawValue)"] }.defaultingToEmpty + numbers).joined(separator: " ")
     }
@@ -72,17 +76,34 @@ private extension Optional where Wrapped == [String] {
 final class AgentTraceEmitter: @unchecked Sendable {
     private let lock = NSLock()
     private var sequence = 0
-    private let runID = UUID()
+    private let runID: UUID
+    private let sessionID: String
+    private var requestID: String?
+    private var invocationID: String?
     private let resolutionID: UUID?
     private let events: AsyncThrowingStream<AgentEvent, Error>.Continuation
     private let sink: @Sendable (AgentDiagnostic) -> Void
 
     init(events: AsyncThrowingStream<AgentEvent, Error>.Continuation, resolutionID: UUID?,
-         sink: @escaping @Sendable (AgentDiagnostic) -> Void) {
+         sink: @escaping @Sendable (AgentDiagnostic) -> Void, context: AgentRunContext = AgentRunContext()) {
         self.events = events
+        runID = context.runID
+        sessionID = context.sessionID
         self.resolutionID = resolutionID
         self.sink = sink
     }
+
+    func beginRequest(_ request: AgentRequestIdentity) {
+        lock.withLock { requestID = request.id; invocationID = nil }
+        events.yield(.requestStarted(request))
+    }
+
+    func beginInvocation(_ invocation: AgentToolInvocation) {
+        lock.withLock { requestID = invocation.requestID; invocationID = invocation.id }
+        events.yield(.invocationRegistered(invocation))
+    }
+
+    func endInvocation() { lock.withLock { invocationID = nil } }
 
     func record(_ kind: AgentDiagnostic.Kind, metrics: [AgentDiagnostic.Metric: Int] = [:],
                 reason: AgentRunStopReason? = nil) {
@@ -90,8 +111,30 @@ final class AgentTraceEmitter: @unchecked Sendable {
         defer { lock.unlock() }
         sequence += 1
         let event = AgentDiagnostic(runID: runID, sequence: sequence, kind: kind, metrics: metrics,
-                                    stopReason: reason, resolutionID: resolutionID)
+                                    stopReason: reason, resolutionID: resolutionID,
+                                    correlation: AgentDiagnosticCorrelation(sessionID: sessionID, requestID: requestID, invocationID: invocationID))
         sink(event)
         events.yield(.diagnostic(event))
+    }
+}
+
+/// Opaque local identifiers only; provider payloads and credentials cannot be logged here.
+public struct AgentDiagnosticCorrelation: Codable, Sendable, Equatable {
+    public let sessionID: String
+    public let requestID: String?
+    public let invocationID: String?
+
+    public init(sessionID: String, requestID: String? = nil, invocationID: String? = nil) {
+        self.sessionID = sessionID; self.requestID = requestID; self.invocationID = invocationID
+    }
+
+    private static func logToken(_ id: String) -> String {
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+        return id.addingPercentEncoding(withAllowedCharacters: safe) ?? "invalid"
+    }
+
+    var logFields: [String] {
+        ["session=\(Self.logToken(sessionID))"] + requestID.map { ["request=\(Self.logToken($0))"] }.defaultingToEmpty
+            + invocationID.map { ["invocation=\(Self.logToken($0))"] }.defaultingToEmpty
     }
 }

@@ -48,6 +48,7 @@ struct AgentWireState {
     var model: String?
     var responseID: String?
     var rawStopReason: String?
+    var providerFacts: [String: JSONValue] = [:]
     var inputTokens: Int?
     var outputTokens: Int?
     var reasoningTokens: Int?
@@ -83,6 +84,7 @@ struct AgentWireState {
         guard payload.utf8.count <= 8 * 1_024 * 1_024 else { throw AgentWireError.bufferLimit }
         guard let value = try? JSONValue.parse(payload), case .object = value else { throw AgentWireError.invalidResponse }
         if case .object = value["error"] { throw AgentWireError.remote(value["error"]["message"].string ?? "Stream error") }
+        captureProviderFacts(value)
         switch format {
         case .anthropic: try anthropic(value)
         case .openAI: try openAI(value)
@@ -110,7 +112,7 @@ struct AgentWireState {
             if case .object(let original) = call.providerMetadata { metadata = original }
             metadata["originalCallID"] = .string(call.id)
             let audit = AgentToolCall(id: "\(callIDPrefix)-\(block.id)", name: call.name, arguments: call.arguments,
-                rawArguments: call.rawArguments, providerMetadata: .object(metadata))
+                rawArguments: call.rawArguments, providerMetadata: .object(metadata), namespace: call.namespace, invocationID: call.invocationID)
             return AgentContentBlock(id: block.id, content: .toolCall(audit, complete: complete))
         }
         let meaningful = blocks.contains { block in
@@ -131,7 +133,9 @@ struct AgentWireState {
         let metadata: JSONValue? = responsesReasoning.isEmpty ? nil : .object([
             "openAIResponses": .object(["reasoning": .array(responsesReasoning.keys.sorted().compactMap { responsesReasoning[$0] })])])
         let identity = AgentResponseIdentity(api: api, model: model, responseID: responseID, requestID: requestID)
-        let fullMetadata: JSONValue? = rawStopReason.map { .object(["rawStopReason": .string($0)]) }
+        var facts = providerFacts
+        if let rawStopReason { facts["rawStopReason"] = .string(rawStopReason) }
+        let fullMetadata: JSONValue? = facts.isEmpty ? nil : .object(facts)
         let message = try AgentContentMessage(id: messageID, timestampMilliseconds: timestampMilliseconds, role: .assistant,
             blocks: blocks, identity: identity, stopReason: stopReason, usage: usage, providerMetadata: fullMetadata)
         return AgentTurnResponse(text: message.text, usage: usage, stopReason: stopReason, providerMetadata: metadata,
@@ -178,7 +182,7 @@ struct AgentWireState {
             guard case .toolCall(let call, _) = block.content else { continue }
             let raw = call.rawArguments.isEmpty ? "{}" : call.rawArguments
             let final = AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(raw)) ?? .null,
-                                      rawArguments: raw, providerMetadata: call.providerMetadata)
+                                      rawArguments: raw, providerMetadata: call.providerMetadata, namespace: call.namespace, invocationID: call.invocationID)
             try emit(.blockUpdated(AgentContentBlock(id: block.id, content: .toolCall(final, complete: true))))
         }
     }

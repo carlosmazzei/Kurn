@@ -9,6 +9,7 @@ struct HarnessChatService {
     var isWikiEnabled: @MainActor () -> Bool = { UserDefaults.standard.bool(forKey: AppSettings.Keys.wikiEnabled) }
     /// nil plans from the authorized workload; explicit limits retain fixed-budget behavior.
     var limits: AgentLimits?
+    var conversationID: UUID?
     var contextWindows: ModelContextWindowStore = .shared
     var refreshMetadata: @Sendable (AIProvider, String, ModelContextWindowStore) async throws -> AgentMetadataRefresh = { provider, model, store in
         try await ProviderModelMetadataService(windows: store).refresh(provider: provider, model: model)
@@ -47,7 +48,7 @@ struct HarnessChatService {
                 $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
             },
             prompt: question, tools: tools,
-            contextResolution: resolution
+            contextResolution: resolution, context: AgentRunContext(sessionID: conversationID ?? UUID())
         )
     }
 

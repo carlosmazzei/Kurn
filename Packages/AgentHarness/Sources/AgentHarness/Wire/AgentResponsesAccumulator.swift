@@ -27,7 +27,7 @@ extension AgentWireState {
             } else {
                 let raw = value["arguments"].string ?? call.rawArguments
                 let final = AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(raw)) ?? .null,
-                                          rawArguments: raw, providerMetadata: call.providerMetadata)
+                                          rawArguments: raw, providerMetadata: call.providerMetadata, namespace: call.namespace, invocationID: call.invocationID)
                 try update(slot, .toolCall(final, complete: value["arguments"].string != nil))
             }
         case "response.completed", "response.incomplete": try finishResponses(value)
@@ -70,7 +70,7 @@ extension AgentWireState {
             if case .toolCall(let call, _) = block(slot)?.content { previous = call } else { previous = nil }
             let raw = item["arguments"].string ?? previous?.rawArguments ?? ""
             let call = AgentToolCall(id: item["call_id"].string ?? previous?.id ?? "",
-                name: item["name"].string ?? previous?.name ?? "", arguments: (try? JSONValue.parse(raw)) ?? .null, rawArguments: raw)
+                name: item["name"].string ?? previous?.name ?? "", arguments: (try? JSONValue.parse(raw)) ?? .null, rawArguments: raw, namespace: item["namespace"].string ?? previous?.namespace)
             let content = AgentContentBlock.Content.toolCall(call,
                 complete: complete && !["in_progress", "incomplete"].contains(item["status"].string ?? ""))
             if block(slot) == nil { try start(slot, content) } else { try update(slot, content) }

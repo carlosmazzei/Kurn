@@ -580,16 +580,26 @@ claim target completion. The fixtures cover opaque replay data and four provider
 requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
-store migration runs in that increment. NH02 is now in progress; NH03–NH10 have not
-started. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03–NH10 have not
+started. The next implementation increment is NH03 (store and migration). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
 wire adapters. It retains interrupted tool calls with synthetic errors, fences late
 callbacks and emits terminal preparation/transport failures. Request replay is a copy,
 with compatible signature handling and logged omissions/ID/argument normalization.
-The app still saves V5 presentation turns; canonical tool-result/entry identity, indexed
-storage and durable audit restoration remain open for NH03/NH04. Session barriers,
+The NH02 completion adds checked native tool-result messages, optional unknown historical
+timestamps and API/model values, owner-assigned request/logical invocation identities,
+canonical error/abort snapshots (including preparation before the first block), and
+paired synthetic results for interrupted calls. Repeated provider call IDs are relinked
+by logical invocation on disposable wire copies. Failed/aborted/deferred messages and
+their paired results are excluded from replay with numeric omission diagnostics.
+Namespaced calls retain their wire identity but cannot dispatch to unqualified bundled
+tools. Supplied private protocol facts remain in native metadata, outside logs/replay.
+Session/run/request/invocation correlation is persisted in the existing diagnostic steps;
+new chats reserve their eventual ChatSession UUID without creating empty saved rows.
+The app still saves V5 presentation turns; indexed entry storage, canonical history
+restoration, effect receipts and migration remain open for NH03/NH04. Session barriers,
 queues and model-level capability qualification remain in their planned increments.
 Evidence and the exact activation boundary are in `docs/contracts/native-harness-v1.md`.
 

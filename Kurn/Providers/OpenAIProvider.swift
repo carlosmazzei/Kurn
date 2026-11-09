@@ -432,11 +432,12 @@ struct OpenAIProvider: LLMProvider, TranscriptionProvider {
 // MARK: - Response shapes
 
 extension OpenAIProvider: AgentModel {
+    var descriptor: AgentModelDescriptor? { AgentModelDescriptor(api: usesResponses ? "openAIResponses" : "openAI", model: chatModel) }
     func streamTurn(
         _ request: AgentTurnRequest,
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
-        try await AgentModelBoundary.perform(onEvent: onEvent, prepare: {
+        try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
             let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
             let official = usesResponses
@@ -451,7 +452,7 @@ extension OpenAIProvider: AgentModel {
             }
             return (httpRequest, format)
         }, stream: { prepared in
-            try await LLMHTTP.streamAgent(prepared.0, session: session, format: prepared.1, onEvent: onEvent)
+            try await LLMHTTP.streamAgent(prepared.0, session: session, format: prepared.1, identity: request.identity, onEvent: onEvent)
         })
     }
 }

@@ -154,6 +154,28 @@ def validate(root: Path, manifest: dict | None = None) -> list[str]:
                     errors.append(f"{label}: fixture baseline does not match catalog")
             except (OSError, ValueError) as error:
                 errors.append(f"{label}: {error}")
+    contracts = manifest.get("contractFixtures", [])
+    if not isinstance(contracts, list):
+        errors.append("contractFixtures: expected array")
+        contracts = []
+    for fixture in contracts:
+        if not isinstance(fixture, dict):
+            errors.append("invalid contract fixture record")
+            continue
+        label = fixture.get("id", "contract fixture")
+        path = local_file(fixture.get("path"), str(label))
+        evidence([fixture.get("consumer")], f"{label}.consumer")
+        if path:
+            if hashlib.sha256(path.read_bytes()).hexdigest() != fixture.get("sha256"):
+                errors.append(f"{label}: contract fixture checksum changed; review and version intentionally")
+            try:
+                payload = read_json(path)
+                if any(type(payload.get(key)) is not int or payload[key] != 1 for key in ("fixtureVersion", "contractVersion")):
+                    errors.append(f"{label}: unsupported contract fixture version")
+                if "baselineCommit" in payload:
+                    errors.append(f"{label}: native contract fixtures cannot claim a legacy baseline")
+            except (OSError, ValueError) as error:
+                errors.append(f"{label}: {error}")
     return errors
 
 

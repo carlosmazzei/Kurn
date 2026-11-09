@@ -19,6 +19,8 @@ extension AgentWireFormat {
                     .object(["type": .string("function_call"), "call_id": .string(call.id),
                              "name": .string(call.name), "arguments": .string(call.rawArguments)])
                 }
+            case .tool(let result):
+                input.append(.object(["type": .string("function_call_output"), "call_id": .string(result.invocation.callID), "output": .string(result.text)]))
             case .toolResult(let callID, _, let content, _):
                 input.append(.object(["type": .string("function_call_output"), "call_id": .string(callID), "output": .string(content)]))
             }
