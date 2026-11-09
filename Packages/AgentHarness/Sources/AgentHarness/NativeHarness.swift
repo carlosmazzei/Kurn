@@ -204,10 +204,19 @@ public struct NativeHarness: Sendable {
                 syntheticReason = AgentToolBlockReason(rawValue: stop.rawValue)
             } else {
                 state.toolCalls += 1
-                (output, isError, syntheticReason) = try await executeOne(normalized, tools: tools)
+                do { (output, isError, syntheticReason) = try await executeOne(normalized, tools: tools) }
+                catch {
+                    trace.record(.toolFinished, metrics: [.isError: 1, .protocolFailure: AgentStreamFailure.classify(error).diagnosticCode])
+                    throw error
+                }
                 if limits.continuation != nil { state.recordProgress(call: call, output: output, isError: isError) }
             }
-            let result = try AgentMessageFactory.result(invocation, output: output, isError: isError, syntheticReason: syntheticReason)
+            let result: AgentMessage
+            do { result = try AgentMessageFactory.result(invocation, output: output, isError: isError, syntheticReason: syntheticReason) }
+            catch {
+                trace.record(.toolFinished, metrics: [.isError: 1, .protocolFailure: AgentStreamFailure.classify(error).diagnosticCode])
+                throw error
+            }
             events.yield(.messageAppended(result))
             state.history.append(result)
             state.context.append(result)

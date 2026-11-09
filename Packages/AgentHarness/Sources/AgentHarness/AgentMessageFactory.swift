@@ -17,12 +17,12 @@ enum AgentMessageFactory {
             responseID: previous?.responseID, requestID: request.id)
         let blocks = message.blocks.map { block -> AgentContentBlock in
             guard case .toolCall(let call, let complete) = block.content else { return block }
-            let invocationID = previous?.requestID == request.id ? (call.invocationID ?? UUID().uuidString) : UUID().uuidString
+            let invocationID = UUID().uuidString
             let normalized = AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(call.rawArguments)) ?? .null,
                 rawArguments: call.rawArguments, providerMetadata: call.providerMetadata, namespace: call.namespace, invocationID: invocationID)
             return AgentContentBlock(id: block.id, content: .toolCall(normalized, complete: complete))
         }
-        return try AgentContentMessage(id: previous?.requestID == request.id ? message.id : UUID().uuidString, timestampMilliseconds: message.timestampMilliseconds, role: .assistant,
+        return try AgentContentMessage(id: UUID().uuidString, timestampMilliseconds: message.timestampMilliseconds, role: .assistant,
             blocks: blocks, identity: identity, stopReason: message.stopReason, usage: message.usage, providerMetadata: message.providerMetadata)
     }
 
