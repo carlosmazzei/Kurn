@@ -38,6 +38,9 @@ struct LibraryEraserTests {
         #expect(try context.fetchCount(FetchDescriptor<MeetingAttachment>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<ChatSession>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<GeneratedDocument>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<HarnessSessionEntry>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<HarnessArtifactRevision>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<HarnessSessionRecord>()) == 0)
 
         #expect(try context.fetchCount(FetchDescriptor<Kurn.Tag>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<Folder>()) == 1)

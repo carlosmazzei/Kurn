@@ -1220,3 +1220,5 @@
 "chat.metric.sentMaxOutputTokens" = "An die API gesendetes Ausgabebudget";
 
 "chat.diagnostic.replayPrepared" = "Verlauf für die API vorbereitet";
+
+"chat.storage.invalid" = "Diese Unterhaltung konnte nicht gelesen oder gespeichert werden. Die gespeicherten Daten wurden beibehalten.";

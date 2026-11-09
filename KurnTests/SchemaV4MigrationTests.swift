@@ -192,9 +192,9 @@ struct SchemaV4MigrationTests {
     }
 
     @Test func v5KeepsEntityNamesAndFreezesV4WithoutLeakingNewProperties() throws {
-        #expect(KurnModelGraph.currentSchemaVersion == Schema.Version(1, 4, 0))
+        #expect(KurnModelGraph.currentSchemaVersion == Schema.Version(1, 5, 0))
         let v4 = Schema(versionedSchema: KurnSchemaV4.self)
-        #expect(Set(v4.entities.map(\.name)) == Set(KurnModelGraph.schema.entities.map(\.name)))
+        #expect(Set(v4.entities.map(\.name)) == Set(Schema(versionedSchema: KurnSchemaV5.self).entities.map(\.name)))
         let oldChat = try #require(v4.entities.first { $0.name == "ChatSession" })
         #expect(!oldChat.attributes.contains { $0.name == "scopeData" || $0.name == "artifactsData" })
         let current = try #require(KurnModelGraph.schema.entities.first { $0.name == "ChatSession" })

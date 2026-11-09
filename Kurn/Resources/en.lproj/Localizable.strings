@@ -1220,3 +1220,5 @@
 "chat.metric.sentMaxOutputTokens" = "Output allowance sent to the API";
 
 "chat.diagnostic.replayPrepared" = "History prepared for the API";
+
+"chat.storage.invalid" = "Couldn’t read or save this conversation. Its stored data has been preserved.";

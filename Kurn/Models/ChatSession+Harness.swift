@@ -2,7 +2,16 @@ import Foundation
 import KurnCore
 
 extension ChatSession {
-    func harnessSnapshot() throws -> (scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) {
+    @MainActor func harnessSnapshot() throws -> (turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) {
+        if canonicalVersion != nil { return try SwiftDataAgentSessionStore.projection(self) }
+        let turns: [PersistedChatTurn]
+        if turnsData.isEmpty { turns = [] }
+        else {
+            guard let value = JSONStorage.decodeAuthoritative([PersistedChatTurn].self, from: turnsData).decodedValue else {
+                throw AppError.apiError(statusCode: 0, message: "Invalid saved chat history.")
+            }
+            turns = value
+        }
         var scope: ChatSourceScope?
         var artifacts: [ChatDocumentArtifact] = []
         if let scopeData {
@@ -17,6 +26,6 @@ extension ChatSession {
             }
             artifacts = decoded
         }
-        return (scope, artifacts)
+        return (turns, scope, artifacts)
     }
 }

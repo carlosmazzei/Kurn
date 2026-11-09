@@ -78,6 +78,9 @@ enum LibraryEraser {
         // What no meeting cascade reaches: library-wide chats and documents,
         // plus anything orphaned by an earlier interrupted delete.
         try deleteAll(ChatSession.self, in: context)
+        try deleteAll(HarnessSessionEntry.self, in: context)
+        try deleteAll(HarnessArtifactRevision.self, in: context)
+        try deleteAll(HarnessSessionRecord.self, in: context)
         try deleteAll(GeneratedDocument.self, in: context)
         try deleteAll(Recording.self, in: context)
         try deleteAll(Transcript.self, in: context)

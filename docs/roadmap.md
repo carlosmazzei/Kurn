@@ -580,8 +580,8 @@ claim target completion. The fixtures cover opaque replay data and four provider
 requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
-store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03–NH10 have not
-started. The next implementation increment is NH03 (store and migration). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04–NH10 have not
+started. The next implementation increment is NH04 (native tool pipeline and durable artifacts). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -602,6 +602,19 @@ The app still saves V5 presentation turns; indexed entry storage, canonical hist
 restoration, effect receipts and migration remain open for NH03/NH04. Session barriers,
 queues and model-level capability qualification remain in their planned increments.
 Evidence and the exact activation boundary are in `docs/contracts/native-harness-v1.md`.
+
+NH03 adds a frozen V5 graph and additive SwiftData V6 (1.5.0). Indexed checked entries,
+immutable artifact revisions and run/queue/draft/effect metadata containers live in the
+protected app store. Conversion runs lazily per session, atomically marks completion,
+retains original turns/scope/artifact bytes and preserves legacy IDs, usage, costs and
+unknowns. Native entries are authoritative for checked loads; presentation caches remain
+rebuildable. The compatibility writer appends changed suffixes as branches and maintains
+an independent selected leaf. Failed saves restore only their staged group, allowing a
+clean retry. Backups use the centralized V6 graph; salvage includes chats, retained
+messages/revisions, metadata and saved documents; erasure covers cascades and orphan rows.
+This does not activate queue consumption, effect reconciliation or an awaitable session
+owner. Those remain NH04/NH05; native tool-history replay and durable compaction remain NH06.
+
 
 The architecture prerequisite separates domain from runtime:
 

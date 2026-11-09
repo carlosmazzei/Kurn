@@ -1220,3 +1220,5 @@
 "chat.metric.sentMaxOutputTokens" = "Budget di uscita inviato all’API";
 
 "chat.diagnostic.replayPrepared" = "Cronologia preparata per l’API";
+
+"chat.storage.invalid" = "Impossibile leggere o salvare questa conversazione. I dati archiviati sono stati conservati.";

@@ -46,6 +46,20 @@ final class ChatSession {
     var turnsData: Data
     var scopeData: Data?
     var artifactsData: Data?
+    var canonicalVersion: Int?
+    var canonicalLeafID: String?
+    var canonicalOrdinal: Int = 0
+    var canonicalRevision: Int = 0
+    /// Exact pre-conversion bytes are retained independently of the rebuildable UI cache.
+    var legacyTurnsData: Data?
+    var legacyScopeData: Data?
+    var legacyArtifactsData: Data?
+    @Relationship(deleteRule: .cascade, inverse: \HarnessSessionEntry.session)
+    var harnessEntries: [HarnessSessionEntry] = []
+    @Relationship(deleteRule: .cascade, inverse: \HarnessArtifactRevision.session)
+    var harnessRevisions: [HarnessArtifactRevision] = []
+    @Relationship(deleteRule: .cascade, inverse: \HarnessSessionRecord.session)
+    var harnessRecords: [HarnessSessionRecord] = []
 
     init(meeting: Meeting?, title: String, createdAt: Date = Date()) {
         self.id = UUID()

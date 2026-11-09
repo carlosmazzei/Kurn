@@ -128,7 +128,9 @@ enum ModelStoreSalvage {
         // about to read.
         return try withExtendedLifetime(container) { () throws -> (result: ModelStoreSalvageResult, exportMarkdown: String?) in
             let meetings = try container.mainContext.fetch(FetchDescriptor<Meeting>())
-            let markdown = Self.exportMarkdown(for: meetings)
+            let sessions = try container.mainContext.fetch(FetchDescriptor<ChatSession>())
+            let documents = try container.mainContext.fetch(FetchDescriptor<GeneratedDocument>())
+            let markdown = Self.exportMarkdown(for: meetings) + HarnessStoreSalvage.markdown(sessions: sessions, documents: documents)
             return (.recovered(meetingCount: meetings.count), markdown)
         }
     }
