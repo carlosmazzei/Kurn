@@ -20,6 +20,17 @@ extension SwiftDataAgentSessionStore {
     }
 
     func writePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) throws {
+        storageLog("commit_started", session: target)
+        do {
+            try planAndWritePresentation(target, turns: turns, scope: scope, artifacts: artifacts)
+            storageLog("commit_finished", session: target)
+        } catch {
+            storageLog("commit_failed", session: target)
+            throw error
+        }
+    }
+
+    private func planAndWritePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) throws {
         guard Set(turns.map(\.id)).count == turns.count else { throw AgentSessionStoreError.invalidEntry }
         _ = try ChatDocumentWorkspace(artifacts: artifacts)
         let migrating = target.canonicalVersion == nil
@@ -94,7 +105,6 @@ extension SwiftDataAgentSessionStore {
             target.turnsData = cache.turns; target.scopeData = cache.scope; target.artifactsData = cache.artifacts
             target.canonicalVersion = 1; target.canonicalLeafID = leaf; target.canonicalOrdinal += rows.count; target.canonicalRevision += 1
             try save(context)
-            storageLog("commit_finished", session: target)
         } catch {
             let entryIDs = Set(rows.map(\.id)); let revisionIDs = Set(revisions.map(\.id))
             target.harnessEntries.removeAll { entryIDs.contains($0.id) }
@@ -102,7 +112,6 @@ extension SwiftDataAgentSessionStore {
             for row in rows { context.delete(row) }
             for row in revisions { context.delete(row) }
             old.restore(target)
-            storageLog("commit_failed", session: target)
             throw error
         }
     }
