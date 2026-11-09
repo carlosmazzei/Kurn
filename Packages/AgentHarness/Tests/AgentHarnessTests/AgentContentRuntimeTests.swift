@@ -16,9 +16,11 @@ struct AgentContentRuntimeTests {
         let events = try await agentEvents(NativeHarness(model: Model(final: final)), tools: [tool])
         let outcome = try agentOutcome(events)
         #expect(outcome.finalText == "Correct final" && outcome.totalUsage == final.usage)
-        #expect(outcome.messages.last == .content(final))
+        guard case .content(let accepted) = outcome.messages.last else { Issue.record("Missing native final"); return }
+        #expect(accepted.blocks == final.blocks && accepted.timestampMilliseconds == final.timestampMilliseconds)
+        #expect(accepted.identity?.requestID != nil)
         #expect(!events.contains { if case .toolStarted = $0 { return true }; return false })
-        #expect(events.contains(.modelContent(.messageFinished(final))))
+        #expect(events.contains(.modelContent(.messageFinished(accepted))))
     }
 
     @Test func nativeInvalidArgumentsProduceErrorDataAndContentFreeDiagnostics() async throws {
@@ -36,9 +38,11 @@ struct AgentContentRuntimeTests {
                                     diagnosticSink: { capture.record($0) })
         let outcome = try agentOutcome(await agentEvents(harness, tools: [tool]))
         #expect(outcome.finalText == "Recovered")
-        #expect(outcome.messages[1] == .content(native))
-        guard case .toolResult("call", "lookup", _, true) = outcome.messages[2] else { Issue.record("Missing validation result"); return }
-        #expect(outcome.messages[3] == .toolResult(callID: "valid", toolName: "lookup", content: "Valid result", isError: false))
+        guard case .content(let accepted) = outcome.messages[1] else { Issue.record("Missing native assistant"); return }
+        #expect(accepted.toolCalls.map(\.rawArguments) == native.toolCalls.map(\.rawArguments))
+        #expect(accepted.toolCalls.allSatisfy { $0.invocationID != nil })
+        guard case .tool(let invalid) = outcome.messages[2], invalid.invocation.callID == "call", invalid.isError, invalid.syntheticReason == .invalidArguments else { Issue.record("Missing validation result"); return }
+        #expect(outcome.messages[3].legacyProjection == .toolResult(callID: "valid", toolName: "lookup", content: "Valid result", isError: false))
         #expect(capture.events.contains { $0.kind == .requestFinished && $0.metrics[.invalidToolCalls] == 1 })
         #expect(!capture.events.map(\.logLine).joined().contains("private-invalid"))
     }
@@ -94,8 +98,10 @@ struct AgentContentRuntimeTests {
         let events = try await agentEvents(NativeHarness(model: model), tools: [tool])
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == .outputLimit && outcome.messages.count == 4)
-        #expect(outcome.messages[1] == .content(message))
-        let errors = outcome.messages.compactMap { if case .toolResult(let id, _, _, true) = $0 { return id }; return nil }
+        guard case .content(let accepted) = outcome.messages[1] else { Issue.record("Missing native assistant"); return }
+        #expect(accepted.hasIncompleteCalls && accepted.stopReason == .maxTokens)
+        #expect(accepted.toolCalls.map(\.rawArguments) == calls.map(\.rawArguments))
+        let errors = outcome.messages.compactMap { if case .tool(let result) = $0, result.isError, result.syntheticReason == .outputLimit { return result.invocation.callID }; return nil }
         #expect(errors == calls.map(\.id))
         #expect(!events.contains { if case .toolStarted = $0 { return true }; return false })
         #expect(try JSONDecoder().decode([AgentMessage].self, from: JSONEncoder().encode(outcome.messages)) == outcome.messages)

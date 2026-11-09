@@ -153,7 +153,7 @@ func tokens(_ count: Int, _ letter: Character = "a") -> String { String(repeatin
         #expect(requests.count == 2)
         #expect(requests[0].tools.isEmpty)
         #expect(requests[0].systemPrompt == AgentCompactionPrompts.standard.system)
-        #expect(requests[1].messages == [.user(AgentContextCompactor.summaryPrefix
+        #expect(requests[1].messages.map(\.legacyProjection) == [.user(AgentContextCompactor.summaryPrefix
             + "No prior history.\n\n---\n\n**Turn context (split turn):**\n\nTurn summary"), history[1], .user("Question")])
         #expect(requests[1].tools == [agentTool().spec])
         #expect(!events.contains(.textDelta("Turn summary")))
@@ -229,7 +229,8 @@ actor AgentCancellationProbe: AgentModel {
         let model: any AgentModel = duringTool
             ? ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()])]) : probe
         let tool = AgentTool(spec: agentTool().spec) { _ in try await probe.block() }
-        let stream = NativeHarness(model: model).run(systemPrompt: "", history: [], prompt: "",
+        let capture = DiagnosticCapture()
+        let stream = NativeHarness(model: model, diagnosticSink: { capture.record($0) }).run(systemPrompt: "", history: [], prompt: "",
                                                      tools: [tool], maxOutputTokens: 10)
         let consumer = Task {
             for try await _ in stream { }
@@ -239,5 +240,11 @@ actor AgentCancellationProbe: AgentModel {
         _ = await consumer.result
         while !(await probe.cancelled) { await Task.yield() }
         #expect(await probe.cancelled)
+        while capture.events.last?.kind != .runCancelled { await Task.yield() }
+        if duringTool {
+            let finished = try #require(capture.events.first { $0.kind == .toolFinished })
+            #expect(finished.metrics[.isError] == 1 && finished.metrics[.protocolFailure] == 4)
+            #expect(finished.correlation?.invocationID != nil)
+        }
     }
 }

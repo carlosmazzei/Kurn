@@ -31,6 +31,7 @@ final class MeetingChatViewModel {
     private(set) var artifacts: [ChatDocumentArtifact] = []
     @ObservationIgnored private var workspace = ChatDocumentWorkspace()
     @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var conversationID = UUID()
     @ObservationIgnored private var retryArtifacts: [ChatArtifactReference] = []
     @ObservationIgnored private var retryOrigins: [UUID: ChatArtifactOrigin] = [:]
     private let agentModelFactory: HarnessChatService.ModelFactory
@@ -171,6 +172,7 @@ final class MeetingChatViewModel {
         } else {
             let firstQuestion = turns.first(where: { $0.role == .user })?.text ?? ""
             target = ChatSession(meeting: meeting, title: ChatSession.title(from: firstQuestion))
+            target.id = conversationID
             modelContext.insert(target)
             session = target
         }
@@ -243,6 +245,7 @@ final class MeetingChatViewModel {
         retryOrigins = [:]
         error = nil
         session = nil
+        conversationID = UUID()
         artifacts = []
         workspace = ChatDocumentWorkspace()
         scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id)
@@ -284,6 +287,7 @@ final class MeetingChatViewModel {
             let restored = try session.harnessSnapshot()
             let workspace = try ChatDocumentWorkspace(artifacts: restored.artifacts)
             self.session = session
+            conversationID = session.id
             self.workspace = workspace
             artifacts = restored.artifacts
             scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
@@ -321,7 +325,9 @@ final class MeetingChatViewModel {
             artifacts = initialArtifacts
             persist(turns: completedTurns)
         }
-        let events = try await harnessService.events(model: agentModel, provider: provider, modelIdentifier: model,
+        var service = harnessService
+        service.conversationID = conversationID
+        let events = try await service.events(model: agentModel, provider: provider, modelIdentifier: model,
                                                      context: modelContext, scope: scope, workspace: workspace,
                                                      history: history, question: question)
         try Task.checkCancellation()

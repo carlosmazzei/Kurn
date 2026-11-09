@@ -6,7 +6,7 @@ public struct AgentContentMessage: Codable, Sendable, Equatable {
     public let contractVersion: Int
     public let id: String
     /// Unix milliseconds, never Foundation's seconds-since-2001 Date codec.
-    public let timestampMilliseconds: Int64
+    public let timestampMilliseconds: Int64?
     public let role: Role
     public private(set) var blocks: [AgentContentBlock]
     public let identity: AgentResponseIdentity?
@@ -14,7 +14,7 @@ public struct AgentContentMessage: Codable, Sendable, Equatable {
     public let usage: AgentUsage?
     public let providerMetadata: JSONValue?
 
-    public init(id: String, timestampMilliseconds: Int64, role: Role, blocks: [AgentContentBlock],
+    public init(id: String, timestampMilliseconds: Int64?, role: Role, blocks: [AgentContentBlock],
                 identity: AgentResponseIdentity? = nil, stopReason: AgentModelStopReason? = nil,
                 usage: AgentUsage? = nil, providerMetadata: JSONValue? = nil) throws {
         guard Self.validID(id), Set(blocks.map(\.id)).count == blocks.count,
@@ -39,7 +39,7 @@ public struct AgentContentMessage: Codable, Sendable, Equatable {
         let value = try decoder.container(keyedBy: CodingKeys.self)
         guard try value.decode(Int.self, forKey: .contractVersion) == 1 else { throw AgentContentError.unsupportedVersion }
         try self.init(id: value.decode(String.self, forKey: .id),
-                      timestampMilliseconds: value.decode(Int64.self, forKey: .timestampMilliseconds),
+                      timestampMilliseconds: value.decodeIfPresent(Int64.self, forKey: .timestampMilliseconds),
                       role: value.decode(Role.self, forKey: .role), blocks: value.decode([AgentContentBlock].self, forKey: .blocks),
                       identity: value.decodeIfPresent(AgentResponseIdentity.self, forKey: .identity),
                       stopReason: value.decodeIfPresent(AgentModelStopReason.self, forKey: .stopReason),
@@ -65,18 +65,21 @@ public struct AgentContentMessage: Codable, Sendable, Equatable {
 
     private static func validCalls(_ blocks: [AgentContentBlock]) -> Bool {
         let ids = blocks.compactMap { if case .toolCall(let call, _) = $0.content { return call.id }; return nil }
-        return Set(ids).count == ids.count
+        let invocations = blocks.compactMap { if case .toolCall(let call, _) = $0.content { return call.invocationID }; return nil }
+        return Set(ids).count == ids.count && Set(invocations).count == invocations.count
     }
 
     private static func validIdentity(_ identity: AgentResponseIdentity?) -> Bool {
         guard let identity else { return true }
-        return validID(identity.requestID) && !identity.api.isEmpty && identity.api.utf8.count <= 64
+        return validID(identity.requestID) && (identity.api.map { !$0.isEmpty && $0.utf8.count <= 64 } ?? true)
             && (identity.responseID.map(validID) ?? true) && (identity.model?.utf8.count ?? 0) <= 512
     }
 
     private static func validContent(_ content: AgentContentBlock.Content) -> Bool {
         switch content {
-        case .toolCall(let call, _): return validID(call.id) && call.name.utf8.count <= 256
+        case .toolCall(let call, _):
+            return validID(call.id) && call.name.utf8.count <= 256
+                && (call.namespace.map(validID) ?? true) && (call.invocationID.map(validID) ?? true)
         case .image(let mime, let data):
             return mime.hasPrefix("image/") && data.utf8.count <= 8 * 1_024 * 1_024 && !data.isEmpty && Data(base64Encoded: data) != nil
         default: return true
@@ -85,12 +88,12 @@ public struct AgentContentMessage: Codable, Sendable, Equatable {
 }
 
 public struct AgentResponseIdentity: Codable, Sendable, Equatable {
-    public let api: String
+    public let api: String?
     public let model: String?
     public let responseID: String?
     public let requestID: String
 
-    public init(api: String, model: String? = nil, responseID: String? = nil, requestID: String) {
+    public init(api: String? = nil, model: String? = nil, responseID: String? = nil, requestID: String) {
         self.api = api
         self.model = model
         self.responseID = responseID

@@ -13,7 +13,7 @@ struct NativeHarnessDefaultsTests {
         #expect(requests.count == 2)
         #expect(requests[0].tools.isEmpty)
         #expect(requests[1].messages.first.map { message in
-            if case .user(let text) = message { return text.hasPrefix(AgentContextCompactor.summaryPrefix) }
+            if case .user(let text) = message.legacyProjection { return text.hasPrefix(AgentContextCompactor.summaryPrefix) }
             return false
         } == true)
         #expect(events.contains { if case .contextCompacted = $0 { return true }; return false })
@@ -26,7 +26,7 @@ struct NativeHarnessDefaultsTests {
         let tool = AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object([:])),
                              requiresConfirmation: true) { _ in AgentToolOutput(content: "data", summary: "Read") }
         let harness = NativeHarness(model: model, contextWindow: 128_000, limits: AgentLimits(maxTurns: 1),
-                                    costEstimator: { _ in 0 }, confirm: { approved in approved == call })
+                                    costEstimator: { _ in 0 }, confirm: { approved in approved.id == call.id && approved.rawArguments == call.rawArguments })
         let events = try await agentEvents(harness, tools: [tool])
         #expect(events.contains(.toolFinished(callID: "1", name: "lookup", summary: "Read", isError: false)))
         #expect(try agentOutcome(events).stopReason == .turnLimit)

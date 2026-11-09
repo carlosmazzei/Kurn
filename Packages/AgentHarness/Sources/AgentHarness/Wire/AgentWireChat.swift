@@ -39,6 +39,12 @@ extension AgentWireState {
             }
             try delta(slot, .toolCall(id: item["id"].string, name: item["function"]["name"].string,
                                      arguments: item["function"]["arguments"].string))
+            if let namespace = item["namespace"].string ?? item["function"]["namespace"].string,
+               case .toolCall(let call, let complete) = block(slot)?.content {
+                try update(slot, .toolCall(AgentToolCall(id: call.id, name: call.name, arguments: call.arguments,
+                    rawArguments: call.rawArguments, providerMetadata: call.providerMetadata, namespace: namespace,
+                    invocationID: call.invocationID), complete: complete))
+            }
         }
         guard let reason = choice["finish_reason"].string else { return }
         rawStopReason = reason

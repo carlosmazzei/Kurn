@@ -235,6 +235,6 @@ private struct DocumentReply {
         #expect(snapshot.first { $0.id == artifact.id }?.version == 6)
         #expect(snapshot.first { $0.id == artifact.id }?.markdown == "New\n\nSection")
         #expect(snapshot.first { $0.title == "Ata" }?.markdown == "# Minutes")
-        #expect(outcome.messages.contains { if case .toolResult(_, _, _, true) = $0 { return true }; return false })
+        #expect(outcome.messages.contains { if case .toolResult(_, _, _, true) = $0.legacyProjection { return true }; return false })
     }
 }

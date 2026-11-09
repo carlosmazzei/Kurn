@@ -39,9 +39,9 @@ public struct NativeHarness: Sendable {
     /// Fit the desired output capacity to the actual context before every request, as pi does.
     public func run(systemPrompt: String, history: [AgentMessage], prompt: String,
                     tools: [AgentTool], maxOutputTokens: Int? = nil,
-                    contextResolution: AgentContextResolution? = nil) -> AsyncThrowingStream<AgentEvent, Error> {
+                    contextResolution: AgentContextResolution? = nil, context: AgentRunContext = AgentRunContext()) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
-            let trace = AgentTraceEmitter(events: continuation, resolutionID: contextResolution?.id, sink: diagnosticSink)
+            let trace = AgentTraceEmitter(events: continuation, resolutionID: contextResolution?.id, sink: diagnosticSink, context: context)
             let task = Task {
                 do {
                     continuation.yield(.runStarted)
@@ -83,7 +83,9 @@ public struct NativeHarness: Sendable {
     private func drive(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
                        maxOutputTokens: Int?, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                        trace: AgentTraceEmitter) async throws {
-        let messages = history + [.user(prompt)]
+        let user = try AgentMessageFactory.user(prompt)
+        let messages = history + [user]
+        events.yield(.messageAppended(user))
         var state = AgentRunState(history: messages, context: messages)
         state.allowedTurns = limits.maxTurns
         state.allowedToolCalls = limits.maxToolCalls
@@ -104,9 +106,10 @@ public struct NativeHarness: Sendable {
             let calls = response.stopReason == .maxTokens ? [] : response.toolCalls.map(NormalizedToolCall.init)
             if !state.responseAlreadyAudited {
                 let assistant = try response.auditMessage()
+                events.yield(.messageAppended(assistant))
                 state.history.append(assistant)
                 state.context.append(assistant)
-                AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: true)
+                try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: true)
             }
             if response.stopReason == .deferred { throw AgentWireError.deferred }
             if response.stopReason == .aborted { throw CancellationError() }
@@ -121,13 +124,13 @@ public struct NativeHarness: Sendable {
                 reason = costLimitReached(state) ? .costLimit : .completed
                 break
             }
-            let stop = try await execute(calls, tools: tools, state: &state, events: events, trace: trace)
+            let stop = try await execute(calls, requestID: response.message?.identity?.requestID, tools: tools, state: &state, events: events, trace: trace)
             if let stop { reason = stop; break }
         }
         if reason != .completed { recordLimit(reason, state: &state, trace: trace) }
         try Task.checkCancellation()
         if limits.wrapUpOnLimit, reason == .turnLimit || reason == .toolCallLimit,
-           case .toolResult? = state.context.last, !costLimitReached(state),
+           case .toolResult? = state.context.last?.legacyProjection, !costLimitReached(state),
            try await wrapUp(settings, state: &state, events: events, trace: trace) == .maxTokens {
             reason = .outputLimit
         }
@@ -152,27 +155,35 @@ public struct NativeHarness: Sendable {
         guard let response = try await modelTurn(&wrapUp, state: &state, events: events, trace: trace) else { return nil }
         try Task.checkCancellation()
         state.finalText = response.text
-        if !state.responseAlreadyAudited, !response.text.isEmpty || !response.toolCalls.isEmpty || !response.blockedToolCalls.isEmpty {
+        if !state.responseAlreadyAudited {
             let blocked = AgentTurnResponse(text: response.text, toolCalls: response.toolCalls + response.blockedToolCalls,
                 usage: response.usage, stopReason: response.stopReason, providerMetadata: response.providerMetadata,
                 message: response.message, blocksToolExecution: true)
             let assistant = try blocked.auditMessage()
+            events.yield(.messageAppended(assistant))
             state.history.append(assistant)
             state.context.append(assistant)
-            AgentResponseAudit.appendBlocked(blocked, state: &state, events: events, trace: trace, toContext: true,
+            try AgentResponseAudit.appendBlocked(blocked, state: &state, events: events, trace: trace, toContext: true, syntheticReason: .toolsDisabled,
                 content: "Tool not executed: tool calling was disabled for this request.")
         }
+        if response.stopReason == .deferred { throw AgentWireError.deferred }
+        if response.stopReason == .aborted { throw CancellationError() }
+        if response.stopReason == .error { throw AgentWireError.invalidResponse }
         trace.record(.wrapUpFinished, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
         return response.stopReason
     }
 
-    private func execute(_ calls: [NormalizedToolCall], tools: [AgentTool], state: inout AgentRunState,
+    private func execute(_ calls: [NormalizedToolCall], requestID: String?, tools: [AgentTool], state: inout AgentRunState,
                          events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                          trace: AgentTraceEmitter) async throws -> AgentRunStopReason? {
         var stop: AgentRunStopReason?
         for normalized in calls {
             try Task.checkCancellation()
             let call = normalized.call
+            guard let requestID else { throw AgentWireError.invalidResponse }
+            let invocation = try AgentMessageFactory.invocation(call, requestID: requestID)
+            trace.beginInvocation(invocation)
+            defer { trace.endInvocation() }
             state.requestedCalls += 1
             trace.record(.toolRequested, metrics: [.callOrdinal: state.requestedCalls, .toolCalls: state.toolCalls])
             if stop == nil {
@@ -183,19 +194,30 @@ public struct NativeHarness: Sendable {
             events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
             let output: AgentToolOutput
             let isError: Bool
+            var syntheticReason: AgentToolBlockReason?
             if let stop {
                 recordLimit(stop, state: &state, trace: trace)
                 trace.record(.toolSkipped, metrics: [.callOrdinal: state.requestedCalls], reason: stop)
                 output = AgentToolOutput(content: "Tool not executed: \(stop.rawValue) reached.",
                                          summary: "Tool not executed: \(stop.rawValue) reached.")
                 isError = true
+                syntheticReason = AgentToolBlockReason(rawValue: stop.rawValue)
             } else {
                 state.toolCalls += 1
-                (output, isError) = try await executeOne(normalized, tools: tools)
+                do { (output, isError, syntheticReason) = try await executeOne(normalized, tools: tools) }
+                catch {
+                    trace.record(.toolFinished, metrics: [.isError: 1, .protocolFailure: AgentStreamFailure.classify(error).diagnosticCode])
+                    throw error
+                }
                 if limits.continuation != nil { state.recordProgress(call: call, output: output, isError: isError) }
             }
-            let result = AgentMessage.toolResult(callID: call.id, toolName: call.name,
-                                                 content: output.content, isError: isError)
+            let result: AgentMessage
+            do { result = try AgentMessageFactory.result(invocation, output: output, isError: isError, syntheticReason: syntheticReason) }
+            catch {
+                trace.record(.toolFinished, metrics: [.isError: 1, .protocolFailure: AgentStreamFailure.classify(error).diagnosticCode])
+                throw error
+            }
+            events.yield(.messageAppended(result))
             state.history.append(result)
             state.context.append(result)
             var metrics = output.metrics
@@ -213,30 +235,31 @@ public struct NativeHarness: Sendable {
         return stop
     }
 
-    private func executeOne(_ normalized: NormalizedToolCall, tools: [AgentTool]) async throws -> (AgentToolOutput, Bool) {
+    private func executeOne(_ normalized: NormalizedToolCall, tools: [AgentTool]) async throws -> (AgentToolOutput, Bool, AgentToolBlockReason?) {
         let call = normalized.call
         do {
+            guard call.namespace == nil else { return toolError("Namespaced tool calls are unsupported.", reason: .unsupportedNamespace) }
             guard let tool = tools.first(where: { $0.spec.name == call.name }) else {
-                return toolError("Unknown tool: \(call.name).")
+                return toolError("Unknown tool: \(call.name).", reason: .unknownTool)
             }
             guard normalized.hasValidArguments else {
-                return toolError("Invalid JSON arguments for \(call.name): \(call.rawArguments)")
+                return toolError("Invalid JSON arguments for \(call.name): \(call.rawArguments)", reason: .invalidArguments)
             }
             if tool.requiresConfirmation {
                 let approved = await confirm(call)
                 try Task.checkCancellation()
-                if !approved { return toolError("Confirmation declined for \(call.name).") }
+                if !approved { return toolError("Confirmation declined for \(call.name).", reason: .confirmationDeclined) }
             }
             let output = try await tool.execute(call.arguments)
             try Task.checkCancellation()
-            return (output, output.isError)
+            return (output, output.isError, nil)
         } catch {
             try Task.checkCancellation()
             return toolError("Tool \(call.name) failed: \(error.localizedDescription)")
         }
     }
 
-    private func toolError(_ text: String) -> (AgentToolOutput, Bool) {
-        (AgentToolOutput(content: text, summary: text), true)
+    private func toolError(_ text: String, reason: AgentToolBlockReason? = nil) -> (AgentToolOutput, Bool, AgentToolBlockReason?) {
+        (AgentToolOutput(content: text, summary: text), true, reason)
     }
 }

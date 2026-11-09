@@ -127,6 +127,6 @@ private actor PartSourceReader: ChatSourceReader {
         let outcome = try agentOutcome(await agentEvents(NativeHarness(model: model), tools: tools))
         #expect(outcome.stopReason == .completed)
         #expect(await reader.reads == [second])
-        #expect(outcome.messages.contains { if case .toolResult(_, _, _, true) = $0 { return true }; return false })
+        #expect(outcome.messages.contains { if case .toolResult(_, _, _, true) = $0.legacyProjection { return true }; return false })
     }
 }

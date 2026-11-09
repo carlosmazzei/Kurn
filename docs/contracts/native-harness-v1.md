@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **message/stream implementation in progress (NH02)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store migration next (NH03)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage, durable canonical
 history and migration remain inactive; complete pi compatibility is not claimed.
@@ -188,12 +188,27 @@ authenticated provider smoke tests remain separately open.
 ## NH02 implementation boundary
 
 `AgentContentMessage` is the checked v1 user/assistant content envelope. It retains an
-opaque message ID, exact Int64 Unix milliseconds, ordered stable block IDs, response and
-request identities, model/API, raw stop reason, reported usage and opaque replay fields.
-`AgentMessage.content` carries it alongside the frozen legacy cases. Legacy user/tool-result
-factories remain compatibility inputs; canonical tool-result/entry identities and app history
-conversion are still required before the session store can become canonical. No V5 fields or
-NH01 fixture bytes change in this increment.
+opaque message ID, exact Int64 Unix milliseconds (absent when historically unknown), ordered
+stable block IDs, response/request identities, optional model/API, raw stop reason, reported
+usage and opaque replay fields. `AgentMessage.content` and `.tool(AgentToolResultMessage)`
+carry native messages alongside the frozen legacy input cases. Live user/assistant/results
+are native; `legacyProjection` is a read-only compatibility view. Results contain bounded
+text/image blocks, optional private details, an error flag and a typed synthetic block reason.
+Thinking/tool-call blocks cannot be decoded as tool results. The native golden is separate
+from NH01's immutable legacy fixtures and does not claim their baseline commit.
+
+The owner assigns a request ID before preparation and a logical invocation ID before tool
+execution; both remain distinct from provider response/call IDs. New retries, summaries and
+wrap-ups receive new request IDs. Reused provider call IDs cannot link a result to a different
+request. Session/run/request/invocation IDs travel in typed events and content-free diagnostic
+steps. New/reloaded conversations use their actual ChatSession UUID, with a new run UUID each
+time. Control characters are escaped in log IDs. Historical identities are never fabricated.
+
+Stream failures create native terminal audit messages even before the first block. Partial
+raw calls stay in the failure snapshot and get synthetic interrupted results without running
+tools. This audit is in-memory until NH03; existing V5 diagnostic steps remain persistent.
+No V5 schema fields or NH01 fixture bytes change. Durable entry history and app history
+conversion remain NH03; effect receipts and awaited persistence barriers remain NH04/NH05.
 
 `AgentMessageReducer` orders interleaved blocks, bounds retained content to 4,096 blocks /
 8 MiB, rejects invalid transitions and replaces all accumulated blocks/usage with the final
@@ -211,7 +226,12 @@ late callbacks and prevents a failed stream from returning executable calls. Def
 are explicit and unsupported; no polling is introduced. Awaitable session barriers and event
 sequence envelopes remain NH05 work.
 
-Provider requests are disposable `AgentReplayProjection` copies. IDs are normalized/relinked
+Provider requests are disposable `AgentReplayProjection` copies. Error/aborted/deferred
+messages and their paired native results are omitted with `omittedMessages` diagnostics.
+Optional namespaces survive reduction/audit; unsupported namespaced calls produce explicit
+errors instead of dispatching an unqualified builtin. Namespace loss in wire replay is counted.
+Supplied declared diagnostics/thinking/reasoning protocol facts remain private metadata and
+are never blindly forwarded. IDs are normalized/relinked
 without touching canonical IDs. Invalid/incomplete arguments become `{}` only in a replay copy
 paired with their error result. Unsupported images/thinking use explicit omission markers;
 signed thinking and Gemini signatures are replayed only to the compatible API/model. Aliases

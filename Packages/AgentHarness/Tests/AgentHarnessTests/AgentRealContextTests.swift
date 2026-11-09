@@ -88,9 +88,9 @@ actor ResultScriptedAgentModel: AgentModel {
         #expect(Array(outcome.messages.prefix(4)) == history())
         let requests = await model.requests
         #expect(requests.count == 3)
-        #expect(requests[0].messages == history() + [.user("Question")])
+        #expect(requests[0].messages.map(\.legacyProjection) == history() + [.user("Question")])
         #expect(requests[1].tools.isEmpty)
-        #expect(requests[2].messages == [splitSummary("Prefix"), history()[3], .user("Question")])
+        #expect(requests[2].messages.map(\.legacyProjection) == [splitSummary("Prefix"), history()[3], .user("Question")])
     }
 
     @Test(arguments: [false, true])
@@ -128,7 +128,7 @@ actor ResultScriptedAgentModel: AgentModel {
         #expect(outcome.finalText == "Answer")
         let requests = await model.requests
         #expect(requests.count == 3)
-        #expect(requests[2].messages == [.user(summary + AgentContextCompactor.omittedPrefixNote), history()[3],
+        #expect(requests[2].messages.map(\.legacyProjection) == [.user(summary + AgentContextCompactor.omittedPrefixNote), history()[3],
                                          .user("Question")])
     }
 
@@ -154,7 +154,7 @@ actor ResultScriptedAgentModel: AgentModel {
         #expect(outcome.finalText == "Partial answer")
         guard case .content(let wrapUp) = outcome.messages[outcome.messages.count - 2] else { Issue.record("Missing wrap-up audit"); return }
         #expect(wrapUp.text == "Partial answer" && wrapUp.toolCalls.map(\.id) == ["3"])
-        guard case .toolResult("3", "lookup", _, true) = outcome.messages.last else { Issue.record("Missing blocked wrap-up result"); return }
+        guard case .toolResult("3", "lookup", _, true) = outcome.messages.last?.legacyProjection else { Issue.record("Missing blocked wrap-up result"); return }
         let requests = await model.requests
         #expect(requests.count == 2)
         #expect(requests[1].systemPrompt == "Be helpful\n\n" + NativeHarness.wrapUpInstruction)
@@ -188,8 +188,8 @@ actor ResultScriptedAgentModel: AgentModel {
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == .turnLimit)
         #expect(outcome.finalText.isEmpty)
-        #expect(outcome.messages.contains(.toolResult(callID: "1", toolName: "lookup", content: "{}", isError: false)))
-        guard case .toolResult("2", "lookup", _, true) = outcome.messages.last else { Issue.record("Missing blocked result"); return }
+        #expect(outcome.messages.map(\.legacyProjection).contains(.toolResult(callID: "1", toolName: "lookup", content: "{}", isError: false)))
+        guard case .toolResult("2", "lookup", _, true) = outcome.messages.last?.legacyProjection else { Issue.record("Missing blocked result"); return }
         #expect(await model.requests.count == 2)
     }
 

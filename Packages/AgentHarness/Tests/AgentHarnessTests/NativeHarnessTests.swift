@@ -59,7 +59,18 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let usage = AgentUsage(inputTokens: 10, outputTokens: 3)
         let model = ScriptedAgentModel([AgentTurnResponse(text: "Answer", usage: usage)])
         let events = try await agentEvents(NativeHarness(model: model), history: [.user("Earlier")])
-        #expect(events.filter { if case .diagnostic = $0 { return false }; if case .modelContent = $0 { return false }; return true } == [.runStarted, .turnStarted(index: 0), .textDelta("Answer"), .usage(usage),
+        let projected = events.map { event -> AgentEvent in
+            if case .runFinished(let value) = event { return .runFinished(AgentRunOutcome(messages: value.messages.map(\.legacyProjection),
+                finalText: value.finalText, stopReason: value.stopReason, totalUsage: value.totalUsage)) }
+            return event
+        }
+        let visibleEvents = projected.filter {
+            switch $0 {
+            case .diagnostic, .modelContent, .messageAppended, .requestStarted, .invocationRegistered: return false
+            default: return true
+            }
+        }
+        #expect(visibleEvents == [.runStarted, .turnStarted(index: 0), .textDelta("Answer"), .usage(usage),
                            .runFinished(AgentRunOutcome(messages: [.user("Earlier"), .user("Question"),
                                .assistant(text: "Answer", toolCalls: [])], finalText: "Answer",
                                stopReason: .completed, totalUsage: usage))])
@@ -78,7 +89,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let request = try #require(await model.requests.last)
         #expect(request.messages.count == count + 2)
         for index in 0..<count {
-            #expect(request.messages[index + 2] == .toolResult(callID: String(index), toolName: "lookup",
+            #expect(request.messages[index + 2].legacyProjection == .toolResult(callID: String(index), toolName: "lookup",
                                                               content: "{\"index\":\(index)}", isError: false))
         }
         let starts = events.compactMap { event -> String? in
@@ -96,7 +107,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
                                            tools: [agentTool(confirm: kind == "decline", fails: kind == "throw")])
         let outcome = try agentOutcome(events)
         #expect(outcome.finalText == "Recovered")
-        guard case .toolResult(_, _, let content, let isError) = outcome.messages[2] else {
+        guard case .toolResult(_, _, let content, let isError) = outcome.messages[2].legacyProjection else {
             Issue.record("Missing tool result")
             return
         }
@@ -139,9 +150,9 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         var expectedCall = call
         expectedCall.arguments = parsed ?? .null
         let expectedAssistant = AgentMessage.assistant(text: "", toolCalls: [expectedCall])
-        #expect(outcome.messages[1] == expectedAssistant)
+        #expect(outcome.messages[1].legacyProjection == expectedAssistant)
         let replay = try #require(await model.requests.last)
-        #expect(replay.messages[1] == expectedAssistant)
+        #expect(replay.messages[1].legacyProjection == expectedAssistant)
     }
 
     @Test func turnLimit() async throws {
@@ -149,7 +160,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let events = try await agentEvents(NativeHarness(model: model, limits: AgentLimits(maxTurns: 1)), tools: [agentTool()])
         #expect(try agentOutcome(events).stopReason == .turnLimit)
         let empty = try await agentEvents(NativeHarness(model: model, limits: AgentLimits(maxTurns: 0)))
-        #expect(try agentOutcome(empty).messages == [.user("Question")])
+        #expect(try agentOutcome(empty).messages.map(\.legacyProjection) == [.user("Question")])
     }
 
     @Test func toolLimitPreservesPairs() async throws {
@@ -161,7 +172,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         #expect(outcome.stopReason == .toolCallLimit)
         #expect(outcome.messages.count == 5)
         #expect(events.contains(.toolFinished(callID: "1", name: "lookup", summary: "Found facts", isError: false)))
-        #expect(outcome.messages[3] == .toolResult(callID: "2", toolName: "lookup",
+        #expect(outcome.messages[3].legacyProjection == .toolResult(callID: "2", toolName: "lookup",
             content: "Tool not executed: toolCallLimit reached.", isError: true))
     }
 

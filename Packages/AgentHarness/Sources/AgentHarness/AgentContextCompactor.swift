@@ -108,7 +108,7 @@ public struct AgentContextCompactor: Sendable {
             }
         }
         switch message.legacyProjection {
-        case .content: return 0 // legacyProjection cannot be native
+        case .content, .tool: return 0 // legacyProjection cannot be native
         case .user(let text):
             return overhead + estimate(text)
         case .assistant(let text, let calls, let metadata):
@@ -251,7 +251,7 @@ public struct AgentContextCompactor: Sendable {
                 continue
             }
             switch message.legacyProjection {
-            case .content: break // native content is projected below
+            case .content, .tool: break // native content is projected below
             case .user(let text):
                 if !text.isEmpty { parts.append("[User]: \(text)") }
             case .assistant(let text, let calls, _):

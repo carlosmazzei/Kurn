@@ -33,6 +33,8 @@ public enum AgentWireFormat: Sendable, CaseIterable {
             + request.messages.map { message in
                 switch message {
                 case .content(let message): return openAIContent(message, model: model)
+                case .tool(let result):
+                    return .object(["role": .string("tool"), "tool_call_id": .string(result.invocation.callID), "content": .string(result.text)])
                 case .user(let text): return .object(["role": .string("user"), "content": .string(text)])
                 case .assistant(let text, let calls, _):
                     var value: [String: JSONValue] = ["role": .string("assistant"), "content": .string(text)]
@@ -78,6 +80,9 @@ public enum AgentWireFormat: Sendable, CaseIterable {
                              "name": .string(call.name), "input": call.arguments])
                 }
                 append(role: "assistant", parts: blocks, to: &messages, field: "content")
+            case .tool(let result):
+                append(role: "user", parts: [.object(["type": .string("tool_result"), "tool_use_id": .string(result.invocation.callID),
+                    "content": .string(result.text), "is_error": .bool(result.isError)])], to: &messages, field: "content")
             case .toolResult(let callID, _, let content, let isError):
                 append(role: "user", parts: [.object(["type": .string("tool_result"), "tool_use_id": .string(callID),
                     "content": .string(content), "is_error": .bool(isError)])], to: &messages, field: "content")
@@ -118,6 +123,9 @@ public enum AgentWireFormat: Sendable, CaseIterable {
                     parts.append(.object(part))
                 }
                 append(role: "model", parts: parts, to: &contents, field: "parts")
+            case .tool(let result):
+                append(role: "user", parts: [.object(["functionResponse": .object(["name": .string(result.invocation.toolName),
+                    "response": .object([result.isError ? "error" : "result": .string(result.text)])])])], to: &contents, field: "parts")
             case .toolResult(let callID, let name, let content, let isError):
                 let call = callsByID[callID]
                 var response: [String: JSONValue] = ["name": .string(call?.name ?? name),

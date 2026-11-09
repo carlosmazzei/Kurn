@@ -59,6 +59,15 @@ class NativeHarnessContractTests(unittest.TestCase):
         value["fixtures"][0]["sha256"] = "0" * 64
         self.assertTrue(any("fixture checksum changed" in error for error in validate(self.root, value)))
 
+    def test_native_golden_is_validated_separately_from_legacy_baseline(self):
+        value = copy.deepcopy(self.manifest)
+        value["contractFixtures"][0]["sha256"] = "0" * 64
+        self.assertTrue(any("contract fixture checksum changed" in error for error in validate(self.root, value)))
+        value["contractFixtures"] = None
+        self.assertTrue(any("contractFixtures: expected array" in error for error in validate(self.root, value)))
+        value["contractFixtures"] = [False]
+        self.assertTrue(any("invalid contract fixture" in error for error in validate(self.root, value)))
+
     def test_paths_cannot_escape_the_repository(self):
         for path in ("../outside.json", "/tmp/outside.json"):
             value = copy.deepcopy(self.manifest)

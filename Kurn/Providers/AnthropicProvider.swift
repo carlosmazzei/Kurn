@@ -171,11 +171,12 @@ struct AnthropicProvider: LLMProvider {
 }
 
 extension AnthropicProvider: AgentModel {
+    var descriptor: AgentModelDescriptor? { AgentModelDescriptor(api: "anthropic", model: model) }
     func streamTurn(
         _ request: AgentTurnRequest,
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
-        try await AgentModelBoundary.perform(onEvent: onEvent, prepare: {
+        try await AgentModelBoundary.perform(onEvent: onEvent, classifyFailure: { LLMHTTP.agentStreamFailure($0) }, prepare: {
             try LLMHTTP.requireAPIKey(apiKey, provider: provider)
             var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
             let projection = AgentWireFormat.anthropic.requestProjection(request, model: model)
@@ -183,7 +184,7 @@ extension AnthropicProvider: AgentModel {
             httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
             return httpRequest
         }, stream: { prepared in
-            try await LLMHTTP.streamAgent(prepared, session: session, format: .anthropic, onEvent: onEvent)
+            try await LLMHTTP.streamAgent(prepared, session: session, format: .anthropic, identity: request.identity, onEvent: onEvent)
         })
     }
 }

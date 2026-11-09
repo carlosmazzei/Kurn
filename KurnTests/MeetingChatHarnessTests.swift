@@ -57,7 +57,7 @@ struct MeetingChatHarnessTests {
         let requests = await model.requests
         #expect(!requests[0].tools.contains { $0.name == "read_wiki" })
         #expect(requests[0].systemPrompt.contains("SAME LANGUAGE as the question"))
-        #expect(requests[1].messages.contains { if case .toolResult(_, "create_document", _, false) = $0 { return true }; return false })
+        #expect(requests[1].messages.contains { if case .toolResult(_, "create_document", _, false) = $0.legacyProjection { return true }; return false })
 
         let revision = ChatAgentModel([
             AgentTurnResponse(text: "", toolCalls: [try chatAgentCall("append_to_document", arguments: .object([
@@ -119,13 +119,13 @@ struct MeetingChatHarnessTests {
         #expect(restored.turns.last?.steps == vm.turns.last?.steps)
         let requests = await model.requests
         let content = requests[1].messages.compactMap { message -> String? in
-            if case .toolResult(_, "list_sources", let content, _) = message { return content }
+            if case .toolResult(_, "list_sources", let content, _) = message.legacyProjection { return content }
             return nil
         }.joined()
         #expect(content.contains(chosen.id.uuidString))
         #expect(!content.contains(other.id.uuidString))
         #expect(requests[1].messages.contains { message in
-            if case .toolResult(_, "read_transcript", let content, false) = message {
+            if case .toolResult(_, "read_transcript", let content, false) = message.legacyProjection {
                 return content.contains("we ship on monday")
             }
             return false

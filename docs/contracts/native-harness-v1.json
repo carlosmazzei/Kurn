@@ -61,9 +61,17 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
           "symbol": "nativeCodecKeepsExactMillisecondsAndOpaqueFields"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeCodecTests.swift",
+          "symbol": "nativeMessagesMatchIndependentGolden"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "repeatedProviderIDsGetDistinctLocalInvocationsAndCorrelatedResults"
         }
       ],
-      "note": "Native v1 user/assistant codecs and raw argument validation are implemented. Canonical tool-result/entry identity, V5 conversion and durable storage remain open."
+      "note": "Native v1 user/assistant/tool-result codecs, exact or explicitly unknown timestamps, owner-assigned request/invocation identity and raw argument validation are implemented. Indexed entries, V5 conversion and durable storage remain NH03."
     },
     {
       "id": "C02",
@@ -85,6 +93,14 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
           "symbol": "terminalCallbacksFenceLateContentAndFailedCallbacksFenceExecution"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "failuresProduceNativeAuditEvenBeforeFirstBlock"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeWireTests.swift",
+          "symbol": "conflictingProviderFinalBecomesOneFailedAudit"
         }
       ],
       "note": "Ordered bounded blocks, final replacement and terminal fencing are implemented. Awaitable session barriers and durable event envelopes remain NH05."
@@ -126,6 +142,14 @@
         {
           "path": "KurnTests/ProviderHTTPTests+Agent.swift",
           "symbol": "agentRejectsMissingKeyAndInvalidURL"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeWireTests.swift",
+          "symbol": "namespaceAndPrivateProtocolFactsSurviveWireReduction"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeIdentityTests.swift",
+          "symbol": "failedMessagesAndTheirResultsStayOutOfReplay"
         }
       ],
       "note": "All four wire adapters accept native blocks and own preparation terminals. Per-model capabilities, aliases and authenticated qualification remain open."
@@ -1463,6 +1487,17 @@
           "symbol": "agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced"
         }
       ]
+    }
+  ],
+  "contractFixtures": [
+    {
+      "id": "native-v1",
+      "path": "Packages/AgentHarness/Tests/AgentHarnessTests/Fixtures/nh02-native-v1.json",
+      "sha256": "dc10659b4bdb39ee683ba2db6b4b48769dc5b7c5eed238e41ae1ae2baf47cdf5",
+      "consumer": {
+        "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeCodecTests.swift",
+        "symbol": "nativeMessagesMatchIndependentGolden"
+      }
     }
   ]
 }

@@ -58,7 +58,7 @@ struct MeetingChatHarnessHistoryTests {
         #expect(!vm.isResponding)
         #expect(vm.error == nil)
         let request = try #require(await model.requests.first)
-        #expect(request.messages == [.user("Earlier question"), .assistant(text: "Earlier answer", toolCalls: []), .user("Question about A")])
+        #expect(request.messages.map(\.legacyProjection) == [.user("Earlier question"), .assistant(text: "Earlier answer", toolCalls: []), .user("Question about A")])
         #expect(!String(describing: request).contains(excerpt))
     }
 }

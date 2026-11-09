@@ -112,7 +112,7 @@ private struct FakeSourceReader: ChatSourceReader {
         let outcome = try agentOutcome(await agentEvents(NativeHarness(model: model), tools: tools))
         #expect(outcome.finalText == "Grounded")
         #expect(outcome.messages.contains { message in
-            if case .toolResult(_, _, _, let isError) = message { return isError }; return false
+            if case .toolResult(_, _, _, let isError) = message.legacyProjection { return isError }; return false
         })
     }
 

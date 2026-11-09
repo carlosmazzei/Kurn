@@ -37,7 +37,7 @@ struct AgentOutputRecoveryTests {
         #expect(outcome.messages.count == 10)
         guard case .content(let interruptedMessage) = outcome.messages[5] else { Issue.record("Missing interrupted message"); return }
         #expect(interruptedMessage.toolCalls.first?.rawArguments == "{incomplete")
-        guard case .toolResult("discarded", _, _, true) = outcome.messages[6] else { Issue.record("Missing blocked error"); return }
+        guard case .toolResult("discarded", _, _, true) = outcome.messages[6].legacyProjection else { Issue.record("Missing blocked error"); return }
         #expect(!requests[3].messages.contains(outcome.messages[5]))
         #expect(!requests[3].messages.contains(outcome.messages[6]))
         #expect(outcome.totalUsage == AgentUsage(inputTokens: 167_858, outputTokens: 32_983, reasoningTokens: 32_700))
@@ -177,7 +177,7 @@ struct AgentOutputRecoveryTests {
         #expect(outcome.finalText == "Partial conclusion")
         guard case .content(let wrapUp) = outcome.messages[outcome.messages.count - 2] else { Issue.record("Missing wrap-up audit"); return }
         #expect(wrapUp.text == "Partial conclusion" && wrapUp.toolCalls.map(\.id) == ["ignored"])
-        guard case .toolResult("ignored", _, _, true) = outcome.messages.last else { Issue.record("Missing blocked result"); return }
+        guard case .toolResult("ignored", _, _, true) = outcome.messages.last?.legacyProjection else { Issue.record("Missing blocked result"); return }
         #expect(diagnostics(events).filter { $0.kind == .limitReached }.map(\.stopReason) == [.toolCallLimit])
     }
 

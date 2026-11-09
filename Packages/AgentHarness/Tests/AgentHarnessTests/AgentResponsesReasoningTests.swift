@@ -44,7 +44,13 @@ import Testing
         let persisted = try JSONDecoder().decode([AgentMessage].self, from: JSONEncoder().encode(outcome.messages))
         #expect(persisted == outcome.messages)
         let canonical = try #require(response.message)
-        #expect(persisted[1] == .content(canonical))
+        guard case .content(let audited) = persisted[1] else { Issue.record("Expected native assistant"); return }
+        #expect(audited.blocks.map(\.content).count == canonical.blocks.count)
+        #expect(audited.text == canonical.text && audited.providerMetadata == canonical.providerMetadata)
+        #expect(audited.identity?.requestID == requests[0].identity?.id)
+        #expect(audited.toolCalls[0].providerMetadata == canonical.toolCalls[0].providerMetadata)
+        #expect(audited.toolCalls[0].rawArguments == canonical.toolCalls[0].rawArguments)
+        #expect(audited.toolCalls[0].invocationID != nil)
     }
 
     @Test func metadataFollowsCompactionGroupAndOldMessagesStillDecode() throws {
