@@ -109,6 +109,9 @@ jobs:
       - name: Run static policy checks
         run: python3 Tools/check_static_policy.py
 
+      - name: Validate native harness contracts
+        run: python3 Tools/check_native_harness_contracts.py
+
       - name: Test the coverage tools
         run: python3 -m unittest discover -s Tools/tests -t .
 

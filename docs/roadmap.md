@@ -573,7 +573,15 @@ only by current input and pi’s safety margin, without the previous 32k/64k/qua
 ceilings. The compaction trigger remains independent of desired maximum output. NH00 still needs the fixed build retested against that corpus on a physical
 device, authenticated provider smoke tests and continued catalog review; synthetic
 regressions are not evidence that the fixed build has passed the user's data/device.
-NH01–NH10 have not started; this is not full harness parity.
+NH01 now freezes the NH00 compatibility baseline in package/app fixtures and defines
+[native contract v1](contracts/native-harness-v1.md). Its machine-checked catalog maps
+C01–C27/A01–A70 separately from Kurn characterization cases; legacy evidence does not
+claim target completion. The fixtures cover opaque replay data and four provider
+requests, source parts/empty overrides, legacy session/history restoration, and
+save/update of conversation artifacts as library documents. CI checks versions,
+fixture hashes and evidence links. The canonical v1 format is not activated and no
+store migration runs in this increment. NH02–NH10 have not started; this is not full
+harness parity. Physical-device/provider qualification for NH00 remains open.
 
 Before continuing NH01, the architecture prerequisite separates domain from runtime:
 

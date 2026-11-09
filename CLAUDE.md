@@ -59,6 +59,16 @@ Compaction prompts are injectable through `AgentContextPolicy.summaryPrompts`: t
 runtime defaults are domain-neutral; `ChatCompactionPrompts.profile` in the app
 preserves the meeting/source/citation instructions used by Kurn.
 
+The NH01 baseline and target are in `docs/contracts/native-harness-v1.md` and its
+machine-checked catalog. Frozen synthetic fixtures live in each package's test
+resources and in `KurnTests/Fixtures`; they pin legacy message/wire/step codecs,
+source selections and artifact/session restoration before canonical migration.
+`Tools/check_native_harness_contracts.py` validates all 27 components/70 acceptance
+cases, evidence links, profile exclusions and fixture hashes in CI. Legacy evidence
+is separate from target conformance. Contract v1 is specified, not activated; the
+app still uses its existing storage and message types. Keep fixture-version,
+contract-version, JSONStorage-envelope, SwiftData-schema and pi-JSONL versions distinct.
+
 `ChatSourceScope` persists meeting/tag/folder/library selection,
 global transcript/summary/wiki/attachment parts and optional per-meeting overrides
 (including an empty selection). Legacy `includeWikis` payloads decode to the old defaults.

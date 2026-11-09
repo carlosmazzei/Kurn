@@ -27,6 +27,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "KurnCore", path: "Sources/KurnCore"),
-        .testTarget(name: "KurnCoreTests", dependencies: ["KurnCore"], path: "Tests/KurnCoreTests")
+        .testTarget(name: "KurnCoreTests", dependencies: ["KurnCore"], path: "Tests/KurnCoreTests", resources: [.copy("Fixtures")])
     ]
 )
