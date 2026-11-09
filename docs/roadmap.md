@@ -626,8 +626,8 @@ assistant call order and progress/completion events in execution order. Source I
 content revisions and search candidates are captured as immutable values before metadata
 refresh/model IO; deletion fails instead of returning an empty success. Document edits are
 planned as domain values, then the app commits the immutable revision, presentation state,
-provenance and invocation receipt in one SwiftData save. A serialized lease spans commit and
-workspace publication. Matching committed invocations replay the saved result without
+provenance and invocation receipt in one SwiftData save. A shared local mutation lease spans commit and
+workspace publication across executors; stale UI saves preserve committed artifacts and provenance. Matching committed invocations replay the saved result without
 reapplying an edit; changed arguments/request identity conflict. Failed saves publish neither
 revision nor receipt, and cancellation after commit preserves the known success. Opening a
 chat does not resume work. Session-wide ownership, durable model-message/result barriers

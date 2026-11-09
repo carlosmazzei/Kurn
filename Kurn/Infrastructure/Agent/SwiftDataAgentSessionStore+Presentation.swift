@@ -30,10 +30,16 @@ extension SwiftDataAgentSessionStore {
     }
 
     func writePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact],
-                           effect: AgentRecoveryRecord? = nil) throws {
+                           effect: AgentRecoveryRecord? = nil, preserveCommittedArtifacts: Bool = false) throws {
         storageLog("commit_started", session: target)
         do {
-            try planAndWritePresentation(target, turns: turns, scope: scope, artifacts: artifacts, effect: effect)
+            var presentation = (turns: turns, artifacts: artifacts)
+            if preserveCommittedArtifacts, target.canonicalVersion != nil {
+                let committed = try target.harnessSnapshot()
+                presentation = try HarnessPresentationReconciler.preserve(turns: turns, artifacts: artifacts,
+                    committed: (committed.turns, committed.artifacts))
+            }
+            try planAndWritePresentation(target, turns: presentation.turns, scope: scope, artifacts: presentation.artifacts, effect: effect)
             storageLog("commit_finished", session: target)
         } catch {
             storageLog("commit_failed", session: target)

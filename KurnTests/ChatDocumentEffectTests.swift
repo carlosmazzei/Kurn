@@ -89,17 +89,20 @@ struct ChatDocumentEffectTests {
         #expect(try ModelContext(store.context.container).fetchCount(FetchDescriptor<HarnessArtifactRevision>()) == 0)
     }
 
-    @Test func concurrentAppendsSerializeThroughCommitAndPublication() async throws {
+    @Test(arguments: [false, true]) func concurrentAppendsSerializeThroughCommitAndPublication(overlappingExecutors: Bool) async throws {
         let (store, session) = try setup()
         let workspace = ChatDocumentWorkspace()
         let executor = ChatDocumentEffectExecutor(writer: ChatDocumentEffectWriter(store: store, sessionID: session.id.uuidString), workspace: workspace)
+        let other = overlappingExecutors
+            ? ChatDocumentEffectExecutor(writer: ChatDocumentEffectWriter(store: store, sessionID: session.id.uuidString), workspace: workspace) : executor
         _ = try await executor.execute("create_document", arguments: create, context: execution(session))
         let id = try #require(await workspace.snapshot().first?.id)
         let contexts = try (0..<8).map { _ in try execution(session, name: "append_to_document") }
         try await withThrowingTaskGroup(of: Void.self) { group in
             for (index, context) in contexts.enumerated() {
+                let selected = index.isMultiple(of: 2) ? executor : other
                 group.addTask {
-                    _ = try await executor.execute("append_to_document", arguments: .object([
+                    _ = try await selected.execute("append_to_document", arguments: .object([
                         "document_id": .string(id.uuidString), "markdown": .string("Section \(index)")]), context: context)
                 }
             }
@@ -203,5 +206,25 @@ struct ChatDocumentEffectTests {
             #expect(result.artifacts.count == 1 && target.harnessRecords.count == 1 && target.harnessRevisions.count == 1)
             return result.output
         }
+    }
+
+    @Test func staleCancellationPresentationCannotEraseCommittedArtifactOrOrigin() throws {
+        let (store, session) = try setup()
+        let question = PersistedChatTurn(id: UUID(), role: .user, text: "Report", usage: nil, costUSD: nil, elapsedSeconds: nil)
+        try store.writePresentation(session, turns: [question], scope: nil, artifacts: [])
+        let origin = ChatArtifactOrigin(question: question.text, modelIdentifier: "test")
+        let writer = ChatDocumentEffectWriter(store: store, sessionID: session.id.uuidString, origin: origin)
+        let effect = try writer.commit("create_document", arguments: create, execution: execution(session))
+        // A cancelled UI consumer has not received toolFinished or refreshed its artifacts yet.
+        try store.writePresentation(session, turns: [question], scope: nil, artifacts: [], preserveCommittedArtifacts: true)
+        let restored = try session.harnessSnapshot()
+        let artifact = try #require(effect.artifacts.first)
+        #expect(restored.artifacts == [artifact] && restored.turns.first?.artifacts == [ChatArtifactReference(artifact)])
+        #expect(ChatArtifactOrigin.recorded(artifactID: artifact.id, in: restored.turns) == origin)
+        let second = try writer.commit("append_to_document", arguments: .object([
+            "document_id": .string(artifact.id.uuidString), "markdown": .string("Appendix")]), execution: execution(session, name: "append_to_document"))
+        try store.writePresentation(session, turns: restored.turns, scope: nil, artifacts: [artifact], preserveCommittedArtifacts: true)
+        #expect(try session.harnessSnapshot().artifacts == second.artifacts)
+        #expect(try session.harnessSnapshot().turns.first?.artifacts?.first?.version == 2)
     }
 }

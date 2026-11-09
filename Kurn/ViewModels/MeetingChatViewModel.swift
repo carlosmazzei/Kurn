@@ -182,7 +182,8 @@ final class MeetingChatViewModel {
             session = target
         }
         try SwiftDataAgentSessionStore(context: modelContext).writePresentation(target,
-            turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts)
+            turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts, preserveCommittedArtifacts: true)
+        artifacts = try target.harnessSnapshot().artifacts
     }
 
     /// Removes any turn appended after `count` — the partial assistant reply

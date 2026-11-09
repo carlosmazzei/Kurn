@@ -82,14 +82,35 @@ actor ChatDocumentEffectExecutor {
             if waiting.isEmpty { busy = false }
             else { waiting.removeFirst().resume() }
         }
-        try Task.checkCancellation()
-        if !prepared {
-            try await writer.prepareSession()
-            prepared = true
+        let needsPreparation = !prepared
+        let writer = writer; let workspace = workspace
+        let output = try await ChatDocumentCommitGate.shared.withLease {
+            try Task.checkCancellation()
+            if needsPreparation { try await writer.prepareSession() }
+            let result = try await writer.commit(name, arguments: arguments, execution: context)
+            // Do not check cancellation after a known durable commit: publish and acknowledge it.
+            try await workspace.restoreCommitted(result.artifacts)
+            return result.output
         }
-        let result = try await writer.commit(name, arguments: arguments, execution: context)
-        // Do not check cancellation after a known durable commit: publish and acknowledge it.
-        try await workspace.restoreCommitted(result.artifacts)
-        return result.output
+        prepared = true
+        return output
+    }
+}
+
+/// Also fences overlapping run executors, until NH05 provides one owner per session.
+/// All local document mutations share this short lease; independent reads remain parallel.
+private actor ChatDocumentCommitGate {
+    static let shared = ChatDocumentCommitGate()
+    private var busy = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func withLease<Value: Sendable>(_ operation: @Sendable () async throws -> Value) async rethrows -> Value {
+        if busy { await withCheckedContinuation { waiting.append($0) } }
+        else { busy = true }
+        defer {
+            if waiting.isEmpty { busy = false }
+            else { waiting.removeFirst().resume() }
+        }
+        return try await operation()
     }
 }

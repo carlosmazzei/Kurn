@@ -336,7 +336,9 @@ invocation/request/provider call, arguments digest, exact decimal artifact versi
 its version as decimal text, avoiding the Double precision limit of JSONValue numbers.
 A matching receipt returns that original result while retaining the latest workspace state;
 changed arguments/identity or a corrupt receipt fail without mutation. Receipts are immutable.
-A lease spans the save and workspace publication, including actor suspension. A failed save
+A shared local mutation lease spans the save and workspace publication, including actor
+suspension and overlapping executors. Compatibility UI saves preserve newer committed
+artifacts/references/provenance during cancellation; explicit branch writes remain separate. A failed save
 restores only staged entries/revisions/receipt. A cancellation arriving after a successful
 save cannot erase the receipt or change the known committed result into a tool failure.
 
