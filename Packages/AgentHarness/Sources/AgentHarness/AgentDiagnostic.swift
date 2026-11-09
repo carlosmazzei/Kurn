@@ -80,6 +80,7 @@ final class AgentTraceEmitter: @unchecked Sendable {
     private let sessionID: String
     private var requestID: String?
     private var invocationID: String?
+    private var invocationRequestID: String?
     private let resolutionID: UUID?
     private let events: AsyncThrowingStream<AgentEvent, Error>.Continuation
     private let sink: @Sendable (AgentDiagnostic) -> Void
@@ -94,16 +95,21 @@ final class AgentTraceEmitter: @unchecked Sendable {
     }
 
     func beginRequest(_ request: AgentRequestIdentity) {
-        lock.withLock { requestID = request.id; invocationID = nil }
+        lock.withLock { requestID = request.id; invocationID = nil; invocationRequestID = nil }
         events.yield(.requestStarted(request))
     }
 
+    /// End only the matching attempt; a deferred cleanup cannot erase a newer request.
+    func endRequest(_ request: AgentRequestIdentity) {
+        lock.withLock { if requestID == request.id { requestID = nil } }
+    }
+
     func beginInvocation(_ invocation: AgentToolInvocation) {
-        lock.withLock { requestID = invocation.requestID; invocationID = invocation.id }
+        lock.withLock { invocationRequestID = invocation.requestID; invocationID = invocation.id }
         events.yield(.invocationRegistered(invocation))
     }
 
-    func endInvocation() { lock.withLock { invocationID = nil } }
+    func endInvocation() { lock.withLock { invocationID = nil; invocationRequestID = nil } }
 
     func record(_ kind: AgentDiagnostic.Kind, metrics: [AgentDiagnostic.Metric: Int] = [:],
                 reason: AgentRunStopReason? = nil) {
@@ -112,7 +118,7 @@ final class AgentTraceEmitter: @unchecked Sendable {
         sequence += 1
         let event = AgentDiagnostic(runID: runID, sequence: sequence, kind: kind, metrics: metrics,
                                     stopReason: reason, resolutionID: resolutionID,
-                                    correlation: AgentDiagnosticCorrelation(sessionID: sessionID, requestID: requestID, invocationID: invocationID))
+                                    correlation: AgentDiagnosticCorrelation(sessionID: sessionID, requestID: invocationRequestID ?? requestID, invocationID: invocationID))
         sink(event)
         events.yield(.diagnostic(event))
     }

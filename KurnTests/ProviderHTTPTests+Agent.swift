@@ -245,4 +245,26 @@ extension ProviderHTTPTests {
         #expect(!body.contains("private") && body.contains("Thinking omitted"))
     }
 
+    @Test(arguments: AgentTestVendor.allCases)
+    private func agentErrorAfterFinishProducesFailureInsteadOfAnExecutableResponse(vendor: AgentTestVendor) async throws {
+        var payloads = [vendor.toolPayload]
+        if vendor == .openAI { payloads.append(#"{"type":"response.completed","response":{}}"#) }
+        if vendor == .anthropic {
+            payloads += [#"{"type":"content_block_stop","index":0}"#,
+                #"{"type":"message_delta","delta":{"stop_reason":"tool_use"}}"#, #"{"type":"message_stop"}"#]
+        }
+        payloads.append(#"{"error":{"message":"Late failure"}}"#)
+        MockURLProtocol.enqueue([.success(status: 200, body: sseBody(payloads), headers: [:])])
+        let output = AsyncStream<AgentModelEvent>.makeStream()
+        await #expect(throws: AppError.self) {
+            try await vendor.model().streamTurn(agentRequest) { output.continuation.yield($0) }
+        }
+        output.continuation.finish()
+        var events: [AgentModelEvent] = []
+        for await event in output.stream { events.append(event) }
+        #expect(events.filter { if case .content(.failed) = $0 { return true }; return false } == [.content(.failed(.transport))])
+        #expect(!events.contains { if case .content(.messageFinished) = $0 { return true }; return false })
+        #expect(MockURLProtocol.capturedRequests.count == 1)
+    }
+
 }

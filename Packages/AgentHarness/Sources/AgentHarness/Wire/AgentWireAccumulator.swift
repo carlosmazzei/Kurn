@@ -73,17 +73,18 @@ struct AgentWireState {
 
     mutating func consume(_ payload: String) throws -> [AgentModelEvent] {
         events = []
-        guard !payload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, payload != "[DONE]" else { return [] }
-        if terminal {
-            if payload.utf8.count <= 8 * 1_024 * 1_024, let value = try? JSONValue.parse(payload) {
-                if format == .openAI { openAIUsage(value["usage"]) }
-                if format == .gemini { geminiUsage(value["usageMetadata"]) }
-            }
-            return []
-        }
+        let marker = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !marker.isEmpty, marker != "[DONE]" else { return [] }
         guard payload.utf8.count <= 8 * 1_024 * 1_024 else { throw AgentWireError.bufferLimit }
         guard let value = try? JSONValue.parse(payload), case .object = value else { throw AgentWireError.invalidResponse }
-        if case .object = value["error"] { throw AgentWireError.remote(value["error"]["message"].string ?? "Stream error") }
+        // A finish reason closes content, not the SSE transport. Explicit failures remain
+        // authoritative until EOF and must poison response(), including after a final snapshot.
+        try checkProviderFailure(value)
+        if terminal {
+            if format == .openAI { openAIUsage(value["usage"]) }
+            if format == .gemini { geminiUsage(value["usageMetadata"]) }
+            return []
+        }
         captureProviderFacts(value)
         switch format {
         case .anthropic: try anthropic(value)
@@ -92,6 +93,17 @@ struct AgentWireState {
         case .openAIResponses: try responses(value)
         }
         return events
+    }
+
+    private func checkProviderFailure(_ value: JSONValue) throws {
+        if case .object = value["error"] { throw AgentWireError.remote(value["error"]["message"].string ?? "Stream error") }
+        if format == .openAIResponses, value["type"].string == "response.failed" {
+            throw value["response"]["error"]["message"].string.map(AgentWireError.remote) ?? .invalidResponse
+        }
+        if format == .openAIResponses, value["type"].string == "error" {
+            throw value["message"].string.map(AgentWireError.remote) ?? .invalidResponse
+        }
+        if format == .anthropic, value["type"].string == "error" { throw AgentWireError.remote("Stream error") }
     }
 
     var usage: AgentUsage? {

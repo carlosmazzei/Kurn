@@ -278,3 +278,20 @@ The graph is shared by production, tests and whole-store protected backups. Mark
 salvage includes conversations, retained native messages/artifact revisions, recovery metadata
 and independent library documents, while leaving live bytes unchanged. Library erasure
 removes all three new entities, including orphans, and per-session deletion cascades.
+
+
+## NH02 review corrections — PRs #337/#338
+
+The wire finish reason closes content, not transport validation. Until SSE EOF, explicit
+provider errors (including Responses typed failure events) invalidate the entire response.
+Failures are sticky and cannot be cleared by later usage updates. Malformed/oversized
+trailers fail explicitly; valid cumulative usage remains accepted and late content stays
+fenced. Tools cannot execute from a response invalidated after its finish reason.
+
+Diagnostic request correlation is scoped to the active model attempt. Request/summary
+terminal events retain that attempt's ID, then close it on success, failure or cancellation.
+Context checks, compaction decisions, retry decisions and run terminals outside requests
+carry session/run identity with no stale request ID. Summary requests get their own scope.
+Tool diagnostics explicitly reference their invocation's originating request without changing
+the ambient model scope; ending an invocation cannot leak its request into the next check.
+Existing persisted traces are retained as recorded rather than retrospectively relabeled.

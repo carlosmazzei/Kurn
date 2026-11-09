@@ -101,6 +101,18 @@
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentNativeWireTests.swift",
           "symbol": "conflictingProviderFinalBecomesOneFailedAudit"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentLateFailureTests.swift",
+          "symbol": "harnessNeverExecutesCallsWhenTheTransportReportsAnErrorAfterFinish"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
+          "symbol": "nextContextCheckAndRunCompletionDoNotInheritThePreviousRequestOrInvocation"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentRequestCorrelationTests.swift",
+          "symbol": "compactionDecisionsAreRunScopedAndOnlySummaryEventsCarryTheSummaryRequest"
         }
       ],
       "note": "Ordered bounded blocks, final replacement and terminal fencing are implemented. Awaitable session barriers and durable event envelopes remain NH05."
