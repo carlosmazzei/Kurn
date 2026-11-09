@@ -1218,3 +1218,5 @@
 "chat.metric.outputCapacityFallback" = "Capacità di uscita di riserva utilizzata (1 = sì)";
 "chat.diagnostic.outputBudgetAdjusted" = "Budget di uscita adeguato al minimo dell’API";
 "chat.metric.sentMaxOutputTokens" = "Budget di uscita inviato all’API";
+
+"chat.diagnostic.replayPrepared" = "Cronologia preparata per l’API";

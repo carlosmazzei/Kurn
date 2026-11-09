@@ -112,8 +112,8 @@ def validate(root: Path, manifest: dict | None = None) -> list[str]:
                 errors.append(f"{label}: invalid implementation increment")
             if status == "verified" and not item.get("targetEvidence"):
                 errors.append(f"{label}: verified target needs target evidence, not only legacy evidence")
-            if status == "partial" and not item.get("baselineEvidence"):
-                errors.append(f"{label}: partial status needs baseline evidence")
+            if status == "partial" and not (item.get("baselineEvidence") or item.get("targetEvidence")):
+                errors.append(f"{label}: partial status needs baseline or target evidence")
             evidence(item.get("baselineEvidence"), f"{label}.baselineEvidence")
             evidence(item.get("targetEvidence"), f"{label}.targetEvidence")
             if label in {"C20", "C21", "C22", "C23", "C27"} and disposition != "excluded":

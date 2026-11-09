@@ -7,7 +7,8 @@ import Testing
         let accumulator = AgentWireAccumulator(format: format, callIDPrefix: "turn")
         var events: [AgentModelEvent] = []
         for payload in payloads { events += try accumulator.consume(payload) }
-        return (try accumulator.response(), events)
+        if format == .anthropic { events += try accumulator.consume(#"{"type":"message_stop"}"#) }
+        return (try accumulator.response(), events.filter { if case .content = $0 { return false }; return true })
     }
 
     @Test func anthropicTextAndUsage() throws {
@@ -20,7 +21,8 @@ import Testing
             #"{"type":"message_stop"}"#
         ], format: .anthropic)
         #expect(events == [.textDelta("Hi"), .textDelta(" there")])
-        #expect(response == AgentTurnResponse(text: "Hi there", usage: AgentUsage(inputTokens: 30, outputTokens: 5)))
+        #expect(response.text == "Hi there" && response.usage == AgentUsage(inputTokens: 30, outputTokens: 5))
+        #expect(response.toolCalls.isEmpty && response.stopReason == .endTurn && response.message != nil)
     }
 
     @Test(arguments: [1, 2]) func anthropicToolsAndSplitJSON(count: Int) throws {
@@ -32,6 +34,7 @@ import Testing
         if count == 2 {
             payloads += [#"{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"b","name":"read","input":{"id":7}}}"#]
         }
+        payloads += (1...count).map { #"{"type":"content_block_stop","index":\#($0)}"# }
         payloads += [#"{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":9}}"#]
         let (response, events) = try consume(payloads, format: .anthropic)
         #expect(events.isEmpty)
@@ -51,7 +54,8 @@ import Testing
             "[DONE]"
         ], format: .openAI)
         #expect(events == [.textDelta("Hi"), .textDelta("!")])
-        #expect(response == AgentTurnResponse(text: "Hi!", usage: AgentUsage(inputTokens: 12, outputTokens: 3)))
+        #expect(response.text == "Hi!" && response.usage == AgentUsage(inputTokens: 12, outputTokens: 3))
+        #expect(response.toolCalls.isEmpty && response.stopReason == .endTurn && response.message != nil)
     }
 
     @Test(arguments: [1, 2]) func openAIIndexedTools(count: Int) throws {
@@ -81,7 +85,8 @@ import Testing
             #"{"candidates":[{"content":{"parts":[{"text":"!"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":2,"thoughtsTokenCount":4}}"#
         ], format: .gemini)
         #expect(events == [.textDelta("Hi"), .textDelta("!")])
-        #expect(response == AgentTurnResponse(text: "Hi!", usage: AgentUsage(inputTokens: 12, outputTokens: 6, reasoningTokens: 4)))
+        #expect(response.text == "Hi!" && response.usage == AgentUsage(inputTokens: 12, outputTokens: 6, reasoningTokens: 4))
+        #expect(response.toolCalls.isEmpty && response.stopReason == .endTurn && response.message != nil)
     }
 
     @Test(arguments: [1, 2]) func geminiToolsHaveStableIDs(count: Int) throws {
@@ -121,15 +126,22 @@ import Testing
     }
 
     @Test(arguments: AgentWireFormat.allCases) func malformedPayloadsAndErrors(format: AgentWireFormat) throws {
-        let accumulator = AgentWireAccumulator(format: format)
-        for payload in ["garbage", "{", "null", "[]", "{}", #"{"choices":[],"candidates":[]}"#] {
-            #expect(try accumulator.consume(payload).isEmpty)
+        let empty = AgentWireAccumulator(format: format)
+        for payload in ["", "[DONE]", "{}", #"{"choices":[],"candidates":[]}"#] {
+            #expect(try empty.consume(payload).isEmpty)
         }
-        #expect(throws: AgentWireError.emptyResponse) { try accumulator.response() }
-        #expect(throws: AgentWireError.remote("Rate limited")) {
-            try accumulator.consume(#"{"error":{"message":"Rate limited"}}"#)
+        #expect(throws: AgentWireError.emptyResponse) { try empty.response() }
+        for payload in ["garbage", "{", "null", "[]"] {
+            let broken = AgentWireAccumulator(format: format)
+            #expect(throws: AgentWireError.invalidResponse) { try broken.consume(payload) }
+            #expect(throws: AgentWireError.invalidResponse) { try broken.response() }
         }
-        #expect(throws: AgentWireError.remote("Stream error")) { try accumulator.consume(#"{"error":{}}"#) }
+        for (payload, message) in [(#"{"error":{"message":"Rate limited"}}"#, "Rate limited"),
+                                   (#"{"error":{}}"#, "Stream error")] {
+            let broken = AgentWireAccumulator(format: format)
+            #expect(throws: AgentWireError.remote(message)) { try broken.consume(payload) }
+            #expect(throws: AgentWireError.remote(message)) { try broken.response() }
+        }
     }
 
     @Test func invalidArgumentsRetainRawText() throws {
@@ -164,7 +176,7 @@ import Testing
             #"{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}"#,
             #"{"type":"message_delta","delta":{"stop_reason":"\#(reason)"},"usage":{"input_tokens":7}}"#
         ], format: .anthropic)
-        let expected: AgentModelStopReason = reason == "max_tokens" ? .maxTokens : reason == "stop_sequence" ? .endTurn : .other(reason)
+        let expected: AgentModelStopReason = reason == "max_tokens" ? .maxTokens : reason == "stop_sequence" ? .endTurn : .deferred
         #expect(response.stopReason == expected)
         #expect(response.usage?.inputTokens == 7)
     }

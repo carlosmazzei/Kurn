@@ -7,6 +7,7 @@ extension AgentWireFormat {
         var input: [JSONValue] = []
         for message in request.messages {
             switch message {
+            case .content(let message): input += responsesContent(message, model: model)
             case .user(let text):
                 input.append(.object(["role": .string("user"), "content": .string(text)]))
             case .assistant(let text, let calls, let metadata):

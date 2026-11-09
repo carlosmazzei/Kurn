@@ -30,6 +30,8 @@ public struct AgentToolCall: Codable, Sendable, Equatable {
 }
 
 public enum AgentMessage: Codable, Sendable, Equatable {
+    /// Native v1 content. Legacy cases retain their original Codable bytes for migration.
+    case content(AgentContentMessage)
     case user(String)
     case assistant(text: String, toolCalls: [AgentToolCall], providerMetadata: JSONValue? = nil)
     case toolResult(callID: String, toolName: String, content: String, isError: Bool)
@@ -57,6 +59,7 @@ public struct AgentUsage: Codable, Sendable, Equatable {
 
 public enum AgentModelStopReason: Codable, Sendable, Equatable {
     case endTurn, toolUse, maxTokens
+    case error, aborted, deferred
     case other(String)
 }
 
@@ -89,6 +92,8 @@ public struct AgentTurnRequest: Sendable, Equatable {
 
 public enum AgentModelEvent: Sendable, Equatable {
     case textDelta(String)
+    case content(AgentContentEvent)
+    case replayAdjusted(AgentReplayAdjustment)
     /// The wire protocol may require a minimum above the logical headroom floor.
     case outputBudgetAdjusted(requested: Int, sent: Int)
 }
@@ -101,15 +106,25 @@ public struct AgentTurnResponse: Sendable, Equatable {
     public let providerMetadata: JSONValue?
     /// Wire adapters discard every tool call from an output-limited response, even complete-looking ones.
     public let discardedToolCalls: Int
+    public let message: AgentContentMessage?
+    /// Includes interrupted calls retained for audit; these must never be sent to tool execution.
+    public let blockedToolCalls: [AgentToolCall]
+    public let toolExecutionBlocked: Bool
 
     public init(text: String, toolCalls: [AgentToolCall] = [], usage: AgentUsage? = nil,
-                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil, discardedToolCalls: Int = 0) {
-        self.text = text
-        self.toolCalls = toolCalls
-        self.usage = usage
+                stopReason: AgentModelStopReason = .endTurn, providerMetadata: JSONValue? = nil, discardedToolCalls: Int = 0,
+                message: AgentContentMessage? = nil, blocksToolExecution: Bool = false) {
+        let stopReason = message?.stopReason ?? stopReason
+        self.text = message?.text ?? text
+        let blocked = !stopReason.permitsToolExecution || blocksToolExecution
+        toolExecutionBlocked = blocked
+        self.toolCalls = blocked ? [] : (message?.toolCalls ?? toolCalls)
+        self.usage = message?.usage ?? usage
         self.stopReason = stopReason
         self.providerMetadata = providerMetadata
-        self.discardedToolCalls = max(0, discardedToolCalls)
+        blockedToolCalls = blocked ? (message?.toolCalls ?? toolCalls) : []
+        self.discardedToolCalls = max(0, max(discardedToolCalls, blockedToolCalls.count))
+        self.message = message
     }
 }
 
@@ -190,6 +205,7 @@ public enum AgentEvent: Sendable, Equatable {
     case diagnostic(AgentDiagnostic)
     case turnStarted(index: Int)
     case textDelta(String)
+    case modelContent(AgentContentEvent)
     case toolStarted(callID: String, name: String, arguments: JSONValue)
     case toolFinished(callID: String, name: String, summary: String, isError: Bool)
     case contextCompacted(beforeTokens: Int, afterTokens: Int)

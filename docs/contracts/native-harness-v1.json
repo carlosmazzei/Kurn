@@ -57,8 +57,13 @@
           "symbol": "legacyMessagesPreserveOpaqueReplayDataAndInvalidRawArguments"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "nativeCodecKeepsExactMillisecondsAndOpaqueFields"
+        }
+      ],
+      "note": "Native v1 user/assistant codecs and raw argument validation are implemented. Canonical tool-result/entry identity, V5 conversion and durable storage remain open."
     },
     {
       "id": "C02",
@@ -72,8 +77,17 @@
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentWireStreamTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "reducerOrdersInterleavedBlocksAndFinalReplacesDeltasAndUsage"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "terminalCallbacksFenceLateContentAndFailedCallbacksFenceExecution"
+        }
+      ],
+      "note": "Ordered bounded blocks, final replacement and terminal fencing are implemented. Awaitable session barriers and durable event envelopes remain NH05."
     },
     {
       "id": "C03",
@@ -104,8 +118,17 @@
           "symbol": "providerRequestsMatchTheFrozenBaseline"
         }
       ],
-      "targetEvidence": [],
-      "note": "Baseline evidence characterizes NH00 only; the versioned canonical/session target remains open."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentReplayTests.swift",
+          "symbol": "providerCopiesPreserveCanonicalDataAndPairNormalizedIDs"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentRejectsMissingKeyAndInvalidURL"
+        }
+      ],
+      "note": "All four wire adapters accept native blocks and own preparation terminals. Per-model capabilities, aliases and authenticated qualification remain open."
     },
     {
       "id": "C05",
@@ -505,8 +528,13 @@
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentWireStreamTests.swift"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "anthropicThinkingSignaturesAndInterleavedCallsRetainOrder"
+        }
+      ],
+      "note": "Indexed JSON fragments and Unicode native codecs are exercised; full transport/interchange qualification remains open."
     },
     {
       "id": "A07",
@@ -514,10 +542,23 @@
       "requirement": "Índices mantêm texto/thinking/toolCall separados",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "anthropicThinkingSignaturesAndInterleavedCallsRetainOrder"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "indexedChatCallsStayInProviderOrderWhenFragmentsArriveOutOfOrder"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "responsesFinalReorderKeepsKnownItemBlockIdentity"
+        }
+      ],
+      "note": "Native block indices preserve thinking/text/call separation and provider ordering through interleaved fragments; this verifies the in-process criterion, not durable session storage."
     },
     {
       "id": "A08",
@@ -525,10 +566,23 @@
       "requirement": "End substitui reconstrução",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "pending",
+      "targetStatus": "verified",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "reducerOrdersInterleavedBlocksAndFinalReplacesDeltasAndUsage"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "authoritativeNativeFinalReplacesDraftAndDoesNotExecuteRemovedCalls"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced"
+        }
+      ],
+      "note": "The authoritative final replaces draft blocks, text, calls and usage, including corrected/removed/reordered Responses items. Removed calls never execute."
     },
     {
       "id": "A09",
@@ -536,10 +590,19 @@
       "requirement": "Mensagem final de erro e nenhum estado pendente eterno",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "pending",
+      "targetStatus": "partial",
       "baselineEvidence": [],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "providerBoundaryAlwaysEmitsOneTerminal"
+        },
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentRejectsMissingKeyAndInvalidURL"
+        }
+      ],
+      "note": "Preparation emits one typed failure before any start event and reaches normal app error handling. Persisted canonical error messages and session settlement remain NH03/NH05."
     },
     {
       "id": "A10",
@@ -661,15 +724,28 @@
       "requirement": "argumentsError bloqueia aquela chamada; length bloqueia todas as chamadas da resposta",
       "disposition": "required",
       "increment": "NH02",
-      "targetStatus": "partial",
+      "targetStatus": "verified",
       "baselineEvidence": [
         {
           "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputLimitTests.swift",
           "symbol": "truncatedTurnNeverExecutesTools"
         }
       ],
-      "targetEvidence": [],
-      "note": "Legacy evidence does not establish the full target criterion."
+      "targetEvidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "nativeInvalidArgumentsProduceErrorDataAndContentFreeDiagnostics"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "lengthBlocksEveryCallAndKeepsPairedSyntheticResults"
+        },
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentOutputRecoveryTests.swift",
+          "symbol": "emptyLimitedReplyRetriesWithoutReexecutingCommittedToolsAndRetainsBlockedAudit"
+        }
+      ],
+      "note": "Invalid raw arguments block that invocation while a valid sibling executes; length blocks every invocation, retains raw calls and adds synthetic errors without confirmation/effects. Durable audit restoration remains NH03/NH04, beyond this execution criterion."
     },
     {
       "id": "A21",
@@ -1343,6 +1419,50 @@
         }
       ],
       "note": "Synthetic automated evidence; not physical-device qualification."
+    },
+    {
+      "id": "K09",
+      "scenario": "Native exact-time and opaque block codecs",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+          "symbol": "nativeCodecKeepsExactMillisecondsAndOpaqueFields"
+        }
+      ]
+    },
+    {
+      "id": "K10",
+      "scenario": "Native provider stream and final reconciliation",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentWireTests.swift",
+          "symbol": "responsesFinalReorderKeepsKnownItemBlockIdentity"
+        }
+      ]
+    },
+    {
+      "id": "K11",
+      "scenario": "Blocked calls retained as non-executed audit results",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentRuntimeTests.swift",
+          "symbol": "lengthBlocksEveryCallAndKeepsPairedSyntheticResults"
+        }
+      ]
+    },
+    {
+      "id": "K12",
+      "scenario": "Replay policy changes traced without content",
+      "status": "characterized",
+      "evidence": [
+        {
+          "path": "KurnTests/ProviderHTTPTests+Agent.swift",
+          "symbol": "agentFinalCorrectsStreamedDraftAndReplayChangesAreTraced"
+        }
+      ]
     }
   ]
 }

@@ -436,18 +436,23 @@ extension OpenAIProvider: AgentModel {
         _ request: AgentTurnRequest,
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-        let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
-        let official = usesResponses
-        let format: AgentWireFormat = official ? .openAIResponses : .openAI
-        let body = format.requestBody(request, model: chatModel, reasoningEffort: reasoningEffort)
-        var httpRequest = try LLMHTTP.jsonRequest(provider: provider, path: official ? "responses" : "chat/completions",
-            timeout: LLMHTTP.chatTimeout, headers: ["Authorization": "Bearer \(apiKey)"], body: [:])
-        httpRequest.httpBody = Data(try body.encodedString().utf8)
-        if official, request.maxOutputTokens < AgentWireFormat.responsesMinimumOutputTokens {
-            onEvent(.outputBudgetAdjusted(requested: request.maxOutputTokens, sent: AgentWireFormat.responsesMinimumOutputTokens))
-        }
-        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: format, onEvent: onEvent)
+        try await AgentModelBoundary.perform(onEvent: onEvent, prepare: {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+            let reasoningEffort = provider.id == AIProvider.openAI.id && chatModel.lowercased().hasPrefix("gpt-5") ? "low" : nil
+            let official = usesResponses
+            let format: AgentWireFormat = official ? .openAIResponses : .openAI
+            let projection = format.requestProjection(request, model: chatModel, reasoningEffort: reasoningEffort)
+            if projection.adjustment.hasChanges { onEvent(.replayAdjusted(projection.adjustment)) }
+            var httpRequest = try LLMHTTP.jsonRequest(provider: provider, path: official ? "responses" : "chat/completions",
+                timeout: LLMHTTP.chatTimeout, headers: ["Authorization": "Bearer \(apiKey)"], body: [:])
+            httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
+            if official, request.maxOutputTokens < AgentWireFormat.responsesMinimumOutputTokens {
+                onEvent(.outputBudgetAdjusted(requested: request.maxOutputTokens, sent: AgentWireFormat.responsesMinimumOutputTokens))
+            }
+            return (httpRequest, format)
+        }, stream: { prepared in
+            try await LLMHTTP.streamAgent(prepared.0, session: session, format: prepared.1, onEvent: onEvent)
+        })
     }
 }
 

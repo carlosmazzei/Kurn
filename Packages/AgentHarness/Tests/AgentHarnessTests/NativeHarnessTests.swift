@@ -59,7 +59,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let usage = AgentUsage(inputTokens: 10, outputTokens: 3)
         let model = ScriptedAgentModel([AgentTurnResponse(text: "Answer", usage: usage)])
         let events = try await agentEvents(NativeHarness(model: model), history: [.user("Earlier")])
-        #expect(events.filter { if case .diagnostic = $0 { return false }; return true } == [.runStarted, .turnStarted(index: 0), .textDelta("Answer"), .usage(usage),
+        #expect(events.filter { if case .diagnostic = $0 { return false }; if case .modelContent = $0 { return false }; return true } == [.runStarted, .turnStarted(index: 0), .textDelta("Answer"), .usage(usage),
                            .runFinished(AgentRunOutcome(messages: [.user("Earlier"), .user("Question"),
                                .assistant(text: "Answer", toolCalls: [])], finalText: "Answer",
                                stopReason: .completed, totalUsage: usage))])
@@ -132,8 +132,8 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let events = try await agentEvents(harness, tools: [tool])
         #expect(events.contains(.toolStarted(callID: "1", name: "lookup", arguments: parsed ?? .null)))
         #expect(events.contains(.toolFinished(callID: "1", name: "lookup",
-                                              summary: parsed == nil ? "Invalid JSON arguments for lookup: {bad" : "Executed",
-                                              isError: parsed == nil)))
+                                              summary: call.hasValidArguments ? "Executed" : "Invalid JSON arguments for lookup: \(raw)",
+                                              isError: !call.hasValidArguments)))
         let outcome = try agentOutcome(events)
         #expect(outcome.finalText == "Done")
         var expectedCall = call

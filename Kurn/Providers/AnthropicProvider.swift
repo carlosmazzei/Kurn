@@ -175,11 +175,16 @@ extension AnthropicProvider: AgentModel {
         _ request: AgentTurnRequest,
         onEvent: @escaping @Sendable (AgentModelEvent) -> Void
     ) async throws -> AgentTurnResponse {
-        try LLMHTTP.requireAPIKey(apiKey, provider: provider)
-        var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
-        let body = AgentWireFormat.anthropic.requestBody(request, model: model)
-        httpRequest.httpBody = Data(try body.encodedString().utf8)
-        return try await LLMHTTP.streamAgent(httpRequest, session: session, format: .anthropic, onEvent: onEvent)
+        try await AgentModelBoundary.perform(onEvent: onEvent, prepare: {
+            try LLMHTTP.requireAPIKey(apiKey, provider: provider)
+            var httpRequest = try makeRequest(timeout: LLMHTTP.chatTimeout, body: [:])
+            let projection = AgentWireFormat.anthropic.requestProjection(request, model: model)
+            if projection.adjustment.hasChanges { onEvent(.replayAdjusted(projection.adjustment)) }
+            httpRequest.httpBody = Data(try projection.body.encodedString().utf8)
+            return httpRequest
+        }, stream: { prepared in
+            try await LLMHTTP.streamAgent(prepared, session: session, format: .anthropic, onEvent: onEvent)
+        })
     }
 }
 

@@ -36,6 +36,17 @@ class NativeHarnessContractTests(unittest.TestCase):
         value["acceptance"][0]["targetStatus"] = "verified"
         self.assertTrue(any("verified target needs target evidence" in error for error in validate(self.root, value)))
 
+    def test_partial_target_evidence_is_distinct_from_legacy_and_full_verification(self):
+        value = copy.deepcopy(self.manifest)
+        item = next(item for item in value["acceptance"] if item["id"] == "A09")
+        item.update(targetStatus="partial", baselineEvidence=[], targetEvidence=[{
+            "path": "Packages/AgentHarness/Tests/AgentHarnessTests/AgentContentContractTests.swift",
+            "symbol": "providerBoundaryAlwaysEmitsOneTerminal",
+        }])
+        self.assertEqual(validate(self.root, value), [])
+        item["targetEvidence"] = []
+        self.assertTrue(any("A09: partial status needs" in error for error in validate(self.root, value)))
+
     def test_stale_test_symbols_and_missing_files_fail(self):
         for item in ({"path": "missing-test.swift"},
                      {"path": "KurnTests/NativeHarnessContractFixtureTests.swift", "symbol": "removedTest"}):

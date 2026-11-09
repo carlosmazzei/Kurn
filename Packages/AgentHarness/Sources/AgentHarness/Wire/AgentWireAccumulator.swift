@@ -2,192 +2,184 @@ import Foundation
 
 public enum AgentWireError: Error, Sendable, Equatable {
     case remote(String)
-    case invalidResponse
-    case emptyResponse
-    case incompleteToolCall
-    case incompleteStream
+    case invalidResponse, emptyResponse, incompleteToolCall, incompleteStream, bufferLimit, deferred
 }
 
-/// Consumes SSE data payloads, not SSE framing. State is protected by `lock`.
+/// SSE data payloads only. A failure is sticky; response() can never salvage a failed stream.
 public final class AgentWireAccumulator: @unchecked Sendable {
     private let lock = NSLock()
     private var state: AgentWireState
+    private var failure: AgentWireError?
 
-    public init(format: AgentWireFormat, callIDPrefix: String = UUID().uuidString) {
-        state = AgentWireState(format: format, callIDPrefix: callIDPrefix)
+    public init(format: AgentWireFormat, callIDPrefix: String = UUID().uuidString,
+                messageID: String = UUID().uuidString, requestID: String = UUID().uuidString,
+                timestampMilliseconds: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)) {
+        state = AgentWireState(format: format, callIDPrefix: callIDPrefix, messageID: messageID,
+                               requestID: requestID, timestampMilliseconds: timestampMilliseconds)
     }
 
     public func consume(_ payload: String) throws -> [AgentModelEvent] {
-        try lock.withLock { try state.consume(payload) }
+        try lock.withLock {
+            if let failure { throw failure }
+            do { return try state.consume(payload) }
+            catch {
+                let problem = (error as? AgentWireError) ?? (error is AgentContentError ? .bufferLimit : .invalidResponse)
+                failure = problem
+                throw problem
+            }
+        }
     }
 
     public func response() throws -> AgentTurnResponse {
-        try lock.withLock { try state.response() }
+        try lock.withLock {
+            if let failure { throw failure }
+            do { return try state.response() }
+            catch is AgentContentError { throw AgentWireError.invalidResponse }
+        }
     }
 }
 
-private struct AgentWireState {
-    struct PartialCall {
-        var id = ""
-        var name = ""
-        var raw = ""
-        var initial: JSONValue = .object([:])
-        var metadata: JSONValue?
-    }
-
+struct AgentWireState {
     let format: AgentWireFormat
     let callIDPrefix: String
-    var text = ""
-    var calls: [Int: PartialCall] = [:]
+    let messageID: String
+    let requestID: String
+    let timestampMilliseconds: Int64
+    var model: String?
+    var responseID: String?
+    var rawStopReason: String?
     var inputTokens: Int?
     var outputTokens: Int?
     var reasoningTokens: Int?
     var stopReason: AgentModelStopReason = .other("unknown")
-    var receivedTerminal = false
-    var responses = AgentResponsesAccumulator()
+    var terminal = false
+    var anthropicStopReceived = false
+    var reducer = AgentMessageReducer()
+    var slots: [String: Int] = [:]
+    var nextSlot = 0
+    var chatCallBase: Int?
+    var lastChatKind: String?
+    var lastChatSlot: Int?
+    var geminiOutputTokens: Int?
+    var lastGeminiKind: String?
+    var lastGeminiSlot: Int?
+    var responsesReasoning: [Int: JSONValue] = [:]
+    var responsesCalls: [String: Int] = [:]
+    var responsesSlotIDs: [Int: String] = [:]
+    var responsesKnownIDs: [String: String] = [:]
+    var responsesItemIDs: [Int: String] = [:]
+    var events: [AgentModelEvent] = []
 
     mutating func consume(_ payload: String) throws -> [AgentModelEvent] {
-        guard let value = try? JSONValue.parse(payload), case .object = value else { return [] }
-        if case .object = value["error"] {
-            throw AgentWireError.remote(value["error"]["message"].string ?? "Stream error")
+        events = []
+        guard !payload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, payload != "[DONE]" else { return [] }
+        if terminal {
+            if payload.utf8.count <= 8 * 1_024 * 1_024, let value = try? JSONValue.parse(payload) {
+                if format == .openAI { openAIUsage(value["usage"]) }
+                if format == .gemini { geminiUsage(value["usageMetadata"]) }
+            }
+            return []
         }
+        guard payload.utf8.count <= 8 * 1_024 * 1_024 else { throw AgentWireError.bufferLimit }
+        guard let value = try? JSONValue.parse(payload), case .object = value else { throw AgentWireError.invalidResponse }
+        if case .object = value["error"] { throw AgentWireError.remote(value["error"]["message"].string ?? "Stream error") }
         switch format {
-        case .anthropic: return try anthropic(value)
-        case .openAI: return openAI(value)
-        case .gemini: return gemini(value)
-        case .openAIResponses: return try responses.consume(value)
+        case .anthropic: try anthropic(value)
+        case .openAI: try openAI(value)
+        case .gemini: try gemini(value)
+        case .openAIResponses: try responses(value)
         }
+        return events
+    }
+
+    var usage: AgentUsage? {
+        inputTokens == nil && outputTokens == nil ? nil
+            : AgentUsage(inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0, reasoningTokens: reasoningTokens)
+    }
+
+    var api: String {
+        switch format { case .anthropic: "anthropic"; case .openAI: "openAI"; case .openAIResponses: "openAIResponses"; case .gemini: "gemini" }
     }
 
     func response() throws -> AgentTurnResponse {
-        if format == .openAIResponses { return try responses.response() }
-        guard !text.isEmpty || !calls.isEmpty || stopReason == .maxTokens else { throw AgentWireError.emptyResponse }
-        guard receivedTerminal else { throw AgentWireError.incompleteStream }
-        let callIndices = stopReason == .maxTokens ? [] : calls.keys.sorted()
-        let toolCalls = try callIndices.map { index in
-            let call = calls[index] ?? PartialCall()
-            guard !call.id.isEmpty, !call.name.isEmpty else { throw AgentWireError.incompleteToolCall }
-            let raw = call.raw.isEmpty ? try call.initial.encodedString() : call.raw
-            return AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(raw)) ?? .null,
-                                 rawArguments: raw, providerMetadata: call.metadata)
-        }
-        let usage = inputTokens == nil && outputTokens == nil ? nil
-            : AgentUsage(inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0, reasoningTokens: reasoningTokens)
-        return AgentTurnResponse(text: text, toolCalls: toolCalls, usage: usage, stopReason: stopReason,
-                                 discardedToolCalls: stopReason == .maxTokens ? calls.count : 0)
-    }
-
-    mutating func appendText(_ delta: String?) -> [AgentModelEvent] {
-        guard let delta, !delta.isEmpty else { return [] }
-        text += delta
-        return [.textDelta(delta)]
-    }
-
-    mutating func anthropic(_ value: JSONValue) throws -> [AgentModelEvent] {
-        switch value["type"].string {
-        case "error": throw AgentWireError.remote(value["error"]["message"].string ?? "Stream error")
-        case "message_start":
-            let usage = value["message"]["usage"]
-            inputTokens = usage["input_tokens"].int
-            outputTokens = usage["output_tokens"].int
-        case "content_block_start":
-            let block = value["content_block"]
-            if block["type"].string == "tool_use", let index = value["index"].int {
-                calls[index] = PartialCall(id: block["id"].string ?? "", name: block["name"].string ?? "",
-                                           initial: block["input"] == .null ? .object([:]) : block["input"])
-            }
-            if block["type"].string == "text" { return appendText(block["text"].string) }
-        case "content_block_delta":
-            return anthropicDelta(value)
-        case "message_delta":
-            anthropicFinish(value)
-        case "message_stop":
-            if !receivedTerminal { stopReason = calls.isEmpty ? .endTurn : .toolUse }
-            receivedTerminal = true
-        default: break
-        }
-        return []
-    }
-
-    mutating func anthropicDelta(_ value: JSONValue) -> [AgentModelEvent] {
-        let delta = value["delta"]
-        if delta["type"].string == "text_delta" { return appendText(delta["text"].string) }
-        if delta["type"].string == "input_json_delta", let index = value["index"].int, calls[index] != nil {
-            calls[index]?.raw += delta["partial_json"].string ?? ""
-        }
-        return []
-    }
-
-    mutating func anthropicFinish(_ value: JSONValue) {
-        if let input = value["usage"]["input_tokens"].int { inputTokens = input }
-        if let output = value["usage"]["output_tokens"].int { outputTokens = output }
-        guard let reason = value["delta"]["stop_reason"].string else { return }
-        receivedTerminal = true
-        switch reason {
-        case "end_turn", "stop_sequence": stopReason = .endTurn
-        case "tool_use": stopReason = .toolUse
-        case "max_tokens": stopReason = .maxTokens
-        default: stopReason = .other(reason)
-        }
-    }
-
-    mutating func openAI(_ value: JSONValue) -> [AgentModelEvent] {
-        let usage = value["usage"]
-        if let input = usage["prompt_tokens"].int { inputTokens = input }
-        if let output = usage["completion_tokens"].int { outputTokens = output }
-        if let reasoning = usage["completion_tokens_details"]["reasoning_tokens"].int { reasoningTokens = reasoning }
-        guard let choice = value["choices"].array.first(where: { ($0["index"].int ?? 0) == 0 }) else { return [] }
-        let delta = choice["delta"]
-        for fragment in delta["tool_calls"].array {
-            guard let index = fragment["index"].int else { continue }
-            var call = calls[index] ?? PartialCall()
-            if let id = fragment["id"].string { call.id = id }
-            call.name += fragment["function"]["name"].string ?? ""
-            call.raw += fragment["function"]["arguments"].string ?? ""
-            calls[index] = call
-        }
-        if let reason = choice["finish_reason"].string {
-            receivedTerminal = true
-            switch reason {
-            case "stop": stopReason = .endTurn
-            case "tool_calls", "function_call": stopReason = .toolUse
-            case "length": stopReason = .maxTokens
-            default: stopReason = .other(reason)
-            }
-        }
-        return appendText(delta["content"].string)
-    }
-
-    mutating func gemini(_ value: JSONValue) -> [AgentModelEvent] {
-        if let reasoning = value["usageMetadata"]["thoughtsTokenCount"].int { reasoningTokens = reasoning }
-        let usage = value["usageMetadata"]
-        if let input = usage["promptTokenCount"].int { inputTokens = input }
-        if let output = usage["candidatesTokenCount"].int {
-            outputTokens = output + (usage["thoughtsTokenCount"].int ?? 0)
-        }
-        guard let candidate = value["candidates"].array.first(where: { ($0["index"].int ?? 0) == 0 }) else { return [] }
-        var events: [AgentModelEvent] = []
-        for part in candidate["content"]["parts"].array {
-            if part["thought"] != .bool(true) { events += appendText(part["text"].string) }
-            let function = part["functionCall"]
-            guard let name = function["name"].string else { continue }
-            let index = calls.count
-            let id = function["id"].string
+        var auditIDs = Set<String>()
+        let blocks = reducer.blocks.map { block -> AgentContentBlock in
+            guard !stopReason.permitsToolExecution, case .toolCall(let call, let complete) = block.content else { return block }
+            if !call.id.isEmpty, auditIDs.insert(call.id).inserted { return block }
             var metadata: [String: JSONValue] = [:]
-            if let id { metadata["geminiID"] = .string(id) }
-            if let signature = part["thoughtSignature"].string { metadata["thoughtSignature"] = .string(signature) }
-            calls[index] = PartialCall(id: id ?? "\(callIDPrefix)-\(index)", name: name,
-                                      initial: function["args"] == .null ? .object([:]) : function["args"],
-                                      metadata: metadata.isEmpty ? nil : .object(metadata))
+            if case .object(let original) = call.providerMetadata { metadata = original }
+            metadata["originalCallID"] = .string(call.id)
+            let audit = AgentToolCall(id: "\(callIDPrefix)-\(block.id)", name: call.name, arguments: call.arguments,
+                rawArguments: call.rawArguments, providerMetadata: .object(metadata))
+            return AgentContentBlock(id: block.id, content: .toolCall(audit, complete: complete))
         }
-        if let reason = candidate["finishReason"].string {
-            receivedTerminal = true
-            switch reason {
-            case "STOP": stopReason = calls.isEmpty ? .endTurn : .toolUse
-            case "MAX_TOKENS": stopReason = .maxTokens
-            default: stopReason = .other(reason)
-            }
+        let meaningful = blocks.contains { block in
+            switch block.content { case .text(let text, _): return !text.isEmpty; case .toolCall, .image: return true; case .thinking: return false }
         }
-        return events
+        let allowsEmpty: Bool
+        switch stopReason { case .maxTokens, .deferred, .error, .aborted: allowsEmpty = true; default: allowsEmpty = false }
+        guard meaningful || allowsEmpty else { throw AgentWireError.emptyResponse }
+        guard terminal else { throw AgentWireError.incompleteStream }
+        let calls = blocks.compactMap { block -> AgentToolCall? in
+            if case .toolCall(let call, _) = block.content { return call }; return nil
+        }
+        if stopReason.permitsToolExecution {
+            guard blocks.allSatisfy({ if case .toolCall(let call, let complete) = $0.content {
+                return complete && !call.id.isEmpty && !call.name.isEmpty
+            }; return true }), Set(calls.map(\.id)).count == calls.count else { throw AgentWireError.incompleteToolCall }
+        }
+        let metadata: JSONValue? = responsesReasoning.isEmpty ? nil : .object([
+            "openAIResponses": .object(["reasoning": .array(responsesReasoning.keys.sorted().compactMap { responsesReasoning[$0] })])])
+        let identity = AgentResponseIdentity(api: api, model: model, responseID: responseID, requestID: requestID)
+        let fullMetadata: JSONValue? = rawStopReason.map { .object(["rawStopReason": .string($0)]) }
+        let message = try AgentContentMessage(id: messageID, timestampMilliseconds: timestampMilliseconds, role: .assistant,
+            blocks: blocks, identity: identity, stopReason: stopReason, usage: usage, providerMetadata: fullMetadata)
+        return AgentTurnResponse(text: message.text, usage: usage, stopReason: stopReason, providerMetadata: metadata,
+                                 discardedToolCalls: stopReason == .maxTokens ? calls.count : 0, message: message)
+    }
+
+    func blockID(_ slot: Int) -> String { responsesSlotIDs[slot] ?? "b\(slot)" }
+    func block(_ slot: Int) -> AgentContentBlock? { reducer.blocks.first { $0.id == blockID(slot) } }
+
+    mutating func start(_ slot: Int, _ content: AgentContentBlock.Content) throws {
+        guard slot >= 0, slot < 4_096 * 4_096 else { throw AgentWireError.invalidResponse }
+        let event = AgentContentEvent.blockStarted(index: slot, block: AgentContentBlock(id: blockID(slot), content: content))
+        try emit(event)
+    }
+
+    mutating func update(_ slot: Int, _ content: AgentContentBlock.Content) throws {
+        try emit(.blockUpdated(AgentContentBlock(id: blockID(slot), content: content)))
+    }
+
+    mutating func delta(_ slot: Int, _ delta: AgentContentDelta) throws { try emit(.blockDelta(id: blockID(slot), delta: delta)) }
+
+    mutating func emit(_ event: AgentContentEvent) throws {
+        try reducer.apply(event)
+        events.append(.content(event))
+    }
+
+    mutating func text(_ text: String?, slot: Int, thinking: Bool = false) throws {
+        guard let text, !text.isEmpty else { return }
+        if block(slot) == nil { try start(slot, thinking ? .thinking(text: "", signature: nil, redacted: false) : .text("")) }
+        try delta(slot, thinking ? .thinking(text) : .text(text))
+        if !thinking { events.append(.textDelta(text)) }
+    }
+
+    mutating func allocated(_ key: String) -> Int {
+        if let slot = slots[key] { return slot }
+        let slot = nextSlot
+        nextSlot += 1
+        slots[key] = slot
+        return slot
+    }
+
+    mutating func finishCalls() throws {
+        for block in reducer.blocks {
+            guard case .toolCall(let call, _) = block.content else { continue }
+            let raw = call.rawArguments.isEmpty ? "{}" : call.rawArguments
+            let final = AgentToolCall(id: call.id, name: call.name, arguments: (try? JSONValue.parse(raw)) ?? .null,
+                                      rawArguments: raw, providerMetadata: call.providerMetadata)
+            try emit(.blockUpdated(AgentContentBlock(id: block.id, content: .toolCall(final, complete: true))))
+        }
     }
 }

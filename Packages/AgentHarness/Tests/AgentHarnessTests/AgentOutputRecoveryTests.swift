@@ -15,7 +15,7 @@ struct AgentOutputRecoveryTests {
         return events
     }
 
-    @Test func emptyLimitedReplyRetriesWithoutReexecutingCommittedToolsOrAppendingIncompleteCalls() async throws {
+    @Test func emptyLimitedReplyRetriesWithoutReexecutingCommittedToolsAndRetainsBlockedAudit() async throws {
         let limited = AgentUsage(inputTokens: 54_879, outputTokens: 32_768, reasoningTokens: 32_700)
         let model = ScriptedAgentModel([
             AgentTurnResponse(text: "", toolCalls: [agentCall("committed")], usage: AgentUsage(inputTokens: 3_000, outputTokens: 100)),
@@ -34,7 +34,12 @@ struct AgentOutputRecoveryTests {
             == ["committed", "after-recovery"])
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == .completed)
-        #expect(outcome.messages.count == 8)
+        #expect(outcome.messages.count == 10)
+        guard case .content(let interruptedMessage) = outcome.messages[5] else { Issue.record("Missing interrupted message"); return }
+        #expect(interruptedMessage.toolCalls.first?.rawArguments == "{incomplete")
+        guard case .toolResult("discarded", _, _, true) = outcome.messages[6] else { Issue.record("Missing blocked error"); return }
+        #expect(!requests[3].messages.contains(outcome.messages[5]))
+        #expect(!requests[3].messages.contains(outcome.messages[6]))
         #expect(outcome.totalUsage == AgentUsage(inputTokens: 167_858, outputTokens: 32_983, reasoningTokens: 32_700))
         let facts = diagnostics(events)
         #expect(!facts.contains { $0.kind == .limitReached })
@@ -170,7 +175,9 @@ struct AgentOutputRecoveryTests {
         let outcome = try agentOutcome(events)
         #expect(outcome.stopReason == .toolCallLimit)
         #expect(outcome.finalText == "Partial conclusion")
-        #expect(outcome.messages.last == .assistant(text: "Partial conclusion", toolCalls: []))
+        guard case .content(let wrapUp) = outcome.messages[outcome.messages.count - 2] else { Issue.record("Missing wrap-up audit"); return }
+        #expect(wrapUp.text == "Partial conclusion" && wrapUp.toolCalls.map(\.id) == ["ignored"])
+        guard case .toolResult("ignored", _, _, true) = outcome.messages.last else { Issue.record("Missing blocked result"); return }
         #expect(diagnostics(events).filter { $0.kind == .limitReached }.map(\.stopReason) == [.toolCallLimit])
     }
 

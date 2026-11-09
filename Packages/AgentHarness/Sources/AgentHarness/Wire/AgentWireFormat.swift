@@ -7,13 +7,24 @@ public enum AgentWireFormat: Sendable, CaseIterable {
     public func requestBody(_ request: AgentTurnRequest, model: String,
                             openAITokenField: String = "max_completion_tokens",
                             reasoningEffort: String? = nil) -> JSONValue {
+        requestProjection(request, model: model, openAITokenField: openAITokenField, reasoningEffort: reasoningEffort).body
+    }
+
+    public func requestProjection(_ request: AgentTurnRequest, model: String,
+                                  openAITokenField: String = "max_completion_tokens",
+                                  reasoningEffort: String? = nil) -> AgentWireRequestProjection {
+        var projection = AgentReplayProjection(format: self, model: model)
+        let request = AgentTurnRequest(systemPrompt: request.systemPrompt, messages: projection.messages(request.messages),
+            tools: request.tools, maxOutputTokens: request.maxOutputTokens, allowsToolCalls: request.allowsToolCalls)
+        let body: JSONValue
         switch self {
-        case .anthropic: return anthropicBody(request, model: model)
+        case .anthropic: body = anthropicBody(request, model: model)
         case .openAI:
-            return openAIBody(request, model: model, tokenField: openAITokenField, reasoningEffort: reasoningEffort)
-        case .gemini: return geminiBody(request)
-        case .openAIResponses: return responsesBody(request, model: model, reasoningEffort: reasoningEffort)
+            body = openAIBody(request, model: model, tokenField: openAITokenField, reasoningEffort: reasoningEffort)
+        case .gemini: body = geminiBody(request, model: model)
+        case .openAIResponses: body = responsesBody(request, model: model, reasoningEffort: reasoningEffort)
         }
+        return AgentWireRequestProjection(body: body, adjustment: projection.adjustment)
     }
 
     private func openAIBody(_ request: AgentTurnRequest, model: String, tokenField: String,
@@ -21,6 +32,7 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         let messages: [JSONValue] = [.object(["role": .string("system"), "content": .string(request.systemPrompt)])]
             + request.messages.map { message in
                 switch message {
+                case .content(let message): return openAIContent(message, model: model)
                 case .user(let text): return .object(["role": .string("user"), "content": .string(text)])
                 case .assistant(let text, let calls, _):
                     var value: [String: JSONValue] = ["role": .string("assistant"), "content": .string(text)]
@@ -54,6 +66,8 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         var messages: [JSONValue] = []
         for message in request.messages {
             switch message {
+            case .content(let message):
+                append(role: message.role.rawValue, parts: contentParts(message, model: model), to: &messages, field: "content")
             case .user(let text):
                 append(role: "user", parts: [.object(["type": .string("text"), "text": .string(text)])],
                        to: &messages, field: "content")
@@ -80,11 +94,15 @@ public enum AgentWireFormat: Sendable, CaseIterable {
         return .object(body)
     }
 
-    private func geminiBody(_ request: AgentTurnRequest) -> JSONValue {
+    private func geminiBody(_ request: AgentTurnRequest, model: String) -> JSONValue {
         var contents: [JSONValue] = []
         var callsByID: [String: AgentToolCall] = [:]
         for message in request.messages {
             switch message {
+            case .content(let message):
+                for call in message.toolCalls { callsByID[call.id] = call }
+                append(role: message.role == .user ? "user" : "model", parts: contentParts(message, model: model),
+                       to: &contents, field: "parts")
             case .user(let text):
                 append(role: "user", parts: [.object(["text": .string(text)])], to: &contents, field: "parts")
             case .assistant(let text, let calls, _):

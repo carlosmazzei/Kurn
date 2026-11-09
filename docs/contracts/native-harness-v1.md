@@ -1,8 +1,9 @@
 # Native harness contract v1
 
-Status: **specified, not activated**. NH01 freezes the NH00 compatibility baseline and
-defines the target for NH02–NH10. It does not introduce a canonical store, change the
-message wire format, perform a migration or claim complete pi compatibility.
+Status: **message/stream implementation in progress (NH02)**. NH01 froze the NH00
+compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
+boundary and consumes them in the harness. Indexed session storage, durable canonical
+history and migration remain inactive; complete pi compatibility is not claimed.
 
 Baseline: `6ec656b93c6cf59cbc3dc32f9bd08e1abb1517ed`. The attached reference documents
 describe pi revision `f064465d10d6a8e5c19f687bba1b5b5499b51680`. Their A/C identifiers
@@ -10,15 +11,15 @@ are reference criteria, not identifiers of upstream pi test functions.
 
 The [catalog](native-harness-v1.json) maps all C01–C27 and A01–A70 individually to
 scope, delivery increment, legacy evidence and target evidence. `partial` means that
-some legacy behavior is exercised; it never means that the full target passed.
-K01–K08 are Kurn characterization cases, separate from pi conformance.
+some named behavior is exercised; baseline and target evidence remain separate and do
+not establish the full target. Kurn characterization cases are separate from pi conformance.
 
 ## Versions and ownership
 
 | Version | Meaning | Current reader/writer |
 | --- | --- | --- |
 | Fixture v1 | Frozen synthetic test inputs and expected legacy output | Test bundles and catalog validator |
-| Contract v1 | Native canonical message/event/entry rules specified here | Implementation starts at NH02; no live writer yet |
+| Contract v1 | Native canonical message/event/entry rules specified here | Provider boundaries write user/assistant content envelopes; session/entry writer remains inactive |
 | JSONStorage envelope v1 | Existing checksum envelope around authoritative app values | Existing app persistence; bare legacy JSON remains readable |
 | SwiftData V5 | Current model graph | Existing app store; V6 migration belongs to NH03 |
 | pi JSONL v3 | Qualified future interchange boundary | Not a native store schema; NH10 |
@@ -64,8 +65,11 @@ Important current adaptations/gaps:
 - Runtime compaction changes only the current request projection. Reopen/another question
   does not yet reuse a durable checkpoint. Full branch history, receipts and revision
   recovery are not implemented.
-- Output-limited calls never execute. Current adapters/runtime discard interrupted calls;
-  canonical synthetic error results/audit retention remain NH02/NH04 work.
+- Output-limited calls never execute. NH02 retains native call blocks/raw arguments and
+  appends synthetic error results in the in-memory audit history. A successful output
+  recovery excludes that interrupted exchange from retry context. The V5 app still saves
+  presentation turns/trace rather than this complete canonical history; durable retention
+  belongs to NH03/NH04.
 - The current UI can request cancellation and clear its busy state before the task settles.
   Confirmed termination, durable barriers, queues and late-event fencing belong to NH05.
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
@@ -176,7 +180,48 @@ profile scope, evidence links/test symbols, fixture versions, baselines and chec
 runs it with static policy. Tests decode real fixture bytes through current package/app
 readers; no provider keys or paid calls are needed.
 
-NH01 completion means the baseline and target are reviewable and traceable. It does not mark
-pending target criteria verified. NH02 implements message/stream contracts; NH03 activates
-store codecs/migration only after validation. NH00's real-corpus/device qualification and
+NH01 completion means the baseline and target are reviewable and traceable. Target evidence
+now identifies the exercised NH02 behavior; session-dependent criteria remain open. NH03
+activates store codecs/migration only after validation. NH00's real-corpus/device qualification and
 authenticated provider smoke tests remain separately open.
+
+## NH02 implementation boundary
+
+`AgentContentMessage` is the checked v1 user/assistant content envelope. It retains an
+opaque message ID, exact Int64 Unix milliseconds, ordered stable block IDs, response and
+request identities, model/API, raw stop reason, reported usage and opaque replay fields.
+`AgentMessage.content` carries it alongside the frozen legacy cases. Legacy user/tool-result
+factories remain compatibility inputs; canonical tool-result/entry identities and app history
+conversion are still required before the session store can become canonical. No V5 fields or
+NH01 fixture bytes change in this increment.
+
+`AgentMessageReducer` orders interleaved blocks, bounds retained content to 4,096 blocks /
+8 MiB, rejects invalid transitions and replaces all accumulated blocks/usage with the final
+message. Thinking/redacted data never becomes visible text. Wire errors are sticky; malformed
+payloads, unknown required block types, incomplete tool calls, missing terminal events and
+explicit buffer overflow cannot be salvaged into executable calls. Anthropic requires both
+`content_block_stop` for a tool and `message_stop` for the response. Responses final output
+replaces stale/removed/reordered items, preserving known item identities. Chat Completions
+orders tool fragments by provider index. Trailing cumulative usage replaces earlier counts;
+Gemini reasoning is an output component, counted once.
+
+Every production AgentModel implementation uses `AgentModelBoundary`, covering credential/URL
+preparation and transport. It emits exactly one typed final/failure event. The harness fences
+late callbacks and prevents a failed stream from returning executable calls. Deferred outcomes
+are explicit and unsupported; no polling is introduced. Awaitable session barriers and event
+sequence envelopes remain NH05 work.
+
+Provider requests are disposable `AgentReplayProjection` copies. IDs are normalized/relinked
+without touching canonical IDs. Invalid/incomplete arguments become `{}` only in a replay copy
+paired with their error result. Unsupported images/thinking use explicit omission markers;
+signed thinking and Gemini signatures are replayed only to the compatible API/model. Aliases
+without a qualified identity mapping remain conservative. No new image picker or model-level
+image/thinking capability claim is introduced; provider capability qualification is NH07.
+
+`replayPrepared` persists numeric omission/normalization/sanitization counts. Request completion
+adds native/thinking block counts, invalid/incomplete call counts and a normalized stop code
+(0 stop, 1 tools, 2 length, 3 error, 4 abort, 5 deferred, 6 other). Request/summary failure adds
+`protocolFailure` (1 preparation, 2 transport, 3 invalid stream, 4 cancellation, 5 deferred;
+0 if no typed failure was observed). No content, signatures or raw errors enter these records.
+All returned disabled/length-limited calls receive synthetic tool-error audit results and
+`toolRequested`/`toolSkipped`/`toolFinished` diagnostics without invoking confirmation or tools.

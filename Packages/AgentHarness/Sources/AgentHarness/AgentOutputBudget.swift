@@ -70,10 +70,25 @@ extension AgentTurnResponse {
             .discardedToolCalls: discardedToolCalls + (stopReason == .maxTokens ? toolCalls.count : 0),
             .outputLimited: stopReason == .maxTokens ? 1 : 0, .usageReported: usage == nil ? 0 : 1
         ]
+        switch stopReason {
+        case .endTurn: metrics[.modelStopReason] = 0
+        case .toolUse: metrics[.modelStopReason] = 1
+        case .maxTokens: metrics[.modelStopReason] = 2
+        case .error: metrics[.modelStopReason] = 3
+        case .aborted: metrics[.modelStopReason] = 4
+        case .deferred: metrics[.modelStopReason] = 5
+        case .other: metrics[.modelStopReason] = 6
+        }
         if let usage {
             metrics[.inputTokens] = usage.inputTokens
             metrics[.outputTokens] = usage.outputTokens
             metrics[.reasoningTokens] = usage.reasoningTokens
+        }
+        if let message {
+            metrics[.contentBlocks] = message.blocks.count
+            metrics[.thinkingBlocks] = message.blocks.filter { if case .thinking = $0.content { return true }; return false }.count
+            metrics[.invalidToolCalls] = message.toolCalls.filter { !$0.hasValidArguments }.count
+            metrics[.incompleteToolCalls] = message.blocks.filter { if case .toolCall(_, false) = $0.content { return true }; return false }.count
         }
         return metrics
     }

@@ -1218,3 +1218,5 @@
 "chat.metric.outputCapacityFallback" = "已使用备用输出容量（1 = 是）";
 "chat.diagnostic.outputBudgetAdjusted" = "输出预算已调整至 API 最小值";
 "chat.metric.sentMaxOutputTokens" = "发送到 API 的输出预算";
+
+"chat.diagnostic.replayPrepared" = "已为 API 准备历史记录";

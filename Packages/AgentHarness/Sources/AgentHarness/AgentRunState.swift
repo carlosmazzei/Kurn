@@ -9,6 +9,7 @@ struct AgentRunState: Sendable {
     var requestedCalls = 0
     var turns = 0
     var finalText = ""
+    var responseAlreadyAudited = false
     var firstLimit: AgentRunStopReason?
     var allowedTurns = 0
     var allowedToolCalls = 0

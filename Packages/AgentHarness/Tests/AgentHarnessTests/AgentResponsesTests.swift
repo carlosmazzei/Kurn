@@ -47,10 +47,11 @@ import Testing
 
     @Test func textDeltasTerminalAndUsage() throws {
         let accumulator = AgentWireAccumulator(format: .openAIResponses)
-        #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":"Hello"}"#) == [.textDelta("Hello")])
+        #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":"Hello"}"#).filter { if case .content = $0 { return false }; return true } == [.textDelta("Hello")])
         #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":""}"#).isEmpty)
         _ = try accumulator.consume(completed)
-        #expect(try accumulator.response() == AgentTurnResponse(text: "Hello", usage: AgentUsage(inputTokens: 12, outputTokens: 3)))
+        #expect(try accumulator.response().text == "Hello")
+        #expect(try accumulator.response().usage == AgentUsage(inputTokens: 12, outputTokens: 3))
         #expect(try accumulator.consume(#"{"type":"response.output_text.delta","delta":"ignored"}"#).isEmpty)
     }
 

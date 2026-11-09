@@ -94,7 +94,21 @@ public struct AgentContextCompactor: Sendable {
 
     public func estimateTokens(of message: AgentMessage) -> Int {
         let overhead = Self.messageOverheadTokens
-        switch message {
+        if case .content(let value) = message {
+            return overhead + value.blocks.reduce(0) { total, block in
+                switch block.content {
+                case .text(let text, let signature): return total + estimate(text) + estimate(signature ?? "")
+                case .thinking(let text, let signature, _, let metadata):
+                    return total + (metadata.map { estimate(encoded($0)) } ?? (estimate(text ?? "") + estimate(signature ?? "")))
+                case .toolCall(let call, _):
+                    return total + overhead + estimate(call.id) + estimate(call.name) + estimate(call.rawArguments)
+                        + estimate(call.providerMetadata.map { encoded($0) } ?? "")
+                case .image(_, let data): return total + estimate(data)
+                }
+            }
+        }
+        switch message.legacyProjection {
+        case .content: return 0 // legacyProjection cannot be native
         case .user(let text):
             return overhead + estimate(text)
         case .assistant(let text, let calls, let metadata):
@@ -173,7 +187,7 @@ public struct AgentContextCompactor: Sendable {
         let serialized = Self.serialize(messages)
         let conversation = fitted(serialized, toTokens: budget)
         let clipped = messages.reduce(0) { count, message in
-            guard case .toolResult(_, _, let content, _) = message else { return count }
+            guard case .toolResult(_, _, let content, _) = message.legacyProjection else { return count }
             return count + max(0, content.count - Self.serializedToolResultLimit)
         }
         let omitted = conversation == serialized ? 0
@@ -224,7 +238,20 @@ public struct AgentContextCompactor: Sendable {
     public static func serialize(_ messages: [AgentMessage]) -> String {
         var parts: [String] = []
         for message in messages {
-            switch message {
+            if case .content(let value) = message {
+                for block in value.blocks {
+                    switch block.content {
+                    case .text(let text, _):
+                        if !text.isEmpty { parts.append("[\(value.role == .user ? "User" : "Assistant")]: \(text)") }
+                    case .toolCall(let call, _): parts.append("[Assistant tool calls]: \(call.name)(\(call.rawArguments))")
+                    case .image: parts.append("[Image omitted from textual summary]")
+                    case .thinking: break
+                    }
+                }
+                continue
+            }
+            switch message.legacyProjection {
+            case .content: break // native content is projected below
             case .user(let text):
                 if !text.isEmpty { parts.append("[User]: \(text)") }
             case .assistant(let text, let calls, _):
@@ -247,17 +274,17 @@ public struct AgentContextCompactor: Sendable {
     }
 
     private static func previousSummary(in messages: [AgentMessage]) -> (String?, Int) {
-        guard case .user(let text)? = messages.first, text.hasPrefix(summaryPrefix) else { return (nil, 0) }
+        guard case .user(let text)? = messages.first?.legacyProjection, text.hasPrefix(summaryPrefix) else { return (nil, 0) }
         return (String(text.dropFirst(summaryPrefix.count)), 1)
     }
 
     private static func isUser(_ message: AgentMessage) -> Bool {
-        if case .user = message { return true }
+        if case .user = message.legacyProjection { return true }
         return false
     }
 
     private static func isToolResult(_ message: AgentMessage) -> Bool {
-        if case .toolResult = message { return true }
+        if case .toolResult = message.legacyProjection { return true }
         return false
     }
 

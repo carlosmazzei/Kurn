@@ -580,10 +580,20 @@ claim target completion. The fixtures cover opaque replay data and four provider
 requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
-store migration runs in this increment. NH02–NH10 have not started; this is not full
-harness parity. Physical-device/provider qualification for NH00 remains open.
+store migration runs in that increment. NH02 is now in progress; NH03–NH10 have not
+started. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
-Before continuing NH01, the architecture prerequisite separates domain from runtime:
+The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
+codecs, an ordered bounded reducer, authoritative final reconciliation and all four
+wire adapters. It retains interrupted tool calls with synthetic errors, fences late
+callbacks and emits terminal preparation/transport failures. Request replay is a copy,
+with compatible signature handling and logged omissions/ID/argument normalization.
+The app still saves V5 presentation turns; canonical tool-result/entry identity, indexed
+storage and durable audit restoration remain open for NH03/NH04. Session barriers,
+queues and model-level capability qualification remain in their planned increments.
+Evidence and the exact activation boundary are in `docs/contracts/native-harness-v1.md`.
+
+The architecture prerequisite separates domain from runtime:
 
 - `AgentHarness` owns model capacity resolution/catalog, script-aware token estimation,
   overflow classification/contracts, the execution/compaction loop and generic
