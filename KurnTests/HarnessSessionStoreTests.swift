@@ -160,4 +160,19 @@ struct HarnessSessionStoreTests {
         #expect(try context.fetchCount(FetchDescriptor<HarnessSessionRecord>()) == 0)
     }
 
+    @Test func unsupportedStorageEnvelopeIsNotTreatedAsEmptyOrOverwritten() throws {
+        let future: [String: Any] = ["version": 2, "payloadChecksum": 0, "payload": Data("intact future data".utf8).base64EncodedString()]
+        let raw = try JSONSerialization.data(withJSONObject: future)
+        #expect(throws: AgentSessionStoreError.unsupportedVersion) {
+            try HarnessPresentationCodec.decode(AgentSessionEntry.self, from: raw)
+        }
+        let context = ModelContext(TestModelContainer.make())
+        let session = seed(context)
+        try SwiftDataAgentSessionStore(context: context).migrate(session)
+        let row = try #require(session.harnessEntries.first)
+        row.payloadData = raw
+        #expect(throws: AgentSessionStoreError.unsupportedVersion) { try session.harnessSnapshot() }
+        #expect(row.payloadData == raw && session.canonicalVersion == 1)
+    }
+
 }

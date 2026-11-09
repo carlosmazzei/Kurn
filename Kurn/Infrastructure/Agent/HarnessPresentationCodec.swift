@@ -28,8 +28,11 @@ enum HarnessPresentationCodec {
         try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
     }
     static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
-        guard let result = JSONStorage.decodeAuthoritative(type, from: data).decodedValue else { throw AgentSessionStoreError.corruptPayload }
-        return result
+        switch JSONStorage.decodeAuthoritative(type, from: data) {
+        case .value(let result): return result
+        case .unsupportedVersion: throw AgentSessionStoreError.unsupportedVersion
+        case .empty, .corrupted: throw AgentSessionStoreError.corruptPayload
+        }
     }
     static func encode<T: Encodable>(_ value: T) throws -> Data {
         guard let data = JSONStorage.encodeAuthoritative(value) else { throw AgentSessionStoreError.corruptPayload }
