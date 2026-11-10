@@ -20,12 +20,7 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
 
     func snapshot(_ session: ChatSession) throws -> AgentSessionSnapshot {
         guard session.canonicalVersion == 1 else { throw AgentSessionStoreError.unsupportedVersion }
-        let entries = try session.harnessEntries.map { row -> AgentSessionEntry in
-            let value = try HarnessPresentationCodec.decode(AgentSessionEntry.self, from: row.payloadData)
-            guard row.sessionID == session.id, row.entryID == value.id, row.parentEntryID == value.parentID,
-                  row.ordinal == value.ordinal, row.kindRaw == value.kind, row.createdAtUTC == value.createdAt, row.id == session.id.uuidString + ":" + value.id else { throw AgentSessionStoreError.invalidGraph }
-            return value
-        }
+        let entries = try session.harnessEntries.map { try Self.checkedEntry($0, session: session) }
         guard entries.count == session.canonicalOrdinal, entries.isEmpty == (session.canonicalLeafID == nil), session.canonicalRevision > 0, session.canonicalRevision < Int.max else {
             throw AgentSessionStoreError.invalidGraph
         }
@@ -65,7 +60,7 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
     func insert(_ row: HarnessSessionEntry, into target: ChatSession) {
         row.session = target
         context.insert(row)
-        if !target.harnessEntries.contains(where: { $0.id == row.id }) { target.harnessEntries.append(row) }
+
     }
 
     static func projection(_ session: ChatSession) throws -> (turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact]) {
@@ -77,7 +72,10 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
         let turns = try path.compactMap { entry -> PersistedChatTurn? in
             if case .message = entry.payload { return try HarnessPresentationCodec.turn(entry) }; return nil
         }
-        guard let last = path.last, case .custom(let type, let json) = last.payload, type == HarnessPresentationState.type else {
+        guard let last = path.last(where: {
+            if case .custom(let type, _) = $0.payload { return type == HarnessPresentationState.type }
+            return false
+        }), case .custom(_, let json) = last.payload else {
             throw AgentSessionStoreError.corruptPayload
         }
         let state = try JSONDecoder().decode(HarnessPresentationState.self, from: JSONEncoder().encode(json))
@@ -95,6 +93,17 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
         _ = try ChatDocumentWorkspace(artifacts: artifacts)
         guard Set(turns.map(\.id)).count == turns.count else { throw AgentSessionStoreError.corruptPayload }
         return (turns, state.scope, artifacts)
+    }
+
+    /// Validate one row independently so recovery can retain intact siblings without accepting
+    /// unchecked payloads or claiming that a damaged graph is a valid active conversation.
+    static func checkedEntry(_ row: HarnessSessionEntry, session: ChatSession) throws -> AgentSessionEntry {
+        let value = try HarnessPresentationCodec.decode(AgentSessionEntry.self, from: row.payloadData)
+        guard value.sessionID == session.id.uuidString, row.sessionID == session.id,
+              row.entryID == value.id, row.parentEntryID == value.parentID,
+              row.ordinal == value.ordinal, row.kindRaw == value.kind, row.createdAtUTC == value.createdAt,
+              row.id == session.id.uuidString + ":" + value.id else { throw AgentSessionStoreError.invalidGraph }
+        return value
     }
 
     static func requireContext(_ session: ChatSession) throws -> ModelContext {

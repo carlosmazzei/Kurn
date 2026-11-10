@@ -126,6 +126,8 @@ struct HarnessSessionStoreTests {
         let entry = try AgentSessionEntry(sessionID: before.sessionID, id: UUID().uuidString, parentID: before.leafID,
             ordinal: before.entries.count + 1, createdAt: AgentSessionEntry.time(), payload: .custom(type: "checkpoint", data: .null))
         try await store.commit(AgentSessionCommit(sessionID: before.sessionID, expectedRevision: before.revision, entries: [entry], leafID: entry.id))
+        #expect(try session.harnessSnapshot().turns.map(\.text) == ["Question", "Answer [0:12]"])
+        #expect(try session.harnessSnapshot().scope == nil)
         await #expect(throws: AgentSessionStoreError.conflict) {
             try await store.commit(AgentSessionCommit(sessionID: before.sessionID, expectedRevision: before.revision, entries: [], leafID: entry.id))
         }
