@@ -28,17 +28,27 @@ actor SessionTestStore: AgentSessionStore {
     var failTerminal = false
     var failMessages = false
     var commitThenThrow = false
+    var terminalGate: SessionTestGate?
+    var failTerminalLoad = false
     func configure(gate: SessionTestGate? = nil, failTerminal: Bool = false, failMessages: Bool = false, commitThenThrow: Bool = false) {
         self.gate = gate; self.failTerminal = failTerminal; self.failMessages = failMessages; self.commitThenThrow = commitThenThrow
     }
+    func configureTerminal(gate: SessionTestGate? = nil, failLoad: Bool = false) {
+        terminalGate = gate; failTerminalLoad = failLoad
+    }
     func load(sessionID: String) async throws -> AgentSessionSnapshot {
-        AgentSessionSnapshot(sessionID: sessionID, revision: revision, leafID: entries.last?.id, entries: entries)
+        if failTerminalLoad, let last = entries.last, case .message(.content(let value)) = last.payload, value.role == .assistant {
+            failTerminalLoad = false
+            throw Failure.disk
+        }
+        return AgentSessionSnapshot(sessionID: sessionID, revision: revision, leafID: entries.last?.id, entries: entries)
     }
     func commit(_ group: AgentSessionCommit) async throws {
         if let gate { self.gate = nil; await gate.block() }
         guard group.expectedRevision == revision else { throw AgentSessionStoreError.conflict }
         if failMessages, group.entries.contains(where: { $0.kind == "message" }) { throw Failure.disk }
         let terminal = group.entries.contains { $0.kind == "agent.run-end.v1" }
+        if terminal, let terminalGate { self.terminalGate = nil; await terminalGate.block() }
         if terminal, failTerminal { failTerminal = false; throw Failure.disk }
         _ = try AgentEntryGraph(sessionID: sessionID, entries: entries + group.entries, leafID: group.leafID)
         entries += group.entries; revision += 1
@@ -114,6 +124,37 @@ actor SessionTestStore: AgentSessionStore {
         #expect(settled.end == .completed && settled.phase == .idle && settled.outcome?.finalText == "Answer")
         #expect(await model.requests.count == 1)
         #expect(await store.kinds() == ["agent.run-start.v1", "message", "agent.usage.v1", "message", "agent.run-end.v1"])
+    }
+
+    @Test func terminalPersistenceKeepsTheSessionBusyUntilItsSaveCompletes() async throws {
+        let store = SessionTestStore()
+        let gate = SessionTestGate()
+        await store.configureTerminal(gate: gate)
+        let session = try AgentSession(sessionID: "session", store: store)
+        let harness = NativeHarness(model: ScriptedAgentModel([AgentTurnResponse(text: "Answer")]))
+        try await session.prompt(harness: harness, systemPrompt: "", history: [], prompt: "Q", tools: [])
+        await gate.waitUntilEntered()
+        #expect(await session.snapshot().end == nil)
+        await #expect(throws: AgentSessionOwnerError.busy) {
+            try await session.prompt(harness: harness, systemPrompt: "", history: [], prompt: "Other", tools: [])
+        }
+        await #expect(throws: AgentSessionOwnerError.busy) { try await session.retrySettlement() }
+        await gate.release()
+        #expect(await session.waitUntilSettled().end == .completed)
+        #expect(await store.kinds().last == "agent.run-end.v1")
+    }
+
+    @Test func terminalLoadFailureCanBeRetriedWithoutLosingTheTerminalIntent() async throws {
+        let store = SessionTestStore()
+        await store.configureTerminal(failLoad: true)
+        let session = try AgentSession(sessionID: "session", store: store)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        try await session.prompt(harness: NativeHarness(model: model), systemPrompt: "", history: [], prompt: "Q", tools: [])
+        #expect(await session.waitUntilSettled().end == .persistenceFailed)
+        try await session.retrySettlement()
+        #expect(await session.waitUntilSettled().end == .completed)
+        #expect(await model.requests.count == 1)
+        #expect(await store.kinds().last == "agent.run-end.v1")
     }
 
     @Test func failedMessageSaveStopsModelAndRemainsExplicitlyBlocked() async throws {
