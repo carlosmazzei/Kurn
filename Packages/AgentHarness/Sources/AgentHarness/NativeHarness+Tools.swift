@@ -20,7 +20,7 @@ extension NativeHarness {
                 try Task.checkCancellation()
                 let work = try prepare(call, requestID: requestID, stop: &stop, state: &state, events: events, trace: trace)
                 let result = try await perform(work, pipeline: pipeline)
-                try append(result, work: work, state: &state, events: events, trace: trace)
+                try await append(result, work: work, state: &state, events: events, trace: trace)
             }
             return stop
         }
@@ -39,7 +39,7 @@ extension NativeHarness {
             var failure: Error?
             for (index, result) in results {
                 switch result {
-                case .success(let result): try append(result, work: work[index], state: &state, events: events, trace: trace)
+                case .success(let result): try await append(result, work: work[index], state: &state, events: events, trace: trace)
                 case .failure(let error): failure = failure ?? error
                 }
             }
@@ -100,11 +100,11 @@ extension NativeHarness {
     }
 
     private func append(_ execution: AgentToolExecution, work: Work, state: inout AgentRunState,
-                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter) throws {
+                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter) async throws {
         let output = execution.output
         if limits.continuation != nil, work.blocked == nil { state.recordProgress(call: work.normalized.call, output: output, isError: execution.isError) }
         let result = try AgentMessageFactory.result(work.invocation, output: output, isError: execution.isError, syntheticReason: execution.reason)
-        events.yield(.messageAppended(result))
+        try await publish(result, events: events)
         state.history.append(result); state.context.append(result)
         var metrics = output.metrics; metrics[.callOrdinal] = work.ordinal
         if (metrics[.omittedScalars] ?? 0) > 0 || (metrics[.omittedItems] ?? 0) > 0 {

@@ -28,8 +28,9 @@ enum AgentResponseAudit {
     static func appendBlocked(_ response: AgentTurnResponse, state: inout AgentRunState,
                               events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                               trace: AgentTraceEmitter, toContext: Bool,
+                              commit: @Sendable (AgentMessage) async throws -> Void,
                               syntheticReason: AgentToolBlockReason = .interruptedResponse,
-                              content: String = "Tool not executed: the model response was interrupted or deferred.") throws {
+                              content: String = "Tool not executed: the model response was interrupted or deferred.") async throws {
         for call in response.blockedToolCalls {
             guard let requestID = response.message?.identity?.requestID else { throw AgentWireError.invalidResponse }
             let invocation = try AgentMessageFactory.invocation(call, requestID: requestID)
@@ -42,6 +43,7 @@ enum AgentResponseAudit {
             let reason: AgentToolBlockReason = response.stopReason == .maxTokens ? .outputLimit : syntheticReason
             let result = try AgentMessageFactory.result(invocation, output: AgentToolOutput(content: content, summary: content),
                                                         isError: true, syntheticReason: reason)
+            try await commit(result)
             events.yield(.messageAppended(result))
             state.history.append(result)
             if toContext { state.context.append(result) }
