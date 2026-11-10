@@ -21,7 +21,7 @@ extension SwiftDataAgentSessionStore {
         storageLog("migration_started", session: target)
         do {
             let legacy = try target.harnessSnapshot()
-            try writePresentation(target, turns: legacy.turns, scope: legacy.scope, artifacts: legacy.artifacts)
+            try writePresentation(target, turns: legacy.turns, scope: legacy.scope, artifacts: legacy.artifacts, preserveUpdatedAt: true)
             storageLog("migration_finished", session: target)
         } catch {
             storageLog("migration_failed", session: target)
@@ -30,7 +30,7 @@ extension SwiftDataAgentSessionStore {
     }
 
     func writePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact],
-                           effect: AgentRecoveryRecord? = nil, preserveCommittedArtifacts: Bool = false) throws {
+                           effect: AgentRecoveryRecord? = nil, preserveCommittedArtifacts: Bool = false, preserveUpdatedAt: Bool = false) throws {
         storageLog("commit_started", session: target)
         do {
             var presentation = (turns: turns, artifacts: artifacts)
@@ -39,7 +39,7 @@ extension SwiftDataAgentSessionStore {
                 presentation = try HarnessPresentationReconciler.preserve(turns: turns, artifacts: artifacts,
                     committed: (committed.turns, committed.artifacts))
             }
-            try planAndWritePresentation(target, turns: presentation.turns, scope: scope, artifacts: presentation.artifacts, effect: effect)
+            try planAndWritePresentation(target, turns: presentation.turns, scope: scope, artifacts: presentation.artifacts, effect: effect, preserveUpdatedAt: preserveUpdatedAt)
             storageLog("commit_finished", session: target)
         } catch {
             storageLog("commit_failed", session: target)
@@ -48,7 +48,7 @@ extension SwiftDataAgentSessionStore {
     }
 
     private func planAndWritePresentation(_ target: ChatSession, turns: [PersistedChatTurn], scope: ChatSourceScope?, artifacts: [ChatDocumentArtifact],
-                                          effect: AgentRecoveryRecord?) throws {
+                                          effect: AgentRecoveryRecord?, preserveUpdatedAt: Bool) throws {
         guard Set(turns.map(\.id)).count == turns.count else { throw AgentSessionStoreError.invalidEntry }
         _ = try ChatDocumentWorkspace(artifacts: artifacts)
         let migrating = target.canonicalVersion == nil
@@ -95,7 +95,7 @@ extension SwiftDataAgentSessionStore {
         let cache = try PresentationCache(turns: turns, scope: scope, artifacts: artifacts)
         let record = try effect.map { HarnessSessionRecord(session: target, recordID: $0.id, kindRaw: $0.kind.rawValue,
             payloadData: try HarnessPresentationCodec.encode($0)) }
-        try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache, effect: record)
+        try applyPresentation(target, rows: rows, revisions: revisionRows, leaf: stateEntry.id, cache: cache, effect: record, preserveUpdatedAt: preserveUpdatedAt)
     }
 
     private func planRevisions(_ target: ChatSession, artifacts: [ChatDocumentArtifact]) throws -> [HarnessArtifactRevision] {
@@ -114,7 +114,7 @@ extension SwiftDataAgentSessionStore {
     }
 
     private func applyPresentation(_ target: ChatSession, rows: [HarnessSessionEntry], revisions: [HarnessArtifactRevision],
-                                   leaf: String, cache: PresentationCache, effect: HarnessSessionRecord?) throws {
+                                   leaf: String, cache: PresentationCache, effect: HarnessSessionRecord?, preserveUpdatedAt: Bool) throws {
         let old = PresentationCheckpoint(target)
         do {
             if target.canonicalVersion == nil {
@@ -124,13 +124,11 @@ extension SwiftDataAgentSessionStore {
             for row in revisions {
                 row.session = target
                 context.insert(row)
-                if !target.harnessRevisions.contains(where: { $0.id == row.id }) { target.harnessRevisions.append(row) }
             }
             if let effect {
                 effect.session = target; context.insert(effect)
-                if !target.harnessRecords.contains(where: { $0.id == effect.id }) { target.harnessRecords.append(effect) }
             }
-            if target.canonicalVersion != nil { target.updatedAt = Date() }
+            if !preserveUpdatedAt { target.updatedAt = Date() }
             target.turnsData = cache.turns; target.scopeData = cache.scope; target.artifactsData = cache.artifacts
             target.canonicalVersion = 1; target.canonicalLeafID = leaf; target.canonicalOrdinal += rows.count; target.canonicalRevision += 1
             try save(context)

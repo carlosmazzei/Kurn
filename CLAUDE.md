@@ -311,6 +311,18 @@ Apple's provider does not conform. App adapters import `AgentHarness` explicitly
 there is no re-export through KurnCore and no agent UI yet. The loop is inspired
 by pi-agent-core's design only; no third-party implementation code was copied.
 
+### Harness recovery and presentation reads
+
+`HarnessStoreSalvage` reads and validates entries, artifact revisions and recovery
+metadata independently. An unreadable component adds its own warning without hiding
+intact siblings; retained records are recovery data, not a validated active path.
+Pre-conversion copies are labeled separately. Recovery never mutates the source store.
+Live session reads remain strict and use the nearest presentation-state ancestor of
+the selected leaf, allowing checkpoint leaves without selecting a sibling's state.
+Migration preserves `updatedAt`; new presentation writes update it atomically, including
+the first write, and restore it if saving fails. Harness rows assign only their parent;
+SwiftData maintains inverse collections.
+
 ### Where documentation lives
 
 This file is the architecture and conventions reference; `README.md` describes

@@ -8,22 +8,28 @@ extension SwiftDataAgentSessionStore {
     func validateRevisions(_ target: ChatSession) throws {
         var ids = Set<String>()
         for row in target.harnessRevisions {
-            let value = try HarnessPresentationCodec.decode(KurnCore.ChatDocumentArtifact.self, from: row.payloadData)
-            guard ids.insert(row.id).inserted, row.sessionID == target.id, row.artifactID == value.id,
-                  row.version == value.version, row.id == Self.revisionID(session: target, artifact: value) else {
-                throw AgentSessionStoreError.corruptPayload
-            }
-            _ = try KurnCore.ChatDocumentWorkspace(artifacts: [value])
+            _ = try Self.checkedRevision(row, session: target)
+            guard ids.insert(row.id).inserted else { throw AgentSessionStoreError.corruptPayload }
         }
     }
 
+    static func checkedRevision(_ row: HarnessArtifactRevision, session: ChatSession) throws -> ChatDocumentArtifact {
+        let value = try HarnessPresentationCodec.decode(ChatDocumentArtifact.self, from: row.payloadData)
+        guard row.sessionID == session.id, row.artifactID == value.id, row.version == value.version,
+              row.id == Self.revisionID(session: session, artifact: value) else { throw AgentSessionStoreError.corruptPayload }
+        _ = try ChatDocumentWorkspace(artifacts: [value])
+        return value
+    }
+
     func records(_ target: ChatSession) throws -> [AgentRecoveryRecord] {
-        try target.harnessRecords.map { row in
-            let value = try HarnessPresentationCodec.decode(AgentRecoveryRecord.self, from: row.payloadData)
-            guard row.sessionID == target.id, row.recordID == value.id, row.kindRaw == value.kind.rawValue,
-                  row.id == target.id.uuidString + ":" + value.kind.rawValue + ":" + value.id else { throw AgentSessionStoreError.corruptPayload }
-            return value
-        }
+        try target.harnessRecords.map { try Self.checkedRecord($0, session: target) }
+    }
+
+    static func checkedRecord(_ row: HarnessSessionRecord, session: ChatSession) throws -> AgentRecoveryRecord {
+        let value = try HarnessPresentationCodec.decode(AgentRecoveryRecord.self, from: row.payloadData)
+        guard row.sessionID == session.id, row.recordID == value.id, row.kindRaw == value.kind.rawValue,
+              row.id == session.id.uuidString + ":" + value.kind.rawValue + ":" + value.id else { throw AgentSessionStoreError.corruptPayload }
+        return value
     }
 
     func put(_ value: AgentRecoveryRecord, in target: ChatSession, expectedRevision: Int) throws {
@@ -43,7 +49,6 @@ extension SwiftDataAgentSessionStore {
             if existing == nil {
                 row.session = target
                 context.insert(row)
-                if !target.harnessRecords.contains(where: { $0.id == id }) { target.harnessRecords.append(row) }
             }
             row.payloadData = data; target.canonicalRevision += 1
             try save(context)

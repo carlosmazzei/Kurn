@@ -634,6 +634,13 @@ chat does not resume work. Session-wide ownership, durable model-message/result 
 and automatic recovery orchestration remain NH05; canonical model replay remains NH06.
 
 
+NH03 review follow-up (#339): component-isolated salvage, first-write history dates,
+ancestor presentation lookup for checkpoint leaves and parent-only SwiftData relationship
+insertion are implemented in the review correction increment. Targeted regressions cover
+partial corruption, index validation, rollback, migration dates and sibling-branch state.
+iOS CI qualification is pending; this prerequisite does not activate NH05 ownership.
+
+
 The architecture prerequisite separates domain from runtime:
 
 - `AgentHarness` owns model capacity resolution/catalog, script-aware token estimation,
