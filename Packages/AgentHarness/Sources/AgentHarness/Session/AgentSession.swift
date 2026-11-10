@@ -25,6 +25,7 @@ public actor AgentSession {
     private var cancellationRequested = false
     private var persistenceFailed = false
     private var pendingTerminal: AgentSessionEntry?
+    private var terminalPayload: AgentSessionEntry.Payload?
     private var terminalEnd: AgentSessionState.End?
 
     public init(sessionID: String, store: any AgentSessionStore) throws {
@@ -72,15 +73,14 @@ public actor AgentSession {
     /// Returns after acceptance; `waitUntilSettled` also waits for this persistence attempt.
     public func retrySettlement() throws {
         guard task == nil else { throw AgentSessionOwnerError.busy }
-        guard let pendingTerminal else { throw AgentSessionOwnerError.persistenceBlocked }
+        guard pendingTerminal != nil || terminalPayload != nil else { throw AgentSessionOwnerError.persistenceBlocked }
         state.phase = .preparing
-        task = Task { await retryTerminal(pendingTerminal) }
+        task = Task { await retryTerminal() }
     }
 
-    private func retryTerminal(_ terminal: AgentSessionEntry) async -> AgentSessionState {
+    private func retryTerminal() async -> AgentSessionState {
         do {
-            try await append(terminal)
-            pendingTerminal = nil
+            try await commitTerminal()
             persistenceFailed = terminalEnd == .persistenceFailed
             state.end = terminalEnd
         } catch { state.end = .persistenceFailed }
@@ -114,15 +114,13 @@ public actor AgentSession {
         handle = nil
         if persistenceFailed { end = .persistenceFailed }
         terminalEnd = end
+        let data: JSONValue = .object([
+            "runID": .string(runID.uuidString), "end": .string(end.rawValue),
+            "stopReason": outcome.map { .string($0.stopReason.rawValue) } ?? .null
+        ])
+        terminalPayload = .custom(type: "agent.run-end.v1", data: data)
         do {
-            let data: JSONValue = .object([
-                "runID": .string(runID.uuidString), "end": .string(end.rawValue),
-                "stopReason": outcome.map { .string($0.stopReason.rawValue) } ?? .null
-            ])
-            let terminal = try await entry(payload: .custom(type: "agent.run-end.v1", data: data))
-            pendingTerminal = terminal
-            try await append(terminal)
-            pendingTerminal = nil
+            try await commitTerminal()
         } catch {
             persistenceFailed = true
             end = .persistenceFailed
@@ -132,6 +130,17 @@ public actor AgentSession {
         state.phase = end == .completed ? .idle : .interrupted
         task = nil
         return state
+    }
+
+    private func commitTerminal() async throws {
+        if pendingTerminal == nil {
+            guard let terminalPayload else { throw AgentSessionOwnerError.persistenceBlocked }
+            pendingTerminal = try await entry(payload: terminalPayload)
+        }
+        guard let pendingTerminal else { throw AgentSessionOwnerError.persistenceBlocked }
+        try await append(pendingTerminal)
+        self.pendingTerminal = nil
+        terminalPayload = nil
     }
 
     private func appendMessage(_ message: AgentMessage, runID: UUID) async throws {

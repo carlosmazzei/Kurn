@@ -2902,3 +2902,23 @@ enforced by lint and by a CI audit test, not just convention:
   modifier). Both rules are `severity: error` in `.swiftlint.yml` and fail CI,
   not just warn — check this before pushing UI changes, not after `lint-and-validate`
   fails.
+
+
+### Awaited runtime persistence and initial session owner
+
+AgentHarness's `NativeHarness` can install awaited message and usage commits. Canonical user
+messages precede model IO; assistant finals precede tool effects; results precede the next
+request. Audit failures and synthetic blocked results use the same message sink. A failed
+commit throws and prevents dependent work. `AgentRunHandle` separates producer completion
+from observation lifetime: `start` has bounded disposable events and explicit cancellation,
+while `result()` waits for producer termination. The legacy `run` API retains its existing
+stream-consumer cancellation semantics.
+
+`AgentSession` is initial Foundation-only ownership infrastructure, not yet the app's chat
+owner. It reserves busy state before store awaits, persists run/message/usage/end entries,
+and awaits producer termination plus terminal persistence before releasing ownership. A
+terminal-save retry never reruns inference/effects and recognizes an identical committed
+entry after a lost acknowledgement. Persistence failure is explicit and blocks new prompts;
+message/usage failures require host recovery. Store adapters must implement atomic checked
+append groups. One retained owner per session and authorized history projection are host
+responsibilities; constructing an owner never resumes a saved run.

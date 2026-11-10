@@ -580,8 +580,8 @@ claim target completion. The fixtures cover opaque replay data and four provider
 requests, source parts/empty overrides, legacy session/history restoration, and
 save/update of conversation artifacts as library documents. CI checks versions,
 fixture hashes and evidence links. The canonical v1 format is not activated and no
-store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05–NH10 have not
-started. The next implementation increment is NH05 (session owner and lifecycle). This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
+store migration runs in that increment. NH02 implements the local message/stream profile described below; NH03 implements the store/migration boundary described below; NH04 implements the native tool pipeline and durable local artifact boundary described below; NH05 has an initial package ownership/barrier increment; NH06–NH10 have not
+started. The next implementation increment is NH05 host activation and recovery. This is not full harness parity. Physical-device/provider qualification for NH00 remains open.
 
 The first NH02 increment adds checked native user/assistant blocks, exact Unix-ms
 codecs, an ordered bounded reducer, authoritative final reconciliation and all four
@@ -639,6 +639,25 @@ ancestor presentation lookup for checkpoint leaves and parent-only SwiftData rel
 insertion are implemented in the review correction increment. Targeted regressions cover
 partial corruption, index validation, rollback, migration dates and sibling-branch state.
 iOS CI qualification is pending; this prerequisite does not activate NH05 ownership.
+
+
+The initial NH05 package increment adds awaited canonical-message and usage sinks to every
+runtime append path, plus `AgentRunHandle` for producer cancellation/completion independently
+of its bounded, disposable observation stream. `AgentSession` reserves ownership before
+store awaits, serializes accepted runs, appends native entries and start/end/usage metadata,
+and holds cancellation through producer termination and terminal persistence. Failed durable
+writes block new prompts; retrying a terminal save does not repeat model/tool work, including
+lost commit acknowledgements. Caller-supplied authorized history remains mandatory.
+
+**Still open in NH05:** activate a host-owned coordinator retained beyond view lifetime;
+replace view-model task ownership; canonical UI/history restoration and scope authorization
+entries; crash/effect reconciliation; full phase/identity projection; durable command
+idempotency; host suspension policy and persistence-failure recovery. The package owner
+requires one retained actor per session; it does not enforce uniqueness across independently
+created actors. Failed message/usage commits require explicit host recovery, rather than
+retrying inference on an incomplete log. The legacy `run` observation path remains unbounded
+until host activation replaces it. NH06 projection and compaction, and NH08 queues, remain
+separate. Package tests do not qualify the inactive SwiftData/UI owner integration.
 
 
 The architecture prerequisite separates domain from runtime:

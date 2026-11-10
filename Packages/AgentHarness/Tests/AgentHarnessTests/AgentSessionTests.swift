@@ -76,6 +76,7 @@ actor SessionTestStore: AgentSessionStore {
             func streamTurn(_ request: AgentTurnRequest, onEvent: @escaping @Sendable (AgentModelEvent) -> Void) async throws -> AgentTurnResponse {
                 onEvent(.textDelta("Partial"))
                 await gate.block() // Deliberately ignores cancellation until the provider confirms.
+                try Task.checkCancellation()
                 return AgentTurnResponse(text: "Late answer")
             }
         }
@@ -125,6 +126,25 @@ actor SessionTestStore: AgentSessionStore {
         #expect(await model.requests.isEmpty)
         #expect(await store.kinds().last == "agent.run-end.v1")
         await #expect(throws: AgentSessionOwnerError.persistenceBlocked) { try await session.retrySettlement() }
+    }
+
+    @Test func cancellationAfterACommittedToolRetainsItsCanonicalSuccess() async throws {
+        let store = SessionTestStore()
+        let gate = SessionTestGate()
+        let session = try AgentSession(sessionID: "session", store: store)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()])])
+        let tool = AgentTool(spec: agentTool().spec) { _ in
+            await gate.block()
+            // Simulate a tool whose effect committed before cancellation was observed.
+            return AgentToolOutput(content: "Committed", summary: "Committed")
+        }
+        try await session.prompt(harness: NativeHarness(model: model), systemPrompt: "", history: [], prompt: "Q", tools: [tool])
+        await gate.waitUntilEntered()
+        await session.abort()
+        await gate.release()
+        #expect(await session.waitUntilSettled().end == .cancelled)
+        #expect(await model.requests.count == 1)
+        #expect(await store.entries.contains { if case .message(.tool(let value)) = $0.payload { return !value.isError && value.text == "Committed" }; return false })
     }
 
     @Test func reopenDoesNotAutomaticallyExecuteAndPriorCanonicalEntriesRemain() async throws {
