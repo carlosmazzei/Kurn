@@ -316,7 +316,9 @@ by pi-agent-core's design only; no third-party implementation code was copied.
 `HarnessStoreSalvage` reads and validates entries, artifact revisions and recovery
 metadata independently. An unreadable component adds its own warning without hiding
 intact siblings; retained records are recovery data, not a validated active path.
-Pre-conversion copies are labeled separately. Recovery never mutates the source store.
+Pre-conversion copies are labeled separately. A decodable legacy artifact array is
+validated per document, so an invalid item cannot hide intact neighbors. Component labels
+and decode warnings use the seven app localizations. Recovery never mutates the source store.
 Live session reads remain strict and use the nearest presentation-state ancestor of
 the selected leaf, allowing checkpoint leaves without selecting a sibling's state.
 Migration preserves `updatedAt`; new presentation writes update it atomically, including
