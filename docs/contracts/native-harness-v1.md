@@ -320,7 +320,9 @@ termination policy is exposed (A23/A24 remain conditional).
 Independent read batches use at most four workers (configurable bounded 1–16). Mixed batches
 containing any sequential/unknown tool run sequentially. All started workers settle before
 failure escapes. Progress/end events follow completion; native result messages append in
-original assistant call order. Document mutations are always sequential. Model-visible
+original assistant call order. Document mutations are always sequential. Before extending a soft tool limit, the
+scheduler settles the currently authorized capacity so completed parallel reads contribute
+to progress. Repeated/stale reads cannot earn more budget, and the hard limit stays logged. Model-visible
 content, host details and structuredContent are separate native output fields; every wire
 adapter projects only explicit content. The existing Unicode-safe pagination remains.
 

@@ -25,9 +25,33 @@ extension NativeHarness {
             return stop
         }
         var stop: AgentRunStopReason?
-        let work = try calls.map { try prepare($0, requestID: requestID, stop: &stop, state: &state, events: events, trace: trace) }
+        var offset = 0
+        while offset < calls.count {
+            try Task.checkCancellation()
+            // Settle the currently authorized capacity before considering an extension. Preparing
+            // the entire batch upfront would deny progress earned by its own completed reads.
+            let capacity = stop == nil ? max(1, state.allowedToolCalls - state.toolCalls) : calls.count
+            let count = min(capacity, calls.count - offset)
+            let work = try calls[offset..<(offset + count)].map {
+                try prepare($0, requestID: requestID, stop: &stop, state: &state, events: events, trace: trace)
+            }
+            let results = await performParallel(work, pipeline: pipeline)
+            var failure: Error?
+            for (index, result) in results {
+                switch result {
+                case .success(let result): try append(result, work: work[index], state: &state, events: events, trace: trace)
+                case .failure(let error): failure = failure ?? error
+                }
+            }
+            if let failure { throw failure }
+            offset += count
+        }
+        return stop
+    }
+
+    private func performParallel(_ work: [Work], pipeline: AgentToolPipeline) async -> [(Int, Result<AgentToolExecution, Error>)] {
         let workers = min(maxParallelReads, work.count)
-        let results = await withTaskGroup(of: [(Int, Result<AgentToolExecution, Error>)].self) { group in
+        return await withTaskGroup(of: [(Int, Result<AgentToolExecution, Error>)].self) { group in
             for worker in 0..<workers {
                 group.addTask {
                     var results: [(Int, Result<AgentToolExecution, Error>)] = []
@@ -42,16 +66,6 @@ extension NativeHarness {
             for await completed in group { results += completed }
             return results.sorted { $0.0 < $1.0 }
         }
-        // Every started call settles before a failure escapes. Canonical messages stay in call order.
-        var failure: Error?
-        for (index, result) in results {
-            switch result {
-            case .success(let result): try append(result, work: work[index], state: &state, events: events, trace: trace)
-            case .failure(let error): failure = failure ?? error
-            }
-        }
-        if let failure { throw failure }
-        return stop
     }
 
     private func prepare(_ normalized: NormalizedToolCall, requestID: String, stop: inout AgentRunStopReason?, state: inout AgentRunState,
