@@ -23,7 +23,7 @@ struct NativeHarnessDefaultsTests {
     @Test func limitsAndConfirmationAreForwarded() async throws {
         let call = agentCall()
         let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [call]), AgentTurnResponse(text: "Answer")])
-        let tool = AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object([:])),
+        let tool = AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object(["type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(true)])),
                              requiresConfirmation: true) { _ in AgentToolOutput(content: "data", summary: "Read") }
         let harness = NativeHarness(model: model, contextWindow: 128_000, limits: AgentLimits(maxTurns: 1),
                                     costEstimator: { _ in 0 }, confirm: { approved in approved.id == call.id && approved.rawArguments == call.rawArguments })

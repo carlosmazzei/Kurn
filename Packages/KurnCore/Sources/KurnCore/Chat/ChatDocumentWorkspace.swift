@@ -36,6 +36,12 @@ public actor ChatDocumentWorkspace {
         artifacts.values.sorted { $0.id.uuidString < $1.id.uuidString }
     }
 
+    /// Publish a snapshot only after its durable commit has succeeded.
+    public func restoreCommitted(_ values: [ChatDocumentArtifact]) throws {
+        _ = try ChatDocumentWorkspace(artifacts: values)
+        artifacts = Dictionary(uniqueKeysWithValues: values.map { ($0.id, $0) })
+    }
+
     public func read(_ id: UUID) throws -> ChatDocumentArtifact {
         guard let artifact = artifacts[id] else { throw ChatDocumentError("Unknown document ID.") }
         return artifact

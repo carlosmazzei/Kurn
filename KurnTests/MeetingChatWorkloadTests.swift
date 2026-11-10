@@ -65,9 +65,16 @@ struct MeetingChatWorkloadTests {
         #expect(trace.first?.metrics[.estimatedReadPages] == 26)
         #expect(trace.first?.metrics[.maxToolCalls] == 90)
         #expect(trace.filter { $0.kind == .toolFinished }.count == 68)
+        #expect(trace.filter { $0.kind == .toolFinished }.allSatisfy { $0.metrics[.isError] == 0 })
+        #expect(trace.filter { $0.kind == .toolFinished }.reduce(0) { $0 + ($1.metrics[.mutationsCommitted] ?? 0) } == 1)
         #expect(trace.filter { $0.kind == .toolFinished }.reduce(0) { $0 + ($1.metrics[.returnedScalars] ?? 0) } >= 117_000)
         #expect(!trace.contains { [.limitReached, .toolSkipped, .compactionStarted, .payloadClipped].contains($0.kind) })
         #expect(await workspace.snapshot().count == 1)
+        let session = try #require(try context.fetch(FetchDescriptor<ChatSession>()).first)
+        let committed = try session.harnessSnapshot()
+        let published = await workspace.snapshot()
+        #expect(committed.artifacts == published)
+        #expect(session.harnessRecords.count == 1 && session.harnessRevisions.count == 1)
         #expect(await model.requests.count == 2)
     }
 }

@@ -1222,3 +1222,10 @@
 "chat.diagnostic.replayPrepared" = "Histórico preparado para a API";
 
 "chat.storage.invalid" = "Não foi possível ler ou salvar esta conversa. Os dados armazenados foram preservados.";
+
+// Native tool pipeline diagnostics.
+"chat.diagnostic.toolValidationFailed" = "Argumentos da ferramenta rejeitados";
+"chat.diagnostic.toolPolicyDenied" = "Ferramenta bloqueada pela política";
+"chat.diagnostic.toolProgress" = "Progresso da ferramenta";
+"chat.diagnostic.toolAborted" = "Ferramenta cancelada";
+"chat.diagnostic.toolRegistryRejected" = "Registro de ferramenta rejeitado";

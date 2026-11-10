@@ -165,6 +165,11 @@ final class MeetingChatViewModel {
     /// screen exactly as it is — the user's answer is not lost, only its
     /// persistence.
     private func persist(turns savedTurns: [Turn]? = nil) {
+        do { try persistOrThrow(turns: savedTurns) }
+        catch { self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error")) }
+    }
+
+    private func persistOrThrow(turns savedTurns: [Turn]? = nil) throws {
         guard let modelContext else { return }
         let target: ChatSession
         if let session {
@@ -176,12 +181,9 @@ final class MeetingChatViewModel {
             modelContext.insert(target)
             session = target
         }
-        do {
-            try SwiftDataAgentSessionStore(context: modelContext).writePresentation(target,
-                turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts)
-        } catch {
-            self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
-        }
+        try SwiftDataAgentSessionStore(context: modelContext).writePresentation(target,
+            turns: (savedTurns ?? turns).map(PersistedChatTurn.init), scope: scope, artifacts: artifacts, preserveCommittedArtifacts: true)
+        artifacts = try target.harnessSnapshot().artifacts
     }
 
     /// Removes any turn appended after `count` — the partial assistant reply
@@ -327,6 +329,12 @@ final class MeetingChatViewModel {
         }
         var service = harnessService
         service.conversationID = conversationID
+        service.documentOrigin = origin
+        let acceptedTurns = turns
+        service.prepareDocumentSession = { [weak self] in
+            guard let self, self.generation == generation else { throw CancellationError() }
+            try self.persistOrThrow(turns: acceptedTurns)
+        }
         let events = try await service.events(model: agentModel, provider: provider, modelIdentifier: model,
                                                      context: modelContext, scope: scope, workspace: workspace,
                                                      history: history, question: question)

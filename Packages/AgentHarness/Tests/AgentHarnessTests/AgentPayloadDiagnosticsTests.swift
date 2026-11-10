@@ -4,7 +4,7 @@ import Testing
 struct AgentPayloadDiagnosticsTests {
     @Test func clippingAndContinuationAreDistinctFacts() async throws {
         let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()]), AgentTurnResponse(text: "Answer")])
-        let tool = AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object([:]))) { _ in
+        let tool = AgentTool(spec: AgentToolSpec(name: "lookup", description: "Read", inputSchema: .object(["type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(true)]))) { _ in
             AgentToolOutput(content: "PRIVATE TEXT", summary: "Read", metrics: [.omittedScalars: 7, .deferredScalars: 20])
         }
         let events = try await agentEvents(NativeHarness(model: model), tools: [tool])

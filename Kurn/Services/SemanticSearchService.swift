@@ -21,7 +21,7 @@ struct SemanticSearchService {
     }
 
     /// A main-actor snapshot of one `SemanticChunk`, safe to rank off-main.
-    struct Candidate: Sendable {
+    struct Candidate: Codable, Sendable {
         var chunkID: UUID
         var meetingID: UUID
         var recordingID: UUID

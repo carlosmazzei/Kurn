@@ -1,6 +1,6 @@
 # Native harness contract v1
 
-Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03)**. NH01 froze the NH00
+Status: **local message/stream profile implemented (NH02); store/migration profile implemented (NH03); tool/local-effect profile implemented (NH04)**. NH01 froze the NH00
 compatibility baseline. NH02 now produces native v1 assistant blocks at the provider
 boundary and consumes them in the harness. Indexed session storage and lazy legacy conversion are active; detailed runtime
 message persistence barriers and tool-history replay remain NH05/NH06; complete pi compatibility is not claimed.
@@ -63,13 +63,13 @@ Important current adaptations/gaps:
   same library document for the session/artifact identity. Legacy missing model provenance
   stays unknown; it is not reconstructed from today's selected model.
 - Runtime compaction changes only the current request projection. Reopen/another question
-  does not yet reuse a durable checkpoint. Full branch history, receipts and revision
-  recovery are not implemented.
+  does not yet reuse a durable checkpoint. Retained branches and local effect receipts
+  are stored, but automatic session recovery and canonical replay remain NH05/NH06.
 - Output-limited calls never execute. NH02 retains native call blocks/raw arguments and
   appends synthetic error results in the in-memory audit history. A successful output
-  recovery excludes that interrupted exchange from retry context. The V5 app still saves
-  presentation turns/trace rather than this complete canonical history; durable retention
-  belongs to NH03/NH04.
+  recovery excludes that interrupted exchange from retry context. The V6 app compatibility writer still saves
+  presentation turns/trace rather than this complete native tool history; the awaited
+  model-message/result barriers belong to NH05.
 - The current UI can request cancellation and clear its busy state before the task settles.
   Confirmed termination, durable barriers, queues and late-event fencing belong to NH05.
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
@@ -271,8 +271,8 @@ them behind awaited barriers. Current model replay remains plain history; NH06 a
 qualified source-aware canonical projection.
 
 Recovery records persist versioned run/queue/draft/effect metadata only. Their presence
-never resumes work, consumes a prompt or proves an effect committed. NH04 defines validated
-receipt transitions and document commits; NH05/NH08 define session/queue behavior.
+never resumes work or consumes a prompt. Generic effect metadata alone does not prove
+a commit; the validated NH04 local receipt profile below does. NH05/NH08 define session/queue behavior.
 
 The graph is shared by production, tests and whole-store protected backups. Markdown
 salvage includes conversations, retained native messages/artifact revisions, recovery metadata
@@ -295,3 +295,59 @@ carry session/run identity with no stale request ID. Summary requests get their 
 Tool diagnostics explicitly reference their invocation's originating request without changing
 the ambient model scope; ending an invocation cannot leak its request into the next check.
 Existing persisted traces are retained as recorded rather than retrospectively relabeled.
+
+
+## NH04 activation boundary
+
+`AgentToolRegistry` accepts only the tools bundled by the host, with unique ASCII identifier
+names (1–64 bytes). Schemas are bounded to depth 32 and 4096 nodes. The non-coercing subset
+supports object/properties/required/boolean additionalProperties, homogeneous arrays/items,
+string Unicode-scalar length and UUID format, finite number/integer bounds, boolean, null,
+description and enum. Object roots and explicit properties/additionalProperties are required.
+Unknown keywords, references, combinators, patterns and other formats fail registration.
+Bundled source/document schemas use additionalProperties=false. Semantic authorization,
+empty text, size, identity and paging checks remain in the host tools.
+
+Every invocation is schema-checked before policy and rechecked after an allowed argument
+transformation. Denial, confirmation refusal, unknown tools, invalid arguments, errors and
+abort all close the tool lifecycle. Generic diagnostics contain numeric facts and opaque
+IDs, never raw arguments or exception descriptions. Progress phases are 0=validation,
+1=authorization, 2=execution, 3=commit, 4=committed, 5=recovered committed receipt. A shared
+terminal fence rejects late callbacks. The UI trace retains progress plus content-free
+validation/policy/abort/registration diagnostics. No after-result replacement hook or
+termination policy is exposed (A23/A24 remain conditional).
+
+Independent read batches use at most four workers (configurable bounded 1–16). Mixed batches
+containing any sequential/unknown tool run sequentially. All started workers settle before
+failure escapes. Progress/end events follow completion; native result messages append in
+original assistant call order. Document mutations are always sequential. Before extending a soft tool limit, the
+scheduler settles the currently authorized capacity so completed parallel reads contribute
+to progress. Repeated/stale reads cannot earn more budget, and the hard limit stays logged. Model-visible
+content, host details and structuredContent are separate native output fields; every wire
+adapter projects only explicit content. The existing Unicode-safe pagination remains.
+
+The app captures source metadata, selected parts, passage/attachment bodies, semantic
+candidates and SHA-256 content revisions before model IO. Later selection/content changes
+cannot expand that snapshot; source deletion and attachment deletion fail explicitly. The
+snapshot is per task; persisting authorization entries for later replay is NH05/NH06.
+
+The synchronous MainActor effect transaction reads the current checked session, plans a
+pure domain edit, then saves its immutable artifact revision, selected presentation state,
+artifact reference/provenance and effect receipt together. The receipt identifies the logical
+invocation/request/provider call, arguments digest, exact decimal artifact version and original result. The structured output also carries
+its version as decimal text, avoiding the Double precision limit of JSONValue numbers.
+A matching receipt returns that original result while retaining the latest workspace state;
+changed arguments/identity or a corrupt receipt fail without mutation. Receipts are immutable.
+A shared local mutation lease spans the save and workspace publication, including actor
+suspension and overlapping executors. Compatibility UI saves preserve newer committed
+artifacts/references/provenance during cancellation; explicit branch writes remain separate. A failed save
+restores only staged entries/revisions/receipt. A cancellation arriving after a successful
+save cannot erase the receipt or change the known committed result into a tool failure.
+
+New sessions are still lazy. Before the first document effect of each task, the accepted
+user presentation is saved for both new and existing conversations. Preparation runs only
+once per task, so a later mutation cannot rewind earlier committed artifacts. Other accepted input/message/result barriers, one owner per
+session, crash recovery scheduling and settle semantics remain NH05. Native tool messages
+are still in-memory until that owner persists them; reopen does not automatically execute
+anything. Canonical provider replay and persistent compaction remain NH06. Local durable
+receipt replay is qualified; no remote/unknown-outcome side-effect mechanism is introduced.

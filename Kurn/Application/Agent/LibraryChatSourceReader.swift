@@ -29,6 +29,10 @@ final class LibraryChatSourceReader: ChatSourceReader {
         try meetings().first { $0.id == id }
     }
 
+    func authorizedSnapshot() throws -> AuthorizedChatSourceReader {
+        try AuthorizedChatSourceReader(context: context, scope: scope, meetings: meetings(), search: retrieve)
+    }
+
     func workload(allowedIDs: Set<UUID>) throws -> AgentWorkload {
         try ChatWorkloadEstimator.estimate(meetings: meetings().filter { allowedIDs.contains($0.id) }, scope: scope)
     }

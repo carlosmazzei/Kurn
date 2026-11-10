@@ -29,7 +29,7 @@ func agentCall(_ id: String = "1", name: String = "lookup", raw: String = "{}") 
 }
 
 func agentTool(confirm: Bool = false, fails: Bool = false) -> AgentTool {
-    AgentTool(spec: AgentToolSpec(name: "lookup", description: "Look up facts", inputSchema: .object([:])),
+    AgentTool(spec: AgentToolSpec(name: "lookup", description: "Look up facts", inputSchema: .object(["type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(true)])),
               requiresConfirmation: confirm) { arguments in
         if fails { throw ScriptedAgentModel.Failure.provider }
         return AgentToolOutput(content: try arguments.encodedString(), summary: "Found facts")
@@ -143,7 +143,7 @@ func agentOutcome(_ events: [AgentEvent]) throws -> AgentRunOutcome {
         let events = try await agentEvents(harness, tools: [tool])
         #expect(events.contains(.toolStarted(callID: "1", name: "lookup", arguments: parsed ?? .null)))
         #expect(events.contains(.toolFinished(callID: "1", name: "lookup",
-                                              summary: call.hasValidArguments ? "Executed" : "Invalid JSON arguments for lookup: \(raw)",
+                                              summary: call.hasValidArguments ? "Executed" : "Invalid JSON arguments for lookup.",
                                               isError: !call.hasValidArguments)))
         let outcome = try agentOutcome(events)
         #expect(outcome.finalText == "Done")

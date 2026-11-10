@@ -15,6 +15,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case outputBudgetExtended, outputBudgetExtensionDenied
         case outputRetryStarted, outputRetryDenied
         case outputBudgetAdjusted, replayPrepared
+        case toolValidationFailed, toolPolicyDenied, toolProgress, toolAborted, toolRegistryRejected
     }
     public enum Metric: String, Codable, Sendable, CodingKeyRepresentable {
         case contextTokens, thresholdTokens, retainedTokens, afterTokens, forced
@@ -34,6 +35,7 @@ public struct AgentDiagnostic: Codable, Sendable, Equatable {
         case contentBlocks, thinkingBlocks, invalidToolCalls, incompleteToolCalls, protocolFailure, modelStopReason
         case omittedMessages, omittedThinkingBlocks, omittedImages, omittedNamespaces, normalizedCallIDs, sanitizedArguments, strippedSignatures
         case visibleTextScalars, streamedText, returnedToolCalls, discardedToolCalls, outputLimited, usageReported, reasoningTokens, costLimitReached
+        case toolPhase, completedItems
     }
 
     public let runID: UUID
@@ -77,7 +79,7 @@ final class AgentTraceEmitter: @unchecked Sendable {
     private let lock = NSLock()
     private var sequence = 0
     private let runID: UUID
-    private let sessionID: String
+    let sessionID: String
     private var requestID: String?
     private var invocationID: String?
     private var invocationRequestID: String?
@@ -111,14 +113,17 @@ final class AgentTraceEmitter: @unchecked Sendable {
 
     func endInvocation() { lock.withLock { invocationID = nil; invocationRequestID = nil } }
 
+    func register(_ invocation: AgentToolInvocation) { events.yield(.invocationRegistered(invocation)) }
+
     func record(_ kind: AgentDiagnostic.Kind, metrics: [AgentDiagnostic.Metric: Int] = [:],
-                reason: AgentRunStopReason? = nil) {
+                reason: AgentRunStopReason? = nil, invocation: AgentToolInvocation? = nil) {
         lock.lock()
         defer { lock.unlock() }
         sequence += 1
         let event = AgentDiagnostic(runID: runID, sequence: sequence, kind: kind, metrics: metrics,
                                     stopReason: reason, resolutionID: resolutionID,
-                                    correlation: AgentDiagnosticCorrelation(sessionID: sessionID, requestID: invocationRequestID ?? requestID, invocationID: invocationID))
+                                    correlation: AgentDiagnosticCorrelation(sessionID: sessionID,
+                                        requestID: invocation?.requestID ?? invocationRequestID ?? requestID, invocationID: invocation?.id ?? invocationID))
         sink(event)
         events.yield(.diagnostic(event))
     }

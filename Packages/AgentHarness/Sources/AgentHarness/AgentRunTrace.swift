@@ -17,6 +17,7 @@ public struct AgentRunStep: Codable, Sendable, Equatable, Identifiable {
     public var stopReason: AgentRunStopReason?
     public var contextResolution: AgentContextResolution?
     public var diagnostic: AgentDiagnostic?
+    public var toolProgress: AgentToolProgress?
     public var argumentsSummary: String? { arguments.flatMap { try? $0.encodedString() } }
 
     public init(kind: Kind, status: Status = .running) {
@@ -69,6 +70,10 @@ public struct AgentRunTrace: Sendable, Equatable {
                 step.toolName = name
                 step.outputSummary = summary
                 steps.append(step)
+            }
+        case .toolProgress(let invocation, let progress):
+            if let index = steps.lastIndex(where: { $0.kind == .tool && $0.callID == invocation.callID && $0.status == .running }) {
+                steps[index].toolProgress = progress
             }
         case .contextCompacted(let before, let after):
             var step = AgentRunStep(kind: .compaction, status: .finished)

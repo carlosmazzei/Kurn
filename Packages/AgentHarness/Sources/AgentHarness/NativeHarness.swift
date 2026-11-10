@@ -1,12 +1,14 @@
 import Foundation
 
-/// Sequential provider-neutral agent loop. Tool failures are conversation data.
+/// Provider-neutral agent loop with ordered tool results. Tool failures are conversation data.
 public struct NativeHarness: Sendable {
     let model: any AgentModel
     let limits: AgentLimits
     let costEstimator: (@Sendable (AgentUsage) -> Double)?
     let compactor: AgentContextCompactor
-    private let confirm: @Sendable (AgentToolCall) async -> Bool
+    let confirm: @Sendable (AgentToolCall) async -> Bool
+    let toolPolicy: AgentToolPolicy
+    let maxParallelReads: Int
     let isContextOverflow: @Sendable (Error) -> Bool
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
@@ -25,6 +27,8 @@ public struct NativeHarness: Sendable {
                 isContextOverflow: @escaping @Sendable (Error) -> Bool = {
                     ($0 as? any AgentContextOverflowError)?.isContextOverflow == true
                 },
+                maxParallelReads: Int = 4,
+                toolPolicy: @escaping AgentToolPolicy = { _, arguments in .allow(arguments) },
                 confirm: @escaping @Sendable (AgentToolCall) async -> Bool = { _ in false },
                 diagnosticSink: @escaping @Sendable (AgentDiagnostic) -> Void = { _ in }) {
         self.model = model
@@ -33,6 +37,8 @@ public struct NativeHarness: Sendable {
         self.compactor = AgentContextCompactor(policy: contextPolicy, tokenEstimator: tokenEstimator)
         self.isContextOverflow = isContextOverflow
         self.confirm = confirm
+        self.toolPolicy = toolPolicy
+        self.maxParallelReads = min(16, max(1, maxParallelReads))
         self.diagnosticSink = diagnosticSink
     }
 
@@ -67,7 +73,7 @@ public struct NativeHarness: Sendable {
         var allowsToolCalls = true
     }
 
-    private struct NormalizedToolCall {
+    struct NormalizedToolCall {
         let call: AgentToolCall
         let hasValidArguments: Bool
 
@@ -83,6 +89,8 @@ public struct NativeHarness: Sendable {
     private func drive(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
                        maxOutputTokens: Int?, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
                        trace: AgentTraceEmitter) async throws {
+        do { _ = try AgentToolRegistry(tools) }
+        catch { trace.record(.toolRegistryRejected); throw error }
         let user = try AgentMessageFactory.user(prompt)
         let messages = history + [user]
         events.yield(.messageAppended(user))
@@ -173,93 +181,4 @@ public struct NativeHarness: Sendable {
         return response.stopReason
     }
 
-    private func execute(_ calls: [NormalizedToolCall], requestID: String?, tools: [AgentTool], state: inout AgentRunState,
-                         events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
-                         trace: AgentTraceEmitter) async throws -> AgentRunStopReason? {
-        var stop: AgentRunStopReason?
-        for normalized in calls {
-            try Task.checkCancellation()
-            let call = normalized.call
-            guard let requestID else { throw AgentWireError.invalidResponse }
-            let invocation = try AgentMessageFactory.invocation(call, requestID: requestID)
-            trace.beginInvocation(invocation)
-            defer { trace.endInvocation() }
-            state.requestedCalls += 1
-            trace.record(.toolRequested, metrics: [.callOrdinal: state.requestedCalls, .toolCalls: state.toolCalls])
-            if stop == nil {
-                if costLimitReached(state) { stop = .costLimit }
-                else if state.toolCalls >= state.allowedToolCalls,
-                        !state.extendBudget(.toolCallLimit, limits: limits, trace: trace) { stop = .toolCallLimit }
-            }
-            events.yield(.toolStarted(callID: call.id, name: call.name, arguments: call.arguments))
-            let output: AgentToolOutput
-            let isError: Bool
-            var syntheticReason: AgentToolBlockReason?
-            if let stop {
-                recordLimit(stop, state: &state, trace: trace)
-                trace.record(.toolSkipped, metrics: [.callOrdinal: state.requestedCalls], reason: stop)
-                output = AgentToolOutput(content: "Tool not executed: \(stop.rawValue) reached.",
-                                         summary: "Tool not executed: \(stop.rawValue) reached.")
-                isError = true
-                syntheticReason = AgentToolBlockReason(rawValue: stop.rawValue)
-            } else {
-                state.toolCalls += 1
-                do { (output, isError, syntheticReason) = try await executeOne(normalized, tools: tools) }
-                catch {
-                    trace.record(.toolFinished, metrics: [.isError: 1, .protocolFailure: AgentStreamFailure.classify(error).diagnosticCode])
-                    throw error
-                }
-                if limits.continuation != nil { state.recordProgress(call: call, output: output, isError: isError) }
-            }
-            let result: AgentMessage
-            do { result = try AgentMessageFactory.result(invocation, output: output, isError: isError, syntheticReason: syntheticReason) }
-            catch {
-                trace.record(.toolFinished, metrics: [.isError: 1, .protocolFailure: AgentStreamFailure.classify(error).diagnosticCode])
-                throw error
-            }
-            events.yield(.messageAppended(result))
-            state.history.append(result)
-            state.context.append(result)
-            var metrics = output.metrics
-            metrics[.callOrdinal] = state.requestedCalls
-            metrics[.isError] = isError ? 1 : 0
-            trace.record(.toolFinished, metrics: metrics)
-            if (metrics[.omittedScalars] ?? 0) > 0 || (metrics[.omittedItems] ?? 0) > 0 {
-                trace.record(.payloadClipped, metrics: metrics)
-            }
-            if (metrics[.deferredScalars] ?? 0) > 0 || (metrics[.deferredItems] ?? 0) > 0 {
-                trace.record(.payloadPaged, metrics: metrics)
-            }
-            events.yield(.toolFinished(callID: call.id, name: call.name, summary: output.summary, isError: isError))
-        }
-        return stop
-    }
-
-    private func executeOne(_ normalized: NormalizedToolCall, tools: [AgentTool]) async throws -> (AgentToolOutput, Bool, AgentToolBlockReason?) {
-        let call = normalized.call
-        do {
-            guard call.namespace == nil else { return toolError("Namespaced tool calls are unsupported.", reason: .unsupportedNamespace) }
-            guard let tool = tools.first(where: { $0.spec.name == call.name }) else {
-                return toolError("Unknown tool: \(call.name).", reason: .unknownTool)
-            }
-            guard normalized.hasValidArguments else {
-                return toolError("Invalid JSON arguments for \(call.name): \(call.rawArguments)", reason: .invalidArguments)
-            }
-            if tool.requiresConfirmation {
-                let approved = await confirm(call)
-                try Task.checkCancellation()
-                if !approved { return toolError("Confirmation declined for \(call.name).", reason: .confirmationDeclined) }
-            }
-            let output = try await tool.execute(call.arguments)
-            try Task.checkCancellation()
-            return (output, output.isError, nil)
-        } catch {
-            try Task.checkCancellation()
-            return toolError("Tool \(call.name) failed: \(error.localizedDescription)")
-        }
-    }
-
-    private func toolError(_ text: String, reason: AgentToolBlockReason? = nil) -> (AgentToolOutput, Bool, AgentToolBlockReason?) {
-        (AgentToolOutput(content: text, summary: text), true, reason)
-    }
 }
