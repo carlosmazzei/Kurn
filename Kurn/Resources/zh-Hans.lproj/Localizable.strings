@@ -1229,3 +1229,14 @@
 "chat.diagnostic.toolProgress" = "工具进度";
 "chat.diagnostic.toolAborted" = "工具已取消";
 "chat.diagnostic.toolRegistryRejected" = "工具注册被拒绝";
+
+/* Conversation recovery export: component labels and isolated decode warning */
+"store_recovery.chat.retained_entry" = "保留的条目";
+"store_recovery.chat.artifact_revision" = "文档修订版本";
+"store_recovery.chat.recovery_metadata" = "恢复元数据";
+"store_recovery.chat.legacy_conversation" = "转换前的对话";
+"store_recovery.chat.legacy_artifacts" = "转换前的文档";
+"store_recovery.chat.conversation" = "对话";
+"store_recovery.chat.artifacts" = "文档";
+"store_recovery.chat.artifact" = "文档";
+"store_recovery.chat.decode_warning" = "无法读取%@。原始存储数据未更改。";

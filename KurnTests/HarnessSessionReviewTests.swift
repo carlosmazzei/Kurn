@@ -97,4 +97,41 @@ struct HarnessSessionReviewTests {
         let output = HarnessStoreSalvage.markdown(sessions: [session], documents: [])
         #expect(output.contains("Conversation could not be decoded") && output.contains("Readable legacy artifact"))
     }
+    @Test(arguments: [false, true])
+    func invalidLegacyArtifactDoesNotHideValidNeighborsOrChangeOriginalBytes(converted: Bool) throws {
+        let context = ModelContext(TestModelContainer.make())
+        let session = ChatSession(meeting: nil, title: "Recovery")
+        context.insert(session)
+        if converted { try SwiftDataAgentSessionStore(context: context).migrate(session) }
+        let values = [ChatDocumentArtifact(title: "Before", markdown: "Readable before"),
+                      ChatDocumentArtifact(title: "Invalid version", markdown: "Do not export this", version: 0),
+                      ChatDocumentArtifact(title: " ", markdown: "Do not export blank-title body"),
+                      ChatDocumentArtifact(title: "After", markdown: "Readable after", version: 2)]
+        let data = try HarnessPresentationCodec.encode(values)
+        if converted { session.legacyArtifactsData = data } else { session.artifactsData = data }
+        let output = HarnessStoreSalvage.markdown(sessions: [session], documents: [])
+        #expect(output.contains("Readable before") && output.contains("Readable after"))
+        #expect(!output.contains("Do not export this") && !output.contains("Do not export blank-title body"))
+        let warning = HarnessStoreSalvage.warning(.artifact)
+        #expect(output.components(separatedBy: warning).count == 3)
+        #expect((converted ? session.legacyArtifactsData : session.artifactsData) == data)
+    }
+
+    @Test(arguments: ["en", "pt-BR", "es", "fr", "it", "de", "zh-Hans"])
+    func recoveryWarningsUseTranslatedComponentsAndFormatInEveryLanguage(locale: String) throws {
+        let path = try #require(Bundle.main.path(forResource: locale, ofType: "lproj"))
+        let bundle = try #require(Bundle(path: path))
+        for component in HarnessStoreSalvage.Component.allCases {
+            let label = component.displayName(bundle: bundle)
+            #expect(!label.isEmpty && !label.hasPrefix("store_recovery.chat."))
+            let warning = HarnessStoreSalvage.warning(component, bundle: bundle)
+            #expect(warning.contains(label) && !warning.contains("%@"))
+            #expect(!warning.hasPrefix("store_recovery.chat."))
+        }
+        if locale == "pt-BR" {
+            #expect(HarnessStoreSalvage.warning(.recoveryMetadata, bundle: bundle)
+                == "Não foi possível ler: Metadados de recuperação. Os dados originais do armazenamento não foram alterados.")
+        }
+    }
+
 }

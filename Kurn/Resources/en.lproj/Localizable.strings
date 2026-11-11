@@ -1229,3 +1229,14 @@
 "chat.diagnostic.toolProgress" = "Tool progress";
 "chat.diagnostic.toolAborted" = "Tool cancelled";
 "chat.diagnostic.toolRegistryRejected" = "Tool registration rejected";
+
+/* Conversation recovery export: component labels and isolated decode warning */
+"store_recovery.chat.retained_entry" = "Retained entry";
+"store_recovery.chat.artifact_revision" = "Artifact revision";
+"store_recovery.chat.recovery_metadata" = "Recovery metadata";
+"store_recovery.chat.legacy_conversation" = "Pre-conversion conversation";
+"store_recovery.chat.legacy_artifacts" = "Pre-conversion artifacts";
+"store_recovery.chat.conversation" = "Conversation";
+"store_recovery.chat.artifacts" = "Artifacts";
+"store_recovery.chat.artifact" = "Artifact";
+"store_recovery.chat.decode_warning" = "%@ could not be decoded. Original store bytes are unchanged.";

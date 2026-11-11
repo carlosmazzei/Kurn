@@ -1229,3 +1229,14 @@
 "chat.diagnostic.toolProgress" = "Werkzeugfortschritt";
 "chat.diagnostic.toolAborted" = "Werkzeug abgebrochen";
 "chat.diagnostic.toolRegistryRejected" = "Werkzeugregistrierung abgelehnt";
+
+/* Conversation recovery export: component labels and isolated decode warning */
+"store_recovery.chat.retained_entry" = "Aufbewahrter Eintrag";
+"store_recovery.chat.artifact_revision" = "Dokumentrevision";
+"store_recovery.chat.recovery_metadata" = "Wiederherstellungsmetadaten";
+"store_recovery.chat.legacy_conversation" = "Unterhaltung vor der Konvertierung";
+"store_recovery.chat.legacy_artifacts" = "Dokumente vor der Konvertierung";
+"store_recovery.chat.conversation" = "Unterhaltung";
+"store_recovery.chat.artifacts" = "Dokumente";
+"store_recovery.chat.artifact" = "Dokument";
+"store_recovery.chat.decode_warning" = "Nicht lesbar: %@. Die ursprünglichen gespeicherten Daten sind unverändert.";

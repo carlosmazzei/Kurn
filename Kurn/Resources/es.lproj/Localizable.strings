@@ -1229,3 +1229,14 @@
 "chat.diagnostic.toolProgress" = "Progreso de la herramienta";
 "chat.diagnostic.toolAborted" = "Herramienta cancelada";
 "chat.diagnostic.toolRegistryRejected" = "Registro de herramienta rechazado";
+
+/* Conversation recovery export: component labels and isolated decode warning */
+"store_recovery.chat.retained_entry" = "Entrada conservada";
+"store_recovery.chat.artifact_revision" = "Revisión del documento";
+"store_recovery.chat.recovery_metadata" = "Metadatos de recuperación";
+"store_recovery.chat.legacy_conversation" = "Conversación anterior a la conversión";
+"store_recovery.chat.legacy_artifacts" = "Documentos anteriores a la conversión";
+"store_recovery.chat.conversation" = "Conversación";
+"store_recovery.chat.artifacts" = "Documentos";
+"store_recovery.chat.artifact" = "Documento";
+"store_recovery.chat.decode_warning" = "No se pudo leer: %@. Los datos originales del almacenamiento no se han modificado.";
