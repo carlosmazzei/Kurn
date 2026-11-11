@@ -63,6 +63,8 @@ final class MeetingChatViewModel {
     /// `deinit`, when the view owned this object): the host retains the conversation instead.
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var runToken: UUID?
+    /// The session and `ChatRunRecord` of the current run, closed as `.ended` when it settles.
+    @ObservationIgnored private var runRecord: (session: ChatSession, record: ChatRunRecord)?
     /// The background-execution window held for the current run (see `send`).
     @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
     @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
@@ -93,10 +95,20 @@ final class MeetingChatViewModel {
         turns[turns.count - 1].artifactOrigins = retryOrigins
         retryArtifacts = []
         retryOrigins = [:]
+        // Persistence barrier (NH05): the question is saved before any request, so a crash or a
+        // suspension mid-run can lose the reply but never the question. A failed save stops here
+        // with the question left retryable; nothing is sent that the store has not accepted.
+        do { try persistOrThrow() } catch {
+            if !(error is CancellationError) {
+                self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error"))
+            }
+            return
+        }
         isResponding = true
         phase = .preparing
         let token = UUID()
         runToken = token
+        beginRunRecord(token, questionTurnID: turns[turns.count - 1].id)
         // Suspension policy (NH05): a run outlives its view, so it can also outlive the
         // foreground. Hold a finite background window for it; when the system reclaims the
         // window, stop the run so it settles as an interruption (retryable question, committed
@@ -165,6 +177,38 @@ final class MeetingChatViewModel {
         phase = .idle
         backgroundWindow?.end()
         backgroundWindow = nil
+        markRunRecord(.ended)
+    }
+
+    /// Writes the `.running` `ChatRunRecord` for this run into the saved session. Best effort: a
+    /// failure is reported, not fatal, since the question itself is already durable.
+    private func beginRunRecord(_ token: UUID, questionTurnID: UUID) {
+        guard let session, let modelContext else { return }
+        let record = ChatRunRecord(runID: token.uuidString, questionTurnID: questionTurnID)
+        runRecord = (session, record)
+        writeRunRecord(record, in: session, context: modelContext)
+    }
+
+    private func markRunRecord(_ state: ChatRunRecord.State) {
+        guard let current = runRecord else { return }
+        runRecord = nil
+        let target = current.session
+        guard let modelContext, !target.isDeleted, target.modelContext != nil else { return }
+        var updated = current.record
+        updated.state = state
+        writeRunRecord(updated, in: target, context: modelContext)
+    }
+
+    private func writeRunRecord(_ record: ChatRunRecord, in target: ChatSession, context: ModelContext) {
+        do {
+            try SwiftDataAgentSessionStore(context: context).put(record.record(), in: target,
+                                                                 expectedRevision: target.canonicalRevision)
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: OperationID(String(record.runID.prefix(8))), operation: "meeting_chat",
+                stage: "run_record", outcome: .failed, code: "run_record_write_failed"
+            ))
+        }
     }
 
     /// The background window for run `token` is running out: cancel it like a user stop,

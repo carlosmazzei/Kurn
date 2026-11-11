@@ -390,10 +390,13 @@ exposes `idle/preparing/streaming/executingTools/cancelling` and refuses a new p
 settled. A conversation whose meeting or saved session was deleted writes nothing further,
 and the open session cannot be deleted under its own run. A run holds a finite background
 execution window; when it expires the run is cancelled and settles as a retryable interruption.
+The question is persisted before any request (a failed save sends nothing), and each run writes a
+`.run` recovery record, `running` then `ended`. A launch sweep marks records still `running` as
+`interrupted`; it never re-sends, resumes or replays a run.
 
 Not yet activated: `AgentSession` as the app writer of native message/usage/run entries (the
 V6 presentation writer remains the app's canonical writer), canonical history restoration and
-scope-authorization entries, crash/effect reconciliation, durable command idempotency,
+scope-authorization entries, durable command idempotency,
 foreground resumption of an interrupted run, persistence-failure recovery UI, compaction/retry/waiting
 phases and coalesced, back-pressured observation.
 
