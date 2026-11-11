@@ -2371,11 +2371,11 @@ framework (`NLContextualEmbedding`, multilingual, loaded once via the
   (`Models/ChatSession.swift`) — the same "reopen a past chat, start a new one,
   delete one" affordances Claude's own mobile app offers, via the history/new
   toolbar buttons on `MeetingChatView` and `Views/ChatSessionListView.swift`'s
-  history sheet. A session is created lazily, on the conversation's first
-  *successfully completed* exchange (`MeetingChatViewModel.persist()`) — a
-  cancelled/failed reply never reaches it (`dropPartialReply` removes those
-  turns first), and a chat opened and abandoned with nothing sent leaves no
-  row in history. Turns (including steps, artifacts and token usage/cost) are
+  history sheet. A session is created when the conversation's first question is
+  sent: the question is saved before any request (the NH05 persistence barrier),
+  so a crash or suspension mid-reply never loses it. A cancelled/failed reply is
+  never saved (`dropPartialReply` removes those turns first), and a chat opened
+  and abandoned with nothing sent leaves no row in history. Turns (including steps, artifacts and token usage/cost) are
   JSON-encoded into `ChatSession.turnsData`, the same `Transcript.segmentsData`
   pattern; like every other `@Model`, it's encrypted at rest by
   `ModelStoreProtection` with the rest of the store. Scoped like the feature
@@ -2947,5 +2947,14 @@ held — the system's own expiration handler must end the task and is too late f
 clean-up, so it is only the fallback. The chat cancels the run there like a user stop, and it
 settles as a retryable interruption (reliability code `background_expired`) inside the window,
 never frozen mid-request or mid-tool. The transcription coordinator's background cancellation
-gets the same earlier, checkpointable moment. `AgentSession` is still not the app's writer: the
-presentation writer remains canonical until a later NH05 increment activates it.
+gets the same earlier, checkpointable moment.
+
+**The question is a barrier, and every run leaves a record.** `send` saves the conversation
+with the new question before any request; if that save fails nothing is sent and the question
+stays retryable. A `ChatRunRecord` (`Infrastructure/Agent/`, an `AgentRecoveryRecord` of kind
+`.run` in the session) is written `.running` right after, and `.ended` when the run settles.
+`ChatRunRecovery.sweep`, one of `AppComposition`'s launch sweeps, marks every record still
+`.running` as `.interrupted` (reliability code `run_interrupted`): no run is live when a store
+opens, the saved question already reopens as the retryable one, and committed document effects
+keep their own receipts. It never re-sends or resumes anything. `AgentSession` is still not the
+app's writer: the presentation writer remains canonical until a later NH05 increment activates it.

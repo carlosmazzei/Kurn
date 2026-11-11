@@ -657,11 +657,13 @@ observation and awaits producer termination on every exit; cancellation keeps th
 conversation busy in `cancelling` until settled and refuses new prompts until then. Reset/reload
 fence the old run; deleted meetings/sessions receive no further writes; "Delete all data"
 settles and drops every conversation first. A running reply holds a finite background window;
-on expiry it is cancelled and settles as a retryable interruption.
+on expiry it is cancelled and settles as a retryable interruption. The question is saved before
+any request, and each run writes a durable `ChatRunRecord` (`.running` → `.ended`); a launch sweep
+marks records a dead process left running as interrupted, so the question reopens as retryable.
 
 **Still open in NH05:** make `AgentSession` the app's writer of native message/usage/run
 entries, reconciled with the presentation writer; canonical UI/history restoration and scope
-authorization entries; crash/effect reconciliation; full phase/identity projection (run/turn/
+authorization entries; surfacing an interrupted run in the UI beyond its retryable question; full phase/identity projection (run/turn/
 call IDs, compacting/retry/waiting phases); durable command idempotency; resuming an
 interrupted run on return to the foreground; persistence-failure recovery UI. The package owner
 requires one retained actor per session; it does not enforce uniqueness across independently

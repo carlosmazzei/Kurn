@@ -118,5 +118,8 @@ final class AppComposition {
         // known on-device `.inProgress` work becomes `.pending`; cloud or
         // unknown work becomes `.failed` to prevent ambiguous paid replay.
         TranscriptionRecovery.sweepStaleTranscriptions(modelContainer: container)
+        // And after one that died mid-reply: a chat run still marked running is interrupted. Its
+        // question was saved before the run started and reopens as the retryable one.
+        ChatRunRecovery.sweep(context: context)
     }
 }

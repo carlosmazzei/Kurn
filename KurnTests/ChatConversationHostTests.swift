@@ -123,7 +123,7 @@ struct MeetingChatSettlementTests {
         #expect(vm.artifacts.count == 1)
     }
 
-    @Test func resetFencesARunThatIsStillSettling() async {
+    @Test func resetFencesARunThatIsStillSettling() async throws {
         let model = ChatAgentModel([AgentTurnResponse(text: "Late")], pauseAt: 0)
         let (vm, _) = Self.configured(model)
         vm.send(question: "Old question", provider: .openAI, model: "gpt-4o")
@@ -134,7 +134,10 @@ struct MeetingChatSettlementTests {
         await vm.waitUntilSettled()
         #expect(vm.turns.isEmpty)
         #expect(vm.retryableQuestion == nil)
-        #expect(vm.pastSessions().isEmpty)
+        // The old question was saved before its run started; the fenced run adds nothing to it.
+        let saved = try #require(vm.pastSessions().first)
+        #expect(vm.pastSessions().count == 1)
+        #expect(saved.turns.map(\.text) == ["Old question"])
     }
 
     @Test func theOpenSessionCannotBeDeletedUnderItsRun() async throws {
