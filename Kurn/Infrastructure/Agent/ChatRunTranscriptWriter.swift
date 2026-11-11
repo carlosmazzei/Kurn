@@ -1,5 +1,6 @@
 import AgentHarness
 import Foundation
+import KurnCore
 import SwiftData
 
 /// Records a chat run's canonical messages and per-request usage in its session log (NH05).
