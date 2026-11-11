@@ -53,16 +53,19 @@ public struct NativeHarness: Sendable {
                observation: .legacy).events
     }
 
-    /// An owned run. Observation is bounded and disposable; canonical writes use an awaited
-    /// channel. Detaching an observer does not cancel execution. The owner must cancel explicitly
-    /// and await `result()` before reporting termination.
+    /// An owned run. Canonical writes use an awaited channel. Detaching an observer does not
+    /// cancel execution. The owner must cancel explicitly and await `result()` before reporting
+    /// termination. `.bounded` observation keeps the newest 128 events; `.complete` keeps every
+    /// event for a host whose presentation reducer cannot tolerate a gap (it is not a canonical
+    /// channel either — the message/usage sinks are).
     public func start(systemPrompt: String, history: [AgentMessage], prompt: String,
                       tools: [AgentTool], maxOutputTokens: Int? = nil,
                       contextResolution: AgentContextResolution? = nil,
-                      context: AgentRunContext = AgentRunContext()) -> AgentRunHandle {
+                      context: AgentRunContext = AgentRunContext(),
+                      observation: AgentRunObservation = .bounded) -> AgentRunHandle {
         launch(systemPrompt: systemPrompt, history: history, prompt: prompt, tools: tools,
                maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, context: context,
-               observation: .owned)
+               observation: observation == .bounded ? .owned : .ownedComplete)
     }
 
     /// The sink must commit or throw. It is called in canonical order, including failure audit,
@@ -79,13 +82,13 @@ public struct NativeHarness: Sendable {
         return copy
     }
 
-    private enum ObservationMode { case legacy, owned }
+    private enum ObservationMode { case legacy, owned, ownedComplete }
 
     private func launch(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
                         maxOutputTokens: Int?, contextResolution: AgentContextResolution?, context: AgentRunContext,
                         observation: ObservationMode) -> AgentRunHandle {
         let (events, continuation) = AsyncThrowingStream<AgentEvent, Error>.makeStream(
-            bufferingPolicy: observation == .legacy ? .unbounded : .bufferingNewest(128))
+            bufferingPolicy: observation == .owned ? .bufferingNewest(128) : .unbounded)
         let trace = AgentTraceEmitter(events: continuation, resolutionID: contextResolution?.id, sink: diagnosticSink, context: context)
         let task = Task {
             do {

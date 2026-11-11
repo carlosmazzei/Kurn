@@ -2912,8 +2912,9 @@ AgentHarness's `NativeHarness` can install awaited message and usage commits. Ca
 messages precede model IO; assistant finals precede tool effects; results precede the next
 request. Audit failures and synthetic blocked results use the same message sink. A failed
 commit throws and prevents dependent work. `AgentRunHandle` separates producer completion
-from observation lifetime: `start` has bounded disposable events and explicit cancellation,
-while `result()` waits for producer termination. The legacy `run` API retains its existing
+from observation lifetime: `start` has disposable events (`.bounded`, the newest 128, or
+`.complete` for a reducer that cannot tolerate a gap) and explicit cancellation, while
+`result()` waits for producer termination. The legacy `run` API retains its existing
 stream-consumer cancellation semantics.
 
 `AgentSession` is initial Foundation-only ownership infrastructure, not yet the app's chat
@@ -2924,3 +2925,27 @@ entry after a lost acknowledgement. Persistence failure is explicit and blocks n
 message/usage failures require host recovery. Store adapters must implement atomic checked
 append groups. One retained owner per session and authorized history projection are host
 responsibilities; constructing an owner never resumes a saved run.
+
+**Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
+(`ViewModels/`, built by `AppComposition`, injected app-wide) retains one
+`MeetingChatViewModel` per scope — a meeting, or the library-wide Ask shared by the meetings
+list and documents — so `MeetingChatView` only resolves and renders it. A reply keeps running
+when its sheet or tab is dismissed (the view model used to cancel from `deinit`). At most
+`capacity` (4) conversations are kept, evicting the least recently opened idle one, never a
+running one; "Delete all data" awaits `closeAll()` before `LibraryEraser`. The run is the
+`AgentRunHandle` from `HarnessChatService.start` (complete observation): every exit cancels
+it and awaits `result()` first. `cancel()` only requests: the conversation stays busy in
+`ChatRunPhase.cancelling` until settled (`waitUntilSettled()`), the Stop button disables, and
+`send` refuses until then. `reset`/`load` fence the old run by generation; it still owns the
+busy state until it terminates. A run whose meeting or open session was deleted writes nothing
+(`persistOrThrow` throws `CancellationError`, which `persist` swallows), and `delete` refuses
+the open session while its run is active. A run holds a finite background-execution window
+(`BackgroundExecutionWindow`, `BackgroundActivity` in production, injected through
+`makeBackgroundWindow`). `BackgroundActivity` calls its owner's expiration handler once
+`BackgroundDeadline.windDownLead` (8 s) of background time remains, while the task is still
+held — the system's own expiration handler must end the task and is too late for async
+clean-up, so it is only the fallback. The chat cancels the run there like a user stop, and it
+settles as a retryable interruption (reliability code `background_expired`) inside the window,
+never frozen mid-request or mid-tool. The transcription coordinator's background cancellation
+gets the same earlier, checkpointable moment. `AgentSession` is still not the app's writer: the
+presentation writer remains canonical until a later NH05 increment activates it.

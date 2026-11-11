@@ -17,11 +17,49 @@ struct HarnessChatService {
         try await ProviderModelMetadataService(windows: store).refresh(provider: provider, model: model)
     }
 
+    /// A prepared run: everything validated and resolved, nothing sent to the model yet.
+    struct PreparedRun {
+        let harness: NativeHarness
+        let systemPrompt: String
+        let history: [AgentMessage]
+        let question: String
+        let tools: [AgentTool]
+        let resolution: AgentContextResolution
+        let context: AgentRunContext
+    }
+
+    /// Legacy observation: dropping the stream cancels the run, and nothing awaits the producer.
     func events(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
         history: [ChatMessage], question: String
     ) async throws -> AsyncThrowingStream<AgentEvent, Error> {
+        let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
+                                    scope: scope, workspace: workspace, history: history, question: question)
+        return run.harness.run(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
+                               tools: run.tools, contextResolution: run.resolution, context: run.context)
+    }
+
+    /// An owned run (NH05): observation never cancels it, so the owner cancels explicitly and
+    /// awaits `AgentRunHandle.result()` before reporting the run settled. Every event is kept
+    /// because the chat rebuilds its timeline and artifact state from them.
+    func start(
+        model: any AgentModel, provider: AIProvider, modelIdentifier: String,
+        context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
+        history: [ChatMessage], question: String
+    ) async throws -> AgentRunHandle {
+        let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
+                                    scope: scope, workspace: workspace, history: history, question: question)
+        return run.harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
+                                 tools: run.tools, contextResolution: run.resolution, context: run.context,
+                                 observation: .complete)
+    }
+
+    func prepare(
+        model: any AgentModel, provider: AIProvider, modelIdentifier: String,
+        context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
+        history: [ChatMessage], question: String
+    ) async throws -> PreparedRun {
         let effective = effectiveScope(scope)
         let reader = try LibraryChatSourceReader(context: context, scope: effective).authorizedSnapshot()
         let ids = Set(try await reader.listSources().map(\.id))
@@ -56,13 +94,14 @@ struct HarnessChatService {
                                                                       summaryPrompts: ChatCompactionPrompts.profile,
                                                                       maxOutputTokens: resolution.maxOutputTokens),
                                     diagnosticSink: { HarnessDiagnostics.record($0) })
-        return harness.run(
+        return PreparedRun(
+            harness: harness,
             systemPrompt: try Self.systemPrompt(artifacts: artifacts),
             history: history.map {
                 $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
             },
-            prompt: question, tools: tools,
-            contextResolution: resolution, context: try AgentRunContext(sessionID: sessionID)
+            question: question, tools: tools,
+            resolution: resolution, context: try AgentRunContext(sessionID: sessionID)
         )
     }
 

@@ -18,6 +18,7 @@ struct MeetingChatHarnessArtifactRetryTests {
         for _ in 0..<2_000 where vm.artifacts.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
         let artifact = try #require(vm.artifacts.first)
         vm.cancel()
+        await vm.waitUntilSettled()
         #expect(vm.turns.flatMap(\.artifacts) == [ChatArtifactReference(artifact)])
         let session = try #require(vm.pastSessions().first)
         #expect(ChatArtifactStore.origin(artifactID: artifact.id, in: session.turns).modelIdentifier == "\(AIProvider.openAI.id):gpt-4o")

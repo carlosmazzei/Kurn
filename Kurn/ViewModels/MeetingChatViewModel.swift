@@ -14,6 +14,11 @@
 //  A cancelled/failed partial answer is dropped, while its execution trace and
 //  reported usage are retained on the retryable question (see `dropPartialReply`).
 //
+//  NH05: the app retains this object through `ChatConversationHost`, not the view,
+//  so a run survives its view being dismissed. A run is an owned `AgentRunHandle`;
+//  `cancel()` is a request, and the conversation stays busy (`phase == .cancelling`)
+//  until the producer has terminated and the partial reply has been reconciled.
+//
 
 import AgentHarness
 import Foundation
@@ -26,6 +31,8 @@ import SwiftData
 final class MeetingChatViewModel {
     private(set) var turns: [Turn] = []
     private(set) var isResponding = false
+    /// What the current run is doing; `.idle` exactly when `isResponding` is false.
+    private(set) var phase: ChatRunPhase = .idle
     private(set) var scopeEditor = ChatSourceScopeEditor()
     var scope: ChatSourceScope { scopeEditor.scope }
     private(set) var artifacts: [ChatDocumentArtifact] = []
@@ -51,39 +58,22 @@ final class MeetingChatViewModel {
     var artifactSession: ChatSession? { session }
     var error: AppError?
 
-    // H8 PR 20: `deinit` is nonisolated even on a `@MainActor` class (Swift
-    // gives it no way to hop actors before the object is gone), so cancelling
-    // `task` there needs unchecked access — confirmed by CI, which rejected
-    // a plain `private var task` with "main actor-isolated property 'task'
-    // can not be referenced from a nonisolated context". This is the same
-    // "the compiler can't prove it, but it's fine" shape PR 18 already
-    // resolved for `LockScreenRecordingController.activity`: every other
-    // access to `task` (`send`/`cancel`/`reset`) is already isolated to the
-    // main actor as normal, and the one added by `deinit` can't race them —
-    // `deinit` only runs once the object's refcount reaches zero, and the
-    // task's own closure holds a strong reference to `self` (via its
-    // `guard let self`) for as long as it's actively mutating state, which
-    // makes that reference and deinit mutually exclusive by construction.
-    // `@ObservationIgnored` keeps this a plain stored property; behind the
-    // `@Observable` accessors `nonisolated(unsafe)` would have no effect.
-    @ObservationIgnored private nonisolated(unsafe) var task: Task<Void, Never>?
-
-    /// H8 PR 20, item 1's "chat/search tasks cancel on dismissal": this view
-    /// model is owned by `MeetingChatView`'s `@State`, so SwiftUI deallocates
-    /// it when the chat tab/sheet leaves the hierarchy — but nothing
-    /// previously cancelled `task` when that happened, so a reply already in
-    /// flight (a paid cloud LLM call) kept running to completion in the
-    /// background after the user navigated away. `deinit` is the reliable
-    /// backstop regardless of which dismissal path was taken.
-    deinit {
-        task?.cancel()
-    }
+    /// The run's owner task. Retained until the run settles, which is what `send` and
+    /// `waitUntilSettled` key off. Dismissing a view no longer cancels it (it used to, from
+    /// `deinit`, when the view owned this object): the host retains the conversation instead.
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var runToken: UUID?
+    /// The background-execution window held for the current run (see `send`).
+    @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
+    @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
-         harnessService: HarnessChatService = HarnessChatService()) {
+         harnessService: HarnessChatService = HarnessChatService(),
+         makeBackgroundWindow: @escaping @MainActor () -> any BackgroundExecutionWindow = { BackgroundActivity() }) {
         self.agentModelFactory = agentModelFactory
         self.harnessService = harnessService
+        self.makeBackgroundWindow = makeBackgroundWindow
     }
 
     /// Send `question` to the agent over the current source scope. `provider`/`model` come from
@@ -92,7 +82,7 @@ final class MeetingChatViewModel {
     /// disables the composer for it before that can happen.
     func send(question: String, provider: AIProvider, model: String, runID: OperationID = OperationID()) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isResponding else { return }
+        guard !trimmed.isEmpty, !isResponding, task == nil else { return }
         error = nil
 
         generation = UUID()
@@ -104,6 +94,18 @@ final class MeetingChatViewModel {
         retryArtifacts = []
         retryOrigins = [:]
         isResponding = true
+        phase = .preparing
+        let token = UUID()
+        runToken = token
+        // Suspension policy (NH05): a run outlives its view, so it can also outlive the
+        // foreground. Hold a finite background window for it; when the system reclaims the
+        // window, stop the run so it settles as an interruption (retryable question, committed
+        // artifacts kept) instead of being frozen mid-request or mid-tool.
+        let window = makeBackgroundWindow()
+        backgroundWindow = window
+        window.begin(name: "ai.kurn.chat") { [weak self] in
+            self?.expireInBackground(token, runID: runID)
+        }
         let priorTurns = Array(turns.dropLast())
         // A cancel or failure drops whatever reply was appended after the question, so the
         // question stays as the retryable, unanswered turn.
@@ -114,6 +116,7 @@ final class MeetingChatViewModel {
 
         task = Task { [weak self] in
             guard let self else { return }
+            defer { self.settle(token) }
             do {
                 try Task.checkCancellation()
                 guard let agentModel = try agentModelFactory(provider, model) else {
@@ -149,10 +152,36 @@ final class MeetingChatViewModel {
                     code: error is AppError ? appError.logCode : "unexpected"
                 ))
             }
-            guard self.generation == generation else { return }
-            self.isResponding = false
-            self.task = nil
         }
+    }
+
+    /// Ends the run `token` started, whichever conversation is on screen by now: a fenced old
+    /// generation cannot change content, but it still owns the busy state until it terminates.
+    private func settle(_ token: UUID) {
+        guard runToken == token else { return }
+        runToken = nil
+        task = nil
+        isResponding = false
+        phase = .idle
+        backgroundWindow?.end()
+        backgroundWindow = nil
+    }
+
+    /// The background window for run `token` is running out: cancel it like a user stop,
+    /// early enough (`BackgroundDeadline`) that settling still runs inside the window. The
+    /// system's own expiration may call this again; only the first call acts.
+    private func expireInBackground(_ token: UUID, runID: OperationID) {
+        guard runToken == token, phase != .cancelling else { return }
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat", stage: "background",
+            outcome: .cancelled, code: "background_expired"
+        ))
+        cancel()
+    }
+
+    /// Returns once the current run, if any, has terminated and reconciled its reply.
+    func waitUntilSettled() async {
+        while let task { await task.value }
     }
 
     // MARK: - Persistence
@@ -166,11 +195,16 @@ final class MeetingChatViewModel {
     /// persistence.
     private func persist(turns savedTurns: [Turn]? = nil) {
         do { try persistOrThrow(turns: savedTurns) }
+        catch is CancellationError {}
         catch { self.error = .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.invalid", comment: "Saved chat storage error")) }
     }
 
     private func persistOrThrow(turns savedTurns: [Turn]? = nil) throws {
         guard let modelContext else { return }
+        // A retained conversation can outlive its meeting or saved session: deleting either while
+        // a run settles must not write into (or resurrect) a deleted row.
+        if let meeting, meeting.isDeleted || meeting.modelContext == nil { throw CancellationError() }
+        if let session, session.isDeleted || session.modelContext == nil { throw CancellationError() }
         let target: ChatSession
         if let session {
             target = session
@@ -227,12 +261,13 @@ final class MeetingChatViewModel {
         prior.map { ChatMessage(role: $0.role, content: $0.text) }
     }
 
-    /// Cancel an in-flight reply.
+    /// Requests cancellation of the in-flight reply. The conversation stays busy in `.cancelling`
+    /// until the run settles (`waitUntilSettled`); the run itself drops the partial reply and
+    /// keeps its trace, usage and committed artifacts on the retryable question.
     func cancel() {
-        task?.cancel()
-        task = nil
-        if isResponding, turns.last?.role == .assistant { dropPartialReply(keeping: turns.count - 1) }
-        isResponding = false
+        guard let task else { return }
+        phase = .cancelling
+        task.cancel()
     }
 
     /// Starts a brand-new, unsaved conversation — the "new chat" affordance.
@@ -240,6 +275,7 @@ final class MeetingChatViewModel {
     /// so an abandoned new chat never leaves an empty row in history.
     func reset() {
         cancel()
+        // Fences the cancelled run: it can no longer touch what is shown from here on.
         generation = UUID()
         turns.removeAll()
         retryArtifacts = []
@@ -335,16 +371,23 @@ final class MeetingChatViewModel {
             guard let self, self.generation == generation else { throw CancellationError() }
             try self.persistOrThrow(turns: acceptedTurns)
         }
-        let events = try await service.events(model: agentModel, provider: provider, modelIdentifier: model,
-                                                     context: modelContext, scope: scope, workspace: workspace,
-                                                     history: history, question: question)
-        try Task.checkCancellation()
+        let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
+                                          context: modelContext, scope: scope, workspace: workspace,
+                                          history: history, question: question)
+        // Whatever ends this function, the producer has terminated first: a cancelled or failed
+        // run is only reported once nothing can still call a tool or write its effect.
+        defer { run.cancel() }
+        do { try Task.checkCancellation() } catch {
+            await Self.terminate(run)
+            throw error
+        }
         let index = turns.count
         turns.append(Turn(role: .assistant, text: ""))
         var timeline = AgentRunTrace()
         do {
-            for try await event in events {
+            for try await event in run.events {
                 try Task.checkCancellation()
+                if self.generation == generation { phase = phase.applying(event) }
                 timeline.apply(event)
                 turns[index].steps = timeline.steps
                 turns[index].usage = timeline.hasUsage
@@ -368,7 +411,9 @@ final class MeetingChatViewModel {
                 }
             }
             try Task.checkCancellation()
+            _ = try await run.result()
         } catch {
+            await Self.terminate(run)
             let snapshot = await workspace.snapshot()
             if self.generation == generation, snapshot != artifacts {
                 turns[index - 1].recordArtifacts(from: artifacts, to: snapshot,
@@ -391,16 +436,27 @@ final class MeetingChatViewModel {
         return true
     }
 
+    /// Cancels `run` and waits for its producer, ignoring how it ended; the caller reports that.
+    private static func terminate(_ run: AgentRunHandle) async {
+        run.cancel()
+        _ = try? await run.result()
+    }
+
     /// Permanently deletes `target`. If it was the open conversation, starts
     /// a fresh one in its place so the view doesn't keep showing turns that
     /// no longer exist on disk.
-    func delete(_ target: ChatSession) {
-        guard let modelContext else { return }
+    /// Returns whether `target` was deleted, so a list can keep a refused row.
+    @discardableResult
+    func delete(_ target: ChatSession) -> Bool {
+        guard let modelContext else { return false }
         let wasCurrent = target.id == session?.id
+        // The open conversation's run writes into its session until it settles.
+        guard !(wasCurrent && isResponding) else { return false }
         modelContext.delete(target)
         if let saveError = modelContext.saveOrError() {
             self.error = saveError
         }
         if wasCurrent { reset() }
+        return true
     }
 }

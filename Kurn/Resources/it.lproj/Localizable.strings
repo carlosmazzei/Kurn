@@ -1089,6 +1089,7 @@
 "chat.step.read_document" = "Lettura del documento “%@”";
 "chat.step.failed" = "Non riuscito";
 "chat.step.running" = "In corso";
+"chat.step.cancelling" = "Interruzione in corso…";
 "chat.artifact.reference" = "Documento: %@ v%d";
 "chat.limit.stopped" = "Interrotto: %@.";
 "chat.limit.retry" = "%@. Puoi riprovare la domanda.";
