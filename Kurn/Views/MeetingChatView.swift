@@ -169,7 +169,15 @@ struct MeetingChatConversationView: View {
                             .id(turn.id)
                     }
                     if vm.isResponding { respondingRow }
-                    if let question = vm.retryableQuestion { retryRow(question: question) }
+                    if let question = vm.retryableQuestion {
+                        if vm.retryableQuestionWasInterrupted {
+                            Text(NSLocalizedString("chat.run.interrupted", comment: "A reply cut off when the app closed"))
+                                .font(Theme.footnote)
+                                .foregroundStyle(Theme.textSecondary)
+                                .accessibilityIdentifier("chat.run_interrupted")
+                        }
+                        retryRow(question: question)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)

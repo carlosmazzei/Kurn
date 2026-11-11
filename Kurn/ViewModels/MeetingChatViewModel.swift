@@ -63,6 +63,8 @@ final class MeetingChatViewModel {
     /// `deinit`, when the view owned this object): the host retains the conversation instead.
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var runToken: UUID?
+    /// Question turns of the loaded session whose runs were interrupted (`ChatRunRecovery`).
+    private var interruptedQuestionIDs: Set<UUID> = []
     /// The session and `ChatRunRecord` of the current run, closed as `.ended` when it settles.
     @ObservationIgnored private var runRecord: (session: ChatSession, record: ChatRunRecord)?
     /// The background-execution window held for the current run (see `send`).
@@ -293,6 +295,13 @@ final class MeetingChatViewModel {
     /// Removes the trailing unanswered user turn so a retry can re-send it
     /// without leaving a duplicate question bubble behind. No-op unless
     /// `retryableQuestion` is non-nil.
+    /// Whether the retryable question is one whose run the app was closed during (a crash, or a
+    /// suspension the background wind-down could not outrun), found by `ChatRunRecovery`.
+    var retryableQuestionWasInterrupted: Bool {
+        guard retryableQuestion != nil, let last = turns.last else { return false }
+        return interruptedQuestionIDs.contains(last.id)
+    }
+
     func dropRetryableQuestion() {
         guard retryableQuestion != nil else { return }
         let pending = turns.removeLast()
@@ -326,6 +335,7 @@ final class MeetingChatViewModel {
         retryOrigins = [:]
         error = nil
         session = nil
+        interruptedQuestionIDs = []
         conversationID = UUID()
         artifacts = []
         workspace = ChatDocumentWorkspace()
@@ -374,6 +384,7 @@ final class MeetingChatViewModel {
             artifacts = restored.artifacts
             scopeEditor = ChatSourceScopeEditor(meetingID: meeting?.id, scope: restored.scope)
             turns = restored.turns.map(Turn.init)
+            interruptedQuestionIDs = modelContext.map { ChatRunRecovery.interruptedQuestionIDs(in: session, context: $0) } ?? []
             retryArtifacts = []
             retryOrigins = [:]
             error = nil

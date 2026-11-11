@@ -116,4 +116,36 @@ struct ChatRunRecordTests {
         #expect(vm.turns.map(\.text) == ["When?", "Monday.", "And then?", "Tuesday."])
         #expect(try session.harnessSnapshot().turns.map(\.text) == ["When?", "Monday.", "And then?", "Tuesday."])
     }
+    @Test func aReopenedInterruptedQuestionSaysWhyItIsUnanswered() async throws {
+        let paused = ChatAgentModel([AgentTurnResponse(text: "Partial")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let crashed = MeetingChatViewModel(agentModelFactory: { _, _ in paused })
+        crashed.configure(meeting: meeting, modelContext: context)
+        crashed.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        let session = try #require(crashed.pastSessions().first)
+        // The process dies here: its run record stays `.running` until the next launch's sweep.
+        #expect(ChatRunRecovery.sweep(context: context) == 1)
+        let questionID = try #require(session.turns.first?.id)
+        #expect(ChatRunRecovery.interruptedQuestionIDs(in: session, context: context) == [questionID])
+
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")])
+        let reopened = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        reopened.configure(meeting: meeting, modelContext: context)
+        reopened.load(session: session)
+        #expect(reopened.retryableQuestion == "When?")
+        #expect(reopened.retryableQuestionWasInterrupted)
+
+        reopened.dropRetryableQuestion()
+        #expect(!reopened.retryableQuestionWasInterrupted)
+        reopened.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await reopened.waitUntilSettled()
+        #expect(reopened.turns.map(\.text) == ["When?", "Monday."])
+        #expect(!reopened.retryableQuestionWasInterrupted)
+        reopened.reset()
+        #expect(!reopened.retryableQuestionWasInterrupted)
+
+        crashed.cancel()
+        await crashed.waitUntilSettled()
+    }
 }
