@@ -37,4 +37,11 @@ enum ChatRunRecovery {
         }
         return interrupted
     }
+
+    /// The question turns whose runs were interrupted, so a reopened conversation can say why
+    /// its question is unanswered. Unreadable records contribute nothing: this only explains.
+    static func interruptedQuestionIDs(in session: ChatSession, context: ModelContext) -> Set<UUID> {
+        guard let records = try? SwiftDataAgentSessionStore(context: context).records(session) else { return [] }
+        return Set(records.compactMap(ChatRunRecord.init).filter { $0.state == .interrupted }.map(\.questionTurnID))
+    }
 }

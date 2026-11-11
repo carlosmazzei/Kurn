@@ -659,11 +659,12 @@ fence the old run; deleted meetings/sessions receive no further writes; "Delete 
 settles and drops every conversation first. A running reply holds a finite background window;
 on expiry it is cancelled and settles as a retryable interruption. The question is saved before
 any request, and each run writes a durable `ChatRunRecord` (`.running` → `.ended`); a launch sweep
-marks records a dead process left running as interrupted, so the question reopens as retryable.
+marks records a dead process left running as interrupted, so the question reopens as retryable,
+with a note above Retry saying the app closed before the reply finished.
 
 **Still open in NH05:** make `AgentSession` the app's writer of native message/usage/run
 entries, reconciled with the presentation writer; canonical UI/history restoration and scope
-authorization entries; surfacing an interrupted run in the UI beyond its retryable question; full phase/identity projection (run/turn/
+authorization entries; full phase/identity projection (run/turn/
 call IDs, compacting/retry/waiting phases); durable command idempotency; resuming an
 interrupted run on return to the foreground; persistence-failure recovery UI. The package owner
 requires one retained actor per session; it does not enforce uniqueness across independently

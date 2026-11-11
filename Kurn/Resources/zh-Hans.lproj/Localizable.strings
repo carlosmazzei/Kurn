@@ -1090,6 +1090,7 @@
 "chat.step.failed" = "失败";
 "chat.step.running" = "正在运行";
 "chat.step.cancelling" = "正在停止…";
+"chat.run.interrupted" = "此回复完成前应用已关闭。未重新发送任何内容。";
 "chat.artifact.reference" = "文档：%@ v%d";
 "chat.limit.stopped" = "已停止：%@。";
 "chat.limit.retry" = "%@。您可以重试该问题。";

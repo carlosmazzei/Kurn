@@ -2956,5 +2956,8 @@ stays retryable. A `ChatRunRecord` (`Infrastructure/Agent/`, an `AgentRecoveryRe
 `ChatRunRecovery.sweep`, one of `AppComposition`'s launch sweeps, marks every record still
 `.running` as `.interrupted` (reliability code `run_interrupted`): no run is live when a store
 opens, the saved question already reopens as the retryable one, and committed document effects
-keep their own receipts. It never re-sends or resumes anything. `AgentSession` is still not the
+keep their own receipts. It never re-sends or resumes anything. A reopened conversation whose
+retryable question is one of those (`ChatRunRecovery.interruptedQuestionIDs`) says so above
+Retry (`retryableQuestionWasInterrupted`, `chat.run.interrupted`), so an unanswered question left
+by a crash reads differently from one the user stopped. `AgentSession` is still not the
 app's writer: the presentation writer remains canonical until a later NH05 increment activates it.

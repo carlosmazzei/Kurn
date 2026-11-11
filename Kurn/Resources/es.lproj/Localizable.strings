@@ -1090,6 +1090,7 @@
 "chat.step.failed" = "Falló";
 "chat.step.running" = "En curso";
 "chat.step.cancelling" = "Deteniendo…";
+"chat.run.interrupted" = "La app se cerró antes de que terminara esta respuesta. No se volvió a enviar nada.";
 "chat.artifact.reference" = "Documento: %@ v%d";
 "chat.limit.stopped" = "Detenido: %@.";
 "chat.limit.retry" = "%@. Puedes volver a intentar la pregunta.";
