@@ -656,13 +656,14 @@ so a reply survives dismissal. The chat runs on an owned `AgentRunHandle` with c
 observation and awaits producer termination on every exit; cancellation keeps the
 conversation busy in `cancelling` until settled and refuses new prompts until then. Reset/reload
 fence the old run; deleted meetings/sessions receive no further writes; "Delete all data"
-settles and drops every conversation first.
+settles and drops every conversation first. A running reply holds a finite background window;
+on expiry it is cancelled and settles as a retryable interruption.
 
 **Still open in NH05:** make `AgentSession` the app's writer of native message/usage/run
 entries, reconciled with the presentation writer; canonical UI/history restoration and scope
 authorization entries; crash/effect reconciliation; full phase/identity projection (run/turn/
-call IDs, compacting/retry/waiting phases); durable command idempotency; host suspension
-policy (backgrounding during a run) and persistence-failure recovery UI. The package owner
+call IDs, compacting/retry/waiting phases); durable command idempotency; resuming an
+interrupted run on return to the foreground; persistence-failure recovery UI. The package owner
 requires one retained actor per session; it does not enforce uniqueness across independently
 created actors. Failed message/usage commits require explicit host recovery, rather than
 retrying inference on an incomplete log. The chat now uses `start(observation: .complete)`; coalesced

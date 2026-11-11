@@ -15,11 +15,19 @@
 import UIKit
 #endif
 
+/// A finite background-execution window. The seam lets an owner's policy (what to
+/// do when the window expires) be tested without UIKit granting real time.
+@MainActor
+protocol BackgroundExecutionWindow: AnyObject {
+    func begin(name: String, onExpiration: (@MainActor @Sendable () -> Void)?)
+    func end()
+}
+
 /// One-shot wrapper around `UIApplication.beginBackgroundTask`. Begin it before
 /// the work, end it (idempotently) when the work finishes; the expiration handler
 /// ends it defensively if the system reclaims the time first.
 @MainActor
-final class BackgroundActivity {
+final class BackgroundActivity: BackgroundExecutionWindow {
     #if canImport(UIKit)
     private var taskID: UIBackgroundTaskIdentifier = .invalid
     #endif

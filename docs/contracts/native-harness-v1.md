@@ -388,12 +388,13 @@ before the conversation reports the run over, so a cancelled or failed reply is 
 only after no tool can still run or commit an effect. `cancel()` is a request; the owner
 exposes `idle/preparing/streaming/executingTools/cancelling` and refuses a new prompt until
 settled. A conversation whose meeting or saved session was deleted writes nothing further,
-and the open session cannot be deleted under its own run.
+and the open session cannot be deleted under its own run. A run holds a finite background
+execution window; when it expires the run is cancelled and settles as a retryable interruption.
 
 Not yet activated: `AgentSession` as the app writer of native message/usage/run entries (the
 V6 presentation writer remains the app's canonical writer), canonical history restoration and
 scope-authorization entries, crash/effect reconciliation, durable command idempotency,
-background suspension policy, persistence-failure recovery UI, compaction/retry/waiting
+foreground resumption of an interrupted run, persistence-failure recovery UI, compaction/retry/waiting
 phases and coalesced, back-pressured observation.
 
 The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect

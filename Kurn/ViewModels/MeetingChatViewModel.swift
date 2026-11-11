@@ -63,12 +63,17 @@ final class MeetingChatViewModel {
     /// `deinit`, when the view owned this object): the host retains the conversation instead.
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var runToken: UUID?
+    /// The background-execution window held for the current run (see `send`).
+    @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
+    @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
 
     /// Tests pass a scripted `AgentModel` through `agentModelFactory`.
     init(agentModelFactory: @escaping HarnessChatService.ModelFactory = { try ProviderFactory.agentModel(for: $0, model: $1) },
-         harnessService: HarnessChatService = HarnessChatService()) {
+         harnessService: HarnessChatService = HarnessChatService(),
+         makeBackgroundWindow: @escaping @MainActor () -> any BackgroundExecutionWindow = { BackgroundActivity() }) {
         self.agentModelFactory = agentModelFactory
         self.harnessService = harnessService
+        self.makeBackgroundWindow = makeBackgroundWindow
     }
 
     /// Send `question` to the agent over the current source scope. `provider`/`model` come from
@@ -92,6 +97,15 @@ final class MeetingChatViewModel {
         phase = .preparing
         let token = UUID()
         runToken = token
+        // Suspension policy (NH05): a run outlives its view, so it can also outlive the
+        // foreground. Hold a finite background window for it; when the system reclaims the
+        // window, stop the run so it settles as an interruption (retryable question, committed
+        // artifacts kept) instead of being frozen mid-request or mid-tool.
+        let window = makeBackgroundWindow()
+        backgroundWindow = window
+        window.begin(name: "ai.kurn.chat") { [weak self] in
+            self?.expireInBackground(token, runID: runID)
+        }
         let priorTurns = Array(turns.dropLast())
         // A cancel or failure drops whatever reply was appended after the question, so the
         // question stays as the retryable, unanswered turn.
@@ -149,6 +163,18 @@ final class MeetingChatViewModel {
         task = nil
         isResponding = false
         phase = .idle
+        backgroundWindow?.end()
+        backgroundWindow = nil
+    }
+
+    /// The background window for run `token` expired: cancel it like a user stop.
+    private func expireInBackground(_ token: UUID, runID: OperationID) {
+        guard runToken == token else { return }
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: runID, operation: "meeting_chat", stage: "background",
+            outcome: .cancelled, code: "background_expired"
+        ))
+        cancel()
     }
 
     /// Returns once the current run, if any, has terminated and reconciled its reply.

@@ -2939,5 +2939,9 @@ it and awaits `result()` first. `cancel()` only requests: the conversation stays
 `send` refuses until then. `reset`/`load` fence the old run by generation; it still owns the
 busy state until it terminates. A run whose meeting or open session was deleted writes nothing
 (`persistOrThrow` throws `CancellationError`, which `persist` swallows), and `delete` refuses
-the open session while its run is active. `AgentSession` is still not the app's writer: the
+the open session while its run is active. A run holds a finite background-execution window
+(`BackgroundExecutionWindow`, `BackgroundActivity` in production, injected through
+`makeBackgroundWindow`); when the system reclaims it, the run is cancelled like a user stop and
+settles as a retryable interruption (reliability code `background_expired`), never frozen
+mid-request or mid-tool. `AgentSession` is still not the app's writer: the
 presentation writer remains canonical until a later NH05 increment activates it.

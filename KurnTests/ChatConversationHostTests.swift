@@ -154,6 +154,63 @@ struct MeetingChatSettlementTests {
     }
 }
 
+@MainActor
+final class FakeBackgroundWindow: BackgroundExecutionWindow {
+    private(set) var began = 0
+    private(set) var ended = 0
+    private var onExpiration: (@MainActor @Sendable () -> Void)?
+
+    func begin(name: String, onExpiration: (@MainActor @Sendable () -> Void)?) {
+        began += 1
+        self.onExpiration = onExpiration
+    }
+
+    func end() { ended += 1 }
+
+    func expire() { onExpiration?() }
+}
+
+@MainActor
+struct MeetingChatBackgroundTests {
+    @Test func aRunHoldsABackgroundWindowUntilItSettles() async {
+        let window = FakeBackgroundWindow()
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        #expect(window.began == 1)
+        #expect(window.ended == 0)
+        await vm.waitUntilSettled()
+        #expect(window.ended == 1)
+        #expect(vm.turns.last?.text == "Monday.")
+    }
+
+    @Test func anExpiredBackgroundWindowStopsTheRunAsAnInterruption() async {
+        let window = FakeBackgroundWindow()
+        let model = ChatAgentModel([AgentTurnResponse(text: "Partial")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        vm.configure(meeting: meeting, modelContext: context)
+        let runID = OperationID()
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o", runID: runID)
+        for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        window.expire()
+        #expect(vm.phase == .cancelling)
+        await vm.waitUntilSettled()
+        let cancelled = await model.wasCancelled
+        #expect(cancelled)
+        #expect(vm.retryableQuestion == "When?")
+        #expect(vm.error == nil)
+        #expect(window.ended == 1)
+        // A late expiration of a settled run changes nothing.
+        window.expire()
+        #expect(vm.phase == .idle)
+    }
+}
+
 struct ChatRunPhaseTests {
     @Test func ownerStatesIgnoreEvents() {
         #expect(ChatRunPhase.idle.applying(.textDelta("x")) == .idle)
