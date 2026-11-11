@@ -37,13 +37,15 @@ extension SettingsView {
     }
 
     /// Stops whatever could still write meeting content (a running
-    /// transcription, read-aloud) and hands the erase to `LibraryEraser`,
+    /// transcription, read-aloud, a chat reply) and hands the erase to `LibraryEraser`,
     /// which also removes the recovery copies a plain model delete leaves.
     func deleteAllData() {
         ReadAloudController.shared.stop()
         transcription?.cancelAllTranscriptions()
         Task {
             await transcription?.awaitActiveTranscriptions()
+            // Retained conversations hold sessions this deletes; settle and drop them first.
+            await chatConversations?.closeAll()
             let residual: Int
             do {
                 residual = try LibraryEraser.eraseAll(context: modelContext)

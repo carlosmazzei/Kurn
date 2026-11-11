@@ -157,6 +157,9 @@ struct MeetingChatHarnessTests {
         #expect(vm.scope == scope)
         ask(vm, "Ignored while busy")
         vm.cancel()
+        await vm.waitUntilSettled()
+        let cancelled = await model.wasCancelled
+        #expect(cancelled)
         #expect(vm.turns.map(\.role) == [.user])
         #expect(vm.retryableQuestion == "Create minutes")
         #expect(vm.error == nil)
@@ -165,11 +168,5 @@ struct MeetingChatHarnessTests {
         await waitUntil { !vm.isResponding }
         #expect(vm.turns.map(\.text) == ["Retry", "Retried."])
         #expect(vm.artifacts.count == 1)
-        for _ in 0..<2_000 {
-            if await model.wasCancelled { break }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
-        let cancelled = await model.wasCancelled
-        #expect(cancelled)
     }
 }

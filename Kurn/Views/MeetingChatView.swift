@@ -22,11 +22,27 @@ struct MeetingChatView: View {
     /// meeting time. Per-meeting scope only.
     var onJumpToTime: ((TimeInterval) -> Void)?
 
+    /// The app-wide owner of conversations (NH05): a run outlives this view. Optional only so a
+    /// view built outside the app environment still works, with a conversation of its own.
+    @Environment(ChatConversationHost.self) private var conversations: ChatConversationHost?
+    @State private var detached = MeetingChatViewModel()
+
+    var body: some View {
+        MeetingChatConversationView(meeting: meeting, onJumpToTime: onJumpToTime,
+                                    vm: conversations?.conversation(for: meeting?.id) ?? detached)
+    }
+}
+
+/// The conversation itself, rendering whichever retained view model `MeetingChatView` resolved.
+struct MeetingChatConversationView: View {
+    let meeting: Meeting?
+    var onJumpToTime: ((TimeInterval) -> Void)?
+    @Bindable var vm: MeetingChatViewModel
+
     @Environment(AppSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var vm = MeetingChatViewModel()
     @State private var input = ""
     @FocusState private var inputFocused: Bool
     @State private var showingHistory = false
@@ -223,7 +239,9 @@ struct MeetingChatView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 ProgressView().accessibilityHidden(true)
-                Text(NSLocalizedString("chat.step.running", comment: "Running"))
+                Text(vm.phase == .cancelling
+                     ? NSLocalizedString("chat.step.cancelling", comment: "Stopping a reply")
+                     : NSLocalizedString("chat.step.running", comment: "Running"))
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if let turn = vm.turns.last, turn.role == .assistant, let usage = turn.usage {
@@ -347,6 +365,8 @@ struct MeetingChatView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // A stop is a request; the reply settles before the composer comes back.
+            .disabled(vm.phase == .cancelling)
             .accessibilityLabel(NSLocalizedString("chat.stop", comment: "Stop"))
             .accessibilityIdentifier("chat.stop")
         } else {

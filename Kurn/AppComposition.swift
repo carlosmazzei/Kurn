@@ -37,6 +37,9 @@ struct AppEnvironment {
     /// Times the App Store rating request after finished transcripts and
     /// summaries; presented by `reviewPromptPresenter()`.
     let reviewPrompt: ReviewPromptCoordinator
+    /// Chat conversations, retained beyond the views showing them so a reply keeps running
+    /// when its sheet or tab is dismissed (NH05).
+    let chatConversations: ChatConversationHost
 }
 
 @MainActor
@@ -86,7 +89,8 @@ final class AppComposition {
             semanticIndex: semanticIndex,
             wiki: wiki,
             recordingSession: RecordingSessionController(modelContext: context, settings: settings),
-            reviewPrompt: reviewPrompt
+            reviewPrompt: reviewPrompt,
+            chatConversations: ChatConversationHost()
         )
     }
 

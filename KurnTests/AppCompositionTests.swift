@@ -33,6 +33,7 @@ struct AppCompositionTests {
         #expect(environment.summaries.modelContext === container.mainContext)
         #expect(environment.summaries.reviewPrompt === environment.reviewPrompt)
         #expect(environment.transcription.reviewPrompt === environment.reviewPrompt)
+        #expect(environment.chatConversations.retainedScopes.isEmpty)
     }
 
     @Test func eachCallBuildsIndependentCoordinators() throws {

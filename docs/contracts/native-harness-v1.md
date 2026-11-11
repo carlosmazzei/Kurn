@@ -70,8 +70,10 @@ Important current adaptations/gaps:
   recovery excludes that interrupted exchange from retry context. The V6 app compatibility writer still saves
   presentation turns/trace rather than this complete native tool history; the awaited
   model-message/result barriers belong to NH05.
-- The current UI can request cancellation and clear its busy state before the task settles.
-  Confirmed termination, durable barriers, queues and late-event fencing belong to NH05.
+- Since NH05 host activation the chat stays busy (`cancelling`) after a stop until the run's
+  producer has terminated and its partial reply is reconciled; a conversation reset or reload
+  fences the old run by generation. Durable barriers for app-written native messages, queues
+  and durable command deduplication remain open.
 - Legacy Codable Date fields use Foundation seconds since 2001. Preserve that codec while
   reading old data. Contract v1/pi timestamps below are different fields and units.
 
@@ -370,7 +372,30 @@ captured run state, including explicit persistence failure; it does not claim su
 durability when a write failed. Message/usage failures require host recovery. Opening a new
 owner executes nothing. One owner per session is a host responsibility.
 
-This is package infrastructure with tests, not app activation or completion of session
-acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect
+`start(observation:)` takes `.bounded` (default, newest 128 events) or `.complete` (every
+event, for a host presentation reducer that cannot tolerate a gap). Neither cancels the run
+when the observer goes away.
+
+## NH05 host activation, increment 1
+
+The app retains chat conversations in `ChatConversationHost` (built by `AppComposition`),
+one per scope (a meeting or the library-wide Ask), not in the view showing them. Dismissing
+the view no longer cancels a reply. Retention is bounded (four by default, least recently
+opened idle first) and never evicts a running conversation; "Delete all data" cancels every
+run, awaits settlement and forgets the conversations before erasing. A run is an owned
+`AgentRunHandle` with complete observation: every exit path cancels it and awaits `result()`
+before the conversation reports the run over, so a cancelled or failed reply is reported
+only after no tool can still run or commit an effect. `cancel()` is a request; the owner
+exposes `idle/preparing/streaming/executingTools/cancelling` and refuses a new prompt until
+settled. A conversation whose meeting or saved session was deleted writes nothing further,
+and the open session cannot be deleted under its own run.
+
+Not yet activated: `AgentSession` as the app writer of native message/usage/run entries (the
+V6 presentation writer remains the app's canonical writer), canonical history restoration and
+scope-authorization entries, crash/effect reconciliation, durable command idempotency,
+background suspension policy, persistence-failure recovery UI, compaction/retry/waiting
+phases and coalesced, back-pressured observation.
+
+The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect
 recovery, durable command deduplication and complete phase projection remain open in NH05;
 compaction/projection and queues retain their later roadmap boundaries.

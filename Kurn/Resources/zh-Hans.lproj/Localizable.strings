@@ -1089,6 +1089,7 @@
 "chat.step.read_document" = "正在读取文档“%@”";
 "chat.step.failed" = "失败";
 "chat.step.running" = "正在运行";
+"chat.step.cancelling" = "正在停止…";
 "chat.artifact.reference" = "文档：%@ v%d";
 "chat.limit.stopped" = "已停止：%@。";
 "chat.limit.retry" = "%@。您可以重试该问题。";

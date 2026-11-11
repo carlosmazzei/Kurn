@@ -139,7 +139,7 @@ struct MeetingChatViewModelSendTests {
         #expect(viewModel.retryableQuestion == "When do we ship?")
     }
 
-    @Test func cancellingAnInFlightReplyClearsTheRunningState() async {
+    @Test func cancellingAnInFlightReplyClearsTheRunningStateOnceSettled() async {
         let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")], pauseAt: 0)
         let viewModel = Self.viewModel(model)
         _ = Self.configured(viewModel)
@@ -147,8 +147,18 @@ struct MeetingChatViewModelSendTests {
         Self.ask(viewModel, "When do we ship?")
         for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
         viewModel.cancel()
+        // A stop is a request: the conversation stays busy until the producer has terminated.
+        #expect(viewModel.isResponding)
+        #expect(viewModel.phase == .cancelling)
+        Self.ask(viewModel, "Ignored while settling")
+        await viewModel.waitUntilSettled()
 
+        let cancelled = await model.wasCancelled
+        let requestCount = await model.requests.count
+        #expect(cancelled)
+        #expect(requestCount == 1)
         #expect(!viewModel.isResponding)
+        #expect(viewModel.phase == .idle)
         #expect(viewModel.error == nil)
         #expect(viewModel.retryableQuestion == "When do we ship?")
     }
