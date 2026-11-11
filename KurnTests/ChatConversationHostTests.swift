@@ -72,13 +72,22 @@ struct ChatConversationHostTests {
         #expect(host.retainedScopes == [.meeting(meeting.id), .meeting(newer)])
         #expect(host.conversation(for: meeting.id) === running)
 
+        // Once the run settles, the next open of any scope brings the host back within capacity.
+        running.cancel()
+        await running.waitUntilSettled()
+        _ = host.conversation(for: newer)
+        #expect(host.retainedScopes == [.meeting(newer)])
+        #expect(running.retryableQuestion == "When do we ship?")
+
+        let again = host.conversation(for: meeting.id)
+        again.configure(meeting: meeting, modelContext: context)
+        again.send(question: "Still there?", provider: .openAI, model: "gpt-4o")
         await host.closeAll()
         let cancelled = await paused.wasCancelled
         #expect(cancelled)
-        #expect(!running.isResponding)
-        #expect(running.retryableQuestion == "When do we ship?")
+        #expect(!again.isResponding)
         #expect(host.retainedScopes.isEmpty)
-        #expect(host.conversation(for: meeting.id) !== running)
+        #expect(host.conversation(for: meeting.id) !== again)
     }
 
     @Test func capacityIsAtLeastOne() {
@@ -135,11 +144,11 @@ struct MeetingChatSettlementTests {
         await vm.waitUntilSettled()
         let session = try #require(vm.pastSessions().first)
         vm.send(question: "And then?", provider: .openAI, model: "gpt-4o")
-        vm.delete(session)
+        #expect(!vm.delete(session))
         #expect(vm.pastSessions().count == 1)
         vm.cancel()
         await vm.waitUntilSettled()
-        vm.delete(session)
+        #expect(vm.delete(session))
         #expect(vm.pastSessions().isEmpty)
         #expect(vm.turns.isEmpty)
     }

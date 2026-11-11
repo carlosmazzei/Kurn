@@ -9,7 +9,8 @@ import Observation
 /// finished from where it was saved.
 ///
 /// Retention is bounded: at most `capacity` conversations are kept, evicting the least recently
-/// opened idle one; a running conversation is never evicted. Nothing here is observable: the
+/// opened idle one whenever a conversation is opened; a running conversation is never evicted,
+/// so the bound can be exceeded only until the next open after those runs settle. Nothing here is observable: the
 /// conversations are, and handing one out must not invalidate the view asking for it.
 @MainActor
 @Observable
@@ -33,11 +34,12 @@ final class ChatConversationHost {
         let scope: Scope = meetingID.map { .meeting($0) } ?? .library
         clock += 1
         lastOpened[scope] = clock
-        if let existing = conversations[scope] { return existing }
-        let created = makeConversation()
-        conversations[scope] = created
+        let conversation = conversations[scope] ?? makeConversation()
+        conversations[scope] = conversation
+        // Every access re-applies the bound: conversations that were running when they would have
+        // been evicted have settled since, and nothing else tells the host they went idle.
         evictIdle(keeping: scope)
-        return created
+        return conversation
     }
 
     /// Scopes currently retained, for tests and diagnostics.

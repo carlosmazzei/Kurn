@@ -417,15 +417,18 @@ final class MeetingChatViewModel {
     /// Permanently deletes `target`. If it was the open conversation, starts
     /// a fresh one in its place so the view doesn't keep showing turns that
     /// no longer exist on disk.
-    func delete(_ target: ChatSession) {
-        guard let modelContext else { return }
+    /// Returns whether `target` was deleted, so a list can keep a refused row.
+    @discardableResult
+    func delete(_ target: ChatSession) -> Bool {
+        guard let modelContext else { return false }
         let wasCurrent = target.id == session?.id
         // The open conversation's run writes into its session until it settles.
-        guard !(wasCurrent && isResponding) else { return }
+        guard !(wasCurrent && isResponding) else { return false }
         modelContext.delete(target)
         if let saveError = modelContext.saveOrError() {
             self.error = saveError
         }
         if wasCurrent { reset() }
+        return true
     }
 }

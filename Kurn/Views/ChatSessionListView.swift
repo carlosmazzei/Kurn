@@ -9,7 +9,9 @@
 //
 //  Takes a snapshot `sessions` array rather than a live `@Query` so a row
 //  removed here disappears immediately without waiting on a SwiftData
-//  re-fetch; `onDelete` still does the actual persistence.
+//  re-fetch; `onDelete` still does the actual persistence, and reports
+//  whether it deleted anything (the open conversation is refused while its
+//  reply is still running), so a refused row stays in the list.
 //
 
 import SwiftUI
@@ -18,7 +20,7 @@ struct ChatSessionListView: View {
     @State private var sessions: [ChatSession]
     let currentSessionID: UUID?
     let onSelect: (ChatSession) -> Void
-    let onDelete: (ChatSession) -> Void
+    let onDelete: (ChatSession) -> Bool
 
     @Environment(\.dismiss) private var dismiss
 
@@ -26,7 +28,7 @@ struct ChatSessionListView: View {
         sessions: [ChatSession],
         currentSessionID: UUID?,
         onSelect: @escaping (ChatSession) -> Void,
-        onDelete: @escaping (ChatSession) -> Void
+        onDelete: @escaping (ChatSession) -> Bool
     ) {
         self._sessions = State(initialValue: sessions)
         self.currentSessionID = currentSessionID
@@ -89,10 +91,10 @@ struct ChatSessionListView: View {
         .accessibilityAddTraits(session.id == currentSessionID ? .isSelected : [])
     }
 
-    /// Removes the row immediately (this view's own snapshot) and hands the
-    /// deletion off to `onDelete` for the actual SwiftData delete + save.
+    /// Hands each deletion to `onDelete` for the actual SwiftData delete +
+    /// save, then removes from this view's snapshot only the rows it deleted.
     private func delete(at offsets: IndexSet) {
-        for index in offsets { onDelete(sessions[index]) }
-        sessions.remove(atOffsets: offsets)
+        let deleted = IndexSet(offsets.filter { onDelete(sessions[$0]) })
+        sessions.remove(atOffsets: deleted)
     }
 }
