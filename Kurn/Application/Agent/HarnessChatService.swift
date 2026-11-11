@@ -42,15 +42,23 @@ struct HarnessChatService {
 
     /// An owned run (NH05): observation never cancels it, so the owner cancels explicitly and
     /// awaits `AgentRunHandle.result()` before reporting the run settled. Every event is kept
-    /// because the chat rebuilds its timeline and artifact state from them.
+    /// because the chat rebuilds its timeline and artifact state from them. With `transcript`,
+    /// every canonical message and usage report is committed to the session's run branch first.
     func start(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
-        history: [ChatMessage], question: String
+        history: [ChatMessage], question: String, transcript: ChatRunTranscriptWriter? = nil
     ) async throws -> AgentRunHandle {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question)
-        return run.harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
+        var harness = run.harness
+        // Canonical messages and usage are durable before the work that depends on them.
+        if let transcript {
+            harness = harness
+                .persistingMessages { message in try await transcript.append(message) }
+                .persistingUsage { usage in try await transcript.append(usage) }
+        }
+        return harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
                                  tools: run.tools, contextResolution: run.resolution, context: run.context,
                                  observation: .complete)
     }

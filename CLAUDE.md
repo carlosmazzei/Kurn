@@ -2959,5 +2959,15 @@ opens, the saved question already reopens as the retryable one, and committed do
 keep their own receipts. It never re-sends or resumes anything. A reopened conversation whose
 retryable question is one of those (`ChatRunRecovery.interruptedQuestionIDs`) says so above
 Retry (`retryableQuestionWasInterrupted`, `chat.run.interrupted`), so an unanswered question left
-by a crash reads differently from one the user stopped. `AgentSession` is still not the
-app's writer: the presentation writer remains canonical until a later NH05 increment activates it.
+by a crash reads differently from one the user stopped.
+
+**A run's model history is durable, on its own branch.** `ChatRunTranscriptWriter`
+(`Infrastructure/Agent/`) is installed as the harness's message and usage sinks, so the question,
+each assistant turn with its tool calls, each tool result and each request's usage are committed to
+the session before the work that depends on them. Its entries carry the run record's `runID` as
+metadata and chain from the leaf at run start (the accepted question), but never move the selected
+leaf: the presentation path, `SwiftDataAgentSessionStore.projection` and the compatibility writer's
+prefix diff see none of them. Each append reads revision/ordinal/leaf and calls the synchronous
+`commitNow` in one main-actor step, so it cannot interleave with a presentation or effect write. A
+failed commit fails the run (question retryable, `run_transcript_write_failed`). Replay still sends
+plain presentation history; `AgentSession` is not yet the app's run owner.

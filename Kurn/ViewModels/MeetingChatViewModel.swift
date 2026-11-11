@@ -137,7 +137,7 @@ final class MeetingChatViewModel {
                     throw AppError.apiError(statusCode: 0, message: NSLocalizedString(
                         "chat.artifact.cloud_required", comment: "Chat provider requirement"))
                 }
-                let answered = try await self.runHarness(agentModel, question: trimmed,
+                let answered = try await self.runHarness(agentModel, runID: token, question: trimmed,
                                                          history: Self.buildHistory(from: priorTurns),
                                                          provider: provider, model: model, startedAt: startedAt)
                 try Task.checkCancellation()
@@ -399,7 +399,7 @@ final class MeetingChatViewModel {
         if session != nil { persist() }
     }
 
-    private func runHarness(_ agentModel: any AgentModel, question: String, history: [ChatMessage],
+    private func runHarness(_ agentModel: any AgentModel, runID: UUID, question: String, history: [ChatMessage],
                             provider: AIProvider, model: String, startedAt: Date) async throws -> Bool {
         guard let modelContext else {
             throw AppError.apiError(statusCode: 0, message: "Chat requires a configured model context.")
@@ -426,9 +426,14 @@ final class MeetingChatViewModel {
             guard let self, self.generation == generation else { throw CancellationError() }
             try self.persistOrThrow(turns: acceptedTurns)
         }
+        // The run's canonical messages go on their own branch of the saved session, anchored at
+        // the accepted question; `runID` matches the run's `ChatRunRecord`.
+        let transcript = session.map {
+            ChatRunTranscriptWriter(runID: runID.uuidString, session: $0, store: SwiftDataAgentSessionStore(context: modelContext))
+        }
         let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
                                           context: modelContext, scope: scope, workspace: workspace,
-                                          history: history, question: question)
+                                          history: history, question: question, transcript: transcript)
         // Whatever ends this function, the producer has terminated first: a cancelled or failed
         // run is only reported once nothing can still call a tool or write its effect.
         defer { run.cancel() }

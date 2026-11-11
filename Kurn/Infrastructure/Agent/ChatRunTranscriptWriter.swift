@@ -1,0 +1,75 @@
+import AgentHarness
+import Foundation
+import KurnCore
+import SwiftData
+
+/// Records a chat run's canonical messages and per-request usage in its session log (NH05).
+///
+/// The run's entries form their own branch, anchored at the conversation's leaf when the run
+/// started: each entry's parent is the previous one, and the selected leaf is never moved. So
+/// the presentation path — the turns the chat shows and the compatibility writer diffs — is
+/// unchanged by a run, and a later presentation branch (an inherited artifact reference, a
+/// dropped reply) cannot detach or reorder the run's history. Entries carry the run's
+/// `ChatRunRecord` ID as `runID` metadata, the same shape `AgentSession` writes.
+///
+/// Each append reads the revision and commits in one main-actor step. A failed write throws,
+/// which fails the run before any dependent model or tool work (the harness awaits its sinks);
+/// the question stays retryable and a retry starts a new branch rather than continuing an
+/// incomplete one.
+@MainActor
+final class ChatRunTranscriptWriter {
+    static let usageType = "agent.usage.v1"
+
+    let runID: String
+    private let session: ChatSession
+    private let store: SwiftDataAgentSessionStore
+    private let anchorID: String?
+    private(set) var lastEntryID: String?
+
+    init(runID: String, session: ChatSession, store: SwiftDataAgentSessionStore) {
+        self.runID = runID
+        self.session = session
+        self.store = store
+        anchorID = session.canonicalLeafID
+    }
+
+    func append(_ message: AgentMessage) throws {
+        try append(payload: .message(message))
+    }
+
+    func append(_ usage: AgentUsage) throws {
+        try append(payload: .custom(type: Self.usageType, data: .object([
+            "inputTokens": .number(Double(usage.inputTokens)),
+            "outputTokens": .number(Double(usage.outputTokens)),
+            "reasoningTokens": usage.reasoningTokens.map { .number(Double($0)) } ?? .null
+        ])))
+    }
+
+    /// Whether `entry` belongs to a run branch rather than the presentation path.
+    static func runID(of entry: AgentSessionEntry) -> String? {
+        guard case .object(let fields)? = entry.metadata, case .string(let id)? = fields["runID"] else { return nil }
+        return id
+    }
+
+    private func append(payload: AgentSessionEntry.Payload) throws {
+        // A run can outlive its session; a deleted row must not be written or resurrected.
+        guard !session.isDeleted, session.modelContext != nil else { throw CancellationError() }
+        let sessionID = session.id.uuidString
+        do {
+            // `commitNow` re-validates the whole graph against these values before saving.
+            let entry = try AgentSessionEntry(sessionID: sessionID, id: UUID().uuidString,
+                parentID: lastEntryID ?? anchorID, ordinal: session.canonicalOrdinal + 1,
+                createdAt: AgentSessionEntry.time(), payload: payload,
+                metadata: .object(["runID": .string(runID)]))
+            try store.commitNow(AgentSessionCommit(sessionID: sessionID, expectedRevision: session.canonicalRevision,
+                                                   entries: [entry], leafID: session.canonicalLeafID))
+            lastEntryID = entry.id
+        } catch {
+            ReliabilityLog.record(ReliabilityEvent(
+                operationID: OperationID(String(runID.prefix(8))), operation: "meeting_chat",
+                stage: "run_transcript", outcome: .failed, code: "run_transcript_write_failed"
+            ))
+            throw error
+        }
+    }
+}
