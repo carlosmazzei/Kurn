@@ -10,6 +10,8 @@ public struct NativeHarness: Sendable {
     let toolPolicy: AgentToolPolicy
     let maxParallelReads: Int
     let isContextOverflow: @Sendable (Error) -> Bool
+    var messageCommit: @Sendable (AgentMessage) async throws -> Void = { _ in }
+    var usageCommit: @Sendable (AgentUsage) async throws -> Void = { _ in }
     private let diagnosticSink: @Sendable (AgentDiagnostic) -> Void
 
     /// Appended to the system prompt for the tool-less wrap-up turn after a turn or tool-call limit.
@@ -46,23 +48,67 @@ public struct NativeHarness: Sendable {
     public func run(systemPrompt: String, history: [AgentMessage], prompt: String,
                     tools: [AgentTool], maxOutputTokens: Int? = nil,
                     contextResolution: AgentContextResolution? = nil, context: AgentRunContext = AgentRunContext()) -> AsyncThrowingStream<AgentEvent, Error> {
-        AsyncThrowingStream { continuation in
-            let trace = AgentTraceEmitter(events: continuation, resolutionID: contextResolution?.id, sink: diagnosticSink, context: context)
-            let task = Task {
-                do {
-                    continuation.yield(.runStarted)
-                    if let contextResolution { continuation.yield(.contextResolved(contextResolution)) }
-                    trace.record(.runStarted, metrics: limits.diagnosticMetrics)
-                    try await drive(systemPrompt: systemPrompt, history: history, prompt: prompt,
-                                    tools: tools, maxOutputTokens: maxOutputTokens, events: continuation, trace: trace)
-                    continuation.finish()
-                } catch {
-                    trace.record(error is CancellationError ? .runCancelled : .runFailed)
-                    continuation.finish(throwing: error)
-                }
+        launch(systemPrompt: systemPrompt, history: history, prompt: prompt, tools: tools,
+               maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, context: context,
+               observation: .legacy).events
+    }
+
+    /// An owned run. Observation is bounded and disposable; canonical writes use an awaited
+    /// channel. Detaching an observer does not cancel execution. The owner must cancel explicitly
+    /// and await `result()` before reporting termination.
+    public func start(systemPrompt: String, history: [AgentMessage], prompt: String,
+                      tools: [AgentTool], maxOutputTokens: Int? = nil,
+                      contextResolution: AgentContextResolution? = nil,
+                      context: AgentRunContext = AgentRunContext()) -> AgentRunHandle {
+        launch(systemPrompt: systemPrompt, history: history, prompt: prompt, tools: tools,
+               maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, context: context,
+               observation: .owned)
+    }
+
+    /// The sink must commit or throw. It is called in canonical order, including failure audit,
+    /// before dependent tool/model work and before message-appended observations.
+    public func persistingMessages(_ commit: @escaping @Sendable (AgentMessage) async throws -> Void) -> Self {
+        var copy = self
+        copy.messageCommit = commit
+        return copy
+    }
+
+    public func persistingUsage(_ commit: @escaping @Sendable (AgentUsage) async throws -> Void) -> Self {
+        var copy = self
+        copy.usageCommit = commit
+        return copy
+    }
+
+    private enum ObservationMode { case legacy, owned }
+
+    private func launch(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
+                        maxOutputTokens: Int?, contextResolution: AgentContextResolution?, context: AgentRunContext,
+                        observation: ObservationMode) -> AgentRunHandle {
+        let (events, continuation) = AsyncThrowingStream<AgentEvent, Error>.makeStream(
+            bufferingPolicy: observation == .legacy ? .unbounded : .bufferingNewest(128))
+        let trace = AgentTraceEmitter(events: continuation, resolutionID: contextResolution?.id, sink: diagnosticSink, context: context)
+        let task = Task {
+            do {
+                continuation.yield(.runStarted)
+                if let contextResolution { continuation.yield(.contextResolved(contextResolution)) }
+                trace.record(.runStarted, metrics: limits.diagnosticMetrics)
+                let outcome = try await drive(systemPrompt: systemPrompt, history: history, prompt: prompt,
+                    tools: tools, maxOutputTokens: maxOutputTokens, events: continuation, trace: trace)
+                continuation.finish()
+                return outcome
+            } catch {
+                trace.record(error is CancellationError ? .runCancelled : .runFailed)
+                continuation.finish(throwing: error)
+                throw error
             }
-            continuation.onTermination = { _ in task.cancel() }
         }
+        if observation == .legacy { continuation.onTermination = { _ in task.cancel() } }
+        return AgentRunHandle(events: events, task: task)
+    }
+
+    func publish(_ message: AgentMessage, events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws {
+        try await messageCommit(message)
+        events.yield(.messageAppended(message))
     }
 
     struct TurnSettings {
@@ -88,12 +134,12 @@ public struct NativeHarness: Sendable {
 
     private func drive(systemPrompt: String, history: [AgentMessage], prompt: String, tools: [AgentTool],
                        maxOutputTokens: Int?, events: AsyncThrowingStream<AgentEvent, Error>.Continuation,
-                       trace: AgentTraceEmitter) async throws {
+                       trace: AgentTraceEmitter) async throws -> AgentRunOutcome {
         do { _ = try AgentToolRegistry(tools) }
         catch { trace.record(.toolRegistryRejected); throw error }
         let user = try AgentMessageFactory.user(prompt)
         let messages = history + [user]
-        events.yield(.messageAppended(user))
+        try await publish(user, events: events)
         var state = AgentRunState(history: messages, context: messages)
         state.allowedTurns = limits.maxTurns
         state.allowedToolCalls = limits.maxToolCalls
@@ -114,10 +160,10 @@ public struct NativeHarness: Sendable {
             let calls = response.stopReason == .maxTokens ? [] : response.toolCalls.map(NormalizedToolCall.init)
             if !state.responseAlreadyAudited {
                 let assistant = try response.auditMessage()
-                events.yield(.messageAppended(assistant))
+                try await publish(assistant, events: events)
                 state.history.append(assistant)
                 state.context.append(assistant)
-                try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: true)
+                try await AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: true, commit: messageCommit)
             }
             if response.stopReason == .deferred { throw AgentWireError.deferred }
             if response.stopReason == .aborted { throw CancellationError() }
@@ -146,8 +192,10 @@ public struct NativeHarness: Sendable {
         trace.record(.runFinished, metrics: [.toolCalls: state.toolCalls, .inputTokens: state.usage.inputTokens,
                                             .outputTokens: state.usage.outputTokens,
                                             .blockedCalls: state.requestedCalls - state.toolCalls], reason: reason)
-        events.yield(.runFinished(AgentRunOutcome(messages: state.history, finalText: state.finalText,
-                                                 stopReason: reason, totalUsage: state.usage)))
+        let outcome = AgentRunOutcome(messages: state.history, finalText: state.finalText,
+                                      stopReason: reason, totalUsage: state.usage)
+        events.yield(.runFinished(outcome))
+        return outcome
     }
 
     /// One text-only answer from what the run already gathered, instead of ending on tool results.
@@ -168,10 +216,10 @@ public struct NativeHarness: Sendable {
                 usage: response.usage, stopReason: response.stopReason, providerMetadata: response.providerMetadata,
                 message: response.message, blocksToolExecution: true)
             let assistant = try blocked.auditMessage()
-            events.yield(.messageAppended(assistant))
+            try await publish(assistant, events: events)
             state.history.append(assistant)
             state.context.append(assistant)
-            try AgentResponseAudit.appendBlocked(blocked, state: &state, events: events, trace: trace, toContext: true, syntheticReason: .toolsDisabled,
+            try await AgentResponseAudit.appendBlocked(blocked, state: &state, events: events, trace: trace, toContext: true, commit: messageCommit, syntheticReason: .toolsDisabled,
                 content: "Tool not executed: tool calling was disabled for this request.")
         }
         if response.stopReason == .deferred { throw AgentWireError.deferred }

@@ -37,7 +37,7 @@ extension NativeHarness {
                 try Task.checkCancellation()
             } catch {
                 stream.fail(error)
-                try recordFailure(stream, state: &state, events: events, trace: trace)
+                try await recordFailure(stream, state: &state, events: events, trace: trace)
                 trace.record(.requestFailed, metrics: [.durationMs: Self.milliseconds(since: started), .protocolFailure: stream.failureCode])
                 trace.endRequest(requestIdentity)
                 try Task.checkCancellation()
@@ -55,7 +55,7 @@ extension NativeHarness {
             metrics[.streamedText] = stream.hasVisibleText ? 1 : 0
             trace.record(.requestFinished, metrics: metrics, reason: response.stopReason == .maxTokens ? .outputLimit : nil)
             trace.endRequest(requestIdentity)
-            record(response.usage, state: &state, events: events)
+            try await record(response.usage, state: &state, events: events)
             if response.stopReason == .maxTokens,
                try await recoverOutput(response, streamed: stream.hasVisibleText, settings: &settings,
                                        state: &state, events: events, trace: trace) { continue }
@@ -80,9 +80,9 @@ extension NativeHarness {
         facts[.outputRetries] = settings.outputBudget.retries
         trace.record(.outputRetryStarted, metrics: facts, reason: .outputLimit)
         let interrupted = try response.auditMessage()
-        events.yield(.messageAppended(interrupted))
+        try await publish(interrupted, events: events)
         state.history.append(interrupted)
-        try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
+        try await AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false, commit: messageCommit)
         state.responseAlreadyAudited = true
         if let usage = response.usage, usage.inputTokens > 0 {
             // Preserve reported input size without counting the discarded response or its calls.
@@ -116,8 +116,9 @@ extension NativeHarness {
     }
 
     private func record(_ usage: AgentUsage?, state: inout AgentRunState,
-                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation) {
+                        events: AsyncThrowingStream<AgentEvent, Error>.Continuation) async throws {
         guard let usage else { return }
+        try await usageCommit(usage)
         state.usage = state.usage.adding(usage)
         state.cost += max(0, costEstimator?(usage) ?? 0)
         events.yield(.usage(usage))
@@ -212,18 +213,18 @@ extension NativeHarness {
         } catch {
             stream.fail(error)
             // Summary failures are protocol/audit data, never usable compaction checkpoints.
-            try recordFailure(stream, state: &state, events: events, trace: trace)
+            try await recordFailure(stream, state: &state, events: events, trace: trace)
             trace.record(.summaryFailed, metrics: [.protocolFailure: stream.failureCode])
             throw error
         }
         try Task.checkCancellation()
         if response.stopReason == .error || response.stopReason == .aborted || response.stopReason == .deferred {
             let message = try response.auditMessage()
-            events.yield(.messageAppended(message))
+            try await publish(message, events: events)
             state.history.append(message)
-            try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
+            try await AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false, commit: messageCommit)
         }
-        record(response.usage, state: &state, events: events)
+        try await record(response.usage, state: &state, events: events)
         trace.record(.summaryFinished, metrics: response.diagnosticMetrics,
                      reason: response.stopReason == .maxTokens ? .outputLimit : nil)
         let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,13 +232,13 @@ extension NativeHarness {
     }
 
     private func recordFailure(_ stream: AgentTurnStream, state: inout AgentRunState,
-                               events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter) throws {
+                               events: AsyncThrowingStream<AgentEvent, Error>.Continuation, trace: AgentTraceEmitter) async throws {
         guard let message = stream.failureMessage else { return }
         let failure = AgentMessage.content(message)
-        events.yield(.messageAppended(failure))
+        try await publish(failure, events: events)
         state.history.append(failure)
         let response = AgentTurnResponse(text: message.text, message: message, blocksToolExecution: true)
-        try AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false)
+        try await AgentResponseAudit.appendBlocked(response, state: &state, events: events, trace: trace, toContext: false, commit: messageCommit)
     }
 
 }

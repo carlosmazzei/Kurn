@@ -351,3 +351,26 @@ session, crash recovery scheduling and settle semantics remain NH05. Native tool
 are still in-memory until that owner persists them; reopen does not automatically execute
 anything. Canonical provider replay and persistent compaction remain NH06. Local durable
 receipt replay is qualified; no remote/unknown-outcome side-effect mechanism is introduced.
+
+
+## Initial NH05 package ownership boundary
+
+`NativeHarness.persistingMessages` and `persistingUsage` install awaited commits before
+model/tool dependencies advance. Failure audit and synthetic results use the same message
+barrier. `start` returns a producer handle: its bounded events are disposable observations,
+while `result()` waits for the producer itself and `cancel()` requests termination.
+The compatibility `run` API retains its original observation/cancellation contract.
+
+`AgentSession` owns an accepted run across store awaits, explicit cancellation and terminal
+writes. It writes `agent.run-start.v1`, `agent.usage.v1` and `agent.run-end.v1` custom entries
+alongside native messages, correlated by run ID. A failed terminal write blocks new work;
+`retrySettlement` retries the saved terminal entry without inference or effects, recognizing
+an identical entry when a commit acknowledgement was lost. `waitUntilSettled` returns the
+captured run state, including explicit persistence failure; it does not claim successful
+durability when a write failed. Message/usage failures require host recovery. Opening a new
+owner executes nothing. One owner per session is a host responsibility.
+
+This is package infrastructure with tests, not app activation or completion of session
+acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect
+recovery, durable command deduplication and complete phase projection remain open in NH05;
+compaction/projection and queues retain their later roadmap boundaries.
