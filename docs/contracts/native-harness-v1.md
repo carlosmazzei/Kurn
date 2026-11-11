@@ -397,7 +397,10 @@ The question is persisted before any request (a failed save sends nothing), and 
 ## NH05 host activation, increment 2: canonical run history
 
 Each chat run commits its native messages (the question, assistant turns with tool calls, tool
-results, the answer) and each request's reported usage (`agent.usage.v1`) to the saved session
+results, the answer) and each request's reported usage (`agent.usage.v1`) to the saved session,
+between a start entry (`agent.run-start.v1`, carrying the frozen authorization: effective source
+scope, resolved meeting IDs and `provider:model`, written before model IO) and an end entry
+(`agent.run-end.v1`: completed/failed/cancelled and the stop reason),
 through the harness's awaited sinks, before any dependent model or tool work. The entries form
 one branch per run: the first is a child of the session leaf when the run started (the accepted
 question), each later one a child of the previous, and every entry carries the run record's ID

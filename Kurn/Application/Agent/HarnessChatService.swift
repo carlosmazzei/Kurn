@@ -26,6 +26,8 @@ struct HarnessChatService {
         let tools: [AgentTool]
         let resolution: AgentContextResolution
         let context: AgentRunContext
+        /// What the run may read and which model answers it, frozen before any model IO.
+        let authorization: ChatRunAuthorization
     }
 
     /// Legacy observation: dropping the stream cancels the run, and nothing awaits the producer.
@@ -52,8 +54,10 @@ struct HarnessChatService {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question)
         var harness = run.harness
-        // Canonical messages and usage are durable before the work that depends on them.
+        // Canonical messages and usage are durable before the work that depends on them, and the
+        // run's authorization is recorded before the first of them.
         if let transcript {
+            try transcript.begin(run.authorization)
             harness = harness
                 .persistingMessages { message in try await transcript.append(message) }
                 .persistingUsage { usage in try await transcript.append(usage) }
@@ -109,7 +113,9 @@ struct HarnessChatService {
                 $0.role == .assistant ? AgentMessage.assistant(text: $0.content, toolCalls: []) : AgentMessage.user($0.content)
             },
             question: question, tools: tools,
-            resolution: resolution, context: try AgentRunContext(sessionID: sessionID)
+            resolution: resolution, context: try AgentRunContext(sessionID: sessionID),
+            authorization: ChatRunAuthorization(scope: effective, meetingIDs: ids,
+                                                model: "\(provider.id):\(modelIdentifier)")
         )
     }
 

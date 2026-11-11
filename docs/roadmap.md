@@ -662,13 +662,13 @@ any request, and each run writes a durable `ChatRunRecord` (`.running` → `.end
 marks records a dead process left running as interrupted, so the question reopens as retryable,
 with a note above Retry saying the app closed before the reply finished. Each run also commits
 its native messages and per-request usage through the harness's awaited sinks, before dependent
-work, on a branch of the saved session anchored at the accepted question; the selected leaf never
+work, between start (frozen scope authorization and model) and end entries, on a branch of the saved session anchored at the accepted question; the selected leaf never
 moves, so the presentation path is unchanged, and a failed commit fails the run with the question
 retryable.
 
 **Still open in NH05:** make `AgentSession` the app's run owner (the host now writes native
-message/usage entries in its shape, on per-run branches); canonical UI/history restoration and scope
-authorization entries; full phase/identity projection (run/turn/
+message/usage entries in its shape, on per-run branches, including scope authorization); canonical UI/history
+restoration from those branches; full phase/identity projection (run/turn/
 call IDs, compacting/retry/waiting phases); durable command idempotency; resuming an
 interrupted run on return to the foreground; persistence-failure recovery UI. The package owner
 requires one retained actor per session; it does not enforce uniqueness across independently

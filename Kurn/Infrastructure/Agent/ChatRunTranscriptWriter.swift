@@ -19,6 +19,12 @@ import SwiftData
 @MainActor
 final class ChatRunTranscriptWriter {
     static let usageType = "agent.usage.v1"
+    /// The same entry types `AgentSession` writes, with the host's authorization added to the start.
+    static let startType = "agent.run-start.v1"
+    static let endType = "agent.run-end.v1"
+
+    /// How a run ended, with `AgentSessionState.End`'s raw values.
+    enum End: String { case completed, failed, cancelled }
 
     let runID: String
     private let session: ChatSession
@@ -31,6 +37,21 @@ final class ChatRunTranscriptWriter {
         self.session = session
         self.store = store
         anchorID = session.canonicalLeafID
+    }
+
+    /// The branch's first entry: the sources and model the run was authorized to use.
+    func begin(_ authorization: ChatRunAuthorization) throws {
+        try append(payload: .custom(type: Self.startType, data: .object([
+            "runID": .string(runID), "authorization": try HarnessPresentationCodec.json(authorization)
+        ])))
+    }
+
+    /// The branch's last entry. `stopReason` is the harness's, when the run produced an outcome.
+    func end(_ end: End, stopReason: AgentRunStopReason?) throws {
+        try append(payload: .custom(type: Self.endType, data: .object([
+            "runID": .string(runID), "end": .string(end.rawValue),
+            "stopReason": stopReason.map { .string($0.rawValue) } ?? .null
+        ])))
     }
 
     func append(_ message: AgentMessage) throws {
@@ -71,5 +92,19 @@ final class ChatRunTranscriptWriter {
             ))
             throw error
         }
+    }
+}
+
+/// A run's frozen authorization (NH05): the effective source scope, the meetings it resolved to
+/// when the run was prepared, and the `provider:model` that answered. IDs and settings only.
+struct ChatRunAuthorization: Codable, Equatable, Sendable {
+    let scope: ChatSourceScope
+    let meetingIDs: [UUID]
+    let model: String
+
+    init(scope: ChatSourceScope, meetingIDs: Set<UUID>, model: String) {
+        self.scope = scope
+        self.meetingIDs = meetingIDs.sorted { $0.uuidString < $1.uuidString }
+        self.model = model
     }
 }

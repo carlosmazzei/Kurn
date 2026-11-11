@@ -63,6 +63,40 @@ struct ChatRunTranscriptTests {
         #expect(path.contains { $0.id == run.first?.parentID })
         #expect(!path.contains { ChatRunTranscriptWriter.runID(of: $0) != nil })
         #expect(try SwiftDataAgentSessionStore.projection(session).turns.map(\.text) == ["When?", "Monday."])
+        // The branch opens with the run's authorization and closes with how it ended.
+        guard case .custom(ChatRunTranscriptWriter.startType, .object(let start))? = run.first?.payload,
+              case .object(let authorization)? = start["authorization"],
+              case .custom(ChatRunTranscriptWriter.endType, .object(let end))? = run.last?.payload else {
+            Issue.record("Expected run start and end entries")
+            return
+        }
+        #expect(authorization["meetingIDs"] == .array([.string(meeting.id.uuidString)]))
+        #expect(authorization["model"] == .string("openAI:gpt-4o"))
+        #expect(end["end"] == .string("completed"))
+        #expect(end["stopReason"] == .string("completed"))
+    }
+
+    @Test func aCancelledRunRecordsHowItEnded() async throws {
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        vm.cancel()
+        await vm.waitUntilSettled()
+        let session = try #require(vm.pastSessions().first)
+
+        let run = try Self.runEntries(session, context: context)
+        #expect(run.first?.kind == ChatRunTranscriptWriter.startType)
+        guard case .custom(ChatRunTranscriptWriter.endType, .object(let end))? = run.last?.payload else {
+            Issue.record("Expected a run end entry")
+            return
+        }
+        #expect(end["end"] == .string("cancelled"))
+        #expect(end["stopReason"] == .null)
+        #expect(vm.retryableQuestion == "When?")
     }
 
     @Test func eachRunHasItsOwnBranchAndTheConversationReopensUnchanged() async throws {
