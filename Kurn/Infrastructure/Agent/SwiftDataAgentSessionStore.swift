@@ -31,7 +31,11 @@ struct SwiftDataAgentSessionStore: AgentSessionStore {
                                     leafID: session.canonicalLeafID, entries: graph.entries)
     }
 
-    func commit(_ group: AgentSessionCommit) async throws {
+    func commit(_ group: AgentSessionCommit) async throws { try commitNow(group) }
+
+    /// Synchronous on the main actor, so a caller that reads the revision and leaf and commits in
+    /// one step cannot interleave with another writer of the same session.
+    func commitNow(_ group: AgentSessionCommit) throws {
         let target = try session(group.sessionID)
         let current = try snapshot(target)
         guard current.revision == group.expectedRevision else { throw AgentSessionStoreError.conflict }

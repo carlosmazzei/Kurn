@@ -268,8 +268,8 @@ The app compatibility writer records presentation messages/host metadata and sel
 scope/artifact revision references as append-only entries. A changed/deleted suffix selects
 a new branch; retained siblings stay available. Checked loads derive from the active path,
 not `turnsData`/`scopeData`/`artifactsData` caches. This is the sole production presentation
-writer. Detailed live model/tool messages remain in the runtime until the NH05 owner writes
-them behind awaited barriers. Current model replay remains plain history; NH06 adds the
+writer. Since NH05 host increment 2, live model/tool messages are written behind awaited
+barriers on per-run branches that never move the selected leaf (below). Current model replay remains plain history; NH06 adds the
 qualified source-aware canonical projection.
 
 Recovery records persist versioned run/queue/draft/effect metadata only. Their presence
@@ -394,8 +394,22 @@ The question is persisted before any request (a failed save sends nothing), and 
 `.run` recovery record, `running` then `ended`. A launch sweep marks records still `running` as
 `interrupted`; it never re-sends, resumes or replays a run.
 
-Not yet activated: `AgentSession` as the app writer of native message/usage/run entries (the
-V6 presentation writer remains the app's canonical writer), canonical history restoration and
+## NH05 host activation, increment 2: canonical run history
+
+Each chat run commits its native messages (the question, assistant turns with tool calls, tool
+results, the answer) and each request's reported usage (`agent.usage.v1`) to the saved session
+through the harness's awaited sinks, before any dependent model or tool work. The entries form
+one branch per run: the first is a child of the session leaf when the run started (the accepted
+question), each later one a child of the previous, and every entry carries the run record's ID
+as `runID` metadata. The selected leaf never moves, so the presentation path, its projection and
+the compatibility writer's diff are unchanged, and a later presentation branch cannot detach a
+run's history. Each append reads the revision and commits in one main-actor step, so it cannot
+interleave with a presentation or effect write. A failed commit fails the run (the question stays
+retryable; a retry starts a new branch) and records `run_transcript_write_failed`. Run entries are
+recorded history only: replay still sends plain presentation history until NH06.
+
+Not yet activated: `AgentSession` itself as the app's run owner (the host writer above uses the
+same entry shape), canonical history restoration and
 scope-authorization entries, durable command idempotency,
 foreground resumption of an interrupted run, persistence-failure recovery UI, compaction/retry/waiting
 phases and coalesced, back-pressured observation.
