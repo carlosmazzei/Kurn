@@ -2941,7 +2941,11 @@ busy state until it terminates. A run whose meeting or open session was deleted 
 (`persistOrThrow` throws `CancellationError`, which `persist` swallows), and `delete` refuses
 the open session while its run is active. A run holds a finite background-execution window
 (`BackgroundExecutionWindow`, `BackgroundActivity` in production, injected through
-`makeBackgroundWindow`); when the system reclaims it, the run is cancelled like a user stop and
-settles as a retryable interruption (reliability code `background_expired`), never frozen
-mid-request or mid-tool. `AgentSession` is still not the app's writer: the
+`makeBackgroundWindow`). `BackgroundActivity` calls its owner's expiration handler once
+`BackgroundDeadline.windDownLead` (8 s) of background time remains, while the task is still
+held — the system's own expiration handler must end the task and is too late for async
+clean-up, so it is only the fallback. The chat cancels the run there like a user stop, and it
+settles as a retryable interruption (reliability code `background_expired`) inside the window,
+never frozen mid-request or mid-tool. The transcription coordinator's background cancellation
+gets the same earlier, checkpointable moment. `AgentSession` is still not the app's writer: the
 presentation writer remains canonical until a later NH05 increment activates it.

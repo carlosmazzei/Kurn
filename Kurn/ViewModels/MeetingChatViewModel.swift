@@ -167,9 +167,11 @@ final class MeetingChatViewModel {
         backgroundWindow = nil
     }
 
-    /// The background window for run `token` expired: cancel it like a user stop.
+    /// The background window for run `token` is running out: cancel it like a user stop,
+    /// early enough (`BackgroundDeadline`) that settling still runs inside the window. The
+    /// system's own expiration may call this again; only the first call acts.
     private func expireInBackground(_ token: UUID, runID: OperationID) {
-        guard runToken == token else { return }
+        guard runToken == token, phase != .cancelling else { return }
         ReliabilityLog.record(ReliabilityEvent(
             operationID: runID, operation: "meeting_chat", stage: "background",
             outcome: .cancelled, code: "background_expired"

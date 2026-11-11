@@ -199,6 +199,9 @@ struct MeetingChatBackgroundTests {
         for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
         window.expire()
         #expect(vm.phase == .cancelling)
+        // The system's own expiration can follow the early wind-down; it must not act twice.
+        window.expire()
+        #expect(vm.phase == .cancelling)
         await vm.waitUntilSettled()
         let cancelled = await model.wasCancelled
         #expect(cancelled)
@@ -208,6 +211,17 @@ struct MeetingChatBackgroundTests {
         // A late expiration of a settled run changes nothing.
         window.expire()
         #expect(vm.phase == .idle)
+    }
+}
+
+struct BackgroundDeadlineTests {
+    @Test func windsDownOnlyOnceTheRemainingTimeNoLongerCoversTheLead() {
+        #expect(!BackgroundDeadline.shouldWindDown(remaining: .greatestFiniteMagnitude))
+        #expect(!BackgroundDeadline.shouldWindDown(remaining: 30))
+        #expect(!BackgroundDeadline.shouldWindDown(remaining: BackgroundDeadline.windDownLead + 0.5))
+        #expect(BackgroundDeadline.shouldWindDown(remaining: BackgroundDeadline.windDownLead))
+        #expect(BackgroundDeadline.shouldWindDown(remaining: 0))
+        #expect(BackgroundDeadline.shouldWindDown(remaining: 3, lead: 4))
     }
 }
 
