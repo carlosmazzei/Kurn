@@ -88,4 +88,32 @@ struct ChatRunRecordTests {
         let requests = await model.requests
         #expect(requests.isEmpty)
     }
+    @Test func aStoreFailureSendsNothingAndTheRetrySavesTheQuestion() async throws {
+        let model = ChatAgentModel([AgentTurnResponse(text: "Monday."), AgentTurnResponse(text: "Tuesday.")])
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        let session = try #require(vm.pastSessions().first)
+        let revision = session.canonicalRevision
+
+        // A session the store can no longer validate makes the question's save itself fail.
+        session.canonicalRevision = 0
+        vm.send(question: "And then?", provider: .openAI, model: "gpt-4o")
+        #expect(!vm.isResponding)
+        #expect(vm.error != nil)
+        #expect(vm.retryableQuestion == "And then?")
+        let requestsAfterFailure = await model.requests.count
+        #expect(requestsAfterFailure == 1)
+
+        session.canonicalRevision = revision
+        vm.error = nil
+        vm.dropRetryableQuestion()
+        vm.send(question: "And then?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        #expect(vm.turns.map(\.text) == ["When?", "Monday.", "And then?", "Tuesday."])
+        #expect(try session.harnessSnapshot().turns.map(\.text) == ["When?", "Monday.", "And then?", "Tuesday."])
+    }
 }
