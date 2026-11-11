@@ -57,6 +57,8 @@ struct HarnessChatService {
         // Canonical messages and usage are durable before the work that depends on them, and the
         // run's authorization is recorded before the first of them.
         if let transcript {
+            // A stop that arrived while preparing must not open a branch nothing will close.
+            try Task.checkCancellation()
             try transcript.begin(run.authorization)
             harness = harness
                 .persistingMessages { message in try await transcript.append(message) }

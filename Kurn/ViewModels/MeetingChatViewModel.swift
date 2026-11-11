@@ -439,6 +439,7 @@ final class MeetingChatViewModel {
         defer { run.cancel() }
         do { try Task.checkCancellation() } catch {
             await Self.terminate(run)
+            try? transcript?.end(.cancelled, stopReason: nil)
             throw error
         }
         let index = turns.count
