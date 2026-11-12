@@ -393,9 +393,10 @@ The app retains chat conversations in `ChatConversationHost` (built by `AppCompo
 one per scope (a meeting or the library-wide Ask), not in the view showing them. Dismissing
 the view no longer cancels a reply. Retention is bounded (four by default, least recently
 opened idle first) and never evicts a running conversation; "Delete all data" cancels every
-run, awaits settlement and forgets the conversations before erasing. A run is an owned
-`AgentRunHandle` with complete observation: every exit path cancels it and awaits `result()`
-before the conversation reports the run over, so a cancelled or failed reply is reported
+run, awaits settlement and forgets the conversations before erasing. A run is owned with
+complete observation (an `AgentSession` run once the conversation is saved, else the plain
+`AgentRunHandle`): every exit path aborts it and awaits its settlement before the conversation
+reports the run over, so a cancelled or failed reply is reported
 only after no tool can still run or commit an effect. `cancel()` is a request; the owner
 exposes `idle/preparing/streaming/executingTools/cancelling` and refuses a new prompt until
 settled. A conversation whose meeting or saved session was deleted writes nothing further,
