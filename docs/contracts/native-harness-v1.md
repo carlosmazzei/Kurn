@@ -370,7 +370,11 @@ alongside native messages, correlated by run ID. A failed terminal write blocks 
 an identical entry when a commit acknowledgement was lost. `waitUntilSettled` returns the
 captured run state, including explicit persistence failure; it does not claim successful
 durability when a write failed. Message/usage failures require host recovery. Opening a new
-owner executes nothing. One owner per session is a host responsibility.
+owner executes nothing. One owner per session is a host responsibility. `start` returns the run's
+identity and a disposable event stream that ends only after settlement, throwing the run's failure:
+a failed history write is the typed `persistenceFailed` (also when only the terminal entry failed
+after an answer, ahead of any other failure), an abort is a cancellation. The host may
+supply the run ID and extra run-start fields; the run ID field cannot be overridden.
 
 `appendMode: .branch` keeps the selected leaf where the host put it and chains the run's entries
 from the leaf at run start (an empty session's first entry becomes the leaf). Every append is built

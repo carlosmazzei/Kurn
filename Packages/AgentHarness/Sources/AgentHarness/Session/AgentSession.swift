@@ -2,6 +2,19 @@ import Foundation
 
 public enum AgentSessionOwnerError: Error, Sendable, Equatable {
     case busy, persistenceBlocked
+    /// The run's history could not be committed, so the run stopped before any work that
+    /// depended on it. The store's own error is not passed on: it may describe storage, not the run.
+    case persistenceFailed
+}
+
+/// An accepted run: its identity and a disposable observation of its events. The stream ends
+/// only after the run has settled — the producer terminated and its terminal entry was saved —
+/// throwing the run's failure: `AgentSessionOwnerError.persistenceFailed` for any history write
+/// that failed, including the terminal entry after an answer (which takes precedence over any
+/// other failure), and otherwise `CancellationError` for an abort. Dropping it never cancels the run; `abort()` does.
+public struct AgentSessionRun: Sendable {
+    public let runID: UUID
+    public let events: AsyncThrowingStream<AgentEvent, Error>
 }
 
 public struct AgentSessionState: Sendable, Equatable {
@@ -64,18 +77,31 @@ public actor AgentSession {
     public func prompt(harness: NativeHarness, systemPrompt: String, history: [AgentMessage], prompt: String,
                        tools: [AgentTool], maxOutputTokens: Int? = nil,
                        contextResolution: AgentContextResolution? = nil) throws -> UUID {
+        try start(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt, tools: tools,
+                  maxOutputTokens: maxOutputTokens, contextResolution: contextResolution).runID
+    }
+
+    /// `prompt` with the run's events. `runID` lets a host reuse an identity it has already
+    /// recorded (its own run record); `startFields` are added to the `agent.run-start.v1` entry,
+    /// such as the sources and model the host authorized, and cannot replace its `runID`.
+    public func start(harness: NativeHarness, systemPrompt: String, history: [AgentMessage], prompt: String,
+                      tools: [AgentTool], maxOutputTokens: Int? = nil,
+                      contextResolution: AgentContextResolution? = nil, runID: UUID = UUID(),
+                      startFields: [String: JSONValue] = [:],
+                      observation: AgentRunObservation = .bounded) throws -> AgentSessionRun {
         guard task == nil else { throw AgentSessionOwnerError.busy }
         guard !persistenceFailed else { throw AgentSessionOwnerError.persistenceBlocked }
-        let runID = UUID()
         state = AgentSessionState(phase: .preparing, runID: runID)
         cancellationRequested = false
         branchTip = nil
         branchAnchor = nil
-        task = Task {
-            await perform(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt,
-                          tools: tools, maxOutputTokens: maxOutputTokens, contextResolution: contextResolution, runID: runID)
-        }
-        return runID
+        let (events, observer) = AsyncThrowingStream<AgentEvent, Error>.makeStream(
+            bufferingPolicy: observation == .bounded ? .bufferingNewest(128) : .unbounded)
+        let request = RunRequest(harness: harness, systemPrompt: systemPrompt, history: history, prompt: prompt,
+            tools: tools, maxOutputTokens: maxOutputTokens, contextResolution: contextResolution,
+            startFields: startFields, observation: observation)
+        task = Task { await perform(request, runID: runID, observer: observer) }
+        return AgentSessionRun(runID: runID, events: events)
     }
 
     /// A request only. Busy ownership stays held until producer termination and terminal save.
@@ -113,26 +139,45 @@ public actor AgentSession {
         return state
     }
 
-    private func perform(harness: NativeHarness, systemPrompt: String, history: [AgentMessage], prompt: String,
-                         tools: [AgentTool], maxOutputTokens: Int?, contextResolution: AgentContextResolution?, runID: UUID) async -> AgentSessionState {
+    private struct RunRequest: Sendable {
+        let harness: NativeHarness
+        let systemPrompt: String
+        let history: [AgentMessage]
+        let prompt: String
+        let tools: [AgentTool]
+        let maxOutputTokens: Int?
+        let contextResolution: AgentContextResolution?
+        let startFields: [String: JSONValue]
+        let observation: AgentRunObservation
+    }
+
+    private func perform(_ request: RunRequest, runID: UUID,
+                         observer: AsyncThrowingStream<AgentEvent, Error>.Continuation) async -> AgentSessionState {
         var end = AgentSessionState.End.failed
         var outcome: AgentRunOutcome?
+        var failure: Error?
         do {
-            try await append(payload: .custom(type: "agent.run-start.v1", data: .object(["runID": .string(runID.uuidString)])))
+            var fields = request.startFields
+            fields["runID"] = .string(runID.uuidString)
+            do { try await append(payload: .custom(type: "agent.run-start.v1", data: .object(fields))) }
+            catch { throw AgentSessionOwnerError.persistenceFailed }
             if cancellationRequested { throw CancellationError() }
-            let owned = harness.persistingMessages { [self] message in
+            let owned = request.harness.persistingMessages { [self] message in
                 try await appendMessage(message, runID: runID)
             }.persistingUsage { [self] usage in
                 try await appendUsage(usage, runID: runID)
             }
-            let run = owned.start(systemPrompt: systemPrompt, history: history, prompt: prompt, tools: tools,
-                maxOutputTokens: maxOutputTokens, contextResolution: contextResolution,
-                context: try AgentRunContext(sessionID: sessionID, runID: runID))
+            let run = owned.start(systemPrompt: request.systemPrompt, history: request.history, prompt: request.prompt,
+                tools: request.tools, maxOutputTokens: request.maxOutputTokens, contextResolution: request.contextResolution,
+                context: try AgentRunContext(sessionID: sessionID, runID: runID), observation: request.observation)
             handle = run
             state.phase = .running
+            // An observer that stopped reading or went away does not hold the run back.
+            do { for try await event in run.events { observer.yield(event) } } catch {}
             outcome = try await run.result()
             end = cancellationRequested ? .cancelled : .completed
         } catch {
+            failure = error
             end = error is CancellationError ? .cancelled : .failed
         }
         handle = nil
@@ -148,11 +193,17 @@ public actor AgentSession {
         } catch {
             persistenceFailed = true
             end = .persistenceFailed
+            // The session is now blocked until `retrySettlement`, which the observer must learn
+            // even when the run itself answered or failed for another reason.
+            failure = AgentSessionOwnerError.persistenceFailed
         }
         state.end = end
         state.outcome = outcome
         state.phase = end == .completed ? .idle : .interrupted
         task = nil
+        // An abort reads the same to the observer whether the producer threw or returned early.
+        if failure == nil, end == .cancelled { failure = CancellationError() }
+        if let failure { observer.finish(throwing: failure) } else { observer.finish() }
         return state
     }
 
@@ -168,7 +219,7 @@ public actor AgentSession {
     private func appendMessage(_ message: AgentMessage, runID: UUID) async throws {
         guard state.runID == runID else { throw AgentSessionStoreError.conflict }
         do { try await append(payload: .message(message)) }
-        catch { persistenceFailed = true; throw error }
+        catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
     }
 
     private func appendUsage(_ usage: AgentUsage, runID: UUID) async throws {
@@ -179,7 +230,7 @@ public actor AgentSession {
                 "reasoningTokens": usage.reasoningTokens.map { .number(Double($0)) } ?? .null
             ])
             try await append(payload: .custom(type: "agent.usage.v1", data: data))
-        } catch { persistenceFailed = true; throw error }
+        } catch { persistenceFailed = true; throw AgentSessionOwnerError.persistenceFailed }
     }
 
     /// Builds the entry against the snapshot it commits on, so its parent and ordinal are never

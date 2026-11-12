@@ -2929,7 +2929,13 @@ chains a run's entries from the leaf at run start without moving the selected le
 host's `ChatRunTranscriptWriter` writes, so the owner can take that over. Each append is built
 against the snapshot it commits on; a conflict (another writer committed first) rebuilds it on the
 new snapshot, up to `conflictAttempts` (4) tries, and the terminal entry keeps one append identity
-across retries so a lost acknowledgement is recognized by ID and payload.
+across retries so a lost acknowledgement is recognized by ID and payload. `start` is `prompt` with
+the run's events (`AgentSessionRun`): it takes the host's own `runID` and extra run-start fields (the
+host's authorization; `runID` cannot be overridden), and its disposable stream ends only once the run
+has settled, throwing the run's failure — `AgentSessionOwnerError.persistenceFailed` for any history
+write that failed (a terminal entry that could not be saved after an answer included, ahead of any
+other failure), never the store's own error, and otherwise `CancellationError` after `abort()`. A run-start
+that cannot be saved fails the run without blocking the session, since nothing of it was written.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`
 (`ViewModels/`, built by `AppComposition`, injected app-wide) retains one
