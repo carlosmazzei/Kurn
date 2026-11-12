@@ -182,7 +182,7 @@ final class MeetingChatViewModel {
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: error is ChatRunTranscriptWriter.WriteFailure ? "run_transcript_write_failed"
+                    code: ChatRunBranch.isWriteFailure(error) ? "run_transcript_write_failed"
                         : error is AppError ? appError.logCode : "unexpected"
                 ))
             }
@@ -471,20 +471,20 @@ final class MeetingChatViewModel {
             guard let self, self.generation == generation else { throw CancellationError() }
             try self.persistOrThrow(turns: acceptedTurns)
         }
-        // The run's canonical messages go on their own branch of the saved session, anchored at
-        // the accepted question; `runID` matches the run's `ChatRunRecord`.
-        let transcript = session.map {
-            ChatRunTranscriptWriter(runID: runID.uuidString, session: $0, store: SwiftDataAgentSessionStore(context: modelContext))
+        // The run's canonical history goes on its own branch of the saved session, anchored at
+        // the accepted question, written by an `AgentSession` owner (`ChatRunBranch`); `runID`
+        // matches the run's `ChatRunRecord`.
+        let savedSession = session
+        let owner = try savedSession.map {
+            try ChatRunBranch.owner(session: $0, store: SwiftDataAgentSessionStore(context: modelContext))
         }
         let run = try await service.start(model: agentModel, provider: provider, modelIdentifier: model,
                                           context: modelContext, scope: scope, workspace: workspace,
-                                          history: history, question: question, transcript: transcript)
-        // Whatever ends this function, the producer has terminated first: a cancelled or failed
-        // run is only reported once nothing can still call a tool or write its effect.
-        defer { run.cancel() }
+                                          history: history, question: question, owner: owner, runID: runID)
+        // Whatever ends this function, the run has settled first: a cancelled or failed run is
+        // only reported once nothing can still call a tool or write its effect.
         do { try Task.checkCancellation() } catch {
-            await Self.terminate(run)
-            try? transcript?.end(.cancelled, stopReason: nil)
+            await run.terminate()
             throw error
         }
         let index = turns.count
@@ -517,12 +517,9 @@ final class MeetingChatViewModel {
                 }
             }
             try Task.checkCancellation()
-            let outcome = try await run.result()
-            // Best effort: the answer is already complete, and a failure is reported by the writer.
-            try? transcript?.end(.completed, stopReason: outcome.stopReason)
+            await run.settle()
         } catch {
-            await Self.terminate(run)
-            try? transcript?.end(error is CancellationError ? .cancelled : .failed, stopReason: nil)
+            await run.terminate()
             let snapshot = await workspace.snapshot()
             // Any document change this run committed rules out an automatic resume.
             if snapshot != initialArtifacts { stoppedRunCommittedEffects = true }
@@ -532,6 +529,8 @@ final class MeetingChatViewModel {
                 artifacts = snapshot
                 persist(turns: completedTurns + [turns[index - 1]])
             }
+            // A run whose session was deleted under it writes nothing more and reports nothing.
+            if let savedSession, savedSession.isDeleted || savedSession.modelContext == nil { throw CancellationError() }
             throw error
         }
         turns[index].elapsedSeconds = Date().timeIntervalSince(startedAt)

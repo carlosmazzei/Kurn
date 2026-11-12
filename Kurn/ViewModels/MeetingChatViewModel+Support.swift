@@ -12,15 +12,9 @@ extension MeetingChatViewModel {
     /// The error a failed run shows. A run whose history could not be saved says so, rather than
     /// showing the store's own error text.
     static func presentedError(_ error: Error) -> AppError {
-        if error is ChatRunTranscriptWriter.WriteFailure {
+        if ChatRunBranch.isWriteFailure(error) {
             return .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.run_failed", comment: "Chat run history save error"))
         }
         return error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
-    }
-
-    /// Cancels `run` and waits for its producer, ignoring how it ended; the caller reports that.
-    static func terminate(_ run: AgentRunHandle) async {
-        run.cancel()
-        _ = try? await run.result()
     }
 }

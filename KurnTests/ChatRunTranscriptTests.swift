@@ -20,7 +20,7 @@ struct ChatRunTranscriptTests {
 
     private static func runEntries(_ session: ChatSession, context: ModelContext) throws -> [AgentSessionEntry] {
         try SwiftDataAgentSessionStore(context: context).snapshot(session).entries.filter {
-            ChatRunTranscriptWriter.runID(of: $0) != nil
+            ChatRunBranch.runID(of: $0) != nil
         }
     }
 
@@ -56,17 +56,17 @@ struct ChatRunTranscriptTests {
         #expect(answer.role == .assistant && answer.text == "Monday.")
         // One chain, each entry the child of the previous, tagged with the run record's ID.
         let record = try #require(try SwiftDataAgentSessionStore(context: context).records(session).compactMap(ChatRunRecord.init).first)
-        #expect(Set(run.compactMap(ChatRunTranscriptWriter.runID(of:))) == [record.runID])
+        #expect(Set(run.compactMap(ChatRunBranch.runID(of:))) == [record.runID])
         for (parent, child) in zip(run, run.dropFirst()) { #expect(child.parentID == parent.id) }
         // The anchor is on the presentation path, and the presentation path holds no run entry.
         let path = try Self.activePath(session, context: context)
         #expect(path.contains { $0.id == run.first?.parentID })
-        #expect(!path.contains { ChatRunTranscriptWriter.runID(of: $0) != nil })
+        #expect(!path.contains { ChatRunBranch.runID(of: $0) != nil })
         #expect(try SwiftDataAgentSessionStore.projection(session).turns.map(\.text) == ["When?", "Monday."])
         // The branch opens with the run's authorization and closes with how it ended.
-        guard case .custom(ChatRunTranscriptWriter.startType, .object(let start))? = run.first?.payload,
+        guard case .custom(ChatRunBranch.startType, .object(let start))? = run.first?.payload,
               case .object(let authorization)? = start["authorization"],
-              case .custom(ChatRunTranscriptWriter.endType, .object(let end))? = run.last?.payload else {
+              case .custom(ChatRunBranch.endType, .object(let end))? = run.last?.payload else {
             Issue.record("Expected run start and end entries")
             return
         }
@@ -89,8 +89,8 @@ struct ChatRunTranscriptTests {
         let session = try #require(vm.pastSessions().first)
 
         let run = try Self.runEntries(session, context: context)
-        #expect(run.first?.kind == ChatRunTranscriptWriter.startType)
-        guard case .custom(ChatRunTranscriptWriter.endType, .object(let end))? = run.last?.payload else {
+        #expect(run.first?.kind == ChatRunBranch.startType)
+        guard case .custom(ChatRunBranch.endType, .object(let end))? = run.last?.payload else {
             Issue.record("Expected a run end entry")
             return
         }
@@ -111,7 +111,7 @@ struct ChatRunTranscriptTests {
         await vm.waitUntilSettled()
         let session = try #require(vm.pastSessions().first)
 
-        let runs = Dictionary(grouping: try Self.runEntries(session, context: context)) { ChatRunTranscriptWriter.runID(of: $0) ?? "" }
+        let runs = Dictionary(grouping: try Self.runEntries(session, context: context)) { ChatRunBranch.runID(of: $0) ?? "" }
         #expect(runs.count == 2)
         let path = Set(try Self.activePath(session, context: context).map(\.id))
         for entries in runs.values {
@@ -149,13 +149,13 @@ struct ChatRunTranscriptTests {
 
     @Test func onlyAHistoryWriteFailureGetsTheSaveMessage() {
         let saveMessage = NSLocalizedString("chat.storage.run_failed", comment: "")
-        #expect(Self.message(of: MeetingChatViewModel.presentedError(ChatRunTranscriptWriter.WriteFailure())) == saveMessage)
+        #expect(Self.message(of: MeetingChatViewModel.presentedError(AgentSessionOwnerError.persistenceFailed)) == saveMessage)
         let other = AppError.apiError(statusCode: 500, message: "Server error")
         #expect(Self.message(of: MeetingChatViewModel.presentedError(other)) == "Server error")
         #expect(Self.message(of: MeetingChatViewModel.presentedError(SaveFailure())) != saveMessage)
     }
 
-    @Test func theWriterNeverMovesTheLeafAndRollsBackAFailedSave() async throws {
+    @Test func aFailedSaveLeavesTheConversationAsItWas() async throws {
         let model = ChatAgentModel([AgentTurnResponse(text: "Monday.")])
         let context = ModelContext(TestModelContainer.make())
         let meeting = MeetingFixtures.transcribed("Planning", in: context)
@@ -167,21 +167,16 @@ struct ChatRunTranscriptTests {
         let leaf = session.canonicalLeafID
         let ordinal = session.canonicalOrdinal
 
-        let writer = ChatRunTranscriptWriter(runID: "run-a", session: session, store: SwiftDataAgentSessionStore(context: context))
-        try writer.append(AgentUsage(inputTokens: 10, outputTokens: 2))
-        try writer.append(AgentUsage(inputTokens: 12, outputTokens: 3))
-        #expect(session.canonicalLeafID == leaf)
-        #expect(session.canonicalOrdinal == ordinal + 2)
-        let usage = try Self.runEntries(session, context: context).filter { ChatRunTranscriptWriter.runID(of: $0) == "run-a" }
-        #expect(usage.map(\.kind) == [ChatRunTranscriptWriter.usageType, ChatRunTranscriptWriter.usageType])
-        #expect(usage.first?.parentID == leaf)
-        #expect(usage.last?.parentID == usage.first?.id)
-
-        let failing = ChatRunTranscriptWriter(runID: "run-b", session: session,
+        // Every commit of this owner fails to save: nothing of its run, not even an end, stays.
+        let failing = try ChatRunBranch.owner(session: session,
             store: SwiftDataAgentSessionStore(context: context, save: { _ in throw SaveFailure() }))
-        #expect(throws: ChatRunTranscriptWriter.WriteFailure.self) { try failing.append(AgentUsage(inputTokens: 1, outputTokens: 1)) }
-        #expect(failing.lastEntryID == nil)
-        #expect(session.canonicalOrdinal == ordinal + 2)
+        let other = ChatAgentModel([AgentTurnResponse(text: "Unused")])
+        let run = try await failing.start(harness: NativeHarness(model: other), systemPrompt: "", history: [],
+                                          prompt: "Q", tools: [], observation: .complete)
+        await #expect(throws: AgentSessionOwnerError.persistenceFailed) { for try await _ in run.events {} }
+        #expect(await failing.snapshot().end == .persistenceFailed)
+        #expect(await other.requests.isEmpty)
+        #expect(session.canonicalOrdinal == ordinal)
         #expect(session.canonicalLeafID == leaf)
         #expect(try SwiftDataAgentSessionStore.projection(session).turns.map(\.text) == ["When?", "Monday."])
     }
@@ -195,9 +190,16 @@ struct ChatRunTranscriptTests {
         vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
         await vm.waitUntilSettled()
         let session = try #require(vm.pastSessions().first)
-        let writer = ChatRunTranscriptWriter(runID: "run-a", session: session, store: SwiftDataAgentSessionStore(context: context))
+        let owner = try ChatRunBranch.owner(session: session, store: SwiftDataAgentSessionStore(context: context))
+        let sessionID = session.id
         context.delete(session)
         try context.save()
-        #expect(throws: CancellationError.self) { try writer.append(AgentUsage(inputTokens: 1, outputTokens: 1)) }
+
+        let other = ChatAgentModel([AgentTurnResponse(text: "Unused")])
+        try await owner.prompt(harness: NativeHarness(model: other), systemPrompt: "", history: [], prompt: "Q", tools: [])
+        #expect(await owner.waitUntilSettled().end == .persistenceFailed)
+        #expect(await other.requests.isEmpty)
+        let remaining = try context.fetch(FetchDescriptor<ChatSession>(predicate: #Predicate { $0.id == sessionID }))
+        #expect(remaining.isEmpty)
     }
 }

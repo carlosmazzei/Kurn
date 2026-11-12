@@ -663,25 +663,23 @@ marks records a dead process left running as interrupted, so the question reopen
 with a note above Retry saying the app closed before the reply finished. A reply the background
 wind-down stopped is sent again once when the app returns to the foreground, unless the user
 stopped, replaced or left it, or the stopped run had already committed a document change (stable
-effect identity across a resumed run is open). Each run also commits
+effect identity across a resumed run is open). Each run is owned by an `AgentSession` in branch
+mode, which commits
 its native messages and per-request usage through the harness's awaited sinks, before dependent
 work, between start (frozen scope authorization and model) and end entries, on a branch of the saved session anchored at the accepted question; the selected leaf never
 moves, so the presentation path is unchanged, and a failed commit fails the run with the question
 retryable.
 
-**Still open in NH05:** make `AgentSession` the app's run owner (the host now writes native
-message/usage entries in its shape, on per-run branches, including scope authorization; the owner now
-supports that branch mode, retries an append another writer raced and exposes the run's events with
-a typed persistence failure through `start`, so the remaining step is replacing the host writer with it); canonical UI/history
+**Still open in NH05:** canonical UI/history
 restoration from those branches; full phase/identity projection (run/turn/
 call IDs, compacting/retry/waiting phases); durable command idempotency; resuming a run a
 dead process left interrupted (the in-process background case is done); persistence-failure recovery beyond retry (a failed
-run-history write now says so and keeps the question retryable). The package owner
-requires one retained actor per session; it does not enforce uniqueness across independently
-created actors. Failed message/usage commits require explicit host recovery, rather than
+run-history write now says so and keeps the question retryable). The chat creates one owner per
+run, which is safe while its view model admits one run at a time; a session-retained owner (and
+uniqueness across independently created actors) arrives with queued commands. Failed message/usage commits require explicit host recovery, rather than
 retrying inference on an incomplete log. The chat now uses `start(observation: .complete)`; coalesced
 snapshots with back-pressure instead of an unbounded presentation stream remain open. NH06 projection and compaction, and NH08 queues, remain
-separate. Package tests do not qualify the inactive SwiftData/UI owner integration.
+separate.
 
 
 The architecture prerequisite separates domain from runtime:

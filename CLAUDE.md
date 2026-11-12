@@ -2917,8 +2917,8 @@ from observation lifetime: `start` has disposable events (`.bounded`, the newest
 `result()` waits for producer termination. The legacy `run` API retains its existing
 stream-consumer cancellation semantics.
 
-`AgentSession` is initial Foundation-only ownership infrastructure, not yet the app's chat
-owner. It reserves busy state before store awaits, persists run/message/usage/end entries,
+`AgentSession` is Foundation-only run ownership infrastructure; the chat runs each reply through
+one (see "A run's model history is durable" below). It reserves busy state before store awaits, persists run/message/usage/end entries,
 and awaits producer termination plus terminal persistence before releasing ownership. A
 terminal-save retry never reruns inference/effects and recognizes an identical committed
 entry after a lost acknowledgement. Persistence failure is explicit and blocks new prompts;
@@ -2926,7 +2926,7 @@ message/usage failures require host recovery. Store adapters must implement atom
 append groups. One retained owner per session and authorized history projection are host
 responsibilities; constructing an owner never resumes a saved run. `AgentSessionAppendMode.branch`
 chains a run's entries from the leaf at run start without moving the selected leaf — the shape the
-host's `ChatRunTranscriptWriter` writes, so the owner can take that over. Each append is built
+chat's run branches use. Each append is built
 against the snapshot it commits on; a conflict (another writer committed first) rebuilds it on the
 new snapshot, up to `conflictAttempts` (4) tries, and the terminal entry keeps one append identity
 across retries so a lost acknowledgement is recognized by ID and payload. `start` is `prompt` with
@@ -2944,8 +2944,9 @@ list and documents — so `MeetingChatView` only resolves and renders it. A repl
 when its sheet or tab is dismissed (the view model used to cancel from `deinit`). At most
 `capacity` (4) conversations are kept, evicting the least recently opened idle one, never a
 running one; "Delete all data" awaits `closeAll()` before `LibraryEraser`. The run is the
-`AgentRunHandle` from `HarnessChatService.start` (complete observation): every exit cancels
-it and awaits `result()` first. `cancel()` only requests: the conversation stays busy in
+`HarnessChatService.Run` from `HarnessChatService.start` (complete observation, an
+`AgentSession` run once the conversation is saved): every exit aborts it and waits for it to settle
+first. `cancel()` only requests: the conversation stays busy in
 `ChatRunPhase.cancelling` until settled (`waitUntilSettled()`), the Stop button disables, and
 `send` refuses until then. `reset`/`load` fence the old run by generation; it still owns the
 busy state until it terminates. A run whose meeting or open session was deleted writes nothing
@@ -2982,19 +2983,23 @@ retryable question is one of those (`ChatRunRecovery.interruptedQuestionIDs`) sa
 Retry (`retryableQuestionWasInterrupted`, `chat.run.interrupted`), so an unanswered question left
 by a crash reads differently from one the user stopped.
 
-**A run's model history is durable, on its own branch.** `ChatRunTranscriptWriter`
-(`Infrastructure/Agent/`) is installed as the harness's message and usage sinks, so the question,
+**A run's model history is durable, on its own branch, written by `AgentSession`.** Each chat run
+is started through a per-run `AgentSession` owner in `.branch` mode (`ChatRunBranch`,
+`Infrastructure/Agent/`; `HarnessChatService.start(owner:runID:)`), with the run's `ChatRunRecord`
+ID as its `runID`. The owner is installed as the harness's message and usage sinks, so the question,
 each assistant turn with its tool calls, each tool result and each request's usage are committed to
 the session before the work that depends on them. The branch opens with `agent.run-start.v1`
 carrying the run's `ChatRunAuthorization` (effective scope, the meeting IDs it resolved to, the
-`provider:model`), written before any model IO, and closes with `agent.run-end.v1` (completed,
-failed or cancelled, plus the harness stop reason; best effort, since the run has already ended).
-Its entries carry the run record's `runID` as
-metadata and chain from the leaf at run start (the accepted question), but never move the selected
-leaf: the presentation path, `SwiftDataAgentSessionStore.projection` and the compatibility writer's
-prefix diff see none of them. Each append reads revision/ordinal/leaf and calls the synchronous
-`commitNow` in one main-actor step, so it cannot interleave with a presentation or effect write. A
-failed commit throws `ChatRunTranscriptWriter.WriteFailure`, which fails the run (question retryable,
-`run_transcript_write_failed`) and shows `chat.storage.run_failed` — saying nothing more was sent —
-instead of the store's own error text (`MeetingChatViewModel.presentedError`). Replay still sends
-plain presentation history; `AgentSession` is not yet the app's run owner.
+`provider:model`) as a host start field, written before any model IO, and closes with
+`agent.run-end.v1` (how it ended plus the harness stop reason). Its entries chain from the leaf at
+run start (the accepted question) but never move the selected leaf: the presentation path,
+`SwiftDataAgentSessionStore.projection` and the compatibility writer's prefix diff see none of them.
+A presentation or effect write that lands between an owner append's load and commit is a revision
+conflict, and the append is rebuilt on the new snapshot. The chat reads the owner's event stream,
+which ends only once the run has settled; a stop is `abort()` plus waiting for settlement. A failed
+history write ends the stream with `AgentSessionOwnerError.persistenceFailed`, which fails the run
+(question retryable, `run_transcript_write_failed`) and shows `chat.storage.run_failed` — saying
+nothing more was sent — instead of the store's own error text (`MeetingChatViewModel.presentedError`);
+a run whose session was deleted under it ends as a cancellation. One owner per run is safe because the
+view model admits one run at a time and a retry starts a new branch. Replay still sends plain
+presentation history.

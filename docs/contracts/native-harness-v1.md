@@ -422,15 +422,14 @@ one branch per run: the first is a child of the session leaf when the run starte
 question), each later one a child of the previous, and every entry carries the run record's ID
 as `runID` metadata. The selected leaf never moves, so the presentation path, its projection and
 the compatibility writer's diff are unchanged, and a later presentation branch cannot detach a
-run's history. Each append reads the revision and commits in one main-actor step, so it cannot
-interleave with a presentation or effect write. A failed commit fails the run (the question stays
+run's history. The run is an `AgentSession` run in `.branch` mode, with the run record's ID and the
+authorization as a host start field; a presentation or effect write landing between an append's
+load and commit is a revision conflict, rebuilt on the new snapshot. A failed commit fails the run (the question stays
 retryable; a retry starts a new branch), records `run_transcript_write_failed` and tells the user the
 reply's progress could not be saved and nothing more was sent, instead of the store's error text. Run entries are
 recorded history only: replay still sends plain presentation history until NH06.
 
-Not yet activated: `AgentSession` itself as the app's run owner (the host writer above uses the
-same entry shape), canonical history restoration and
-scope-authorization entries, durable command idempotency,
+Not yet activated: canonical history restoration, durable command idempotency,
 resumption of a run a dead process left interrupted, persistence-failure recovery beyond retry, compaction/retry/waiting
 phases and coalesced, back-pressured observation.
 

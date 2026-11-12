@@ -42,31 +42,45 @@ struct HarnessChatService {
                                tools: run.tools, contextResolution: run.resolution, context: run.context)
     }
 
+    /// A started chat run: its observation, and the owner's explicit stop and settlement.
+    struct Run: Sendable {
+        /// Every event, because the chat rebuilds its timeline and artifact state from them.
+        let events: AsyncThrowingStream<AgentEvent, Error>
+        let abort: @Sendable () async -> Void
+        let settle: @Sendable () async -> Void
+
+        /// Stops the run and waits until nothing can still call a tool or write its effect.
+        func terminate() async {
+            await abort()
+            await settle()
+        }
+    }
+
     /// An owned run (NH05): observation never cancels it, so the owner cancels explicitly and
-    /// awaits `AgentRunHandle.result()` before reporting the run settled. Every event is kept
-    /// because the chat rebuilds its timeline and artifact state from them. With `transcript`,
-    /// every canonical message and usage report is committed to the session's run branch first.
+    /// waits for settlement before reporting the run settled. With `owner`, the run is an
+    /// `AgentSession` run on its own branch of the saved session (`ChatRunBranch`): its
+    /// authorization, every canonical message and every usage report are committed before the
+    /// work that depends on them, under `runID`.
     func start(
         model: any AgentModel, provider: AIProvider, modelIdentifier: String,
         context: ModelContext, scope: ChatSourceScope, workspace: ChatDocumentWorkspace,
-        history: [ChatMessage], question: String, transcript: ChatRunTranscriptWriter? = nil
-    ) async throws -> AgentRunHandle {
+        history: [ChatMessage], question: String, owner: AgentSession? = nil, runID: UUID = UUID()
+    ) async throws -> Run {
         let run = try await prepare(model: model, provider: provider, modelIdentifier: modelIdentifier, context: context,
                                     scope: scope, workspace: workspace, history: history, question: question)
-        var harness = run.harness
-        // Canonical messages and usage are durable before the work that depends on them, and the
-        // run's authorization is recorded before the first of them.
-        if let transcript {
-            // A stop that arrived while preparing must not open a branch nothing will close.
-            try Task.checkCancellation()
-            try transcript.begin(run.authorization)
-            harness = harness
-                .persistingMessages { message in try await transcript.append(message) }
-                .persistingUsage { usage in try await transcript.append(usage) }
+        guard let owner else {
+            let handle = run.harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
+                                           tools: run.tools, contextResolution: run.resolution, context: run.context,
+                                           observation: .complete)
+            return Run(events: handle.events, abort: { handle.cancel() }, settle: { _ = try? await handle.result() })
         }
-        return harness.start(systemPrompt: run.systemPrompt, history: run.history, prompt: run.question,
-                                 tools: run.tools, contextResolution: run.resolution, context: run.context,
-                                 observation: .complete)
+        // A stop that arrived while preparing must not open a branch.
+        try Task.checkCancellation()
+        let owned = try await owner.start(harness: run.harness, systemPrompt: run.systemPrompt, history: run.history,
+                                          prompt: run.question, tools: run.tools, contextResolution: run.resolution,
+                                          runID: runID, startFields: try ChatRunBranch.startFields(run.authorization),
+                                          observation: .complete)
+        return Run(events: owned.events, abort: { await owner.abort() }, settle: { _ = await owner.waitUntilSettled() })
     }
 
     func prepare(
