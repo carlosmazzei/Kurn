@@ -439,6 +439,7 @@ final class MeetingChatViewModel {
         defer { run.cancel() }
         do { try Task.checkCancellation() } catch {
             await Self.terminate(run)
+            try? transcript?.end(.cancelled, stopReason: nil)
             throw error
         }
         let index = turns.count
@@ -471,9 +472,12 @@ final class MeetingChatViewModel {
                 }
             }
             try Task.checkCancellation()
-            _ = try await run.result()
+            let outcome = try await run.result()
+            // Best effort: the answer is already complete, and a failure is reported by the writer.
+            try? transcript?.end(.completed, stopReason: outcome.stopReason)
         } catch {
             await Self.terminate(run)
+            try? transcript?.end(error is CancellationError ? .cancelled : .failed, stopReason: nil)
             let snapshot = await workspace.snapshot()
             if self.generation == generation, snapshot != artifacts {
                 turns[index - 1].recordArtifacts(from: artifacts, to: snapshot,

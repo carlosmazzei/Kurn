@@ -2964,7 +2964,11 @@ by a crash reads differently from one the user stopped.
 **A run's model history is durable, on its own branch.** `ChatRunTranscriptWriter`
 (`Infrastructure/Agent/`) is installed as the harness's message and usage sinks, so the question,
 each assistant turn with its tool calls, each tool result and each request's usage are committed to
-the session before the work that depends on them. Its entries carry the run record's `runID` as
+the session before the work that depends on them. The branch opens with `agent.run-start.v1`
+carrying the run's `ChatRunAuthorization` (effective scope, the meeting IDs it resolved to, the
+`provider:model`), written before any model IO, and closes with `agent.run-end.v1` (completed,
+failed or cancelled, plus the harness stop reason; best effort, since the run has already ended).
+Its entries carry the run record's `runID` as
 metadata and chain from the leaf at run start (the accepted question), but never move the selected
 leaf: the presentation path, `SwiftDataAgentSessionStore.projection` and the compatibility writer's
 prefix diff see none of them. Each append reads revision/ordinal/leaf and calls the synchronous
