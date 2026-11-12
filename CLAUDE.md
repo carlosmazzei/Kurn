@@ -2933,7 +2933,8 @@ across retries so a lost acknowledgement is recognized by ID and payload. `start
 the run's events (`AgentSessionRun`): it takes the host's own `runID` and extra run-start fields (the
 host's authorization; `runID` cannot be overridden), and its disposable stream ends only once the run
 has settled, throwing the run's failure — `AgentSessionOwnerError.persistenceFailed` for any history
-write that failed, never the store's own error, and `CancellationError` after `abort()`. A run-start
+write that failed (a terminal entry that could not be saved after an answer included, ahead of any
+other failure), never the store's own error, and otherwise `CancellationError` after `abort()`. A run-start
 that cannot be saved fails the run without blocking the session, since nothing of it was written.
 
 **Chat conversations are host-owned (NH05 host activation).** `ChatConversationHost`

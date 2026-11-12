@@ -337,4 +337,42 @@ actor SessionTestStore: AgentSessionStore {
         #expect(await session.snapshot().end == .cancelled)
         #expect(await store.kinds().last == "agent.run-end.v1")
     }
+
+    @Test func aTerminalEntryThatCannotBeSavedFailsTheObservationAfterAnAnswer() async throws {
+        let store = SessionTestStore()
+        await store.configure(failTerminal: true)
+        let session = try AgentSession(sessionID: "session", store: store)
+        let harness = NativeHarness(model: ScriptedAgentModel([AgentTurnResponse(text: "Answer")]))
+        let run = try await session.start(harness: harness, systemPrompt: "", history: [], prompt: "Q", tools: [],
+                                          observation: .complete)
+        var finished = false
+        await #expect(throws: AgentSessionOwnerError.persistenceFailed) {
+            for try await event in run.events { if case .runFinished = event { finished = true } }
+        }
+        // The answer was observed, but the session is blocked until the end entry is saved.
+        #expect(finished)
+        #expect(await session.snapshot().end == .persistenceFailed)
+        await #expect(throws: AgentSessionOwnerError.persistenceBlocked) {
+            try await session.prompt(harness: harness, systemPrompt: "", history: [], prompt: "Q", tools: [])
+        }
+    }
+
+    @Test func aTerminalSaveFailureTakesPrecedenceOverAnAbort() async throws {
+        let store = SessionTestStore()
+        await store.configure(failTerminal: true)
+        let gate = SessionTestGate()
+        let session = try AgentSession(sessionID: "session", store: store)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()])])
+        let tool = AgentTool(spec: agentTool().spec) { _ in
+            await gate.block()
+            return AgentToolOutput(content: "Done", summary: "Done")
+        }
+        let run = try await session.start(harness: NativeHarness(model: model), systemPrompt: "", history: [],
+                                          prompt: "Q", tools: [tool], observation: .complete)
+        await gate.waitUntilEntered()
+        await session.abort()
+        await gate.release()
+        await #expect(throws: AgentSessionOwnerError.persistenceFailed) { for try await _ in run.events {} }
+        #expect(await session.snapshot().end == .persistenceFailed)
+    }
 }

@@ -9,8 +9,9 @@ public enum AgentSessionOwnerError: Error, Sendable, Equatable {
 
 /// An accepted run: its identity and a disposable observation of its events. The stream ends
 /// only after the run has settled — the producer terminated and its terminal entry was saved —
-/// throwing the run's failure (`AgentSessionOwnerError.persistenceFailed` for a failed write,
-/// `CancellationError` for an abort). Dropping it never cancels the run; `abort()` does.
+/// throwing the run's failure: `AgentSessionOwnerError.persistenceFailed` for any history write
+/// that failed, including the terminal entry after an answer (which takes precedence over any
+/// other failure), and otherwise `CancellationError` for an abort. Dropping it never cancels the run; `abort()` does.
 public struct AgentSessionRun: Sendable {
     public let runID: UUID
     public let events: AsyncThrowingStream<AgentEvent, Error>
@@ -192,14 +193,15 @@ public actor AgentSession {
         } catch {
             persistenceFailed = true
             end = .persistenceFailed
+            // The session is now blocked until `retrySettlement`, which the observer must learn
+            // even when the run itself answered or failed for another reason.
+            failure = AgentSessionOwnerError.persistenceFailed
         }
         state.end = end
         state.outcome = outcome
         state.phase = end == .completed ? .idle : .interrupted
         task = nil
-        // The observer sees the run's own result: a terminal entry that could not be saved is
-        // in the settled state instead, and blocks new prompts until `retrySettlement`. An abort
-        // reads the same to it whether the producer threw or returned early.
+        // An abort reads the same to the observer whether the producer threw or returned early.
         if failure == nil, end == .cancelled { failure = CancellationError() }
         if let failure { observer.finish(throwing: failure) } else { observer.finish() }
         return state
