@@ -1224,6 +1224,7 @@
 "chat.diagnostic.replayPrepared" = "History prepared for the API";
 
 "chat.storage.invalid" = "Couldn’t read or save this conversation. Its stored data has been preserved.";
+"chat.storage.run_failed" = "Couldn’t save this reply’s progress, so it stopped before sending anything more. Your question is kept; try again.";
 
 // Native tool pipeline diagnostics.
 "chat.diagnostic.toolValidationFailed" = "Tool arguments rejected";

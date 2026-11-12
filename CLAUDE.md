@@ -2973,5 +2973,7 @@ metadata and chain from the leaf at run start (the accepted question), but never
 leaf: the presentation path, `SwiftDataAgentSessionStore.projection` and the compatibility writer's
 prefix diff see none of them. Each append reads revision/ordinal/leaf and calls the synchronous
 `commitNow` in one main-actor step, so it cannot interleave with a presentation or effect write. A
-failed commit fails the run (question retryable, `run_transcript_write_failed`). Replay still sends
+failed commit throws `ChatRunTranscriptWriter.WriteFailure`, which fails the run (question retryable,
+`run_transcript_write_failed`) and shows `chat.storage.run_failed` — saying nothing more was sent —
+instead of the store's own error text (`MeetingChatViewModel.presentedError`). Replay still sends
 plain presentation history; `AgentSession` is not yet the app's run owner.

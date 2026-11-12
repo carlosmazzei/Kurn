@@ -23,6 +23,10 @@ final class ChatRunTranscriptWriter {
     static let startType = "agent.run-start.v1"
     static let endType = "agent.run-end.v1"
 
+    /// A run's history could not be committed. The run stops before any dependent work, the
+    /// question stays retryable, and the chat says so instead of showing the store's own error.
+    struct WriteFailure: Error {}
+
     /// How a run ended, with `AgentSessionState.End`'s raw values.
     enum End: String { case completed, failed, cancelled }
 
@@ -90,7 +94,7 @@ final class ChatRunTranscriptWriter {
                 operationID: OperationID(String(runID.prefix(8))), operation: "meeting_chat",
                 stage: "run_transcript", outcome: .failed, code: "run_transcript_write_failed"
             ))
-            throw error
+            throw WriteFailure()
         }
     }
 }
