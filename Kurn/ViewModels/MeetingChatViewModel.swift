@@ -67,6 +67,18 @@ final class MeetingChatViewModel {
     private var interruptedQuestionIDs: Set<UUID> = []
     /// The session and `ChatRunRecord` of the current run, closed as `.ended` when it settles.
     @ObservationIgnored private var runRecord: (session: ChatSession, record: ChatRunRecord)?
+    /// What the current run was asked, kept until it settles so a background wind-down can
+    /// hand it to `pendingForegroundResume`.
+    @ObservationIgnored private var currentRequest: ForegroundResume?
+    /// A question the background wind-down stopped, sent again once on return to the
+    /// foreground (`resumeAfterForeground`). A user stop, a new question, `reset` or `load`
+    /// clear it: only an interruption the user did not ask for is resumed.
+    @ObservationIgnored private(set) var pendingForegroundResume: ForegroundResume?
+    struct ForegroundResume {
+        let question: String
+        let provider: AIProvider
+        let model: String
+    }
     /// The background-execution window held for the current run (see `send`).
     @ObservationIgnored private var backgroundWindow: (any BackgroundExecutionWindow)?
     @ObservationIgnored private let makeBackgroundWindow: @MainActor () -> any BackgroundExecutionWindow
@@ -88,6 +100,7 @@ final class MeetingChatViewModel {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding, task == nil else { return }
         error = nil
+        pendingForegroundResume = nil
 
         generation = UUID()
         let generation = self.generation
@@ -108,6 +121,7 @@ final class MeetingChatViewModel {
         }
         isResponding = true
         phase = .preparing
+        currentRequest = ForegroundResume(question: trimmed, provider: provider, model: model)
         let token = UUID()
         runToken = token
         beginRunRecord(token, questionTurnID: turns[turns.count - 1].id)
@@ -176,6 +190,7 @@ final class MeetingChatViewModel {
         guard runToken == token else { return }
         runToken = nil
         task = nil
+        currentRequest = nil
         isResponding = false
         phase = .idle
         backgroundWindow?.end()
@@ -223,7 +238,27 @@ final class MeetingChatViewModel {
             operationID: runID, operation: "meeting_chat", stage: "background",
             outcome: .cancelled, code: "background_expired"
         ))
+        let request = currentRequest
         cancel()
+        pendingForegroundResume = request
+    }
+
+    /// Sends again, once, the question a background wind-down stopped (NH05 foreground
+    /// resumption). Waits for that run to settle first; does nothing if the user has since
+    /// answered, stopped, replaced or left the question. The run starts over from the saved
+    /// question with the same provider and model: committed document effects keep their
+    /// receipts, and nothing of the stopped run is replayed.
+    func resumeAfterForeground() async {
+        await waitUntilSettled()
+        guard let pending = pendingForegroundResume else { return }
+        pendingForegroundResume = nil
+        guard retryableQuestion == pending.question, error == nil else { return }
+        ReliabilityLog.record(ReliabilityEvent(
+            operationID: OperationID(), operation: "meeting_chat", stage: "background",
+            outcome: .started, code: "background_resumed"
+        ))
+        dropRetryableQuestion()
+        send(question: pending.question, provider: pending.provider, model: pending.model)
     }
 
     /// Returns once the current run, if any, has terminated and reconciled its reply.
@@ -310,15 +345,11 @@ final class MeetingChatViewModel {
         retryOrigins = pending.artifactOrigins
     }
 
-    /// Prior turns as plain user/assistant history; old tool payloads are never replayed.
-    static func buildHistory(from prior: [Turn]) -> [ChatMessage] {
-        prior.map { ChatMessage(role: $0.role, content: $0.text) }
-    }
-
     /// Requests cancellation of the in-flight reply. The conversation stays busy in `.cancelling`
     /// until the run settles (`waitUntilSettled`); the run itself drops the partial reply and
     /// keeps its trace, usage and committed artifacts on the retryable question.
     func cancel() {
+        pendingForegroundResume = nil
         guard let task else { return }
         phase = .cancelling
         task.cancel()
@@ -499,21 +530,6 @@ final class MeetingChatViewModel {
             return false
         }
         return true
-    }
-
-    /// The error a failed run shows. A run whose history could not be saved says so, rather than
-    /// showing the store's own error text.
-    static func presentedError(_ error: Error) -> AppError {
-        if error is ChatRunTranscriptWriter.WriteFailure {
-            return .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.run_failed", comment: "Chat run history save error"))
-        }
-        return error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
-    }
-
-    /// Cancels `run` and waits for its producer, ignoring how it ended; the caller reports that.
-    private static func terminate(_ run: AgentRunHandle) async {
-        run.cancel()
-        _ = try? await run.result()
     }
 
     /// Permanently deletes `target`. If it was the open conversation, starts

@@ -2946,7 +2946,13 @@ the open session while its run is active. A run holds a finite background-execut
 held — the system's own expiration handler must end the task and is too late for async
 clean-up, so it is only the fallback. The chat cancels the run there like a user stop, and it
 settles as a retryable interruption (reliability code `background_expired`) inside the window,
-never frozen mid-request or mid-tool. The transcription coordinator's background cancellation
+never frozen mid-request or mid-tool. That interruption is kept as `pendingForegroundResume` (the
+question, provider and model); on the next `.active` scene phase `KurnApp` calls
+`ChatConversationHost.resumeAfterForeground()`, which sends each such question again once
+(`background_resumed`) after its run has settled — only if it is still the unanswered retryable
+question with no error. A user stop, a new question, `reset` or `load` clear it, and the host does
+not evict a conversation that holds one. The resumed run starts over from the saved question; nothing
+of the stopped run is replayed, and committed document effects keep their receipts. The transcription coordinator's background cancellation
 gets the same earlier, checkpointable moment.
 
 **The question is a barrier, and every run leaves a record.** `send` saves the conversation
