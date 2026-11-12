@@ -23,7 +23,10 @@ actor SessionTestStore: AgentSessionStore {
     enum Failure: Error { case disk }
     let sessionID = "session"
     var entries: [AgentSessionEntry] = []
+    var leaf: String?
     var revision = 0
+    /// Another writer commits just before the owner's next commit, which then conflicts.
+    var interleavedWrites = 0
     var gate: SessionTestGate?
     var failTerminal = false
     var failMessages = false
@@ -41,20 +44,31 @@ actor SessionTestStore: AgentSessionStore {
             failTerminalLoad = false
             throw Failure.disk
         }
-        return AgentSessionSnapshot(sessionID: sessionID, revision: revision, leafID: entries.last?.id, entries: entries)
+        return AgentSessionSnapshot(sessionID: sessionID, revision: revision, leafID: leaf, entries: entries)
     }
     func commit(_ group: AgentSessionCommit) async throws {
         if let gate { self.gate = nil; await gate.block() }
+        if interleavedWrites > 0 {
+            interleavedWrites -= 1
+            try appendHostEntry("host-\(interleavedWrites)-\(entries.count)")
+        }
         guard group.expectedRevision == revision else { throw AgentSessionStoreError.conflict }
         if failMessages, group.entries.contains(where: { $0.kind == "message" }) { throw Failure.disk }
         let terminal = group.entries.contains { $0.kind == "agent.run-end.v1" }
         if terminal, let terminalGate { self.terminalGate = nil; await terminalGate.block() }
         if terminal, failTerminal { failTerminal = false; throw Failure.disk }
         _ = try AgentEntryGraph(sessionID: sessionID, entries: entries + group.entries, leafID: group.leafID)
-        entries += group.entries; revision += 1
+        entries += group.entries; leaf = group.leafID; revision += 1
         if terminal, commitThenThrow { commitThenThrow = false; throw Failure.disk }
     }
     func kinds() -> [String] { entries.map(\.kind) }
+    /// A host's own entry on the selected path, such as a presentation-state checkpoint.
+    func appendHostEntry(_ id: String) throws {
+        let entry = try AgentSessionEntry(sessionID: sessionID, id: id, parentID: leaf, ordinal: entries.count + 1,
+            createdAt: AgentSessionEntry.time(), payload: .custom(type: "host.state", data: .object([:])))
+        entries.append(entry); leaf = id; revision += 1
+    }
+    func interleave(_ count: Int) { interleavedWrites = count }
 }
 
 @Suite struct AgentSessionTests {
@@ -202,5 +216,48 @@ actor SessionTestStore: AgentSessionStore {
         #expect(await store.entries.count == count)
         #expect(await model.requests.count == 1)
         #expect(throws: AgentSessionStoreError.invalidEntry) { try AgentSession(sessionID: "", store: store) }
+    }
+
+    @Test func branchModeChainsTheRunWithoutMovingTheSelectedLeaf() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let harness = NativeHarness(model: ScriptedAgentModel([AgentTurnResponse(text: "Answer")]))
+        try await session.prompt(harness: harness, systemPrompt: "", history: [], prompt: "Q", tools: [])
+        #expect(await session.waitUntilSettled().end == .completed)
+        #expect(await store.leaf == "question")
+        let run = await store.entries.filter { $0.id != "question" }
+        #expect(run.map(\.kind) == ["agent.run-start.v1", "message", "message", "agent.run-end.v1"])
+        #expect(run.first?.parentID == "question")
+        for (parent, child) in zip(run, run.dropFirst()) { #expect(child.parentID == parent.id) }
+    }
+
+    @Test func aConflictingWriterIsRetriedOnTheNewSnapshot() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        // Two host writes land between the owner's load and commit, as a document effect would.
+        await store.interleave(2)
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let harness = NativeHarness(model: ScriptedAgentModel([AgentTurnResponse(text: "Answer")]))
+        try await session.prompt(harness: harness, systemPrompt: "", history: [], prompt: "Q", tools: [])
+        #expect(await session.waitUntilSettled().end == .completed)
+        let entries = await store.entries
+        // Ordinals stay dense, the host's newest entry stays selected, and the run chain holds.
+        #expect(entries.map(\.ordinal) == Array(1...entries.count))
+        #expect(await store.leaf?.hasPrefix("host-") == true)
+        let run = entries.filter { $0.metadata != nil }
+        #expect(run.count == 4)
+        for (parent, child) in zip(run, run.dropFirst()) { #expect(child.parentID == parent.id) }
+    }
+
+    @Test func aWriterThatKeepsWinningFailsTheRunExplicitly() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        await store.interleave(1_000)
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Unused")])
+        try await session.prompt(harness: NativeHarness(model: model), systemPrompt: "", history: [], prompt: "Q", tools: [])
+        #expect(await session.waitUntilSettled().end == .persistenceFailed)
+        #expect(await model.requests.isEmpty)
     }
 }

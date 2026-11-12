@@ -372,6 +372,13 @@ captured run state, including explicit persistence failure; it does not claim su
 durability when a write failed. Message/usage failures require host recovery. Opening a new
 owner executes nothing. One owner per session is a host responsibility.
 
+`appendMode: .branch` keeps the selected leaf where the host put it and chains the run's entries
+from the leaf at run start (an empty session's first entry becomes the leaf). Every append is built
+on the snapshot it is committed against; a revision conflict means another writer committed first,
+so the entry is rebuilt on the new snapshot and committed again, at most four times before the
+failure is reported. A failed commit writes nothing, so a retry cannot duplicate an entry, and the
+terminal entry's append identity is fixed so a retried save recognizes a lost acknowledgement.
+
 `start(observation:)` takes `.bounded` (default, newest 128 events) or `.complete` (every
 event, for a host presentation reducer that cannot tolerate a gap). Neither cancels the run
 when the observer goes away.
