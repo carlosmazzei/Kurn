@@ -155,7 +155,7 @@ final class MeetingChatViewModel {
                     outcome: .cancelled, elapsedSeconds: Date().timeIntervalSince(startedAt)
                 ))
             } catch {
-                let appError = error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
+                let appError = Self.presentedError(error)
                 if self.generation == generation {
                     self.dropPartialReply(keeping: turnCountBeforeReply)
                     self.error = appError
@@ -163,7 +163,8 @@ final class MeetingChatViewModel {
                 ReliabilityLog.record(ReliabilityEvent(
                     operationID: runID, operation: "meeting_chat", stage: "view_model",
                     outcome: .failed, elapsedSeconds: Date().timeIntervalSince(startedAt),
-                    code: error is AppError ? appError.logCode : "unexpected"
+                    code: error is ChatRunTranscriptWriter.WriteFailure ? "run_transcript_write_failed"
+                        : error is AppError ? appError.logCode : "unexpected"
                 ))
             }
         }
@@ -498,6 +499,15 @@ final class MeetingChatViewModel {
             return false
         }
         return true
+    }
+
+    /// The error a failed run shows. A run whose history could not be saved says so, rather than
+    /// showing the store's own error text.
+    static func presentedError(_ error: Error) -> AppError {
+        if error is ChatRunTranscriptWriter.WriteFailure {
+            return .apiError(statusCode: 0, message: NSLocalizedString("chat.storage.run_failed", comment: "Chat run history save error"))
+        }
+        return error as? AppError ?? .apiError(statusCode: 0, message: error.localizedDescription)
     }
 
     /// Cancels `run` and waits for its producer, ignoring how it ended; the caller reports that.

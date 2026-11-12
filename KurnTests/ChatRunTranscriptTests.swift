@@ -138,7 +138,21 @@ struct ChatRunTranscriptTests {
         let requests = await model.requests
         #expect(requests.isEmpty)
         #expect(vm.retryableQuestion == "When?")
-        #expect(vm.error != nil)
+        // The chat names what happened instead of showing the store's own error text.
+        #expect(Self.message(of: vm.error) == NSLocalizedString("chat.storage.run_failed", comment: ""))
+    }
+
+    private static func message(of error: AppError?) -> String? {
+        guard case .apiError(_, let message)? = error else { return nil }
+        return message
+    }
+
+    @Test func onlyAHistoryWriteFailureGetsTheSaveMessage() {
+        let saveMessage = NSLocalizedString("chat.storage.run_failed", comment: "")
+        #expect(Self.message(of: MeetingChatViewModel.presentedError(ChatRunTranscriptWriter.WriteFailure())) == saveMessage)
+        let other = AppError.apiError(statusCode: 500, message: "Server error")
+        #expect(Self.message(of: MeetingChatViewModel.presentedError(other)) == "Server error")
+        #expect(Self.message(of: MeetingChatViewModel.presentedError(SaveFailure())) != saveMessage)
     }
 
     @Test func theWriterNeverMovesTheLeafAndRollsBackAFailedSave() async throws {
@@ -165,7 +179,7 @@ struct ChatRunTranscriptTests {
 
         let failing = ChatRunTranscriptWriter(runID: "run-b", session: session,
             store: SwiftDataAgentSessionStore(context: context, save: { _ in throw SaveFailure() }))
-        #expect(throws: SaveFailure.self) { try failing.append(AgentUsage(inputTokens: 1, outputTokens: 1)) }
+        #expect(throws: ChatRunTranscriptWriter.WriteFailure.self) { try failing.append(AgentUsage(inputTokens: 1, outputTokens: 1)) }
         #expect(failing.lastEntryID == nil)
         #expect(session.canonicalOrdinal == ordinal + 2)
         #expect(session.canonicalLeafID == leaf)

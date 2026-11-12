@@ -408,13 +408,14 @@ as `runID` metadata. The selected leaf never moves, so the presentation path, it
 the compatibility writer's diff are unchanged, and a later presentation branch cannot detach a
 run's history. Each append reads the revision and commits in one main-actor step, so it cannot
 interleave with a presentation or effect write. A failed commit fails the run (the question stays
-retryable; a retry starts a new branch) and records `run_transcript_write_failed`. Run entries are
+retryable; a retry starts a new branch), records `run_transcript_write_failed` and tells the user the
+reply's progress could not be saved and nothing more was sent, instead of the store's error text. Run entries are
 recorded history only: replay still sends plain presentation history until NH06.
 
 Not yet activated: `AgentSession` itself as the app's run owner (the host writer above uses the
 same entry shape), canonical history restoration and
 scope-authorization entries, durable command idempotency,
-foreground resumption of an interrupted run, persistence-failure recovery UI, compaction/retry/waiting
+foreground resumption of an interrupted run, persistence-failure recovery beyond retry, compaction/retry/waiting
 phases and coalesced, back-pressured observation.
 
 The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect

@@ -670,7 +670,8 @@ retryable.
 message/usage entries in its shape, on per-run branches, including scope authorization); canonical UI/history
 restoration from those branches; full phase/identity projection (run/turn/
 call IDs, compacting/retry/waiting phases); durable command idempotency; resuming an
-interrupted run on return to the foreground; persistence-failure recovery UI. The package owner
+interrupted run on return to the foreground; persistence-failure recovery beyond retry (a failed
+run-history write now says so and keeps the question retryable). The package owner
 requires one retained actor per session; it does not enforce uniqueness across independently
 created actors. Failed message/usage commits require explicit host recovery, rather than
 retrying inference on an incomplete log. The chat now uses `start(observation: .complete)`; coalesced
