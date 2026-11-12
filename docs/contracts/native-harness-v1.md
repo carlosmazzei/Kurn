@@ -392,7 +392,12 @@ and the open session cannot be deleted under its own run. A run holds a finite b
 execution window; when it expires the run is cancelled and settles as a retryable interruption.
 The question is persisted before any request (a failed save sends nothing), and each run writes a
 `.run` recovery record, `running` then `ended`. A launch sweep marks records still `running` as
-`interrupted`; it never re-sends, resumes or replays a run.
+`interrupted`; it never re-sends, resumes or replays a run. A run the background wind-down stopped
+in a live process is sent again once when the app returns to the foreground, from the saved
+question with the same provider and model, only while that question is still the unanswered one
+and only if the stopped run committed no document change (its tool would run again under a new
+invocation identity); a user stop, a new question, a new chat or opening another saved conversation
+in that scope cancels it.
 
 ## NH05 host activation, increment 2: canonical run history
 
@@ -415,7 +420,7 @@ recorded history only: replay still sends plain presentation history until NH06.
 Not yet activated: `AgentSession` itself as the app's run owner (the host writer above uses the
 same entry shape), canonical history restoration and
 scope-authorization entries, durable command idempotency,
-foreground resumption of an interrupted run, persistence-failure recovery beyond retry, compaction/retry/waiting
+resumption of a run a dead process left interrupted, persistence-failure recovery beyond retry, compaction/retry/waiting
 phases and coalesced, back-pressured observation.
 
 The package infrastructure above is not by itself completion of session acceptance criteria. UI/coordinator lifetime, canonical replay/provenance, crash/effect

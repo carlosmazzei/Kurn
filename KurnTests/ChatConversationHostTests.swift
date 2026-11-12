@@ -215,6 +215,91 @@ struct MeetingChatBackgroundTests {
         window.expire()
         #expect(vm.phase == .idle)
     }
+
+    @Test func aReplyStoppedInTheBackgroundResumesOnceInTheForeground() async {
+        let window = FakeBackgroundWindow()
+        let model = ChatAgentModel([AgentTurnResponse(text: "Partial"), AgentTurnResponse(text: "Monday.")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let host = ChatConversationHost(makeConversation: {
+            MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        })
+        let vm = host.conversation(for: meeting.id)
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        window.expire()
+        #expect(vm.pendingForegroundResume?.question == "When?")
+
+        await host.resumeAfterForeground()
+        await vm.waitUntilSettled()
+        #expect(vm.turns.map(\.text) == ["When?", "Monday."])
+        #expect(vm.pendingForegroundResume == nil)
+        // Resumed once: a second activation sends nothing more.
+        await host.resumeAfterForeground()
+        let requests = await model.requests.count
+        #expect(requests == 2)
+    }
+
+    @Test func aStoppedRunThatChangedADocumentIsLeftForTheUser() async throws {
+        let window = FakeBackgroundWindow()
+        let create = try chatAgentCall("create_document", arguments: .object([
+            "title": .string("Draft"), "markdown": .string("Body")
+        ]))
+        let model = ChatAgentModel([AgentTurnResponse(text: "", toolCalls: [create]),
+                                    AgentTurnResponse(text: "Writing"), AgentTurnResponse(text: "Again")], pauseAt: 1)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "Minutes", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await model.requests.count < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+        window.expire()
+        await vm.resumeAfterForeground()
+        // The document was committed before the stop: re-running would create it a second time.
+        #expect(vm.retryableQuestion == "Minutes")
+        #expect(vm.artifacts.count == 1)
+        let requests = await model.requests.count
+        #expect(requests == 2)
+    }
+
+    @Test func aUserStopIsNeverResumed() async {
+        let window = FakeBackgroundWindow()
+        let model = ChatAgentModel([AgentTurnResponse(text: "Partial"), AgentTurnResponse(text: "Monday.")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        window.expire()
+        // The user stops the reply themselves before coming back: that decision wins.
+        vm.cancel()
+        await vm.resumeAfterForeground()
+        #expect(vm.retryableQuestion == "When?")
+        let requests = await model.requests.count
+        #expect(requests == 1)
+    }
+
+    @Test func aQuestionTheUserReplacedIsNotResumed() async {
+        let window = FakeBackgroundWindow()
+        let model = ChatAgentModel([AgentTurnResponse(text: "Partial"), AgentTurnResponse(text: "Tuesday.")], pauseAt: 0)
+        let context = ModelContext(TestModelContainer.make())
+        let meeting = MeetingFixtures.transcribed("Planning", in: context)
+        let vm = MeetingChatViewModel(agentModelFactory: { _, _ in model }, makeBackgroundWindow: { window })
+        vm.configure(meeting: meeting, modelContext: context)
+        vm.send(question: "When?", provider: .openAI, model: "gpt-4o")
+        for _ in 0..<2_000 where await model.requests.isEmpty { try? await Task.sleep(for: .milliseconds(5)) }
+        window.expire()
+        await vm.waitUntilSettled()
+        vm.dropRetryableQuestion()
+        vm.send(question: "And then?", provider: .openAI, model: "gpt-4o")
+        await vm.waitUntilSettled()
+        await vm.resumeAfterForeground()
+        #expect(vm.turns.map(\.text) == ["And then?", "Tuesday."])
+        let requests = await model.requests.count
+        #expect(requests == 2)
+    }
 }
 
 struct BackgroundDeadlineTests {

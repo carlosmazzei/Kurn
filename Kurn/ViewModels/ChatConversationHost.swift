@@ -56,9 +56,14 @@ final class ChatConversationHost {
         lastOpened.removeAll()
     }
 
+    /// On return to the foreground, resumes once each reply the background wind-down stopped.
+    func resumeAfterForeground() async {
+        for conversation in Array(conversations.values) { await conversation.resumeAfterForeground() }
+    }
+
     private func evictIdle(keeping current: Scope) {
         let idle = conversations
-            .filter { $0.key != current && !$0.value.isResponding }
+            .filter { $0.key != current && !$0.value.isResponding && $0.value.pendingForegroundResume == nil }
             .map(\.key)
             .sorted { (lastOpened[$0] ?? 0) < (lastOpened[$1] ?? 0) }
         for scope in idle where conversations.count > capacity {

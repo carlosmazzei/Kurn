@@ -266,6 +266,8 @@ struct KurnApp: App {
         // death. `.pending` recordings carry a checkpoint, so each continues
         // from its last completed chunk.
         if phase == .active {
+            // A chat reply the background wind-down stopped resumes once (NH05).
+            Task { await environment.chatConversations.resumeAfterForeground() }
             // Reattach any orphaned recording (and end stuck Live
             // Activities) without waiting for the next cold launch. No-op
             // while a recorder session is live.
