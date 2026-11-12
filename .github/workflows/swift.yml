@@ -227,6 +227,27 @@ jobs:
 
       - uses: ./.github/actions/prepare-simulator
 
+      # Boot the destination simulator before xcodebuild, so its cold boot is
+      # not spent inside the first UI test's app-launch timeout ("Timed out
+      # while launching application via Xcode"). Picks the named device on the
+      # newest available iOS runtime, the one `name=` resolves to.
+      - name: Boot the simulator
+        env:
+          DEVICE_NAME: iPhone 17
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, os, sys
+          devices = json.load(sys.stdin)["devices"]
+          ios = sorted((r for r in devices if ".iOS-" in r),
+                       key=lambda r: [int(p) for p in r.rsplit(".iOS-", 1)[1].split("-")])
+          for runtime in reversed(ios):
+              for device in devices[runtime]:
+                  if device["name"] == os.environ["DEVICE_NAME"]:
+                      print(device["udid"]); sys.exit(0)
+          sys.exit(1)')
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b
+
       - uses: ./.github/actions/cache-spm-packages
 
       - name: Build and test

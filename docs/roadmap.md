@@ -1313,18 +1313,14 @@ measured `ui-flake-rate` lane. Open, in the order they pay off:
    `.xctestrun` plus products uploaded as an artifact, and
    `test-without-building` in the shards removes two builds; the artifact
    transfer has to be measured against the build it saves.
-3. **Boot the simulator before `xcodebuild`.** `xcrun simctl boot` +
-   `simctl bootstatus -b` in `prepare-simulator` keeps the cold boot out of the
-   first test's time budget, which is where launch-time waits most often run
-   out.
-4. **Fewer launches per suite.** Each test relaunches the app (~10–15 s on a
+3. **Fewer launches per suite.** Each test relaunches the app (~10–15 s on a
    CI runner); checks that share a screen belong in one test, as
    `testMeetingDetailTabs` already does for the audit. Separate tests only
    where a failure would otherwise hide the next check.
-5. **Rebalance the shards from measured times.** `main` now also runs
+4. **Rebalance the shards from measured times.** `main` now also runs
    `BulkSelectionFlowUITests`; read the per-suite durations from the
    `.xcresult` and move suites so neither shard waits on the other.
-6. **Replace the remaining text handles.** Menu-picker options, segmented
+5. **Replace the remaining text handles.** Menu-picker options, segmented
    segments ("Single file") and the selection title ("Selected: N") are still
    matched by their en string, because SwiftUI does not surface an identifier
    set on a picker option. A custom `Menu` of identified `Button`s, or an
