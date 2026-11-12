@@ -69,6 +69,8 @@ actor SessionTestStore: AgentSessionStore {
         entries.append(entry); leaf = id; revision += 1
     }
     func interleave(_ count: Int) { interleavedWrites = count }
+    /// Enough racing host writes to exhaust one append's retries, and no more.
+    static let conflictsToExhaustOneAppend = AgentSession.conflictAttempts
 }
 
 @Suite struct AgentSessionTests {
@@ -261,5 +263,78 @@ actor SessionTestStore: AgentSessionStore {
         try await session.prompt(harness: NativeHarness(model: model), systemPrompt: "", history: [], prompt: "Q", tools: [])
         #expect(await session.waitUntilSettled().end == .persistenceFailed)
         #expect(await model.requests.isEmpty)
+    }
+
+    @Test func startStreamsTheRunAndEndsOnlyOnceItHasSettled() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let runID = UUID()
+        let harness = NativeHarness(model: ScriptedAgentModel([AgentTurnResponse(text: "Answer")]))
+        let run = try await session.start(harness: harness, systemPrompt: "", history: [], prompt: "Q", tools: [],
+            runID: runID, startFields: ["authorization": .string("scope"), "runID": .string("forged")],
+            observation: .complete)
+        #expect(run.runID == runID)
+        var finished = false
+        for try await event in run.events { if case .runFinished = event { finished = true } }
+        #expect(finished)
+        // The stream ended after the terminal entry was saved, not merely when the producer did.
+        #expect(await store.kinds().last == "agent.run-end.v1")
+        #expect(await session.snapshot().end == .completed)
+        let entries = await store.entries
+        let start = try #require(entries.first { $0.kind == "agent.run-start.v1" })
+        guard case .custom(_, .object(let fields)) = start.payload else { Issue.record("No run-start fields"); return }
+        #expect(fields["runID"] == .string(runID.uuidString))
+        #expect(fields["authorization"] == .string("scope"))
+        #expect(start.metadata == .object(["runID": .string(runID.uuidString)]))
+    }
+
+    @Test func aFailedWriteEndsTheObservationWithATypedPersistenceFailure() async throws {
+        let store = SessionTestStore()
+        await store.configure(failMessages: true)
+        let session = try AgentSession(sessionID: "session", store: store)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Unused")])
+        let run = try await session.start(harness: NativeHarness(model: model), systemPrompt: "", history: [],
+                                          prompt: "Q", tools: [], observation: .complete)
+        await #expect(throws: AgentSessionOwnerError.persistenceFailed) { for try await _ in run.events {} }
+        #expect(await session.snapshot().end == .persistenceFailed)
+        #expect(await model.requests.isEmpty)
+    }
+
+    @Test func aRunStartThatCannotBeSavedFailsWithoutBlockingTheSession() async throws {
+        let store = SessionTestStore()
+        try await store.appendHostEntry("question")
+        // Every attempt at the run-start loses the race; the terminal entry then commits.
+        await store.interleave(SessionTestStore.conflictsToExhaustOneAppend)
+        let session = try AgentSession(sessionID: "session", store: store, appendMode: .branch)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "Unused")])
+        let run = try await session.start(harness: NativeHarness(model: model), systemPrompt: "", history: [],
+                                          prompt: "Q", tools: [], observation: .complete)
+        await #expect(throws: AgentSessionOwnerError.persistenceFailed) { for try await _ in run.events {} }
+        #expect(await session.snapshot().end == .failed)
+        #expect(await model.requests.isEmpty)
+        // Nothing of the run was written but its end, so a new prompt is accepted.
+        let retry = ScriptedAgentModel([AgentTurnResponse(text: "Answer")])
+        try await session.prompt(harness: NativeHarness(model: retry), systemPrompt: "", history: [], prompt: "Q", tools: [])
+        #expect(await session.waitUntilSettled().end == .completed)
+    }
+
+    @Test func anAbortEndsTheObservationCancelledAfterTheToolSettles() async throws {
+        let store = SessionTestStore()
+        let gate = SessionTestGate()
+        let session = try AgentSession(sessionID: "session", store: store)
+        let model = ScriptedAgentModel([AgentTurnResponse(text: "", toolCalls: [agentCall()])])
+        let tool = AgentTool(spec: agentTool().spec) { _ in
+            await gate.block()
+            return AgentToolOutput(content: "Done", summary: "Done")
+        }
+        let run = try await session.start(harness: NativeHarness(model: model), systemPrompt: "", history: [],
+                                          prompt: "Q", tools: [tool], observation: .complete)
+        await gate.waitUntilEntered()
+        await session.abort()
+        await gate.release()
+        await #expect(throws: CancellationError.self) { for try await _ in run.events {} }
+        #expect(await session.snapshot().end == .cancelled)
+        #expect(await store.kinds().last == "agent.run-end.v1")
     }
 }
